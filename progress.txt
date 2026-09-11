@@ -1,0 +1,21 @@
+# Progress notes
+
+- This repo (`open-tomato/rafa`) is a single-package bun repo: `package.json`,
+  `src/`, `scripts/` at the root, no `packages/` directory and no workspace
+  boundaries. Agent/doc files ported from the sibling
+  `~/projects/agentic-research` (a bun-workspaces monorepo) must have every
+  `packages/`, workspace and monorepo reference rewritten away.
+- `scripts/control-byte-gate/control-byte-gate.ts` (with a colocated
+  `control-byte-gate.test.ts`) is this repo's control-byte gate script,
+  referenced by `.githooks/pre-commit` per the plan (though the hook's
+  current path and `core.hooksPath` wiring were not verified in this task).
+- `.claude/skills/` in this repo currently carries `progress-hygiene`,
+  `dev-planner`, `documentation`, `git-workflow`, and others copied from the
+  sibling; the plan schedules `progress-hygiene` for deletion in a later
+  stage ("Structured task report"), so don't treat its current presence as
+  permanent when writing docs that reference skills.
+- No `AGENTS.md` or `context/` directory exists yet at repo root as of this
+  task — both are added by a later "Bootstrap the routing surface" task
+  (doc-updater agent). Files ported early (e.g. `.claude/agents/*.md`) may
+  reference paths like `src/tests/context-page-imports.test.ts` and
+  `src/PROMPT.md` that don't exist yet but are added by later plan stages.
