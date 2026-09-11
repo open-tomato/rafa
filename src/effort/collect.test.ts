@@ -117,6 +117,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '../config.js';
+import { stampPrompt } from '../utils/plan-stamp.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import {
@@ -931,10 +932,24 @@ describe.each(BACKENDS)('collectEffort through the %s store', (_name, open) => {
 });
 
 describe('the session row both backends store', () => {
-  it('holds the issue identifier and the mode, byte for byte', async () => {
+  it('holds the reconciled row byte for byte, including a stamped plan stub and a null issue', async () => {
     const tree = makeTree([]);
+    // A second plan the branch below does not name, so a row resolving
+    // to it can only have gotten there through the prompt stamp.
+    writeFileSync(join(tree.plansDir, 'PLAN-q21-alt-target.md'), '# x\n');
     taskLog(tree.logDir, 's-opt', 'feat/opt-407-control-byte-gate');
     taskLog(tree.logDir, 's-q19', 'feat/q19-loop-economics');
+    // The branch alone resolves to 'q19-loop-economics' (an EXACT
+    // match, and a real plan in the roster), so a row landing on
+    // 'q21-alt-target' with match 'stamped' proves the stamp outranked
+    // the branch rather than merely being the only candidate.
+    writeLog(tree.logDir, 's-stamped', [
+      enqueue(stampPrompt(
+        'q21-alt-target',
+        `${TASK_PREFIX}Add the alt thing\nMore boilerplate here.`,
+      )),
+      assistantTurn('feat/q19-loop-economics', '2026-09-08T10:00:00.000Z'),
+    ]);
     const commits = plantedCommits([]);
 
     const stored: string[] = [];
@@ -949,13 +964,20 @@ describe('the session row both backends store', () => {
     }
     const fields = [...openNdjsonStore(tree.root).read('sessions')]
       .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
-      .map((row) => [row.sessionId, row.issueIdentifier, row.mode]);
+      .map((row) => [
+        row.sessionId,
+        row.issueIdentifier,
+        row.mode,
+        row.planStub,
+        row.planStubMatch,
+      ]);
 
     expect(stored).toHaveLength(2);
     expect(stored[1]).toBe(stored[0]);
     expect(fields).toEqual([
-      ['s-opt', 'OPT-407', 'local'],
-      ['s-q19', null, 'local'],
+      ['s-opt', 'OPT-407', 'local', null, 'none'],
+      ['s-q19', null, 'local', 'q19-loop-economics', 'exact'],
+      ['s-stamped', null, 'local', 'q21-alt-target', 'stamped'],
     ]);
   });
 });

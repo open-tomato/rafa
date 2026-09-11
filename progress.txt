@@ -247,11 +247,6 @@
   through `Bun.spawnSync([process.execPath, 'test', <file>])`, with the
   unmutated file run before and after as controls. Never run the full
   suite while it runs: the module on disk is mutated.
-- The Bash tool's shell is zsh, where `${PIPESTATUS[0]}` is bash-only
-  and expands to NOTHING: `cmd | tail; echo "code ${PIPESTATUS[0]}"`
-  prints a blank code that reads like a pass. Measured on three gates
-  at once. When the exit code is the reading, redirect instead of
-  piping: `cmd > /tmp/x.txt 2>&1; echo "Exited with code $?"`.
 - The session row (`SessionEffortRow`, `src/effort/store/types.ts`)
   carries `mode` (type `SessionMode`, `'local'` alone until phase 6
   adds `remote`; written from `SESSION_MODE` in `effort/collect.ts`) and
@@ -261,3 +256,15 @@
   here writes. So a lineage parity check cannot compare whole rows byte
   for byte against that store: project each row to the sibling's own
   keys first, and account for `planStubPatch` explicitly.
+- Proving a `stamped` plan-stub match (`resolveSessionPlan`'s stamp
+  outranks the branch) needs a branch that resolves to a DIFFERENT,
+  real roster stub on its own — stamping a branch that resolves to
+  `none` only proves the stamp is read, not that it outranks the
+  branch. `src/effort/collect.test.ts`'s `describe('the session row
+  both backends store')` plants a second `PLAN-*.md` the branch's own
+  exact match does not name, then stamps THAT one, so the row's
+  `planStub`/`planStubMatch` landing on it is evidence of precedence.
+  That same case is where the full reconciled session row
+  (`issueIdentifier`, `mode`, `planStub`, `planStubMatch`) is pinned
+  byte-for-byte across both backends at once, run through the real
+  collector rather than a planted row.
