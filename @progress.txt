@@ -1,0 +1,20 @@
+# Progress: Phase 0 — package, parity, cutover
+
+## Completed Tasks
+
+### Stage: Import the sibling loop
+
+- [x] Remove vitest from the repo by deleting `vitest.config.ts` and dropping the `vitest` devDependency from `package.json`
+  - Deleted `vitest.config.ts` (which contained node and include configuration for `tools/**/*.test.ts`)
+  - Removed `"vitest": "^4.1.7"` from `package.json` devDependencies
+  - Status: Complete
+
+## Findings
+
+### Patterns
+- The project is transitioning from vitest to bun's native test runner (`bun:test`)
+- vitest.config.ts pointed to `tools/**/*.test.ts` which no longer exists in this repo (src layout imported from sibling)
+
+### Next Steps
+- Test files under src/ will need migration from vitest imports to bun:test imports
+- A task follows to port test files and replace vitest API calls (vi.spyOn, vi.restoreAllMocks)
