@@ -6,7 +6,8 @@
  * what a commit changed. This one walks the session log directory and
  * the commit history, skips whatever the store already holds, and
  * appends the rest. It owns no parsing of its own: everything it
- * writes is a projection of what those modules answered.
+ * writes is a projection of what those modules answered, save the one
+ * field no module answers, the session's mode.
  *
  * ## Where the session logs are
  *
@@ -53,6 +54,14 @@
  * {@link SessionEffortRow.modifiedAt} are recorded beside the
  * counters: a row whose size is short of the file on disk is a row
  * taken mid-session.
+ *
+ * ## The mode is the phase's, not the log's
+ *
+ * Every session row carries a `mode`, and this collector writes `local`
+ * on every one. It is `SESSION_MODE`, read from nothing in the log. The
+ * spec fixes the mode at `local` for this phase and reserves `remote`
+ * for phase 6, and the row's type admits `local` alone, so this module
+ * cannot write another mode and still compile.
  *
  * ## One store, both halves
  *
@@ -147,7 +156,11 @@ import type {
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
-import type { EffortStore, SessionEffortRow } from './store/types.js';
+import type {
+  EffortStore,
+  SessionEffortRow,
+  SessionMode,
+} from './store/types.js';
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -182,6 +195,12 @@ const PROJECT_LOG_ROOT = ['.claude', 'projects'] as const;
 
 /** The plan directory, relative to the repo root. */
 const PLANS_DIR = '.plans';
+
+/**
+ * The mode every session row this collector writes carries. A constant
+ * rather than a reading; see the module note.
+ */
+const SESSION_MODE: SessionMode = 'local';
 
 /*
  * The row the session half writes is declared with the store port it
@@ -527,7 +546,8 @@ export function readPlanStubs(plansDir: string): string[] {
  *
  * Two passes; see the module note. The candidate supplies the size
  * and mtime rather than a second stat, so the row describes the file
- * as the walk saw it.
+ * as the walk saw it. The mode is read from neither pass; see the
+ * module note on why it is the phase's constant.
  */
 export async function collectSessionRow(
   candidate: SessionLogCandidate,
@@ -540,6 +560,7 @@ export async function collectSessionRow(
   return {
     ...stats,
     kind: attribution.kind,
+    mode: SESSION_MODE,
     branch: attribution.branch,
     branchRecordCount: attribution.branchRecordCount,
     distinctBranchCount: attribution.distinctBranchCount,
@@ -547,6 +568,7 @@ export async function collectSessionRow(
     branchStub: attribution.branchStub,
     planStub: attribution.planStub,
     planStubMatch: attribution.planStubMatch,
+    issueIdentifier: attribution.issueIdentifier,
     taskText: attribution.taskText,
     enqueueRecordIndex: enqueue.recordIndex,
     sizeBytes: candidate.sizeBytes,

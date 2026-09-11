@@ -89,6 +89,7 @@ export type {
   EffortRowKind,
   EffortStore,
   SessionEffortRow,
+  SessionMode,
 } from './types.js';
 
 export { STORE_BACKENDS } from '../../config.js';

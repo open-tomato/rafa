@@ -1,8 +1,3 @@
-- This repo is a single-package bun repo (`package.json`, `src/`,
-  `scripts/` at the root; no `packages/`, no workspaces). Agent/doc files
-  ported from the sibling `~/projects/agentic-research`, a bun-workspaces
-  monorepo, need every `packages/`, workspace and monorepo reference
-  rewritten away.
 - The plan's "Structured task report" stage deletes
   `.claude/skills/progress-hygiene`, so don't treat its presence as
   permanent when writing docs that reference skills.
@@ -80,15 +75,11 @@
   missing) while `bun.lock` and `package.json` agree. Run `bun install`
   and read its output (added vs. already satisfied) before calling a
   missing-module error a real code/config bug.
-- `Bun.YAML.parse`, measured on bun 1.3.14, for any YAML reader here
-  (`rafa:report` parser included): empty, whitespace-only, comment-only
-  or bare `---` input gives `null`; a multi-document stream, an ARRAY; a
-  duplicate key silently keeps the last value; malformed input throws a
-  `SyntaxError` naming no line or column; a TAB-indented child does NOT
-  throw but parses as a sibling top-level key. `constructor`, `toString`
-  and `__proto__` come back as ordinary own keys, so look keys up with
-  `Map`/`Set`, never `in` or an object index. Integer-like keys
-  enumerate first, so `Object.entries` order is not source order.
+- `Bun.YAML.parse`'s traps, for any YAML reader here (`rafa:report`
+  parser included), are recorded in `src/config.ts`'s header (its
+  "The parser, measured on bun 1.3.14" section, and the `Map`/`Set`
+  key-lookup rule above it). Not there: integer-like keys enumerate
+  first, so `Object.entries` order is not source order.
 - Config is `src/config.ts`: `loadConfig(root, cli, warn?)` reads
   `.rafa/config.yaml` and ranks command line > file > `CONFIG_DEFAULTS`;
   `parseConfigText` and `resolveConfig` are pure; refusals throw
@@ -104,13 +95,12 @@
   `src/config.ts` ships `stage`, spelled once in `CONFIG_DEFAULTS`, so
   the cutover runbook's "one-line default flip" must check that line
   rather than assume `full`.
-- `progress.txt` is TRACKED despite its `.gitignore` entry: committed in
-  3771916, ignored only later in 1e0e701, and an ignore rule does nothing
-  for an indexed file, so the loop's `git add -A` commits every edit to
-  it until something runs `git rm --cached progress.txt` (nothing has).
+- `progress.txt` is TRACKED despite its `.gitignore` entry: committed
+  before the rule was added, and an ignore rule does nothing for an
+  indexed file, so the loop's `git add -A` commits every edit to it
+  until something runs `git rm --cached progress.txt` (nothing has).
   Check with `git ls-files`; `git check-ignore` is silent about tracked
-  files. A second tracked root file, `@progress.txt` (created in
-  00a8a14, appended to only by 80c0077 and f12bd8d), holds task
+  files. A second tracked root file, `@progress.txt`, holds task
   summaries; the findings every other session appended are here.
 - The effort store port is `src/effort/store/types.ts`: `EffortStore`
   (`append`, `keys`, `read`, each taking an `EffortRowKind`), the row map
@@ -133,7 +123,10 @@
   `"typeRoots": ["<repo>/node_modules/@types"]` (without it, measured, it
   fails on `node:fs` and `process`), then run
   `./node_modules/.bin/tsc -p <it>`. Plant a type error once to prove the
-  check is live.
+  check is live. It is not clean on every test file:
+  `src/effort/attribution.test.ts` carries a pre-existing TS2769 at
+  `toEqual(MEASURED_BRANCHES)` (the `readonly` overload case above), so
+  diff the error's line against HEAD before owning it.
 - The NDJSON backend is `src/effort/store/ndjson.ts`
   (`openNdjsonStore(repoRoot)`: the port plus `path(kind)` and
   `readRows(kind)`; its `append` answers `NdjsonAppendResult`). It only
@@ -165,11 +158,15 @@
   history can be driven on a `:memory:` db.
 - `bun:sqlite` facts measured on bun 1.3.14 on macOS (Apple's SQLite
   3.51.0) are recorded in `src/effort/store/sqlite.ts`'s header. Not
-  there: `new Database(path)` CREATES a missing file, while
-  `{ readwrite: true }` (with or without `create: false`) refuses one;
+  there: `new Database(path)` with no options CREATES a missing file;
   `OR IGNORE` also swallows CHECK violations; `Statement.run` returns
   `{ changes, lastInsertRowid }`, not a Promise; a trailing lone high
-  surrogate binds as `''`.
+  surrogate binds as `''`; `Database.close()` finalizes `db.query(...)`
+  statements at once whatever `throwOnError` says (it defaults to
+  false), while `db.prepare(...)` ones linger until finalized or GC'd,
+  so a module that only calls `db.query` and closes in a `finally`
+  leaks no descriptor without `close(true)`, measured on `sqlite.ts`,
+  which relies on exactly this.
 - The Write and Edit tools decoded a plain four-hex-digit unicode escape
   of a Latin-1 letter into the literal letter, in file content and
   `new_string` alike, so two Edits "made no change". Surrogate escapes
@@ -234,14 +231,6 @@
   is legitimately `[]` on every "nothing new" run, which then prints a
   healthy-looking `+0 rows`. Reproduction: finding 1 of
   `.plans/REVIEW-phase-0-store.md`.
-- `bun:sqlite`'s `Database.close()` (no args, `throwOnError` defaults to
-  false) finalizes statements created through `db.query(...)`
-  immediately regardless of `throwOnError`; only statements from
-  `db.prepare(...)` linger until finalized or GC'd. So a module that
-  only ever calls `db.query(...)` (never `.prepare()`) and closes in a
-  `finally` leaks no descriptor even without an explicit
-  `close(true)` — measured against `src/effort/store/sqlite.ts`, which
-  relies on exactly this.
 - Issue identifiers come from `src/effort/attribution.ts`:
   `resolveIssueIdentifier({ branch, planStub, planIssue? }, teamKeys?)`
   ranks a declared plan `issue:` > the plan stub > the WHOLE branch
@@ -253,14 +242,22 @@
   `collectSessionRow` in `effort/collect.ts` copies attribution fields
   ONE BY ONE, so a new attribution field reaches no stored row (and no
   parity reading) until that function copies it.
-- To back a "N mutations were driven" claim in a test header: a bun
-  script that rewrites the module in place, runs ONE file through
-  `Bun.spawnSync([process.execPath, 'test', <file>])`, restores it in a
-  `finally`, and runs the unmutated file before and after as controls,
-  ending on a byte-identity check. Assert each search string occurs
-  exactly once, or a mutation can silently change nothing. Never run
-  the full suite while it runs: the module on disk is mutated.
-- The out-of-repo tsconfig check above is not clean on every test file:
-  `src/effort/attribution.test.ts` carries a pre-existing TS2769 at the
-  measured-table `toEqual(MEASURED_BRANCHES)` (the `readonly` overload
-  case), so diff the error's line against HEAD before owning it.
+- To back a test header's "N mutations were driven" claim (method: the
+  `mutation-leg-grids` skill), a bun script runs ONE file per leg
+  through `Bun.spawnSync([process.execPath, 'test', <file>])`, with the
+  unmutated file run before and after as controls. Never run the full
+  suite while it runs: the module on disk is mutated.
+- The Bash tool's shell is zsh, where `${PIPESTATUS[0]}` is bash-only
+  and expands to NOTHING: `cmd | tail; echo "code ${PIPESTATUS[0]}"`
+  prints a blank code that reads like a pass. Measured on three gates
+  at once. When the exit code is the reading, redirect instead of
+  piping: `cmd > /tmp/x.txt 2>&1; echo "Exited with code $?"`.
+- The session row (`SessionEffortRow`, `src/effort/store/types.ts`)
+  carries `mode` (type `SessionMode`, `'local'` alone until phase 6
+  adds `remote`; written from `SESSION_MODE` in `effort/collect.ts`) and
+  `issueIdentifier`, but NOT attribution's `issueIdentifierSource`. The
+  sibling's stored rows predate both fields, and 74 of its 1,052 rows
+  (measured 2026-09-11) also end in a `planStubPatch` key no collector
+  here writes. So a lineage parity check cannot compare whole rows byte
+  for byte against that store: project each row to the sibling's own
+  keys first, and account for `planStubPatch` explicitly.

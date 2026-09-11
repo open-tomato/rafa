@@ -60,16 +60,42 @@ import type { CommitStats } from '../commits.js';
 import type { SessionStats } from '../session-log.js';
 
 /**
- * One stats row widened with everything attribution answered — the row
- * the collector's session half writes.
+ * Where a session ran, as its row records it.
+ *
+ * `local` is the only member in this phase, and the collector writes it
+ * on every row. The spec reserves `remote` for phase 6, the phase that
+ * brings the remote transport, and the member joins this union then and
+ * not before: a union holding it now would let a row of this phase
+ * claim a mode no session of this phase can have.
+ */
+export type SessionMode = 'local';
+
+/**
+ * One stats row widened with what attribution answered and with the
+ * mode the session ran in — the row the collector's session half writes.
  *
  * Declared here rather than beside the collector that builds it, so the
  * port depends only on the modules the row is made of and never on its
  * own caller. `effort/collect.ts` re-exports it.
+ *
+ * Attribution reaches the row field by field, and one of its answers
+ * stays off it: `issueIdentifierSource`, where the identifier was read.
+ * The reconciled schema names the identifier alone.
+ *
+ * {@link SessionEffortRow.mode} and {@link SessionEffortRow.issueIdentifier}
+ * are the reconciled schema's widening, and a row collected before it
+ * carries neither. An append-only store never rewrites such a row, and
+ * the sibling's own store is made of them: measured on 2026-09-11, not
+ * one of its session rows carries either field. The row type is the
+ * port's assertion over a row read back, as it is for every other
+ * field, so a reader of that store meets the two fields ABSENT, which
+ * is neither `local` nor null.
  */
 export interface SessionEffortRow extends SessionStats {
   /** What the session was dispatched to do. */
   kind: SessionKind;
+  /** Where the session ran: `local`, on every row of this phase. */
+  mode: SessionMode;
   /** The modal branch of the session's records, or null. */
   branch: string | null;
   /** Records carrying it, and how many distinct branches were seen. */
@@ -81,6 +107,12 @@ export interface SessionEffortRow extends SessionStats {
   /** The resolved plan, or null — never the branch stub as a fallback. */
   planStub: string | null;
   planStubMatch: PlanStubMatch;
+  /**
+   * The issue the session resolved to, upper-cased, or null — never the
+   * branch stub as a fallback. Read from the resolved plan stub, else
+   * from the whole branch name, by `effort/attribution.ts`.
+   */
+  issueIdentifier: string | null;
   /** The dispatched task sentence, for a task session only. */
   taskText: string | null;
   /** Index of the enqueue among parsed records, or null if none. */

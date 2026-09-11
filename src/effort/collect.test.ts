@@ -80,6 +80,21 @@
  * it catches as a refusal, rather than rethrowing what is not a config
  * one. No case drives a fault that is not a refusal through the
  * command, because the command takes no seam to plant one through.
+ *
+ * Nine more were driven against the widened session row, seven in this
+ * module and one in each backend's writer, with the unmutated tree
+ * green before and after and every file restored byte-identical, and
+ * ALL NINE reddened at least one case: the mode dropped from the row,
+ * the mode written as `remote`, the issue identifier dropped, written
+ * as the branch stub, as the whole branch name, as null throughout, and
+ * re-read from the branch alone so the resolved plan lends it nothing,
+ * the SQLite body serialised without the identifier, and the NDJSON
+ * line without the mode. The two backend mutations are caught only by
+ * the case that collects one tree through both backends, and the
+ * branch-alone re-read only by the case whose resolved plan names an
+ * issue its branch does not. Three were also run against `check-types`:
+ * each field dropped fails with TS2741, and `remote` with TS2322, so
+ * the mode is held at `local` by the compiler as well as by this suite.
  */
 import type { CollectOptions, SessionLogCandidate } from './collect.js';
 import type { CommitLogParseResult, CommitStats } from './commits.js';
@@ -618,6 +633,62 @@ describe('collectSessionRow', () => {
     expect(row.planStub).toBeNull();
     expect(row.planStubMatch).toBe('none');
   });
+
+  it('stamps the local mode on the row', async () => {
+    const dir = makeScratch();
+    taskLog(dir, 'sess-4', 'feat/opt-407-control-byte-gate');
+    const found = listSessionLogs(dir);
+    const entry = found[0];
+    if (entry === undefined) throw new Error('no candidate');
+
+    const row = await collectSessionRow(entry, []);
+
+    expect(row.mode).toBe('local');
+  });
+
+  it('carries the issue the whole branch name holds', async () => {
+    const dir = makeScratch();
+    taskLog(dir, 'sess-5', 'feat/opt-407-control-byte-gate');
+    const found = listSessionLogs(dir);
+    const entry = found[0];
+    if (entry === undefined) throw new Error('no candidate');
+
+    const row = await collectSessionRow(entry, []);
+
+    expect(row.branchStub).toBe('opt-407-control-byte-gate');
+    expect(row.planStub).toBeNull();
+    expect(row.issueIdentifier).toBe('OPT-407');
+  });
+
+  it('carries the issue the resolved plan names, and only once resolved', async () => {
+    const dir = makeScratch();
+    taskLog(dir, 'sess-6', 'feat/q21-harness');
+    const found = listSessionLogs(dir);
+    const entry = found[0];
+    if (entry === undefined) throw new Error('no candidate');
+
+    const resolved = await collectSessionRow(entry, ['q21-opt-363-harness']);
+    const unresolved = await collectSessionRow(entry, []);
+
+    expect(resolved.planStub).toBe('q21-opt-363-harness');
+    expect(resolved.issueIdentifier).toBe('OPT-363');
+    expect(unresolved.planStub).toBeNull();
+    expect(unresolved.issueIdentifier).toBeNull();
+  });
+
+  it('answers no issue, rather than the branch stub, when none is named', async () => {
+    const dir = makeScratch();
+    taskLog(dir, 'sess-7', 'feat/q19-loop-economics');
+    const found = listSessionLogs(dir);
+    const entry = found[0];
+    if (entry === undefined) throw new Error('no candidate');
+
+    const row = await collectSessionRow(entry, ['q19-loop-economics']);
+
+    expect(row.branchStub).toBe('q19-loop-economics');
+    expect(row.planStub).toBe('q19-loop-economics');
+    expect(row.issueIdentifier).toBeNull();
+  });
 });
 
 /** A scratch repo root with a log tree and a plan roster. */
@@ -856,6 +927,36 @@ describe.each(BACKENDS)('collectEffort through the %s store', (_name, open) => {
 
     expect(quiet).toEqual([]);
     expect(loud.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the session row both backends store', () => {
+  it('holds the issue identifier and the mode, byte for byte', async () => {
+    const tree = makeTree([]);
+    taskLog(tree.logDir, 's-opt', 'feat/opt-407-control-byte-gate');
+    taskLog(tree.logDir, 's-q19', 'feat/q19-loop-economics');
+    const commits = plantedCommits([]);
+
+    const stored: string[] = [];
+    for (const [, open] of BACKENDS) {
+      const store = open(tree.root);
+      await collectEffort({
+        ...optionsFor(tree, commits),
+        store,
+        collectCommits: false,
+      });
+      stored.push(JSON.stringify(store.read('sessions')));
+    }
+    const fields = [...openNdjsonStore(tree.root).read('sessions')]
+      .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
+      .map((row) => [row.sessionId, row.issueIdentifier, row.mode]);
+
+    expect(stored).toHaveLength(2);
+    expect(stored[1]).toBe(stored[0]);
+    expect(fields).toEqual([
+      ['s-opt', 'OPT-407', 'local'],
+      ['s-q19', null, 'local'],
+    ]);
   });
 });
 
