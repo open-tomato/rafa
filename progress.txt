@@ -5,154 +5,93 @@
   boundaries. Agent/doc files ported from the sibling
   `~/projects/agentic-research` (a bun-workspaces monorepo) must have every
   `packages/`, workspace and monorepo reference rewritten away.
-- `scripts/control-byte-gate/control-byte-gate.ts` (with a colocated
-  `control-byte-gate.test.ts`) is this repo's control-byte gate script,
-  referenced by `.githooks/pre-commit` per the plan (though the hook's
-  current path and `core.hooksPath` wiring were not verified in this task).
-- `.claude/skills/` in this repo currently carries `progress-hygiene`,
-  `dev-planner`, `documentation`, `git-workflow`, and others copied from the
-  sibling; the plan schedules `progress-hygiene` for deletion in a later
-  stage ("Structured task report"), so don't treat its current presence as
-  permanent when writing docs that reference skills.
-- No `AGENTS.md` or `context/` directory exists yet at repo root as of this
-  task — both are added by a later "Bootstrap the routing surface" task
-  (doc-updater agent). Files ported early (e.g. `.claude/agents/*.md`) may
-  reference paths like `src/tests/context-page-imports.test.ts` and
-  `src/PROMPT.md` that don't exist yet but are added by later plan stages.
-- `rm -rf` (and even `rm -r`/`rm -rf` on files under /tmp) is blocked by this
-  sandbox's Bash permission layer regardless of target path. Use `mv` to a
-  scratch directory instead of deleting when you need to clear a directory's
-  contents, and prefer `cp -R src/. dest/` (trailing `/.`) to copy a
-  directory's contents into an existing directory without deleting it first.
-- The sibling `tools/ralph/` tree (48 files) uses `.js` extensions in its
-  relative imports (e.g. `import start from './start.js'` inside
-  `ralph.ts`/`rafa.ts`) even though the files are `.ts` — this is normal
-  TypeScript ESM-style import convention (bun/tsc resolve `.js` specifiers to
-  `.ts` sources) and should be left as-is when porting/repointing paths in a
-  later task.
-- `bun:test` is a drop-in for the `describe`/`it`/`expect`/`beforeEach`/
-  `afterEach`/`beforeAll`/`afterAll` shape of vitest's API — porting those
-  imports is a pure module-specifier swap (`'vitest'` → `'bun:test'`), no
-  call-site changes needed. For `vi.spyOn(...)`/`vi.restoreAllMocks()`,
-  `bun:test` has its own native names: `spyOn(...)` (same signature) and
-  `mock.restore()` (restores every spy at once, the equivalent of
-  `vi.restoreAllMocks()`). Verified empirically that `spyOn(console, 'log')`
-  under `bun:test` behaves like vitest's console patch: a `process.stdout
-  .write` patch does NOT see `console.log` output, so the "spy on console,
-  not stdout" pattern used in this codebase still applies verbatim. Note
-  `bun:test` also exports a `vi` compatibility alias (`vi.fn`, `vi.spyOn`,
-  `vi.mock`, `vi.restoreAllMocks`, `vi.resetAllMocks`, `vi.clearAllMocks`)
-  for a literal drop-in port, but this repo prefers the native `spyOn`/
-  `mock` names over that alias.
-- Bun's test runner internally resolves the bare `'vitest'` module specifier
-  to its own `bun:test` implementation, even with no `vitest` package in
-  `node_modules` at all — `import { describe, it, expect } from 'vitest'`
-  still runs correctly under `bun test`. So `bun test` passing is NOT proof
-  that every `vitest` import has been ported; grep for the literal string
-  `from 'vitest'` to confirm a port is complete rather than relying on test
-  failures to catch a missed file.
-- This repo's root `tsconfig.json` excludes `**/*.test.ts` from
-  `bunx tsc --noEmit` entirely (a comment there tracks burning this down in
-  `.specs/test-type-checking.md`, which does not exist in this repo yet).
-  Because of that, a per-file/editor TypeScript diagnostic inside a test
-  file (e.g. `bun:test`'s `expect(...).toEqual()` overloads rejecting a
-  `readonly T[]` where vitest's looser typing accepted it) can appear
-  without ever showing up in the project's own `bunx tsc --noEmit` gate —
-  confirm against that actual command before treating such a diagnostic as
-  a real build break.
-- A few TSDoc comments describe historical rationale tied specifically to
-  vitest running the suite under Node while the real spawner is
-  `Bun.spawn` (e.g. `src/utils/claude.ts`, `src/utils/claude.test.ts`:
-  "the root suite run[s] vitest under node"; `src/effort/store.ts`:
-  "under vitest on NODE"). Now that the whole suite runs under `bun:test`
-  (i.e. under Bun, not Node), that specific rationale is stale, but a
-  literal "vitest" → "bun:test" word swap there would be actively wrong
-  (the suite no longer runs "under node" either) — left untouched as
-  outside the scope of a mechanical import port; a later doc-focused task
+- The plan schedules `.claude/skills/progress-hygiene` for deletion in a
+  later stage ("Structured task report"), so don't treat its current
+  presence as permanent when writing docs that reference skills.
+- `rm -r`/`rm -rf` is blocked by this sandbox's Bash permission layer
+  regardless of target path, /tmp included. To clear a directory, `mv` its
+  contents to a scratch directory; to copy a directory's contents into an
+  existing one, use `cp -R src/. dest/` (trailing `/.`).
+- Relative imports under `src/` use `.js` specifiers for `.ts` files (e.g.
+  `from './utils/claude.js'`) — normal TypeScript ESM style that bun/tsc
+  resolve to the `.ts` source; leave them as-is when moving or repointing.
+- Porting vitest to `bun:test` is a pure module-specifier swap for
+  `describe`/`it`/`expect`/`beforeEach`/`afterEach`/`beforeAll`/`afterAll`.
+  `vi.spyOn(...)` becomes `spyOn(...)` (same signature) and
+  `vi.restoreAllMocks()` becomes `mock.restore()` (restores every spy at
+  once); `bun:test` also exports a `vi` alias, but this repo prefers the
+  native names. Verified: `spyOn(console, 'log')` behaves as under vitest —
+  a `process.stdout.write` patch does NOT see `console.log` output — so
+  "spy on console, not stdout" still applies verbatim.
+- Bun's test runner resolves a bare `'vitest'` specifier to its own
+  `bun:test` even with no `vitest` package installed, so `bun test` passing
+  is NOT proof a port is complete — grep for the literal `from 'vitest'`.
+- `tsconfig.json` excludes `**/*.test.ts` from `bun run check-types`
+  (`tsc --noEmit`); its comment points at `.specs/test-type-checking.md`,
+  which doesn't exist in this repo yet. So an editor diagnostic inside a
+  test file (e.g. `bun:test`'s `toEqual()` overloads rejecting a
+  `readonly T[]` vitest accepted) can appear without ever reaching the gate
+  — confirm against that command before treating it as a build break.
+- Some TSDoc still gives rationale tied to vitest running the suite under
+  Node while the real spawner is `Bun.spawn` (`src/utils/claude.ts`,
+  `src/utils/claude.test.ts`: "the root suite run[s] vitest under node";
+  `src/effort/store.ts`: "under vitest on NODE"). The suite now runs under
+  Bun, so that rationale is stale, but a literal "vitest" → "bun:test" swap
+  would be wrong too (it no longer runs "under node" either) — a doc task
   should re-derive the rationale rather than search-and-replace it.
-- When a colocated drift guard (a test that does `new URL('../../../foo',
-  import.meta.url)` / `readFileSync` to re-read another source file and
-  assert a literal is still present in it) survives a file move, the `../`
-  depth in its `new URL` base has to be recounted from the NEW file
-  location, not just the path literal it appends. Two such guards were
-  found stale after the `tools/ralph/` → `src/` move (`src/effort/
-  classify.test.ts`'s `keeps every prefix live` case, and `src/utils/
-  progress.test.ts`'s `repoText` helper) — both used a 3-level-up base
-  (`../../../`) that was correct for `tools/ralph/<subdir>/*.test.ts` but
-  needed to become 2-level-up (`../../`) for `src/<subdir>/*.test.ts`, in
-  addition to updating the appended path literal itself. A guard whose
-  base is wrong doesn't necessarily fail loudly — `progress.test.ts`'s
-  case still "passed" pre-fix because it was silently reading an entirely
-  different repo's `.gitignore` outside this repo's tree (the umbrella
-  `open-tomato/.gitignore`), not this one; only re-deriving the correct
-  depth and checking the actual content read exposed that it had been
-  reading the wrong file.
-- Not every literal string containing `tools/ralph` inside `src/` is a
-  real path reference to repoint after the sibling-tree move. Distinguish:
-  (a) genuine path literals (TSDoc file references, `new URL`/`readFileSync`
-  targets, CLI usage examples) — these should be repointed at `src/`; from
-  (b) test fixture content that merely happens to quote a `tools/ralph/...`
-  string as example/planted text, especially when its exact LENGTH is
-  pinned by a later assertion (e.g. `src/tests/commit-refusals.test.ts`'s
-  `LONG_TASK` is commented as "181 characters" and used in truncation
-  cases) — changing those risks silently breaking an unrelated pinned
-  assertion and is out of scope for a mechanical path-repoint task; from
-  (c) fixture content that deliberately represents ANOTHER repo's file
-  (e.g. `src/tests/agents-split-accounting.test.ts`'s `RESIDUE` constant
-  is a snapshot of the SIBLING `agentic-research` repo's own `AGENTS.md`,
-  which legitimately still names `tools/ralph` since that repo wasn't
-  touched) — never rewrite these.
-- A wrong `../` depth in a `new URL(..., import.meta.url)` base doesn't
-  just risk ENOENT — it can silently resolve into a live, unrelated
-  directory and read/write against IT instead. `src/tests/
-  routing-table-agents.test.ts` and `src/tests/context-page-imports
-  .test.ts` both carried `new URL('../../../', import.meta.url)` for
-  `REPO_ROOT`, which is 3 levels up from `src/tests/<file>.test.ts`
-  (tests -> src -> repo root -> one too many) and landed one level
-  above this repo, at `/Users/marcos/projects/open-tomato/` — the
-  PARENT directory holding this repo as a sibling among several other,
-  unrelated checkouts. That parent happens to itself contain a
-  `packages/` directory and its own `AGENTS.md`, so the bug produced
-  plausible-looking (wrong) results rather than a crash, until `REPO_ROOT`
-  was corrected to `../../` (2 levels up, the established depth for any
-  `src/<subdir>/*.test.ts` file per the earlier `classify.test.ts`/
-  `progress.test.ts` finding above) and the reads landed in the actual
-  repo, which has no `packages/` dir at all. When auditing a `new URL`
-  path base, don't just check it resolves without throwing — print/log
-  the resolved absolute path once and confirm it against `pwd`, since a
-  wrong-but-existing sibling directory is the silent-failure case that
-  matters most.
-- A `readdirSync(join(root, 'packages'))` (or similar) call with no
-  `existsSync` guard in front of it will not surface as a bug in this
-  repo until whatever computes `root` is ALSO correct — this repo has
-  no `packages/` directory, so an unguarded read only throws once
-  `root` actually resolves here. Guard every `packages/`-relative
-  `readdirSync` the same way `findAgentsMaps` in `src/tests/
-  context-page-imports.test.ts` already does (`existsSync(packages) ?
-  readdirSync(packages) ... : []`), rather than assuming a passing test
-  run proves the read is safe.
-- `.githooks/pre-commit` already pointed at
-  `scripts/control-byte-gate/control-byte-gate.ts` before this task ran —
-  it was ported/written correctly in an earlier stage even though an
-  earlier task's own notes said the hook's path wasn't verified. When a
-  scoped task's own checklist line says to "align" a file, check its
-  current content first; it may already satisfy the target and need no
-  edit.
-- `bunx eslint .` currently fails at startup with `ERR_MODULE_NOT_FOUND:
-  Cannot find package '@eslint/js'` — `node_modules/@eslint` doesn't exist
-  even though `@eslint/js` is listed in `package.json` `devDependencies`,
-  i.e. `bun install` has not been run (or not run since that dependency
-  was added) in this worktree. This is unrelated to any `src/`-layout
-  path/config content and needs a `bun install`, not a config edit, to
-  clear — don't mistake it for a config-correctness problem when auditing
-  `eslint.config.mjs`/`eslint.base.mjs`.
-- `bunx tsc --noEmit` is clean against `tsconfig.json` `"include": ["src",
-  "scripts", "*.ts", "*.mjs"]` (scripts/ needed adding alongside src/,
-  since the file previously only listed the nonexistent `tools`).
-- `bun test` as of this task has 3 pre-existing failures, all in
-  `src/tests/context-page-imports.test.ts`'s "the context/ pages are
-  pointed at, never imported" describe block — they fail because
-  `AGENTS.md`/`context/` don't exist at repo root yet (added by the later
-  "Bootstrap the routing surface" stage per the plan). Not caused by, or
-  fixable within, a config-alignment task; expected to clear once that
-  stage lands.
+- Not every `tools/ralph` string inside `src/` is a path to repoint. Only
+  genuine path literals (TSDoc file references, `new URL`/`readFileSync`
+  targets, CLI usage examples) belong at `src/`. Leave test fixture text
+  that merely quotes one, especially when a later assertion pins its LENGTH
+  (`src/tests/commit-refusals.test.ts`'s 181-character `LONG_TASK`), and
+  never rewrite fixtures representing ANOTHER repo's file
+  (`src/tests/agents-split-accounting.test.ts`'s `RESIDUE` snapshots the
+  sibling's own `AGENTS.md`, which legitimately names `tools/ralph`).
+- When a file holding a `new URL('../../foo', import.meta.url)` base moves,
+  recount the `../` depth from its NEW location, not just the path literal
+  it appends: a `src/<subdir>/*.test.ts` reaches the repo root with
+  `../../`. A wrong depth need not throw — `../../../` from there lands in
+  the parent `open-tomato/` checkout, which has its own `packages/`,
+  `AGENTS.md` and `.gitignore`, so guards read the wrong tree and still
+  pass. Print the resolved absolute path once and check it against `pwd`.
+- This repo has no `packages/`, so an unguarded
+  `readdirSync(join(root, 'packages'))` only throws once `root` really
+  resolves here — a wrong root masks it, and a passing run proves nothing.
+  Guard every such read with `existsSync`, as `findAgentsMaps` in
+  `src/tests/context-page-imports.test.ts` does.
+- `.githooks/pre-commit` (wired by `core.hooksPath=.githooks`) already runs
+  `scripts/control-byte-gate/control-byte-gate.ts --staged`. When a task
+  says to "align" a file, check its current content first; it may already
+  satisfy the target and need no edit.
+- `bunx eslint .` fails at startup with `ERR_MODULE_NOT_FOUND: Cannot find
+  package '@eslint/js'`: `node_modules/@eslint` doesn't exist although
+  `@eslint/js` is in `devDependencies`, i.e. `bun install` hasn't run since
+  it was added. It needs a `bun install`, not a config edit — don't mistake
+  it for a problem in `eslint.config.mjs`/`eslint.base.mjs`.
+- `bun test` is green over the whole `src/` suite (656 pass, 1 skip, 0 fail,
+  26 files under `src/` plus `scripts/control-byte-gate/`, 27 total) —
+  confirmed stable across three repeat runs, under `--randomize` (default
+  and `--seed=42`), and via the `bun run test` script; all exit 0. A grep
+  for `expect.extend`, fake timers, `vi.mock`/`mock.module`, and
+  `import.meta.vitest` across `src/` found none, so nothing in the ported
+  suite depends on a vitest-only mocking feature bun:test lacks.
+- The suite's one skip is the genuine "passes only under vitest" case the
+  port needed to preserve rather than delete: `src/utils/claude.test.ts`'s
+  `it.skipIf(HAS_BUN)('defaults to the real spawner', ...)` asserts
+  `runClaude(prompt)` rejects with a `ReferenceError` naming `Bun` when no
+  spawner is injected — true only when `globalThis.Bun` is undefined, which
+  happens under vitest-on-Node but never under `bun test` (where `Bun` is
+  always defined). It is intentionally guarded with `skipIf`, not deleted,
+  and its file header documents why; `src/effort/collect.test.ts`'s
+  `it.skipIf(isRoot)` is a different, unrelated environment guard (root vs.
+  non-root file permissions) and is not a vitest-vs-bun case.
+- `scripts/control-byte-gate/control-byte-gate.test.ts` still has a literal
+  `import { describe, expect, it } from 'vitest'` — the only remaining one
+  in the repo. It predates the sibling import (it was one of the 3 files in
+  the pre-import baseline) and sits outside `src/`, so the "port every test
+  file under `src/`" task never touched it; it uses only
+  `describe`/`expect`/`it` with no vitest-specific API, so it is not a
+  vitest-only-passing test, just an unported literal riding on bun's
+  `'vitest'`-to-`bun:test` shim (see the entry above on that shim). Left
+  as-is as out of this phase's `src/` import scope; a future task touching
+  `scripts/` should swap this one specifier too.
