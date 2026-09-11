@@ -160,3 +160,39 @@
   created in 00a8a14, only 80c0077 and f12bd8d have appended to it, and
   it holds task summaries. The findings every other session appended are
   here in `progress.txt`.
+- The effort store port is `src/effort/store/types.ts`. It holds the
+  kind-parameterised `EffortStore` (`append`, `keys` and `read`, each
+  taking an `EffortRowKind`) and the closed row map `EffortRowByKind`.
+  It also declares `SessionEffortRow`, which `effort/collect.ts` now
+  re-exports. Finally it holds `EFFORT_KEY_PROJECTIONS`: `sessions` are
+  keyed by `sessionId` and `commits` by `sha`, and a keyless row
+  answers null. The port's `AppendResult` is `{ path, appended,
+  skipped }` only. NDJSON-only readings (`separatedPartialLine`, the
+  line arithmetic) belong on a backend's own wider type. Until
+  `src/effort/store.ts` is retired, it ALSO exports an `EffortRowKind`
+  and an `AppendResult` (with `separatedPartialLine`), so import the
+  port's from `store/types.js`.
+- Declare a port interface with PROPERTY signatures
+  (`keys: (kind: K) => ...`), not method signatures. Measured with this
+  repo's tsc: a backend whose parameter is narrower than the port's is
+  refused under a property signature (TS2322). Under a method
+  signature it is silently accepted, because method parameters are
+  checked bivariantly. For a closed per-kind map use a `type` alias. An
+  interface can be widened from another file by declaration merging,
+  while re-declaring an alias fails with TS2300.
+- A compile-time claim can be driven red by planting a mutated copy of
+  the module BESIDE it (`src/<dir>/zz-control-*.ts`, so its relative
+  imports still resolve) and running `bunx tsc --noEmit`. Move every
+  copy out before exiting: `git add -A` would commit a forgotten one,
+  and `tsc` would stay red.
+- To type-check one `*.test.ts`, which `check-types` excludes, put a
+  tsconfig OUTSIDE the repo with `"extends": "<repo>/tsconfig.json"`,
+  `"files": ["<abs test path>"]`, `"include": []` and an absolute
+  `"typeRoots": ["<repo>/node_modules/@types"]`. Then run
+  `./node_modules/.bin/tsc -p <it>`. Measured: without `typeRoots` it
+  fails on `node:fs` and `process`. Plant a deliberate type error once
+  to prove the check is live.
+- `bun:sqlite` is synchronous on bun 1.3.14. `Statement.run` returns
+  `{ changes, lastInsertRowid }` and `.all()` returns an array, and
+  neither is a Promise. A SQLite backend can therefore implement the
+  synchronous store port without awaiting.

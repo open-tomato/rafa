@@ -117,14 +117,12 @@
  * `planStub` resolve to null, which reads as a collector that failed
  * to attribute anything. The roster size is reported for that reason.
  */
-import type { PlanStubMatch } from './attribution.js';
-import type { SessionKind } from './classify.js';
 import type {
   CommitLogOptions,
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
-import type { SessionStats } from './session-log.js';
+import type { SessionEffortRow } from './store/types.js';
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -159,30 +157,12 @@ const PROJECT_LOG_ROOT = ['.claude', 'projects'] as const;
 /** The plan directory, relative to the repo root. */
 const PLANS_DIR = '.plans';
 
-/** One stats row widened with everything attribution answered. */
-export interface SessionEffortRow extends SessionStats {
-  /** What the session was dispatched to do. */
-  kind: SessionKind;
-  /** The modal branch of the session's records, or null. */
-  branch: string | null;
-  /** Records carrying it, and how many distinct branches were seen. */
-  branchRecordCount: number;
-  distinctBranchCount: number;
-  /** The branch split; the stub is not yet a plan stub. */
-  branchType: string | null;
-  branchStub: string | null;
-  /** The resolved plan, or null — never the branch stub as a fallback. */
-  planStub: string | null;
-  planStubMatch: PlanStubMatch;
-  /** The dispatched task sentence, for a task session only. */
-  taskText: string | null;
-  /** Index of the enqueue among parsed records, or null if none. */
-  enqueueRecordIndex: number | null;
-  /** File size at collection; short of the file means a frozen row. */
-  sizeBytes: number;
-  /** File mtime at collection, ISO 8601. */
-  modifiedAt: string;
-}
+/*
+ * The row the session half writes is declared with the store port it
+ * is appended through, which depends on nothing in this module, and is
+ * re-exported here so the collector still names what it builds.
+ */
+export type { SessionEffortRow } from './store/types.js';
 
 /** One session log the walk found, before anything has been read. */
 export interface SessionLogCandidate {

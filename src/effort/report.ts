@@ -216,7 +216,7 @@ export interface ReportOptions {
  *
  * The body is an assignment and the assignment is the point: it is a
  * compile-time assertion that {@link SessionEffortRow} still satisfies
- * {@link ReportSessionRow}, so a field renamed on the collector reds
+ * {@link ReportSessionRow}, so a field renamed on the stored row reds
  * `check-types` here rather than producing a report of zeroes. Putting
  * it in a test would prove nothing — this repo's root tsconfig
  * excludes `*.test.ts`, so a type-level claim in one is never checked.
