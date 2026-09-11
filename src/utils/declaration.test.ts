@@ -54,7 +54,7 @@
  */
 import type { TaskDeclaration } from './declaration.js';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   DECLARATION_KEYS,

@@ -119,7 +119,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { PROMPT_SHAPES } from '../effort/classify.js';
 import { collectEffort } from '../effort/collect.js';

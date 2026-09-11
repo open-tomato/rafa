@@ -10,7 +10,7 @@
  * findNextTask is tested as a pure function without mocking.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 // ── Pure unit tests for tracker helpers ──────────────────────────────────────
  

@@ -130,8 +130,9 @@ import {
   describe,
   expect,
   it,
-  vi,
-} from 'vitest';
+  mock,
+  spyOn,
+} from 'bun:test';
 
 import { commitFinishedTask, dispatchTask } from '../start.js';
 import { runClaude } from '../utils/claude.js';
@@ -394,7 +395,7 @@ let warnings: string[] = [];
  * Captures what the dispatch printed.
  *
  * Through a spy on `console` and not a `process.stdout.write` patch:
- * vitest replaces the console object, so a stream capture reads zero
+ * bun:test replaces the console object, so a stream capture reads zero
  * lines here and every absence assertion would pass against a loop
  * that announced the block in full.
  *
@@ -404,16 +405,16 @@ let warnings: string[] = [];
 beforeEach(() => {
   logs = [];
   warnings = [];
-  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     logs.push(args.map(String).join(' '));
   });
-  vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+  spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
     warnings.push(args.map(String).join(' '));
   });
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 /** The one announced line carrying `marker`, or the empty string. */

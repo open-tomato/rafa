@@ -144,7 +144,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 /** What a mismatch reports when the artefact outran the source. */
 const PAST_END = '<past the end of the source>';

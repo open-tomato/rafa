@@ -2,7 +2,7 @@
  * Tests for the merged loop's new pieces: per-plan tracker derivation,
  * --start-at time math, and plan-prompt templating.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { buildPlanPrompt, formatProgressSection, stubFromSpecPath } from '../plan.js';
 import { msUntil } from '../utils/schedule.js';

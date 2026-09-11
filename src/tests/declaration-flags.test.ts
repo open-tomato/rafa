@@ -70,7 +70,7 @@ import type {
   TaskDeclaration,
 } from '../utils/declaration.js';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   parseTaskDeclaration,

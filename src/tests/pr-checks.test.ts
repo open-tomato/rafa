@@ -8,7 +8,7 @@
  * writes when a PR has no checks at all.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   classifyState,

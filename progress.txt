@@ -30,3 +30,43 @@
   TypeScript ESM-style import convention (bun/tsc resolve `.js` specifiers to
   `.ts` sources) and should be left as-is when porting/repointing paths in a
   later task.
+- `bun:test` is a drop-in for the `describe`/`it`/`expect`/`beforeEach`/
+  `afterEach`/`beforeAll`/`afterAll` shape of vitest's API — porting those
+  imports is a pure module-specifier swap (`'vitest'` → `'bun:test'`), no
+  call-site changes needed. For `vi.spyOn(...)`/`vi.restoreAllMocks()`,
+  `bun:test` has its own native names: `spyOn(...)` (same signature) and
+  `mock.restore()` (restores every spy at once, the equivalent of
+  `vi.restoreAllMocks()`). Verified empirically that `spyOn(console, 'log')`
+  under `bun:test` behaves like vitest's console patch: a `process.stdout
+  .write` patch does NOT see `console.log` output, so the "spy on console,
+  not stdout" pattern used in this codebase still applies verbatim. Note
+  `bun:test` also exports a `vi` compatibility alias (`vi.fn`, `vi.spyOn`,
+  `vi.mock`, `vi.restoreAllMocks`, `vi.resetAllMocks`, `vi.clearAllMocks`)
+  for a literal drop-in port, but this repo prefers the native `spyOn`/
+  `mock` names over that alias.
+- Bun's test runner internally resolves the bare `'vitest'` module specifier
+  to its own `bun:test` implementation, even with no `vitest` package in
+  `node_modules` at all — `import { describe, it, expect } from 'vitest'`
+  still runs correctly under `bun test`. So `bun test` passing is NOT proof
+  that every `vitest` import has been ported; grep for the literal string
+  `from 'vitest'` to confirm a port is complete rather than relying on test
+  failures to catch a missed file.
+- This repo's root `tsconfig.json` excludes `**/*.test.ts` from
+  `bunx tsc --noEmit` entirely (a comment there tracks burning this down in
+  `.specs/test-type-checking.md`, which does not exist in this repo yet).
+  Because of that, a per-file/editor TypeScript diagnostic inside a test
+  file (e.g. `bun:test`'s `expect(...).toEqual()` overloads rejecting a
+  `readonly T[]` where vitest's looser typing accepted it) can appear
+  without ever showing up in the project's own `bunx tsc --noEmit` gate —
+  confirm against that actual command before treating such a diagnostic as
+  a real build break.
+- A few TSDoc comments describe historical rationale tied specifically to
+  vitest running the suite under Node while the real spawner is
+  `Bun.spawn` (e.g. `src/utils/claude.ts`, `src/utils/claude.test.ts`:
+  "the root suite run[s] vitest under node"; `src/effort/store.ts`:
+  "under vitest on NODE"). Now that the whole suite runs under `bun:test`
+  (i.e. under Bun, not Node), that specific rationale is stale, but a
+  literal "vitest" → "bun:test" word swap there would be actively wrong
+  (the suite no longer runs "under node" either) — left untouched as
+  outside the scope of a mechanical import port; a later doc-focused task
+  should re-derive the rationale rather than search-and-replace it.

@@ -115,8 +115,9 @@ import {
   describe,
   expect,
   it,
-  vi,
-} from 'vitest';
+  mock,
+  spyOn,
+} from 'bun:test';
 
 import { commitFinishedTask } from '../start.js';
 import { findNextTask } from '../utils/tracker.js';
@@ -181,23 +182,23 @@ let errors: string[] = [];
  * Captures the helper's own output.
  *
  * Through a spy on `console` and not a `process.stdout.write` patch:
- * vitest replaces the console object, so a stream capture reads zero
+ * bun:test replaces the console object, so a stream capture reads zero
  * lines here and every absence assertion below would pass against a
  * helper that reported nothing at all.
  */
 beforeEach(() => {
   logs = [];
   errors = [];
-  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     logs.push(args.map(String).join(' '));
   });
-  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+  spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
     errors.push(args.map(String).join(' '));
   });
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 /** Runs git in a repository, reading back rather than through git.ts. */

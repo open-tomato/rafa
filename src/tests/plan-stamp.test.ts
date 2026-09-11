@@ -9,7 +9,7 @@
  * guard stayed green. Nothing else here would catch that.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { resolveSessionPlan } from '../effort/attribution.js';
 import { classifyPromptContent } from '../effort/classify.js';

@@ -123,7 +123,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const PAGE_PATH = 'context/workflow.md';
