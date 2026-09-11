@@ -131,3 +131,28 @@
   context-page-imports.test.ts` already does (`existsSync(packages) ?
   readdirSync(packages) ... : []`), rather than assuming a passing test
   run proves the read is safe.
+- `.githooks/pre-commit` already pointed at
+  `scripts/control-byte-gate/control-byte-gate.ts` before this task ran —
+  it was ported/written correctly in an earlier stage even though an
+  earlier task's own notes said the hook's path wasn't verified. When a
+  scoped task's own checklist line says to "align" a file, check its
+  current content first; it may already satisfy the target and need no
+  edit.
+- `bunx eslint .` currently fails at startup with `ERR_MODULE_NOT_FOUND:
+  Cannot find package '@eslint/js'` — `node_modules/@eslint` doesn't exist
+  even though `@eslint/js` is listed in `package.json` `devDependencies`,
+  i.e. `bun install` has not been run (or not run since that dependency
+  was added) in this worktree. This is unrelated to any `src/`-layout
+  path/config content and needs a `bun install`, not a config edit, to
+  clear — don't mistake it for a config-correctness problem when auditing
+  `eslint.config.mjs`/`eslint.base.mjs`.
+- `bunx tsc --noEmit` is clean against `tsconfig.json` `"include": ["src",
+  "scripts", "*.ts", "*.mjs"]` (scripts/ needed adding alongside src/,
+  since the file previously only listed the nonexistent `tools`).
+- `bun test` as of this task has 3 pre-existing failures, all in
+  `src/tests/context-page-imports.test.ts`'s "the context/ pages are
+  pointed at, never imported" describe block — they fail because
+  `AGENTS.md`/`context/` don't exist at repo root yet (added by the later
+  "Bootstrap the routing surface" stage per the plan). Not caused by, or
+  fixable within, a config-alignment task; expected to clear once that
+  stage lands.
