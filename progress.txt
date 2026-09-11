@@ -1,5 +1,3 @@
-# Progress notes
-
 - This repo (`open-tomato/rafa`) is a single-package bun repo: `package.json`,
   `src/`, `scripts/` at the root, no `packages/` directory and no workspace
   boundaries. Agent/doc files ported from the sibling
@@ -26,6 +24,10 @@
 - Bun's test runner resolves a bare `'vitest'` specifier to its own
   `bun:test` even with no `vitest` package installed, so `bun test` passing
   is NOT proof a port is complete — grep for the literal `from 'vitest'`.
+  The one left is `import { describe, expect, it } from 'vitest'` in
+  `scripts/control-byte-gate/control-byte-gate.test.ts`, which uses no
+  vitest-specific API and sits outside `src/`, so the `src/` port never
+  touched it. A task touching `scripts/` should swap that specifier too.
 - `tsconfig.json` excludes `**/*.test.ts` from `bun run check-types`
   (`tsc --noEmit`); its comment points at `.specs/test-type-checking.md`,
   which doesn't exist in this repo yet. So an editor diagnostic inside a
@@ -39,6 +41,10 @@
   Bun, so that rationale is stale, but a literal "vitest" → "bun:test" swap
   would be wrong too (it no longer runs "under node" either) — a doc task
   should re-derive the rationale rather than search-and-replace it.
+  Fixing `store.ts`'s note (its "SQLite would be untestable" rationale)
+  also falsifies `store/ndjson.ts`, which says `store.ts` is byte-identical
+  to the sibling's `tools/ralph/effort/store.ts` (`diff` still exits 0):
+  fix both in one change, or leave the note to the task retiring store.ts.
 - Not every `tools/ralph` string inside `src/` is a path to repoint. Only
   genuine path literals (TSDoc file references, `new URL`/`readFileSync`
   targets, CLI usage examples) belong at `src/`. Leave test fixture text
@@ -53,62 +59,31 @@
   `../../`. A wrong depth need not throw — `../../../` from there lands in
   the parent `open-tomato/` checkout, which has its own `packages/`,
   `AGENTS.md` and `.gitignore`, so guards read the wrong tree and still
-  pass. Print the resolved absolute path once and check it against `pwd`.
-- This repo has no `packages/`, so an unguarded
-  `readdirSync(join(root, 'packages'))` only throws once `root` really
-  resolves here — a wrong root masks it, and a passing run proves nothing.
-  Guard every such read with `existsSync`, as `findAgentsMaps` in
+  pass, and an unguarded `readdirSync(join(root, 'packages'))` throws only
+  once `root` really resolves here, where there is no `packages/`. Print
+  the resolved absolute path once and check it against `pwd`, and guard
+  every such read with `existsSync`, as `findAgentsMaps` in
   `src/tests/context-page-imports.test.ts` does.
-- `.githooks/pre-commit` (wired by `core.hooksPath=.githooks`) already runs
-  `scripts/control-byte-gate/control-byte-gate.ts --staged`. When a task
-  says to "align" a file, check its current content first; it may already
-  satisfy the target and need no edit.
-- `bunx eslint .` fails at startup with `ERR_MODULE_NOT_FOUND: Cannot find
-  package '@eslint/js'`: `node_modules/@eslint` doesn't exist although
-  `@eslint/js` is in `devDependencies`, i.e. `bun install` hasn't run since
-  it was added. It needs a `bun install`, not a config edit — don't mistake
-  it for a problem in `eslint.config.mjs`/`eslint.base.mjs`.
-- `bun test` is green over the whole `src/` suite (656 pass, 1 skip, 0 fail,
-  26 files under `src/` plus `scripts/control-byte-gate/`, 27 total) —
-  confirmed stable across three repeat runs, under `--randomize` (default
-  and `--seed=42`), and via the `bun run test` script; all exit 0. A grep
-  for `expect.extend`, fake timers, `vi.mock`/`mock.module`, and
-  `import.meta.vitest` across `src/` found none, so nothing in the ported
-  suite depends on a vitest-only mocking feature bun:test lacks.
-- The suite's one skip is the genuine "passes only under vitest" case the
-  port needed to preserve rather than delete: `src/utils/claude.test.ts`'s
-  `it.skipIf(HAS_BUN)('defaults to the real spawner', ...)` asserts
-  `runClaude(prompt)` rejects with a `ReferenceError` naming `Bun` when no
-  spawner is injected — true only when `globalThis.Bun` is undefined, which
-  happens under vitest-on-Node but never under `bun test` (where `Bun` is
-  always defined). It is intentionally guarded with `skipIf`, not deleted,
-  and its file header documents why; `src/effort/collect.test.ts`'s
-  `it.skipIf(isRoot)` is a different, unrelated environment guard (root vs.
-  non-root file permissions) and is not a vitest-vs-bun case.
-- `scripts/control-byte-gate/control-byte-gate.test.ts` still has a literal
-  `import { describe, expect, it } from 'vitest'` — the only remaining one
-  in the repo. It predates the sibling import (it was one of the 3 files in
-  the pre-import baseline) and sits outside `src/`, so the "port every test
-  file under `src/`" task never touched it; it uses only
-  `describe`/`expect`/`it` with no vitest-specific API, so it is not a
-  vitest-only-passing test, just an unported literal riding on bun's
-  `'vitest'`-to-`bun:test` shim (see the entry above on that shim). Left
-  as-is as out of this phase's `src/` import scope; a future task touching
-  `scripts/` should swap this one specifier too.
-- After `bun install` (which brings in `@eslint/js` and the rest, per the
-  entry above), `bunx tsc --noEmit` and `bunx eslint src/` are both green
-  (0 errors, 0 warnings, 48 files linted under `src/` including tests).
-  `bunx eslint .` — run with no path, as the plan literally writes it —
-  is NOT green: it reports 4 pre-existing errors, all outside `src/` and
-  all outside this phase's scope: an `import/order` self-lint failure in
-  root `eslint.base.mjs`, `quotes`/`eol-last` in the placeholder root
-  `index.ts` (both from the initial commit, predating the sibling import),
-  and the already-documented `scripts/control-byte-gate/control-byte-gate.test.ts`
-  vitest-import case above. A future task that runs `bunx eslint .`
-  expecting a clean exit for the WHOLE repo (e.g. anything in the
-  "Package and cutover" stage) will need to fix those three root/scripts
-  items too; a task scoped to `src/` should invoke `eslint src/`, not `.`,
-  to avoid being blocked by them.
+- `.githooks/pre-commit` (wired by `core.hooksPath=.githooks`) runs
+  `scripts/control-byte-gate/control-byte-gate.ts --staged`, so it is the
+  first run to see a new file. Add `--include-untracked` to a manual
+  `bun scripts/control-byte-gate/control-byte-gate.ts` run to check files
+  that are not yet git-added.
+- The skip `it.skipIf(HAS_BUN)('defaults to the real spawner', ...)` in
+  `src/utils/claude.test.ts` is a genuine "passes only under vitest" case,
+  kept on purpose rather than deleted: it asserts `runClaude(prompt)`
+  rejects with a `ReferenceError` naming `Bun` when no spawner is injected,
+  true only when `globalThis.Bun` is undefined (vitest on Node), never
+  under `bun test`. Its file header documents why.
+  `src/effort/collect.test.ts`'s `it.skipIf(isRoot)` is an unrelated
+  root-vs-non-root permissions guard, not a vitest-vs-bun case.
+- `bun run lint` is `eslint .`, and it exits 1 on 4 pre-existing errors,
+  none under `src/`: an `import/order` self-lint failure in root
+  `eslint.base.mjs`, `quotes` and `eol-last` in the placeholder root
+  `index.ts`, and `import/no-unresolved` on the vitest import above. A
+  task scoped to `src/` should run `eslint src/`, not `.`, to avoid being
+  blocked by them; one that needs the whole repo green, as anything in
+  the "Package and cutover" stage may, must fix those three files.
 - `node_modules` in this repo can be in a partial state — only a handful of
   packages present (e.g. `@types`, `bun-types`, `typescript`) with the rest
   of `devDependencies` missing — even though `bun.lock` and `package.json`
@@ -116,11 +91,6 @@
   and check its output (packages added vs. already satisfied) before
   concluding a missing-module error is a real code/config bug rather than
   a stale `node_modules`.
-- The Bash tool's shell is zsh, where `${PIPESTATUS[0]}` expands EMPTY
-  (zsh spells it `$pipestatus`, 1-indexed). `cmd | tail; echo "Exited with
-  code ${PIPESTATUS[0]}"` therefore prints a blank code, which is no
-  reading at all. Capture `$?` from an unpiped command instead:
-  `cmd > /tmp/x.log 2>&1; ec=$?; tail /tmp/x.log; echo "Exited with code $ec"`.
 - `Bun.file(path).exists()` answers false for a DIRECTORY (and `.text()`
   on one throws EISDIR), measured on bun 1.3.14, so it cannot answer "is
   anything at this path". Use `existsSync` wherever an unreadable path
@@ -192,10 +162,6 @@
   `./node_modules/.bin/tsc -p <it>`. Measured: without `typeRoots` it
   fails on `node:fs` and `process`. Plant a deliberate type error once
   to prove the check is live.
-- `bun:sqlite` is synchronous on bun 1.3.14. `Statement.run` returns
-  `{ changes, lastInsertRowid }` and `.all()` returns an array, and
-  neither is a Promise. A SQLite backend can therefore implement the
-  synchronous store port without awaiting.
 - The NDJSON backend is `src/effort/store/ndjson.ts`.
   `openNdjsonStore(repoRoot)` gives the port's `append`, `keys` and
   `read`, plus `path(kind)` (the kind's file) and `readRows(kind)` (the
@@ -208,24 +174,16 @@
   `ndjson.test.ts` over (it imports `openEffortStore`), not deleting
   them.
 - A kind added to `EffortRowByKind` in `store/types.ts`, such as a future
-  `findings` kind, breaks `check-types` in `store/ndjson.ts`, with
-  TS2345 at every `effortStorePath` call. It keeps failing until
-  `STORE_FILE_NAMES` in `src/effort/store.ts` names that kind's file.
-  Measured. A table only the SQLite backend holds belongs outside the
-  port's row map, or else the NDJSON backend has to take it too.
+  `findings` kind, breaks `check-types` in both backends, measured: TS2345
+  at every `effortStorePath` call in `store/ndjson.ts` until
+  `STORE_FILE_NAMES` in `src/effort/store.ts` names that kind's file, and
+  TS2741 in `store/sqlite.ts` until `KIND_TABLES` has an entry for it. A
+  table only the SQLite backend holds belongs outside the port's row map,
+  or else the NDJSON backend has to take it too.
 - To test "exists but cannot be read", plant a DIRECTORY at the file's
   path. `readFileSync` then throws `EISDIR: illegal operation on a
   directory, read`, measured on bun 1.3.14. Unlike a `chmod 000` plant,
   this also fails as root, so it needs no `it.skipIf(isRoot)`.
-- To drive runtime mutations against a module, write a scratch bun
-  script under `/tmp` that does the following for each mutation:
-  string-replace the module in place; assert that the replacement
-  changed the text; run only the colocated test file; write the
-  original back in a `finally`. Also run the unmutated module once as
-  the control, and afterwards `cmp` the module against a `/tmp` backup.
-  The assert matters because a pattern that matches nothing leaves the
-  module unchanged, and its green run would then pass for a surviving
-  mutant.
 - The Bash tool's zsh globs an unquoted `grep --include=*.ts` itself.
   It prints `no matches found` and grep never runs, and that empty
   output reads like "no hits". Quote the pattern: `--include='*.ts'`.
@@ -239,11 +197,12 @@
   history is `SQLITE_MIGRATIONS`. A schema change APPENDS an entry and
   never edits a shipped one. The version is the array's length, held in
   `PRAGMA user_version`. `migrateSchema(db, path, migrations?)` is
-  exported so a synthetic history can be driven on a `:memory:` db. A
-  new port kind also needs a `KIND_TABLES` entry, or check-types fails
-  with TS2741, measured.
+  exported so a synthetic history can be driven on a `:memory:` db.
 - `bun:sqlite` facts, measured on bun 1.3.14 on macOS, where bun uses
   Apple's system SQLite (3.51.0 here):
+  - It is synchronous: `.all()` returns an array and `Statement.run`
+    returns `{ changes, lastInsertRowid }`, neither a Promise, so a
+    backend implements the synchronous store port without awaiting.
   - `new Database(path)` with no options CREATES a missing file.
     `{ readwrite: true }`, with or without `create: false`, refuses one
     with `SQLITE_CANTOPEN` and creates nothing.
@@ -278,11 +237,34 @@
   file's non-ASCII code points with a bun one-liner to see what really
   landed. The braced form (`\u{e9}`) got through where the plain form
   kept being decoded.
-- Editing `src/effort/store.ts`, even just to fix its stale "SQLite
-  would be untestable" note, breaks another sentence: `store/ndjson.ts`
-  says store.ts is byte-identical to the sibling's
-  `tools/ralph/effort/store.ts`. `diff` still exits 0. Fix both in one
-  change, or leave the note to the task that retires store.ts.
-- `bun scripts/control-byte-gate/control-byte-gate.ts --include-untracked`
-  checks files that are not yet git-added. Without the flag, the
-  pre-commit hook's `--staged` run is the first to see a new file.
+- The store's entry is `src/effort/store/index.ts`, the module the
+  spec's `exports` map builds `./store` from. `selectEffortStore(root,
+  config)` takes the `config` FIELD of what `loadConfig` and
+  `resolveConfig` answer (the resolution itself is refused with a
+  `TypeError`), and never reads `.rafa/config.yaml` itself. It answers
+  the port plus `path(kind)`. Import the store from `./store/index.js`:
+  `./store.js` is still the sibling's file-bound module, with its own,
+  different `openEffortStore`. Backend-only readings (`readRows`,
+  `separatedPartialLine`) need that backend's opener, also exported
+  there. `index.test.ts` pins the entry's runtime export list, so a new
+  export has to be added there too.
+- The Bash tool's shell is zsh, where `${PIPESTATUS[0]}` is EMPTY (zsh
+  spells it `$pipestatus`, lowercase and 1-indexed). Measured: `bun
+  test f | tail; echo "Exited with code ${PIPESTATUS[0]}"` printed no
+  code at all. Redirect a gate to a file and read `$?` instead, so a
+  missing exit code cannot pass for a zero.
+- `import/order` puts every `import type` line in ONE group, and
+  eslint-plugin-import 2.32's sorter never compares a sibling path with
+  a parent one by name: it stops at the differing first segment and
+  sorts by segment COUNT, fewer `/` first. So `./types.js` must precede
+  `../../config.js` in the type block, while `../store.js` and
+  `./types.js` tie and pass in either order (`store/ndjson.ts`). Value
+  imports sit in separate parent and sibling groups, so it never arises
+  there. An import of `./index.js` is the `index` group: after the
+  sibling group, behind its own blank line.
+- To drive runtime mutations against a suite, run a bun script from
+  OUTSIDE the repo that swaps one exact string in the module (assert it
+  matches once), runs `bun test <file>` through `Bun.spawnSync`, writes
+  the original back, and compares a sha of the module at the end. The
+  module is mutated in place, so no copy is left for `git add -A`, but
+  nothing else may run the suite meanwhile.
