@@ -264,7 +264,10 @@
   `RAFA_PARITY_LOG_DIR` and `RAFA_PARITY_STORE_DIR`; both defaults
   derive from `~/projects/agentic-research` and resolve PRESENT on this
   machine (1,053 loose logs), so a suite gated on it runs in every
-  plain `bun test` here. It locates nothing else.
+  plain `bun test` here. It locates nothing else: a test needing the
+  sibling checkout's git history or `.plans/` roster (both parity
+  tests do) derives that root itself, independent of the overrides, as
+  `join(homedir(), 'projects', 'agentic-research')`.
 - `collectEffort`'s `repoRoot` also sets the default `plansDir`
   (`<repoRoot>/.plans`, the roster `planStub` resolves against), the
   commit half's git cwd, and, with no `store` passed, where the store
@@ -274,47 +277,23 @@
   or keep `repoRoot` a temp root and pass `plansDir` and `readCommits`.
 - User-level skills `env-gated-suite-skip-readings` (the three-leg
   proof that a skip came from its gate) and
-  `port-parity-differential-testing` fit the parity stage. Both were
-  measured under vitest; the describe-body reading held on bun 1.3.14
-  too (`describe.skipIf(true)` still runs its callback, so keep a
-  fixture's reading in `beforeAll` or a case).
-- Confirmed on bun 1.3.14, `describe.skipIf(true)(...)`: the describe
-  callback runs (so a plain module-scope reading executes either way,
-  per the note above), but a `beforeAll`/`afterAll`/`it` REGISTERED
-  inside it does not run its body at all when skipped — each just
-  reports `(skip)`. So heavy setup belongs in `beforeAll` not only to
-  keep a readable reason in scope, but because it is the thing that
-  is actually skipped.
+  `port-parity-differential-testing` fit the parity stage; both were
+  measured under vitest. On bun 1.3.14 `describe.skipIf(true)(...)`
+  still runs its callback, so a module-scope reading executes either
+  way, while a `beforeAll`/`afterAll`/`it` registered inside it never
+  runs its body and only reports `(skip)`: keep a fixture's reading
+  and any heavy setup in `beforeAll` or a case, the part a skip skips.
 - `beforeAll`/`it` in `bun:test` take an optional second argument,
   `HookOptions = number | { timeout?: number }`
-  (`node_modules/bun-types/test.d.ts`), overriding the 5000ms per-hook
-  default. The default is PER HOOK, not per assertion inside it: a
-  `beforeAll` running two sequential heavy operations (e.g. collecting
-  through two store backends) needs one explicit timeout for the
-  whole hook, not two. Measured failure shape when it is missing:
+  (`node_modules/bun-types/test.d.ts`), overriding the 5000ms default,
+  which is PER HOOK, not per assertion inside it. A full
+  `collectEffort` run (both halves) over the live sibling (~1,053 loose
+  logs, ~1.3GB; ~1,214 commits) took ~4-5s per backend, measured
+  2026-09-11, so a `beforeAll` collecting through both backends needs
+  one explicit timeout for the whole hook. Missing, it fails as
   `(fail) ... > (unnamed) [5000.13ms] a beforeEach/afterEach hook
-  timed out for this test` — blaming an unnamed test rather than
-  naming the hook, which reads like a fixture problem rather than a
-  timeout.
-- A full `collectEffort` run (sessions and commits, both halves) over
-  the live sibling directory (`~/.claude/projects/-Users-marcos-projects-agentic-research`,
-  ~1053 loose logs / ~1.3GB; `~/projects/agentic-research`'s ~1214
-  commits) took ~4-5s per backend, measured 2026-09-11. Cheap enough
-  to run on every `bun test` here, as the fixture note already flags,
-  but still needs an explicit `beforeAll` timeout (see above) once a
-  case runs the collector more than once.
-- `resolveParityFixture` (`src/tests/parity-fixture.ts`) locates ONLY
-  two things — the session log directory and the sibling's stored-row
-  files — never the sibling checkout's git repository or its
-  `.plans/` roster (its own module note says so explicitly). A test
-  needing the commit half or the plan roster (both parity tests do)
-  must derive the checkout root itself, independent of the fixture's
-  own overridable paths: `join(homedir(), 'projects',
-  'agentic-research')` on the machine the parity stage was written
-  on. Pass that as `CollectOptions.repoRoot` together with an
-  explicit `store` opened under a scratch temp root to reach the real
-  git history and roster while writing nothing into the sibling's own
-  `.ralph/` (the config file is never read once `store` is passed).
+  timed out for this test`, blaming an unnamed test instead of naming
+  the hook, which reads like a fixture problem rather than a timeout.
 - Both effort-store backends' `read(kind)` answer rows that were
   themselves round-tripped through `JSON.parse` (of an NDJSON line, or
   of SQLite's `row_json` column), so the strongest "byte-identical"
@@ -330,3 +309,46 @@
   buckets including one `(none)` bucket of 105 out of ~1053 sessions),
   which is useful non-vacuity evidence for any test grouping the live
   fixture's sessions by plan stub.
+- The lineage parity test (`src/tests/parity-lineage.test.ts`, beside
+  `parity-differential.test.ts`) runs `collectEffort` ONCE, through the
+  NDJSON backend, over the live sibling directory, and compares what it
+  answers to the rows already sitting in the sibling's OWN
+  `sessions.ndjson`/`commits.ndjson` (read via `readStoreRows` — see
+  below), not to another fresh collection. A second collect over a live
+  directory is NOT guaranteed to reproduce an already-stored row
+  byte-for-byte, beyond the `mode`/`issueIdentifier`/`planStubPatch`
+  drift already noted: measured 2026-09-11, 3 of the sibling's 1,052
+  stored session rows are frozen mid-session in exactly the sense
+  `effort/collect.ts`'s own module note describes — the log at that
+  `sessionId` kept growing after the sibling's collector read it, so
+  `sizeBytes`, `modifiedAt`, and every content-derived field
+  (`lineCount`, `usage`, `lastTimestamp`, `gitBranchCounts`, etc.)
+  legitimately differ from the frozen row. Detect this by `sizeBytes`
+  and `modifiedAt` alone, asserting them monotonic (never smaller than
+  what was stored) rather than diffing every field — a row that shrank
+  is a real mismatch, not this, and should fail loudly rather than being
+  waved through by the same check.
+- `readStoreRows<Record<string, unknown>>(path)` (exported from
+  `src/effort/store.ts`) is the safe way to read an NDJSON store file
+  whose rows predate a field the CURRENT row type declares (e.g. the
+  sibling's session rows predating `mode`/`issueIdentifier`): it only
+  asserts a line parses to a plain JSON object and never checks a
+  shape, so a foreign-schema row round-trips exactly as it was written.
+  Reading such a file through a typed `EffortStore` instead would claim
+  fields the row never carries.
+- Dropping a known set of keys from a row for a projection comparison
+  needs an `omit`-style loop over `Object.entries`, not
+  `const { mode: _mode, ...rest } = row` — this repo's eslint config
+  sets no ignore pattern for `@typescript-eslint/no-unused-vars` (nor
+  `ignoreRestSiblings`), so the discarded destructured bindings are
+  flagged even when underscore-prefixed. Measured by planting the
+  pattern and running `eslint` on it.
+- A fresh `SessionEffortRow` with `mode` and `issueIdentifier` dropped
+  reproduces the sibling's own stored session row's exact key order
+  (`effort/collect.ts` builds the row by spreading the session stats
+  and then appending the rest in the reconciled schema's order, and the
+  sibling's rows were built the same way minus those two fields), which
+  is what lets a projection be compared with plain `JSON.stringify`
+  equality instead of a canonicalizer. Against the live store, every
+  stored commit row compares byte-identical with no projection at all;
+  only session rows need one.
