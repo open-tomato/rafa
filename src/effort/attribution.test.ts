@@ -35,17 +35,36 @@
  * instead of null, taking the first histogram entry instead of the
  * modal one, breaking a tie the other way, and falling the plan stub
  * back to the branch stub.
+ *
+ * The issue-identifier cases transcribe three more real names: this
+ * repo's own run branch, which a generic team key misreads, and the
+ * two issue branches the open-tomato repo carried, both lower-case and
+ * one without a slash. Fourteen further mutations of that derivation
+ * were driven the same way, each reddening at least one case with the
+ * restored module green before and after: taking any letter run as a
+ * team key, matching case-sensitively, dropping the upper-casing, the
+ * word boundaries, the dedupe within a name, the team-key validation
+ * or the empty-list guard, searching a declared issue instead of
+ * anchoring it, ignoring the declaration, ranking the branch above the
+ * plan stub, taking the first identifier of an ambiguous source,
+ * searching the branch stub instead of the whole branch, reading the
+ * stamped stub instead of the resolved plan, and falling the issue
+ * back to the branch stub.
  */
 import type { PlanStubMatch } from './attribution.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { stampPrompt } from '../utils/plan-stamp.js';
+
 import {
   attributeBranch,
   attributeSession,
   dominantBranch,
+  issueIdentifiersIn,
   planStubsFromFileNames,
   queueIdOf,
+  resolveIssueIdentifier,
   resolvePlanStub,
   taskTextFromPrompt,
 } from './attribution.js';
@@ -548,6 +567,204 @@ describe('dominantBranch', () => {
   });
 });
 
+/** This repo's own run branch, which a generic team key would misread. */
+const THIS_REPO_BRANCH = 'feat/phase-0-package-parity-cutover';
+
+/** Every measured branch name, plus this repo's own. */
+const PLAN_WORD_BRANCHES: readonly string[] = [
+  ...MEASURED_BRANCHES.map((row) => row.branch),
+  THIS_REPO_BRANCH,
+];
+
+describe('issueIdentifiersIn', () => {
+  it('reads a lower-case identifier out of a branch, upper-cased', () => {
+    expect(issueIdentifiersIn('feat/opt-407-control-byte-gate'))
+      .toEqual(['OPT-407']);
+  });
+
+  it('reads one out of a slashless branch', () => {
+    expect(issueIdentifiersIn('opt-363-e2e-harness')).toEqual(['OPT-363']);
+  });
+
+  it('reads an upper-case identifier as written', () => {
+    expect(issueIdentifiersIn('feat/OPT-12-add-login')).toEqual(['OPT-12']);
+  });
+
+  it('reads nothing out of the measured branches or this repo run', () => {
+    expect(PLAN_WORD_BRANCHES.flatMap((name) => issueIdentifiersIn(name)))
+      .toEqual([]);
+  });
+
+  it('would misread four of them under a key that is a plan word', () => {
+    // The control for the case above: the pattern is live on these very
+    // names, and the key list is the only thing keeping them out.
+    const read = PLAN_WORD_BRANCHES
+      .flatMap((name) => issueIdentifiersIn(name, ['PHASE']));
+    expect(read).toEqual(['PHASE-3', 'PHASE-2', 'PHASE-1', 'PHASE-0']);
+  });
+
+  it('is word-bounded at both ends', () => {
+    expect(issueIdentifiersIn('feat/xopt-12-thing')).toEqual([]);
+    expect(issueIdentifiersIn('feat/opt-12a-thing')).toEqual([]);
+    expect(issueIdentifiersIn('feat/opt12-thing')).toEqual([]);
+    expect(issueIdentifiersIn('feat/opt--12-thing')).toEqual([]);
+  });
+
+  it('collapses one identifier named twice', () => {
+    expect(issueIdentifiersIn('opt-5-redo-of-opt-5')).toEqual(['OPT-5']);
+  });
+
+  it('answers two distinct identifiers in the order they appear', () => {
+    expect(issueIdentifiersIn('feat/opt-2-after-opt-1'))
+      .toEqual(['OPT-2', 'OPT-1']);
+  });
+
+  it('honours a caller-supplied team key list', () => {
+    expect(issueIdentifiersIn('feat/eng-42-billing', ['ENG']))
+      .toEqual(['ENG-42']);
+    expect(issueIdentifiersIn('feat/eng-42-billing')).toEqual([]);
+  });
+
+  it('reads nothing against an empty key list, not an error', () => {
+    expect(issueIdentifiersIn('feat/opt-407-control-byte-gate', []))
+      .toEqual([]);
+  });
+
+  it('refuses a team key that could not open an identifier', () => {
+    for (const key of ['', 'O.T', '7OPT', 'OPT-']) {
+      expect(() => issueIdentifiersIn('feat/opt-1', [key]))
+        .toThrow(/unusable issue team key/);
+    }
+  });
+
+  it('answers nothing for null, undefined and empty', () => {
+    expect(issueIdentifiersIn(null)).toEqual([]);
+    expect(issueIdentifiersIn(undefined)).toEqual([]);
+    expect(issueIdentifiersIn('')).toEqual([]);
+  });
+});
+
+describe('resolveIssueIdentifier', () => {
+  it('answers the branch identifier when only the branch has one', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'feat/opt-407-control-byte-gate',
+      planStub: null,
+    })).toEqual({
+      identifier: 'OPT-407',
+      source: 'branch',
+      candidates: ['OPT-407'],
+    });
+  });
+
+  it('answers the plan stub identifier when only the plan has one', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'main',
+      planStub: 'opt-410-plan-format',
+    })).toEqual({
+      identifier: 'OPT-410',
+      source: 'plan-stub',
+      candidates: ['OPT-410'],
+    });
+  });
+
+  it('answers a declared plan issue, trimmed and upper-cased', () => {
+    expect(resolveIssueIdentifier({
+      branch: null,
+      planStub: null,
+      planIssue: '  opt-9\n',
+    })).toEqual({
+      identifier: 'OPT-9',
+      source: 'plan-issue',
+      candidates: ['OPT-9'],
+    });
+  });
+
+  it('answers null, never the branch stub, when neither has one', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'feat/q19-loop-economics',
+      planStub: 'q19-loop-economics',
+    })).toEqual({ identifier: null, source: 'none', candidates: [] });
+  });
+
+  it('ranks the plan above the branch and keeps the disagreement', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'feat/opt-407-control-byte-gate',
+      planStub: 'opt-410-plan-format',
+    })).toEqual({
+      identifier: 'OPT-410',
+      source: 'plan-stub',
+      candidates: ['OPT-410', 'OPT-407'],
+    });
+  });
+
+  it('ranks a declared issue above the plan stub', () => {
+    expect(resolveIssueIdentifier({
+      branch: null,
+      planStub: 'opt-410-plan-format',
+      planIssue: 'OPT-411',
+    })).toEqual({
+      identifier: 'OPT-411',
+      source: 'plan-issue',
+      candidates: ['OPT-411', 'OPT-410'],
+    });
+  });
+
+  it('collapses agreeing sources into one candidate', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'feat/opt-407-control-byte-gate',
+      planStub: 'opt-407-control-byte-gate',
+    })).toEqual({
+      identifier: 'OPT-407',
+      source: 'plan-stub',
+      candidates: ['OPT-407'],
+    });
+  });
+
+  it('passes over a malformed declaration to the next rank', () => {
+    const malformed = ['see OPT-9', 'OPT-9 and OPT-10', 'OPT', 'phase-0', ''];
+    for (const planIssue of malformed) {
+      expect(resolveIssueIdentifier({
+        branch: 'feat/opt-407-control-byte-gate',
+        planStub: null,
+        planIssue,
+      })).toEqual({
+        identifier: 'OPT-407',
+        source: 'branch',
+        candidates: ['OPT-407'],
+      });
+    }
+  });
+
+  it('reads nothing from a name carrying two distinct identifiers', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'feat/opt-2-after-opt-1',
+      planStub: null,
+    })).toEqual({
+      identifier: null,
+      source: 'none',
+      candidates: ['OPT-2', 'OPT-1'],
+    });
+  });
+
+  it('asks the branch when the plan stub is ambiguous', () => {
+    expect(resolveIssueIdentifier({
+      branch: 'feat/opt-1-fix',
+      planStub: 'opt-2-after-opt-1',
+    })).toEqual({
+      identifier: 'OPT-1',
+      source: 'branch',
+      candidates: ['OPT-2', 'OPT-1'],
+    });
+  });
+
+  it('honours a caller-supplied team key list', () => {
+    const sources = { branch: 'feat/eng-42-billing', planStub: null };
+    expect(resolveIssueIdentifier(sources, ['ENG']).identifier)
+      .toBe('ENG-42');
+    expect(resolveIssueIdentifier(sources).identifier).toBeNull();
+  });
+});
+
 describe('attributeSession', () => {
   it('builds the whole row for a task on a plan branch', () => {
     const row = attributeSession(
@@ -568,6 +785,8 @@ describe('attributeSession', () => {
       branchStub: 'q03-port-phase-3',
       planStub: 'q03-port-phase-3-build-dispatch',
       planStubMatch: 'queue-id',
+      issueIdentifier: null,
+      issueIdentifierSource: 'none',
       kind: 'task',
       taskText: 'Add the streaming reader',
     });
@@ -648,5 +867,75 @@ describe('attributeSession', () => {
     expect(row.branch).toBe('feat/q15-ui-pages');
     expect(row.distinctBranchCount).toBe(2);
     expect(row.planStub).toBe('q15-ui-pages');
+  });
+
+  it('carries the issue of a lower-case issue branch', () => {
+    const row = attributeSession(
+      {
+        sessionId: 'issue',
+        gitBranchCounts: { 'feat/opt-407-control-byte-gate': 30 },
+      },
+      taskPrompt('Add the gate'),
+      PLAN_STUBS,
+    );
+
+    expect(row.branchStub).toBe('opt-407-control-byte-gate');
+    expect(row.planStub).toBeNull();
+    expect(row.issueIdentifier).toBe('OPT-407');
+    expect(row.issueIdentifierSource).toBe('branch');
+  });
+
+  it('carries the issue of a slashless branch, which has no stub', () => {
+    const row = attributeSession(
+      { sessionId: 'slashless', gitBranchCounts: { 'opt-363-e2e-harness': 5 } },
+      null,
+      PLAN_STUBS,
+    );
+
+    expect(row.branchStub).toBeNull();
+    expect(row.issueIdentifier).toBe('OPT-363');
+    expect(row.issueIdentifierSource).toBe('branch');
+  });
+
+  it('takes the issue of the stamped plan over the branch', () => {
+    const row = attributeSession(
+      {
+        sessionId: 'stamped',
+        gitBranchCounts: { 'feat/opt-407-control-byte-gate': 30 },
+      },
+      stampPrompt('opt-410-plan-format', taskPrompt('Add the parser')),
+      [...PLAN_STUBS, 'opt-410-plan-format'],
+    );
+
+    expect(row.planStub).toBe('opt-410-plan-format');
+    expect(row.issueIdentifier).toBe('OPT-410');
+    expect(row.issueIdentifierSource).toBe('plan-stub');
+  });
+
+  it('lends no issue from a stamp naming an unknown plan', () => {
+    const row = attributeSession(
+      { sessionId: 'ghost', gitBranchCounts: { main: 3 } },
+      stampPrompt('opt-999-ghost', taskPrompt('Do a thing')),
+      PLAN_STUBS,
+    );
+
+    expect(row.planStub).toBeNull();
+    expect(row.issueIdentifier).toBeNull();
+    expect(row.issueIdentifierSource).toBe('none');
+  });
+
+  it('never offers the branch stub as the issue', () => {
+    const row = attributeSession(
+      {
+        sessionId: 'ci-gate',
+        gitBranchCounts: { 'chore/ralph-ci-gate': 7 },
+      },
+      taskPrompt('Add the CI gate'),
+      PLAN_STUBS,
+    );
+
+    expect(row.branchStub).toBe('ralph-ci-gate');
+    expect(row.issueIdentifier).toBeNull();
+    expect(row.issueIdentifierSource).toBe('none');
   });
 });

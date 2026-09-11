@@ -1,14 +1,14 @@
 /**
- * Attributes one session to the plan it was run for, and to the task
- * text it was dispatched with.
+ * Attributes one session to the plan it was run for, to the issue it
+ * was run for, and to the task text it was dispatched with.
  *
- * Both mappings are DERIVED rather than inferred. The reference
+ * Every mapping is DERIVED rather than inferred. The reference
  * implementation this collector is modelled on reaches a per-issue
  * attribution by text-matching prompt content and walking merge
  * commits — four functions and a cache. Neither is needed here: every
  * record in these logs carries a top-level `gitBranch`, and this
  * repo's task prompt is assembled by `start.ts` from a single tracker
- * line, so both halves are a split of a string the log already holds.
+ * line, so each mapping is read out of a string the log already holds.
  *
  * Measured over the live tree at the time of writing — 897 loose
  * session logs, 18 distinct branch values — 889 sessions carried
@@ -47,6 +47,43 @@
  * with a branch that resolved to nothing; folding the branch stub in as
  * a fallback here would make those two cases indistinguishable
  * downstream.
+ *
+ * The issue identifier is read from the same two names, the branch and
+ * the plan, and from nothing else. The reference searches prompt text,
+ * message bodies, session titles, touched paths, task summaries and
+ * commit subjects for one; a derivation over names needs none of that,
+ * for the reason the plan is not text-matched either.
+ *
+ * An identifier is a tracker TEAM KEY, a hyphen and digits, matched
+ * whole-word without regard to case and answered upper-cased: the
+ * reference's own grammar, with its one hard-coded key lifted into
+ * {@link ISSUE_TEAM_KEYS}. The key list is what keeps a plan stub from
+ * reading as an issue, and that is measured rather than feared. Over
+ * the eighteen branch values measured above plus this repo's own
+ * `feat/phase-0-package-parity-cutover`, a pattern taking ANY run of
+ * letters as a key reads `PHASE-3`, `PHASE-2`, `PHASE-1` and `PHASE-0`
+ * out of four of them, where the keyed one reads nothing. Ignoring case
+ * is not optional either: both issue branches the open-tomato repo
+ * carried are lower-case, `feat/opt-407-control-byte-gate` and
+ * `opt-363-e2e-harness`.
+ *
+ * The second of those has no slash, so {@link attributeBranch} gives it
+ * no stub, and that is why the identifier is searched for in the WHOLE
+ * branch name and never in the branch stub.
+ *
+ * The plan outranks the branch, for the reason the stamp does in
+ * {@link resolveSessionPlan}: a declared `issue:` is written by the
+ * planner and a plan stub names what was dispatched, while a branch is
+ * a naming habit, and only the modal one for a session that outlived
+ * its checkout. A disagreement is settled by that rank and stays
+ * visible in the candidates. One name carrying two DISTINCT
+ * identifiers is not settled at all — the reference takes the first —
+ * and answers nothing from that name.
+ *
+ * Nothing falls back. A session whose branch and plan carry no
+ * identifier answers null, never its branch stub, for the reason the
+ * plan stub does not: an issue column holding stubs would make an
+ * unlinked session indistinguishable from a linked one downstream.
  *
  * The task text is the FIRST LINE of the prompt with the shape's own
  * prefix removed, and that is exact rather than approximate:
@@ -129,6 +166,49 @@ export interface DominantBranch {
   distinctCount: number;
 }
 
+/**
+ * Where a session's issue identifier was read from, highest rank first.
+ *
+ * `plan-issue` is the plan's own declared `issue:` value, `plan-stub`
+ * the name of the plan the session resolved to, and `branch` the whole
+ * branch name. `none` means no source carried exactly one identifier.
+ */
+export type IssueIdentifierSource =
+  | 'plan-issue'
+  | 'plan-stub'
+  | 'branch'
+  | 'none';
+
+/** The names an issue identifier may be read out of. */
+export interface IssueIdentifierSources {
+  /** The branch name, whole — not its stub; see the module note. */
+  branch: string | null | undefined;
+  /** The plan stub the session RESOLVED to, not a stamp nobody knows. */
+  planStub: string | null | undefined;
+  /**
+   * The plan's declared issue, when the caller has read one: the
+   * `issue:` field of its `rafa:plan` header. Taken as a value rather
+   * than parsed here, for the reason the module note gives for the
+   * declaration block: parsing it here would be a second implementation
+   * of a grammar that gets its own module.
+   */
+  planIssue?: string | null | undefined;
+}
+
+/** The issue a session resolved to, and where it was read. */
+export interface IssueIdentifierResolution {
+  /** The upper-cased identifier, or null — never a stub standing in. */
+  identifier: string | null;
+  source: IssueIdentifierSource;
+  /**
+   * Every distinct identifier any source carried, highest rank first.
+   * More than one member means the sources disagreed, with each other
+   * or within one name, which is what keeps a disagreement reportable
+   * after the rank has settled it.
+   */
+  candidates: readonly string[];
+}
+
 /** One session's attribution row. Carries no transcript content. */
 export interface SessionAttribution {
   sessionId: string;
@@ -141,6 +221,9 @@ export interface SessionAttribution {
   /** The resolved plan, or null — never the branch stub as a fallback. */
   planStub: string | null;
   planStubMatch: PlanStubMatch;
+  /** The resolved issue, or null — never the branch stub as a fallback. */
+  issueIdentifier: string | null;
+  issueIdentifierSource: IssueIdentifierSource;
   kind: SessionKind;
   /** The dispatched task sentence, or null for every other kind. */
   taskText: string | null;
@@ -165,6 +248,29 @@ const PLAN_FILE_NAME = /^PLAN-(.+)\.md$/;
  * report it as a decisive match.
  */
 const QUEUE_ID = /^(q\d+[a-z]?)(?:-|$)/;
+
+/**
+ * The tracker team keys an issue identifier may open with.
+ *
+ * One key, `OPT`: the one the open-tomato collector hard-codes, and the
+ * only one on either issue branch that repo carries. No branch the
+ * sibling recorded carries an identifier at all. No config key holds a
+ * team list in this phase, so {@link resolveIssueIdentifier} and
+ * {@link issueIdentifiersIn} take one and default to this, while
+ * {@link attributeSession}, the collector's entry, uses this. A key
+ * missing from the list reads as no identifier — an unlinked session,
+ * never a misattributed one.
+ */
+export const ISSUE_TEAM_KEYS: readonly string[] = ['OPT'];
+
+/**
+ * A usable team key: a letter, then letters or digits.
+ *
+ * Checked before a key is joined into a pattern, so a key can never
+ * carry pattern syntax, and so an empty key cannot turn `-123` alone
+ * into an identifier.
+ */
+const TEAM_KEY = /^[A-Za-z][A-Za-z0-9]*$/;
 
 /** The task shape, looked up once; see the module note on drift. */
 const TASK_SHAPE = PROMPT_SHAPES.find((shape) => shape.kind === 'task');
@@ -326,16 +432,6 @@ export function dominantBranch(
 }
 
 /**
- * Builds one attribution row from a stats row and its enqueue content.
- *
- * Takes the two fields it reads rather than the whole
- * {@link SessionStats}, which keeps the coupling visible and lets a
- * caller holding only a histogram use it. The roster is required rather
- * than defaulted: an empty one is a legitimate answer — no `.plans/`
- * directory — and a caller that forgot to pass one would otherwise get
- * the identical all-`none` result with nothing saying which it was.
- */
-/**
  * Resolves a session's plan, stamp first and branch second.
  *
  * A stamp naming a plan the store does not know does NOT win. It is
@@ -356,6 +452,141 @@ export function resolveSessionPlan(
   return resolvePlanStub(branchStub, planStubs);
 }
 
+/**
+ * Joins the team keys into a pattern alternation, or null for none.
+ *
+ * Throws on an unusable key rather than skipping it: a key list is
+ * written by a caller, not read from a log, so a bad key is a mistake
+ * to report and not a record to tolerate. An empty list is legitimate
+ * — no tracker — and answers null, which every reader here takes as
+ * "no identifier".
+ */
+function teamKeyAlternation(teamKeys: readonly string[]): string | null {
+  for (const key of teamKeys) {
+    if (!TEAM_KEY.test(key)) {
+      throw new Error(
+        `effort attribution: unusable issue team key ${JSON.stringify(key)}`,
+      );
+    }
+  }
+  return teamKeys.length === 0
+    ? null
+    : teamKeys.join('|');
+}
+
+/**
+ * Every distinct issue identifier a name carries, upper-cased, in order.
+ *
+ * A word-bounded SEARCH, for names that hold an identifier among other
+ * words: `feat/opt-407-control-byte-gate` answers `OPT-407`, while
+ * `xopt-407` and `opt-407a` answer nothing. One identifier named twice
+ * is one; two distinct ones are both answered, and what that means is
+ * {@link resolveIssueIdentifier}'s call.
+ */
+export function issueIdentifiersIn(
+  name: string | null | undefined,
+  teamKeys: readonly string[] = ISSUE_TEAM_KEYS,
+): string[] {
+  const keys = teamKeyAlternation(teamKeys);
+  if (keys === null || typeof name !== 'string') return [];
+
+  const pattern = new RegExp(`\\b(?:${keys})-\\d+\\b`, 'gi');
+  const found = new Set<string>();
+  for (const match of name.matchAll(pattern)) {
+    found.add(match[0].toUpperCase());
+  }
+  return [...found];
+}
+
+/**
+ * The identifier a declared value IS, upper-cased, or null.
+ *
+ * Anchored where {@link issueIdentifiersIn} searches: a declaration
+ * names an issue and nothing else, so `see OPT-9` or `OPT-9 and OPT-10`
+ * is a malformed declaration, passed over as a stamp naming an unknown
+ * plan is, rather than a name with an identifier somewhere in it.
+ */
+function declaredIssueIdentifier(
+  value: string | null | undefined,
+  teamKeys: readonly string[],
+): string | null {
+  const keys = teamKeyAlternation(teamKeys);
+  if (keys === null || typeof value !== 'string') return null;
+
+  const match = new RegExp(`^(?:${keys})-\\d+$`, 'i').exec(value.trim());
+  return match === null
+    ? null
+    : match[0].toUpperCase();
+}
+
+/** What one source carried, in rank order. */
+interface IssueReading {
+  source: Exclude<IssueIdentifierSource, 'none'>;
+  identifiers: readonly string[];
+}
+
+/**
+ * Resolves a session's issue identifier from its plan and its branch.
+ *
+ * Rank order is the plan's declared issue, then the plan stub, then
+ * the whole branch name, and the first source carrying exactly ONE
+ * identifier answers. A source carrying two distinct ones answers
+ * nothing and the next rank is asked. When no source answers, the
+ * identifier is null and the source `none`: the branch stub is never
+ * offered in its place.
+ */
+export function resolveIssueIdentifier(
+  sources: IssueIdentifierSources,
+  teamKeys: readonly string[] = ISSUE_TEAM_KEYS,
+): IssueIdentifierResolution {
+  const declared = declaredIssueIdentifier(sources.planIssue, teamKeys);
+  const readings: readonly IssueReading[] = [
+    {
+      source: 'plan-issue',
+      identifiers: declared === null
+        ? []
+        : [declared],
+    },
+    {
+      source: 'plan-stub',
+      identifiers: issueIdentifiersIn(sources.planStub, teamKeys),
+    },
+    {
+      source: 'branch',
+      identifiers: issueIdentifiersIn(sources.branch, teamKeys),
+    },
+  ];
+  const candidates = [
+    ...new Set(readings.flatMap((reading) => reading.identifiers)),
+  ];
+
+  for (const reading of readings) {
+    if (reading.identifiers.length === 1) {
+      return {
+        identifier: reading.identifiers[0] ?? null,
+        source: reading.source,
+        candidates,
+      };
+    }
+  }
+  return { identifier: null, source: 'none', candidates };
+}
+
+/**
+ * Builds one attribution row from a stats row and its enqueue content.
+ *
+ * Takes the two fields it reads rather than the whole
+ * {@link SessionStats}, which keeps the coupling visible and lets a
+ * caller holding only a histogram use it. The roster is required rather
+ * than defaulted: an empty one is a legitimate answer — no `.plans/`
+ * directory — and a caller that forgot to pass one would otherwise get
+ * the identical all-`none` result with nothing saying which it was.
+ *
+ * The issue identifier reads the dominant branch WHOLE and the RESOLVED
+ * plan stub, so a stamp naming a plan nobody knows lends it nothing
+ * either. The collector reads no plan file, so no declared `issue:`
+ * reaches this entry.
+ */
 export function attributeSession(
   stats: Pick<SessionStats, 'sessionId' | 'gitBranchCounts'>,
   enqueueContent: string | null,
@@ -364,6 +595,10 @@ export function attributeSession(
   const dominant = dominantBranch(stats.gitBranchCounts);
   const branch = attributeBranch(dominant.branch);
   const plan = resolveSessionPlan(enqueueContent, branch.stub, planStubs);
+  const issue = resolveIssueIdentifier({
+    branch: branch.branch,
+    planStub: plan.stub,
+  });
 
   return {
     sessionId: stats.sessionId,
@@ -374,6 +609,8 @@ export function attributeSession(
     branchStub: branch.stub,
     planStub: plan.stub,
     planStubMatch: plan.match,
+    issueIdentifier: issue.identifier,
+    issueIdentifierSource: issue.source,
     kind: classifyPromptContent(enqueueContent),
     taskText: taskTextFromPrompt(enqueueContent),
   };

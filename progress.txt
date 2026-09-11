@@ -66,9 +66,7 @@
   run to check files not yet git-added.
 - `it.skipIf(HAS_BUN)('defaults to the real spawner', ...)` in
   `src/utils/claude.test.ts` is a genuine "passes only under vitest"
-  case, kept on purpose (its file header says why): with no spawner
-  injected, `runClaude(prompt)` rejects with a `ReferenceError` naming
-  `Bun` only when `globalThis.Bun` is undefined (vitest on Node).
+  case, kept on purpose (its file header says why).
   `src/effort/collect.test.ts`'s `it.skipIf(isRoot)` is an unrelated
   root-permissions guard.
 - `bun run lint` (`eslint .`) exits 1 on 4 pre-existing errors, none
@@ -166,14 +164,8 @@
   `migrateSchema(db, path, migrations?)` is exported so a synthetic
   history can be driven on a `:memory:` db.
 - `bun:sqlite` facts measured on bun 1.3.14 on macOS (Apple's SQLite
-  3.51.0) are recorded in `src/effort/store/sqlite.ts`'s header: open
-  refusals (`SQLITE_CANTOPEN`, `SQLITE_NOTADB`), a zero-byte file as an
-  empty database, `INSERT OR IGNORE` vs `ON CONFLICT (col) DO NOTHING`,
-  an all-duplicate append leaving the file byte-identical, rollback of
-  DDL and `user_version` with their transaction, lossy lone-surrogate
-  binding, the default `delete` journal vs WAL sidecars outliving a
-  close, no busy timeout, descriptors released on close. Not there:
-  `new Database(path)` CREATES a missing file, while
+  3.51.0) are recorded in `src/effort/store/sqlite.ts`'s header. Not
+  there: `new Database(path)` CREATES a missing file, while
   `{ readwrite: true }` (with or without `create: false`) refuses one;
   `OR IGNORE` also swallows CHECK violations; `Statement.run` returns
   `{ changes, lastInsertRowid }`, not a Promise; a trailing lone high
@@ -226,37 +218,22 @@
   `makeRepo` and `runCollect` in `src/effort/collect.test.ts` do this.
 - Both effort-store backends are held to one property in ONE
   `describe.each` file rather than duplicated per backend:
-  `src/effort/store/refusal.test.ts` (the keyless-batch refusal) and
-  `contract.test.ts` (append/read-back, key-set-from-rows, in-batch
-  dedupe, empty-append writes-nothing). Their `path(kind)` (on
-  `NdjsonEffortStore` and `SqliteEffortStore`, not on the base port) is
-  identically shaped, so a local `interface StoreWithPath extends
-  EffortStore { path: (kind: EffortRowKind) => string }` accepts
+  `src/effort/store/refusal.test.ts` and `contract.test.ts`, whose
+  headers say what each proves, the key-set-from-rows proof included.
+  Their local `StoreWithPath` (the port plus the identically shaped
+  `path(kind)` both backends add) accepts
   `openNdjsonStore`/`openSqliteStore` with no cast, and both backends
-  throw the identical message on a keyless row
-  (`effort store: row X of Y carries no key; batch refused`, from
-  `store.ts`'s `appendRows` and `sqlite.ts`'s `refused`), so one
-  `toThrow` assertion holds both. "The key set is derived from rows, not
-  a sidecar" is provable with no backend-specific planting: assert
-  `store.keys(kind)` equals the real `EFFORT_KEY_PROJECTIONS` mapped over
-  `store.read(kind)` (the production record, not a reimplemented key
-  extraction), and that a second, independent `open(root)` handle
-  answers the same keys (rules out a per-handle cache).
-- Reviewing `src/effort/store/sqlite.ts`: `appendKind`'s early return for
-  an EMPTY batch (`entries.length === 0`) happens before `withStore` is
-  ever called, so it skips `checkedVersion`/`migrateSchema` too. Every
-  other call shape (`keys`, `read`, a non-empty `append`) refuses a store
-  whose `user_version` is past what `SQLITE_MIGRATIONS` knows; an empty
-  `append` against that same store silently answers
-  `{ appended: 0, skipped: 0 }` instead. Reproduced by hand: set
-  `PRAGMA user_version` above `SQLITE_SCHEMA_VERSION` on a fresh store,
-  then `store.append(kind, [])` returns normally while
-  `store.append(kind, [row])` throws the expected refusal. Matters
-  because `effort/collect.ts` calls `store.append(kind, selection.pending)`
-  unconditionally, and `pending` is legitimately `[]` on an ordinary
-  "nothing new" run — exactly the run most likely to hit an
-  already-migrated-by-a-newer-rafa store and least likely to be looked at
-  closely, since it prints the same `+0 rows` a healthy run does.
+  throw the identical keyless-row message (`store.ts`'s `appendRows`,
+  `sqlite.ts`'s `refused`), so one `toThrow` assertion holds both.
+- Reviewing `src/effort/store/sqlite.ts`: `appendKind` returns early on
+  an EMPTY batch before `withStore`, skipping
+  `checkedVersion`/`migrateSchema`, so `append(kind, [])` against a store
+  whose `user_version` is past `SQLITE_MIGRATIONS` answers
+  `{ appended: 0, skipped: 0 }` where every other call shape refuses.
+  `effort/collect.ts` appends `selection.pending` unconditionally, and it
+  is legitimately `[]` on every "nothing new" run, which then prints a
+  healthy-looking `+0 rows`. Reproduction: finding 1 of
+  `.plans/REVIEW-phase-0-store.md`.
 - `bun:sqlite`'s `Database.close()` (no args, `throwOnError` defaults to
   false) finalizes statements created through `db.query(...)`
   immediately regardless of `throwOnError`; only statements from
@@ -265,3 +242,25 @@
   `finally` leaks no descriptor even without an explicit
   `close(true)` — measured against `src/effort/store/sqlite.ts`, which
   relies on exactly this.
+- Issue identifiers come from `src/effort/attribution.ts`:
+  `resolveIssueIdentifier({ branch, planStub, planIssue? }, teamKeys?)`
+  ranks a declared plan `issue:` > the plan stub > the WHOLE branch
+  name (not its stub: `opt-363-e2e-harness` has no slash), and answers
+  null, never a stub. The grammar is team-keyed (`ISSUE_TEAM_KEYS`,
+  `['OPT']`, matched case-insensitively): a generic `[a-z]+-\d+` reads
+  `PHASE-0` out of this repo's own branch, measured. `attributeSession`
+  answers `issueIdentifier`/`issueIdentifierSource`, but
+  `collectSessionRow` in `effort/collect.ts` copies attribution fields
+  ONE BY ONE, so a new attribution field reaches no stored row (and no
+  parity reading) until that function copies it.
+- To back a "N mutations were driven" claim in a test header: a bun
+  script that rewrites the module in place, runs ONE file through
+  `Bun.spawnSync([process.execPath, 'test', <file>])`, restores it in a
+  `finally`, and runs the unmutated file before and after as controls,
+  ending on a byte-identity check. Assert each search string occurs
+  exactly once, or a mutation can silently change nothing. Never run
+  the full suite while it runs: the module on disk is mutated.
+- The out-of-repo tsconfig check above is not clean on every test file:
+  `src/effort/attribution.test.ts` carries a pre-existing TS2769 at the
+  measured-table `toEqual(MEASURED_BRANCHES)` (the `readonly` overload
+  case), so diff the error's line against HEAD before owning it.
