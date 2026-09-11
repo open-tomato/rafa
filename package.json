@@ -10,6 +10,12 @@
   "engines": {
     "node": ">=22"
   },
+  "scripts": {
+    "test": "bun test",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "ralph": "bun /Users/marcos/projects/agentic-research/tools/ralph/ralph.ts"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@eslint/markdown": "^8.0.3",

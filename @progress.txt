@@ -9,6 +9,14 @@
   - Removed `"vitest": "^4.1.7"` from `package.json` devDependencies
   - Status: Complete
 
+- [x] Add the `package.json` scripts `test` running `bun test`, `lint` running `eslint .`, `check-types` running `tsc --noEmit`, and a temporary `ralph` script pointing at the sibling's `tools/ralph/ralph.ts` by absolute path
+  - Added `scripts` section to package.json with all four entries
+  - `test` script runs `bun test` for the native test runner
+  - `lint` script runs `eslint .` for linting the entire project
+  - `check-types` script runs `tsc --noEmit` for type checking
+  - `ralph` script points to `/Users/marcos/projects/agentic-research/tools/ralph/ralph.ts` by absolute path (temporary bootstrap before bin entry)
+  - Status: Complete
+
 ## Findings
 
 ### Patterns
