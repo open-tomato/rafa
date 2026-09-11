@@ -229,3 +229,60 @@
 - The Bash tool's zsh globs an unquoted `grep --include=*.ts` itself.
   It prints `no matches found` and grep never runs, and that empty
   output reads like "no hits". Quote the pattern: `--include='*.ts'`.
+- The SQLite backend is `src/effort/store/sqlite.ts`.
+  `openSqliteStore(repoRoot)` gives the port plus `path(kind)`, which
+  answers the one file every kind shares, `.ralph/effort/effort.sqlite`.
+  There is one table per kind (`sessions` keyed by `session_id`,
+  `commits` keyed by `sha`), each holding `seq`, the key and `row_json`.
+  `row_json` is the exact line text the NDJSON backend writes, so the
+  two backends' rows are byte-identical by construction. The schema
+  history is `SQLITE_MIGRATIONS`. A schema change APPENDS an entry and
+  never edits a shipped one. The version is the array's length, held in
+  `PRAGMA user_version`. `migrateSchema(db, path, migrations?)` is
+  exported so a synthetic history can be driven on a `:memory:` db. A
+  new port kind also needs a `KIND_TABLES` entry, or check-types fails
+  with TS2741, measured.
+- `bun:sqlite` facts, measured on bun 1.3.14 on macOS, where bun uses
+  Apple's system SQLite (3.51.0 here):
+  - `new Database(path)` with no options CREATES a missing file.
+    `{ readwrite: true }`, with or without `create: false`, refuses one
+    with `SQLITE_CANTOPEN` and creates nothing.
+  - A directory throws `SQLITE_CANTOPEN` at open. A non-SQLite file
+    opens fine and throws `SQLITE_NOTADB` at the first statement. A
+    zero-byte file is an empty database at `user_version` 0.
+  - `INSERT OR IGNORE` also swallows NOT NULL and CHECK violations, as a
+    silent 0-change insert. `ON CONFLICT (col) DO NOTHING` absorbs only
+    that conflict and throws on anything else.
+  - A fresh database uses journal mode `delete` and leaves no sidecar
+    file after close. Under WAL on macOS, the `-wal` and `-shm` files
+    OUTLIVE the close, so byte-comparing the main file only means
+    something without WAL.
+  - A transaction whose inserts all hit `DO NOTHING` leaves the file
+    byte-identical. `PRAGMA user_version = N` and DDL roll back with
+    their transaction.
+  - Binding a string holding a lone UTF-16 surrogate is LOSSY, and can
+    collide: `ab\uD800cd` is stored as `ab\u{10063}d`, the same text a
+    real astral character gives. A trailing lone high surrogate was
+    stored as `''`. The same string inside `JSON.stringify` text
+    round-trips.
+  - There is no busy timeout by default. A second writer that runs
+    `BEGIN IMMEDIATE` while another connection holds one gets
+    `SQLITE_BUSY` at once.
+  - A default `db.close()` after `db.transaction(...)` releases the
+    file descriptor. `lsof` showed 1 while open and 0 after.
+- The Write and Edit tools decoded a plain four-hex-digit unicode
+  escape of a Latin-1 letter into the literal letter, in file content
+  and in `new_string` alike, so two Edits "made no change". Surrogate
+  escapes such as `\uD800`, and braced ones such as `\u{1F345}`,
+  arrived as typed. After writing an escape into source, list the
+  file's non-ASCII code points with a bun one-liner to see what really
+  landed. The braced form (`\u{e9}`) got through where the plain form
+  kept being decoded.
+- Editing `src/effort/store.ts`, even just to fix its stale "SQLite
+  would be untestable" note, breaks another sentence: `store/ndjson.ts`
+  says store.ts is byte-identical to the sibling's
+  `tools/ralph/effort/store.ts`. `diff` still exits 0. Fix both in one
+  change, or leave the note to the task that retires store.ts.
+- `bun scripts/control-byte-gate/control-byte-gate.ts --include-untracked`
+  checks files that are not yet git-added. Without the flag, the
+  pre-commit hook's `--staged` run is the first to see a new file.
