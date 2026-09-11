@@ -23,6 +23,14 @@
 - The project is transitioning from vitest to bun's native test runner (`bun:test`)
 - vitest.config.ts pointed to `tools/**/*.test.ts` which no longer exists in this repo (src layout imported from sibling)
 
-### Next Steps
+#- [x] Add the repo-root `AGENTS.md` map listing `context/workflow.md` and `context/verification.md` as plain paths, write both pages with the task-shape-to-agent routing table on the workflow page and the gate order on the verification page, and add the `@AGENTS.md` import line to `CLAUDE.md`
+  - Created root-level `AGENTS.md` (25 lines, under 80-line cap)
+  - Created `context/workflow.md` with task-shape-to-agent routing table
+  - Created `context/verification.md` with gate order and capture-reading guidance
+  - Added `@AGENTS.md` import line to `CLAUDE.md` at line 1
+  - Both test suites now pass: routing-table-agents (21 tests) and context-page-imports (9 tests)
+  - Status: Complete
+
+## Next Steps
 - Test files under src/ will need migration from vitest imports to bun:test imports
 - A task follows to port test files and replace vitest API calls (vi.spyOn, vi.restoreAllMocks)
