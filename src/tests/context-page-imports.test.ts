@@ -101,7 +101,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** A reference in the harness's import form: `@` at a word boundary. */
 const IMPORT_REFERENCE = /(?:^|\s)(@\S+)/g;
@@ -256,8 +256,12 @@ export function findAgentsMaps(root: string): AgentsMap[] {
 
 /** The files that DO use the import form, and so prove the matcher bites. */
 function findImporters(root: string): { path: string; text: string }[] {
+  const packages = join(root, 'packages');
+  const packageDirs = existsSync(packages)
+    ? readdirSync(packages).map((p) => join(packages, p))
+    : [];
   const found: { path: string; text: string }[] = [];
-  for (const dir of [root, ...readdirSync(join(root, 'packages')).map((p) => join(root, 'packages', p))]) {
+  for (const dir of [root, ...packageDirs]) {
     const path = join(dir, 'CLAUDE.md');
     if (existsSync(path)) found.push({ path: path.slice(root.length), text: readFileSync(path, 'utf8') });
   }

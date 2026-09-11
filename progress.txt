@@ -102,3 +102,32 @@
   is a snapshot of the SIBLING `agentic-research` repo's own `AGENTS.md`,
   which legitimately still names `tools/ralph` since that repo wasn't
   touched) — never rewrite these.
+- A wrong `../` depth in a `new URL(..., import.meta.url)` base doesn't
+  just risk ENOENT — it can silently resolve into a live, unrelated
+  directory and read/write against IT instead. `src/tests/
+  routing-table-agents.test.ts` and `src/tests/context-page-imports
+  .test.ts` both carried `new URL('../../../', import.meta.url)` for
+  `REPO_ROOT`, which is 3 levels up from `src/tests/<file>.test.ts`
+  (tests -> src -> repo root -> one too many) and landed one level
+  above this repo, at `/Users/marcos/projects/open-tomato/` — the
+  PARENT directory holding this repo as a sibling among several other,
+  unrelated checkouts. That parent happens to itself contain a
+  `packages/` directory and its own `AGENTS.md`, so the bug produced
+  plausible-looking (wrong) results rather than a crash, until `REPO_ROOT`
+  was corrected to `../../` (2 levels up, the established depth for any
+  `src/<subdir>/*.test.ts` file per the earlier `classify.test.ts`/
+  `progress.test.ts` finding above) and the reads landed in the actual
+  repo, which has no `packages/` dir at all. When auditing a `new URL`
+  path base, don't just check it resolves without throwing — print/log
+  the resolved absolute path once and confirm it against `pwd`, since a
+  wrong-but-existing sibling directory is the silent-failure case that
+  matters most.
+- A `readdirSync(join(root, 'packages'))` (or similar) call with no
+  `existsSync` guard in front of it will not surface as a bug in this
+  repo until whatever computes `root` is ALSO correct — this repo has
+  no `packages/` directory, so an unguarded read only throws once
+  `root` actually resolves here. Guard every `packages/`-relative
+  `readdirSync` the same way `findAgentsMaps` in `src/tests/
+  context-page-imports.test.ts` already does (`existsSync(packages) ?
+  readdirSync(packages) ... : []`), rather than assuming a passing test
+  run proves the read is safe.

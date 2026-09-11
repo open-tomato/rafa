@@ -125,7 +125,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PAGE_PATH = 'context/workflow.md';
 const AGENT_DIR = '.claude/agents';
 const USER_LEVEL_MARKER = 'user-level';
