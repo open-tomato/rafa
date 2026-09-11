@@ -229,3 +229,24 @@
   the two and a fresh row has the stored key order, so project to the
   sibling's keys, handle `planStubPatch` explicitly, compare by
   `JSON.stringify`. Commit rows match byte-for-byte unprojected.
+- Block reader, `src/plan/blocks.ts`: `readRafaBlocks(md)` answers every
+  `rafa:*` fence as `{ kind, body, span, closed }`, unknown kinds kept
+  (`RAFA_BLOCK_KINDS`/`isRafaBlockKind` name this phase's four). `span`
+  is 1-based inclusive, fences included (`sed -n 'first,lastp'`), while
+  `TaskInfo.lineNum` is 0-based: compare as `lineNum + 1`.
+- The block reader tracks EVERY fence by CommonMark rules, so a `rafa:`
+  fence inside another fence is body; `findNextTask` tracks none
+  (measured: a `- [ ] ` inside a fence is dispatched), so a block-aware
+  task list has to exclude the lines inside a span itself.
+- Illustrating the plan format needs a LONGER outer fence (4 backticks):
+  inside a 3-backtick outer, the first inner closing fence closes the
+  OUTER one and later `rafa:` fences are real blocks to any CommonMark
+  reader. `.specs/phase-0-package-parity-cutover.md` reads 2 such blocks
+  (lines 149, 156); the phase-0 PLAN, fenced with 4, reads 0.
+- CommonMark oracle: `mdast-util-from-markdown` (micromark, installed via
+  `@eslint/markdown`) imports into a scratch script by absolute path,
+  `<repo>/node_modules/mdast-util-from-markdown/index.js`. It is a
+  transitive dependency, so tests do not import it.
+- `bunx eslint --stdin --stdin-filename <path>` over a planted violation
+  proves a path is linted at all, without touching the file: the control
+  a zero-exit `eslint <dir>` needs.
