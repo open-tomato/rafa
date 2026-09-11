@@ -116,3 +116,47 @@
   and check its output (packages added vs. already satisfied) before
   concluding a missing-module error is a real code/config bug rather than
   a stale `node_modules`.
+- The Bash tool's shell is zsh, where `${PIPESTATUS[0]}` expands EMPTY
+  (zsh spells it `$pipestatus`, 1-indexed). `cmd | tail; echo "Exited with
+  code ${PIPESTATUS[0]}"` therefore prints a blank code, which is no
+  reading at all. Capture `$?` from an unpiped command instead:
+  `cmd > /tmp/x.log 2>&1; ec=$?; tail /tmp/x.log; echo "Exited with code $ec"`.
+- `Bun.file(path).exists()` answers false for a DIRECTORY (and `.text()`
+  on one throws EISDIR), measured on bun 1.3.14, so it cannot answer "is
+  anything at this path". Use `existsSync` wherever an unreadable path
+  must not pass for an absent one.
+- `Bun.YAML.parse` facts, measured on bun 1.3.14, for any YAML reader here
+  (the `rafa:report` parser included). An empty, whitespace-only,
+  comment-only or bare `---` input gives `null`. A multi-document stream
+  gives an ARRAY of documents. Duplicate keys: the last one wins silently.
+  Malformed input throws a `SyntaxError` whose message has no line or
+  column. A TAB-indented child does NOT throw: it parses as a sibling
+  top-level key. Keys spelled `constructor`, `toString` or `__proto__` come
+  back as ordinary own keys, so look keys up with `Map`/`Set`, never `in`
+  or an object index. Integer-like keys enumerate first, so
+  `Object.entries` order is not source order.
+- Config lives in `src/config.ts`. `loadConfig(root, cli, warn?)` reads
+  `.rafa/config.yaml` and ranks command line > file > `CONFIG_DEFAULTS`.
+  `parseConfigText` and `resolveConfig` are pure, and refusals throw
+  `ConfigError` (with `.problems`). Unknown keys come back as `extras` plus
+  `warnings`, never as a refusal. Pass command-line values RAW, keyed by
+  setting (`{ store, inject }`, as `argValue` returns them): the resolver
+  validates them, so callers should not pre-validate. The file key
+  `plan.inject` is the field `inject`.
+- The plan contradicts itself on the `plan.inject` default. Its "Config
+  surface" decision, the spec's injection-mode table and the config task
+  say `stage`; its "Cutover" paragraph ("`full` as the shipped DEFAULT")
+  and roadmap risk 1 say `full`. `src/config.ts` ships `stage`, spelled
+  once in `CONFIG_DEFAULTS`. A task writing the cutover runbook's
+  "one-line default flip" should check what that line holds rather than
+  assume `full`.
+- `progress.txt` is TRACKED despite its `.gitignore` entry: it was
+  committed in 3771916, and the entry only arrived later in 1e0e701. An
+  ignore rule does nothing for a file already in the index, so the loop's
+  `git add -A` commits every edit to it. Taking it out of the index needs
+  `git rm --cached progress.txt`; nothing has done that yet. Check with
+  `git ls-files`: `git check-ignore` stays silent about tracked files.
+  A second tracked file, `@progress.txt`, also sits at the root. It was
+  created in 00a8a14, only 80c0077 and f12bd8d have appended to it, and
+  it holds task summaries. The findings every other session appended are
+  here in `progress.txt`.
