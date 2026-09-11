@@ -12,8 +12,4 @@ After completing the task, append any new findings to `@progress.txt` that match
 * Do not add task-specific details or anything that won't apply to future tasks
 * Do not duplicate existing entries — read what's there before appending
 
-After completing a task, commit all changes:
-* Stage all modified and new files with `git add -A`
-* Commit with a short descriptive message summarizing what was done
-* Fix any linting or formatting issues that arise from pre-commit hooks
-* Do not include Claude attribution in the commit message
+Do not stage or commit anything: the loop owns staging and committing, and once this session exits cleanly it runs `git add -A` and commits your work under a subject derived from the task text. Leave your changes in the working tree, and leave them in a state the pre-commit hooks accept — a refused hook blocks the task and stops the loop.

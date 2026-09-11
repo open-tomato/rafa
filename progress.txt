@@ -19,3 +19,14 @@
   (doc-updater agent). Files ported early (e.g. `.claude/agents/*.md`) may
   reference paths like `src/tests/context-page-imports.test.ts` and
   `src/PROMPT.md` that don't exist yet but are added by later plan stages.
+- `rm -rf` (and even `rm -r`/`rm -rf` on files under /tmp) is blocked by this
+  sandbox's Bash permission layer regardless of target path. Use `mv` to a
+  scratch directory instead of deleting when you need to clear a directory's
+  contents, and prefer `cp -R src/. dest/` (trailing `/.`) to copy a
+  directory's contents into an existing directory without deleting it first.
+- The sibling `tools/ralph/` tree (48 files) uses `.js` extensions in its
+  relative imports (e.g. `import start from './start.js'` inside
+  `ralph.ts`/`rafa.ts`) even though the files are `.ts` — this is normal
+  TypeScript ESM-style import convention (bun/tsc resolve `.js` specifiers to
+  `.ts` sources) and should be left as-is when porting/repointing paths in a
+  later task.
