@@ -1,354 +1,231 @@
 - The plan's "Structured task report" stage deletes
   `.claude/skills/progress-hygiene`; docs must not treat it as permanent.
-- `rm -r`/`rm -rf` is blocked by this sandbox's Bash permission layer
-  for any path, /tmp included. To clear a directory, `mv` its contents to
-  a scratch one; to copy a directory's contents into an existing one, use
-  `cp -R src/. dest/` (trailing `/.`).
-- Relative imports under `src/` use `.js` specifiers for `.ts` files
-  (`from './utils/claude.js'`), which bun and tsc resolve to the `.ts`
-  source; leave them as-is when moving or repointing.
-- Tests use `bun:test`'s native `spyOn(...)` and `mock.restore()` (every
-  spy at once, as `vi.restoreAllMocks()`), not its `vi` alias. Measured:
-  a `process.stdout.write` patch does NOT see `console.log`, so spy on
-  `console`, as under vitest.
-- Bun's test runner resolves a bare `'vitest'` import to `bun:test` with
-  no `vitest` installed, so a green `bun test` does NOT prove a port
-  complete: grep for `from 'vitest'`. One remains, in
-  `scripts/control-byte-gate/control-byte-gate.test.ts` (`describe`,
-  `expect`, `it`); a task touching `scripts/` should swap it.
-- `tsconfig.json` excludes `**/*.test.ts` from `bun run check-types`,
-  citing a `.specs/test-type-checking.md` that does not exist, so an
-  editor diagnostic in a test file (e.g. `bun:test`'s `toEqual()`
-  rejecting a `readonly T[]` vitest accepted) never reaches the gate:
-  confirm against that command before calling it a build break.
-- Stale TSDoc still says the suite runs vitest under Node, though the
-  spawner is `Bun.spawn`: `src/utils/claude.ts`,
-  `src/utils/claude.test.ts`, `src/effort/store.ts`. Re-derive the
-  rationale (nothing runs under Node now, so a "vitest" -> "bun:test"
-  swap is wrong too). Editing `store.ts`'s note falsifies
-  `store/ndjson.ts`'s claim that `store.ts` is byte-identical to the
-  sibling's `tools/ralph/effort/store.ts` (`diff` exits 0): fix both at
-  once, or wait for `store.ts`'s retirement, which no task schedules.
-- Of `src/`'s `tools/ralph` strings, repoint only real path literals
-  (TSDoc file references, `new URL`/`readFileSync` targets, CLI usage
-  examples). Leave fixture text quoting one, above all a LENGTH-pinned
-  one (`LONG_TASK`, 181 characters, `src/tests/commit-refusals.test.ts`),
-  and never rewrite a fixture of ANOTHER repo's file (`RESIDUE` in
-  `src/tests/agents-split-accounting.test.ts` snapshots the sibling's
-  `AGENTS.md`, which rightly names `tools/ralph`).
-- When a file with a `new URL('../../foo', import.meta.url)` base moves,
-  recount `../` from its NEW location (`src/<subdir>/*.test.ts` reaches
-  the root with `../../`). A wrong depth need not throw: `../../../`
-  lands in the parent `open-tomato/`, with its own `packages/`,
-  `AGENTS.md` and `.gitignore`, so guards read the wrong tree and pass,
-  while an unguarded `readdirSync(join(root, 'packages'))` throws only
-  once `root` resolves here. Print the resolved path once against `pwd`;
-  guard every such read with `existsSync` (`findAgentsMaps` in
+- The sandbox blocks `rm -r`/`rm -rf` on any path, /tmp included: clear a
+  directory by `mv`-ing its contents to a scratch one; copy contents into
+  an existing directory with `cp -R src/. dest/`.
+- Relative imports under `src/` use `.js` specifiers for `.ts` files;
+  keep them when moving files.
+- Tests use `bun:test`'s `spyOn` and `mock.restore()` (restores every
+  spy), not the `vi` alias; spy on `console`, which a
+  `process.stdout.write` patch misses.
+- A bare `'vitest'` import resolves to `bun:test`, so a green `bun test`
+  does not prove a port done: grep `from 'vitest'`. One remains, in
+  `scripts/control-byte-gate/control-byte-gate.test.ts`; swap it when
+  touching `scripts/`.
+- `tsconfig.json` excludes `**/*.test.ts` from `bun run check-types`
+  (citing a nonexistent `.specs/test-type-checking.md`), so an editor
+  error in a test file (e.g. `toEqual()` on a `readonly T[]`) is no
+  build break until that command says so.
+- Stale TSDoc says the suite runs vitest under Node (it is bun):
+  `src/utils/claude.ts`, `claude.test.ts`, `src/effort/store.ts`;
+  re-derive the rationale, don't swap the word. Editing `store.ts`
+  falsifies `store/ndjson.ts`'s note that it is byte-identical to the
+  sibling's `tools/ralph/effort/store.ts`: fix both, or wait for
+  `store.ts`'s retirement (no task schedules it).
+- Repoint only real `tools/ralph` path literals in `src/` (TSDoc refs,
+  `new URL`/`readFileSync` targets, CLI usage), never fixture text:
+  `LONG_TASK` is length-pinned (181 chars,
+  `src/tests/commit-refusals.test.ts`), and `RESIDUE`
+  (`src/tests/agents-split-accounting.test.ts`) snapshots the sibling's
+  `AGENTS.md`.
+- After moving a file with a `new URL('../../foo', import.meta.url)`
+  base, recount `../` (`src/<subdir>/*.test.ts` reaches the root with
+  `../../`): one too many lands silently in the parent `open-tomato/`
+  (own `packages/`, `AGENTS.md`), where guards pass. Print the resolved
+  path once; guard reads with `existsSync` (`findAgentsMaps`,
   `src/tests/context-page-imports.test.ts`).
-- `.githooks/pre-commit` (`core.hooksPath=.githooks`) runs
-  `scripts/control-byte-gate/control-byte-gate.ts --staged`, so a new
-  file is first checked at commit; add `--include-untracked` to a manual
-  run to check files not yet git-added.
-- `it.skipIf(HAS_BUN)('defaults to the real spawner', ...)` in
-  `src/utils/claude.test.ts` genuinely passes only under vitest and is
-  kept on purpose (its file header says why);
-  `src/effort/collect.test.ts`'s `it.skipIf(isRoot)` is an unrelated
-  root-permissions guard.
-- `bun run lint` (`eslint .`) exits 1 on 4 pre-existing errors, none
-  under `src/`: `import/order` in root `eslint.base.mjs`, `quotes` and
-  `eol-last` in the placeholder root `index.ts`, and
-  `import/no-unresolved` on the vitest import above. A `src/`-scoped
-  task runs `eslint src/`; one needing the whole repo green, as
-  "Package and cutover" may, must fix those three files.
-- `node_modules` can be partial here (`@types`, `bun-types`,
-  `typescript` and a few more, the rest of `devDependencies` missing)
-  while `bun.lock` and `package.json` agree. Run `bun install` and read
-  its output (added vs. already satisfied) before calling a
-  missing-module error a real code/config bug.
-- `Bun.YAML.parse`'s traps, for any YAML reader here (`rafa:report`
-  parser included), are in `src/config.ts`'s header ("The parser,
-  measured on bun 1.3.14", and the `Map`/`Set` key-lookup rule above
-  it). Not there: integer-like keys enumerate first, so `Object.entries`
-  order is not source order.
-- Config is `src/config.ts`: `loadConfig(root, cli, warn?)` reads
-  `.rafa/config.yaml`, ranking command line > file > `CONFIG_DEFAULTS`;
-  `parseConfigText` and `resolveConfig` are pure; refusals throw
-  `ConfigError` (with `.problems`); unknown keys come back as `extras`
-  plus `warnings`, never a refusal. Pass command-line values RAW, keyed
-  by setting (`{ store, inject }`, as `argValue` returns them), for the
-  resolver to validate. The file key `plan.inject` is the field `inject`.
-- The plan contradicts itself on the `plan.inject` default: its "Config
-  surface" decision, the spec's injection-mode table and the config task
-  say `stage`; its "Cutover" paragraph ("`full` as the shipped DEFAULT")
-  and roadmap risk 1 say `full`. `src/config.ts` ships `stage`, spelled
-  once in `CONFIG_DEFAULTS`: the cutover runbook's "one-line default
-  flip" must check that line rather than assume `full`.
-- `progress.txt` is TRACKED despite its `.gitignore` entry (committed
-  before the rule; an ignore rule does nothing for an indexed file), so
-  the loop's `git add -A` commits every edit to it until something runs
-  `git rm --cached progress.txt` (nothing has). Check with
-  `git ls-files`; `git check-ignore` is silent about tracked files.
-  `@progress.txt`, also tracked, holds task summaries; findings go here.
-- The effort store port is `src/effort/store/types.ts`: `EffortStore`
-  (`append`, `keys`, `read`, each taking an `EffortRowKind`), the row map
-  `EffortRowByKind`, `EFFORT_KEY_PROJECTIONS`, and `SessionEffortRow`,
-  which `effort/collect.ts` re-exports. Its `AppendResult` is only
-  `{ path, appended, skipped }`; NDJSON-only readings
-  (`separatedPartialLine`, the line arithmetic) go on a backend's own
-  wider type.
-- Declare a port interface with PROPERTY signatures
-  (`keys: (kind: K) => ...`), not method ones: measured with this repo's
-  tsc, a backend whose parameter is narrower than the port's is refused
-  under a property signature (TS2322) but silently accepted under a
-  method one, checked bivariantly. Use a `type` alias for a closed
-  per-kind map: another file can widen an interface by declaration
-  merging, while re-declaring an alias fails with TS2300.
-- To type-check one `*.test.ts`, put a tsconfig OUTSIDE the repo with
-  `"extends": "<repo>/tsconfig.json"`, `"files": ["<abs test path>"]`,
-  `"include": []` and an absolute
-  `"typeRoots": ["<repo>/node_modules/@types"]` (without it, measured, it
-  fails on `node:fs` and `process`), then run
-  `./node_modules/.bin/tsc -p <it>`; plant a type error once to prove the
-  check is live. `src/effort/attribution.test.ts` has a pre-existing
-  TS2769 at `toEqual(MEASURED_BRANCHES)` (the `readonly` case above), so
-  diff an error's line against HEAD before owning it.
-- The NDJSON backend is `src/effort/store/ndjson.ts`
-  (`openNdjsonStore(repoRoot)`: the port plus `path(kind)` and
-  `readRows(kind)`; its `append` answers `NdjsonAppendResult`). It only
-  routes to `src/effort/store.ts`'s functions, so retiring `store.ts`
-  means MOVING them into `ndjson.ts`, not deleting them, and carrying
-  over `ndjson.test.ts`'s parity case, which imports `openEffortStore`.
-- A kind added to `EffortRowByKind` (e.g. a future `findings`) breaks
-  `check-types` in both backends, measured: TS2345 at every
-  `effortStorePath` call in `store/ndjson.ts` until `STORE_FILE_NAMES` in
-  `src/effort/store.ts` names its file, and TS2741 in `store/sqlite.ts`
-  until `KIND_TABLES` has its entry. A table only SQLite holds belongs
-  outside the port's row map, or the NDJSON backend must take it too.
-- A DIRECTORY at a file's path, measured on bun 1.3.14:
-  `Bun.file(path).exists()` answers false and `.text()` throws EISDIR, so
-  use `existsSync` wherever an unreadable path must not pass for an
-  absent one. Planting one tests "exists but cannot be read":
-  `readFileSync` throws `EISDIR: illegal operation on a directory, read`
-  even as root, unlike a `chmod 000` plant, so it needs no
-  `it.skipIf(isRoot)`.
-- The Bash tool's zsh globs an unquoted `grep --include=*.ts` itself,
-  prints `no matches found` and never runs grep, which reads like
-  "no hits". Quote the pattern: `--include='*.ts'`.
-- The SQLite backend is `src/effort/store/sqlite.ts`: every kind in one
-  file, `.ralph/effort/effort.sqlite`, one table per kind, `row_json`
-  holding the exact NDJSON line text. A schema change APPENDS an entry to
-  `SQLITE_MIGRATIONS` and never edits a shipped one (the version is the
-  array's length, in `PRAGMA user_version`);
-  `migrateSchema(db, path, migrations?)` is exported so a synthetic
-  history can be driven on a `:memory:` db.
-- `bun:sqlite` facts measured on bun 1.3.14 on macOS (Apple's SQLite
-  3.51.0) are in `src/effort/store/sqlite.ts`'s header. Not there:
-  `new Database(path)` with no options CREATES a missing file;
-  `OR IGNORE` also swallows CHECK violations; `Statement.run` returns
-  `{ changes, lastInsertRowid }`, not a Promise; a trailing lone high
-  surrogate binds as `''`; `Database.close()` finalizes `db.query(...)`
-  statements at once whatever `throwOnError` says (default false), while
-  `db.prepare(...)` ones linger until finalized or GC'd, so a module
-  that only calls `db.query` and closes in a `finally` leaks no
-  descriptor without `close(true)` (`sqlite.ts` relies on exactly this).
-- The Write and Edit tools decoded a plain four-hex-digit unicode escape
-  of a Latin-1 letter into the literal letter, in file content and
-  `new_string` alike, so two Edits "made no change". Surrogate escapes
-  (`\uD800`) and braced ones (`\u{1F345}`) arrived as typed; the braced
-  form (`\u{e9}`) got through where the plain one kept being decoded.
-  After writing an escape into source, list the file's non-ASCII code
-  points with a bun one-liner to see what really landed.
-- The store entry is `src/effort/store/index.ts`:
-  `selectEffortStore(root, config)` takes the `config` FIELD of what
-  `loadConfig`/`resolveConfig` answer, and both openers are exported
-  beside it. Import the store from `./store/index.js` and the port's
-  types from `./store/types.js`, never `./store.js`: still the sibling's
-  file-bound module, its `openEffortStore`, `EffortRowKind` and
-  `AppendResult` are different ones. `index.test.ts` pins the entry's
-  runtime export list, so a new export must be added there too.
-- `import/order` puts every `import type` line in ONE group, where
-  eslint-plugin-import 2.32's sorter ranks a sibling path against a
-  parent one by segment COUNT, fewer `/` first, never by name:
-  `./types.js` must precede `../../config.js`, while `../store.js` and
-  `./types.js` tie (`store/ndjson.ts`). Value imports sit in separate
-  parent and sibling groups, so it never arises there. `./index.js` is
-  the `index` group, after the sibling group behind its own blank line;
-  `./store/index.js` from the directory above is an ordinary sibling
-  import, passing at the end of the sibling block with no blank line
-  (`effort/collect.ts`).
-- `collectEffort` (`src/effort/collect.ts`) takes `store` (an
-  `EffortStore`), else resolves one ONCE per run from the config, so a
-  run with no store and no `.rafa/config.yaml` writes SQLite and both
-  halves' `storePath` report `effort.sqlite`. To target a backend (the
-  parity tests), pass `openNdjsonStore(root)` or `openSqliteStore(root)`;
-  `effort collect` has no `--store` flag.
-- `src/effort/report.ts` still reads `sessions.ndjson` directly
-  (`effortStorePath` plus `readStoreRows`), not through the selected
-  store, and no plan task rewires it. Measured: with no config or
-  `store: sqlite`, a collect appends into `effort.sqlite` and
-  `buildReport` reads 0 rows; with `store: ndjson` it reads them. So
-  under the default config `rafa effort report` sees nothing
-  `rafa effort collect` wrote; hence `store: ndjson` in
+- `.githooks/pre-commit` runs the control-byte gate `--staged`, so new
+  files are first checked at commit; a manual run of
+  `scripts/control-byte-gate/control-byte-gate.ts` needs
+  `--include-untracked` for unadded files.
+- `it.skipIf(HAS_BUN)` in `src/utils/claude.test.ts` passes only under
+  vitest and is kept on purpose (header says why); `collect.test.ts`'s
+  `it.skipIf(isRoot)` is an unrelated root guard.
+- `bun run lint` exits 1 on 4 pre-existing errors outside `src/`
+  (`import/order` in `eslint.base.mjs`; `quotes`, `eol-last` in root
+  `index.ts`; `import/no-unresolved` on the vitest import above). A
+  `src/` task runs `eslint src/`; a whole-repo-green one fixes all three
+  files.
+- `node_modules` can be partial (e.g. only `@types`, `bun-types`,
+  `typescript`) while `bun.lock` and `package.json` agree: run
+  `bun install` and read added vs. satisfied before calling a missing
+  module a real bug.
+- `Bun.YAML.parse` traps: `src/config.ts`'s header ("The parser,
+  measured on bun 1.3.14", the `Map`/`Set` lookup rule). Missing there:
+  integer-like keys enumerate first, so `Object.entries` is not source
+  order.
+- Config, `src/config.ts`: `loadConfig(root, cli, warn?)` ranks command
+  line > `.rafa/config.yaml` > `CONFIG_DEFAULTS`; `parseConfigText` and
+  `resolveConfig` are pure; refusals throw `ConfigError` (`.problems`);
+  unknown keys come back as `extras` + `warnings`. Pass command-line
+  values RAW keyed by setting (`{ store, inject }`, from `argValue`);
+  file key `plan.inject` is field `inject`.
+- The plan says `stage` for the `plan.inject` default ("Config surface",
+  the spec's table, the config task) and `full` ("Cutover", roadmap risk
+  1). `src/config.ts` ships `stage` in `CONFIG_DEFAULTS`; the runbook's
+  "one-line default flip" must check that line.
+- `progress.txt` is TRACKED despite `.gitignore` (committed before the
+  rule), so `git add -A` commits every edit until
+  `git rm --cached progress.txt` runs; `git ls-files` shows it,
+  `git check-ignore` is silent. `@progress.txt` (tracked) holds task
+  summaries; findings go here.
+- Store port, `src/effort/store/types.ts`: `EffortStore` (`append`,
+  `keys`, `read`, per `EffortRowKind`), `EffortRowByKind`,
+  `EFFORT_KEY_PROJECTIONS`, `SessionEffortRow` (re-exported by
+  `effort/collect.ts`). `AppendResult` is `{ path, appended, skipped }`;
+  NDJSON-only readings go on a backend's wider type.
+- Declare ports with PROPERTY signatures (`keys: (kind: K) => ...`):
+  tsc refuses a narrower backend parameter (TS2322) that a method
+  signature accepts bivariantly. Close a per-kind map with a `type`
+  alias, which declaration merging cannot widen.
+- Type-check one `*.test.ts` via a tsconfig OUTSIDE the repo:
+  `"extends": "<repo>/tsconfig.json"`, `"files": ["<abs path>"]`,
+  `"include": []`, absolute `"typeRoots": ["<repo>/node_modules/@types"]`
+  (else `node:fs`/`process` fail); run `./node_modules/.bin/tsc -p <it>`, planting an error once to prove
+  it live. `src/effort/attribution.test.ts` has a pre-existing TS2769
+  (`toEqual(MEASURED_BRANCHES)`): diff errors against HEAD.
+- NDJSON backend, `src/effort/store/ndjson.ts`:
+  `openNdjsonStore(repoRoot)` = port + `path(kind)`, `readRows(kind)`,
+  `append` answering `NdjsonAppendResult`. It routes to
+  `src/effort/store.ts`, so retiring `store.ts` means MOVING its
+  functions in and carrying over `ndjson.test.ts`'s parity case (imports
+  `openEffortStore`).
+- A new `EffortRowByKind` kind (e.g. `findings`) breaks `check-types`:
+  TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
+  `STORE_FILE_NAMES` (`src/effort/store.ts`) names its file, TS2741 in
+  `store/sqlite.ts` until `KIND_TABLES` has it. A SQLite-only table
+  stays outside the port's row map.
+- A directory at a file's path: `Bun.file(path).exists()` is false and
+  `.text()` throws EISDIR, so use `existsSync` where unreadable must not
+  read as absent. Planting one tests "unreadable" portably:
+  `readFileSync` throws EISDIR even as root, so no `it.skipIf(isRoot)`.
+- Quote grep globs in the Bash tool: zsh expands an unquoted
+  `--include=*.ts`, prints `no matches found` and never runs grep, which
+  reads like "no hits".
+- SQLite backend, `src/effort/store/sqlite.ts`: one file
+  (`.ralph/effort/effort.sqlite`), a table per kind, `row_json` holding
+  the NDJSON line text. Schema changes APPEND to `SQLITE_MIGRATIONS`
+  (version = its length, in `PRAGMA user_version`), never edit a shipped
+  entry; `migrateSchema(db, path, migrations?)` is exported for
+  synthetic histories on `:memory:`.
+- `bun:sqlite` facts are in `sqlite.ts`'s header. Missing there:
+  `new Database(path)` CREATES a missing file; `OR IGNORE` also
+  swallows CHECK violations; `Statement.run` is sync, returning
+  `{ changes, lastInsertRowid }`; a trailing lone high surrogate binds
+  as `''`; `close()` finalizes `db.query` statements at once (whatever
+  `throwOnError`) while `db.prepare` ones linger until finalized or
+  GC'd, so query-only code closing in a `finally` needs no `close(true)`
+  (as `sqlite.ts` does).
+- Write/Edit decode a plain four-hex-digit escape of a Latin-1 letter
+  into the letter (Edits then "make no change"); surrogate (`\uD800`)
+  and braced (`\u{e9}`) escapes arrive as typed. Check what landed by
+  listing the file's non-ASCII code points with bun.
+- Store entry, `src/effort/store/index.ts`: `selectEffortStore(root,
+  config)` takes the `config` FIELD of `loadConfig`/`resolveConfig`'s
+  answer, beside both openers. Import it from `./store/index.js` and
+  port types from `./store/types.js`, never `./store.js` (the sibling's
+  module: its `openEffortStore`, `EffortRowKind`, `AppendResult`
+  differ). `index.test.ts` pins the export list.
+- `import/order` ranks all `import type` lines in ONE group by segment
+  COUNT (fewer `/` first), not name: `./types.js` before
+  `../../config.js`; `../store.js` ties `./types.js`. Value imports
+  split parent/sibling, so never hit this. `./index.js` is the `index`
+  group after a blank line; `./store/index.js` from above is a plain
+  sibling (`effort/collect.ts`).
+- `src/effort/report.ts` reads `sessions.ndjson` directly
+  (`effortStorePath` + `readStoreRows`), not the selected store, and no
+  task rewires it: under the default config (`sqlite`), `rafa effort
+  report` sees nothing `effort collect` wrote; hence `store: ndjson` in
   `src/tests/effort-pipeline.test.ts`.
-- A command that resolves its repo root through git (`getRepoRoot`
-  reads the cwd) and takes no seam can be driven black-box: spawn
-  `[process.execPath, <abs path of src/rafa.ts>, ...]` with `cwd` a
-  scratch `git init` repo holding one `--allow-empty --no-verify` commit,
-  made with `-c user.name=... -c user.email=... -c commit.gpgsign=false
-  -c core.hooksPath=/dev/null` to keep this machine's git config out.
-  `makeRepo` and `runCollect` in `src/effort/collect.test.ts` do this.
-- Both effort-store backends are held to one property in ONE
-  `describe.each` file, not one per backend:
-  `src/effort/store/refusal.test.ts` and `contract.test.ts`, whose
-  headers say what each proves, the key-set-from-rows proof included.
-  Their local `StoreWithPath` (the port plus the `path(kind)` both
-  backends add) takes `openNdjsonStore`/`openSqliteStore` uncast, and
-  both backends throw the identical keyless-row message (`store.ts`'s
-  `appendRows`, `sqlite.ts`'s `refused`), so one `toThrow` holds both.
-- `src/effort/store/sqlite.ts`'s `appendKind` returns early on an EMPTY
-  batch before `withStore`, skipping `checkedVersion`/`migrateSchema`,
-  so `append(kind, [])` against a store whose `user_version` is past
+- A command resolving its root via git from the cwd is driven
+  black-box: spawn `[process.execPath, <abs src/rafa.ts>, ...]` in a
+  scratch `git init` repo with one `--allow-empty --no-verify` commit
+  made under `-c user.name=... -c user.email=... -c commit.gpgsign=false
+  -c core.hooksPath=/dev/null` (`makeRepo`/`runCollect`,
+  `src/effort/collect.test.ts`).
+- Both backends share ONE `describe.each` file per property
+  (`src/effort/store/refusal.test.ts`, `contract.test.ts`); their
+  `StoreWithPath` takes both openers uncast, and both throw the identical
+  keyless-row message (`store.ts`'s `appendRows`, `sqlite.ts`'s
+  `refused`), so one `toThrow` holds both.
+- `sqlite.ts`'s `appendKind` returns early on an EMPTY batch, skipping
+  `checkedVersion`/`migrateSchema`: `append(kind, [])` on a store past
   `SQLITE_MIGRATIONS` answers `{ appended: 0, skipped: 0 }` where every
-  other call shape refuses. `effort/collect.ts` appends
-  `selection.pending` unconditionally, legitimately `[]` on every
-  "nothing new" run, which then prints a healthy-looking `+0 rows`.
-  Reproduction: finding 1 of `.plans/REVIEW-phase-0-store.md`.
-- Issue identifiers come from `src/effort/attribution.ts`:
-  `resolveIssueIdentifier({ branch, planStub, planIssue? }, teamKeys?)`
-  ranks a declared plan `issue:` > the plan stub > the WHOLE branch name
-  (not its stub: `opt-363-e2e-harness` has no slash), and answers null,
-  never a stub. The grammar is team-keyed (`ISSUE_TEAM_KEYS`, `['OPT']`,
-  case-insensitive): a generic `[a-z]+-\d+` reads `PHASE-0` out of this
-  repo's own branch, measured. `attributeSession` answers
-  `issueIdentifier`/`issueIdentifierSource`, but `collectSessionRow` in
-  `effort/collect.ts` copies attribution fields ONE BY ONE, so a new
-  attribution field reaches no stored row (nor any parity reading)
-  until that function copies it.
-- To back a test header's "N mutations were driven" claim (method: the
-  `mutation-leg-grids` skill), a bun script runs ONE file per leg through
-  `Bun.spawnSync([process.execPath, 'test', <file>])`, with the unmutated
-  file run before and after as controls. Never run the full suite
-  meanwhile: the module on disk is mutated.
-- The session row (`SessionEffortRow`, `src/effort/store/types.ts`)
-  carries `mode` (`SessionMode`, `'local'` alone until phase 6 adds
-  `remote`; written from `SESSION_MODE` in `effort/collect.ts`) and
-  `issueIdentifier`, but NOT attribution's `issueIdentifierSource`. The
-  sibling's stored rows predate both fields, and 74 of its 1,052 rows
-  (measured 2026-09-11) also end in a `planStubPatch` key no collector
-  here writes. So a lineage parity check cannot compare whole rows byte
-  for byte against that store: project each row to the sibling's own
-  keys first, and account for `planStubPatch` explicitly.
+  other call refuses, and `effort/collect.ts` appends `[]` on each
+  "nothing new" run, printing `+0 rows`. Finding 1 of
+  `.plans/REVIEW-phase-0-store.md`.
+- `resolveIssueIdentifier({ branch, planStub, planIssue? }, teamKeys?)`
+  (`src/effort/attribution.ts`) ranks plan `issue:` > plan stub > WHOLE
+  branch name, and answers null, never a stub. Its grammar is team-keyed
+  (`ISSUE_TEAM_KEYS`, `['OPT']`, case-insensitive); a generic
+  `[a-z]+-\d+` reads `PHASE-0` from this branch. `collectSessionRow`
+  (`effort/collect.ts`) copies attribution fields ONE BY ONE: a new
+  field reaches no row until copied there.
+- Driving mutation legs (`mutation-leg-grids` skill): a bun script runs
+  ONE file per leg via `Bun.spawnSync([process.execPath, 'test',
+  <file>])`, the unmutated file before and after as controls; never run
+  the full suite meanwhile, as the module on disk is mutated.
 - Proving a `stamped` plan-stub match (`resolveSessionPlan`'s stamp
-  outranks the branch) needs a branch that resolves on its own to a
-  DIFFERENT, real roster stub; stamping one that resolves to `none` only
-  proves the stamp is read. `src/effort/collect.test.ts`'s
-  `describe('the session row both backends store')` plants a second
-  `PLAN-*.md` the branch's exact match does not name and stamps THAT
-  one, so the row's `planStub`/`planStubMatch` landing on it is
-  evidence of precedence.
-- `CLAUDECODE` is set inside a Claude Code session (measured in a loop
-  task session), and under it bun 1.3.14's `bun test` prints no
-  `(pass)` or `(skip)` line, only the counts, so a skipped case's
-  title, and any skip reason in it, never reaches the capture.
-  `env -u CLAUDECODE bun test <file>` restores the
-  `(pass|skip|fail) <describe> > <case>` lines (unsetting
-  `CLAUDE_CODE_ENTRYPOINT` alone does not), and
-  `--reporter=junit --reporter-outfile=<f>` names every skipped case
-  either way. The end summary can re-list a `(fail)` line, so count
-  DISTINCT failing titles, never lines.
-- The parity fixture resolver is `src/tests/parity-fixture.ts`:
-  `resolveParityFixture({ env?, home? })` never throws and answers
-  `present: true` (`logDir`, `storeDir`, `sessionsPath`, `commitsPath`,
-  `sessionLogCount`) or `present: false` (coded `absences` plus a
-  one-line `reason` for the describe title). Overrides are
-  `RAFA_PARITY_LOG_DIR` and `RAFA_PARITY_STORE_DIR`; both defaults
-  derive from `~/projects/agentic-research` and resolve PRESENT on this
-  machine (1,053 loose logs), so a suite gated on it runs in every
-  plain `bun test` here. It locates nothing else: a test needing the
-  sibling checkout's git history or `.plans/` roster (both parity
-  tests do) derives that root itself, independent of the overrides, as
+  outranks the branch) needs a branch resolving on its own to a
+  DIFFERENT real roster stub (stamping a `none` one only proves the stamp
+  is read): `collect.test.ts` plants a second `PLAN-*.md` and stamps it.
+- `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print
+  counts only, no `(pass)`/`(skip)` lines or skip reasons.
+  `env -u CLAUDECODE bun test <file>` restores them (unsetting
+  `CLAUDE_CODE_ENTRYPOINT` does not); `--reporter=junit
+  --reporter-outfile=<f>` lists skips either way. Count DISTINCT failing
+  titles: the summary re-lists `(fail)` lines.
+- `resolveParityFixture({ env?, home? })` (`src/tests/parity-fixture.ts`)
+  never throws: `present: true` (`logDir`, `storeDir`, `sessionsPath`,
+  `commitsPath`, `sessionLogCount`) or `present: false` (`absences`, a
+  one-line `reason`). Overrides `RAFA_PARITY_LOG_DIR`,
+  `RAFA_PARITY_STORE_DIR`; defaults under `~/projects/agentic-research`
+  resolve PRESENT here, so gated suites run in plain `bun test`. The
+  sibling's git history and `.plans/` are derived separately, as
   `join(homedir(), 'projects', 'agentic-research')`.
-- `collectEffort`'s `repoRoot` also sets the default `plansDir`
-  (`<repoRoot>/.plans`, the roster `planStub` resolves against), the
-  commit half's git cwd, and, with no `store` passed, where the store
-  WRITES (`selectEffortStore` opens under it). Pointing it at the
-  sibling to reach its roster or history writes into the sibling's
-  `.ralph/` unless a `store` opened under a temp root is passed too;
-  or keep `repoRoot` a temp root and pass `plansDir` and `readCommits`.
-- User-level skills `env-gated-suite-skip-readings` (the three-leg
-  proof that a skip came from its gate) and
-  `port-parity-differential-testing` fit the parity stage; both were
-  measured under vitest. On bun 1.3.14 `describe.skipIf(true)(...)`
-  still runs its callback, so a module-scope reading executes either
-  way, while a `beforeAll`/`afterAll`/`it` registered inside it never
-  runs its body and only reports `(skip)`: keep a fixture's reading
-  and any heavy setup in `beforeAll` or a case, the part a skip skips.
-- `beforeAll`/`it` in `bun:test` take an optional second argument,
-  `HookOptions = number | { timeout?: number }`
-  (`node_modules/bun-types/test.d.ts`), overriding the 5000ms default,
-  which is PER HOOK, not per assertion inside it. A full
-  `collectEffort` run (both halves) over the live sibling (~1,053 loose
-  logs, ~1.3GB; ~1,214 commits) took ~4-5s per backend, measured
-  2026-09-11, so a `beforeAll` collecting through both backends needs
-  one explicit timeout for the whole hook. Missing, it fails as
-  `(fail) ... > (unnamed) [5000.13ms] a beforeEach/afterEach hook
-  timed out for this test`, blaming an unnamed test instead of naming
-  the hook, which reads like a fixture problem rather than a timeout.
-- Both effort-store backends' `read(kind)` answer rows that were
-  themselves round-tripped through `JSON.parse` (of an NDJSON line, or
-  of SQLite's `row_json` column), so the strongest "byte-identical"
-  check reachable through the public `EffortStore` port is
-  `JSON.stringify(row)` string equality between the two backends'
-  answers for the same key — `toEqual` alone would miss a field that
-  changed position. Compare by an explicit key (session id, commit
-  sha) rather than by array position: two independently-run
-  `collectEffort` calls are not guaranteed to answer in the same
-  order even though both sort deterministically in practice.
-- The sibling checkout's real `.plans/` roster attributes sessions to
-  a genuinely diverse set of plan stubs (measured 2026-09-11: 12
-  buckets including one `(none)` bucket of 105 out of ~1053 sessions),
-  which is useful non-vacuity evidence for any test grouping the live
-  fixture's sessions by plan stub.
-- The lineage parity test (`src/tests/parity-lineage.test.ts`, beside
-  `parity-differential.test.ts`) runs `collectEffort` ONCE, through the
-  NDJSON backend, over the live sibling directory, and compares what it
-  answers to the rows already sitting in the sibling's OWN
-  `sessions.ndjson`/`commits.ndjson` (read via `readStoreRows` — see
-  below), not to another fresh collection. A second collect over a live
-  directory is NOT guaranteed to reproduce an already-stored row
-  byte-for-byte, beyond the `mode`/`issueIdentifier`/`planStubPatch`
-  drift already noted: measured 2026-09-11, 3 of the sibling's 1,052
-  stored session rows are frozen mid-session in exactly the sense
-  `effort/collect.ts`'s own module note describes — the log at that
-  `sessionId` kept growing after the sibling's collector read it, so
-  `sizeBytes`, `modifiedAt`, and every content-derived field
-  (`lineCount`, `usage`, `lastTimestamp`, `gitBranchCounts`, etc.)
-  legitimately differ from the frozen row. Detect this by `sizeBytes`
-  and `modifiedAt` alone, asserting them monotonic (never smaller than
-  what was stored) rather than diffing every field — a row that shrank
-  is a real mismatch, not this, and should fail loudly rather than being
-  waved through by the same check.
-- `readStoreRows<Record<string, unknown>>(path)` (exported from
-  `src/effort/store.ts`) is the safe way to read an NDJSON store file
-  whose rows predate a field the CURRENT row type declares (e.g. the
-  sibling's session rows predating `mode`/`issueIdentifier`): it only
-  asserts a line parses to a plain JSON object and never checks a
-  shape, so a foreign-schema row round-trips exactly as it was written.
-  Reading such a file through a typed `EffortStore` instead would claim
-  fields the row never carries.
-- Dropping a known set of keys from a row for a projection comparison
-  needs an `omit`-style loop over `Object.entries`, not
-  `const { mode: _mode, ...rest } = row` — this repo's eslint config
-  sets no ignore pattern for `@typescript-eslint/no-unused-vars` (nor
-  `ignoreRestSiblings`), so the discarded destructured bindings are
-  flagged even when underscore-prefixed. Measured by planting the
-  pattern and running `eslint` on it.
-- A fresh `SessionEffortRow` with `mode` and `issueIdentifier` dropped
-  reproduces the sibling's own stored session row's exact key order
-  (`effort/collect.ts` builds the row by spreading the session stats
-  and then appending the rest in the reconciled schema's order, and the
-  sibling's rows were built the same way minus those two fields), which
-  is what lets a projection be compared with plain `JSON.stringify`
-  equality instead of a canonicalizer. Against the live store, every
-  stored commit row compares byte-identical with no projection at all;
-  only session rows need one.
+- `collectEffort` (`src/effort/collect.ts`): with no `store` it resolves
+  one ONCE per run from config under `repoRoot` (no config: SQLite, both
+  halves' `storePath` = `effort.sqlite`); pass `openNdjsonStore(root)`
+  or `openSqliteStore(root)` to pick one (`effort collect` has no
+  `--store`). `repoRoot` also sets the default `plansDir` and the commit
+  half's git cwd, so aimed at the sibling it writes the sibling's
+  `.ralph/` unless a temp-root `store` is passed; or keep `repoRoot`
+  temp and pass `plansDir` and `readCommits`.
+- On bun too (skills `env-gated-suite-skip-readings`,
+  `port-parity-differential-testing` measured vitest),
+  `describe.skipIf(true)` runs its callback while hooks and cases inside
+  report `(skip)` unrun: keep fixture reads and heavy setup in
+  `beforeAll` or a case.
+- `bun:test` hooks/cases take `number | { timeout }` as a second
+  argument, overriding 5000ms PER HOOK. A full `collectEffort` over the
+  live sibling (~1,053 logs, ~1.3GB, ~1,214 commits) takes ~4-5s per
+  backend, so a two-backend `beforeAll` needs one explicit timeout, else
+  it fails as `(unnamed) [5000.13ms] a beforeEach/afterEach hook timed
+  out`, blaming no hook.
+- Backends' `read(kind)` rows are `JSON.parse` round-trips, so the
+  strongest cross-backend check is `JSON.stringify(row)` equality
+  (`toEqual` misses field order), paired by key (session id, sha), not
+  position.
+- The sibling's `.plans/` roster spreads sessions over 12 plan-stub
+  buckets (`(none)` 105 of ~1,053): non-vacuity evidence for per-stub
+  groupings of the live fixture.
+- `src/tests/parity-lineage.test.ts` collects ONCE (NDJSON) over the
+  live sibling and compares with the sibling's OWN stored rows (via
+  `readStoreRows`). 3 of 1,052 stored session rows are frozen
+  mid-session (the log grew afterwards, per `effort/collect.ts`'s module
+  note), so every content field differs: accept them only by
+  `sizeBytes`/`modifiedAt` having grown, and fail a row that shrank.
+- `readStoreRows<Record<string, unknown>>(path)` (`src/effort/store.ts`)
+  reads older-schema NDJSON rows as written, checking only for a plain
+  object per line; a typed `EffortStore` read would claim absent fields.
+- Drop projection keys with an `Object.entries` loop, not
+  `const { mode: _mode, ...rest } = row`: `@typescript-eslint/no-unused-vars`
+  has no ignore pattern or `ignoreRestSiblings` here, so `_` discards
+  are flagged.
+- `SessionEffortRow` carries `mode` (`SessionMode`, `'local'` until phase
+  6 adds `remote`; from `SESSION_MODE`) and `issueIdentifier`, not
+  `issueIdentifierSource`. The sibling's stored rows predate both, and
+  74 of 1,052 end in a `planStubPatch` no collector here writes; drop
+  the two and a fresh row has the stored key order, so project to the
+  sibling's keys, handle `planStubPatch` explicitly, compare by
+  `JSON.stringify`. Commit rows match byte-for-byte unprojected.
