@@ -196,3 +196,36 @@
   `{ changes, lastInsertRowid }` and `.all()` returns an array, and
   neither is a Promise. A SQLite backend can therefore implement the
   synchronous store port without awaiting.
+- The NDJSON backend is `src/effort/store/ndjson.ts`.
+  `openNdjsonStore(repoRoot)` gives the port's `append`, `keys` and
+  `read`, plus `path(kind)` (the kind's file) and `readRows(kind)` (the
+  rows with `lineCount` and `unparsedLineCount`). Its `append` answers
+  `NdjsonAppendResult`, which adds `separatedPartialLine`. It holds no
+  logic of its own: it routes to the functions of
+  `src/effort/store.ts`, which is byte-identical to the sibling's
+  `tools/ralph/effort/store.ts`. So retiring `store.ts` means MOVING
+  those functions into `ndjson.ts` and carrying the parity case in
+  `ndjson.test.ts` over (it imports `openEffortStore`), not deleting
+  them.
+- A kind added to `EffortRowByKind` in `store/types.ts`, such as a future
+  `findings` kind, breaks `check-types` in `store/ndjson.ts`, with
+  TS2345 at every `effortStorePath` call. It keeps failing until
+  `STORE_FILE_NAMES` in `src/effort/store.ts` names that kind's file.
+  Measured. A table only the SQLite backend holds belongs outside the
+  port's row map, or else the NDJSON backend has to take it too.
+- To test "exists but cannot be read", plant a DIRECTORY at the file's
+  path. `readFileSync` then throws `EISDIR: illegal operation on a
+  directory, read`, measured on bun 1.3.14. Unlike a `chmod 000` plant,
+  this also fails as root, so it needs no `it.skipIf(isRoot)`.
+- To drive runtime mutations against a module, write a scratch bun
+  script under `/tmp` that does the following for each mutation:
+  string-replace the module in place; assert that the replacement
+  changed the text; run only the colocated test file; write the
+  original back in a `finally`. Also run the unmutated module once as
+  the control, and afterwards `cmp` the module against a `/tmp` backup.
+  The assert matters because a pattern that matches nothing leaves the
+  module unchanged, and its green run would then pass for a surviving
+  mutant.
+- The Bash tool's zsh globs an unquoted `grep --include=*.ts` itself.
+  It prints `no matches found` and grep never runs, and that empty
+  output reads like "no hits". Quote the pattern: `--include='*.ts'`.
