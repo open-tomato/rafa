@@ -91,10 +91,6 @@
   and check its output (packages added vs. already satisfied) before
   concluding a missing-module error is a real code/config bug rather than
   a stale `node_modules`.
-- `Bun.file(path).exists()` answers false for a DIRECTORY (and `.text()`
-  on one throws EISDIR), measured on bun 1.3.14, so it cannot answer "is
-  anything at this path". Use `existsSync` wherever an unreadable path
-  must not pass for an absent one.
 - `Bun.YAML.parse` facts, measured on bun 1.3.14, for any YAML reader here
   (the `rafa:report` parser included). An empty, whitespace-only,
   comment-only or bare `---` input gives `null`. A multi-document stream
@@ -138,10 +134,7 @@
   keyed by `sessionId` and `commits` by `sha`, and a keyless row
   answers null. The port's `AppendResult` is `{ path, appended,
   skipped }` only. NDJSON-only readings (`separatedPartialLine`, the
-  line arithmetic) belong on a backend's own wider type. Until
-  `src/effort/store.ts` is retired, it ALSO exports an `EffortRowKind`
-  and an `AppendResult` (with `separatedPartialLine`), so import the
-  port's from `store/types.js`.
+  line arithmetic) belong on a backend's own wider type.
 - Declare a port interface with PROPERTY signatures
   (`keys: (kind: K) => ...`), not method signatures. Measured with this
   repo's tsc: a backend whose parameter is narrower than the port's is
@@ -150,11 +143,6 @@
   checked bivariantly. For a closed per-kind map use a `type` alias. An
   interface can be widened from another file by declaration merging,
   while re-declaring an alias fails with TS2300.
-- A compile-time claim can be driven red by planting a mutated copy of
-  the module BESIDE it (`src/<dir>/zz-control-*.ts`, so its relative
-  imports still resolve) and running `bunx tsc --noEmit`. Move every
-  copy out before exiting: `git add -A` would commit a forgotten one,
-  and `tsc` would stay red.
 - To type-check one `*.test.ts`, which `check-types` excludes, put a
   tsconfig OUTSIDE the repo with `"extends": "<repo>/tsconfig.json"`,
   `"files": ["<abs test path>"]`, `"include": []` and an absolute
@@ -168,9 +156,8 @@
   rows with `lineCount` and `unparsedLineCount`). Its `append` answers
   `NdjsonAppendResult`, which adds `separatedPartialLine`. It holds no
   logic of its own: it routes to the functions of
-  `src/effort/store.ts`, which is byte-identical to the sibling's
-  `tools/ralph/effort/store.ts`. So retiring `store.ts` means MOVING
-  those functions into `ndjson.ts` and carrying the parity case in
+  `src/effort/store.ts`. So retiring `store.ts` means MOVING those
+  functions into `ndjson.ts` and carrying the parity case in
   `ndjson.test.ts` over (it imports `openEffortStore`), not deleting
   them.
 - A kind added to `EffortRowByKind` in `store/types.ts`, such as a future
@@ -180,10 +167,13 @@
   TS2741 in `store/sqlite.ts` until `KIND_TABLES` has an entry for it. A
   table only the SQLite backend holds belongs outside the port's row map,
   or else the NDJSON backend has to take it too.
-- To test "exists but cannot be read", plant a DIRECTORY at the file's
-  path. `readFileSync` then throws `EISDIR: illegal operation on a
-  directory, read`, measured on bun 1.3.14. Unlike a `chmod 000` plant,
-  this also fails as root, so it needs no `it.skipIf(isRoot)`.
+- A DIRECTORY at a file's path, measured on bun 1.3.14:
+  `Bun.file(path).exists()` answers false for it and `.text()` throws
+  EISDIR, so use `existsSync` wherever an unreadable path must not pass
+  for an absent one. Planting one is how to test "exists but cannot be
+  read": `readFileSync` throws `EISDIR: illegal operation on a
+  directory, read`, and unlike a `chmod 000` plant it also fails as
+  root, so it needs no `it.skipIf(isRoot)`.
 - The Bash tool's zsh globs an unquoted `grep --include=*.ts` itself.
   It prints `no matches found` and grep never runs, and that empty
   output reads like "no hits". Quote the pattern: `--include='*.ts'`.
@@ -242,17 +232,14 @@
   config)` takes the `config` FIELD of what `loadConfig` and
   `resolveConfig` answer (the resolution itself is refused with a
   `TypeError`), and never reads `.rafa/config.yaml` itself. It answers
-  the port plus `path(kind)`. Import the store from `./store/index.js`:
-  `./store.js` is still the sibling's file-bound module, with its own,
-  different `openEffortStore`. Backend-only readings (`readRows`,
+  the port plus `path(kind)`. Import the store from `./store/index.js`
+  and the port's types from `./store/types.js`: `./store.js`, until
+  retired, is still the sibling's file-bound module, with its own,
+  different `openEffortStore`, `EffortRowKind` and `AppendResult` (with
+  `separatedPartialLine`). Backend-only readings (`readRows`,
   `separatedPartialLine`) need that backend's opener, also exported
   there. `index.test.ts` pins the entry's runtime export list, so a new
   export has to be added there too.
-- The Bash tool's shell is zsh, where `${PIPESTATUS[0]}` is EMPTY (zsh
-  spells it `$pipestatus`, lowercase and 1-indexed). Measured: `bun
-  test f | tail; echo "Exited with code ${PIPESTATUS[0]}"` printed no
-  code at all. Redirect a gate to a file and read `$?` instead, so a
-  missing exit code cannot pass for a zero.
 - `import/order` puts every `import type` line in ONE group, and
   eslint-plugin-import 2.32's sorter never compares a sibling path with
   a parent one by name: it stops at the differing first segment and
@@ -261,10 +248,35 @@
   `./types.js` tie and pass in either order (`store/ndjson.ts`). Value
   imports sit in separate parent and sibling groups, so it never arises
   there. An import of `./index.js` is the `index` group: after the
-  sibling group, behind its own blank line.
-- To drive runtime mutations against a suite, run a bun script from
-  OUTSIDE the repo that swaps one exact string in the module (assert it
-  matches once), runs `bun test <file>` through `Bun.spawnSync`, writes
-  the original back, and compares a sha of the module at the end. The
-  module is mutated in place, so no copy is left for `git add -A`, but
-  nothing else may run the suite meanwhile.
+  sibling group, behind its own blank line. `./store/index.js` from the
+  directory above it is NOT: it is an ordinary sibling import, and lint
+  passes it at the end of the sibling block with no blank line
+  (`effort/collect.ts`).
+- The collector, `src/effort/collect.ts`, goes through the store port.
+  `collectEffort` takes `store` (an `EffortStore`). Without one it
+  resolves the store ONCE per run, `loadConfig(repoRoot, {}, log)` then
+  `selectEffortStore`, before either half reads a log or runs git. So
+  to target a backend (the parity tests), pass `openNdjsonStore(root)`
+  or `openSqliteStore(root)`. A run given no store, under a root with no
+  `.rafa/config.yaml`, writes SQLite. Each half's `storePath` is the
+  path its append answered, so under SQLite both halves report
+  `effort.sqlite`. `effort collect` has no `--store` flag, and it
+  prints a `ConfigError` as one `ralph effort collect: <problem>` line
+  per problem, exiting 1.
+- `src/effort/report.ts` still reads `sessions.ndjson` directly
+  (`effortStorePath` plus `readStoreRows`) rather than through the
+  selected store, and no task in the plan rewires it. Measured: with no
+  config, or with `store: sqlite`, a collect appends into
+  `effort.sqlite` and `buildReport` then reads 0 rows. With
+  `store: ndjson` it reads them. So under the default config
+  `rafa effort report` sees nothing `rafa effort collect` wrote.
+  `src/tests/effort-pipeline.test.ts` plants `store: ndjson` in its
+  fixture for that reason.
+- A command that resolves its repo root through git (`getRepoRoot`
+  reads the cwd) and takes no seam can be driven black-box. Spawn
+  `[process.execPath, <abs path of src/rafa.ts>, ...]` with `cwd` set to
+  a scratch `git init` repo holding one `--allow-empty --no-verify`
+  commit. Make that commit with `-c user.name=... -c user.email=...
+  -c commit.gpgsign=false -c core.hooksPath=/dev/null`, so this
+  machine's git config stays out. `makeRepo` and `runCollect` in
+  `src/effort/collect.test.ts` do exactly this.

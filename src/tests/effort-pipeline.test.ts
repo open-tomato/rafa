@@ -14,7 +14,13 @@
  *
  *   - The store the collector WRITES is the store the report READS.
  *     A path that drifted apart leaves both colocated suites green
- *     and every report empty.
+ *     and every report empty. That holds under `store: ndjson` alone,
+ *     which the fixture's `.rafa/config.yaml` selects. The collector
+ *     appends through whichever store the config selects, while the
+ *     report reads the NDJSON sessions file directly, so under the
+ *     default `sqlite` the rows land in `effort.sqlite` and a report
+ *     reads none of them. Measured, a fixture planting no config turns
+ *     twelve of this file's sixteen cases red.
  *   - A log's `gitBranch` reaches a report GROUP KEY. That chain runs
  *     through four modules — the record fold, the dominant-branch
  *     histogram, the plan-stub resolution and the accumulator's key —
@@ -64,7 +70,9 @@
  * logs and write into the real `.ralph/`. Their argv is covered
  * purely in the colocated suites; everything here goes through
  * {@link collectEffort} and {@link buildReport} with the root, the log
- * directory and the commit reader all injected.
+ * directory and the commit reader all injected, and the store selected
+ * by the fixture's planted config, which is how the command selects
+ * one.
  *
  * The `ci-repair` prompt shape has no live session anywhere in the
  * tree — it is newer than every log there — so its only evidence
@@ -437,6 +445,12 @@ interface Fixture {
   plansDir: string;
 }
 
+/**
+ * The config the fixture plants: the one backend the report reads. See
+ * the module note.
+ */
+const FIXTURE_CONFIG = 'store: ndjson\n';
+
 /** Plants the whole fixture tree under a fresh temporary root. */
 function makeFixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), 'ralph-pipeline-'));
@@ -446,6 +460,8 @@ function makeFixture(): Fixture {
   const plansDir = join(root, '.plans');
   mkdirSync(logDir);
   mkdirSync(plansDir);
+  mkdirSync(join(root, '.rafa'));
+  writeFileSync(join(root, '.rafa', 'config.yaml'), FIXTURE_CONFIG, 'utf8');
 
   for (const name of PLAN_FILES) {
     writeFileSync(join(plansDir, name), '# a plan\n', 'utf8');

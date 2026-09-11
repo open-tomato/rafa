@@ -18,10 +18,21 @@
  * suite pinned to what it is about, which is whether attribution
  * reaches the row at all.
  *
- * No case reads the real session log directory or runs git. The
- * commit half is driven through {@link CollectOptions.readCommits},
- * which is why that seam exists; a case that shelled out to git would
- * be measuring this machine's history rather than the collector.
+ * No case reads the real session log directory or runs git over this
+ * repo. The commit half is driven through
+ * {@link CollectOptions.readCommits}, which is why that seam exists; a
+ * case that shelled out to git here would be measuring this machine's
+ * history rather than the collector. The two command cases are the one
+ * exception: the command resolves its root through git and takes no
+ * seam, so they run it as a subprocess inside a scratch repository
+ * holding one empty commit.
+ *
+ * The end-to-end cases run once per backend with the store passed in,
+ * because the collector is written against the store port and a run
+ * green on one backend says nothing about the other. The cases that
+ * pass no store read which backend the config selected off the disk.
+ * The file names are spelled HERE rather than read off a backend, so a
+ * run that opened the wrong one fails instead of agreeing with itself.
  *
  * The two properties with no behavioural case are named rather than
  * left implied. A row is FROZEN at whatever the log held when it was
@@ -33,14 +44,15 @@
  * as the streaming-versus-slurp property is unobservable in the
  * session reader beside it.
  *
- * Twenty-three module mutations were driven against this file and ALL
- * TWENTY-THREE reddened at least one case, with the restored module
- * green either side and byte-identical: dropping the `isFile` guard
- * so a directory named `*.jsonl` becomes a candidate, matching every
- * file name instead of only `.jsonl`, ordering newest first, reading
- * a missing log directory as an empty list, making the `--since`
- * bound exclusive, testing the store before the window so the two
- * buckets swap, skipping neither an already-stored session nor an
+ * Twenty-three module mutations were driven against this file before
+ * the collector was rewired onto the store port, and ALL TWENTY-THREE
+ * reddened at least one case, with the restored module green either
+ * side and byte-identical: dropping the `isFile` guard so a directory
+ * named `*.jsonl` becomes a candidate, matching every file name
+ * instead of only `.jsonl`, ordering newest first, reading a missing
+ * log directory as an empty list, making the `--since` bound
+ * exclusive, testing the store before the window so the two buckets
+ * swap, skipping neither an already-stored session nor an
  * already-stored commit, swapping which half `--no-git` and
  * `--no-sessions` switch off, ignoring an unrecognised argument,
  * accepting a `--since` that could not be read, allowing both halves
@@ -51,29 +63,50 @@
  * switched off, printing progress without `--verbose`, attributing
  * without the enqueue record, recording a zero size, rethrowing a
  * failed log read instead of counting it, and dropping the `--no-git`
- * line from the summary.
+ * line from the summary. The rewire took those two key projections out
+ * of this module: the projection is the port's now.
+ *
+ * Thirteen more were driven against the rewire, eleven in this module
+ * and two in the port, with the restored files green either side and
+ * byte-identical, and TWELVE reddened at least one case: the session
+ * half reading the commit keys and the commit half the session keys,
+ * each half appending under the other's kind, a passed store ignored
+ * in favour of the config, the config read twice, the store resolved
+ * lazily so the logs are listed before the config is read, each half's
+ * store path spelled as its NDJSON file, the command without its
+ * config-refusal catch, and each of the port's two key projections
+ * perturbed away from the key the selection skips by. ONE stayed green
+ * and is named rather than dropped: the command printing every error
+ * it catches as a refusal, rather than rethrowing what is not a config
+ * one. No case drives a fault that is not a refusal through the
+ * command, because the command takes no seam to plant one through.
  */
-import type { SessionLogCandidate } from './collect.js';
+import type { CollectOptions, SessionLogCandidate } from './collect.js';
 import type { CommitLogParseResult, CommitStats } from './commits.js';
+import type { EffortStore } from './store/types.js';
 
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'bun:test';
+
+import { ConfigError } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import {
   collectEffort,
   collectSessionRow,
-  commitRowKey,
   formatCollectSummary,
   listSessionLogs,
   parseCollectArgs,
@@ -83,13 +116,15 @@ import {
   selectCommits,
   selectSessionLogs,
   sessionLogDir,
-  sessionRowKey,
 } from './collect.js';
-import { readStoreRows } from './store.js';
+import { openNdjsonStore, openSqliteStore } from './store/index.js';
 
 /** The task prompt's prefix, taken from the shape that declares it. */
 const TASK_PREFIX = PROMPT_SHAPES
   .find((shape) => shape.kind === 'task')?.prefix ?? '';
+
+/** The command dispatcher the command cases run as a subprocess. */
+const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 /**
  * Running as root defeats a permission-denied plant, so the one case
@@ -200,11 +235,14 @@ function commitRow(sha: string): CommitStats {
   };
 }
 
-/** A reader seam answering planted rows and counting its calls. */
-function plantedCommits(rows: readonly CommitStats[]): {
+/** The planted commit reader, and a record of every call it took. */
+interface PlantedCommits {
   read: () => CommitLogParseResult;
   calls: string[];
-} {
+}
+
+/** A reader seam answering planted rows and counting its calls. */
+function plantedCommits(rows: readonly CommitStats[]): PlantedCommits {
   const calls: string[] = [];
   return {
     calls,
@@ -506,16 +544,6 @@ describe('selectCommits', () => {
   });
 });
 
-describe('the store key projections', () => {
-  it('keys a session row on its session id', () => {
-    expect(sessionRowKey({ sessionId: 'abc' })).toBe('abc');
-  });
-
-  it('keys a commit row on its sha', () => {
-    expect(commitRowKey({ sha: 'deadbeef' })).toBe('deadbeef');
-  });
-});
-
 describe('readPlanStubs', () => {
   it('reads the stubs out of a plan directory', () => {
     const dir = makeScratch();
@@ -592,12 +620,15 @@ describe('collectSessionRow', () => {
   });
 });
 
-/** Builds a scratch repo root with a log tree and a plan roster. */
-function makeTree(sessionIds: readonly string[]): {
+/** A scratch repo root with a log tree and a plan roster. */
+interface Tree {
   root: string;
   logDir: string;
   plansDir: string;
-} {
+}
+
+/** Builds a scratch repo root with a log tree and a plan roster. */
+function makeTree(sessionIds: readonly string[]): Tree {
   const root = makeScratch();
   const logDir = join(root, 'logs');
   const plansDir = join(root, 'plans');
@@ -610,18 +641,73 @@ function makeTree(sessionIds: readonly string[]): {
   return { root, logDir, plansDir };
 }
 
-describe('collectEffort', () => {
+/**
+ * A quiet run over a planted tree, reading the planted commits. It
+ * passes no store, so the run selects one from the tree's config.
+ */
+function optionsFor(tree: Tree, commits: PlantedCommits): CollectOptions {
+  return {
+    repoRoot: tree.root,
+    logDir: tree.logDir,
+    plansDir: tree.plansDir,
+    readCommits: commits.read,
+    log: () => undefined,
+  };
+}
+
+/** The store directory under a root, spelled here and not imported. */
+function storeDir(root: string): string {
+  return join(root, '.ralph', 'effort');
+}
+
+/** Plants `.rafa/config.yaml` under a root. */
+function writeConfig(root: string, text: string): void {
+  mkdirSync(join(root, '.rafa'), { recursive: true });
+  writeFileSync(join(root, '.rafa', 'config.yaml'), text, 'utf8');
+}
+
+/** A store that records every call before passing it to a real one. */
+function recordingStore(inner: EffortStore): {
+  store: EffortStore;
+  calls: string[];
+} {
+  const calls: string[] = [];
+  return {
+    calls,
+    store: {
+      keys: (kind) => {
+        calls.push(`keys ${kind}`);
+        return inner.keys(kind);
+      },
+      append: (kind, rows) => {
+        calls.push(`append ${kind} ${rows.length}`);
+        return inner.append(kind, rows);
+      },
+      read: (kind) => {
+        calls.push(`read ${kind}`);
+        return inner.read(kind);
+      },
+    },
+  };
+}
+
+/** Each backend's opener, by the name the config selects it with. */
+const BACKENDS: readonly (readonly [string, (root: string) => EffortStore])[] = [
+  ['ndjson', openNdjsonStore],
+  ['sqlite', openSqliteStore],
+];
+
+describe.each(BACKENDS)('collectEffort through the %s store', (_name, open) => {
+  /** A quiet run over a tree, through this backend under its root. */
+  function runOn(tree: Tree, commits: PlantedCommits): CollectOptions {
+    return { ...optionsFor(tree, commits), store: open(tree.root) };
+  }
+
   it('appends one row per log on a first run', async () => {
     const tree = makeTree(['s1', 's2']);
     const commits = plantedCommits([commitRow('aaa')]);
 
-    const result = await collectEffort({
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
-      log: () => undefined,
-    });
+    const result = await collectEffort(runOn(tree, commits));
 
     expect(result.sessions?.candidates).toBe(2);
     expect(result.sessions?.read).toBe(2);
@@ -635,13 +721,7 @@ describe('collectEffort', () => {
   it('appends nothing at all on a second run', async () => {
     const tree = makeTree(['s1', 's2']);
     const commits = plantedCommits([commitRow('aaa')]);
-    const options = {
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
-      log: () => undefined,
-    };
+    const options = runOn(tree, commits);
     await collectEffort(options);
 
     const second = await collectEffort(options);
@@ -654,36 +734,23 @@ describe('collectEffort', () => {
     expect(second.commits?.appended).toBe(0);
   });
 
-  it('leaves the store files exactly as long', async () => {
+  it('leaves the store exactly as long', async () => {
     const tree = makeTree(['s1', 's2']);
     const commits = plantedCommits([commitRow('aaa'), commitRow('bbb')]);
-    const options = {
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
-      log: () => undefined,
-    };
-    const first = await collectEffort(options);
+    const options = runOn(tree, commits);
+    await collectEffort(options);
     await collectEffort(options);
 
-    const sessionPath = first.sessions?.storePath ?? '';
-    const commitPath = first.commits?.storePath ?? '';
+    const store = open(tree.root);
 
-    expect(readStoreRows(sessionPath).rows).toHaveLength(2);
-    expect(readStoreRows(commitPath).rows).toHaveLength(2);
+    expect(store.read('sessions')).toHaveLength(2);
+    expect(store.read('commits')).toHaveLength(2);
   });
 
   it('reads only the log a second run has not seen', async () => {
     const tree = makeTree(['s1']);
     const commits = plantedCommits([]);
-    const options = {
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
-      log: () => undefined,
-    };
+    const options = runOn(tree, commits);
     await collectEffort(options);
     taskLog(tree.logDir, 's2', 'feat/q19-loop-economics');
 
@@ -697,13 +764,7 @@ describe('collectEffort', () => {
   it('never re-appends a row on a key it already holds', async () => {
     const tree = makeTree(['s1']);
     const commits = plantedCommits([commitRow('aaa')]);
-    const options = {
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
-      log: () => undefined,
-    };
+    const options = runOn(tree, commits);
     const first = await collectEffort(options);
     const second = await collectEffort(options);
 
@@ -718,12 +779,8 @@ describe('collectEffort', () => {
     utimesSync(join(tree.logDir, 's1.jsonl'), 1_600_000, 1_600_000);
 
     const result = await collectEffort({
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
+      ...runOn(tree, commits),
       sinceEpochMs: Date.parse('2026-09-01'),
-      readCommits: commits.read,
-      log: () => undefined,
     });
 
     const expected = new Date(Date.parse('2026-09-01')).toISOString();
@@ -738,12 +795,9 @@ describe('collectEffort', () => {
     const commits = plantedCommits([commitRow('aaa')]);
 
     const result = await collectEffort({
-      repoRoot: tree.root,
+      ...runOn(tree, commits),
       logDir: join(tree.root, 'no-such-directory'),
-      plansDir: tree.plansDir,
       collectSessions: false,
-      readCommits: commits.read,
-      log: () => undefined,
     });
 
     expect(result.sessions).toBeNull();
@@ -755,12 +809,8 @@ describe('collectEffort', () => {
     const commits = plantedCommits([commitRow('aaa')]);
 
     const result = await collectEffort({
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
+      ...runOn(tree, commits),
       collectCommits: false,
-      readCommits: commits.read,
-      log: () => undefined,
     });
 
     expect(result.commits).toBeNull();
@@ -776,10 +826,7 @@ describe('collectEffort', () => {
     const lines: string[] = [];
 
     const result = await collectEffort({
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
+      ...runOn(tree, commits),
       log: (line) => {
         lines.push(line);
       },
@@ -798,12 +845,7 @@ describe('collectEffort', () => {
     const commits = plantedCommits([]);
     const quiet: string[] = [];
     const loud: string[] = [];
-    const base = {
-      repoRoot: tree.root,
-      logDir: tree.logDir,
-      plansDir: tree.plansDir,
-      readCommits: commits.read,
-    };
+    const base = runOn(tree, commits);
 
     await collectEffort({ ...base, log: (line) => quiet.push(line) });
     await collectEffort({
@@ -814,6 +856,144 @@ describe('collectEffort', () => {
 
     expect(quiet).toEqual([]);
     expect(loud.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Each config a run can find, and the file each half should land in
+ * under it: the label, the config text or null for no file, then the
+ * session file and the commit file.
+ */
+const CONFIGURED: readonly (readonly [string, string | null, string, string])[] = [
+  ['no config', null, 'effort.sqlite', 'effort.sqlite'],
+  ['store: sqlite', 'store: sqlite\n', 'effort.sqlite', 'effort.sqlite'],
+  ['store: ndjson', 'store: ndjson\n', 'sessions.ndjson', 'commits.ndjson'],
+];
+
+describe.each(CONFIGURED)('a run finding %s', (
+  _label,
+  config,
+  sessionsFile,
+  commitsFile,
+) => {
+  /** A tree carrying this case's config, when it has one. */
+  function configuredTree(): Tree {
+    const tree = makeTree(['s1']);
+    if (config !== null) writeConfig(tree.root, config);
+    return tree;
+  }
+
+  it('lands both halves in the backend the config selects', async () => {
+    const tree = configuredTree();
+    const commits = plantedCommits([commitRow('aaa')]);
+
+    const result = await collectEffort(optionsFor(tree, commits));
+    const files = [...new Set([sessionsFile, commitsFile])].sort();
+
+    expect(result.sessions?.appended).toBe(1);
+    expect(result.commits?.appended).toBe(1);
+    expect(result.sessions?.storePath)
+      .toBe(join(storeDir(tree.root), sessionsFile));
+    expect(result.commits?.storePath)
+      .toBe(join(storeDir(tree.root), commitsFile));
+    expect(readdirSync(storeDir(tree.root)).sort()).toEqual(files);
+  });
+
+  it('skips on a second run what the first run stored', async () => {
+    const tree = configuredTree();
+    const commits = plantedCommits([commitRow('aaa')]);
+    await collectEffort(optionsFor(tree, commits));
+
+    const second = await collectEffort(optionsFor(tree, commits));
+
+    expect(second.sessions?.alreadyCollected).toBe(1);
+    expect(second.sessions?.appended).toBe(0);
+    expect(second.sessions?.skippedOnAppend).toBe(0);
+    expect(second.commits?.alreadyCollected).toBe(1);
+    expect(second.commits?.appended).toBe(0);
+  });
+});
+
+describe('the store a run goes through', () => {
+  it('serves both halves their keys and their appends', async () => {
+    const tree = makeTree(['s1', 's2']);
+    const commits = plantedCommits([commitRow('aaa')]);
+    const recorded = recordingStore(openNdjsonStore(tree.root));
+
+    await collectEffort({ ...optionsFor(tree, commits), store: recorded.store });
+
+    expect(recorded.calls).toEqual([
+      'keys sessions',
+      'append sessions 2',
+      'keys commits',
+      'append commits 1',
+    ]);
+  });
+
+  it('skips by the keys it reads, before the append sees a row', async () => {
+    const tree = makeTree(['s1', 's2']);
+    const commits = plantedCommits([commitRow('aaa')]);
+    const inner = openSqliteStore(tree.root);
+    await collectEffort({ ...optionsFor(tree, commits), store: inner });
+    const recorded = recordingStore(inner);
+
+    await collectEffort({ ...optionsFor(tree, commits), store: recorded.store });
+
+    expect(recorded.calls).toEqual([
+      'keys sessions',
+      'append sessions 0',
+      'keys commits',
+      'append commits 0',
+    ]);
+  });
+
+  it('never reads the config when a store is passed', async () => {
+    // The config names a store no backend opens, so a run that read it
+    // at all would refuse; the run below writes NDJSON instead.
+    const tree = makeTree(['s1']);
+    writeConfig(tree.root, 'store: postgres\n');
+    const commits = plantedCommits([commitRow('aaa')]);
+
+    const result = await collectEffort({
+      ...optionsFor(tree, commits),
+      store: openNdjsonStore(tree.root),
+    });
+
+    expect(result.sessions?.appended).toBe(1);
+    expect(readdirSync(storeDir(tree.root)).sort())
+      .toEqual(['commits.ndjson', 'sessions.ndjson']);
+  });
+
+  it('refuses a config it cannot run on before reading anything', async () => {
+    // The log directory is missing too. A run that reached the session
+    // half first would reject on that instead of on the config.
+    const tree = makeTree(['s1']);
+    writeConfig(tree.root, 'store: postgres\n');
+    const commits = plantedCommits([commitRow('aaa')]);
+
+    const refusal = await collectEffort({
+      ...optionsFor(tree, commits),
+      logDir: join(tree.root, 'no-such-directory'),
+    }).then(() => null, (error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(ConfigError);
+    expect(commits.calls).toEqual([]);
+    expect(existsSync(join(tree.root, '.ralph'))).toBe(false);
+  });
+
+  it('warns once, through the log sink, about an unknown key', async () => {
+    const tree = makeTree(['s1']);
+    writeConfig(tree.root, 'store: ndjson\ntracker: linear\n');
+    const commits = plantedCommits([commitRow('aaa')]);
+    const lines: string[] = [];
+
+    const result = await collectEffort({
+      ...optionsFor(tree, commits),
+      log: (line) => lines.push(line),
+    });
+
+    expect(lines.filter((line) => line.includes('"tracker"'))).toHaveLength(1);
+    expect(result.commits?.appended).toBe(1);
   });
 });
 
@@ -845,5 +1025,80 @@ describe('formatCollectSummary', () => {
 
     expect(lines.join('\n')).toContain('--no-sessions');
     expect(lines.join('\n')).toContain('--no-git');
+  });
+});
+
+/** What one run of the command printed, and how it exited. */
+interface CommandRun {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * A scratch git repository holding one empty commit and a config. The
+ * `-c` settings keep this machine's own git config (a signing key, a
+ * hook directory) out of a commit nothing here inspects.
+ */
+function makeRepo(config: string): string {
+  const root = makeScratch();
+  const git = (...args: string[]): void => {
+    const run = Bun.spawnSync([
+      'git',
+      '-c',
+      'user.name=rafa',
+      '-c',
+      'user.email=rafa@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      'core.hooksPath=/dev/null',
+      ...args,
+    ], { cwd: root });
+    if (run.exitCode !== 0) {
+      throw new Error(`git ${args.join(' ')}: ${run.stderr.toString()}`);
+    }
+  };
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '--no-verify', '-m', 'init');
+  writeConfig(root, config);
+  return root;
+}
+
+/** Runs `effort collect` inside a repository, as the dispatcher would. */
+function runCollect(root: string, args: readonly string[]): CommandRun {
+  const run = Bun.spawnSync(
+    [process.execPath, RAFA_ENTRY, 'effort', 'collect', ...args],
+    { cwd: root },
+  );
+  return {
+    exitCode: run.exitCode,
+    stdout: run.stdout.toString(),
+    stderr: run.stderr.toString(),
+  };
+}
+
+describe('the collect command', () => {
+  it('collects into the store the config selects', () => {
+    const root = makeRepo('store: ndjson\n');
+
+    const run = runCollect(root, ['--no-sessions']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('+1 rows');
+    expect(readdirSync(storeDir(root))).toEqual(['commits.ndjson']);
+  });
+
+  it('prints a config it cannot run on as a refusal', () => {
+    const root = makeRepo('store: postgres\n');
+
+    const run = runCollect(root, ['--no-sessions']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr.trimEnd().split('\n')).toEqual([
+      expect.stringMatching(/^ralph effort collect: .*store is "postgres"/),
+    ]);
+    expect(run.stdout).toBe('');
+    expect(existsSync(join(root, '.ralph'))).toBe(false);
   });
 });

@@ -54,6 +54,31 @@
  * counters: a row whose size is short of the file on disk is a row
  * taken mid-session.
  *
+ * ## One store, both halves
+ *
+ * Both halves go through one {@link EffortStore}, the port declared in
+ * `effort/store/types.ts`. Each reads the keys its kind already holds
+ * with `keys(kind)`, skips by them, and hands the rest to
+ * `append(kind, rows)`. Neither passes a key projection: the store
+ * reads each kind's key out of the port's one closed record for `keys`
+ * and `append` alike, so the set a half skips by and the set its append
+ * dedupes by come from the same place. What the collector still owns is
+ * the key it looks each candidate up by before any row exists: a
+ * session log's basename, which `readSessionLog` stamps on the row as
+ * its `sessionId`, and a parsed commit's `sha`. `skippedOnAppend` is
+ * the reading that says the collector's key and the store's agree.
+ *
+ * The store is the one a caller passes as {@link CollectOptions.store},
+ * else the one `.rafa/config.yaml` under the repo root selects, which
+ * is `sqlite` when the file names none. That selection is made ONCE per
+ * run, before either half reads a log or runs git, and both halves use
+ * the one store it answered. So the two halves cannot land in two
+ * backends, and a config the loop cannot run on refuses the run before
+ * anything is read. This command has no store flag, so the file
+ * outranks only the default. A store passed in means the file is not
+ * read at all. An unknown key in the file is warned about through
+ * {@link CollectOptions.log}, with everything else the run reports.
+ *
  * ## `--since` is one instant, resolved once
  *
  * The flag is parsed with `Date.parse` and REFUSED when that fails.
@@ -122,12 +147,13 @@ import type {
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
-import type { SessionEffortRow } from './store/types.js';
+import type { EffortStore, SessionEffortRow } from './store/types.js';
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { ConfigError, loadConfig } from '../config.js';
 import { getRepoRoot } from '../utils/git.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
@@ -138,7 +164,7 @@ import {
   readSessionLog,
   sessionIdFromPath,
 } from './session-log.js';
-import { effortStorePath, openEffortStore } from './store.js';
+import { selectEffortStore } from './store/index.js';
 
 /**
  * Path characters the project log directory name replaces.
@@ -205,6 +231,11 @@ export interface CollectArgs {
 /** What the session half did. */
 export interface SessionCollectSummary {
   logDir: string;
+  /**
+   * The file the append targeted, as the store's append answered it:
+   * the kind's own file under NDJSON, the one file every kind shares
+   * under SQLite.
+   */
   storePath: string;
   /** Plan stubs the roster held; zero attributes nothing. */
   planStubCount: number;
@@ -219,14 +250,16 @@ export interface SessionCollectSummary {
   appended: number;
   /**
    * Rows the store declined on a key it already held. Must be zero:
-   * the pending set was built from the same key projection, so
-   * anything here means the two disagreed.
+   * the pending set was selected against the store's own `keys`, so
+   * anything here means the key the collector looked a row up by and
+   * the key the store dedupes it by disagreed.
    */
   skippedOnAppend: number;
 }
 
 /** What the commit half did. */
 export interface CommitCollectSummary {
+  /** The file the append targeted, as on the session summary. */
   storePath: string;
   /** The `--since` argument handed to git, ISO, or null. */
   since: string | null;
@@ -256,10 +289,19 @@ export interface CollectOptions {
   plansDir?: string;
   /** The resolved `--since` instant, shared by both halves. */
   sinceEpochMs?: number | null;
+  /**
+   * The store both halves read their keys from and append to. Defaults
+   * to the backend `.rafa/config.yaml` under the repo root selects; a
+   * store passed here means that file is not read. See the module note.
+   */
+  store?: EffortStore;
   collectSessions?: boolean;
   collectCommits?: boolean;
   verbose?: boolean;
-  /** Sink for progress and errors. Defaults to `console.log`. */
+  /**
+   * Sink for progress, errors and config warnings. Defaults to
+   * `console.log`.
+   */
   log?: (line: string) => void;
   /** Commit reader seam, so a test needs no repository. */
   readCommits?: (options: CommitLogOptions) => CommitLogParseResult;
@@ -271,6 +313,8 @@ interface HalfContext {
   logDir: string;
   plansDir: string;
   sinceEpochMs: number | null;
+  /** The one store both halves read keys from and append to. */
+  store: EffortStore;
   log: (line: string) => void;
   note: (line: string) => void;
   readCommits: (options: CommitLogOptions) => CommitLogParseResult;
@@ -287,18 +331,6 @@ export function sessionLogDir(
   home: string = homedir(),
 ): string {
   return join(home, ...PROJECT_LOG_ROOT, projectLogDirName(repoRoot));
-}
-
-/** The store's key projection for a session row. */
-export function sessionRowKey(
-  row: Pick<SessionEffortRow, 'sessionId'>,
-): string {
-  return row.sessionId;
-}
-
-/** The store's key projection for a commit row. */
-export function commitRowKey(row: Pick<CommitStats, 'sha'>): string {
-  return row.sha;
 }
 
 /**
@@ -533,13 +565,11 @@ function messageOf(error: unknown): string {
 async function collectSessionHalf(
   context: HalfContext,
 ): Promise<SessionCollectSummary> {
-  const storePath = effortStorePath(context.repoRoot, 'sessions');
-  const store = openEffortStore<SessionEffortRow>(storePath, sessionRowKey);
   const planStubs = readPlanStubs(context.plansDir);
   const candidates = listSessionLogs(context.logDir);
   const selection = selectSessionLogs(
     candidates,
-    store.collectedKeys(),
+    context.store.keys('sessions'),
     context.sinceEpochMs,
   );
 
@@ -559,10 +589,10 @@ async function collectSessionHalf(
     }
   }
 
-  const appended = store.append(rows);
+  const appended = context.store.append('sessions', rows);
   return {
     logDir: context.logDir,
-    storePath,
+    storePath: appended.path,
     planStubCount: planStubs.length,
     candidates: candidates.length,
     outsideWindow: selection.outsideWindow.length,
@@ -576,20 +606,18 @@ async function collectSessionHalf(
 
 /** Collects the commit half. */
 function collectCommitHalf(context: HalfContext): CommitCollectSummary {
-  const storePath = effortStorePath(context.repoRoot, 'commits');
-  const store = openEffortStore<CommitStats>(storePath, commitRowKey);
   const since = context.sinceEpochMs === null
     ? undefined
     : new Date(context.sinceEpochMs).toISOString();
 
   const parsed = context.readCommits({ cwd: context.repoRoot, since });
-  const selection = selectCommits(parsed.rows, store.collectedKeys());
+  const selection = selectCommits(parsed.rows, context.store.keys('commits'));
   const window = since ?? 'all';
   context.note(`commits: ${parsed.rows.length} parsed, since ${window}`);
 
-  const appended = store.append(selection.pending);
+  const appended = context.store.append('commits', selection.pending);
   return {
-    storePath,
+    storePath: appended.path,
     since: since ?? null,
     parsedRows: parsed.rows.length,
     unparsedLineCount: parsed.unparsedLineCount,
@@ -600,10 +628,33 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
 }
 
 /**
+ * The store a run goes through: the one passed, else the one the config
+ * under `repoRoot` selects, with the config's warnings sent to `log`.
+ *
+ * Called once per run, so the file is read and warned about once.
+ * Throws a `ConfigError` when the config is one the loop cannot run on.
+ */
+function resolveStore(
+  store: EffortStore | undefined,
+  repoRoot: string,
+  log: (line: string) => void,
+): EffortStore {
+  if (store !== undefined) return store;
+
+  const resolved = loadConfig(repoRoot, {}, log);
+  return selectEffortStore(repoRoot, resolved.config);
+}
+
+/**
  * Runs one collect.
  *
- * The halves are independent and neither reads the other's store, so
- * switching one off changes nothing about the other's result.
+ * The halves are independent and neither reads the other's rows, so
+ * switching one off changes nothing about the other's result. They do
+ * share one store, resolved before either runs; see the module note.
+ *
+ * Rejects with a `ConfigError`, having read no log and run no git, when
+ * no store is passed and the config under the repo root is one the
+ * loop cannot run on.
  */
 export async function collectEffort(
   options: CollectOptions = {},
@@ -616,6 +667,7 @@ export async function collectEffort(
     logDir: options.logDir ?? sessionLogDir(repoRoot),
     plansDir: options.plansDir ?? join(repoRoot, PLANS_DIR),
     sinceEpochMs: options.sinceEpochMs ?? null,
+    store: resolveStore(options.store, repoRoot, log),
     log,
     note: (line: string) => {
       if (verbose) log(line);
@@ -666,29 +718,46 @@ export function formatCollectSummary(result: CollectResult): string[] {
   return lines;
 }
 
+/** Prints each refusal on its own line and marks the run failed. */
+function refuse(problems: readonly string[]): void {
+  for (const problem of problems) {
+    console.error(`ralph effort collect: ${problem}`);
+  }
+  process.exitCode = 1;
+}
+
 /**
  * `ralph effort collect` — the command entry.
  *
  * Sets `process.exitCode` rather than calling `process.exit`, so the
  * function is drivable from a test and so a caller's own output is
  * not truncated mid-flush.
+ *
+ * A config the loop cannot run on is printed as a refusal, one line
+ * per problem, the way a bad argument is. That is the use the config
+ * module's own error class exists for. Anything else thrown is a fault
+ * rather than a refusal, and is rethrown.
  */
 export default async function collect(args: string[]): Promise<void> {
   const parsed = parseCollectArgs(args);
   if (parsed.errors.length > 0) {
-    for (const error of parsed.errors) {
-      console.error(`ralph effort collect: ${error}`);
-    }
-    process.exitCode = 1;
+    refuse(parsed.errors);
     return;
   }
 
-  const result = await collectEffort({
-    sinceEpochMs: parsed.sinceEpochMs,
-    collectSessions: parsed.collectSessions,
-    collectCommits: parsed.collectCommits,
-    verbose: parsed.verbose,
-  });
+  let result: CollectResult;
+  try {
+    result = await collectEffort({
+      sinceEpochMs: parsed.sinceEpochMs,
+      collectSessions: parsed.collectSessions,
+      collectCommits: parsed.collectCommits,
+      verbose: parsed.verbose,
+    });
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    refuse(error.problems);
+    return;
+  }
   for (const line of formatCollectSummary(result)) {
     console.log(line);
   }
