@@ -3,7 +3,7 @@
 /**
  * ralph plan — generate a plan (and prerequisites) from a spec.
  *
- *   bun tools/ralph/ralph.ts plan --spec=specs/my-feature.md [--stub=my-feature]
+ *   bun src/rafa.ts plan --spec=specs/my-feature.md [--stub=my-feature]
  *
  * Reads the spec, wraps it in the plan-generation instructions
  * (plan-prompt.md — the dev-planner format contract), and hands it to a
@@ -14,7 +14,7 @@
  *
  * The stub defaults to the spec's basename. Execute the result with:
  *
- *   bun tools/ralph/ralph.ts start --plan=PLAN-<stub>.md
+ *   bun src/rafa.ts start --plan=PLAN-<stub>.md
  */
 import fs from 'fs';
 import path from 'path';
@@ -139,5 +139,5 @@ export default async function plan(args: string[]): Promise<void> {
   if (fs.existsSync(prereqPath)) {
     console.log(`⚠️  Prerequisites detected: complete .plans/${path.basename(prereqPath)} before starting the loop.`);
   }
-  console.log(`▶ Execute with: bun tools/ralph/ralph.ts start --plan=.plans/PLAN-${stub}.md`);
+  console.log(`▶ Execute with: bun src/rafa.ts start --plan=.plans/PLAN-${stub}.md`);
 }

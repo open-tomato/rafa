@@ -70,3 +70,35 @@
   (the suite no longer runs "under node" either) — left untouched as
   outside the scope of a mechanical import port; a later doc-focused task
   should re-derive the rationale rather than search-and-replace it.
+- When a colocated drift guard (a test that does `new URL('../../../foo',
+  import.meta.url)` / `readFileSync` to re-read another source file and
+  assert a literal is still present in it) survives a file move, the `../`
+  depth in its `new URL` base has to be recounted from the NEW file
+  location, not just the path literal it appends. Two such guards were
+  found stale after the `tools/ralph/` → `src/` move (`src/effort/
+  classify.test.ts`'s `keeps every prefix live` case, and `src/utils/
+  progress.test.ts`'s `repoText` helper) — both used a 3-level-up base
+  (`../../../`) that was correct for `tools/ralph/<subdir>/*.test.ts` but
+  needed to become 2-level-up (`../../`) for `src/<subdir>/*.test.ts`, in
+  addition to updating the appended path literal itself. A guard whose
+  base is wrong doesn't necessarily fail loudly — `progress.test.ts`'s
+  case still "passed" pre-fix because it was silently reading an entirely
+  different repo's `.gitignore` outside this repo's tree (the umbrella
+  `open-tomato/.gitignore`), not this one; only re-deriving the correct
+  depth and checking the actual content read exposed that it had been
+  reading the wrong file.
+- Not every literal string containing `tools/ralph` inside `src/` is a
+  real path reference to repoint after the sibling-tree move. Distinguish:
+  (a) genuine path literals (TSDoc file references, `new URL`/`readFileSync`
+  targets, CLI usage examples) — these should be repointed at `src/`; from
+  (b) test fixture content that merely happens to quote a `tools/ralph/...`
+  string as example/planted text, especially when its exact LENGTH is
+  pinned by a later assertion (e.g. `src/tests/commit-refusals.test.ts`'s
+  `LONG_TASK` is commented as "181 characters" and used in truncation
+  cases) — changing those risks silently breaking an unrelated pinned
+  assertion and is out of scope for a mechanical path-repoint task; from
+  (c) fixture content that deliberately represents ANOTHER repo's file
+  (e.g. `src/tests/agents-split-accounting.test.ts`'s `RESIDUE` constant
+  is a snapshot of the SIBLING `agentic-research` repo's own `AGENTS.md`,
+  which legitimately still names `tools/ralph` since that repo wasn't
+  touched) — never rewrite these.

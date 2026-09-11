@@ -45,7 +45,7 @@ import {
 
 /** A task prompt, assembled as `start.ts` assembles it. */
 const TASK_PROMPT = [
-  'Your scoped task is: Add `tools/ralph/effort/classify.ts`',
+  'Your scoped task is: Add `src/effort/classify.ts`',
   'Consider tasks listed above this one as completed.',
   '',
   '# Plan: q19',
@@ -197,7 +197,7 @@ describe('the shape table', () => {
   it('keeps every prefix live in the source that injects it', () => {
     const misses: string[] = [];
     for (const shape of PROMPT_SHAPES) {
-      const url = new URL(`../../../${shape.source}`, import.meta.url);
+      const url = new URL(`../../${shape.source}`, import.meta.url);
       const source = readFileSync(url, 'utf8');
       if (!source.includes(shape.prefix)) misses.push(shape.kind);
       if (shape.firstLineInfix !== null

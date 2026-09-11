@@ -101,7 +101,7 @@ function decide(
 
 /** Text of a file at the repo root, read from this file's own path. */
 function repoText(relative: string): string {
-  const url = new URL(`../../../${relative}`, import.meta.url);
+  const url = new URL(`../../${relative}`, import.meta.url);
   return readFileSync(url, 'utf8');
 }
 
@@ -156,7 +156,7 @@ describe('the thresholds', () => {
 
 describe('the injection cap this one is copied from', () => {
   it('still reads 16,000 characters in plan.ts', () => {
-    const source = repoText('tools/ralph/plan.ts');
+    const source = repoText('src/plan.ts');
     const match = source.match(/PROGRESS_CAP_CHARS\s*=\s*([0-9_]+)/);
     const spelled = match?.[1];
 
@@ -167,7 +167,7 @@ describe('the injection cap this one is copied from', () => {
   });
 
   it('proves that guard fails on a constant nothing spells', () => {
-    const source = repoText('tools/ralph/plan.ts');
+    const source = repoText('src/plan.ts');
 
     expect(source).toContain('PROGRESS_CAP_CHARS');
     expect(source).not.toContain('PROGRESS_CAP_KILOBYTES');

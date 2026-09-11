@@ -1,5 +1,5 @@
 /**
- * Tests for the plan stamp (tools/ralph/utils/plan-stamp.ts), the
+ * Tests for the plan stamp (src/utils/plan-stamp.ts), the
  * attribution tier that reads it, and the branch guard.
  *
  * The load-bearing case is `keeps every prompt shape classifiable`:

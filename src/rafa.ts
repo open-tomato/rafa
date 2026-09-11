@@ -3,10 +3,10 @@
 /**
  * ralph — spec → plan → loop, in four commands.
  *
- *   bun tools/ralph/ralph.ts plan  --spec=specs/<file>.md [--stub=<name>]
- *   bun tools/ralph/ralph.ts start [--plan=PLAN-<name>.md] [--start-at=HH:MM]
- *   bun tools/ralph/ralph.ts usage
- *   bun tools/ralph/ralph.ts effort <collect|report> [flags]
+ *   bun src/rafa.ts plan  --spec=specs/<file>.md [--stub=<name>]
+ *   bun src/rafa.ts start [--plan=PLAN-<name>.md] [--start-at=HH:MM]
+ *   bun src/rafa.ts usage
+ *   bun src/rafa.ts effort <collect|report> [flags]
  *
  * (Also available as `bun run ralph <command>`.)
  */

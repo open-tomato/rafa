@@ -1,5 +1,5 @@
 /**
- * Tests for the wrap-up stage's CI gate (tools/ralph/utils/pr.ts).
+ * Tests for the wrap-up stage's CI gate (src/utils/pr.ts).
  *
  * Everything here is driven through injected probes and an injected
  * clock, so no `gh`, no network and no real timers are involved. The

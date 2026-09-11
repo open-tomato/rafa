@@ -19,7 +19,7 @@
  * compaction session on it when it has. That session belongs to no task: it
  * writes no tracker line and makes no commit.
  *
- *   bun tools/ralph/ralph.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM]
+ *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM]
  *
  * --plan        plan file to execute (default: PLAN.md at the repo root). The
  *               tracker is derived per plan (PLAN-foo.md → PLAN_TRACKER-foo.md)
