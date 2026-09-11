@@ -245,3 +245,16 @@
   mutation-testing tool, and this repo's existing test file headers
   ("N module mutations were driven against this file") show the same
   technique done exhaustively by hand.
+- The shared store contract suite is `src/effort/store/contract.test.ts`
+  (append/read-back, key-set-from-rows, in-batch dedupe, empty-append
+  writes-nothing), following `refusal.test.ts`'s `describe.each` shape.
+  "The key set is derived from rows, not a sidecar" is provable
+  generically, with no backend-specific planting, by importing the real
+  `EFFORT_KEY_PROJECTIONS` and asserting `store.keys(kind)` equals that
+  projection mapped over `store.read(kind)` — reusing the production
+  record rather than reimplementing key extraction — plus asserting a
+  second, independent `open(root)` handle answers the same keys as the
+  first (rules out a per-handle cache). Both mutation checks (SQLite's
+  `ON CONFLICT ... DO NOTHING` removed, NDJSON's `keys` hardcoded)
+  reddened the expected cases and left `git diff --stat` empty after
+  restore.
