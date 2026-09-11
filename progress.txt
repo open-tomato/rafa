@@ -95,3 +95,24 @@
   `'vitest'`-to-`bun:test` shim (see the entry above on that shim). Left
   as-is as out of this phase's `src/` import scope; a future task touching
   `scripts/` should swap this one specifier too.
+- After `bun install` (which brings in `@eslint/js` and the rest, per the
+  entry above), `bunx tsc --noEmit` and `bunx eslint src/` are both green
+  (0 errors, 0 warnings, 48 files linted under `src/` including tests).
+  `bunx eslint .` — run with no path, as the plan literally writes it —
+  is NOT green: it reports 4 pre-existing errors, all outside `src/` and
+  all outside this phase's scope: an `import/order` self-lint failure in
+  root `eslint.base.mjs`, `quotes`/`eol-last` in the placeholder root
+  `index.ts` (both from the initial commit, predating the sibling import),
+  and the already-documented `scripts/control-byte-gate/control-byte-gate.test.ts`
+  vitest-import case above. A future task that runs `bunx eslint .`
+  expecting a clean exit for the WHOLE repo (e.g. anything in the
+  "Package and cutover" stage) will need to fix those three root/scripts
+  items too; a task scoped to `src/` should invoke `eslint src/`, not `.`,
+  to avoid being blocked by them.
+- `node_modules` in this repo can be in a partial state — only a handful of
+  packages present (e.g. `@types`, `bun-types`, `typescript`) with the rest
+  of `devDependencies` missing — even though `bun.lock` and `package.json`
+  are in sync and nothing looks wrong at a glance. Always run `bun install`
+  and check its output (packages added vs. already satisfied) before
+  concluding a missing-module error is a real code/config bug rather than
+  a stale `node_modules`.
