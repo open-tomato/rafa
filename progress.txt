@@ -250,3 +250,49 @@
 - `bunx eslint --stdin --stdin-filename <path>` over a planted violation
   proves a path is linted at all, without touching the file: the control
   a zero-exit `eslint <dir>` needs.
+- Plan model, `src/plan/parse.ts`: `parsePlan(md)` never throws and
+  answers `{ header, context, stages, tasks, blocks, issues }`. `tasks`
+  is flat, each with a `stage` index into `stages` (null above the first
+  heading), `status` `unchecked`/`blocked`/`done`, `task` (=
+  `TaskInfo.task`) and `text`/`declaration` (= `parseTaskDeclaration`).
+  `lineNum` is 0-based like `TaskInfo`; `PlanIssue.line` is 1-based.
+- Lines inside a `rafa:*` span are block body to `parsePlan`, but
+  `findNextTask` still dispatches an open task line there: the model
+  reports a `task-in-block` issue, and a caller matching the dispatched
+  `lineNum` against `model.tasks` finds nothing. Other fences are read
+  fence-blind, so outside rafa spans the two agree (27 local plans,
+  1,083 walked picks, 0 disagreements).
+- A declaration holding ONLY `skills=` is no declaration to
+  `parseTaskDeclaration`, which needs one `DECLARATION_KEYS` key:
+  `Task  {skills=x}` keeps the block in its text and resolves null.
+  Beside a known key, `skills` lands in `extras` and is stripped. The
+  spec calls `skills=` "a new recognised key".
+- No plan on this machine uses the `rafa:*` format yet: 0 blocks across
+  this repo's `.plans/` (2 plans) and the sibling's (25), so a real-plan
+  test over them exercises the checklist only.
+- The Bash tool runs zsh, where `${PIPESTATUS[0]}` is EMPTY: `cmd | tail;
+  echo "Exited with code ${PIPESTATUS[0]}"` prints no code at all.
+  Redirect instead: `cmd > f 2>&1; echo "Exited with code $?"; cat f`.
+- More `Bun.YAML.parse` traps, in `src/plan/parse.ts`'s header: `issue:
+  #42` is `null` (a `#` after a space opens a comment), `42` and `042`
+  are the number 42, `true` a boolean. Quote such values.
+- `src/plan.ts` (the `rafa plan` command, imported by `src/rafa.ts` as
+  `./plan.js`) coexists with the `src/plan/` DIRECTORY. Measured on bun
+  1.3.14 with a planted `src/plan/index.ts`: both `./plan.js` and
+  `./plan` still resolve to `src/plan.ts`, and the command's default
+  export still loads. So the file always wins and the barrel is
+  unreachable by relative import — the `./plan` subpath task must route
+  it through package.json `exports`, which is where a test must read it
+  back. `package.json` today has NO `main`, `exports`, `bin` or `files`.
+- To prove a test FILE ran in the full suite, grepping the capture for
+  its name is a false negative: `CLAUDECODE` suppresses per-file lines
+  (see the entry above), so the name never appears. `--reporter=junit
+  --reporter-outfile=<f>` carries a `file="..."` attribute per suite and
+  per case; grep that instead, or run the file alone for its own count.
+- `.claude/skills/dev-planner/SKILL.md` says stage headings are "not
+  parsed by the loop ... visual separators only" (line 88) and cites
+  `tools/ralph/utils/tracker.ts` (line 153). `src/plan/parse.ts` now
+  parses them, but nothing outside `src/plan/` imports it yet, so task
+  selection is still `findNextTask`'s alone and the sentence holds until
+  `start.ts` is wired. Both lines are owned by the later dev-planner
+  rewrite task; fix them there, not piecemeal.
