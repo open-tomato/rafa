@@ -19,8 +19,9 @@
  * ## Fences are read the way a renderer shows them
  *
  * The checklist grammar is line-anchored and fence-blind: `findNextTask`
- * dispatches a `- [ ] ` at column 0 wherever it sits, inside a code
- * fence included. This reader is deliberately the opposite. A document
+ * dispatches a `- [ ] ` at column 0 inside a code fence, skipping one
+ * only inside a closed block this module answers. This reader is
+ * deliberately the opposite. A document
  * that ILLUSTRATES the format puts its example inside a longer fence of
  * its own, as the one above does, and a reader taking every line that
  * opens with a `rafa:` fence for a block would hand the illustration to

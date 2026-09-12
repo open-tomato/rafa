@@ -88,8 +88,9 @@
  * `TaskInfo.lineNum` does, and must hold the same `task` there. A
  * tracker is the plan copied once, so a plan edited afterwards can put
  * a different task, or no task, where the tracker's task sits; and a
- * task line inside a `rafa:*` block is one `findNextTask` dispatches
- * and the model reads as that block's body. None of the three is a
+ * task line after the fence of a `rafa:*` block never closed is one
+ * `findNextTask` still dispatches and the model reads as that block's
+ * body. None of the three is a
  * reason to stop a plan. The rendering falls back to `full`, which
  * hands the session everything it had before modes existed, and says
  * why in {@link PlanInjection.fallback}. `full` locates nothing, so it

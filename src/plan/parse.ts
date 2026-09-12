@@ -41,11 +41,12 @@
  * `- [ ] ` and `- [BLOCKED] `, and with the `- [x] ` `updateTrackerLine`
  * ticks a line to. Lines are the same `split('\n')`, and a task's text
  * is its capture trimmed, as `findNextTask` trims it. So outside a
- * `rafa:*` block, a line is an open task of the model exactly when
- * `findNextTask` can dispatch it, with the same text, `lineNum` and
- * status. `parse.test.ts` measures that rather than restating it: it
- * walks whole plans through both, ticking each task the dispatcher
- * picks with the loop's own writer, and holds the two in lockstep.
+ * `rafa:*` block never closed, a line is an open task of the model
+ * exactly when `findNextTask` can dispatch it, with the same text,
+ * `lineNum` and status. `parse.test.ts` measures that rather than
+ * restating it: it walks whole plans through both, ticking each task
+ * the dispatcher picks with the loop's own writer, and holds the two
+ * in lockstep.
  *
  * A stage heading is `# Stage: <name>` at column 0: one `#`, as
  * `dev-planner` requires of a stage label, one space after the colon,
@@ -59,15 +60,19 @@
  * ## Where the two readers disagree
  *
  * The block reader tracks fences as a renderer shows them, and the
- * checklist tracks none. Two rules settle the lines in between.
+ * checklist tracks only the closed `rafa:*` blocks among them. Two
+ * rules settle the lines in between.
  *
  *   - A line inside a `rafa:*` block is that block's body and never a
  *     heading or a task, whatever it looks like: a block is the
- *     format's own unit, read whole and stripped whole. This is the one
- *     place the model and the dispatcher disagree, because
- *     `findNextTask` still dispatches an open task line there, so each
- *     such line is reported as a `task-in-block` issue rather than
- *     dropped in silence.
+ *     format's own unit, read whole and stripped whole. `findNextTask`
+ *     skips an open task line inside a closed block too, which is what
+ *     keeps a block out of every place the loop quotes a task back. It
+ *     still dispatches one after the fence of a block never closed,
+ *     for the reason its TSDoc gives, and that is the one place the
+ *     model and the dispatcher disagree. Either way each such line is
+ *     reported as a `task-in-block` issue rather than dropped in
+ *     silence.
  *   - A line inside any other fence is read fence-blind, as the
  *     checklist reads it, so the model holds every task the loop can
  *     dispatch. A plan illustrating the format indents its example
@@ -371,11 +376,14 @@ function blockAt(blocks: readonly RafaBlock[], lineNum: number): RafaBlock | und
 /** The issue an open task line inside a block produces. */
 function taskInBlock(lineNum: number, status: PlanTaskStatus, block: RafaBlock): PlanIssue {
   const { first, last } = block.span;
+  const dispatcher = block.closed
+    ? 'findNextTask skips it'
+    : 'findNextTask still dispatches it, the block never being closed';
   return planIssue(
     'task-in-block',
     lineNum + 1,
     `${status} task line inside the rafa:${block.kind} block at lines ${first}-${last}: `
-      + 'findNextTask dispatches it, and the model reads it as block body',
+      + `${dispatcher}, and the model reads it as block body`,
   );
 }
 

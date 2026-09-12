@@ -28,6 +28,14 @@
  * `tests/tracker-declarations.test.ts`, which is where that claim is
  * measured rather than stated.
  *
+ * The strip rule reaches every `rafa:*` block too, but not from here.
+ * A declaration sits ON a task line, so the text alone says where it
+ * starts; a block sits AROUND lines, and only a reader holding the
+ * document can tell that a line is its body. `findNextTask` is that
+ * reader, and every site quoting a task back quotes what it answered,
+ * so a task line inside a closed block is skipped there and reaches
+ * neither this module nor the prompt, the log or the commit.
+ *
  * Four rules keep a brace that a task WROTE ABOUT from being read as a
  * declaration, and each one is a shape that occurs in this repo's own
  * plans:

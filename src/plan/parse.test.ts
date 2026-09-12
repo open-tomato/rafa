@@ -13,8 +13,9 @@
  * miss. And the checklist is held against `findNextTask` itself rather
  * than against expectations copied from it: the lockstep walk ticks
  * every task the dispatcher picks with `updateTrackerLine`, the loop's
- * own writer, on a real file, and the `task-in-block` case asks the
- * dispatcher to show the disagreement the issue reports.
+ * own writer, on a real file, and the `task-in-block` cases ask the
+ * dispatcher to show what the issue reports: a line it skips inside a
+ * closed block, and one it still picks after an unclosed fence.
  */
 import type { PlanModel } from './parse.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -254,6 +255,18 @@ describe('the checklist, held against findNextTask', () => {
     ['the example plan in CRLF', PLAN.replaceAll('\n', '\r\n'), 3],
     ['lines one grammar or the other might read', doc(...ODD_LINES), 4],
     ['a plan with no stage heading', doc('- [ ] A', '- [BLOCKED] B', '- [x] C', '- [ ] D'), 3],
+    ['a plan quoting task lines inside rafa blocks', doc(
+      '```rafa:context',
+      '- [BLOCKED] Quoted blocked',
+      '- [ ] Quoted open',
+      '```',
+      '# Stage: one',
+      '- [ ] A',
+      '```rafa:stage-context',
+      '- [ ] Quoted in the stage',
+      '```',
+      '- [ ] B',
+    ), 2],
   ])('picks what it picks from %s, through every tick', (_label, text, picks) => {
     const path = join(dir, 'PLAN_TRACKER-walk.md');
     writeFileSync(path, text);
@@ -291,13 +304,13 @@ describe('a task line inside a rafa block', () => {
     '- [ ] Planned',
   );
 
-  it('is block body and no task, is reported, and is what the dispatcher picks', () => {
+  it('is block body and no task, is reported, and is skipped by the dispatcher', () => {
     const model = parsePlan(quoted);
     expect(textsOf(model)).toEqual(['Planned']);
     expect(model.context).toBe('- [ ] Quoted, not planned');
     expect(reasonsOf(model)).toEqual([['task-in-block', 2]]);
-    expect(model.issues[0]?.text).toContain('rafa:context block at lines 1-3');
-    expect(findNextTask(quoted)).toMatchObject({ task: 'Quoted, not planned', lineNum: 1 });
+    expect(model.issues[0]?.text).toContain('rafa:context block at lines 1-3: findNextTask skips it');
+    expect(findNextTask(quoted)).toMatchObject({ task: 'Planned', lineNum: 4 });
   });
 
   it('is a task once outside the block, the near miss', () => {
@@ -547,12 +560,15 @@ describe('a stage context above every stage heading', () => {
 });
 
 describe('a block never closed', () => {
-  it('is reported, is not read, and takes every line after its fence', () => {
-    const model = parsePlan(doc('```rafa:context', 'c', '# Stage: one', '- [ ] Swallowed'));
+  it('is reported, is not read, and takes every line after its fence from the model alone', () => {
+    const unclosed = doc('```rafa:context', 'c', '# Stage: one', '- [ ] Swallowed');
+    const model = parsePlan(unclosed);
     expect(model.context).toBeNull();
     expect(model.stages).toEqual([]);
     expect(model.tasks).toEqual([]);
     expect(reasonsOf(model)).toEqual([['unclosed-block', 1], ['task-in-block', 4]]);
+    expect(model.issues[1]?.text).toContain('findNextTask still dispatches it');
+    expect(findNextTask(unclosed)).toMatchObject({ task: 'Swallowed', lineNum: 3 });
   });
 
   it('reads everything once closed, the near miss', () => {

@@ -403,23 +403,20 @@ describe('fallback to full', () => {
   });
 
   it('hands over the plan for a task line the model reads as block body', () => {
-    const lines = ['```rafa:context', '- [ ] Written inside the context', '```', '', '- [ ] Written outside'];
+    // Never closed, so the loop still dispatches the line after its fence.
+    const lines = ['- [ ] Written outside', '', '```rafa:context', '- [ ] Written inside the context'];
     const inside = dispatchedAt(lines, '- [ ] Written inside');
-    expect(findNextTask(doc(...lines))).toEqual(inside);
+    expect(findNextTask(doc('- [x] Written outside', ...lines.slice(1)))).toEqual(inside);
 
     const rendered = renderInjection({ mode: 'stage', plan: doc(...lines), task: inside });
     expect(rendered.mode).toBe('full');
-    expect(rendered.fallback).toMatchObject({ reason: 'no-task-at-line', line: 2 });
+    expect(rendered.fallback).toMatchObject({ reason: 'no-task-at-line', line: 4 });
 
     // Near miss: the line outside the block is located.
     const outside = dispatchedAt(lines, '- [ ] Written outside');
     const located = renderInjection({ mode: 'stage', plan: doc(...lines), task: outside });
     expect(located.fallback).toBeNull();
     expect(located.text).toBe(doc(
-      '## Plan context',
-      '',
-      '- [ ] Written inside the context',
-      '',
       '## Checklist',
       '',
       '- [ ] Written outside',

@@ -12,7 +12,10 @@
  * A task line may carry a trailing routing declaration (`utils/declaration.ts`).
  * The loop reads it, dispatches that task under the flags it names, and keeps
  * the block out of everything downstream — the prompt, the operator's log and
- * the commit message all see the task sentence alone.
+ * the commit message all see the task sentence alone. A `rafa:*` block is kept
+ * out of the same places at the source: `findNextTask` never answers a task
+ * line inside a closed one (`utils/tracker.ts`), so no block text becomes a
+ * task to quote.
  *
  * Between tasks the loop also asks `utils/progress.ts` whether `progress.txt`
  * has grown past what the next task should have to read, and spends a
@@ -431,6 +434,10 @@ export function buildTaskPrompt(
  * than stalling the plan on a CLI that refuses `--effort medum`. So
  * each dropped token is named as well: without that line a typo costs
  * a task its routing and nothing anywhere says so.
+ *
+ * A `rafa:*` block has no strip here, and needs none: `findNextTask`
+ * never answers a task line inside a closed one, so the text this
+ * announces and injects can carry no block's body.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -492,7 +499,9 @@ function indentBlock(text: string): string {
  *
  * The declaration comes off the text first. A commit subject is derived
  * from the task sentence, so a block left on it would reach the git
- * history — where nothing here can ever go back and take it out.
+ * history — where nothing here can ever go back and take it out. A
+ * `rafa:*` block needs no strip here: `findNextTask` never answers a
+ * task line inside a closed one, so none reaches `taskInfo`.
  *
  * A failure blocks the task, and the caller stops the loop rather than
  * moving on. It has to: `findNextTask` resumes a blocked task FIRST, so
