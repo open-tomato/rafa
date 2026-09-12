@@ -50,10 +50,6 @@
   `typescript`) while `bun.lock` and `package.json` agree: run
   `bun install` and read added vs. satisfied before calling a missing
   module a real bug.
-- `Bun.YAML.parse` traps: `src/config.ts`'s header ("The parser,
-  measured on bun 1.3.14", the `Map`/`Set` lookup rule). Missing there:
-  integer-like keys enumerate first, so `Object.entries` is not source
-  order.
 - Config, `src/config.ts`: `loadConfig(root, cli, warn?)` ranks command
   line > `.rafa/config.yaml` > `CONFIG_DEFAULTS`; `parseConfigText` and
   `resolveConfig` are pure; refusals throw `ConfigError` (`.problems`);
@@ -165,16 +161,6 @@
   ONE file per leg via `Bun.spawnSync([process.execPath, 'test',
   <file>])`, the unmutated file before and after as controls; never run
   the full suite meanwhile, as the module on disk is mutated.
-- Proving a `stamped` plan-stub match (`resolveSessionPlan`'s stamp
-  outranks the branch) needs a branch resolving on its own to a
-  DIFFERENT real roster stub (stamping a `none` one only proves the stamp
-  is read): `collect.test.ts` plants a second `PLAN-*.md` and stamps it.
-- `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print
-  counts only, no `(pass)`/`(skip)` lines or skip reasons.
-  `env -u CLAUDECODE bun test <file>` restores them (unsetting
-  `CLAUDE_CODE_ENTRYPOINT` does not); `--reporter=junit
-  --reporter-outfile=<f>` lists skips either way. Count DISTINCT failing
-  titles: the summary re-lists `(fail)` lines.
 - `resolveParityFixture({ env?, home? })` (`src/tests/parity-fixture.ts`)
   never throws: `present: true` (`logDir`, `storeDir`, `sessionsPath`,
   `commitsPath`, `sessionLogCount`) or `present: false` (`absences`, a
@@ -209,12 +195,6 @@
 - The sibling's `.plans/` roster spreads sessions over 12 plan-stub
   buckets (`(none)` 105 of ~1,053): non-vacuity evidence for per-stub
   groupings of the live fixture.
-- `src/tests/parity-lineage.test.ts` collects ONCE (NDJSON) over the
-  live sibling and compares with the sibling's OWN stored rows (via
-  `readStoreRows`). 3 of 1,052 stored session rows are frozen
-  mid-session (the log grew afterwards, per `effort/collect.ts`'s module
-  note), so every content field differs: accept them only by
-  `sizeBytes`/`modifiedAt` having grown, and fail a row that shrank.
 - `readStoreRows<Record<string, unknown>>(path)` (`src/effort/store.ts`)
   reads older-schema NDJSON rows as written, checking only for a plain
   object per line; a typed `EffortStore` read would claim absent fields.
@@ -224,20 +204,12 @@
   are flagged.
 - `SessionEffortRow` carries `mode` (`SessionMode`, `'local'` until phase
   6 adds `remote`; from `SESSION_MODE`) and `issueIdentifier`, not
-  `issueIdentifierSource`. The sibling's stored rows predate both, and
-  74 of 1,052 end in a `planStubPatch` no collector here writes; drop
-  the two and a fresh row has the stored key order, so project to the
-  sibling's keys, handle `planStubPatch` explicitly, compare by
-  `JSON.stringify`. Commit rows match byte-for-byte unprojected.
+  `issueIdentifierSource`.
 - Block reader, `src/plan/blocks.ts`: `readRafaBlocks(md)` answers every
   `rafa:*` fence as `{ kind, body, span, closed }`, unknown kinds kept
   (`RAFA_BLOCK_KINDS`/`isRafaBlockKind` name this phase's four). `span`
   is 1-based inclusive, fences included (`sed -n 'first,lastp'`), while
   `TaskInfo.lineNum` is 0-based: compare as `lineNum + 1`.
-- The block reader tracks EVERY fence by CommonMark rules, so a `rafa:`
-  fence inside another fence is body; `findNextTask` tracks none
-  (measured: a `- [ ] ` inside a fence is dispatched), so a block-aware
-  task list has to exclude the lines inside a span itself.
 - Illustrating the plan format needs a LONGER outer fence (4 backticks):
   inside a 3-backtick outer, the first inner closing fence closes the
   OUTER one and later `rafa:` fences are real blocks to any CommonMark
@@ -256,12 +228,15 @@
   heading), `status` `unchecked`/`blocked`/`done`, `task` (=
   `TaskInfo.task`) and `text`/`declaration` (= `parseTaskDeclaration`).
   `lineNum` is 0-based like `TaskInfo`; `PlanIssue.line` is 1-based.
-- Lines inside a `rafa:*` span are block body to `parsePlan`, but
-  `findNextTask` still dispatches an open task line there: the model
-  reports a `task-in-block` issue, and a caller matching the dispatched
-  `lineNum` against `model.tasks` finds nothing. Other fences are read
-  fence-blind, so outside rafa spans the two agree (27 local plans,
-  1,083 walked picks, 0 disagreements).
+- The block reader tracks EVERY fence by CommonMark rules, so a `rafa:`
+  fence inside another fence is body; `findNextTask` tracks none
+  (measured: a `- [ ] ` inside a fence is dispatched). `parsePlan` reads
+  lines inside a `rafa:*` span as block body and other fences
+  fence-blind, so outside rafa spans the two agree (27 local plans, 1,083
+  walked picks, 0 disagreements); inside one, `findNextTask` still
+  dispatches an open task line, the model reports a `task-in-block`
+  issue, and a caller matching the dispatched `lineNum` against
+  `model.tasks` finds nothing.
 - A declaration holding ONLY `skills=` is no declaration to
   `parseTaskDeclaration`, which needs one `DECLARATION_KEYS` key:
   `Task  {skills=x}` keeps the block in its text and resolves null.
@@ -270,12 +245,11 @@
 - No plan on this machine uses the `rafa:*` format yet: 0 blocks across
   this repo's `.plans/` (2 plans) and the sibling's (25), so a real-plan
   test over them exercises the checklist only.
-- The Bash tool runs zsh, where `${PIPESTATUS[0]}` is EMPTY: `cmd | tail;
-  echo "Exited with code ${PIPESTATUS[0]}"` prints no code at all.
-  Redirect instead: `cmd > f 2>&1; echo "Exited with code $?"; cat f`.
-- More `Bun.YAML.parse` traps, in `src/plan/parse.ts`'s header: `issue:
-  #42` is `null` (a `#` after a space opens a comment), `42` and `042`
-  are the number 42, `true` a boolean. Quote such values.
+- `Bun.YAML.parse` traps are in the headers of `src/config.ts` ("The
+  parser, measured on bun 1.3.14", the `Map`/`Set` lookup rule) and
+  `src/plan/parse.ts` (`issue: #42` is `null`, `42` and `042` the number
+  42, integer-like keys enumerate first in `Object.entries`, `true` a
+  boolean). Quote such values.
 - `src/plan.ts` (the `rafa plan` command, imported by `src/rafa.ts` as
   `./plan.js`) coexists with the `src/plan/` DIRECTORY. Measured on bun
   1.3.14 with a planted `src/plan/index.ts`: both `./plan.js` and
@@ -284,11 +258,15 @@
   unreachable by relative import — the `./plan` subpath task must route
   it through package.json `exports`, which is where a test must read it
   back. `package.json` today has NO `main`, `exports`, `bin` or `files`.
-- To prove a test FILE ran in the full suite, grepping the capture for
-  its name is a false negative: `CLAUDECODE` suppresses per-file lines
-  (see the entry above), so the name never appears. `--reporter=junit
-  --reporter-outfile=<f>` carries a `file="..."` attribute per suite and
-  per case; grep that instead, or run the file alone for its own count.
+- `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print
+  counts only: no `(pass)`/`(skip)` lines, skip reasons or per-file
+  names, so grepping a full-suite capture for a test file's name is a
+  false negative. `env -u CLAUDECODE bun test <file>` restores them
+  (unsetting `CLAUDE_CODE_ENTRYPOINT` does not); `--reporter=junit
+  --reporter-outfile=<f>` lists skips either way and carries a
+  `file="..."` attribute per suite and per case, so grep that to prove a
+  file ran, or run the file alone for its own count. Count DISTINCT
+  failing titles: the summary re-lists `(fail)` lines.
 - `.claude/skills/dev-planner/SKILL.md` says stage headings are "not
   parsed by the loop ... visual separators only" (line 88) and cites
   `tools/ralph/utils/tracker.ts` (line 153). `src/plan/parse.ts` now
@@ -296,3 +274,27 @@
   selection is still `findNextTask`'s alone and the sentence holds until
   `start.ts` is wired. Both lines are owned by the later dev-planner
   rewrite task; fix them there, not piecemeal.
+- Injection renderer, `src/plan/inject.ts`: `renderInjection({ mode,
+  plan, task })` (`task` = `TaskInfo`'s `task` + `lineNum`) answers
+  `{ requested, mode, text, fallback }` and never throws. `full` is the
+  plan text byte for byte; `stage`/`task` are built from `parsePlan`
+  under `## Plan context` / `## Stage: <name>` (`## Checklist` above
+  every heading) / `## Stages`, task lines as checkbox + `text`
+  (declaration off). A plan and its tracker render the same text. A task
+  the model does not hold at `lineNum` (plan edited after the tracker
+  was copied, or a line inside a `rafa:*` block) falls back to `full`
+  with `fallback.reason` `no-task-at-line` or `task-text-differs`: the
+  `start.ts` wiring should log it. Wrap-up's `full` is the caller's job.
+- Injection sizes, measured 2026-09-13 walking every dispatch of 14
+  local `PLAN-*.md` files (this repo's and the sibling's `.plans/`;
+  1,051 dispatches, 0 fallbacks): the phase-0 plan's 62 dispatches
+  total 1,740,588 bytes `full`, 162,672 `stage`, 16,637 `task`. No
+  plan here has `rafa:*` blocks yet, so `stage` there is checklist plus
+  stage list only.
+- The Bash tool runs zsh: `${PIPESTATUS[0]}` prints EMPTY (zsh spells it
+  `$pipestatus[1]`), so `cmd | tail; echo $PIPESTATUS` shows no exit code.
+  Redirect to a file, then `echo "Exited with code $?"`.
+- A strip or exclusion test proves nothing unless its fixture carries
+  what is stripped AT THE PLACE rendered: a `task`-mode case dispatching
+  an undeclared task stayed green with declarations left on (mutation
+  leg). Dispatch a declared task, and assert the fixture holds the text.
