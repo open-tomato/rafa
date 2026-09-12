@@ -12,8 +12,9 @@
  * Two of those sessions in three could not have been recovered by any
  * derivation either. A task session carries the tracker line it was
  * dispatched with, so its plan is at least derivable from the tracker
- * text; a compaction and a wrap-up session carry neither the plan path
- * nor the stub anywhere in their prompts, measured across both shapes.
+ * text; a compaction and a wrap-up session carried neither the plan
+ * path nor the stub anywhere in their prompts, measured across both
+ * shapes before the wrap-up was handed its plan.
  * So the signal did not exist to be inferred, and the fix is to WRITE
  * one rather than to guess better.
  *

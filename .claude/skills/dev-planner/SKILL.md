@@ -85,7 +85,7 @@ so the work stays traceable back to the issue it delivers.
 Important notes:
 - `[BLOCKED]` uses uppercase only. `[blocked]` or `[Blocked]` will not be matched.
 - There is one space between `]` and the task text for both `- [ ]` and `- [BLOCKED]`.
-- Stage heading lines (`# Stage: ...`) are **not parsed** by the loop. They are visual separators only and do not affect task selection — as is any other prose or code between task lines.
+- Stage heading lines (`# Stage: ...`) do **not** affect task selection — nor does any other prose or code between task lines. The loop does read them, to hand a task session its own stage under the `stage` and `task` injection modes (`src/plan/inject.ts`).
 - `findNextTask()` prefers blocked tasks over unchecked ones — it resumes interrupted work before starting new tasks.
 
 ---

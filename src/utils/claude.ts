@@ -26,8 +26,9 @@
  *
  * The prompt goes on STDIN and never into the argument list. That is
  * not a style choice: a plan's task prompt here is the injected
- * instructions plus `PROMPT.md` plus the whole plan file, which is far
- * past what an argument list can carry, and an argument list is also
+ * instructions plus `PROMPT.md` plus the plan, the whole file under the
+ * `full` injection mode and in every wrap-up prompt, which is far past
+ * what an argument list can carry, and an argument list is also
  * visible to every `ps` on the machine.
  *
  * {@link ClaudeSpawner} exists because the real spawn is

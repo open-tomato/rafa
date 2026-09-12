@@ -4,7 +4,7 @@
  * ralph — spec → plan → loop, in four commands.
  *
  *   bun src/rafa.ts plan  --spec=specs/<file>.md [--stub=<name>]
- *   bun src/rafa.ts start [--plan=PLAN-<name>.md] [--start-at=HH:MM]
+ *   bun src/rafa.ts start [--plan=PLAN-<name>.md] [--start-at=HH:MM] [--inject=<mode>]
  *   bun src/rafa.ts usage
  *   bun src/rafa.ts effort <collect|report> [flags]
  *
@@ -23,7 +23,7 @@ const HELP = [
   '  plan  --spec=specs/<file>.md [--stub=<name>]   Generate PLAN-<stub>.md (+ PREREQUISITES-<stub>.md) from a spec',
   '  start [--plan=<file>] [--start-at=HH:MM]       Execute a plan task-by-task (resumes blocked tasks first),',
   '                                                 then wrap up, open the PR and wait for CI',
-  '                                                 (--no-ci-wait, --ci-timeout=<min>, --ci-attempts=<n>)',
+  '                                                 (--inject=<full|stage|task>, --no-ci-wait, --ci-timeout=<min>, --ci-attempts=<n>)',
   '  usage                                          Show Claude usage (CLAUDE_USAGE_PERCENT override)',
   '  effort collect [--since=<date>] [--no-git]     Collect session and commit rows into .ralph/effort/ (--no-sessions, --verbose)',
   '  effort report [--kind=<k>] [--entrypoint=<e>]  Roll the stored session rows up per plan (--json)',

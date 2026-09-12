@@ -21,7 +21,8 @@
  *
  * ## The prompt claim is about the injected HEAD, not the whole prompt
  *
- * A prompt is the two injected lines plus `PROMPT.md` plus the WHOLE
+ * Every dispatch here runs under the `full` injection mode, so a
+ * prompt is the two injected lines plus `PROMPT.md` plus the WHOLE
  * plan file, and a plan carrying declared tasks carries their blocks
  * by construction. So `the prompt contains no brace block` is false of
  * the prompt and true of the line the loop wrote, and asserting it
@@ -361,6 +362,7 @@ async function dispatchSpec(
     taskInfo: taskInfoFor(spec, index, overrides.status ?? 'unchecked'),
     promptContent: PROMPT_CONTENT,
     planContent: PLAN_CONTENT,
+    inject: 'full',
     run,
   });
 

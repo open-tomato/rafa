@@ -1,6 +1,6 @@
 Always read `@progress.txt` in full before starting the task.
 
-We shared the plan and all the tasks so you know the context of the overall project and how your scoped task fits into it. However, you should only focus on the scoped task.
+We shared as much of the plan as this run is configured to share — the whole plan, your task's stage, or your task line with the plan's context — so you know the context of the overall project and how your scoped task fits into it. However, you should only focus on the scoped task.
 
 If you discover general findings relevant to future tasks, append them to `@progress.txt`. Only include findings that apply broadly, not task-specific details.
 

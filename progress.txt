@@ -196,21 +196,20 @@
   inside another is body). `findNextTask` skips task lines inside CLOSED
   `rafa:*` blocks (via `readRafaBlocks`) and is fence-blind elsewhere
   (dispatches a `- [ ] ` in any other fence); `parsePlan` reads `rafa:*`
-  spans as body, so the two agree everywhere but after an UNCLOSED
-  `rafa:` fence, which `findNextTask` ignores on purpose (skipping would
-  answer null, which `start.ts` wraps up as a finished plan). There the
-  model reports `task-in-block` and the dispatched `lineNum` matches
-  nothing in `model.tasks`. The 27 local plans (this repo's 2, the
-  sibling's 25) hold 0 `rafa:*` blocks, so a real-plan test over them
-  exercises the checklist only.
+  spans as body, so the two agree except after an UNCLOSED `rafa:`
+  fence, which `findNextTask` ignores on purpose (skipping would answer
+  null, which `start.ts` wraps up as a finished plan): the model reports
+  `task-in-block` and the dispatched `lineNum` matches nothing in
+  `model.tasks`. The 27 local plans (this repo's 2, the sibling's 25)
+  hold 0 `rafa:*` blocks, so a real-plan test over them exercises the
+  checklist only.
 - The `rafa:*` strip rule lives at the SOURCE, `findNextTask`: all four
   quoting sites (prompt header and log in `dispatchTask`, log, subject
   and body in `commitFinishedTask`) quote `taskInfo.task`, so a caller
-  building its own `TaskInfo` (a Tracker port) bypasses it. Nothing yet
-  tells the operator a block line was skipped: a stray bare fence
-  closing a `rafa:` block late can swallow real tasks silently, so
-  `start.ts` should surface `parsePlan`'s `task-in-block` and
-  `unclosed-block` issues.
+  building its own `TaskInfo` (a Tracker port) bypasses it. A stray
+  bare fence closing a `rafa:` block late swallows real tasks; the one
+  signal is `announcePlanIssues` in `start.ts`, which prints
+  `parsePlan`'s issues once at start.
 - A commit BODY is empty unless the subject truncated (72 chars with the
   `type: ` prefix), so an assertion that something is absent from the
   body needs a planted line longer than that, or it passes vacuously.
@@ -222,16 +221,13 @@
   parser, measured on bun 1.3.14", the `Map`/`Set` lookup rule) and
   `src/plan/parse.ts` (`issue: #42` is `null`, `42`/`042` the number 42,
   integer-like keys enumerate first, `true` a boolean). Quote such values.
-- `src/plan.ts` (the `rafa plan` command) coexists with `src/plan/`: from
-  `src/`, `./plan` and `./plan.js` both resolve to `src/plan.ts`, never
-  the barrel; `./plan/index.js` does (bun 1.3.14, pinned in
-  `src/plan/index.test.ts`), so `src/index.ts` imports that.
+- `src/plan/index.ts` is the `./plan` barrel; `index.test.ts` pins its
+  runtime names (`RUNTIME_EXPORTS`), identity, and that from `src/` both
+  `./plan` and `./plan.js` resolve to `src/plan.ts` (the `rafa plan`
+  command), never the barrel, so in-package code imports
+  `./plan/index.js` (bun 1.3.14). A new `src/report/parse.ts` must join
+  the barrel and that list, and rewrite its "not exported" TSDoc section.
   `package.json` has NO `main`, `exports`, `bin` or `files` yet.
-- `src/plan/index.ts` (`./plan`) exports the block reader, `parsePlan`,
-  `renderInjection`, `INJECT_MODES`/`InjectMode`; `index.test.ts` pins
-  the runtime names (`RUNTIME_EXPORTS`) and identity. A new
-  `src/report/parse.ts` must join the barrel and that list, and rewrite
-  its "not exported" TSDoc section.
 - `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print
   counts only (no `(pass)`/`(skip)` lines, skip reasons, file names), so
   grepping a full-suite capture for a file finds nothing;
@@ -239,20 +235,17 @@
   does not), and `--reporter=junit --reporter-outfile=<f>` lists skips
   anyway with `file="..."` per suite and case. Count DISTINCT failing
   titles: the summary re-lists `(fail)`.
-- `.claude/skills/dev-planner/SKILL.md` line 88 (stage headings "not
-  parsed by the loop") and line 153 (`tools/ralph/utils/tracker.ts`)
-  hold until `start.ts` uses `parsePlan`; the dev-planner rewrite task
-  owns both: no piecemeal fixes.
+- `.claude/skills/dev-planner/SKILL.md` line 153 still names
+  `tools/ralph/utils/tracker.ts`; the dev-planner rewrite task owns it.
 - `src/plan/inject.ts`: `renderInjection({ mode, plan, task })` (`task`:
   `TaskInfo`'s `task` + `lineNum`) never throws: `{ requested, mode,
-  text, fallback }`. `full` = the plan's bytes; `stage`/`task`
-  build from `parsePlan` (`## Plan context`, `## Stage: <name>` or
-  `## Checklist` above every heading, `## Stages`; task lines checkbox +
-  `text`, declaration off), identical for plan and tracker. A task not
-  held at `lineNum` (plan edited after the tracker copy, or after an
-  unclosed `rafa:` fence) falls back to `full`, `fallback.reason` `no-task-at-line` or
-  `task-text-differs`: `start.ts` should log it. Wrap-up's `full` is the
-  caller's job.
+  text, fallback }`. `full` = the plan's bytes; `stage`/`task` build from
+  `parsePlan` (`## Plan context`, `## Stage: <name>` or `## Checklist`
+  above every heading, `## Stages`; task lines checkbox + `text`,
+  declaration off), identical for plan and tracker. A task not held at
+  `lineNum` (plan edited after the tracker copy, or after an unclosed
+  `rafa:` fence) falls back to `full`, `fallback.reason`
+  `no-task-at-line` or `task-text-differs`, which `dispatchTask` warns.
 - Injection sizes, 2026-09-13 (14 local plans, 1,051 dispatches, 0
   fallbacks): phase-0's 62 total 1,740,588 bytes `full`, 162,672
   `stage`, 16,637 `task`.
@@ -260,3 +253,19 @@
   what is stripped WHERE it renders: a `task`-mode case dispatching an
   undeclared task stayed green with declarations on (mutation leg).
   Dispatch a declared task and assert the fixture holds the text.
+- `src/start.ts` injection wiring: `loadRunConfig(root, args, warn?)`
+  ranks `--inject=` over `.rafa/config.yaml` (a bare `--inject` is
+  refused as `''`), resolved BEFORE `--start-at` defers; `dispatchTask`
+  REQUIRES `inject` (no second default beside `CONFIG_DEFAULTS`) and
+  records `injection`; `buildWrapUpPrompt(branch, planContent)` appends
+  the whole plan below its classifier-key line and takes no mode.
+  Integration tests: `src/tests/plan-injection.test.ts`.
+- `planStubFromPrompt` answers the FIRST `<!-- ralph:plan=... -->` in
+  a prompt, and task and wrap-up prompts embed plan text ABOVE the
+  appended stamp, so a plan quoting a marker misattributes its
+  sessions. None of the `PLAN-*.md` files in either `.plans/` (2 here,
+  13 in the sibling) carries one today.
+- eslint ignores `.claude/skills/*/SKILL.md` (measured on
+  `dev-planner`): `bunx eslint <skill>` exits 0 with the warning "File
+  ignored because of a matching ignore pattern", so skill prose has no
+  lint gate; read the warning, not the exit code.

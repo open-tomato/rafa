@@ -17,18 +17,29 @@
  * line inside a closed one (`utils/tracker.ts`), so no block text becomes a
  * task to quote.
  *
+ * How much of the plan a task session is handed is the run's injection mode
+ * (`plan/inject.ts`): `full` hands over the plan as it stands, `stage` the plan
+ * context plus the task's stage, `task` the plan context plus the task line.
+ * The mode is resolved once, before the run is deferred, from `--inject=`
+ * over `.rafa/config.yaml` over the default (`config.ts`), and a value no mode
+ * answers to refuses the run. Every part of the plan `parsePlan` does not read
+ * as written is named to the operator once, at start.
+ *
  * Between tasks the loop also asks `utils/progress.ts` whether `progress.txt`
  * has grown past what the next task should have to read, and spends a
  * compaction session on it when it has. That session belongs to no task: it
  * writes no tracker line and makes no commit.
  *
- *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM]
+ *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
  * --plan        plan file to execute (default: PLAN.md at the repo root). The
  *               tracker is derived per plan (PLAN-foo.md → PLAN_TRACKER-foo.md)
  *               so several plans can coexist.
  * --start-at    defer the run until a local time of day (e.g. 23:00) — queue
  *               off-hours runs without cron.
+ * --inject      how much of the plan each task session is handed: full, stage
+ *               or task. Outranks `plan.inject` in `.rafa/config.yaml`. The
+ *               wrap-up session is handed the whole plan whatever it says.
  * --no-ci-wait  finish at the push instead of waiting for CI.
  * --ci-timeout  minutes to wait for checks to settle (default 20).
  * --ci-attempts repair sessions to spend on a red or conflicting PR
@@ -41,6 +52,8 @@
  * this last stage the loop can report a finished plan whose code was
  * never checked once.
  */
+import type { ConfigSource, InjectMode, ResolvedConfig } from './config.js';
+import type { PlanInjection, PlanIssue } from './plan/index.js';
 import type { CommitAttempt, CommitOptions } from './utils/commit.js';
 import type { TaskDeclaration } from './utils/declaration.js';
 import type {
@@ -53,6 +66,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { ConfigError, loadConfig } from './config.js';
+import { parsePlan, renderInjection } from './plan/index.js';
 import { runClaude, checkUsage } from './utils/claude.js';
 import { commitTaskWork } from './utils/commit.js';
 import {
@@ -163,16 +178,32 @@ export function guardRunBranch(
   return true;
 }
 
-async function preserveProgress(): Promise<void> {
-  const branch = getCurrentBranch();
-
-  const prompt = [
+/**
+ * Assembles the prompt the end-of-run wrap-up session is given.
+ *
+ * Its FIRST LINE is a classifier key, as the compaction prompt's is:
+ * `effort/classify.ts` buckets a session whose prompt begins with it
+ * as `wrap-up`. So the plan is APPENDED below the instructions and
+ * never placed above them, and the stamp {@link withStamp} adds lands
+ * after the plan.
+ *
+ * The plan goes in WHOLE whatever injection mode the run's task
+ * sessions were dispatched under, which is why this takes the plan and
+ * no mode: there is no mode to get wrong. `full` renders the plan
+ * document byte for byte (`plan/inject.ts`), so what is appended here
+ * is the `full` rendering. The session titles the PR after the plan,
+ * looks for its issue reference there and summarises the work of every
+ * stage, and a `stage` or `task` rendering holds one stage, or one
+ * task line.
+ */
+export function buildWrapUpPrompt(branch: string, planContent: string): string {
+  return [
     '* Read `@progress.txt` in full.',
     '* If there\'s anything worth keeping, grab what\'s generally relevant from `@progress.txt` and include it in the `context/` page that owns its subject (repo-root `context/` for tree-wide law, `packages/<pkg>/context/` for one package\'s), `@README.md`, `@CONTRIBUTING.md` or a pertinent skill under `.claude/skills/`. The root `@AGENTS.md` is a capped map read into every turn of every session: point at the page from there if a new one is needed, never inline the finding itself.',
     '* Promote a finding ONLY when all three hold, and delete or keep it rather than promoting it when any one fails. It is PROJECT-SPECIFIC — a fact about THIS tree (its layout, its gates, its conventions, what a command here actually answers) and not a general technique, which belongs in a skill and not in this repo\'s docs. It is NOT ALREADY COVERED by a skill under `.claude/skills/` — read the skill that matches the finding\'s subject before writing anything, and extend that skill in place rather than restating it in a second document. And it NAMES WHAT IT REPLACES — the sentence, bullet or table row it supersedes, deleted in the SAME edit — or, when it replaces nothing, says so. A promotion landing beside the claim it should have replaced leaves two authorities on one subject, and nothing here compares two documents, so the stale one is never reported again.',
     '* If a learn/learn-eval skill is available in this session, invoke it now so reusable patterns from this run are persisted as skills.',
     '* Then compact `@progress.txt` per `.claude/skills/progress-hygiene/SKILL.md`: drop every finding that was just persisted somewhere durable and anything stale or task-specific; keep only broadly-relevant findings not yet promoted. The file must stay small — future plan generation injects it as context.',
-    '* If it\'s present, extract the issue reference from the plan file (e.g. "#42") to be used in the PR title.',
+    '* If it\'s present, extract the issue reference from the plan below (e.g. "#42") to be used in the PR title.',
     `* If the reference is not present on the plan check if the branch name (${branch}) carries one (e.g. feat/42-slug).`,
     '* Use the plan title as the PR title, include the issue reference if you found it, e.g. "Implement user authentication (#42)".',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
@@ -182,8 +213,16 @@ async function preserveProgress(): Promise<void> {
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
     '* This step is IDEMPOTENT because a plan\'s own close-out may already have opened the PR. Read the state first with `gh pr list --head <branch> --state open --json number`: when it names a PR, push to it and update its body with `gh pr edit` so the description covers the promotions this session just committed; only create one with `gh pr create` when that list is empty. A `gh pr create` failure saying the PR already exists is the expected shape of that race, never a reason to open a second PR from a new branch.',
     '* Do not include Claude attribution in the commit or PR message.',
+    '',
+    'The plan this run executed follows, in full.',
+    '',
+    planContent,
   ].join('\n');
+}
 
+/** Runs the wrap-up session over the plan the run was started on. */
+async function preserveProgress(planContent: string): Promise<void> {
+  const prompt = buildWrapUpPrompt(getCurrentBranch(), planContent);
   const exitCode = await runClaude(withStamp(prompt));
   if (exitCode !== 0) {
     console.error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);
@@ -329,9 +368,77 @@ async function verifyPullRequest(timeoutMs: number, maxAttempts: number): Promis
   console.error('   Stopping rather than looping. Read the failing jobs and decide.');
 }
 
-function argValue(args: string[], flag: string): string | undefined {
+function argValue(args: readonly string[], flag: string): string | undefined {
   const hit = args.find((a) => a.startsWith(`${flag}=`));
   return hit?.slice(flag.length + 1);
+}
+
+/** The flag naming how much of the plan each task session is handed. */
+const INJECT_FLAG = '--inject';
+
+/**
+ * The raw `--inject` value, for `resolveConfig` to validate: undefined
+ * without the flag, and the empty string for a bare `--inject`.
+ *
+ * A bare flag is an empty value rather than no flag, so it is refused.
+ * Read as absent, it would dispatch every task under the config's mode
+ * while the operator believed they had named one.
+ */
+function injectFlagValue(args: readonly string[]): string | undefined {
+  return args.includes(INJECT_FLAG)
+    ? ''
+    : argValue(args, INJECT_FLAG);
+}
+
+/**
+ * Resolves the settings a run starts on: `--inject=` over
+ * `.rafa/config.yaml` over the defaults, as `config.ts` ranks them.
+ *
+ * `--inject` is the one flag. `store` resolves from the file and the
+ * default and the loop acts on nothing it says, but the file is judged
+ * whole, so an unusable `store:` refuses the run as an unusable
+ * `plan.inject:` does.
+ *
+ * Throws the {@link ConfigError} `loadConfig` throws, naming every
+ * problem. A warning per unknown key goes to `warn`, `console.warn`
+ * when none is given.
+ */
+export function loadRunConfig(
+  repoRoot: string,
+  args: readonly string[],
+  warn?: (message: string) => void,
+): ResolvedConfig {
+  return loadConfig(repoRoot, { inject: injectFlagValue(args) }, warn);
+}
+
+/** Where the injection mode came from, as the operator log names it. */
+function injectSourceLabel(source: ConfigSource, configPath: string | null): string {
+  if (source === 'cli') return INJECT_FLAG;
+  if (source === 'file') return configPath ?? 'the config file';
+  return 'the default';
+}
+
+/**
+ * Names every part of the plan `parsePlan` did not read as written, and
+ * answers them. Called once, at start.
+ *
+ * Nothing here stops a run: the parser never throws, and an issue is a
+ * warning. It is printed because two of the reasons change what the
+ * loop does and nothing else says so. A task line inside a closed
+ * `rafa:*` block is block body and is never dispatched, so a block
+ * missing its closing fence, closed instead by a later fence, takes
+ * every task between the two out of the run. And every line
+ * after a block never closed is read by the model as that block's
+ * body, so a `stage` or `task` rendering of a task there falls back to
+ * `full`.
+ */
+export function announcePlanIssues(planContent: string): readonly PlanIssue[] {
+  const { issues } = parsePlan(planContent);
+  if (issues.length === 0) return issues;
+
+  console.warn(`\n⚠️  The plan holds ${issues.length} part(s) the loop does not read as written:`);
+  for (const issue of issues) console.warn(`   line ${issue.line}: ${issue.text}`);
+  return issues;
 }
 
 /** How one git invocation is made on a finished task's behalf. */
@@ -361,8 +468,17 @@ export interface TaskDispatchOptions {
   taskInfo: TaskInfo;
   /** `PROMPT.md`, read once before the loop. */
   promptContent: string;
-  /** The plan file, read once before the loop. */
+  /**
+   * The plan file, read once before the loop. The session is handed the
+   * share of it {@link TaskDispatchOptions.inject} names.
+   */
   planContent: string;
+  /**
+   * How much of the plan the session is handed. Required rather than
+   * defaulted: a default here would be a second one beside
+   * `CONFIG_DEFAULTS`, free to disagree with it.
+   */
+  inject: InjectMode;
   /** Session seam. Defaults to the real CLI. */
   run?: TaskSessionRunner;
 }
@@ -373,6 +489,8 @@ export interface TaskDispatch {
   taskText: string;
   /** The prompt the session was given, on stdin. */
   prompt: string;
+  /** The share of the plan the prompt carries, and why when it fell back. */
+  injection: PlanInjection;
   /** Flags the declaration resolved to. Empty without one. */
   flags: readonly string[];
   /** What the block declared, or null when there was none. */
@@ -394,6 +512,10 @@ export interface TaskDispatch {
  * artifact that quotes the task back, the plan's own close-out
  * included.
  *
+ * `planText` is the share of the plan the run's injection mode rendered
+ * (`plan/inject.ts`). Under `full` it is the plan file byte for byte,
+ * which makes the prompt the one the loop built before modes existed.
+ *
  * The `Your scoped task is: ` prefix is what `effort/classify.ts`
  * buckets a session log by. It is asserted against this file's source
  * by that module's own drift guard, so it must stay spelled here.
@@ -401,14 +523,14 @@ export interface TaskDispatch {
 export function buildTaskPrompt(
   taskText: string,
   promptContent: string,
-  planContent: string,
+  planText: string,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
     '',
     promptContent,
-    planContent,
+    planText,
   ].join('\n');
 }
 
@@ -438,6 +560,12 @@ export function buildTaskPrompt(
  * A `rafa:*` block has no strip here, and needs none: `findNextTask`
  * never answers a task line inside a closed one, so the text this
  * announces and injects can carry no block's body.
+ *
+ * The plan the prompt carries is rendered here in the mode the caller
+ * names. A `stage` or `task` rendering that cannot find the task at its
+ * line hands the session the whole plan instead, and that is warned
+ * about, because the prompt is then several times the size the run
+ * asked for and nothing else would show it.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -465,15 +593,24 @@ export async function dispatchTask(
     console.warn(`   Declaration: ignoring ${issue.reason} \`${issue.text}\`.`);
   }
 
+  const injection = renderInjection({
+    mode: options.inject,
+    plan: options.planContent,
+    task: taskInfo,
+  });
+  if (injection.fallback !== null) {
+    console.warn(`   Injection: \`${injection.requested}\` not rendered: ${injection.fallback.text}.`);
+  }
+
   const prompt = withStamp(buildTaskPrompt(
     taskText,
     options.promptContent,
-    options.planContent,
+    injection.text,
   ));
 
   const exitCode = await run(prompt, flags);
 
-  return { taskText, prompt, flags, declaration, exitCode };
+  return { taskText, prompt, flags, declaration, injection, exitCode };
 }
 
 /** Indents every line, so a multi-line git message reads as one block. */
@@ -696,6 +833,19 @@ export async function maybeCompactProgress(
 export default async function start(args: string[]): Promise<void> {
   const repoRoot = getRepoRoot();
 
+  // Before the deferral: a run queued for 23:00 that only meets a refused
+  // config then has lost the night, where refusing now costs one command.
+  let runConfig: ResolvedConfig;
+  try {
+    runConfig = loadRunConfig(repoRoot, args);
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    console.error('❌ Refusing to start on this configuration:');
+    for (const problem of error.problems) console.error(`   ${problem}`);
+    process.exit(1);
+  }
+  const injectMode = runConfig.config.inject;
+
   const startAt = argValue(args, '--start-at');
   if (startAt) await deferUntil(startAt);
 
@@ -732,6 +882,10 @@ export default async function start(args: string[]): Promise<void> {
   const planContent = fs.readFileSync(planPath, 'utf8');
   const promptContent = fs.readFileSync(promptPath, 'utf8');
 
+  const injectSource = injectSourceLabel(runConfig.sources.inject, runConfig.path);
+  console.log(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
+  announcePlanIssues(planContent);
+
   // Initialize tracker only if it doesn't exist
   if (!fs.existsSync(trackerPath)) {
     console.log(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -760,7 +914,7 @@ export default async function start(args: string[]): Promise<void> {
       console.log('\n✅ All tasks completed!');
       console.log('🧹 Wrap-up session starting: promote progress.txt findings, compact it, sync with main, then commit, push and open the PR.');
       console.log('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
-      await preserveProgress();
+      await preserveProgress(planContent);
       if (ciWait) {
         await verifyPullRequest(
           Math.max(1, ciTimeoutMin) * 60_000,
@@ -770,7 +924,12 @@ export default async function start(args: string[]): Promise<void> {
       break;
     }
 
-    const { exitCode } = await dispatchTask({ taskInfo, promptContent, planContent });
+    const { exitCode } = await dispatchTask({
+      taskInfo,
+      promptContent,
+      planContent,
+      inject: injectMode,
+    });
 
     if (interrupted) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
