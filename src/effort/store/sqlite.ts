@@ -36,12 +36,14 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds one table that is not a kind: `findings`, one row per
- * finding a task report lists. The port's row map does not name it and
- * nothing in this module reads or writes it. `findings.ts` writes it
- * through {@link withSqliteStore}, so it is opened, migrated and closed
- * as every kind's table is, and says why it has a column per field and
- * two deduplication keys where a kind has `row_json` and one.
+ * The file holds three tables that are not kinds, one per list a task
+ * report carries: `findings`, `blockers` and `out_of_scope_bugs`. The
+ * port's row map names none of them, and nothing in this module reads
+ * or writes them. `findings.ts` writes the first and `triage.ts` the
+ * other two, both through {@link withSqliteStore}, so each is opened,
+ * migrated and closed as every kind's table is. Each writer says why
+ * its tables have a column per field and their own deduplication keys,
+ * where a kind has `row_json` and one key.
  *
  * ## The port's rules, as they come out here
  *
@@ -168,8 +170,8 @@ const STORE_FILE_NAME = 'effort.sqlite';
 
 /**
  * The file the SQLite store lives in under one repo root, whether or
- * not it exists yet. Every kind's table, and the findings table, sit in
- * it.
+ * not it exists yet. Every kind's table, and every table the report
+ * writers fill, sit in it.
  */
 export function sqliteStorePath(repoRoot: string): string {
   return join(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAME);
@@ -230,6 +232,41 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     ON findings (session_id, trigger, what)
     WHERE artifact IS NULL;
   `,
+  // Version 3: one row per task-report blocker and per out-of-scope bug,
+  // outside the port's row map. `triage.ts` writes both and says why
+  // each constraint and each index expression is there.
+  `
+  CREATE TABLE blockers (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    what         TEXT NOT NULL CHECK (what <> ''),
+    artifact     TEXT CHECK (artifact <> ''),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX blockers_by_entry
+    ON blockers (session_id, what, ifnull(artifact, ''));
+
+  CREATE TABLE out_of_scope_bugs (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    what         TEXT NOT NULL CHECK (what <> ''),
+    artifact     TEXT CHECK (artifact <> ''),
+    security     INTEGER CHECK (security IN (0, 1)),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX out_of_scope_bugs_by_entry
+    ON out_of_scope_bugs (session_id, what, ifnull(artifact, ''), ifnull(security, -1));
+  `,
 ];
 
 /**
@@ -265,7 +302,7 @@ const KIND_TABLES: Readonly<Record<EffortRowKind, KindTable>> = {
  * pattern reads code units, which is the level a lone half exists at.
  * Nor is there a `g` flag, so `test` keeps no state between calls.
  *
- * Exported for the findings writer, whose text lands in this file too.
+ * Exported for the report writers, whose text lands in this file too.
  */
 export const LONE_SURROGATE =
   /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
@@ -398,7 +435,7 @@ export function migrateSchema(
  * `use`, and closes it whatever `use` did. Only a caller with a row to
  * add passes `create`, and only then is the directory made.
  *
- * Exported for the findings writer, so its table is opened, migrated
+ * Exported for the report writers, so their tables are opened, migrated
  * and closed exactly as every kind's is.
  */
 export function withSqliteStore<T>(

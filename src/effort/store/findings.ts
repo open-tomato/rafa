@@ -217,15 +217,21 @@ const INSERT_FINDING = `
   ON CONFLICT (session_id, trigger, what) WHERE artifact IS NULL DO NOTHING
 `;
 
-/** A value as a refusal quotes it. Never serialises an object. */
-function describeValue(value: unknown): string {
+/**
+ * A value as a refusal quotes it. Never serialises an object. Exported
+ * for the triage writer, so its refusals quote a value the same way.
+ */
+export function describeValue(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'object' && value !== null) return 'an object';
   return String(value);
 }
 
-/** Why a text value cannot be stored, or null when it is null or can be. */
-function textProblem(value: unknown): string | null {
+/**
+ * Why a text value cannot be stored, or null when it is null or can be.
+ * Exported for the triage writer, whose text fields are held to it.
+ */
+export function textProblem(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value !== 'string') return `is ${describeValue(value)}, not a string`;
   if (value.trim().length === 0) return 'is blank';
@@ -254,25 +260,38 @@ const FIELD_CHECKS: readonly (readonly [FindingField, FieldCheck])[] = [
 ];
 
 /** A whole-write refusal, thrown before the store is opened. */
-function refusedWrite(reason: string): Error {
-  return new Error(`effort store: findings write ${reason}; nothing written`);
+function refusedWrite(subject: string, reason: string): Error {
+  return new Error(`effort store: ${subject} write ${reason}; nothing written`);
 }
 
-/** Throws unless the dispatch and outcome can be stored on every row. */
-function checkWrite(write: FindingsWrite): void {
-  const { sessionId, planStub, taskLine } = write.dispatch;
+/**
+ * Throws unless a dispatch and an outcome can be stored on every row of
+ * one write. `subject` names the write in the refusal: `findings` here.
+ *
+ * Exported for the triage writer, so every table one report fills
+ * refuses a dispatch by the same rule and in the same words.
+ */
+export function checkDispatch(
+  subject: string,
+  dispatch: FindingsDispatch,
+  outcome: FindingOutcome,
+): void {
+  const { sessionId, planStub, taskLine } = dispatch;
   if (typeof sessionId !== 'string' || sessionId.length === 0) {
-    throw refusedWrite(`has session id ${describeValue(sessionId)}, not a non-empty string`);
+    const reason = `has session id ${describeValue(sessionId)}, not a non-empty string`;
+    throw refusedWrite(subject, reason);
   }
-  if (!(FINDING_OUTCOMES as readonly unknown[]).includes(write.outcome)) {
+  if (!(FINDING_OUTCOMES as readonly unknown[]).includes(outcome)) {
     const expected = FINDING_OUTCOMES.join(', ');
-    throw refusedWrite(`has outcome ${describeValue(write.outcome)}, not one of ${expected}`);
+    const reason = `has outcome ${describeValue(outcome)}, not one of ${expected}`;
+    throw refusedWrite(subject, reason);
   }
   if (typeof taskLine !== 'string') {
-    throw refusedWrite(`has task line ${describeValue(taskLine)}, not a string`);
+    throw refusedWrite(subject, `has task line ${describeValue(taskLine)}, not a string`);
   }
   if (planStub !== null && typeof planStub !== 'string') {
-    throw refusedWrite(`has plan stub ${describeValue(planStub)}, not a string or null`);
+    const reason = `has plan stub ${describeValue(planStub)}, not a string or null`;
+    throw refusedWrite(subject, reason);
   }
 
   const texts: readonly (readonly [string, string | null])[] = [
@@ -282,7 +301,7 @@ function checkWrite(write: FindingsWrite): void {
   ];
   for (const [name, text] of texts) {
     if (text !== null && LONE_SURROGATE.test(text)) {
-      throw refusedWrite(`has a ${name} holding a lone UTF-16 surrogate`);
+      throw refusedWrite(subject, `has a ${name} holding a lone UTF-16 surrogate`);
     }
   }
 }
@@ -349,7 +368,7 @@ export function writeFindings(
   write: FindingsWrite,
   seams: FindingsWriterSeams = {},
 ): FindingsWriteResult {
-  checkWrite(write);
+  checkDispatch('findings', write.dispatch, write.outcome);
   const path = sqliteStorePath(repoRoot);
 
   const rejected: FindingRejection[] = [];

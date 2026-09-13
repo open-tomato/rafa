@@ -74,8 +74,7 @@
 - A new `EffortRowByKind` kind breaks `check-types`: TS2345 at each
   `effortStorePath` call in `store/ndjson.ts` until `STORE_FILE_NAMES`
   (`store.ts`) names its file, TS2741 in `store/sqlite.ts` until
-  `KIND_TABLES` has it. A SQLite-only table stays outside the port's row
-  map.
+  `KIND_TABLES` has it.
 - A directory at a file's path: `Bun.file(path).exists()` is false and
   `.text()` throws EISDIR, so use `existsSync` where unreadable must not
   read as absent. Planting one tests "unreadable" portably
@@ -214,8 +213,7 @@
   parser, measured on bun 1.3.14", the `Map`/`Set` lookup rule),
   `src/plan/parse.ts` (`issue: #42` is `null`, `42`/`042` the number 42,
   integer-like keys enumerate first, `true` a boolean) and
-  `src/report/parse.ts` (an unquoted value opening with a backtick, `@`,
-  `%` or `[`, or holding `: `, THROWS; ` #` silently truncates; `yes` is
+  `src/report/parse.ts` (an unquoted value holding `: ` THROWS; `yes` is
   a string, `False` a boolean, `.inf` Infinity). Quote such values.
 - `src/plan/index.ts` is the `./plan` barrel; `index.test.ts` pins its
   runtime names (`RUNTIME_EXPORTS`), identity, and that from `src/` both
@@ -328,10 +326,10 @@
 - `claudeArgs` passes no `--session-id` and `start.ts` holds none, so
   the loop does not know a task session's id at dispatch: wiring
   `writeFindings` needs one obtained first.
-- A SQLite-only table: append to `SQLITE_MIGRATIONS` and write through
-  `sqlite.ts`'s exported `sqliteStorePath`/`withSqliteStore`
-  (`LONE_SURROGATE` too); update the two `tablesOf(...)` expectations in
-  `sqlite.test.ts` (layout, zero-byte cases).
+- A SQLite-only table stays outside the port's row map: add a migration,
+  write through `sqlite.ts`'s exported `sqliteStorePath`/`withSqliteStore`
+  (`LONE_SURROGATE` too) and update the two `tablesOf(...)` expectations
+  in `sqlite.test.ts` (layout, zero-byte cases).
 - SQLite 3.51.0 upsert: a conflict target on a PARTIAL unique index must
   repeat its `WHERE` (else `ON CONFLICT clause does not match any
   PRIMARY KEY or UNIQUE constraint`); several `ON CONFLICT` clauses
@@ -340,3 +338,24 @@
   (syntax error), so leave a column that will widen CHECK-free.
 - `it.each(CONST)` over an `as const` tuple is TS2769 (readonly): spread
   it, `it.each([...CONST])`. `check-types` skips tests, the IDE does not.
+- `src/effort/store/triage.ts`: `writeTriage(root, { dispatch, outcome,
+  blockers, outOfScopeBugs }, seams?)` writes the `blockers` and
+  `out_of_scope_bugs` tables (migration 3) in ONE transaction, into
+  `effort.sqlite` whatever `store` selects. Dedupe is per session on the
+  WHOLE entry (`what`, `artifact`, a bug's `security`), not by artifact;
+  answers `{ path, blockers, outOfScopeBugs }`, each `{ appended,
+  skipped, rejected }`. The dispatch check is shared: `checkDispatch(
+  subject, dispatch, outcome)`, `describeValue`, `textProblem` are
+  exported from `findings.ts`. Neither table has `tracker_ref`.
+- SQLite 3.51.0: a UNIQUE index treats NULLs as distinct, so dedupe a
+  nullable column through an expression index (`ifnull(col, sentinel)`,
+  with a CHECK refusing the sentinel). The upsert target must repeat the
+  expressions: `IFNULL(a,'')` matches `ifnull(a, '')`, while `coalesce` or
+  the bare columns throw `ON CONFLICT clause does not match`.
+  `ALTER TABLE ... ADD COLUMN` leaves an expression index in force.
+- `bun:sqlite` binds `true`/`false` as integers 1/0, and INTEGER affinity
+  stores the STRING `'1'` as 1, which `CHECK (x IN (0, 1))` accepts:
+  check a boolean in JS before binding it.
+- `@progress.txt` (literal `@`) is a stray TRACKED file at the root, added
+  in `f4215ba`; the notes file is `progress.txt`. Never append to the
+  `@` one.

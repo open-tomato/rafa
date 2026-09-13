@@ -294,7 +294,8 @@ describe('openSqliteStore layout', () => {
     store.append('commits', [C_A]);
     const columns = 'SELECT name FROM pragma_table_info(?) ORDER BY cid';
 
-    expect(tablesOf(root)).toEqual(['commits', 'findings', 'sessions']);
+    expect(tablesOf(root))
+      .toEqual(['blockers', 'commits', 'findings', 'out_of_scope_bugs', 'sessions']);
     for (const [kind, keyColumn] of Object.entries(KEY_COLUMNS)) {
       expect(rawQuery<{ name: string }>(root, columns, kind))
         .toEqual([{ name: 'seq' }, { name: keyColumn }, { name: 'row_json' }]);
@@ -579,7 +580,8 @@ describe('schema versioning', () => {
 
     expect(store.keys('sessions').size).toBe(0);
     expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
-    expect(tablesOf(root)).toEqual(['commits', 'findings', 'sessions']);
+    expect(tablesOf(root))
+      .toEqual(['blockers', 'commits', 'findings', 'out_of_scope_bugs', 'sessions']);
     expect(store.append('sessions', [S_A]).appended).toBe(1);
   });
 
