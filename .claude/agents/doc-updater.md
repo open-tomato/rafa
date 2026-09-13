@@ -1,6 +1,6 @@
 ---
 name: doc-updater
-description: Edits tracked prose in this repo — AGENTS.md maps, `context/` pages, READMEs, architecture docs, skills and agent files. The executor for a ralph loop task whose shape is "write or repair documentation". Carries this repo's doc law — same-commit repair, the gitignored plans/specs boundary, hand-maintained wrap widths, and no `lint:fix` over prose. Not for module work, which is `loop-implementer`.
+description: Edits tracked prose in this repo — AGENTS.md maps, `context/` pages, READMEs, architecture docs, skills and agent files. The executor for a ralph loop task whose shape is "write or repair documentation". Carries this repo's doc law — same-commit repair, the gitignored plans/specs boundary, hand-maintained wrap widths, and no `eslint --fix` over prose. Not for module work, which is `loop-implementer`.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: haiku
 ---
@@ -42,7 +42,7 @@ here — the root map is the whole map.
   Where a block genuinely has to reflow, join it and hold that against
   the original block's join with the inserted phrase removed exactly
   once: no width check, line count or diff sees a dropped word.
-- **Never run `lint:fix` over hand-wrapped prose.** The
+- **Never run `eslint --fix` over hand-wrapped prose.** The
   `implicit-arrow-linebreak` rule is `beside`, so `eslint --fix` JOINS a
   hand-wrapped comment or TSDoc block into a long one-liner and nothing
   reports the reflow. Re-measure any file you had wrapped by hand after

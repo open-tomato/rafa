@@ -421,7 +421,7 @@ describe('the wrap-up session', () => {
     const wrapUp = readFileSync(new URL('../start/wrap-up.ts', import.meta.url), 'utf8');
 
     expect(start).toContain('await preserveProgress(planContent);');
-    expect(wrapUp).toContain('buildWrapUpPrompt(getCurrentBranch(), planContent)');
+    expect(wrapUp).toContain('buildWrapUpPrompt(branch, planContent, findOpenPullRequest(branch))');
     expect(start).toContain('inject: injectMode,');
     expect(start).not.toContain('await preserveProgress(injection');
   });
