@@ -9,8 +9,8 @@ import globals from 'globals';
 import * as jsoncParser from 'jsonc-eslint-parser';
 import { configs as tsLintConfig } from 'typescript-eslint';
 
-import sharedRules from './sharedRules.mjs';
 import unsafeUnicode from './scripts/unsafeUnicode.mjs';
+import sharedRules from './sharedRules.mjs';
 /**
  * A custom ESLint configuration for typescript
  *

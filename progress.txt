@@ -235,7 +235,7 @@
   does not), and `--reporter=junit --reporter-outfile=<f>` lists skips
   anyway with `file="..."` per suite and case. Count DISTINCT failing
   titles: the summary re-lists `(fail)`.
-- `.claude/skills/dev-planner/SKILL.md` line 153 still names
+- `.claude/skills/dev-planner/SKILL.md` lines 20, 67 and 153 still name
   `tools/ralph/utils/tracker.ts`; the dev-planner rewrite task owns it.
 - `src/plan/inject.ts`: `renderInjection({ mode, plan, task })` (`task`:
   `TaskInfo`'s `task` + `lineNum`) never throws: `{ requested, mode,

@@ -20,7 +20,7 @@ criteria — **do not execute the plan**.
   from the plan.
 * Do not create or touch any tracker file — the loop derives it from the plan.
 
-## Plan format (parser contract)
+## Structured plan format (parser contract)
 
 * Every task is a flat `- [ ]` checklist line. The loop's parser only reads
   lines starting with `- [ ]` / `- [BLOCKED]` — anything else (headings,
@@ -46,6 +46,63 @@ criteria — **do not execute the plan**.
   Stage-end test tasks cover cross-module/integration behavior — a module's
   own unit tests ride inside its module task (Task sizing below).
 
+### Structured blocks
+
+A plan document may contain fenced blocks of the form `` ```rafa:*``` `` that
+carry metadata and context. Three kinds are read in phase 0:
+
+* `rafa:plan` — Header fields in YAML format: `stub`, `issue` (optional),
+  `spec` (optional). The stub identifies the plan and defaults to the spec's
+  basename or "untitled". The loop uses the spec path to link the plan to the
+  change that prompted it.
+* `rafa:context` — Markdown prose injected into the prompt of EVERY task under
+  this plan.
+* `rafa:stage-context` — Markdown prose injected only into tasks under the
+  nearest `# Stage:` heading above it, providing stage-specific background.
+
+Unknown `rafa:*` block kinds are retained and ignored — they do not cause
+parse failures. This rule mirrors the declaration extras rule: an
+unrecognized key in a task line does not prevent the line from being
+dispatched.
+
+A `rafa:stage-context` block belongs to the NEAREST `# Stage:` heading above
+it. Blocks before the first stage heading have no effect.
+
+#### Block strip rule
+
+Every `rafa:*` block is stripped from the task text before it is quoted
+to the agent, the operator log, or the commit message. The fenced block
+syntax is a planning annotation, never an instruction.
+
+### Example
+
+Every line is indented by two spaces, because the loop's checklist parser is
+line-anchored and fence-blind: a bare `- [ ] ` at column 0 inside prose is
+dispatched as a task. Measured on a draft plan, an unindented example line
+became the dispatcher's answer for task one.
+
+````markdown
+  # Plan: Feature Title
+
+  ```rafa:plan
+  stub: my-feature
+  issue: OPT-123
+  spec: .specs/my-feature.md
+  ```
+
+  ```rafa:context
+  Context prose injected into every task.
+  ```
+
+  # Stage: schema
+
+  ```rafa:stage-context
+  Prose specific to the schema stage.
+  ```
+
+  - [ ] Add the Zod schema  {agent=loop-implementer}
+````
+
 ## Task declarations (routing)
 
 * A task line may carry a trailing declaration naming what the loop should
@@ -64,7 +121,8 @@ criteria — **do not execute the plan**.
   a code span carrying `{ "a": 1 }` is not a declaration.
 * Its tokens are space-separated `key=value` pairs. Recognised keys are
   `agent`, `model`, `effort` and `tools`; an unrecognised key is kept for
-  telemetry and maps to no flag.
+  telemetry and maps to no flag. The key `skills` reserves a comma-separated
+  list of skill names for phase 1 resolution and is stored for reporting.
 * `agent=<name>` outranks the other three — the loop passes only
   `--agent`, the agent definition supplying its own model and tool set.
   The three are still recorded, so the effort collector can report what
