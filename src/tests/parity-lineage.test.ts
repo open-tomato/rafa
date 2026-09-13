@@ -17,7 +17,7 @@
  * because rafa's port answers what its own collector would have
  * answered for every one of them.
  *
- * ## Three accounted-for exceptions, and nothing else
+ * ## Four accounted-for exceptions, and nothing else
  *
  * A stored row is not always byte-identical to what a fresh collect of
  * TODAY's logs answers for the same key, for reasons this suite knows
@@ -60,16 +60,27 @@
  *     {@link hasGrown} throws, rather than answering false, on a row
  *     that shrank, so a truncated log masquerading as an unrelated
  *     mismatch still fails loudly.
+ *   - A RETIRED `kind`. Phase 0's cutover drops the `compaction` shape
+ *     from `effort/classify.ts` (nothing dispatches it once
+ *     `progress.txt` is rendered from the findings store instead of
+ *     compacted), so a fresh classify can no longer answer it — every
+ *     stored row this shape matched (measured 2026-09-13: 38 of 1,052)
+ *     reads `kind: 'other'` on a fresh collect instead. `kind` is
+ *     therefore excluded from the comparison on exactly these rows, and
+ *     the exclusion is itself asserted: the fresh value must be
+ *     `'other'`, so a shape reintroduced under the same name, or a
+ *     classifier that started mapping this content somewhere else,
+ *     turns this from a silent pass into a loud failure.
  *
- * A row with neither exception is held to full equality, field for
- * field, in the sibling's own key order — the same order a fresh row
- * projects to once `mode` and `issueIdentifier` are dropped, since
+ * A row with none of these exceptions is held to full equality, field
+ * for field, in the sibling's own key order — the same order a fresh
+ * row projects to once `mode` and `issueIdentifier` are dropped, since
  * `effort/collect.ts` builds it by spreading the session stats and then
  * appending the rest in the reconciled schema's order. `JSON.stringify`
  * equality is exact down to key order, the same reasoning
  * `parity-differential.test.ts` gives for preferring it over `toEqual`.
  *
- * ## Commits need none of the three
+ * ## Commits need none of the four
  *
  * `CommitEffortRow` (`= CommitStats`) is exactly the sibling's
  * `commits.ndjson` schema, key for key and in the same order — measured
@@ -185,6 +196,50 @@ function storedNumber(row: Record<string, unknown>, field: string): number {
 /** Whether a stored session row carries the hand-patch marker. */
 function isHandPatched(stored: Record<string, unknown>): boolean {
   return STORED_ONLY_SESSION_FIELD in stored;
+}
+
+/** A session kind phase 0 retired from `effort/classify.ts`. */
+const RETIRED_SESSION_KIND = 'compaction';
+
+/** Whether a stored session row was classified under the retired kind. */
+function isRetiredKind(stored: Record<string, unknown>): boolean {
+  return storedString(stored, 'kind') === RETIRED_SESSION_KIND;
+}
+
+/**
+ * Asserts whichever of the hand-patch and retired-kind exceptions apply
+ * to one row, and answers the field names a full comparison of it must
+ * therefore drop.
+ *
+ * The two overlap (measured 2026-09-13: 37 of the 38 retired-kind rows
+ * are also hand-patched — a mid-run compaction session's own attribution
+ * resolved to no match, which is why an analyst patched it), so a row
+ * driving EITHER exception's test may need both exclusions at once, not
+ * only the one that test is named for.
+ */
+function exceptionExclusions(
+  stored: Record<string, unknown>,
+  fresh: SessionEffortRow,
+): readonly string[] {
+  const extra: string[] = [];
+
+  if (isHandPatched(stored)) {
+    // The patch exists because the collector's own attribution had
+    // resolved to no match; a fresh run must resolve the same way, or
+    // the patch is stale and this exception should not apply to it.
+    expect(storedString(stored, 'planStubMatch')).toBe('none');
+    expect(fresh.planStub).toBeNull();
+    extra.push('planStub');
+  }
+
+  if (isRetiredKind(stored)) {
+    // The shape this row matched no longer exists in the classifier's
+    // table, so a fresh classify can only ever answer `other` for it.
+    expect(fresh.kind).toBe('other');
+    extra.push('kind');
+  }
+
+  return extra;
 }
 
 /**
@@ -320,6 +375,7 @@ describe.skipIf(!fixture.present)(title, () => {
 
     for (const stored of storedSessions) {
       if (isHandPatched(stored)) continue;
+      if (isRetiredKind(stored)) continue;
 
       const sessionId = storedString(stored, 'sessionId');
       const fresh = freshCounterpartOf(freshByKey, sessionId, 'session');
@@ -335,6 +391,28 @@ describe.skipIf(!fixture.present)(title, () => {
     expect(compared).toBeGreaterThan(0);
   });
 
+  it('accounts for every session whose stored kind is the retired `compaction` shape', () => {
+    if (freshSessions === null || storedSessions === null) throw new Error('not collected');
+
+    const freshByKey = indexByKey(freshSessions, (row) => row.sessionId, 'session');
+    const retired = storedSessions.filter(isRetiredKind);
+
+    // Non-vacuity: the fixture this exception was written for.
+    expect(retired.length).toBeGreaterThan(0);
+
+    for (const stored of retired) {
+      const sessionId = storedString(stored, 'sessionId');
+      const fresh = freshCounterpartOf(freshByKey, sessionId, 'session');
+      const extra = exceptionExclusions(stored, fresh);
+
+      if (hasGrown(stored, fresh)) continue;
+
+      expect(JSON.stringify(siblingProjection(fresh, extra))).toBe(
+        JSON.stringify(storedProjection(stored, extra)),
+      );
+    }
+  });
+
   it('accounts for every hand-patched planStub, rather than comparing it', () => {
     if (freshSessions === null || storedSessions === null) throw new Error('not collected');
 
@@ -347,17 +425,12 @@ describe.skipIf(!fixture.present)(title, () => {
     for (const stored of patched) {
       const sessionId = storedString(stored, 'sessionId');
       const fresh = freshCounterpartOf(freshByKey, sessionId, 'session');
-
-      // The patch exists because the collector's own attribution had
-      // resolved to no match; a fresh run must resolve the same way, or
-      // the patch is stale and this exception should not apply to it.
-      expect(storedString(stored, 'planStubMatch')).toBe('none');
-      expect(fresh.planStub).toBeNull();
+      const extra = exceptionExclusions(stored, fresh);
 
       if (hasGrown(stored, fresh)) continue;
 
-      expect(JSON.stringify(siblingProjection(fresh, ['planStub']))).toBe(
-        JSON.stringify(storedProjection(stored, ['planStub'])),
+      expect(JSON.stringify(siblingProjection(fresh, extra))).toBe(
+        JSON.stringify(storedProjection(stored, extra)),
       );
     }
   });

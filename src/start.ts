@@ -182,11 +182,10 @@ export function guardRunBranch(
 /**
  * Assembles the prompt the end-of-run wrap-up session is given.
  *
- * Its FIRST LINE is a classifier key, as the compaction prompt's is:
- * `effort/classify.ts` buckets a session whose prompt begins with it
- * as `wrap-up`. So the plan is APPENDED below the instructions and
- * never placed above them, and the stamp {@link withStamp} adds lands
- * after the plan.
+ * Its FIRST LINE is a classifier key: `effort/classify.ts` buckets a
+ * session whose prompt begins with it as `wrap-up`. So the plan is
+ * APPENDED below the instructions and never placed above them, and the
+ * stamp {@link withStamp} adds lands after the plan.
  *
  * The plan goes in WHOLE whatever injection mode the run's task
  * sessions were dispatched under, which is why this takes the plan and
@@ -817,64 +816,6 @@ export function storeTaskReport(options: TaskReportStoreOptions): boolean {
     console.error('   The session printed it above as it ran.');
     return false;
   }
-}
-
-/** What the compaction prompt quotes. */
-interface CompactionPromptInput {
-  /** The size `progress.txt` was at, in bytes. */
-  readonly sizeBytes: number;
-  /** The rule that asked for the compaction. */
-  readonly reason: string;
-  /** The two caps the prompt names. */
-  readonly thresholds: {
-    readonly hardCapBytes: number;
-    readonly softCapBytes: number;
-  };
-}
-
-/**
- * Assembles the prompt a mid-run compaction session was given.
- *
- * Nothing dispatches it now. `progress.txt` is rendered from the findings
- * store (`utils/progress.ts`), so the between-task decision that called
- * this is gone. The builder stays while `effort/classify.ts` still keys
- * its `compaction` shape on this prompt's first line.
- *
- * Its FIRST LINE is a classifier key: `effort/classify.ts` buckets a
- * session log by the prefix its prompt begins with, and `compaction`
- * is one of the shapes there with this file named as its source. A
- * line prepended above it would re-bucket every later compaction as
- * residue while that module's drift guard — a containment check over
- * the whole file — stayed green. Add bullets after line 1, never
- * before it.
- *
- * The session's blast radius is one gitignored file, and that is what
- * makes this safe to run BETWEEN tasks rather than after the last one.
- * `progress.txt` is gitignored, so a session confined to it changes no
- * tracked file, needs no commit, and leaves nothing for the next
- * task's `git add -A` to sweep into a commit whose subject describes
- * something else. The prompt says so explicitly, because the skill it
- * cites describes a promotion ladder that writes to tracked
- * `context/` pages and skills — correct for the end-of-run wrap-up
- * that owns it, wrong here.
- *
- * That bound is also why this asks for DELETION rather than
- * promotion, and why it says to stop instead of over-deleting: the
- * loop cannot verify a session shrank anything, so the only thing
- * standing between an unshrinkable file and a finding thrown away to
- * satisfy a number is the instruction not to.
- */
-export function buildCompactionPrompt(decision: CompactionPromptInput): string {
-  const { sizeBytes, reason, thresholds } = decision;
-
-  return [
-    '* Compact `@progress.txt` per `.claude/skills/progress-hygiene/SKILL.md`, and change NOTHING else.',
-    `* This is a MID-RUN compaction, not the end-of-run one: the plan is unfinished and the next task starts the moment you exit. The loop dispatched it because progress.txt is ${sizeBytes} bytes against a hard cap of ${thresholds.hardCapBytes} (rule: ${reason}). Every task is told to read the whole file before it starts, so every byte left here is paid for again by each task still to come.`,
-    '* Edit progress.txt and NO other file. It is gitignored, so this session leaves the working tree clean and the loop makes no commit for it — whereas a promotion written into a tracked file here would be swept into the NEXT task\'s commit, under a subject describing something else entirely. The end-of-run wrap-up owns the promotion ladder; you own the file.',
-    '* So DELETE rather than promote, and delete only what is safe to lose: a finding already covered by a skill under `.claude/skills/` or by a `context/` page (OPEN the destination and confirm it before dropping the line), a finding the current code or a later finding contradicts, and anything task-specific that leaked in. Merge near-duplicates into the single most precise phrasing.',
-    '* Keep everything else, in its original order and its original one-finding-per-bullet shape. Recency is meaningful — plan generation injects this file and truncates it oldest-first. Do not add a heading, a date, or a summary of what you removed.',
-    `* Get under ${thresholds.softCapBytes} bytes if the file honestly allows it. If it does not, stop there rather than deleting a finding that is still true and unpromoted. The loop will ask again after the next task; a finding deleted here is gone for good.`,
-  ].join('\n');
 }
 
 export default async function start(args: string[]): Promise<void> {

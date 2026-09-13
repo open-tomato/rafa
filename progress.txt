@@ -421,3 +421,18 @@
 - `src/tests/declaration-dispatch.test.ts` wraps `runClaude` as its
   runner (answering `stdout: ''`) so its 21-leg grid stays valid; the
   loop's real runner and its argv are pinned in `task-report.test.ts`.
+- Retiring a `PROMPT_SHAPES` kind from `effort/classify.ts` is not
+  contained to `classify.ts`/`classify.test.ts`: `src/tests/parity-lineage.test.ts`
+  holds the LIVE sibling store's rows (`~/projects/agentic-research/.ralph/effort/`)
+  to full byte equality against a fresh reclassify, so a stored row of the
+  retired kind now reads `kind: 'other'` fresh and reds that suite until a
+  new accounted-for exception excludes `kind` for exactly those rows (and,
+  where a stored row is ALSO hand-patched — measured 2026-09-13: 37 of 38
+  `compaction`-kind rows are — excludes `planStub` too, in the SAME
+  comparison). Any future kind removal should grep
+  `src/tests/parity-lineage.test.ts` for the kind's name before declaring
+  the classifier change done. `src/tests/plan-stamp.test.ts`'s
+  `keeps every prompt shape classifiable` test and its own module-note
+  count of shapes are a second, cheaper place a retired shape's literal
+  prefix lingers — grep the whole `src/` tree for a shape's prefix
+  literal and its `kind` string, not just its own two files.

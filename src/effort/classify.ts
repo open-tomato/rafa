@@ -12,7 +12,7 @@
  * would report those two as having no prompt at all, which reads as a
  * malformed log rather than as a session that started differently.
  *
- * The five shapes below are THIS repo's own, each derived from the
+ * The four shapes below are THIS repo's own, each derived from the
  * source that injects it rather than transcribed from a log. That
  * distinction is the whole reason this module exists as code instead of
  * a regex someone carried across: the reference implementation this
@@ -22,7 +22,7 @@
  * prefix answers every task session. A port that kept the needle would
  * collect nothing and report a clean, plausible, entirely empty run.
  * The colocated test pins both halves — the foreign needle matching
- * none of the five shapes, and this repo's own prefix matching through
+ * none of the four shapes, and this repo's own prefix matching through
  * the identical matcher, which is what makes that zero a reading rather
  * than a dead needle.
  *
@@ -35,15 +35,14 @@
  * Snapshot at the time of writing, over 896 loose session logs — the
  * counts move with every run and are meant to be re-derived, the SHAPE
  * has not moved: 858 `task`, 14 `plan-generation`, 10 `wrap-up`, 0
- * `ci-repair`, 0 `compaction` and 14 `other`, with no file lacking an
- * enqueue record inside the window. The `other` bucket is hand-driven
- * and measurement traffic, this plan's own context probes among it — a
- * plan that measures the loop pollutes what it measures, which is why
+ * `ci-repair` and 14 `other`, with no file lacking an enqueue record
+ * inside the window. The `other` bucket is hand-driven and measurement
+ * traffic, this plan's own context probes among it — a plan that
+ * measures the loop pollutes what it measures, which is why
  * `entrypoint` rather than prompt shape is the discriminator for that
- * question. `ci-repair` and `compaction` at zero are honest rather than
- * broken: both prompts are newer than every session in the tree, so
- * they are the two shapes whose only evidence is the drift guard
- * against their source.
+ * question. `ci-repair` at zero is honest rather than broken: its
+ * prompt is newer than every session in the tree, so it is the one
+ * shape whose only evidence is the drift guard against its source.
  *
  * Nothing here puts prompt content into a classification. The kind, the
  * record index and a line count are the whole result, so a store fed
@@ -58,12 +57,11 @@ import { readLines } from './session-log.js';
 export type SessionKind =
   | 'task'
   | 'plan-generation'
-  | 'compaction'
   | 'wrap-up'
   | 'ci-repair'
   | 'other';
 
-/** The five kinds the loop itself dispatches; `other` is the residue. */
+/** The four kinds the loop itself dispatches; `other` is the residue. */
 export type LoopSessionKind = Exclude<SessionKind, 'other'>;
 
 /** One recognised prompt shape, and where its literal is authored. */
@@ -119,13 +117,6 @@ export const PROMPT_SHAPES: readonly PromptShape[] = [
     label: 'CI repair',
     prefix: 'The pull request for branch ',
     firstLineInfix: ' is not mergeable: ',
-    source: 'src/start.ts',
-  },
-  {
-    kind: 'compaction',
-    label: 'compaction',
-    prefix: '* Compact `@progress.txt` per ',
-    firstLineInfix: null,
     source: 'src/start.ts',
   },
 ];
@@ -199,7 +190,7 @@ export function matchesShape(content: string, shape: PromptShape): boolean {
 }
 
 /**
- * Classifies prompt content against the five shapes.
+ * Classifies prompt content against the four shapes.
  *
  * Anything that matches none of them is `other` rather than an error:
  * the log directory holds hand-driven sessions and measurement probes

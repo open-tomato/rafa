@@ -5,7 +5,7 @@
  * The load-bearing case is `keeps every prompt shape classifiable`:
  * `effort/classify.ts` buckets a session by `content.startsWith(...)`
  * over the WHOLE prompt, so a marker written above the body would
- * re-bucket all five shapes as `other` while that module's own drift
+ * re-bucket all four shapes as `other` while that module's own drift
  * guard stayed green. Nothing else here would catch that.
  */
 
@@ -60,7 +60,7 @@ describe('stampPrompt', () => {
   it('keeps every prompt shape classifiable', () => {
     // The regression this whole placement decision exists for.
     const shapes = [
-      '* Compact `@progress.txt` per `.claude/skills/progress-hygiene/SKILL.md`, and change NOTHING else.\n* body',
+      'Your scoped task is: Add `src/effort/classify.ts`\n* body',
       '* Read `@progress.txt` in full.\n* body',
     ];
     for (const prompt of shapes) {

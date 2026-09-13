@@ -25,11 +25,11 @@
  * It is APPENDED and never prepended, and that is load-bearing rather
  * than cosmetic. `effort/classify.ts` buckets a session by
  * `content.startsWith(shape.prefix)` over the WHOLE prompt, so one
- * line above the body re-buckets every one of the five shapes as
+ * line above the body re-buckets every one of the four shapes as
  * `other` — silently, because that module's drift guard is a
  * containment check that would stay green. `start.ts` states the same
- * rule at its compaction builder: add lines after line 1, never
- * before it. {@link planStubFromPrompt} therefore SEARCHES rather than
+ * rule at its wrap-up builder: add lines after line 1, never before
+ * it. {@link planStubFromPrompt} therefore SEARCHES rather than
  * matching a prefix, which is what lets the marker sit at the end.
  *
  * A stub is written verbatim and matched against the same character
