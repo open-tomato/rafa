@@ -23,6 +23,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
@@ -68,6 +69,25 @@ function nextOf(model: PlanModel): TaskInfo | null {
     if (pick !== undefined) return { task: pick.task, lineNum: pick.lineNum, status };
   }
   return null;
+}
+
+/**
+ * Every task's resolved CLI flags, bucketed by the exact `args` array
+ * `resolveDeclarationFlags` answers for it, sorted by that array's JSON
+ * so the order does not depend on which task happens first.
+ */
+function declarationHistogram(model: PlanModel): [readonly string[], number][] {
+  const buckets = new Map<string, { args: readonly string[]; count: number }>();
+  for (const task of model.tasks) {
+    const { args } = resolveDeclarationFlags(task.declaration);
+    const key = JSON.stringify(args);
+    const bucket = buckets.get(key);
+    if (bucket === undefined) buckets.set(key, { args, count: 1 });
+    else bucket.count += 1;
+  }
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, bucket]) => [bucket.args, bucket.count]);
 }
 
 /** The format's own example, with two stages and every checkbox. */
@@ -686,5 +706,72 @@ describe('issues', () => {
       ['task-in-block', 9],
       ['duplicate-block', 11],
     ]);
+  });
+});
+
+describe('a real plan file on disk', () => {
+  /**
+   * This phase's own plan, read from `.plans/`, not a fixture. It is
+   * the frozen template the loop dispatches from — `PLAN_TRACKER-*.md`
+   * is the copy its ticks land on — so its stage set, task count and
+   * declarations hold still for the run and are pinned here as
+   * measured, the same way `PLAN_LINES` above is written by hand. Per
+   * the module note, none of this repo's plans carry a `rafa:*` block
+   * yet, so this exercises the checklist grammar only; `blocks.test.ts`
+   * and the cases above cover the block reader itself.
+   */
+  const PATH = join(fileURLToPath(new URL('../../', import.meta.url)), '.plans/PLAN-phase-0-package-parity-cutover.md');
+  const model = parsePlan(readFileSync(PATH, 'utf8'));
+
+  it('reads no rafa:* block and reports nothing, so the checklist alone is under test', () => {
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.context).toBeNull();
+    expect(model.blocks).toEqual([]);
+    expect(model.issues).toEqual([]);
+  });
+
+  it('reads every stage heading, in source order', () => {
+    expect(stageNamesOf(model)).toEqual([
+      'Bootstrap the routing surface',
+      'Import the sibling loop',
+      'Store port',
+      'Reconciled schema',
+      'Parity',
+      'Structured plan format',
+      'Structured task report',
+      'Package and cutover',
+    ]);
+  });
+
+  it('counts the tasks under each stage, totalling the 62 tasks the plan states', () => {
+    const counts = model.stages.map(
+      (_, index) => model.tasks.filter((task) => task.stage === index).length,
+    );
+    expect(counts).toEqual([1, 12, 9, 3, 4, 12, 13, 8]);
+    expect(model.tasks).toHaveLength(62);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(model.tasks.length);
+  });
+
+  it('resolves every task declaration to a flag combination, histogrammed', () => {
+    expect(declarationHistogram(model)).toEqual([
+      [['--agent', 'build-error-resolver'], 4],
+      [['--agent', 'code-reviewer'], 1],
+      [['--agent', 'doc-updater'], 6],
+      [['--agent', 'loop-implementer'], 24],
+      [['--agent', 'refactor-cleaner'], 2],
+      [['--agent', 'tdd-guide'], 13],
+      [['--agent', 'typescript-reviewer'], 1],
+      [['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Edit,Bash,Grep,Glob'], 3],
+      [['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Write,Bash,Grep,Glob'], 1],
+      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Edit,Bash,Grep,Glob'], 2],
+      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Write,Bash,Grep,Glob'], 3],
+      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Write,Edit,Bash,Grep,Glob'], 2],
+    ]);
+
+    // Every task on this plan declares something, and no agent task's
+    // other keys are suppressed, because none pairs `agent=` with
+    // `model=`, `effort=` or `tools=`.
+    expect(model.tasks.every((task) => task.declaration !== null)).toBe(true);
+    expect(model.tasks.every((task) => resolveDeclarationFlags(task.declaration).suppressed.length === 0)).toBe(true);
   });
 });

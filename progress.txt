@@ -249,10 +249,6 @@
 - Injection sizes, 2026-09-13 (14 local plans, 1,051 dispatches, 0
   fallbacks): phase-0's 62 total 1,740,588 bytes `full`, 162,672
   `stage`, 16,637 `task`.
-- A strip or exclusion test proves nothing unless the fixture carries
-  what is stripped WHERE it renders: a `task`-mode case dispatching an
-  undeclared task stayed green with declarations on (mutation leg).
-  Dispatch a declared task and assert the fixture holds the text.
 - `src/start.ts` injection wiring: `loadRunConfig(root, args, warn?)`
   ranks `--inject=` over `.rafa/config.yaml` (a bare `--inject` is
   refused as `''`), resolved BEFORE `--start-at` defers; `dispatchTask`
@@ -266,15 +262,25 @@
   sessions. None of the `PLAN-*.md` files in either `.plans/` (2 here,
   13 in the sibling) carries one today.
 - eslint ignores `.claude/skills/*/SKILL.md` (measured on
-  `dev-planner`): `bunx eslint <skill>` exits 0 with the warning "File
-  ignored because of a matching ignore pattern", so skill prose has no
-  lint gate; read the warning, not the exit code.
+  `dev-planner`: exit 0 with "File ignored because of a matching ignore
+  pattern"), so skill prose has no lint gate.
 - A dedicated "add negative parser tests covering X, Y, Z..." task
   (plan or report) tends to find most named cases already pinned in
-  the module's own colocated test file, written when the module
-  shipped (`parse.test.ts` already held 4 of `parse.ts`'s 5 named
-  negative cases). Grep the suite for each named case first and add
-  only the gap. Here the gap was "a `rafa:` fence opened mid-paragraph"
-  at the `parsePlan` level: `blocks.test.ts` already held the
-  block-reader-level version ("a line that opens no fence"), so
-  `parse.test.ts` needed the model-level near-miss pair only.
+  the module's colocated test file, written when it shipped
+  (`parse.test.ts` held 4 of `parse.ts`'s 5): grep the suite for each
+  named case first and add only the gap.
+- `.plans/PLAN-*.md` is the frozen template a real-plan-file test can
+  pin against; `PLAN_TRACKER-*.md` is the copy the loop ticks `[ ]` to
+  `[x]` on dispatch, so it drifts task by task and is the wrong file
+  for a characterization test expecting a fixed stage/task/declaration
+  shape. `src/plan/*.test.ts` reaches repo root the same way
+  `src/tests/*.test.ts` does — `fileURLToPath(new URL('../../',
+  import.meta.url))` — both being one level under `src/`.
+- Two eslint-autofix traps on `bunx eslint --fix`: a nested
+  `a < b ? -1 : a > b ? 1 : 0` sort comparator gets reformatted onto
+  four lines by `@stylistic/multiline-ternary` rather than flagged for
+  a rewrite — use `a.localeCompare(b)` instead when sorting strings;
+  and an apostrophe inside a single-quoted `it(...)`/`describe(...)`
+  string gets backslash-escaped (`\'s`) rather than requoted, since the
+  project forbids double quotes — write test titles with no apostrophe
+  rather than let autofix escape one in.
