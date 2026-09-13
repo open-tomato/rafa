@@ -1,9 +1,10 @@
 /**
- * Tests for the loop's one door onto the Claude CLI.
+ * Tests for the loop's two doors onto the Claude CLI.
  *
  * The subject is an argument list and a spawn, so the question every
- * case here answers is "what would have been RUN", never "did a
- * session appear to work". That distinction is not a preference: the
+ * case answers, bar the stand-in cases described below, is "what
+ * would have been RUN", never "did a session appear to work". That
+ * distinction is not a preference: the
  * real spawner is `Bun.spawn`, and the root suite runs vitest under
  * NODE, where `globalThis.Bun` is `undefined` and
  * `process.versions.bun` is null (measured with a throwaway test at
@@ -35,8 +36,9 @@
  * nowhere among them, so a mutation that puts flags first reddens on
  * position rather than on membership.
  *
- * Twelve module mutations were driven against this file and all
- * TWELVE reddened at least one case, with the module restored
+ * Twelve module mutations were driven against the fifteen cases this
+ * file held before `runClaudeCaptured` existed, and all TWELVE
+ * reddened at least one case, with the module restored
  * byte-identical and the suite green either side: dropping the flags
  * from the argument list (5 of 15), putting them before the base
  * arguments instead of after (5), deduping them (1), sorting them (4),
@@ -51,15 +53,73 @@
  * added for exactly that reason: the first nine left the prompt
  * containment and the once-per-call claims unreddened, and a green
  * there is indistinguishable from a claim nothing tests.
+ *
+ * The `runClaudeCaptured` cases come in two halves. The first drives
+ * the entry through a recording double, exactly as the `runClaude`
+ * cases do, and reads the same literals. The second is the one place
+ * this file RUNS something, because a capture is a tee over a pipe —
+ * chunk order, a character split across two reads, an exit code
+ * beside the text, a session still running after a failed write — and
+ * a recording double has none of that. Those cases call the entry with
+ * its DEFAULT spawner against a stand-in `claude`: a `/bin/sh` script
+ * in a temp directory that PATH is set to, alone, for the case. This
+ * suite runs under bun (the runtime paragraphs above describe the
+ * vitest era, and their `it.skipIf(HAS_BUN)` case is skipped here), so
+ * the default is the real spawner, and the stand-in is what keeps it
+ * from reaching a real session. Measured on bun 1.3.14, `Bun.spawn`
+ * resolves the executable on the PATH it is handed, and a name missing
+ * from that one directory is refused (`Executable not found in $PATH`)
+ * rather than found on the PATH the process started with. That
+ * one-directory PATH is also why the stand-ins name `/bin/cat` and
+ * `/bin/sleep` absolutely.
+ *
+ * Two of those fixtures would pass vacuously if left to chance, so
+ * neither is. The split character is FORCED: the stand-in writes the
+ * first byte of a three-byte character, then polls (at most 100 times)
+ * for a file the operator-stdout spy creates on its first call, so the
+ * second half cannot join the first in a single read, and the case
+ * asserts the split chunk before it reads the decoded text. And
+ * `CLAUDE_CODE_ENTRYPOINT` is set to a sentinel first, so the `cli` a
+ * stand-in reads back came from the spawner rather than from whatever
+ * shell ran the suite, which may already carry `cli`.
+ *
+ * Seventeen module mutations were driven against the section once it
+ * landed, over the file's 28 cases in two full passes, with the file
+ * green before and after each pass and the module restored
+ * byte-identical. Every leg reddened at least one case in both passes:
+ * the entry ignoring its flags (2 of 28), answering exit 0 (3),
+ * dropping the output (6), spawning twice (6, then 7), appending a
+ * newline to the prompt (2), putting the prompt into the argument list
+ * as well (4) and defaulting to an inert stub (7); the tee dropping the
+ * operator write (3), buffering and writing once at the end (2),
+ * decoding chunk by chunk (1), keeping only the last chunk (2),
+ * skipping the decoder's final flush (1) and decoding `fatal` (1); the
+ * spawner rejecting without waiting for the exit (1), answering exit 0
+ * (2), inheriting stdout instead of piping it (7) and dropping the
+ * entrypoint override (1). The UNION of their red sets is all 13 cases
+ * of the section and none of the fifteen above it. The one set that
+ * moved between passes is the double spawn's: its two stand-ins write
+ * through one spy, so whether the failed-write case reddens as well is
+ * a race, and the five recording cases plus the chunk case are what
+ * both passes agree on.
  */
-import type { ClaudeSpawner } from './claude.js';
+import type {
+  CapturedSession,
+  CapturingSpawner,
+  ClaudeSpawner,
+} from './claude.js';
 
-import { describe, expect, it } from 'bun:test';
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import {
   CLAUDE_BASE_ARGS,
   claudeArgs,
   runClaude,
+  runClaudeCaptured,
   spawnClaude,
 } from './claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from './declaration.js';
@@ -249,5 +309,262 @@ describe('the argument list a declaration resolves to', () => {
       '--agent',
       'doc-updater',
     ]);
+  });
+});
+
+/**
+ * A capturing spawner that records what it was asked for, runs
+ * nothing, and answers `answer`.
+ */
+function recordingCapturingSpawner(answer: CapturedSession): {
+  calls: SpawnCall[];
+  spawn: CapturingSpawner;
+} {
+  const calls: SpawnCall[] = [];
+  const spawn: CapturingSpawner = (args, prompt) => {
+    calls.push({ args, prompt });
+    return Promise.resolve(answer);
+  };
+  return { calls, spawn };
+}
+
+/** The answer for a case that reads nothing of what came back. */
+const QUIET_SESSION: CapturedSession = { exitCode: 0, stdout: '' };
+
+describe('runClaudeCaptured', () => {
+  it('spawns the base arguments alone when no flag argument is passed', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+
+    await runClaudeCaptured('do the scoped task', undefined, spawn);
+
+    expect(onlyCall(calls).args).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+    ]);
+  });
+
+  it('spawns the base arguments plus the flags it was handed', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+
+    await runClaudeCaptured('do the scoped task', UNSORTED_FLAGS, spawn);
+
+    expect(onlyCall(calls).args).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--effort',
+      'low',
+      '--agent',
+      'doc-updater',
+    ]);
+  });
+
+  it('hands the prompt to the spawner unchanged', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+    const prompt = 'Your scoped task is: measure the thing\nline two';
+
+    await runClaudeCaptured(prompt, ['--model', 'haiku'], spawn);
+
+    expect(onlyCall(calls).prompt).toBe(prompt);
+  });
+
+  it('keeps the prompt out of the argument list entirely', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+    const prompt = 'Your scoped task is: measure the thing';
+
+    await runClaudeCaptured(prompt, ['--model', 'haiku'], spawn);
+
+    const { args } = onlyCall(calls);
+    expect(args.filter((arg) => arg.includes('scoped'))).toEqual([]);
+  });
+
+  it('answers the exit code and the output the spawner answered', async () => {
+    const { spawn } = recordingCapturingSpawner({
+      exitCode: 7,
+      stdout: 'the final message\n',
+    });
+
+    await expect(runClaudeCaptured('a failing session', [], spawn))
+      .resolves.toEqual({ exitCode: 7, stdout: 'the final message\n' });
+  });
+
+  it('spawns exactly once per call', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+
+    await runClaudeCaptured('one session', ['--effort', 'low'], spawn);
+
+    expect(calls).toHaveLength(1);
+  });
+});
+
+/** The file the operator-stdout spy creates on its first call. */
+const FIRST_WRITE_MARKER = 'first-write-seen';
+
+/** The directory holding this case's stand-in and its marker files. */
+let binDir = '';
+
+/** Every chunk the capture wrote on to the operator, in order. */
+let written: Uint8Array[] = [];
+
+/** When set, the operator-stdout spy throws this instead of recording. */
+let writeFailure: Error | undefined;
+
+/** PATH and the entrypoint as the case found them. */
+let savedEnv: Record<'PATH' | 'CLAUDE_CODE_ENTRYPOINT', string | undefined> = {
+  PATH: undefined,
+  CLAUDE_CODE_ENTRYPOINT: undefined,
+};
+
+/** Puts an environment variable back the way a case found it. */
+function restoreEnv(name: keyof typeof savedEnv, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}
+
+/**
+ * Installs a `/bin/sh` script of `lines` as the only `claude` on PATH
+ * for the rest of the case.
+ */
+function standInClaude(lines: readonly string[]): void {
+  const path = join(binDir, 'claude');
+  writeFileSync(path, ['#!/bin/sh', ...lines, ''].join('\n'));
+  chmodSync(path, 0o755);
+  process.env['PATH'] = binDir;
+}
+
+/**
+ * A stand-in writing `x` and the first byte of a euro sign, then the
+ * rest of the sign and `y` only once the operator holds the first
+ * chunk, polling for the spy's marker at most 100 times.
+ */
+function splitCharacterStandIn(): void {
+  const marker = join(binDir, FIRST_WRITE_MARKER);
+  standInClaude([
+    'printf \'x\\342\'',
+    'n=0',
+    `while [ ! -e '${marker}' ] && [ "$n" -lt 100 ]; do /bin/sleep 0.01; n=$((n + 1)); done`,
+    'printf \'\\202\\254y\\n\'',
+  ]);
+}
+
+describe('runClaudeCaptured against a stand-in claude on PATH', () => {
+  beforeEach(() => {
+    binDir = mkdtempSync(join(tmpdir(), 'rafa-claude-stand-in-'));
+    savedEnv = {
+      PATH: process.env['PATH'],
+      CLAUDE_CODE_ENTRYPOINT: process.env['CLAUDE_CODE_ENTRYPOINT'],
+    };
+    written = [];
+    writeFailure = undefined;
+    spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      if (writeFailure !== undefined) throw writeFailure;
+      if (written.length === 0) {
+        writeFileSync(join(binDir, FIRST_WRITE_MARKER), '');
+      }
+      const bytes = typeof chunk === 'string'
+        ? Buffer.from(chunk)
+        : chunk;
+      written.push(bytes);
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    restoreEnv('PATH', savedEnv.PATH);
+    restoreEnv('CLAUDE_CODE_ENTRYPOINT', savedEnv.CLAUDE_CODE_ENTRYPOINT);
+    mock.restore();
+    rmSync(binDir, { recursive: true, force: true });
+  });
+
+  it('runs the claude on PATH by default with the arguments and prompt given', async () => {
+    process.env['CLAUDE_CODE_ENTRYPOINT'] = 'rafa-test-sentinel';
+    standInClaude([
+      'for arg in "$@"; do printf \'arg:%s\\n\' "$arg"; done',
+      'printf \'entrypoint:%s\\n\' "$CLAUDE_CODE_ENTRYPOINT"',
+      'printf \'stdin:\'',
+      '/bin/cat',
+    ]);
+
+    const session = await runClaudeCaptured(
+      'Your scoped task is: measure the thing\nline two',
+      UNSORTED_FLAGS,
+    );
+
+    expect(session).toEqual({
+      exitCode: 0,
+      stdout: [
+        'arg:-p',
+        'arg:--dangerously-skip-permissions',
+        'arg:--effort',
+        'arg:low',
+        'arg:--agent',
+        'arg:doc-updater',
+        'entrypoint:cli',
+        'stdin:Your scoped task is: measure the thing',
+        'line two',
+      ].join('\n'),
+    });
+  });
+
+  it('writes each stdout chunk on to the operator as it arrives', async () => {
+    splitCharacterStandIn();
+
+    await runClaudeCaptured('split the character');
+
+    expect(written.map((chunk) => Array.from(chunk))).toEqual([
+      [0x78, 0xe2],
+      [0x82, 0xac, 0x79, 0x0a],
+    ]);
+  });
+
+  it('decodes a character split across two chunks as that character', async () => {
+    splitCharacterStandIn();
+
+    const session = await runClaudeCaptured('split the character');
+
+    expect(Array.from(written[0] ?? [])).toEqual([0x78, 0xe2]);
+    expect(session.stdout).toBe(`x${String.fromCodePoint(0x20ac)}y\n`);
+  });
+
+  it('answers bytes that are not UTF-8 as replacement characters', async () => {
+    standInClaude(['printf \'ok\\n\\377\\342\'']);
+
+    const replacement = String.fromCodePoint(0xfffd);
+    await expect(runClaudeCaptured('write a broken tail'))
+      .resolves.toEqual({
+        exitCode: 0,
+        stdout: `ok\n${replacement}${replacement}`,
+      });
+  });
+
+  it('answers a failing exit code with the output written before it', async () => {
+    standInClaude(['printf \'partial report\\n\'', 'exit 3']);
+
+    await expect(runClaudeCaptured('fail after writing'))
+      .resolves.toEqual({ exitCode: 3, stdout: 'partial report\n' });
+  });
+
+  it('answers a killed session as 128 plus the signal number', async () => {
+    standInClaude(['printf \'before the signal\\n\'', 'kill -KILL $$']);
+
+    await expect(runClaudeCaptured('be killed'))
+      .resolves.toEqual({ exitCode: 137, stdout: 'before the signal\n' });
+  });
+
+  it('waits for the session to exit before rejecting on a failed write', async () => {
+    const exited = join(binDir, 'stand-in-exited');
+    writeFailure = new Error('operator stdout is gone');
+    standInClaude([
+      'printf \'first chunk\\n\'',
+      '/bin/sleep 0.3',
+      `: > '${exited}'`,
+    ]);
+
+    await expect(runClaudeCaptured('outlive the reader'))
+      .rejects.toThrow('operator stdout is gone');
+
+    expect(existsSync(exited)).toBe(true);
   });
 });

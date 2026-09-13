@@ -232,8 +232,6 @@
   does not), and `--reporter=junit --reporter-outfile=<f>` lists skips
   anyway with `file="..."` per suite and case. Count DISTINCT failing
   titles: the summary re-lists `(fail)`.
-- `.claude/skills/dev-planner/SKILL.md` lines 20, 67 and 153 still name
-  `tools/ralph/utils/tracker.ts`; the dev-planner rewrite task owns it.
 - `src/plan/inject.ts`: `renderInjection({ mode, plan, task })` (`task`:
   `TaskInfo`'s `task` + `lineNum`) never throws: `{ requested, mode,
   text, fallback }`. `full` = the plan's bytes; `stage`/`task` build from
@@ -280,3 +278,26 @@
   subject/body) passes with the strip gone. Dropping `findNextTask`'s
   `inBlock.has(i)` skip reddens only the checklist-shaped marker
   (`src/tests/rafa-block-strip.test.ts`).
+- `src/utils/claude.ts`: `runClaudeCaptured(prompt, flags?, spawn?)`
+  answers `CapturedSession` `{ exitCode, stdout }` (UTF-8 stdout; stderr
+  stays inherited, never captured) via `CapturingSpawner` /
+  `spawnClaudeCaptured`, teeing each chunk to `process.stdout.write`.
+  `runClaude`/`ClaudeSpawner` are untouched; both spawners share
+  `claudeSessionEnv()`. A report parser reads `.stdout`.
+- Drive a real `Bun.spawn` of a PATH-resolved binary with a stand-in: a
+  `#!/bin/sh` script in a temp dir, `process.env['PATH']` set to that dir
+  ALONE, restored in `afterEach`. Bun resolves on the PATH it is handed
+  and refuses a name absent there (`Executable not found in $PATH`), so
+  the real binary is unreachable; the script names `/bin/cat`,
+  `/bin/sleep` absolutely. See `claude.test.ts` "stand-in claude".
+- `Bun.spawn` on bun 1.3.14: a signalled child's `exited` answers
+  128+signal (137 for SIGKILL, `exitCode` null), so `spawnClaude`'s
+  "`undefined` ... reported as 1" TSDoc is stale and its `?? 1` never
+  fires. Quitting a piped stdout read does NOT kill the child (writes
+  fail EPIPE, it runs on): await `exited` before rejecting. A pipe read
+  to EOF waits on any grandchild still holding it.
+- `spyOn(process.stdout, 'write')` does catch code calling
+  `process.stdout.write` itself (a tee), unlike `console.*`. To force a
+  pipe chunk boundary, have the child poll (bounded) for a marker file
+  the parent's sink writes on its first chunk; a sleep split can merge
+  under load.

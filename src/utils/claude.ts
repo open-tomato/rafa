@@ -2,15 +2,28 @@
  * Spawning a Claude session, and reading how much of the plan's budget
  * has gone.
  *
- * {@link runClaude} is the loop's one door onto the CLI, and it has
- * four call sites in three shapes: plan generation in `plan.ts`, and
- * the wrap-up and CI-repair sessions in `start.ts`, all of which want
- * today's behaviour exactly — one model, one effort, every tool —
- * plus the per-task dispatch, where a task may carry a routing
- * declaration naming what it should run under. So the flags are a
- * parameter with an EMPTY default: `runClaude(prompt)` spawns exactly
- * the process the loop spawned before declarations existed, and
- * nothing but a declaration-bearing task can change that.
+ * {@link runClaude} is the loop's door onto the CLI for a session whose
+ * output only the operator reads. It has four call sites in three
+ * shapes: plan generation in `plan.ts`, and the wrap-up and CI-repair
+ * sessions in `start.ts`, all of which want today's behaviour exactly
+ * — one model, one effort, every tool — plus the per-task dispatch,
+ * where a task may carry a routing declaration naming what it should
+ * run under. So the flags are a parameter with an EMPTY default:
+ * `runClaude(prompt)` spawns exactly the process the loop spawned
+ * before declarations existed, and nothing but a declaration-bearing
+ * task can change that.
+ *
+ * {@link runClaudeCaptured} is the door for a session whose output the
+ * LOOP reads as well. A task session ends its final message with a
+ * `rafa:report` block, and {@link spawnClaude} inherits stdout, so a
+ * loop holding that session's exit code holds nothing else. The
+ * captured entry builds its argument list through the same
+ * {@link claudeArgs} and hands the prompt over the same way; only the
+ * spawner differs, {@link spawnClaudeCaptured} piping stdout, writing
+ * each chunk on to the operator as it arrives and keeping the same
+ * bytes for the answer. It sits BESIDE `runClaude` rather than
+ * replacing its spawner, so a session nothing parses keeps spawning
+ * exactly what it spawned before.
  *
  * The flags land AFTER {@link CLAUDE_BASE_ARGS} rather than before,
  * and the ordering is load-bearing rather than cosmetic. `--tools` is
@@ -135,6 +148,24 @@ export type ClaudeSpawner = (
 ) => Promise<number>;
 
 /**
+ * The environment every session is spawned with: the loop's own, plus
+ * the one entry a session must see whichever spawner started it.
+ *
+ * Shared by {@link spawnClaude} and {@link spawnClaudeCaptured} so the
+ * two cannot drift apart. A hook that observed uncaptured sessions and
+ * missed captured ones would miss exactly the task sessions.
+ */
+function claudeSessionEnv(): Record<string, string | undefined> {
+  return {
+    ...process.env,
+    // Allow ECC continuous-learning hooks to observe ralph sessions.
+    // observe.sh Layer 1 filters on CLAUDE_CODE_ENTRYPOINT — 'cli' is
+    // in the allow-list; the default for -p mode is not.
+    CLAUDE_CODE_ENTRYPOINT: 'cli',
+  };
+}
+
+/**
  * The real spawner: `Bun.spawn`, streams inherited so the session's
  * output reaches the operator as it happens.
  *
@@ -150,13 +181,7 @@ export async function spawnClaude(
     stdin: new TextEncoder().encode(prompt),
     stdout: 'inherit',
     stderr: 'inherit',
-    env: {
-      ...process.env,
-      // Allow ECC continuous-learning hooks to observe ralph sessions.
-      // observe.sh Layer 1 filters on CLAUDE_CODE_ENTRYPOINT — 'cli' is
-      // in the allow-list; the default for -p mode is not.
-      CLAUDE_CODE_ENTRYPOINT: 'cli',
-    },
+    env: claudeSessionEnv(),
   });
   return (await proc.exited) ?? 1;
 }
@@ -174,5 +199,116 @@ export function runClaude(
   flags: readonly string[] = [],
   spawn: ClaudeSpawner = spawnClaude,
 ): Promise<number> {
+  return spawn(claudeArgs(flags), prompt);
+}
+
+/**
+ * What a captured session answers: its exit code, and everything it
+ * wrote to stdout, decoded as UTF-8.
+ */
+export interface CapturedSession {
+  readonly exitCode: number;
+  readonly stdout: string;
+}
+
+/**
+ * Runs `claude` with an argument list and a prompt on stdin, and
+ * answers the exit code together with the session's stdout.
+ *
+ * A seam of its own rather than a widened {@link ClaudeSpawner}:
+ * widening that one would change what every existing `runClaude`
+ * double has to answer, for sessions whose output nothing reads.
+ */
+export type CapturingSpawner = (
+  args: readonly string[],
+  prompt: string,
+) => Promise<CapturedSession>;
+
+/**
+ * Writes each chunk of `stream` to the operator's stdout as it
+ * arrives, and answers all of them decoded as one string.
+ */
+async function teeToOperator(
+  stream: ReadableStream<Uint8Array>,
+): Promise<string> {
+  const decoder = new TextDecoder();
+  let text = '';
+  for await (const chunk of stream) {
+    process.stdout.write(chunk);
+    text += decoder.decode(chunk, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+/**
+ * The capturing spawner: `Bun.spawn` with stdout PIPED, each chunk
+ * written on to the operator's stdout as it arrives and kept for the
+ * answer.
+ *
+ * Everything else matches {@link spawnClaude}: the executable, the
+ * prompt on stdin, the environment. Stderr stays inherited, so the
+ * operator sees it and the capture never holds it, and a report parsed
+ * out of `stdout` cannot have been a warning line.
+ *
+ * The bytes go through ONE streaming `TextDecoder`, never a decode per
+ * chunk, because a pipe read can end inside a character. Measured on
+ * bun 1.3.14, a `€` written in two halves arrived as the chunks
+ * `78 e2` and `82 ac 79`; decoded chunk by chunk that is three U+FFFD
+ * replacement characters where the streaming decoder answers the `€`.
+ * The decoder is not `fatal`, so bytes that are not UTF-8 at all
+ * become U+FFFD rather than a rejection.
+ *
+ * The answer waits for stdout to CLOSE as well as for the exit, which
+ * is what reading a pipe to its end means: a process the session left
+ * behind that still holds the pipe holds the answer too. Measured, a
+ * shell that backgrounded a `sleep 1.5` exited at 17ms and closed its
+ * stdout at 1,530ms.
+ *
+ * A signalled session needs no fallback here. Measured on bun 1.3.14,
+ * `exited` answers 128 plus the signal number (137 for a SIGKILL)
+ * while `exitCode` is null, so a killed session is already a non-zero,
+ * which every caller reads as a failure.
+ *
+ * When a write to the operator throws, the call rejects with that
+ * error, but only once the session has EXITED. Stopping the read does
+ * not stop the process: measured, a shell writing into a pipe whose
+ * reader had quit kept running, each write failing with `Broken pipe`,
+ * until it was killed 3s later. Rejecting at once would hand the loop
+ * back a tree that a session is still changing.
+ */
+export async function spawnClaudeCaptured(
+  args: readonly string[],
+  prompt: string,
+): Promise<CapturedSession> {
+  const proc = Bun.spawn([CLAUDE_BIN, ...args], {
+    stdin: new TextEncoder().encode(prompt),
+    stdout: 'pipe',
+    stderr: 'inherit',
+    env: claudeSessionEnv(),
+  });
+  let stdout: string;
+  try {
+    stdout = await teeToOperator(proc.stdout);
+  } finally {
+    await proc.exited;
+  }
+  return { exitCode: await proc.exited, stdout };
+}
+
+/**
+ * Spawns one Claude session with `prompt` on stdin, and answers its
+ * exit code together with everything it wrote to stdout.
+ *
+ * The argument list is the one {@link runClaude} builds for the same
+ * flags, both going through {@link claudeArgs}, so capturing a session
+ * changes where its stdout goes and nothing about what is run. The
+ * operator still sees that output as it is written, through the tee in
+ * {@link spawnClaudeCaptured}.
+ */
+export function runClaudeCaptured(
+  prompt: string,
+  flags: readonly string[] = [],
+  spawn: CapturingSpawner = spawnClaudeCaptured,
+): Promise<CapturedSession> {
   return spawn(claudeArgs(flags), prompt);
 }
