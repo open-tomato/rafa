@@ -3,7 +3,7 @@
  *
  * Every prompt here is PLANTED — assembled the way the loop assembles
  * it, never copied out of a real log. Two cases reach outside that: the
- * drift guard reads `start.ts`, `start/wrap-up.ts`,
+ * drift guard reads `start/dispatch.ts`, `start/wrap-up.ts`,
  * `start/pr-lifecycle.ts` and `plan-prompt.md`, which is the point of
  * it, and neither reads a session log.
  *
@@ -42,7 +42,7 @@ import {
   PROMPT_SHAPES,
 } from './classify.js';
 
-/** A task prompt, assembled as `start.ts` assembles it. */
+/** A task prompt, assembled as `start/dispatch.ts` assembles it. */
 const TASK_PROMPT = [
   'Your scoped task is: Add `src/effort/classify.ts`',
   'Consider tasks listed above this one as completed.',
@@ -189,7 +189,7 @@ describe('the shape table', () => {
 
   it('proves that guard fails on a prefix nothing injects', () => {
     const source = readFileSync(
-      new URL('../start.ts', import.meta.url),
+      new URL('../start/dispatch.ts', import.meta.url),
       'utf8',
     );
 

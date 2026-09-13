@@ -7,8 +7,9 @@
  * attribution by text-matching prompt content and walking merge
  * commits — four functions and a cache. Neither is needed here: every
  * record in these logs carries a top-level `gitBranch`, and this
- * repo's task prompt is assembled by `start.ts` from a single tracker
- * line, so each mapping is read out of a string the log already holds.
+ * repo's task prompt is assembled by `start/dispatch.ts` from a single
+ * tracker line, so each mapping is read out of a string the log
+ * already holds.
  *
  * Measured over the live tree at the time of writing — 897 loose
  * session logs, 18 distinct branch values — 889 sessions carried
@@ -88,11 +89,11 @@
  * The task text is the FIRST LINE of the prompt with the shape's own
  * prefix removed, and that is exact rather than approximate:
  * `findNextTask` captures a task line with `(.+)`, which cannot cross a
- * newline, so the text `start.ts` interpolates is single-line by
- * construction and the line after it is the loop's own boilerplate. The
- * prefix is read off {@link PROMPT_SHAPES} rather than retyped, which
- * puts this module behind the classifier's existing drift guard instead
- * of adding a second copy of a literal authored somewhere else.
+ * newline, so the text `start/dispatch.ts` interpolates is single-line
+ * by construction and the line after it is the loop's own boilerplate.
+ * The prefix is read off {@link PROMPT_SHAPES} rather than retyped,
+ * which puts this module behind the classifier's existing drift guard
+ * instead of adding a second copy of a literal authored somewhere else.
  *
  * A task line carrying a trailing declaration block is deliberately out
  * of scope. Until the declaration stripper lands the block reaches the

@@ -4,11 +4,12 @@
  * `config.ts` ranks a setting's layers and `plan/inject.ts` renders a
  * mode, and each is tested beside its own module. `start.ts` is where
  * the two meet: it hands `--inject=` to the config as the command-line
- * layer, renders every task prompt in the mode that comes back, and
- * hands the wrap-up the plan with no mode at all, for `start/wrap-up.ts`
- * to build its prompt from. The cases here drive those seams through
- * the real resolver over a real `.rafa/config.yaml`, and through
- * `dispatchTask` with only the session spawn stubbed.
+ * layer, hands the mode that comes back to `start/dispatch.ts`, which
+ * renders every task prompt in it, and hands the wrap-up the plan with
+ * no mode at all, for `start/wrap-up.ts` to build its prompt from. The
+ * cases here drive those seams through the real resolver over a real
+ * `.rafa/config.yaml`, and through `dispatchTask` with only the session
+ * spawn stubbed.
  *
  * ## Controls
  *
@@ -29,7 +30,7 @@
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
 import type { InjectMode } from '../config.js';
-import type { TaskDispatch, TaskSessionRunner } from '../start.js';
+import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import {
@@ -56,12 +57,9 @@ import {
 import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
+import { dispatchTask } from '../start/dispatch.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import {
-  announcePlanIssues,
-  dispatchTask,
-  loadRunConfig,
-} from '../start.js';
+import { announcePlanIssues, loadRunConfig } from '../start.js';
 import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
 import { findNextTask } from '../utils/tracker.js';
 
