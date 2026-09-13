@@ -9,8 +9,9 @@
   not `vi`; spy on `console`, which a `process.stdout.write` patch misses.
 - A bare `'vitest'` import resolves to `bun:test`, so green `bun test`
   proves no port: grep `from 'vitest'`. One remains
-  (`scripts/control-byte-gate/control-byte-gate.test.ts`); swap it when
-  touching `scripts/`.
+  (`scripts/control-byte-gate/control-byte-gate.test.ts`), and its
+  `import/no-unresolved` is the only error failing `bun run lint`; swap
+  it when touching `scripts/`.
 - Stale TSDoc says the suite runs vitest under Node (it is bun):
   `src/utils/claude.ts`, `claude.test.ts`, `src/effort/store.ts`;
   re-derive the rationale, don't swap the word. Editing `store.ts`
@@ -30,10 +31,6 @@
 - `it.skipIf(HAS_BUN)` in `src/utils/claude.test.ts` passes only under
   vitest, kept on purpose (header says why); `collect.test.ts`'s
   `it.skipIf(isRoot)` is an unrelated root guard.
-- `bun run lint` exits 1 on 4 pre-existing errors outside `src/`:
-  `import/order` (`eslint.base.mjs`), `quotes` + `eol-last` (root
-  `index.ts`), `import/no-unresolved` (the vitest import above). A `src/`
-  task runs `eslint src/`; a whole-repo-green one fixes all three files.
 - `node_modules` can be partial (only `@types`, `bun-types`,
   `typescript`) while `bun.lock` and `package.json` agree: run
   `bun install` and read added vs. satisfied before calling a missing
