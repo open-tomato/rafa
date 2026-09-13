@@ -6,7 +6,7 @@
 - Relative imports under `src/` use `.js` specifiers for `.ts` files;
   keep them when moving files.
 - Tests use `bun:test`'s `spyOn` + `mock.restore()` (restores every spy),
-  not `vi`; spy on `console`, which a `process.stdout.write` patch misses.
+  not `vi`.
 - A bare `'vitest'` import resolves to `bun:test`, so green `bun test`
   proves no port: grep `from 'vitest'`. One remains
   (`scripts/control-byte-gate/control-byte-gate.test.ts`), and its
@@ -180,9 +180,6 @@
 - CommonMark oracle: `mdast-util-from-markdown` (micromark; transitive
   via `@eslint/markdown`, so tests don't import it) loads into a scratch
   script by absolute path to its `node_modules/.../index.js`.
-- `bunx eslint --stdin --stdin-filename <path>` over a planted violation
-  proves a path is linted at all, file untouched: the control a
-  zero-exit `eslint <dir>` needs.
 - `src/plan/parse.ts`: `parsePlan(md)` never throws: `{ header, context,
   stages, tasks, blocks, issues }`, `tasks` flat, each with a `stage`
   index (null above the first heading), `status`
@@ -215,15 +212,19 @@
   resolves null. Beside a known key, `skills` lands in `extras`, stripped.
   The spec calls `skills=` "a new recognised key".
 - `Bun.YAML.parse` traps are in the headers of `src/config.ts` ("The
-  parser, measured on bun 1.3.14", the `Map`/`Set` lookup rule) and
+  parser, measured on bun 1.3.14", the `Map`/`Set` lookup rule),
   `src/plan/parse.ts` (`issue: #42` is `null`, `42`/`042` the number 42,
-  integer-like keys enumerate first, `true` a boolean). Quote such values.
+  integer-like keys enumerate first, `true` a boolean) and
+  `src/report/parse.ts` (an unquoted value opening with a backtick, `@`,
+  `%` or `[`, or holding `: `, THROWS; ` #` silently truncates; `yes` is
+  a string, `False` a boolean, `.inf` Infinity). Quote such values.
 - `src/plan/index.ts` is the `./plan` barrel; `index.test.ts` pins its
   runtime names (`RUNTIME_EXPORTS`), identity, and that from `src/` both
   `./plan` and `./plan.js` resolve to `src/plan.ts` (the `rafa plan`
   command), never the barrel, so in-package code imports
-  `./plan/index.js` (bun 1.3.14). A new `src/report/parse.ts` must join
-  the barrel and that list, and rewrite its "not exported" TSDoc section.
+  `./plan/index.js` (bun 1.3.14). It re-exports `src/report/parse.ts`
+  too: a name added there moves `RUNTIME_EXPORTS`/`REEXPORTS` and the
+  type-name count in that test's header.
   `package.json` has NO `main`, `exports`, `bin` or `files` yet.
 - `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print
   counts only (no `(pass)`/`(skip)` lines, skip reasons, file names), so
@@ -296,8 +297,28 @@
   fires. Quitting a piped stdout read does NOT kill the child (writes
   fail EPIPE, it runs on): await `exited` before rejecting. A pipe read
   to EOF waits on any grandchild still holding it.
-- `spyOn(process.stdout, 'write')` does catch code calling
-  `process.stdout.write` itself (a tee), unlike `console.*`. To force a
-  pipe chunk boundary, have the child poll (bounded) for a marker file
-  the parent's sink writes on its first chunk; a sleep split can merge
-  under load.
+- `spyOn(process.stdout, 'write')` catches code calling
+  `process.stdout.write` itself (a tee) but misses `console.*`, which
+  needs a `console` spy. To force a pipe chunk boundary, have the child
+  poll (bounded) for a marker file the parent's sink writes on its first
+  chunk; a sleep split can merge under load.
+- `src/report/parse.ts`: `parseReport(output)` never throws: `{ present:
+  true, report, block, issues }` or `{ present: false, reason, block,
+  text }` (`no-block`, `unclosed-block`, `malformed-block`; `block` keeps
+  the raw body). LAST `rafa:report` only, never falling back to an
+  earlier one. `TaskReport` is camelCase (`skillsUsed`, `outOfScopeBugs`),
+  while `ReportIssue.field` paths use the YAML names
+  (`findings[2].signal`). Closed sets `REPORT_STATUSES`, `FINDING_KINDS`,
+  `FINDING_SIGNALS` go null with an issue outside them; unknown keys go
+  to each level's `extras`. Entries are NEVER deduped: the findings
+  writer dedupes (artifact, else trigger + what).
+- `.claude/skills/dev-planner/SKILL.md`'s `rafa:report` section (field
+  tables, the parser-contract paragraph) restates
+  `src/report/parse.ts`'s rules: change the two together.
+- zsh does not word-split an unquoted `$var`: `for n in $names` runs
+  ONCE with the whole list, so a generated probe collapses onto one line
+  and tsc prints TS1005/TS1434 syntax errors, not a type reading. Use
+  `${=names}`.
+- A mutation leg widening a constant that a test `it.each`es over adds
+  cases, so the denominator moves (`red 4 of 72` over a 71-case file):
+  read M from each leg, never from the control.

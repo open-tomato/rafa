@@ -10,7 +10,8 @@
  *
  * The pipeline cases run a plan through the entry alone, the way a
  * caller importing only `./plan` would: read its blocks, parse it, and
- * render a declared task in every mode the entry names.
+ * render a declared task in every mode the entry names. One more reads a
+ * session's report, and an output without one, through the entry.
  *
  * The resolution cases pin why the entry is imported as
  * `./plan/index.js` from `src/`. Measured on bun 1.3.14 before this
@@ -28,12 +29,17 @@
  * `PLAN_BLOCK_KINDS`, and `renderInjection` exported as a wrapper
  * forcing `full` (red on the `stage` and `task` renderings too). The
  * parse case went red under none of them; a wrong `parsePlan` is caught
- * by its identity case.
+ * by its identity case. Four more were driven the same way when the
+ * report parser joined the entry: `parseReport`'s export dropped (red on
+ * the name list, its identity case and the report case), `parseReport`
+ * exported as a wrapper, `FINDING_KINDS` exported as a copy, and
+ * `FINDING_SIGNALS` exported as `REPORT_STATUSES`, each of the last
+ * three red on its identity case alone.
  *
  * The type names are not checked here, and `check-types` skips this
  * file. Checked through a tsconfig outside the repo, a probe importing
- * all nineteen compiled, and one importing `TaskDeclaration`, which the
- * entry leaves out, failed with TS2305.
+ * all thirty-three compiled, and one importing `TaskDeclaration`, which
+ * the entry leaves out, failed with TS2305.
  */
 import type { PlanTask } from './index.js';
 
@@ -43,6 +49,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 import { INJECT_MODES } from '../config.js';
+import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '../report/parse.js';
 
 import { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from './blocks.js';
 import { renderInjection } from './inject.js';
@@ -52,24 +59,32 @@ import * as entry from './index.js';
 
 /** The runtime names the entry exposes, sorted as `sort` sorts them. */
 const RUNTIME_EXPORTS = [
+  'FINDING_KINDS',
+  'FINDING_SIGNALS',
   'INJECT_MODES',
   'PLAN_BLOCK_KINDS',
   'PLAN_HEADER_FIELDS',
   'RAFA_BLOCK_KINDS',
+  'REPORT_STATUSES',
   'isRafaBlockKind',
   'parsePlan',
+  'parseReport',
   'readRafaBlocks',
   'renderInjection',
 ];
 
 /** Each runtime name, the entry's value for it, and its module's own. */
 const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
+  ['FINDING_KINDS', entry.FINDING_KINDS, FINDING_KINDS],
+  ['FINDING_SIGNALS', entry.FINDING_SIGNALS, FINDING_SIGNALS],
   ['INJECT_MODES', entry.INJECT_MODES, INJECT_MODES],
   ['PLAN_BLOCK_KINDS', entry.PLAN_BLOCK_KINDS, PLAN_BLOCK_KINDS],
   ['PLAN_HEADER_FIELDS', entry.PLAN_HEADER_FIELDS, PLAN_HEADER_FIELDS],
   ['RAFA_BLOCK_KINDS', entry.RAFA_BLOCK_KINDS, RAFA_BLOCK_KINDS],
+  ['REPORT_STATUSES', entry.REPORT_STATUSES, REPORT_STATUSES],
   ['isRafaBlockKind', entry.isRafaBlockKind, isRafaBlockKind],
   ['parsePlan', entry.parsePlan, parsePlan],
+  ['parseReport', entry.parseReport, parseReport],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['renderInjection', entry.renderInjection, renderInjection],
 ];
@@ -152,6 +167,29 @@ describe('a plan read through the entry alone', () => {
     });
 
     expect(rendered).toMatchObject({ requested: mode, mode, fallback: null });
+  });
+});
+
+describe('a session output read through the entry alone', () => {
+  it('reads a report block into its findings, and an output without one into an absence', () => {
+    const output = doc(
+      'Done.',
+      '```rafa:report',
+      'status: done',
+      'findings:',
+      '  - trigger: "when reading a report through the entry"',
+      '    kind: pattern',
+      '    what: "the entry reaches the report parser"',
+      '    signal: silent',
+      '```',
+    );
+
+    expect(entry.parseReport(output)).toMatchObject({
+      present: true,
+      report: { status: 'done', findings: [{ kind: 'pattern', signal: 'silent' }] },
+      issues: [],
+    });
+    expect(entry.parseReport(doc('Done.'))).toMatchObject({ present: false, reason: 'no-block' });
   });
 });
 

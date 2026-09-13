@@ -144,7 +144,7 @@ findings:
     cause: "versioning check too coarse"
     resolution: "check both version and table existence"
     artifact: null
-    signal: quiet
+    signal: silent
 skills_used: [progress-hygiene, sqlite-patterns]
 blockers:
   - what: "Concurrent writes to NDJSON file"
@@ -160,7 +160,7 @@ Report fields:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `status` | string | Task completion state: `done`, `blocked`, `failed` |
+| `status` | string | The session's claim for its task: `done` or `blocked`. Required |
 | `feedback` | string | One block of prose describing what was done and how it went |
 | `findings` | list of objects | Findings discovered during the task (see below) |
 | `skills_used` | list of strings | Names of skills referenced or applied |
@@ -172,12 +172,12 @@ Finding entry fields:
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `trigger` | string | yes | When/how the finding surfaced (e.g., "when running bun test under Docker") |
-| `kind` | string | yes | Category: `gotcha`, `pattern`, `antipattern`, `optimization`, `debt`, `porting-note` |
+| `kind` | string | yes | Category: `gotcha`, `pattern`, `location` or `skill-suggestion` |
 | `what` | string | yes | The finding itself |
 | `cause` | string | no | Root cause or explanation |
 | `resolution` | string | no | How to fix or work around it |
 | `artifact` | string | no | Error message, file path, or code snippet that signals the finding |
-| `signal` | string | no | Loudness: `loud` (blocking), `quiet` (informational) |
+| `signal` | string | yes | `loud` (it surfaced as a failure) or `silent` (it passed while wrong) |
 
 Blocker/bug entry fields:
 
@@ -185,7 +185,7 @@ Blocker/bug entry fields:
 | --- | --- | --- | --- |
 | `what` | string | yes | Description of the blocker or bug |
 | `artifact` | string | no | Error message or diagnostic output |
-| `security` | boolean | no | (bugs only) Whether this is a security issue |
+| `security` | boolean | yes (bugs only) | Whether this is a security issue; never defaulted when missing |
 
 ---
 
@@ -300,7 +300,7 @@ The loop parses plan files through `src/plan/parse.ts`:
 - **Declaration parsing**: Splits task lines on `{...}` and parses the contents as a map of `key=value` pairs.
 - **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
 
-The parser is liberal with unknown input: unknown block kinds are kept, unknown declaration keys are kept, unknown YAML keys are kept. Parsing fails only on structural malformations (missing closing fence, non-YAML report body, task list that is not a list).
+The parser is liberal with unknown input: unknown block kinds are kept, unknown declaration keys are kept, unknown YAML keys are kept. A report yields no report only when its last `rafa:report` block is missing, never closed, not valid YAML, or not a mapping. A field that is missing, or holds a value it cannot take (a `findings` that is not a list, a `signal` other than `loud` or `silent`), is reported as an issue and the rest of the report is still read. Quote every string value in a report: an unquoted value that opens with a backtick, `@`, `%` or `[` makes the whole block unreadable, and a `#` after a space starts a comment that silently cuts the value short.
 
 ---
 

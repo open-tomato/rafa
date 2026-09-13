@@ -1,12 +1,13 @@
 /**
- * The plan format's entry: the block reader, the plan parser and the
- * injection renderer.
+ * The plan format's entry: the block reader, the plan parser, the
+ * report parser and the injection renderer.
  *
  * The spec's `exports` map points the package's `./plan` subpath at
  * `./dist/plan/index.js`, which is this module built, and the roadmap
  * names what that subpath is for: the parsers a service implements
- * against. A caller that reads plans, or renders one task's share of
- * one, and needs none of the rest of the library imports it from here.
+ * against. A caller that reads plans or task reports, or renders one
+ * task's share of a plan, and needs none of the rest of the library
+ * imports it from here.
  *
  * ## What the entry exports
  *
@@ -16,6 +17,11 @@
  *   - The plan parser: {@link parsePlan} and the model it answers, with
  *     {@link PLAN_BLOCK_KINDS} and {@link PLAN_HEADER_FIELDS} naming the
  *     blocks and header fields it reads.
+ *   - The report parser: {@link parseReport}, which reads the last
+ *     `rafa:report` block of a session's output into a report or a
+ *     record of why there is none, with the report model and
+ *     {@link REPORT_STATUSES}, {@link FINDING_KINDS} and
+ *     {@link FINDING_SIGNALS} naming the values its closed fields take.
  *   - The injection renderer: {@link renderInjection}, with its request
  *     and its answer.
  *   - The mode names, {@link INJECT_MODES} and `InjectMode`, so a caller
@@ -28,14 +34,13 @@
  * declaration is spelled `PlanTask['declaration']`, not imported from
  * the declaration module through here.
  *
- * ## The report parser is not exported
+ * ## The report parser lives outside this directory
  *
- * The roadmap puts the report parser under this subpath too, so its
- * entry point belongs in the list above. There is none to export yet:
- * no module under `src/` reads a `rafa:report` block into a report, and
- * `src/report/` does not exist. The change that adds the report parser
- * adds its entry point here, and to the export list `index.test.ts`
- * pins.
+ * The roadmap puts the report parser under this subpath too, but a
+ * report is no plan: it is read out of a session's output, by
+ * `src/report/parse.ts`. It is exported from here all the same, so a
+ * service implementing against `./plan` reaches both parsers through
+ * one entry.
  *
  * ## Importing the entry from inside the package
  *
@@ -46,6 +51,22 @@
  * all three resolutions.
  */
 export type { InjectMode } from '../config.js';
+export type {
+  FindingKind,
+  FindingSignal,
+  ReportAbsenceReason,
+  ReportAbsent,
+  ReportBlocker,
+  ReportBug,
+  ReportExtra,
+  ReportFinding,
+  ReportIssue,
+  ReportIssueReason,
+  ReportPresent,
+  ReportReading,
+  ReportStatus,
+  TaskReport,
+} from '../report/parse.js';
 export type { LineSpan, RafaBlock, RafaBlockKind } from './blocks.js';
 export type {
   InjectionFallback,
@@ -68,6 +89,7 @@ export type {
 } from './parse.js';
 
 export { INJECT_MODES } from '../config.js';
+export { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '../report/parse.js';
 export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from './blocks.js';
 export { renderInjection } from './inject.js';
 export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from './parse.js';
