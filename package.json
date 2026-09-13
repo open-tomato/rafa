@@ -27,8 +27,7 @@
     "build": "rm -rf dist && bun build src/rafa.ts --target=bun --outfile=dist/cli.js && bun build src/index.ts src/plan/index.ts src/effort/store/index.ts src/ports/index.ts --target=bun --splitting --root=src --outdir=dist && cp src/PROMPT.md src/plan-prompt.md dist/",
     "test": "bun test",
     "lint": "eslint .",
-    "check-types": "tsc --noEmit",
-    "ralph": "bun /Users/marcos/projects/agentic-research/tools/ralph/ralph.ts"
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

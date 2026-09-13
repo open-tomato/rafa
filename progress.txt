@@ -373,9 +373,8 @@
 - `bun:sqlite` binds `true`/`false` as integers 1/0, and INTEGER affinity
   stores the STRING `'1'` as 1, which `CHECK (x IN (0, 1))` accepts:
   check a boolean in JS before binding it.
-- `@progress.txt` (literal `@`) is a stray TRACKED file at the root, still
-  committed to; the notes file is `progress.txt`. Never append to the `@`
-  one.
+- `@progress.txt` (literal `@`) is a stray TRACKED file at the root; the
+  notes file is `progress.txt`. Never append to the `@` one.
 - `src/utils/progress.ts` is the `progress.txt` RENDERER, which `start.ts`
   (`renderProgressForDispatch`) calls before every dispatch, the
   wrap-up's included: `writeProgress(root, planStub)` = `readProgressFindings`
@@ -500,12 +499,6 @@
   subpaths load under bun's `import()`. The link's symlink targets the
   REPO ROOT, not `dist/`: resolution goes through `package.json`'s
   `bin`/`exports`.
-- `docs/CUTOVER.md` is the operator runbook: 8 steps (link package, repoint
-  ralph script, run full/stage injection plans, compare artifacts, parity
-  test, delete tools/ralph, document rollback). The commit message names
-  version 0.1.0; step 8 places rollback instructions in the sibling's
-  README "for the length of one plan" (one major phase). Wrap width is 74
-  characters, matching core tracked markdown.
 - The `--target=bun` build makes `.`, `./cli` and `./store` BUN-ONLY at
   runtime: under plain `node -e` dynamic import, `bun:sqlite` (pulled in
   by `src/index.ts` via the store barrel, and by `cli.js`) throws
