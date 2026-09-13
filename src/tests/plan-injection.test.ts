@@ -276,7 +276,7 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
   const prompts: string[] = [];
   const run: TaskSessionRunner = (prompt) => {
     prompts.push(prompt);
-    return Promise.resolve(0);
+    return Promise.resolve({ exitCode: 0, stdout: '' });
   };
 
   const result = await dispatchTask({

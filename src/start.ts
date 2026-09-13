@@ -25,6 +25,16 @@
  * answers to refuses the run. Every part of the plan `parsePlan` does not read
  * as written is named to the operator once, at start.
  *
+ * Each task session is spawned under an id the loop picks, with its stdout
+ * captured (`runTaskSession`). Once the loop knows what became of the task,
+ * `done`, `blocked` or `failed`, the `rafa:report` block that output ends
+ * with is read and stored: its findings, blockers and out-of-scope bugs, or,
+ * with no block the loop could read, one telemetry row saying why
+ * (`report/record.ts`). Before every dispatch, the wrap-up's included,
+ * `progress.txt` is rendered from the stored findings (`utils/progress.ts`).
+ * A store the loop cannot read or write stops the run: before a dispatch,
+ * nothing is dispatched; after a task, its commit and its tick stand.
+ *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
  * --plan        plan file to execute (default: PLAN.md at the repo root). The
@@ -48,18 +58,22 @@
  * never checked once.
  */
 import type { ConfigSource, InjectMode, ResolvedConfig } from './config.js';
+import type { FindingOutcome } from './effort/store/findings.js';
 import type { PlanInjection, PlanIssue } from './plan/index.js';
+import type { CapturedSession, CapturingSpawner } from './utils/claude.js';
 import type { CommitAttempt, CommitOptions } from './utils/commit.js';
 import type { TaskDeclaration } from './utils/declaration.js';
 import type { TaskInfo } from './utils/tracker.js';
 
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { ConfigError, loadConfig } from './config.js';
 import { parsePlan, renderInjection } from './plan/index.js';
-import { runClaude, checkUsage } from './utils/claude.js';
+import { describeTaskReportRecord, recordTaskReport } from './report/record.js';
+import { runClaude, runClaudeCaptured, checkUsage } from './utils/claude.js';
 import { commitTaskWork } from './utils/commit.js';
 import {
   parseTaskDeclaration,
@@ -77,6 +91,7 @@ import {
   readMergeState,
   waitForChecks,
 } from './utils/pr.js';
+import { PROGRESS_CAP_BYTES, writeProgress } from './utils/progress.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
 
@@ -442,11 +457,45 @@ export interface FinishedTaskOptions {
   commit?: TaskCommitRunner;
 }
 
-/** How one task's Claude session is spawned. */
+/** The flag a task session is spawned with to run under the loop's id. */
+export const SESSION_ID_FLAG = '--session-id';
+
+/**
+ * How one task's Claude session is spawned: `prompt` on stdin, the
+ * `flags` its declaration resolved to, and `sessionId` as its id. It
+ * answers the exit code together with everything the session wrote to
+ * stdout.
+ */
 export type TaskSessionRunner = (
   prompt: string,
   flags: readonly string[],
-) => Promise<number>;
+  sessionId: string,
+) => Promise<CapturedSession>;
+
+/**
+ * The loop's task session runner: the CLI through `runClaudeCaptured`,
+ * run under the id the dispatch picked.
+ *
+ * The id goes AHEAD of the declaration's flags. `--tools` is variadic
+ * and is the last flag a declaration resolves to (`utils/claude.ts`), so
+ * a `--session-id` placed after it would be read as a tool name.
+ *
+ * The loop picks the id rather than reading it back, because nothing
+ * would tell it: under `claude -p` stdout is the session's final message
+ * and holds no id. Measured on Claude Code 2.1.268, `claude -p
+ * --session-id <uuid>` exited 0, printed only its reply and wrote its
+ * log as `<uuid>.jsonl`, the basename `effort collect` keys a session
+ * row by (`effort/session-log.ts`). So each row a task's report is
+ * stored as joins the session row of the session that wrote it.
+ */
+export function runTaskSession(
+  prompt: string,
+  flags: readonly string[],
+  sessionId: string,
+  spawn?: CapturingSpawner,
+): Promise<CapturedSession> {
+  return runClaudeCaptured(prompt, [SESSION_ID_FLAG, sessionId, ...flags], spawn);
+}
 
 /** What {@link dispatchTask} needs to run one task. */
 export interface TaskDispatchOptions {
@@ -465,8 +514,10 @@ export interface TaskDispatchOptions {
    * `CONFIG_DEFAULTS`, free to disagree with it.
    */
   inject: InjectMode;
-  /** Session seam. Defaults to the real CLI. */
+  /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
+  /** Where the session's id comes from. Defaults to `randomUUID`. */
+  newSessionId?: () => string;
 }
 
 /** What one dispatched task actually ran as. */
@@ -481,8 +532,12 @@ export interface TaskDispatch {
   flags: readonly string[];
   /** What the block declared, or null when there was none. */
   declaration: TaskDeclaration | null;
+  /** The id the session ran under, which also names its log. */
+  sessionId: string;
   /** The session's exit code. */
   exitCode: number;
+  /** Everything the session wrote to stdout, its report included. */
+  output: string;
 }
 
 /**
@@ -526,14 +581,19 @@ export function buildTaskPrompt(
  * Everything a declaration changes happens here: the block comes off
  * the text before the prompt is built, and the flags it resolved to go
  * to the spawn. A task carrying no block resolves to no flags at all,
- * so `runClaude` is called with the empty list it defaults to and the
- * session is byte-for-byte the one the loop spawned before
- * declarations existed. That is the compatibility promise, and it is
- * kept by the resolver rather than by a branch here. Both halves are
- * driven through the real `runClaude` in
- * `tests/declaration-dispatch.test.ts`, which is the only place the
+ * so its session is spawned with the base arguments and its session id
+ * and nothing else, the arguments every task session shares. That is
+ * the compatibility promise, and it is kept by the resolver rather than
+ * by a branch here. Both halves are driven through the real `claudeArgs`
+ * in `tests/declaration-dispatch.test.ts`, which is the only place the
  * flags a block resolved to are read off an argument list rather
  * than off this function's own record.
+ *
+ * Each session runs under a fresh id, `randomUUID` unless
+ * `newSessionId` replaces it, and the record carries that id beside
+ * everything the session wrote to stdout. Nothing here reads the report
+ * in that output: what became of the task is not known until its commit
+ * has answered, and the loop stores the report under that outcome.
  *
  * The routing is announced because it is otherwise invisible. A
  * session dispatched under an agent looks exactly like one dispatched
@@ -557,7 +617,7 @@ export async function dispatchTask(
   options: TaskDispatchOptions,
 ): Promise<TaskDispatch> {
   const { taskInfo } = options;
-  const run = options.run ?? runClaude;
+  const run = options.run ?? runTaskSession;
 
   const { text: taskText, declaration } = parseTaskDeclaration(taskInfo.task);
   const { args: flags, suppressed } = resolveDeclarationFlags(declaration);
@@ -594,9 +654,19 @@ export async function dispatchTask(
     injection.text,
   ));
 
-  const exitCode = await run(prompt, flags);
+  const sessionId = (options.newSessionId ?? randomUUID)();
+  const session = await run(prompt, flags, sessionId);
 
-  return { taskText, prompt, flags, declaration, injection, exitCode };
+  return {
+    taskText,
+    prompt,
+    flags,
+    declaration,
+    injection,
+    sessionId,
+    exitCode: session.exitCode,
+    output: session.stdout,
+  };
 }
 
 /** Indents every line, so a multi-line git message reads as one block. */
@@ -660,6 +730,93 @@ export function commitFinishedTask(options: FinishedTaskOptions): CommitAttempt 
   }
 
   return attempt;
+}
+
+/** An error's message, or the thrown value itself when it is no error. */
+function messageOf(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : String(error);
+}
+
+/**
+ * Renders `progress.txt` from the stored findings ahead of a dispatch,
+ * and answers whether it could.
+ *
+ * Called before EVERY session that reads the file, the wrap-up's
+ * included, so each is handed what the store held once the task before
+ * it was recorded. The file is replaced whole, and a store holding no
+ * finding for this plan renders it empty, which blanks a `progress.txt`
+ * written by hand.
+ *
+ * A store that cannot be read answers false with the file left as it
+ * was (`utils/progress.ts` reads before it writes), and the caller stops
+ * the run before the dispatch: nothing has been spent yet, and every
+ * later dispatch would meet the same store.
+ */
+export function renderProgressForDispatch(repoRoot: string, planStub: string | null): boolean {
+  try {
+    const render = writeProgress(repoRoot, planStub);
+    const left = render.oversized + render.omitted;
+    if (left > 0) {
+      console.warn(`📝 progress.txt holds ${render.rendered} finding(s); ${left} more did not fit its ${PROGRESS_CAP_BYTES} bytes.`);
+    }
+    return true;
+  } catch (error) {
+    console.error(`\n❌ progress.txt could not be rendered from the findings store: ${messageOf(error)}`);
+    console.error('   Nothing was dispatched. Make the store readable, then run again.');
+    return false;
+  }
+}
+
+/** What {@link storeTaskReport} needs to store one session's report. */
+export interface TaskReportStoreOptions {
+  /** The repo root the store lives under. */
+  readonly repoRoot: string;
+  /** The plan the run is executing, or null when its file name gives none. */
+  readonly planStub: string | null;
+  /** The dispatch whose session wrote the report. */
+  readonly dispatch: Pick<TaskDispatch, 'sessionId' | 'taskText' | 'output'>;
+  /** What the loop made of the task. */
+  readonly outcome: FindingOutcome;
+}
+
+/**
+ * Stores what one task session reported under the loop's outcome for its
+ * task, tells the operator what was stored, and answers whether the store
+ * took it.
+ *
+ * Every row carries the sentence the dispatch quoted, declaration off, and
+ * the id the session ran under, so it joins that session's log. An output
+ * with no report the loop can read is stored as one telemetry row, and a
+ * warning says why (`report/record.ts`).
+ *
+ * A write the store refuses answers false, and the caller stops the run
+ * rather than dispatching tasks whose reports would meet the same store.
+ * The report is not gone with the row: the session wrote it to the
+ * operator's terminal as it ran.
+ */
+export function storeTaskReport(options: TaskReportStoreOptions): boolean {
+  const { dispatch } = options;
+  try {
+    const record = recordTaskReport(options.repoRoot, {
+      dispatch: {
+        sessionId: dispatch.sessionId,
+        planStub: options.planStub,
+        taskLine: dispatch.taskText,
+      },
+      outcome: options.outcome,
+      output: dispatch.output,
+    });
+    const { notes, warnings } = describeTaskReportRecord(record);
+    for (const note of notes) console.log(`   ${note}`);
+    for (const warning of warnings) console.warn(`   ${warning}`);
+    return true;
+  } catch (error) {
+    console.error(`\n❌ The report of session ${dispatch.sessionId} was not stored: ${messageOf(error)}`);
+    console.error('   The session printed it above as it ran.');
+    return false;
+  }
 }
 
 /** What the compaction prompt quotes. */
@@ -795,6 +952,9 @@ export default async function start(args: string[]): Promise<void> {
     const trackerContent = fs.readFileSync(trackerPath, 'utf8');
     const taskInfo = findNextTask(trackerContent);
 
+    // Before the session it is for, whichever it is: a task or the wrap-up.
+    if (!renderProgressForDispatch(repoRoot, planStub)) return;
+
     if (!taskInfo) {
       console.log('\n✅ All tasks completed!');
       console.log('🧹 Wrap-up session starting: promote progress.txt findings, compact it, sync with main, then commit, push and open the PR.');
@@ -809,27 +969,47 @@ export default async function start(args: string[]): Promise<void> {
       break;
     }
 
-    const { exitCode } = await dispatchTask({
+    const dispatch = await dispatchTask({
       taskInfo,
       promptContent,
       planContent,
       inject: injectMode,
     });
+    const { exitCode } = dispatch;
+
+    // Stored once the task's fate is known, and never before: the
+    // outcome goes on every row the report is stored as.
+    const storeReport = (outcome: FindingOutcome): boolean => storeTaskReport({
+      repoRoot,
+      planStub,
+      dispatch,
+      outcome,
+    });
 
     if (interrupted) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
       console.log('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
+      storeReport('blocked');
       process.exit(0);
     }
 
     if (exitCode !== 0) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
       console.error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
+      storeReport('failed');
       return;
     }
 
     const attempt = commitFinishedTask({ trackerPath, taskInfo, repoRoot });
-    if (attempt.outcome === 'failed') return;
+    const committed = attempt.outcome !== 'failed';
+    const stored = storeReport(committed
+      ? 'done'
+      : 'blocked');
+    if (!committed) return;
+    if (!stored) {
+      console.error('   Stopping here. The task stays ticked, so the next run starts after it.');
+      return;
+    }
 
     const shouldPause = await checkUsage('task');
     if (shouldPause) {

@@ -12,6 +12,15 @@
  * only stub — it has to be, the spawner being `Bun.spawn` and the root
  * suite running vitest under node.
  *
+ * The runner each dispatch is handed wraps `runClaude` and answers the
+ * empty output of a session that printed nothing. The loop's own runner
+ * is `runTaskSession`, which spawns through `runClaudeCaptured`, building
+ * its list through the same `claudeArgs`, with the session's
+ * `--session-id` ahead of the declaration's flags. So every argument
+ * list asserted here is the declaration's share of what is run: the base
+ * arguments and the flags, the session id left out. The id, and where it
+ * sits, are pinned by `tests/task-report.test.ts`.
+ *
  * Two claims, and they fail in opposite directions. A block left on
  * the text is read by the session as part of the task, so the routing
  * gets DESCRIBED to an agent instead of applied to it. Flags that stop
@@ -354,8 +363,9 @@ async function dispatchSpec(
     return Promise.resolve(overrides.exitCode ?? 0);
   };
 
-  const run: TaskSessionRunner = function run(prompt, flags) {
-    return runClaude(prompt, flags, spawn);
+  const run: TaskSessionRunner = async function run(prompt, flags) {
+    const exitCode = await runClaude(prompt, flags, spawn);
+    return { exitCode, stdout: '' };
   };
 
   const result = await dispatchTask({

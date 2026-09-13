@@ -3,20 +3,20 @@
  * has gone.
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
- * output only the operator reads. It has four call sites in three
- * shapes: plan generation in `plan.ts`, and the wrap-up and CI-repair
- * sessions in `start.ts`, all of which want today's behaviour exactly
- * — one model, one effort, every tool — plus the per-task dispatch,
- * where a task may carry a routing declaration naming what it should
- * run under. So the flags are a parameter with an EMPTY default:
- * `runClaude(prompt)` spawns exactly the process the loop spawned
- * before declarations existed, and nothing but a declaration-bearing
- * task can change that.
+ * output only the operator reads. It has three call sites: plan
+ * generation in `plan.ts`, and the wrap-up and CI-repair sessions in
+ * `start.ts`, all of which want today's behaviour exactly — one model,
+ * one effort, every tool. So the flags are a parameter with an EMPTY
+ * default: `runClaude(prompt)` spawns exactly the process the loop
+ * spawned before declarations existed.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
- * LOOP reads as well. A task session ends its final message with a
- * `rafa:report` block, and {@link spawnClaude} inherits stdout, so a
- * loop holding that session's exit code holds nothing else. The
+ * LOOP reads as well, and the per-task dispatch is its caller, through
+ * `runTaskSession` in `start.ts`. A task session ends its final message
+ * with a `rafa:report` block, and {@link spawnClaude} inherits stdout,
+ * so a loop holding that session's exit code holds nothing else. Its
+ * flags are the ones a task's routing declaration resolved to, with the
+ * `--session-id` the loop picked for that session ahead of them. The
  * captured entry builds its argument list through the same
  * {@link claudeArgs} and hands the prompt over the same way; only the
  * spawner differs, {@link spawnClaudeCaptured} piping stdout, writing

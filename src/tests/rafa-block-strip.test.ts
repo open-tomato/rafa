@@ -153,7 +153,7 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
 
   it('keeps the block out of the prompt head and the log line', async () => {
     const taskInfo = taskOrThrow(PLAN);
-    const run: TaskSessionRunner = () => Promise.resolve(0);
+    const run: TaskSessionRunner = () => Promise.resolve({ exitCode: 0, stdout: '' });
 
     const result = await dispatchTask({
       taskInfo,

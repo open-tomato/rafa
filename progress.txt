@@ -26,8 +26,6 @@
   many lands silently in parent `open-tomato/` (own `packages/`,
   `AGENTS.md`), where guards pass. Print the resolved path once; guard
   reads with `existsSync` (`findAgentsMaps`, `context-page-imports.test.ts`).
-- `.githooks/pre-commit` runs the control-byte gate `--staged`; a manual
-  run needs `--include-untracked` to see unadded files.
 - `it.skipIf(HAS_BUN)` in `src/utils/claude.test.ts` passes only under
   vitest, kept on purpose (header says why); `collect.test.ts`'s
   `it.skipIf(isRoot)` is an unrelated root guard.
@@ -323,13 +321,19 @@
   + what), never table-wide: phase 5 promotes on one artifact recurring
   across sessions. Bad dispatch/outcome throws before opening; a bad
   entry is answered in `rejected` and the rest are written.
-- `claudeArgs` passes no `--session-id` and `start.ts` holds none, so
-  the loop does not know a task session's id at dispatch: wiring
-  `writeFindings` needs one obtained first.
+- Task sessions run under a loop-picked id: `dispatchTask` draws
+  `randomUUID` (seam `newSessionId`) and `runTaskSession` (`start.ts`)
+  spawns `runClaudeCaptured` with `--session-id <id>` AHEAD of the
+  declaration flags (`--tools` is variadic, so it stays last). Measured
+  on Claude Code 2.1.268: the log is `<id>.jsonl`, so report rows join
+  the collector's session rows. `TaskSessionRunner` is `(prompt, flags,
+  sessionId) => Promise<CapturedSession>`; `TaskDispatch` adds
+  `sessionId` and `output`.
 - A SQLite-only table stays outside the port's row map: add a migration,
   write through `sqlite.ts`'s exported `sqliteStorePath`/`withSqliteStore`
-  (`LONE_SURROGATE` too) and update the two `tablesOf(...)` expectations
-  in `sqlite.test.ts` (layout, zero-byte cases).
+  (`LONE_SURROGATE` too) and update every full table-list expectation:
+  `sqlite.test.ts` (layout, zero-byte cases), `triage.test.ts` and
+  `absences.test.ts` (their migration cases).
 - `it.each(CONST)` over an `as const` tuple is TS2769 (readonly): spread
   it, `it.each([...CONST])`. `check-types` skips tests, the IDE does not.
 - `src/effort/store/triage.ts`: `writeTriage(root, { dispatch, outcome,
@@ -359,8 +363,9 @@
 - `@progress.txt` (literal `@`) is a stray TRACKED file at the root, added
   in `00a8a14` and committed to since (last `f4215ba`); the notes file is
   `progress.txt`. Never append to the `@` one.
-- `src/utils/progress.ts` is the `progress.txt` RENDERER (nothing calls
-  it yet): `writeProgress(root, planStub)` = `readProgressFindings`
+- `src/utils/progress.ts` is the `progress.txt` RENDERER, which `start.ts`
+  (`renderProgressForDispatch`) calls before every dispatch, the
+  wrap-up's included: `writeProgress(root, planStub)` = `readProgressFindings`
   (SQLite `findings`, `plan_stub = stub OR plan_stub IS NULL` as
   "global", `seq DESC`; no store file answers [] and creates nothing; an
   unreadable store throws BEFORE the write) then replaces the file whole
@@ -372,24 +377,47 @@
   its counter, `src/tests/progress-compaction.test.ts`). Still standing:
   `buildCompactionPrompt` (takes a local `CompactionPromptInput`, called
   by nothing), the `compaction` `PROMPT_SHAPES` entry, its cases in
-  `classify.test.ts` and `plan-stamp.test.ts`, and the wrap-up prompt's
-  compaction bullets.
+  `classify.test.ts`, and the wrap-up prompt's compaction bullets.
 - `plan.ts` `formatProgressSection` truncates at 16,000 CHARACTERS keeping
   the TAIL, which in a most-recent-first render is the OLDEST entry; it
   never acts while the renderer's byte cap stays <= that, pinned in
   `src/utils/progress.test.ts`.
 - Loop-generated text landing in a TRACKED file must escape the
-  control-byte gate's refusals: `core.hooksPath` is `.githooks`, so
-  `git add -A` then the hook refuses (measured exit 1 on one ESC in a
-  staged `progress.txt`). Tests import `scanBuffer`, `scanText`,
-  `FORBIDDEN_BYTES`, `FORBIDDEN_CODEPOINTS`, `EMOJI_JOINERS` from
+  control-byte gate's refusals: `core.hooksPath` is `.githooks`, whose
+  `pre-commit` runs the gate `--staged`, so `git add -A` then the hook
+  refuses (measured exit 1 on one ESC in a staged `progress.txt`); a
+  manual run needs `--include-untracked` to see unadded files. Tests
+  import `scanBuffer`, `scanText`, `FORBIDDEN_BYTES`,
+  `FORBIDDEN_CODEPOINTS`, `EMOJI_JOINERS` from
   `../../scripts/control-byte-gate/control-byte-gate.js` (no CLI side
   effect on import).
 - `bun:sqlite` (1.3.14): breaking out of `stmt.iterate()` early breaks
   that (cached `db.query`) statement: the next `iterate()` throws `bad
   parameter or other API misuse`, and `reset()` then `iterate()` silently
   yields one row fewer (4 of 5). `.all()` and a fresh `prepare` are fine.
-- The Bash tool's shell is zsh: `${PIPESTATUS[0]}` is EMPTY (zsh spells
-  it `$pipestatus[1]`), so `cmd | tail; echo ${PIPESTATUS[0]}` records no
-  exit code. Redirect to a file, then `echo $?`. A bare `=====` word is
-  zsh `=cmd` expansion (`not found`) and aborts the rest of the command.
+- In the Bash tool (zsh), a bare `=====` word is zsh `=cmd` expansion
+  (`not found`) and aborts the rest of the command.
+- `src/report/record.ts`: `recordTaskReport(root, { dispatch, outcome,
+  output }, seams?)` parses, then writes findings + triage, or ONE
+  `report_absences` row (`src/effort/store/absences.ts`
+  `writeReportAbsence`, migration 4, one row per session, `reason` and
+  `outcome` CHECK-free); `describeTaskReportRecord` answers operator
+  `notes`/`warnings`. `start.ts` `storeTaskReport` stores AFTER the commit
+  answers: `done`, `blocked` (commit refused, or SIGINT) or `failed`
+  (non-zero exit). A store that refuses the render or the write stops
+  the run.
+- `src/PROMPT.md` does not ask the session for a `rafa:report` block, and
+  no plan task adds the ask: until one does, every task session is
+  stored as a `no-block` absence and no finding reaches `progress.txt`.
+- `start()` wiring is testable black-box: `src/tests/task-report.test.ts`
+  runs `bun src/rafa.ts start --no-ci-wait` in a scratch repo with its own
+  HOME and PATH = a stand-in `claude` dir + git's dir (guarded by
+  `Bun.which('claude', { PATH })`); the stand-in keeps each call's args,
+  prompt and `progress.txt` outside the repo and answers by a marker in
+  the task sentence. Copy it for new loop behaviour.
+- A 0444 SQLite store (non-root, bun 1.3.14) still reads, and a write
+  throws `attempt to write a readonly database`: it separates a write
+  failure from a render failure in a test.
+- `src/tests/declaration-dispatch.test.ts` wraps `runClaude` as its
+  runner (answering `stdout: ''`) so its 21-leg grid stays valid; the
+  loop's real runner and its argv are pinned in `task-report.test.ts`.

@@ -36,14 +36,16 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds three tables that are not kinds, one per list a task
- * report carries: `findings`, `blockers` and `out_of_scope_bugs`. The
- * port's row map names none of them, and nothing in this module reads
- * or writes them. `findings.ts` writes the first and `triage.ts` the
- * other two, both through {@link withSqliteStore}, so each is opened,
- * migrated and closed as every kind's table is. Each writer says why
- * its tables have a column per field and their own deduplication keys,
- * where a kind has `row_json` and one key.
+ * The file holds four tables that are not kinds, all filled from task
+ * reports: `findings`, `blockers` and `out_of_scope_bugs`, one per list
+ * a report carries, and `report_absences`, one row per task session
+ * whose output held no report to read. The port's row map names none
+ * of them, and nothing in this module reads or writes them.
+ * `findings.ts` writes the first, `triage.ts` the next two and
+ * `absences.ts` the last, all through {@link withSqliteStore}, so each
+ * is opened, migrated and closed as every kind's table is. Each writer
+ * says why its tables have a column per field and their own
+ * deduplication keys, where a kind has `row_json` and one key.
  *
  * ## The port's rules, as they come out here
  *
@@ -266,6 +268,23 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
 
   CREATE UNIQUE INDEX out_of_scope_bugs_by_entry
     ON out_of_scope_bugs (session_id, what, ifnull(artifact, ''), ifnull(security, -1));
+  `,
+  // Version 4: one telemetry row per task session whose output held no
+  // report to read, outside the port's row map. `absences.ts` writes it
+  // and says why each constraint is there, and why two columns have none.
+  `
+  CREATE TABLE report_absences (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    reason       TEXT NOT NULL CHECK (reason <> ''),
+    detail       TEXT NOT NULL CHECK (detail <> ''),
+    block_body   TEXT,
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
   `,
 ];
 
