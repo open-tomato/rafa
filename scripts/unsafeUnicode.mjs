@@ -27,7 +27,7 @@
  * a rule with false positives is a rule someone turns off.
  *
  * The byte-level floor under this rule is
- * `tools/control-byte-gate/control-byte-gate.ts`, which scans every
+ * `scripts/control-byte-gate/control-byte-gate.ts`, which scans every
  * tracked file (linted or not) on a bare checkout. Its test suite asserts
  * the two implementations agree on what counts as unsafe.
  */

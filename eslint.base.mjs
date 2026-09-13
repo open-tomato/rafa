@@ -102,7 +102,7 @@ export default defineConfig([
     // rule registered inside a single language's block silently vanishes
     // when someone edits that block. Parsing comes from the per-language
     // blocks above; this block only adds the rule. The byte-level floor
-    // under it is tools/control-byte-gate/ (also covers unlinted files).
+    // under it is scripts/control-byte-gate/ (also covers unlinted files).
     files: [
       '**/*.js', '**/*.mjs', '**/*.cjs', '**/*.ts', '**/*.tsx', '**/*.jsx',
       '**/*.md', '**/*.json',

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Refuse a commit whose STAGED content carries a raw control byte or an
-# invisible/bidi codepoint (tools/control-byte-gate/). Judges the index
+# invisible/bidi codepoint (scripts/control-byte-gate/). Judges the index
 # blobs, not the worktree, so a byte staged and then cleaned up locally
 # still blocks. Needs only bun + git — no install.
 #
