@@ -4,24 +4,25 @@
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
  * output only the operator reads. It has three call sites: plan
- * generation in `plan.ts`, and the wrap-up and CI-repair sessions in
- * `start.ts`, all of which want today's behaviour exactly — one model,
- * one effort, every tool. So the flags are a parameter with an EMPTY
- * default: `runClaude(prompt)` spawns exactly the process the loop
- * spawned before declarations existed.
+ * generation in `plan.ts`, the wrap-up session in `start/wrap-up.ts`
+ * and the CI-repair session in `start/pr-lifecycle.ts`, all of which
+ * want today's behaviour exactly — one model, one effort, every tool.
+ * So the flags are a parameter with an EMPTY default:
+ * `runClaude(prompt)` spawns exactly the process the loop spawned
+ * before declarations existed.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
  * LOOP reads as well, and the per-task dispatch is its caller, through
- * `runTaskSession` in `start.ts`. A task session ends its final message
- * with a `rafa:report` block, and {@link spawnClaude} inherits stdout,
- * so a loop holding that session's exit code holds nothing else. Its
- * flags are the ones a task's routing declaration resolved to, with the
- * `--session-id` the loop picked for that session ahead of them. The
- * captured entry builds its argument list through the same
- * {@link claudeArgs} and hands the prompt over the same way; only the
- * spawner differs, {@link spawnClaudeCaptured} piping stdout, writing
- * each chunk on to the operator as it arrives and keeping the same
- * bytes for the answer. It sits BESIDE `runClaude` rather than
+ * `runTaskSession` in `start/dispatch.ts`. A task session ends its
+ * final message with a `rafa:report` block, and {@link spawnClaude}
+ * inherits stdout, so a loop holding that session's exit code holds
+ * nothing else. Its flags are the ones a task's routing declaration
+ * resolved to, with the `--session-id` the loop picked for that session
+ * ahead of them. The captured entry builds its argument list through
+ * the same {@link claudeArgs} and hands the prompt over the same way;
+ * only the spawner differs, {@link spawnClaudeCaptured} piping stdout,
+ * writing each chunk on to the operator as it arrives and keeping the
+ * same bytes for the answer. It sits BESIDE `runClaude` rather than
  * replacing its spawner, so a session nothing parses keeps spawning
  * exactly what it spawned before.
  *

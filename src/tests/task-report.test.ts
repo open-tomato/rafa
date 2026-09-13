@@ -1,6 +1,6 @@
 /**
  * A task session's report, from the spawn to the store, driven through
- * `start.ts` and through the real `rafa start` command.
+ * `start/dispatch.ts` and through the real `rafa start` command.
  *
  * `report/record.ts` stores a report and `utils/progress.ts` renders the
  * stored findings, and each is tested beside its own module. What this
@@ -38,7 +38,8 @@
  * ## Mutations
  *
  * Fifteen mutations of `start.ts` were driven against this file alone,
- * with the unmutated file green before and after and `start.ts` restored
+ * while `start.ts` still held what `start/dispatch.ts` holds now, with
+ * the unmutated file green before and after and `start.ts` restored
  * byte-identical, and every one reddened at least one of its 10 cases:
  * no render before a dispatch (3 red), none before the wrap-up (1), no
  * `--session-id` on the spawn (6), the id after the flags (1), the report
@@ -49,7 +50,7 @@
  * (3), the plan stub dropped (1), and a failed render that does not stop
  * the run (1).
  */
-import type { TaskSessionRunner } from '../start.js';
+import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { CapturingSpawner } from '../utils/claude.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -80,7 +81,7 @@ import {
 } from 'bun:test';
 
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
-import { dispatchTask, runTaskSession, SESSION_ID_FLAG } from '../start.js';
+import { dispatchTask, runTaskSession, SESSION_ID_FLAG } from '../start/dispatch.js';
 import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
 
 /** A version-4 UUID, as `randomUUID` writes one. */

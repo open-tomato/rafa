@@ -4,10 +4,10 @@
  * This is the JOIN no colocated suite can make. `utils/declaration.ts`
  * knows what a block resolves to and nothing about a prompt;
  * `utils/claude.ts` knows what an argument list looks like and nothing
- * about where its flags came from; `start.ts` is where the two meet,
- * and its `dispatchTask` is the only place that reads a block off a
- * task, builds the prompt from what is left and hands the flags on. So
- * every case here drives that one function through the REAL
+ * about where its flags came from; `start/dispatch.ts` is where the
+ * two meet, and its `dispatchTask` is the only place that reads a block
+ * off a task, builds the prompt from what is left and hands the flags
+ * on. So every case here drives that one function through the REAL
  * `runClaude` and the REAL `claudeArgs`, with the process spawn as the
  * only stub — it has to be, the spawner being `Bun.spawn` and the root
  * suite running vitest under node.
@@ -59,9 +59,9 @@
  * the loop always spawned and nothing else, and its prompt must equal
  * the five-line join spelled out here from literals. The injected
  * second line is rebuilt from fragments rather than referenced, so an
- * edit to the preamble in `start.ts` reddens this file rather than
- * passing silently — a prompt built from the module under test agrees
- * with any prompt that module happens to build.
+ * edit to the preamble in `start/dispatch.ts` reddens this file rather
+ * than passing silently — a prompt built from the module under test
+ * agrees with any prompt that module happens to build.
  *
  * ## The third consumer
  *
@@ -77,13 +77,14 @@
  * ## The mutation grid
  *
  * Twenty-one mutations of `start.ts`, `utils/claude.ts` and
- * `utils/declaration.ts` were driven against this file and all
- * TWENTY-ONE reddened at least one case. Every leg ran TWICE and
- * named the IDENTICAL red set on both passes, asked for through
- * `--reporter=json` so a red SET is comparable member for member — a
- * red COUNT cannot separate two legs reddening the same number of
- * different cases. All three modules were restored bytes-identical
- * and all 14 cases were green either side.
+ * `utils/declaration.ts` were driven against this file, while
+ * `start.ts` still held what `start/dispatch.ts` and `start/commit.ts`
+ * hold now, and all TWENTY-ONE reddened at least one case. Every leg
+ * ran TWICE and named the IDENTICAL red set on both passes, asked for
+ * through `--reporter=json` so a red SET is comparable member for
+ * member — a red COUNT cannot separate two legs reddening the same
+ * number of different cases. All three modules were restored
+ * bytes-identical and all 14 cases were green either side.
  *
  * The wide legs are the ones reaching the argument list. Spawning
  * twice reddens 6; dropping the flags from `claudeArgs`, putting them
@@ -118,7 +119,7 @@
  * (measured, 0 of 14 each): each shadows the other, so only the pair
  * can say which two layers that case rests on.
  */
-import type { TaskDispatch, TaskSessionRunner } from '../start.js';
+import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
 import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -144,7 +145,8 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { commitFinishedTask, dispatchTask } from '../start.js';
+import { commitFinishedTask } from '../start/commit.js';
+import { dispatchTask } from '../start/dispatch.js';
 import { runClaude } from '../utils/claude.js';
 
 /** The two spaces a tracker line puts between text and block. */
@@ -160,8 +162,9 @@ const FIRST_TASK_LINE = 5;
  * The second line the loop injects, rebuilt from fragments.
  *
  * Spelled here rather than imported so an edit to the preamble in
- * `start.ts` reddens the undeclared control. The fragments join on
- * single spaces, which is what the one long line in that file is.
+ * `start/dispatch.ts` reddens the undeclared control. The fragments
+ * join on single spaces, which is what the one long line in that file
+ * is.
  */
 const INJECTED_PREAMBLE = [
   'Consider tasks listed above this one in the plan checklist as',

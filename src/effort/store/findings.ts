@@ -26,8 +26,8 @@
  * ## Where the table lives, and why it is not a kind
  *
  * In the SQLite store's file, created by the second entry of
- * `SQLITE_MIGRATIONS` and opened through `withSqliteStore`, as every
- * kind's table is. It is written there whichever backend the `store`
+ * `SQLITE_MIGRATIONS` and written through `writeSqliteStore`, as every
+ * kind's append is. It is written there whichever backend the `store`
  * setting selects: the NDJSON backend has no findings file. The table
  * stays outside the port's row map on purpose, because a finding breaks
  * three things the port holds of a kind:
@@ -108,21 +108,24 @@
  * TABLE ... ADD CHECK` is a syntax error, so a widened set would mean
  * rebuilding the table. The closed set is enforced here instead.
  *
- * ## Writing nothing writes nothing
+ * ## Writing nothing writes nothing, and still checks the schema
  *
  * A write left with no entry to insert, because the list was empty or
- * every entry was refused, never opens the store, and creates no file
- * and no directory.
+ * every entry was refused, inserts no row. On a store that does not
+ * exist it opens nothing, and creates no file and no directory. On one
+ * that exists it still opens the store, through `writeSqliteStore`, so
+ * the schema check runs as it does for a write with rows: a store past
+ * this rafa's version is refused with no byte changed, one below it is
+ * brought forward, and one already at this version changes no byte.
  */
 import type { ReportFinding } from '../../report/parse.js';
 import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
 
 import { FINDING_KINDS, FINDING_SIGNALS } from '../../report/parse.js';
 
-import { LONE_SURROGATE, sqliteStorePath, withSqliteStore } from './sqlite.js';
+import { LONE_SURROGATE, sqliteStorePath, writeSqliteStore } from './sqlite.js';
 
 /**
  * What the loop made of a task, as its findings rows record it. The
@@ -359,9 +362,11 @@ function insertRows(db: Database, rows: readonly Bound[][]): number {
  * session does not already hold.
  *
  * Throws, having opened nothing, when the dispatch or the outcome cannot
- * be stored. An entry that cannot be stored is left out and answered in
- * `rejected`, and the others are written. See the module note for the
- * dedupe rule and each refusal.
+ * be stored. Throws the store's own refusal of a schema past this rafa's
+ * version whenever the store exists, even with nothing to insert. An
+ * entry that cannot be stored is left out and answered in `rejected`,
+ * and the others are written. See the module note for the dedupe rule
+ * and each refusal.
  */
 export function writeFindings(
   repoRoot: string,
@@ -378,12 +383,11 @@ export function writeFindings(
     if (rejection === null) stored.push(finding);
     else rejected.push(rejection);
   }
-  if (stored.length === 0) return { path, appended: 0, skipped: 0, rejected };
 
   const collectedAt = (seams.now ?? (() => new Date()))().toISOString();
   const newId = seams.newId ?? randomUUID;
   const rows = stored.map((finding) => rowValues(finding, write, newId(), collectedAt));
 
-  const appended = withSqliteStore(path, !existsSync(path), (db) => insertRows(db, rows));
+  const appended = writeSqliteStore(path, rows.length, 0, (db) => insertRows(db, rows));
   return { path, appended, skipped: stored.length - appended, rejected };
 }

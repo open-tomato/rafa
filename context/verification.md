@@ -15,8 +15,7 @@ actually reach them.
 One more gate runs at `git commit` rather than before the PR.
 `.githooks/pre-commit` runs `scripts/control-byte-gate/control-byte-gate.ts`
 with `--staged`, refusing a commit whose staged blobs carry a raw control
-byte or an invisible codepoint, loop-written text in a tracked file such
-as `progress.txt` included. The hook is live only in a clone where
+byte or an invisible codepoint. The hook is live only in a clone where
 `git config core.hooksPath .githooks` has been run. By hand, the script
 with no flag reads every tracked file, and `--include-untracked` adds the
 files not yet added.

@@ -14,11 +14,11 @@
  *
  * Usage:
  *   bun run gate:control-bytes                # all tracked files
- *   bun tools/control-byte-gate/control-byte-gate.ts --staged
+ *   bun scripts/control-byte-gate/control-byte-gate.ts --staged
  *                                             # staged files only
- *   bun tools/control-byte-gate/control-byte-gate.ts --include-untracked
+ *   bun scripts/control-byte-gate/control-byte-gate.ts --include-untracked
  *                                             # + files not yet git-added
- *   bun tools/control-byte-gate/control-byte-gate.ts --root <repo-root>
+ *   bun scripts/control-byte-gate/control-byte-gate.ts --root <repo-root>
  *
  * Exit codes: 0 clean, 1 findings, 2 the gate could not run.
  * 2 is distinct from 0 on purpose — a gate that cannot run must never be

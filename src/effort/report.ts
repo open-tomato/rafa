@@ -3,9 +3,26 @@
  *
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
- * reads the store and nothing else — no log, no repository, no clock —
- * so a report is a pure projection of rows already on disk and two
- * runs over an unchanged store produce identical bytes.
+ * reads the config and the store the config selects, and nothing else
+ * — no log, no clock — so a report is a pure projection of rows already
+ * on disk and two runs over an unchanged store produce identical bytes.
+ *
+ * ## Which store it reads
+ *
+ * The one `rafa effort collect` writes. Both resolve it the same way,
+ * `loadConfig` over the repo root and then `selectEffortStore` over the
+ * resolved config, so under the `sqlite` default a report reads
+ * `effort.sqlite` and under `store: ndjson` the sessions file. A report
+ * reading one backend's file directly reads nothing right after a
+ * successful collect into the other, and says nothing was collected.
+ * {@link ReportOptions.store} is the seam for a caller that already
+ * holds a store, and a store passed there means the config is not read.
+ *
+ * A config the loop cannot run on is refused as the collect command
+ * refuses it: {@link buildReport} throws the `ConfigError`, and the
+ * command prints one line per problem and exits 1. A warning about an
+ * unknown key goes to stderr through `loadConfig`'s default sink, so
+ * the `--json` document on stdout stays parseable.
  *
  * ## What a group is keyed on
  *
@@ -86,12 +103,14 @@
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { SessionUsageTotals } from './session-log.js';
+import type { EffortStore } from './store/types.js';
 
+import { ConfigError, loadConfig } from '../config.js';
 import { getRepoRoot } from '../utils/git.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
-import { effortStorePath, readStoreRows } from './store.js';
+import { selectEffortStore } from './store/index.js';
 
 /** Decimal places a formatted minute figure carries in the table. */
 const TABLE_MINUTE_DECIMALS = 1;
@@ -205,8 +224,14 @@ export interface ReportArgs {
 
 /** Where a report reads from and what it narrows to. */
 export interface ReportOptions {
-  /** Defaults to the git repo root. Governs the store path. */
+  /** Defaults to the git repo root. Governs the config and the store. */
   repoRoot?: string;
+  /**
+   * The store the session rows are read from. Defaults to the backend
+   * `.rafa/config.yaml` under the repo root selects; a store passed here
+   * means that file is not read. See the module note.
+   */
+  store?: EffortStore;
   kinds?: readonly SessionKind[] | null;
   entrypoints?: readonly string[] | null;
 }
@@ -692,23 +717,49 @@ export function parseReportArgs(args: readonly string[]): ReportArgs {
 }
 
 /**
- * Reads the store and rolls it up.
+ * The store a report reads: the one passed, else the one the config
+ * under `repoRoot` selects, resolved as `rafa effort collect` resolves
+ * its own.
  *
- * A missing store answers an EMPTY report rather than throwing —
- * {@link readStoreRows} already treats absence as the first-run case —
- * so the command below is what says "nothing collected yet" in words,
- * which is the one thing a table of zeroes cannot convey.
+ * Throws a `ConfigError` when the config is one the loop cannot run on.
+ */
+function resolveStore(
+  store: EffortStore | undefined,
+  repoRoot: string,
+): EffortStore {
+  if (store !== undefined) return store;
+
+  const resolved = loadConfig(repoRoot);
+  return selectEffortStore(repoRoot, resolved.config);
+}
+
+/**
+ * Reads the session rows of the selected store and rolls them up.
+ *
+ * A missing store answers an EMPTY report rather than throwing — every
+ * backend answers absence as the first-run case — so the command below
+ * is what says "nothing collected yet" in words, which is the one thing
+ * a table of zeroes cannot convey.
+ *
+ * Throws a `ConfigError`, having read no row, when no store is passed
+ * and the config under the repo root is one the loop cannot run on.
  */
 export function buildReport(options: ReportOptions = {}): EffortReport {
   const repoRoot = options.repoRoot ?? getRepoRoot();
-  const stored = readStoreRows<SessionEffortRow>(
-    effortStorePath(repoRoot, 'sessions'),
-  );
+  const store = resolveStore(options.store, repoRoot);
 
-  return summariseSessions(asReportRows(stored.rows), {
+  return summariseSessions(asReportRows(store.read('sessions')), {
     kinds: options.kinds ?? null,
     entrypoints: options.entrypoints ?? null,
   });
+}
+
+/** Prints each refusal on its own line and marks the run failed. */
+function refuse(problems: readonly string[]): void {
+  for (const problem of problems) {
+    console.error(`ralph effort report: ${problem}`);
+  }
+  process.exitCode = 1;
 }
 
 /**
@@ -717,21 +768,30 @@ export function buildReport(options: ReportOptions = {}): EffortReport {
  * Sets `process.exitCode` rather than calling `process.exit`, so the
  * function is drivable from a test and a caller's output is not
  * truncated mid-flush.
+ *
+ * A config the loop cannot run on is printed as a refusal, one line per
+ * problem, the way a bad argument is and the way `rafa effort collect`
+ * prints it. Anything else thrown is a fault rather than a refusal, and
+ * is rethrown.
  */
 export default async function report(args: string[]): Promise<void> {
   const parsed = parseReportArgs(args);
   if (parsed.errors.length > 0) {
-    for (const error of parsed.errors) {
-      console.error(`ralph effort report: ${error}`);
-    }
-    process.exitCode = 1;
+    refuse(parsed.errors);
     return;
   }
 
-  const built = buildReport({
-    kinds: parsed.kinds,
-    entrypoints: parsed.entrypoints,
-  });
+  let built: EffortReport;
+  try {
+    built = buildReport({
+      kinds: parsed.kinds,
+      entrypoints: parsed.entrypoints,
+    });
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    refuse(error.problems);
+    return;
+  }
   if (parsed.json) {
     console.log(JSON.stringify(built, null, 2));
     return;

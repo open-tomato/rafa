@@ -42,7 +42,10 @@
  * whose output held no report to read. The port's row map names none
  * of them, and nothing in this module reads or writes them.
  * `findings.ts` writes the first, `triage.ts` the next two and
- * `absences.ts` the last, all through {@link withSqliteStore}, so each
+ * `absences.ts` the last. `findings.ts` and `triage.ts` write through
+ * {@link writeSqliteStore}, as an append does, so a write left with
+ * nothing to insert still meets the schema check. `absences.ts` always
+ * has its one row and opens {@link withSqliteStore} directly. Each table
  * is opened, migrated and closed as every kind's table is. Each writer
  * says why its tables have a column per field and their own
  * deduplication keys, where a kind has `row_json` and one key.
@@ -70,15 +73,19 @@
  *     and on a store that does not exist yet leaves no file and no
  *     directory. A batch that passes is inserted in one transaction,
  *     and lands whole or not at all.
- *   - Writing nothing writes NOTHING. An empty batch never opens the
- *     store. An append whose every row is already held opens it and
- *     leaves its bytes identical, measured, where an append that adds a
- *     row changes them.
- *   - Absence is the first-run case. `read` and `keys` answer empty for
- *     a store with no file, without opening one, and only an append
- *     with a row to add opens the store with SQLite's create flag.
- *     Measured, an open without that flag refuses a missing file with
- *     `SQLITE_CANTOPEN` and creates nothing.
+ *   - Writing nothing writes NOTHING, and still checks the schema. An
+ *     empty batch on a store that does not exist opens nothing. On a
+ *     store that exists it opens the store, through
+ *     {@link writeSqliteStore}, so an empty append is refused past this
+ *     rafa's version and brought forward below it, as a batch with rows
+ *     is, and inserts nothing. An empty append, or one whose every row
+ *     is already held, leaves a current store's bytes identical,
+ *     measured, where an append that adds a row changes them.
+ *   - Absence is the first-run case. `read`, `keys` and an empty append
+ *     answer empty for a store with no file, without opening one, and
+ *     only an append with a row to add opens the store with SQLite's
+ *     create flag. Measured, an open without that flag refuses a missing
+ *     file with `SQLITE_CANTOPEN` and creates nothing.
  *   - A store that exists and cannot be read throws. Measured, a
  *     directory at the path refuses to open (`SQLITE_CANTOPEN`), and a
  *     file that is not a database refuses its first statement
@@ -146,10 +153,11 @@
  *     run killed between the two leaves a migrated schema recorded as
  *     unmigrated.
  *
- * Every call brings an existing store forward before using it, reads
- * included, as the reference's `openDb` does, so no call reads a store
- * under a schema this code does not know. {@link migrateSchema} names
- * the two stores it refuses instead.
+ * Every call brings an existing store forward before using it, as the
+ * reference's `openDb` does: reads included, and an append with nothing
+ * to insert, so no call reads or writes a store under a schema this
+ * code does not know. {@link migrateSchema} names the two stores it
+ * refuses instead.
  */
 import type {
   AppendResult,
@@ -454,8 +462,9 @@ export function migrateSchema(
  * `use`, and closes it whatever `use` did. Only a caller with a row to
  * add passes `create`, and only then is the directory made.
  *
- * Exported for the report writers, so their tables are opened, migrated
- * and closed exactly as every kind's is.
+ * Exported so the tables outside the port are opened, migrated and
+ * closed exactly as every kind's is. A write that can be left with
+ * nothing to insert goes through {@link writeSqliteStore} instead.
  */
 export function withSqliteStore<T>(
   path: string,
@@ -495,6 +504,36 @@ function insertBatch(
   return insertAll.immediate();
 }
 
+/**
+ * The one path every write that can be left with nothing to insert
+ * takes, whatever its batch size, so no writer can skip the schema
+ * check by having nothing to insert.
+ *
+ * With rows to insert, it opens the store, creating the file and its
+ * directory when absent, and answers what `insert` answers. With none,
+ * it still opens a store that exists, so {@link migrateSchema} brings
+ * it forward or refuses it as it would for a write with rows, and it
+ * answers `empty` without calling `insert`. Only an empty write on a
+ * store that does not exist opens nothing, creating no file and no
+ * directory: the branch `read` and `keys` take on an absent store.
+ *
+ * `rowCount` counts what is left to insert once the caller has checked
+ * its batch. The check comes before this call, so a refused batch opens
+ * nothing.
+ */
+export function writeSqliteStore<T>(
+  path: string,
+  rowCount: number,
+  empty: T,
+  insert: (db: Database) => T,
+): T {
+  const exists = existsSync(path);
+  if (rowCount > 0) return withSqliteStore(path, !exists, insert);
+
+  if (exists) withSqliteStore(path, false, () => undefined);
+  return empty;
+}
+
 /** Appends one kind's batch, deduplicated by that kind's key column. */
 function appendKind<K extends EffortRowKind>(
   path: string,
@@ -502,12 +541,11 @@ function appendKind<K extends EffortRowKind>(
   rows: readonly EffortRow<K>[],
 ): AppendResult {
   const entries = batchEntries(kind, rows);
-  if (entries.length === 0) return { path, appended: 0, skipped: 0 };
-
   const table = KIND_TABLES[kind];
-  const appended = withSqliteStore(
+  const appended = writeSqliteStore(
     path,
-    !existsSync(path),
+    entries.length,
+    0,
     (db) => insertBatch(db, table, entries),
   );
   return { path, appended, skipped: entries.length - appended };

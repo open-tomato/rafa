@@ -14,13 +14,15 @@
  *
  *   - The store the collector WRITES is the store the report READS.
  *     A path that drifted apart leaves both colocated suites green
- *     and every report empty. That holds under `store: ndjson` alone,
- *     which the fixture's `.rafa/config.yaml` selects. The collector
- *     appends through whichever store the config selects, while the
- *     report reads the NDJSON sessions file directly, so under the
- *     default `sqlite` the rows land in `effort.sqlite` and a report
- *     reads none of them. Measured, a fixture planting no config turns
- *     twelve of this file's sixteen cases red.
+ *     and every report empty. Both resolve the store the root's
+ *     `.rafa/config.yaml` selects. The fixture's config selects
+ *     `ndjson` because two cases read the stored rows back through
+ *     `readStoreRows`, which parses a file of NDJSON lines. Measured, a
+ *     fixture planting no config, so both halves select the `sqlite`
+ *     default, turns those two of this file's sixteen cases red and
+ *     leaves every report case green. While the report read the NDJSON
+ *     sessions file whatever the config selected, the same fixture
+ *     turned twelve of the sixteen red.
  *   - A log's `gitBranch` reaches a report GROUP KEY. That chain runs
  *     through four modules — the record fold, the dominant-branch
  *     histogram, the plan-stub resolution and the accumulator's key —
@@ -446,8 +448,8 @@ interface Fixture {
 }
 
 /**
- * The config the fixture plants: the one backend the report reads. See
- * the module note.
+ * The config the fixture plants: the backend whose files
+ * `readStoreRows` parses. See the module note.
  */
 const FIXTURE_CONFIG = 'store: ndjson\n';
 

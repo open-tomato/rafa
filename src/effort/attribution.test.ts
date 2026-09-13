@@ -16,12 +16,12 @@
  * table still covers all four outcomes, so a later edit cannot quietly
  * turn it into eighteen exact matches.
  *
- * The task prompt is assembled the way `start.ts` assembles it, with
- * the prefix written out rather than read off the module — a test whose
- * fixtures all come from the module under test cannot report a prefix
- * that changed. One case then holds that written-out prefix against
- * `PROMPT_SHAPES`, which is what ties the two halves together without
- * duplicating the classifier's own drift guard.
+ * The task prompt is assembled the way `start/dispatch.ts` assembles
+ * it, with the prefix written out rather than read off the module — a
+ * test whose fixtures all come from the module under test cannot
+ * report a prefix that changed. One case then holds that written-out
+ * prefix against `PROMPT_SHAPES`, which is what ties the two halves
+ * together without duplicating the classifier's own drift guard.
  *
  * Fifteen module mutations were driven against this file and every one
  * reddened at least one case, with the restored module green either
@@ -202,10 +202,10 @@ const MEASURED_BRANCHES: readonly BranchRow[] = [
   { branch: 'pw-align', stub: null, plan: null, match: 'none' },
 ];
 
-/** The task prefix, written out as `start.ts` writes it. */
+/** The task prefix, written out as `start/dispatch.ts` writes it. */
 const TASK_PREFIX = 'Your scoped task is: ';
 
-/** A task prompt, assembled as `start.ts` assembles it. */
+/** A task prompt, assembled as `start/dispatch.ts` assembles it. */
 function taskPrompt(task: string): string {
   return [
     `${TASK_PREFIX}${task}`,

@@ -7,8 +7,10 @@
  *
  *   - A report. Its findings go through `writeFindings`, then its
  *     blockers and out-of-scope bugs through `writeTriage`. A report whose
- *     three lists are all empty writes no row and opens no store, as each
- *     writer does with nothing to insert.
+ *     three lists are all empty writes no row, as each writer does with
+ *     nothing to insert. Each writer still opens a store that exists, for
+ *     its schema check, so a store past this rafa's version is refused,
+ *     and neither opens nor creates a store that does not exist.
  *   - No report, for whatever reason. One telemetry row goes through
  *     `writeReportAbsence`, so a session that reported nothing is still a
  *     row.

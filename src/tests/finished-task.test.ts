@@ -1,11 +1,11 @@
 /**
  * The loop's per-task tail, read as the loop reads it.
  *
- * `commitFinishedTask` in `start.ts` is what happens after a task's
- * session returns 0: it stages and commits whatever the session left,
- * then marks the tracker line. `utils/commit.ts` owns whether git was
- * asked the right questions, and `tests/commit-refusals.test.ts` owns
- * whether a refusal is a refusal. Neither can say what the TRACKER
+ * `commitFinishedTask` in `start/commit.ts` is what happens after a
+ * task's session returns 0: it stages and commits whatever the session
+ * left, then marks the tracker line. `utils/commit.ts` owns whether git
+ * was asked the right questions, and `tests/commit-refusals.test.ts`
+ * owns whether a refusal is a refusal. Neither can say what the TRACKER
  * ends up holding, which is the only thing the next iteration reads.
  *
  * The claim this file exists for is the one shape the loop meets more
@@ -57,9 +57,10 @@
  * ## The mutation grid
  *
  * Ten mutations of `commitFinishedTask` were driven against this
- * file, NINE of them reddening at least one case. The module was
- * restored bytes-identical afterwards and all 5 cases were green
- * either side; every case below is in the reddened union.
+ * file, while it still sat in `start.ts`, NINE of them reddening at
+ * least one case. The module was restored bytes-identical afterwards
+ * and all 5 cases were green either side; every case below is in the
+ * reddened union.
  *
  * The splits that ISOLATE are what the file is shaped for. Ticking
  * the line before the commit runs, and ticking a failed task rather
@@ -92,7 +93,7 @@
  * re-anchored on the line above it. A leg that silently lands
  * somewhere else reads exactly like a module nothing guards.
  */
-import type { TaskCommitRunner } from '../start.js';
+import type { TaskCommitRunner } from '../start/commit.js';
 import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -119,7 +120,7 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { commitFinishedTask } from '../start.js';
+import { commitFinishedTask } from '../start/commit.js';
 import { findNextTask } from '../utils/tracker.js';
 
 /** The first open task in every planted tracker. */
