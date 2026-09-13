@@ -15,6 +15,10 @@ back into every turn and the split would save nothing.
   table, and what each agent does.
 - `context/verification.md` — the gate order and how to read their
   captures.
+- `context/effort-store.md` — the store port, its two backends, the
+  SQLite-only tables, and what a new kind or field has to touch.
+- `context/source.md` — import paths under `src/` and the shapes the lint
+  config forces.
 
 ## This file is capped
 

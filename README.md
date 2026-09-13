@@ -6,13 +6,24 @@ To install dependencies:
 bun install
 ```
 
-To run:
+To run the loop from a checkout (no arguments prints the command list):
 
 ```bash
-bun run index.ts
+bun src/rafa.ts start --plan=<file>
 ```
 
+`bun run build` writes `dist/`, which the `rafa` bin and the package's
+`exports` point at.
+
 This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+
+## Runtime
+
+The build targets bun. The package root, `./cli` and `./store` import
+`bun:sqlite`, which node's ESM loader refuses before any module code runs,
+so only `./plan` and `./ports` load under node, whatever `engines.node`
+declares. The package ships no type declarations: `exports` names no
+`types`, and a TypeScript consumer gets TS7016 under `strict`.
 
 ## Attribution
 

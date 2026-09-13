@@ -30,7 +30,7 @@ Execute a plan with `bun run rafa start --plan=PLAN-<stub>.md`.
 2. Optional structured blocks (`rafa:*` fenced code blocks)
 3. One or more `# Stage:` sections with tasks
 
-```markdown
+````markdown
 # Plan: {Feature Title}
 
 ```rafa:plan
@@ -61,7 +61,7 @@ Links to files relevant to this stage, domain-specific guidelines, etc.
 # Stage: {Next Stage}
 
 - [ ] Task three  {agent=tdd-guide effort=medium}
-```
+````
 
 ---
 
@@ -73,13 +73,13 @@ Structured blocks are optional fenced code blocks that provide metadata and cont
 
 Header metadata for the entire plan. Fields are YAML key-value pairs.
 
-```
+````markdown
 ```rafa:plan
 stub: my-feature
 issue: OPT-123
 spec: .specs/my-feature.md
 ```
-```
+````
 
 Recognized fields:
 - `stub` — The plan identifier (string). Used to organize findings and dedupe rows across runs.
@@ -92,12 +92,12 @@ Unknown keys are retained and ignored by the loop; they do not cause parsing to 
 
 Prose that the loop injects into the context of **every task** in the plan. Appears between the plan-wide description and the task prompt.
 
-```
+````markdown
 ```rafa:context
 This plan rewrites the authentication layer. See auth-design.md.
 All tasks share the test fixtures in tests/auth-fixtures.ts.
 ```
-```
+````
 
 One `rafa:context` block per plan. Appears at the top level (not inside a stage).
 
@@ -105,7 +105,7 @@ One `rafa:context` block per plan. Appears at the top level (not inside a stage)
 
 Prose that the loop injects into the context of **only the tasks in the immediately following stage**. Appears before the first task of that stage.
 
-```
+````markdown
 # Stage: Database Schema
 
 ```rafa:stage-context
@@ -115,8 +115,7 @@ Run tests/schema-integration.test.ts after each migration.
 
 - [ ] Add users table
 - [ ] Add posts table
-```
-```
+````
 
 One `rafa:stage-context` block per stage (optional). If present, it must appear immediately after the `# Stage:` heading and before the first task line.
 
@@ -124,7 +123,7 @@ One `rafa:stage-context` block per stage (optional). If present, it must appear 
 
 Agents return a structured report block at the end of their output. The loop parses this to record findings, blockers, and other metadata.
 
-```
+````markdown
 ```rafa:report
 status: done
 feedback: |
@@ -154,7 +153,7 @@ out_of_scope_bugs:
     artifact: "SQLITE_MISUSE"
     security: false
 ```
-```
+````
 
 Report fields:
 
@@ -197,24 +196,23 @@ Each task line ends with a **declaration** — a comma-separated list of key-val
 - [ ] Add Zod schema for CreateJobRequest  {agent=loop-implementer effort=high skills=zod-schemas model=sonnet tools=Read,Write,Edit}
 ```
 
-Recognized keys:
+Recognized keys, the `DECLARATION_KEYS` of `src/utils/declaration.ts`:
 
 | Key | Values | Purpose |
 | --- | --- | --- |
 | `agent` | agent name | Dispatch to a specific agent. Default: `loop-implementer` |
 | `effort` | `low`, `medium`, `high` | Task complexity estimate |
 | `model` | `haiku`, `sonnet`, `opus` | Model override for this task |
-| `skills` | comma-separated list | Skills this task applies or tests |
 | `tools` | comma-separated list | Tools the agent will need |
 
-Unknown keys (not in the table above) are retained in the task's extras map and do not cause parsing to fail. They serve as extensibility points for future phases.
+A brace block is a declaration only when at least one of its keys is in the table above. Beside such a key, any other key (`skills` included) is retained in the task's extras map, maps to no flag and is stripped with the rest of the block; it does not cause parsing to fail, and serves as an extensibility point for future phases. A block with no recognized key is not a declaration at all: it stays in the task text, and so reaches the prompt header, the operator log line and the commit subject.
 
 ### `skills=` declaration
 
-The `skills=` key lists skills the task applies or tests, comma-separated. These are referenced (not implemented) in phase 0; phase 3 resolves them into manifest entries.
+The `skills=` key lists skills the task applies or tests, comma-separated. These are referenced (not implemented) in phase 0; phase 3 resolves them into manifest entries. `skills` is an extras key rather than a recognized one, so give the task a recognized key beside it — `{skills=bun-testing}` alone is left in the task text:
 
 ```markdown
-- [ ] Port vitest tests to bun:test  {skills=bun-testing,vitest-migration}
+- [ ] Port vitest tests to bun:test  {agent=build-error-resolver skills=bun-testing,vitest-migration}
 ```
 
 ---
@@ -264,6 +262,7 @@ Rules:
 - No compound tasks joined by "and". Split "implement X and write tests for X" into two tasks.
 - Tasks must be independently completable in the order listed.
 - Use imperative, specific wording: "Add Zod schema for `CreateJobRequest`" rather than "Handle input validation".
+- When several tasks wire into one file, give one of them the file's split before the file nears the 800-line cap. No single "wire X into `src/start.ts`" task grows it enough for its own diff to flag, and phase 0's six took `src/start.ts` from 798 lines to 960 with no task owning the split; only a whole-change-set review caught it.
 
 ---
 
@@ -285,7 +284,12 @@ Every `rafa:*` block is **stripped from the output the loop quotes back**. This 
 - A block in a stage description does not appear in the operator log line
 - A block anywhere in the plan does not appear in a commit subject or commit body
 
-The rule is universal: any fenced `rafa:*` block at any nesting level is removed before quoting.
+The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/plan/blocks.ts`):
+
+- Only a closed, top-level `rafa:*` block hides its lines. Every other fence is transparent, so a `- [ ] ` line at column 0 inside a `markdown` or `text` illustration, or inside a `rafa:` fence nested in one, is dispatched as a task. A plan that illustrates the format indents its example lines.
+- A `rafa:` fence that is never closed hides nothing, because taking the rest of the document as its body would end the plan with its tasks unrun. `parsePlan` reports it as `unclosed-block`, and each open task line after it as `task-in-block`.
+- A caller that builds its own `TaskInfo`, such as a Tracker port implementation, bypasses the strip.
+- An example that shows a `rafa:*` fence inside a larger fence needs the larger one to be longer, four backticks as in this skill: inside a three-backtick fence the first inner closing fence closes the outer one, and every later `rafa:` fence becomes a real block to any CommonMark reader.
 
 Unknown block kinds (e.g., `rafa:design-notes`) are retained by the parser and ignored, following the same rule as unknown declaration keys. They do not cause parsing to fail and are stripped on output.
 
@@ -297,10 +301,14 @@ The loop parses plan files through `src/plan/parse.ts`:
 
 - **Block parsing** (`src/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
 - **Plan parsing** (`src/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and any `rafa:stage-context` block immediately after the heading.
-- **Declaration parsing**: Splits task lines on `{...}` and parses the contents as a map of `key=value` pairs.
+- **Declaration parsing** (`src/utils/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declaration syntax).
 - **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
 
 The parser is liberal with unknown input: unknown block kinds are kept, unknown declaration keys are kept, unknown YAML keys are kept. A report yields no report only when its last `rafa:report` block is missing, never closed, not valid YAML, or not a mapping. A field that is missing, or holds a value it cannot take (a `findings` that is not a list, a `signal` other than `loud` or `silent`), is reported as an issue and the rest of the report is still read. Quote every string value in a report: an unquoted value that opens with a backtick, `@`, `%` or `[` makes the whole block unreadable, and a `#` after a space starts a comment that silently cuts the value short.
+
+Line numbers count two ways. A block's `span` (`readRafaBlocks`) and a `PlanIssue.line` count from one; `TaskInfo.lineNum` and the stage and task `lineNum` of the plan model count from zero, so compare `lineNum + 1` against either.
+
+The report rules in this skill restate `src/report/parse.ts`, which is the authority: change the two together.
 
 ---
 
@@ -327,7 +335,7 @@ We need request/response logging on all endpoints.
 
 ### Plan with full structured blocks and multiple stages
 
-```markdown
+````markdown
 # Plan: Refactor authentication layer
 
 ```rafa:plan
@@ -367,7 +375,7 @@ Sessions are keyed by session ID, never by user. One session can hold multiple i
 
 - [ ] Implement role-based access control gating  {agent=loop-implementer effort=medium skills=rbac}
 - [ ] Add RBAC integration tests  {agent=tdd-guide effort=high}
-```
+````
 
 ---
 

@@ -1,17 +1,18 @@
 - The sandbox blocks `rm -r`/`rm -rf` everywhere, /tmp too: empty a dir by
   `mv`-ing its contents out; `cp -R src/. dest/` copies into an existing
   one.
-- Relative imports under `src/` use `.js` specifiers for `.ts` files; keep
-  them when moving files.
-- Tests use `bun:test` (`spyOn`, `mock.restore()` restores every spy), but a
-  bare `'vitest'` import also resolves to it, so a green run proves no
-  port: grep `from 'vitest'`. One remains, in
-  `scripts/control-byte-gate/control-byte-gate.test.ts`, the only lint
-  error.
-- Stale TSDoc says the suite runs vitest under Node: `src/utils/claude.ts`,
-  `claude.test.ts`, `src/effort/store.ts`; re-derive the rationale, don't
-  swap the word. Editing `store.ts` falsifies `store/ndjson.ts`'s
-  byte-identical note: fix both.
+- Lint is red on one error, the `'vitest'` import in
+  `scripts/control-byte-gate/control-byte-gate.test.ts`. That script's
+  usage header and `.githooks/pre-commit`'s comment still name
+  `tools/control-byte-gate/` and a `gate:control-bytes` script
+  `package.json` lacks. `src/effort/attribution.test.ts:307` carries a
+  TS2769 only an out-of-repo tsconfig shows.
+- Stale TSDoc still describes the vitest-on-Node era:
+  `src/utils/claude.ts`, `claude.test.ts`, `src/effort/store.ts`
+  (re-derive the rationale, don't swap the word; editing `store.ts`
+  falsifies `store/ndjson.ts`'s byte-identical note). `spawnClaude`'s
+  "reported as 1" and its `?? 1` are dead: `Bun.spawn` answers
+  128+signal.
 - Moving a file with a `new URL('../../x', import.meta.url)` base: recount
   `../` (`src/<subdir>/*.test.ts` reaches the root with `../../`); one too
   many lands silently in parent `open-tomato/`, where guards pass. Print
@@ -19,183 +20,34 @@
 - `node_modules` can be partial while `bun.lock` and `package.json` agree:
   run `bun install` and read added vs. satisfied before calling a missing
   module a bug.
-- `progress.txt` is TRACKED despite `.gitignore` (committed first):
-  `git add -A` commits every edit until `git rm --cached progress.txt`;
-  `git ls-files` lists it, `git check-ignore` is silent.
 - Declare ports with PROPERTY signatures (`keys: (kind: K) => ...`): tsc
   refuses a narrower backend parameter (TS2322) that a method signature
   accepts bivariantly. Close a per-kind map with a `type` alias, which
   declaration merging cannot widen.
-- `check-types` skips `**/*.test.ts` (the cited
-  `.specs/test-type-checking.md` does not exist). To check one, point an
-  out-of-repo tsconfig at it: `extends` the repo's, `files` [abs path],
-  `include` [], absolute `typeRoots` [`<repo>/node_modules/@types`]; run
-  `./node_modules/.bin/tsc -p`. `attribution.test.ts` has a pre-existing
-  TS2769.
-- A new `EffortRowByKind` kind reds `check-types` away from the fix:
-  TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
-  `STORE_FILE_NAMES` (`store.ts`) names its file, TS2741 in
-  `store/sqlite.ts` until `KIND_TABLES` has it.
 - A directory at a file's path: `Bun.file(path).exists()` is false and
   `.text()` throws EISDIR, so use `existsSync` where unreadable must not
   read as absent. Planting one tests "unreadable" even as root.
-- `sqlite.ts` schema changes APPEND to `SQLITE_MIGRATIONS` (version = its
-  length, in `PRAGMA user_version`), never editing a shipped entry.
-- `bun:sqlite`: `new Database(path)` CREATES a missing file; `OR IGNORE`
-  swallows CHECK violations too; a trailing lone high surrogate binds as
-  `''`; `close()` finalizes `db.query` statements at once, `db.prepare`
-  ones only when finalized or GC'd.
-- Write/Edit decode a four-hex-digit Latin-1 escape into the letter
-  (skill `ascii-source-unicode-via-codepoints`), but surrogate (`\uD800`)
-  and braced (`\u{e9}`) escapes arrive as typed.
-- Import store code from `./store/index.js` and port types from
-  `./store/types.js`, never `./store.js` (the sibling's `openEffortStore`,
-  `EffortRowKind`, `AppendResult` differ).
-- `import/order` puts all `import type` lines in ONE group ranked by
-  segment COUNT (fewer `/` first), not name: `./types.js` before
-  `../../config.js`. `./index.js` is its own group after a blank line.
-- `src/effort/report.ts` reads `sessions.ndjson` directly, not the
-  selected store: under default `sqlite`, `rafa effort report` sees
-  nothing `effort collect` wrote.
-- `sqlite.ts` `appendKind` returns early on an EMPTY batch, before the
-  version check: past `SQLITE_MIGRATIONS`, `append(kind, [])` answers
-  `{ appended: 0, skipped: 0 }` where every other call refuses, and
-  `collect.ts` appends `[]` on every "nothing new" run.
-- `collectSessionRow` copies attribution fields ONE BY ONE: a new field
-  reaches no row until copied there. Issue keys are team-keyed
-  (`ISSUE_TEAM_KEYS`), as `[a-z]+-\d+` reads `PHASE-0` from this branch.
-- Mutation legs (`mutation-leg-grids`): a bun script runs ONE file per
-  leg via `Bun.spawnSync([process.execPath, 'test', <file>])`, unmutated
-  runs before and after as controls; never run the full suite meanwhile.
-- `collectEffort` with `repoRoot` at the sibling writes the sibling's
-  `.ralph/` unless handed a temp-root `store` (or use a temp `repoRoot`
-  plus `plansDir` and `readCommits`).
-- On bun too (skill `env-gated-suite-skip-readings` measured vitest),
-  `describe.skipIf(true)` runs its callback while its cases report
-  `(skip)`: keep fixture reads and heavy setup in `beforeAll` or a case.
-- `bun:test` hook/case timeouts (`number | { timeout }`, second arg)
-  default to 5000ms PER HOOK; a two-backend `beforeAll` over the live
-  sibling (~4-5s each) needs one, else it fails as `(unnamed) ... hook
-  timed out`, blaming no hook.
-- Compare store backends' `read(kind)` rows by `JSON.stringify(row)`
-  (`toEqual` misses field order), paired by key, not position.
-- Drop keys with an `Object.entries` loop, not a `{ mode: _mode, ...rest }`
-  discard: `@typescript-eslint/no-unused-vars` has no ignore pattern or
-  `ignoreRestSiblings` here.
-- `readRafaBlocks` `span` and `PlanIssue.line` are 1-based,
-  `TaskInfo.lineNum` 0-based: compare as `lineNum + 1`.
-- Illustrate the plan format inside a LONGER outer fence (4 backticks): in
-  a 3-backtick one the first inner closing fence closes the OUTER, and
-  later `rafa:` fences become real blocks to any CommonMark reader.
+- Open store debt (`.plans/REVIEW-phase-0-full.md`), no task owns it: the
+  SQLite writers return before the schema-version check on an EMPTY
+  batch (`sqlite.ts` `appendKind`, `findings.ts`, `triage.ts`), so an old
+  `rafa` over a newer store reports nothing new instead of refusing, and
+  `collect.ts` appends `[]` on every such run. `src/effort/report.ts`
+  reads `./store.js` directly, so under the default `sqlite` store
+  `rafa effort report` sees nothing `effort collect` wrote.
 - CommonMark oracle: `mdast-util-from-markdown` (transitive via
   `@eslint/markdown`) loads into a scratch script by absolute path to its
   `node_modules/.../index.js`.
-- After an UNCLOSED `rafa:` fence, `findNextTask` (`src/utils/tracker.ts`,
-  skipping only CLOSED blocks' task lines, fence-blind elsewhere) and
-  `parsePlan` disagree on purpose (skipping would end the plan): the model
-  reports `task-in-block` and the dispatched `lineNum` matches no task.
-- The `rafa:*` strip lives in `findNextTask`, so a caller building its own
-  `TaskInfo` (a Tracker port) bypasses it. A stray bare fence closing a
-  `rafa:` block late swallows real tasks, signalled only by
-  `announcePlanIssues` at start.
-- A commit BODY is empty unless the subject truncated (72 chars with the
-  `type: ` prefix), so asserting something is absent from the body needs a
-  planted line longer than that, or it passes vacuously.
-- `parseTaskDeclaration` needs one `DECLARATION_KEYS` key, so
-  `Task  {skills=x}` is no declaration and stays in the text; beside a
-  known key, `skills` lands in `extras`, stripped. The spec calls
-  `skills=` "a new recognised key".
-- `Bun.YAML.parse` traps are in the headers of `src/config.ts`,
-  `src/plan/parse.ts` (`issue: #42` is `null`) and `src/report/parse.ts`
-  (an unquoted value holding `: ` THROWS). Quote such values.
-- From `src/`, `./plan` and `./plan.js` both resolve to `src/plan.ts` (the
-  command), never the barrel: import `./plan/index.js`.
-- `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print counts
-  only; `env -u CLAUDECODE` restores `(pass)`/`(skip)` lines and file
-  names, and `--reporter=junit --reporter-outfile=<f>` lists skips anyway.
-  Count DISTINCT failing titles: the summary re-lists `(fail)`.
-- `planStubFromPrompt` answers the FIRST `ralph:plan=` stamp in a prompt,
-  and task and wrap-up prompts embed plan text ABOVE the appended stamp,
-  so a plan quoting a stamp misattributes its sessions.
-- eslint ignores `.claude/**`, so skill prose has no lint gate.
-- Pin a real-plan-file test to `.plans/PLAN-*.md`, the frozen template: the
-  loop ticks `PLAN_TRACKER-*.md` on dispatch, so it drifts task by task.
-- `bunx eslint --fix`: a nested `a < b ? -1 : a > b ? 1 : 0` comparator is
-  reflowed onto four lines (`@stylistic/multiline-ternary`), so sort with
-  `a.localeCompare(b)`; an apostrophe in a single-quoted test title is
-  backslash-escaped, so write titles without one.
+- `src/plan/parse.test.ts` reads
+  `.plans/PLAN-phase-0-package-parity-cutover.md` at describe time, and
+  `.plans/` is gitignored: on a clone without that plan the file fails
+  before any case runs.
 - A strip-proof test's marker must be a checklist line (`- [ ] <marker>`)
   inside the `rafa:*` block: a prose body is never taken for a task, so
   every absence assertion passes with the strip gone.
-- Stand in for a PATH-resolved binary under `Bun.spawn`: a `#!/bin/sh`
-  script in a temp dir with `PATH` set to that dir ALONE (restored in
-  `afterEach`); bun refuses a name absent there, so the real binary is
-  unreachable. The script names `/bin/cat`, `/bin/sleep` absolutely.
-- `Bun.spawn` (1.3.14): a signalled child's `exited` answers 128+signal
-  (137 for SIGKILL), so `spawnClaude`'s "reported as 1" TSDoc is stale and
-  its `?? 1` never fires. Quitting a piped stdout read does NOT kill the
-  child (EPIPE, runs on): await `exited` before rejecting. A pipe read to
-  EOF waits on any grandchild still holding it.
-- `spyOn(process.stdout, 'write')` misses `console.*`. To force a pipe
-  chunk boundary, have the child poll (bounded) for a marker file the
-  parent's sink writes on its first chunk; a sleep split can merge under
-  load.
-- `.claude/skills/dev-planner/SKILL.md`'s `rafa:report` section restates
-  `src/report/parse.ts`'s rules: change the two together.
-- A mutation leg widening a constant a test `it.each`es over adds cases,
-  so the denominator moves: read M from each leg, never from the control.
-- Task sessions pass `--session-id <id>` AHEAD of the declaration flags
-  (`--tools` is variadic, so it stays last); the log is `<id>.jsonl`.
-- A SQLite-only table stays outside the port's row map: add a migration,
-  write through `sqlite.ts`'s exported `sqliteStorePath`/`withSqliteStore`
-  and update every full table-list expectation (`sqlite.test.ts`,
-  `triage.test.ts`, `absences.test.ts`).
-- `it.each(CONST)` over an `as const` tuple is TS2769 (readonly): spread
-  it, `it.each([...CONST])`.
-- `writeFindings`/`writeTriage` write `effort.sqlite` WHATEVER `store`
-  selects, deduping per SESSION, never table-wide (phase 5 promotes on an
-  artifact recurring across sessions).
-- `.specs/` and `.plans/` are BOTH gitignored, so a sweep of tracked files
-  never reaches them: don't rewrite a plan's or spec's illustrative text,
-  or a test quoting it verbatim, to chase a dead-code sweep.
 - A genuinely model-generated `rafa:report` fixture cannot come from a
   task dispatch yet: pipe a prompt to `claude -p
   --dangerously-skip-permissions`, freeze its stdout ONCE as a file
   (`src/report/testdata/`) and read it back.
-- A nullable model field fails a non-null matcher parameter
-  (`toContain(expected: string)`, TS2769) even where plainly non-null:
-  narrow via a throwing helper (`textOf`), not `!`. An expected array
-  against a closed-set union field needs `: ReportFinding[]`, else its
-  literals widen to `string`.
-- SQLite 3.51.0 upsert: the conflict target must repeat a partial index's
-  `WHERE` and an expression index's expressions (`IFNULL(a,'')` matches
-  `ifnull(a, '')`; `coalesce` or bare columns throw), so dedupe a nullable
-  column via `ifnull(col, sentinel)` plus a CHECK refusing the sentinel.
-  `ON CONFLICT` clauses stack. No `ALTER TABLE` changes a CHECK: leave a
-  column that will widen CHECK-free. `ADD COLUMN` keeps expression indexes.
-- `bun:sqlite` binds `true`/`false` as 1/0, and INTEGER affinity stores
-  the STRING `'1'` as 1, which `CHECK (x IN (0, 1))` accepts: check a
-  boolean in JS before binding it.
-- `@progress.txt` (literal `@`) is a stray TRACKED file at the root; the
-  notes file is `progress.txt`. Never append to the `@` one.
-- `src/utils/progress.ts` rewrites `progress.txt` whole from SQLite
-  `findings` before every dispatch: a render over an empty store BLANKS
-  an authored `progress.txt`, this repo's tracked one included.
-- `plan.ts` `formatProgressSection` truncates at 16,000 CHARACTERS keeping
-  the TAIL, the OLDEST entry of a most-recent-first render; it never acts
-  while the renderer's byte cap stays <= that (`progress.test.ts`).
-- Loop-generated text in a TRACKED file must pass the control-byte gate:
-  `core.hooksPath` is `.githooks`, whose `pre-commit` runs it `--staged`
-  (one ESC in a staged `progress.txt` refused a commit); a manual run
-  needs `--include-untracked`.
-- `bun:sqlite` (1.3.14): breaking out of `stmt.iterate()` early breaks
-  that cached `db.query` statement: the next `iterate()` throws `bad
-  parameter or other API misuse`, and `reset()` then `iterate()` silently
-  yields one row fewer. `.all()` and a fresh `prepare` are fine.
-- In the Bash tool, a zsh expansion error kills that command and the rest
-  of the line, which reads like "no hits": quote grep globs (an unquoted
-  `--include=*.ts` prints `no matches found`) and separators (a bare
-  `=====` is `=cmd` expansion, `not found`).
 - `src/PROMPT.md` does not ask the session for a `rafa:report` block, and
   no plan task adds the ask: until one does, every task session is stored
   as a `no-block` absence and no finding reaches `progress.txt`.
@@ -204,46 +56,11 @@
   (`makeRepo`, `collect.test.ts`); for `start`, copy
   `src/tests/task-report.test.ts` (own HOME, PATH = stand-in `claude` +
   git's dir).
-- A 0444 SQLite store (non-root) still reads, and a write throws `attempt
-  to write a readonly database`: it separates a write failure from a
-  render failure in a test.
-- Retiring a `PROMPT_SHAPES` kind reds `parity-lineage.test.ts` (LIVE
-  sibling rows byte-equal to a reclassify) until an exception excludes
-  `kind` (and hand-patched `planStub`) for exactly those rows, and
-  `plan-stamp.test.ts` holds the prefix: grep `src/` for both literals.
-- Never import `src/rafa.ts` from a library module: it dispatches on
-  `process.argv` when imported. A name added to either barrel or
-  `config.ts` must also reach the root `src/index.ts`.
-- `bun run build`: without `--splitting` a subpath's names are COPIES of
-  the root's; without `rm -rf dist`, stale hash-named chunks publish. A new
-  entry or template goes in the script AND `package-build.test.ts`.
-  `module` still names the root `index.ts` placeholder.
-- The build ships no type declarations (the spec's `exports` has no
-  `types`): a TS consumer gets TS7016 on `.` and `./ports`. `bun pm pack
-  --dry-run` lists the published set, even under `private: true`.
-- Type-level claims CAN run in `bun test`: `ts.createProgram` over tmpdir
-  probes importing `src/` by absolute `.js` path (~0.4s), then
-  `getPreEmitDiagnostics` per probe (`src/ports/index.test.ts`). Hold each
-  refusal to its code AND message: unrelated ones share TS2322.
-- `noUnusedLocals` does not flag an unused, unexported top-level interface
-  (tsc 5.9), so a type losing its `export` passes every gate unless a case
-  lists the module's type exports.
-- Link-test the build: `bun run build`, `bun link` at the root, `bun link
-  @open-tomato/rafa` in a scratch `bun init` dir; the link targets the REPO
-  ROOT, resolving through `package.json`'s `bin`/`exports`, not `dist/`.
-- The `--target=bun` build makes `.`, `./cli` and `./store` BUN-ONLY
-  (`bun:sqlite` fails node's ESM loader before any module code); only
-  `./plan` and `./ports` load under node, so `engines.node >=22` is wrong
-  for three of five entries: debt beside `.ralph/` and `bun@1.3.9`.
-- A file can cross the repo's own 800-line cap through many small "wire
-  X into `start.ts`"-shaped tasks, none large on its own: the sibling
-  import already landed `src/start.ts` at 798, and six unrelated
-  wiring tasks after it added a net 162 more with no task owning a
-  split. A whole-change-set review is where this is caught; no single
-  task's diff looks big enough to flag it alone.
-- `git merge-tree --write-tree A B` prints ONE line (the tree sha) and
-  exits 0 on a clean merge; a real conflict adds `CONFLICT (content)`
-  text, three merge-stage index lines for the path, and exit 1. A
-  silent/stale tool would print the same one-line clean shape, so pair
-  the reading with a scratch-repo control that forces a real conflict
-  through the same command before trusting a clean result.
+- A name added to either barrel or `config.ts` must also reach the root
+  `src/index.ts`.
+- Package debt before publishing: `private: true`; `packageManager`
+  declares `bun@1.3.9` against the 1.3.14 every reading used;
+  `engines.node >=22` although three of five entries are bun-only;
+  `module` still names the placeholder root `index.ts`.
+- `src/start.ts` is 960 lines, over the 800 cap, and needs a task that
+  owns its split.
