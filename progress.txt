@@ -16,14 +16,13 @@
   re-derive the rationale, don't swap the word. Editing `store.ts`
   falsifies `store/ndjson.ts`'s note that it is byte-identical to the
   sibling's: fix both, or wait for its (unscheduled) retirement.
-- A path-literal sweep of `src/` must not rewrite fixture text:
-  `LONG_TASK` is length-pinned (181 chars,
-  `src/tests/commit-refusals.test.ts`); `RESIDUE`
-  (`src/tests/agents-split-accounting.test.ts`) snapshots the sibling's
-  `AGENTS.md`.
-- After moving a file with a `new URL('../../x', import.meta.url)` base,
-  recount `../` (`src/<subdir>/*.test.ts` reaches the root with `../../`):
-  one too many lands silently in parent `open-tomato/` (own `packages/`,
+- A path-literal sweep of `src/` must not rewrite fixture text (both in
+  `src/tests/`): `LONG_TASK` (`commit-refusals.test.ts`) is length-pinned
+  at 181 chars; `RESIDUE` (`agents-split-accounting.test.ts`) snapshots
+  the sibling's `AGENTS.md`.
+- Moving a file with a `new URL('../../x', import.meta.url)` base: recount
+  `../` (`src/<subdir>/*.test.ts` reaches the root with `../../`); one too
+  many lands silently in parent `open-tomato/` (own `packages/`,
   `AGENTS.md`), where guards pass. Print the resolved path once; guard
   reads with `existsSync` (`findAgentsMaps`, `context-page-imports.test.ts`).
 - `.githooks/pre-commit` runs the control-byte gate `--staged`; a manual
@@ -50,16 +49,16 @@
   `stage`, which the runbook's "one-line default flip" must check.
 - `progress.txt` is TRACKED despite `.gitignore` (committed first):
   `git add -A` commits every edit until `git rm --cached progress.txt`;
-  `git ls-files` lists it, `git check-ignore` is silent. The root file
-  literally named `@progress.txt`, also tracked, holds task summaries;
-  findings go here.
+  `git ls-files` lists it, `git check-ignore` is silent. `@progress.txt`
+  (root, also tracked) holds task summaries; findings go here.
 - Store port, `src/effort/store/types.ts`: `EffortStore` (`append`,
   `keys`, `read`, per `EffortRowKind`), `EffortRowByKind`,
   `EFFORT_KEY_PROJECTIONS`, `SessionEffortRow` (re-exported by
-  `effort/collect.ts`; `SessionMode` `mode` is `'local'` via `SESSION_MODE`
-  until phase 6 adds `remote`; `issueIdentifier`, no
-  `issueIdentifierSource`); `AppendResult` = `{ path, appended, skipped }`,
-  NDJSON-only readings on a backend's wider type.
+  `effort/collect.ts`; `SessionMode` `mode` is `'local'` via
+  `SESSION_MODE` until phase 6 adds `remote`; `issueIdentifier`, no
+  `issueIdentifierSource`);
+  `AppendResult` = `{ path, appended, skipped }`, NDJSON-only readings on
+  a backend's wider type.
 - Declare ports with PROPERTY signatures (`keys: (kind: K) => ...`): tsc
   refuses a narrower backend parameter (TS2322) a method signature
   accepts bivariantly. Close a per-kind map with a `type` alias, which
@@ -201,9 +200,9 @@
   fence, which `findNextTask` ignores on purpose (skipping would answer
   null, which `start.ts` wraps up as a finished plan): the model reports
   `task-in-block` and the dispatched `lineNum` matches nothing in
-  `model.tasks`. The 27 local plans (this repo's 2, the sibling's 25)
-  hold 0 `rafa:*` blocks, so a real-plan test over them exercises the
-  checklist only.
+  `model.tasks`. The 27 local plans (2 here, 25 in the sibling) hold 0
+  `rafa:*` blocks, so a real-plan test over them exercises the checklist
+  only.
 - The `rafa:*` strip rule lives at the SOURCE, `findNextTask`: all four
   quoting sites (prompt header and log in `dispatchTask`, log, subject
   and body in `commitFinishedTask`) quote `taskInfo.task`, so a caller
@@ -247,6 +246,9 @@
   `lineNum` (plan edited after the tracker copy, or after an unclosed
   `rafa:` fence) falls back to `full`, `fallback.reason`
   `no-task-at-line` or `task-text-differs`, which `dispatchTask` warns.
+  `full` itself locates no task, so its `fallback` is always null: a
+  dispatch test under `full` asserts zero warnings with no positive
+  control.
 - Injection sizes, 2026-09-13 (14 local plans, 1,051 dispatches, 0
   fallbacks): phase-0's 62 total 1,740,588 bytes `full`, 162,672
   `stage`, 16,637 `task`.
@@ -257,17 +259,15 @@
   records `injection`; `buildWrapUpPrompt(branch, planContent)` appends
   the whole plan below its classifier-key line and takes no mode.
   Integration tests: `src/tests/plan-injection.test.ts`.
-- `planStubFromPrompt` answers the FIRST `<!-- ralph:plan=... -->` in
+- `planStubFromPrompt` answers the FIRST `ralph:plan=` stamp comment in
   a prompt, and task and wrap-up prompts embed plan text ABOVE the
-  appended stamp, so a plan quoting a marker misattributes its
-  sessions. No `PLAN*.md` in either `.plans/` carries one today.
-- eslint ignores `.claude/skills/*/SKILL.md` (measured: "File ignored
-  because of a matching ignore pattern", exit 0), so skill prose has no
-  lint gate.
+  appended stamp, so a plan quoting a stamp misattributes its sessions.
+  No `PLAN*.md` in either `.plans/` carries one today.
+- eslint ignores `.claude/**` (`eslint.config.mjs`), so skill prose has
+  no lint gate.
 - A task to "add negative parser tests covering X, Y, Z" usually finds
-  most named cases already pinned in the module's colocated test file
-  (`parse.test.ts` held 4 of `parse.ts`'s 5): grep the suite for each
-  named case first and add only the gap.
+  most named cases already pinned in the module's colocated test file:
+  grep the suite for each named case first and add only the gap.
 - Pin a real-plan-file test to `.plans/PLAN-*.md`, the frozen template:
   the loop ticks `PLAN_TRACKER-*.md` `[ ]` to `[x]` on dispatch, so it
   drifts task by task under a fixed stage/task/declaration expectation.
@@ -277,15 +277,9 @@
   in a single-quoted `it(...)`/`describe(...)` title is backslash-escaped
   (`\'s`), not requoted (double quotes are forbidden), so write titles
   without one.
-- A "strip-proof" test over a `rafa:*` block needs the block's body
-  written AS a checklist line (`- [ ] <marker>`), not as plain prose: a
-  prose-only block body can never be mistaken for a task regardless of
-  whether `findNextTask`'s exclusion still works, so every downstream
-  absence assertion (prompt head, operator log, commit subject/body)
-  passes whether or not the strip is doing anything. Confirmed by
-  mutating `findNextTask` to drop its `inBlock.has(i)` skip: only the
-  checklist-shaped marker reddens (`src/tests/rafa-block-strip.test.ts`).
-- `renderInjection({ mode: 'full', ... })` (`src/plan/inject.ts`) never
-  falls back — `fallback` is always null under `full`, which locates no
-  task by line at all — so a dispatch test driven under `full` asserts
-  zero warnings without a positive control for that absence.
+- A "strip-proof" test over a `rafa:*` block must write its marker AS a
+  checklist line (`- [ ] <marker>`): a prose body is never taken for a
+  task, so every absence assertion (prompt head, operator log, commit
+  subject/body) passes with the strip gone. Dropping `findNextTask`'s
+  `inBlock.has(i)` skip reddens only the checklist-shaped marker
+  (`src/tests/rafa-block-strip.test.ts`).

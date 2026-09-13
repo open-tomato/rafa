@@ -242,6 +242,23 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.issues).toEqual([]);
   });
 
+  it('pins `skills=` to extras: no flag of its own, and the text it trails comes clean', () => {
+    const line =
+      'Add the Zod schema for CreateJobRequest  {agent=loop-implementer effort=high skills=zod-schemas}';
+    const declaration = declarationOf(line);
+
+    expect(declaration.extras).toEqual([
+      { key: 'skills', value: 'zod-schemas' },
+    ]);
+    expect(resolveDeclarationFlags(declaration).args).toEqual([
+      '--agent',
+      'loop-implementer',
+    ]);
+    expect(parseTaskDeclaration(line).text).toBe(
+      'Add the Zod schema for CreateJobRequest',
+    );
+  });
+
   it('takes the first of a duplicated key and says so', () => {
     const declaration = declarationOf('Do it  {model=opus model=haiku}');
 
