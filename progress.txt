@@ -301,7 +301,7 @@
   (`findings[2].signal`). Closed sets `REPORT_STATUSES`, `FINDING_KINDS`,
   `FINDING_SIGNALS` go null with an issue outside them; unknown keys go
   to each level's `extras`. Entries are NEVER deduped: the findings
-  writer dedupes (artifact, else trigger + what).
+  writer dedupes.
 - `.claude/skills/dev-planner/SKILL.md`'s `rafa:report` section (field
   tables, the parser-contract paragraph) restates
   `src/report/parse.ts`'s rules: change the two together.
@@ -450,3 +450,20 @@
   file for each named case and confirm it passes (`git log --oneline --
   <the test file>` showing only the implementation commit says they were
   pinned then), then add only the gap.
+- `src/index.ts` is the package-root barrel: ALL of `./plan/index.js`,
+  `./effort/store/index.js` and `config.ts`, plus the five commands
+  `src/rafa.ts` dispatches, as `startCommand`, `planCommand`,
+  `usageCommand`, `effortCollectCommand`, `effortReportCommand`.
+  `index.test.ts` pins the spelled name list, each subpath and `config.ts`
+  contained in the root, every binding `src/rafa.ts` imports (read off its
+  source) reachable from the root, and a fresh-process import probe (no
+  output, signal listener, exit code or file). A name added to either
+  barrel or to `config.ts` must be added to the root too. Never import
+  `src/rafa.ts` from a library module: it dispatches on `process.argv`
+  when imported. `package.json` `module` still names the root
+  `index.ts`, the `bun init` `console.log` placeholder.
+- `bun build src/index.ts --target bun` inlines `start.ts` and `plan.ts`,
+  whose `__dirname` comes from `import.meta.url`, so the bundle reads
+  `plan-prompt.md` (and `PROMPT.md` when the repo root has none) beside
+  the bundle file, not beside `src/`: a build must place both next to
+  every bundle that inlines those modules (measured on the index bundle).
