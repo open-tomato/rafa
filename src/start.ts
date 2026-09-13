@@ -51,11 +51,11 @@
  *               before escalating (default 2; 0 disables repair but
  *               still reports the verdict).
  *
- * After the last task the loop runs a wrap-up session (promote findings,
- * sync with main, commit, push, open or update the PR) and then WAITS on
- * that PR's checks. A conflicting PR gets no CI run at all, so without
- * this last stage the loop can report a finished plan whose code was
- * never checked once.
+ * After the last task the loop runs a wrap-up session (`start/wrap-up.ts`:
+ * promote findings, sync with main, commit, push, open or update the PR)
+ * and then WAITS on that PR's checks. A conflicting PR gets no CI run at
+ * all, so without this last stage the loop can report a finished plan
+ * whose code was never checked once.
  */
 import type { ConfigSource, InjectMode, ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -74,6 +74,7 @@ import { ConfigError, loadConfig } from './config.js';
 import { parsePlan, renderInjection } from './plan/index.js';
 import { describeTaskReportRecord, recordTaskReport } from './report/record.js';
 import { setActivePlanStub, withStamp } from './start/stamp.js';
+import { preserveProgress } from './start/wrap-up.js';
 import { runClaude, runClaudeCaptured, checkUsage } from './utils/claude.js';
 import { commitTaskWork } from './utils/commit.js';
 import {
@@ -153,57 +154,6 @@ export function guardRunBranch(
     console.warn('   The run proceeds; the convention is `feat/<plan-stub>`.');
   }
   return true;
-}
-
-/**
- * Assembles the prompt the end-of-run wrap-up session is given.
- *
- * Its FIRST LINE is a classifier key: `effort/classify.ts` buckets a
- * session whose prompt begins with it as `wrap-up`. So the plan is
- * APPENDED below the instructions and never placed above them, and the
- * stamp {@link withStamp} adds lands after the plan.
- *
- * The plan goes in WHOLE whatever injection mode the run's task
- * sessions were dispatched under, which is why this takes the plan and
- * no mode: there is no mode to get wrong. `full` renders the plan
- * document byte for byte (`plan/inject.ts`), so what is appended here
- * is the `full` rendering. The session titles the PR after the plan,
- * looks for its issue reference there and summarises the work of every
- * stage, and a `stage` or `task` rendering holds one stage, or one
- * task line.
- */
-export function buildWrapUpPrompt(branch: string, planContent: string): string {
-  return [
-    '* Read `@progress.txt` in full.',
-    '* If there\'s anything worth keeping, grab what\'s generally relevant from `@progress.txt` and include it in the `context/` page that owns its subject (repo-root `context/` for tree-wide law, `packages/<pkg>/context/` for one package\'s), `@README.md`, `@CONTRIBUTING.md` or a pertinent skill under `.claude/skills/`. The root `@AGENTS.md` is a capped map read into every turn of every session: point at the page from there if a new one is needed, never inline the finding itself.',
-    '* Promote a finding ONLY when all three hold, and delete or keep it rather than promoting it when any one fails. It is PROJECT-SPECIFIC — a fact about THIS tree (its layout, its gates, its conventions, what a command here actually answers) and not a general technique, which belongs in a skill and not in this repo\'s docs. It is NOT ALREADY COVERED by a skill under `.claude/skills/` — read the skill that matches the finding\'s subject before writing anything, and extend that skill in place rather than restating it in a second document. And it NAMES WHAT IT REPLACES — the sentence, bullet or table row it supersedes, deleted in the SAME edit — or, when it replaces nothing, says so. A promotion landing beside the claim it should have replaced leaves two authorities on one subject, and nothing here compares two documents, so the stale one is never reported again.',
-    '* If a learn/learn-eval skill is available in this session, invoke it now so reusable patterns from this run are persisted as skills.',
-    '* If it\'s present, extract the issue reference from the plan below (e.g. "#42") to be used in the PR title.',
-    `* If the reference is not present on the plan check if the branch name (${branch}) carries one (e.g. feat/42-slug).`,
-    '* Use the plan title as the PR title, include the issue reference if you found it, e.g. "Implement user authentication (#42)".',
-    '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
-    '* BEFORE pushing, bring the branch up to date with the base: `git fetch origin main` then `git merge origin/main`. A branch that conflicts with main gets NO CI run at all — GitHub cannot build `refs/pull/<n>/merge` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan\'s context is still loaded, is the cheapest place it will ever be.',
-    '* Resolve MECHANICAL conflicts yourself and do not stop for them: dependency version bumps (take the base\'s version unless this branch deliberately pinned it, and say which in the commit), lockfiles, generated artifacts, and complementary additions where both sides appended different material to the same file (keep BOTH). Stop only for a genuine semantic conflict — two sides changing the same behaviour incompatibly. In that case commit nothing, leave the branch as it is, and report the conflicting paths and both sides\' intent, so a human decides.',
-    '* If the merge touched `bun.lock` or any `package.json`, run `bun install --frozen-lockfile` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base\'s copy (`git checkout origin/main -- bun.lock`), run a plain `bun install` so this branch\'s own dependencies are re-added, and confirm the frozen run then passes.',
-    `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
-    '* This step is IDEMPOTENT because a plan\'s own close-out may already have opened the PR. Read the state first with `gh pr list --head <branch> --state open --json number`: when it names a PR, push to it and update its body with `gh pr edit` so the description covers the promotions this session just committed; only create one with `gh pr create` when that list is empty. A `gh pr create` failure saying the PR already exists is the expected shape of that race, never a reason to open a second PR from a new branch.',
-    '* Do not include Claude attribution in the commit or PR message.',
-    '',
-    'The plan this run executed follows, in full.',
-    '',
-    planContent,
-  ].join('\n');
-}
-
-/** Runs the wrap-up session over the plan the run was started on. */
-async function preserveProgress(planContent: string): Promise<void> {
-  const prompt = buildWrapUpPrompt(getCurrentBranch(), planContent);
-  const exitCode = await runClaude(withStamp(prompt));
-  if (exitCode !== 0) {
-    console.error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);
-  } else {
-    console.log('\n✅ Progress preserved; PR opened or updated on this branch.');
-  }
 }
 
 /** How long to keep polling a PR's checks before giving up on them. */

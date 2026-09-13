@@ -4,11 +4,11 @@
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
  * output only the operator reads. It has three call sites: plan
- * generation in `plan.ts`, and the wrap-up and CI-repair sessions in
- * `start.ts`, all of which want today's behaviour exactly — one model,
- * one effort, every tool. So the flags are a parameter with an EMPTY
- * default: `runClaude(prompt)` spawns exactly the process the loop
- * spawned before declarations existed.
+ * generation in `plan.ts`, the wrap-up session in `start/wrap-up.ts`
+ * and the CI-repair session in `start.ts`, all of which want today's
+ * behaviour exactly — one model, one effort, every tool. So the flags
+ * are a parameter with an EMPTY default: `runClaude(prompt)` spawns
+ * exactly the process the loop spawned before declarations existed.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
  * LOOP reads as well, and the per-task dispatch is its caller, through

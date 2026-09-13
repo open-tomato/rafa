@@ -27,9 +27,9 @@
  * `content.startsWith(shape.prefix)` over the WHOLE prompt, so one
  * line above the body re-buckets every one of the four shapes as
  * `other` — silently, because that module's drift guard is a
- * containment check that would stay green. `start.ts` states the same
- * rule at its wrap-up builder: add lines after line 1, never before
- * it. {@link planStubFromPrompt} therefore SEARCHES rather than
+ * containment check that would stay green. `start/wrap-up.ts` states
+ * the same rule at its wrap-up builder: add lines after line 1, never
+ * before it. {@link planStubFromPrompt} therefore SEARCHES rather than
  * matching a prefix, which is what lets the marker sit at the end.
  *
  * A stub is written verbatim and matched against the same character

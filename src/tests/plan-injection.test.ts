@@ -5,10 +5,10 @@
  * mode, and each is tested beside its own module. `start.ts` is where
  * the two meet: it hands `--inject=` to the config as the command-line
  * layer, renders every task prompt in the mode that comes back, and
- * builds the wrap-up prompt with no mode at all. The cases here drive
- * those seams through the real resolver over a real
- * `.rafa/config.yaml`, and through `dispatchTask` with only the session
- * spawn stubbed.
+ * hands the wrap-up the plan with no mode at all, for `start/wrap-up.ts`
+ * to build its prompt from. The cases here drive those seams through
+ * the real resolver over a real `.rafa/config.yaml`, and through
+ * `dispatchTask` with only the session spawn stubbed.
  *
  * ## Controls
  *
@@ -22,9 +22,11 @@
  *
  * ## What is not driven
  *
- * `start()` itself is not: it spawns the real CLI with no seam. What it
- * threads is pinned instead, by reading its source for the two calls
- * that carry the mode to the dispatch and the plan to the wrap-up.
+ * `start()` itself is not: it spawns the real CLI with no seam, and
+ * neither does `preserveProgress`. What they thread is pinned instead,
+ * by reading each literal in the file it lives in: `start.ts` for the
+ * two calls that carry the mode to the dispatch and the plan to the
+ * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
 import type { InjectMode } from '../config.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start.js';
@@ -54,9 +56,9 @@ import {
 import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
+import { buildWrapUpPrompt } from '../start/wrap-up.js';
 import {
   announcePlanIssues,
-  buildWrapUpPrompt,
   dispatchTask,
   loadRunConfig,
 } from '../start.js';
@@ -416,12 +418,13 @@ describe('the wrap-up session', () => {
   });
 
   it('is started with the plan and never with a rendering', () => {
-    const source = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
+    const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
+    const wrapUp = readFileSync(new URL('../start/wrap-up.ts', import.meta.url), 'utf8');
 
-    expect(source).toContain('await preserveProgress(planContent);');
-    expect(source).toContain('buildWrapUpPrompt(getCurrentBranch(), planContent)');
-    expect(source).toContain('inject: injectMode,');
-    expect(source).not.toContain('await preserveProgress(injection');
+    expect(start).toContain('await preserveProgress(planContent);');
+    expect(wrapUp).toContain('buildWrapUpPrompt(getCurrentBranch(), planContent)');
+    expect(start).toContain('inject: injectMode,');
+    expect(start).not.toContain('await preserveProgress(injection');
   });
 });
 
