@@ -241,3 +241,9 @@
   wiring tasks after it added a net 162 more with no task owning a
   split. A whole-change-set review is where this is caught; no single
   task's diff looks big enough to flag it alone.
+- `git merge-tree --write-tree A B` prints ONE line (the tree sha) and
+  exits 0 on a clean merge; a real conflict adds `CONFLICT (content)`
+  text, three merge-stage index lines for the path, and exit 1. A
+  silent/stale tool would print the same one-line clean shape, so pair
+  the reading with a scratch-repo control that forces a real conflict
+  through the same command before trusting a clean result.
