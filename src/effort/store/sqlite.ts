@@ -36,6 +36,13 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
+ * The file holds one table that is not a kind: `findings`, one row per
+ * finding a task report lists. The port's row map does not name it and
+ * nothing in this module reads or writes it. `findings.ts` writes it
+ * through {@link withSqliteStore}, so it is opened, migrated and closed
+ * as every kind's table is, and says why it has a column per field and
+ * two deduplication keys where a kind has `row_json` and one.
+ *
  * ## The port's rules, as they come out here
  *
  *   - Append-only. `append` inserts, and nothing here updates or
@@ -160,6 +167,15 @@ import { EFFORT_KEY_PROJECTIONS } from './types.js';
 const STORE_FILE_NAME = 'effort.sqlite';
 
 /**
+ * The file the SQLite store lives in under one repo root, whether or
+ * not it exists yet. Every kind's table, and the findings table, sit in
+ * it.
+ */
+export function sqliteStorePath(repoRoot: string): string {
+  return join(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAME);
+}
+
+/**
  * The schema's history. The entry at index `i` takes a store from
  * version `i` to version `i + 1`; the module note says why the version
  * is this array's length and lives in `user_version`.
@@ -182,6 +198,37 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     sha      TEXT NOT NULL UNIQUE CHECK (sha <> ''),
     row_json TEXT NOT NULL
   );
+  `,
+  // Version 2: one row per task-report finding, outside the port's row
+  // map. `findings.ts` writes it and says why each constraint is there.
+  `
+  CREATE TABLE findings (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    kind         TEXT
+      CHECK (kind IN ('gotcha', 'pattern', 'location', 'skill-suggestion')),
+    trigger      TEXT CHECK (trigger <> ''),
+    what         TEXT CHECK (what <> ''),
+    cause        TEXT,
+    resolution   TEXT,
+    artifact     TEXT CHECK (artifact <> ''),
+    signal       TEXT CHECK (signal IN ('loud', 'silent')),
+    outcome      TEXT NOT NULL,
+    tracker_ref  TEXT,
+    collected_at TEXT NOT NULL,
+    CHECK (artifact IS NOT NULL OR (trigger IS NOT NULL AND what IS NOT NULL))
+  );
+
+  CREATE UNIQUE INDEX findings_by_artifact
+    ON findings (session_id, artifact)
+    WHERE artifact IS NOT NULL;
+
+  CREATE UNIQUE INDEX findings_by_trigger_what
+    ON findings (session_id, trigger, what)
+    WHERE artifact IS NULL;
   `,
 ];
 
@@ -216,8 +263,11 @@ const KIND_TABLES: Readonly<Record<EffortRowKind, KindTable>> = {
  * A lone UTF-16 surrogate: a high half with no low half after it, or a
  * low half with no high half before it. There is no `u` flag, so the
  * pattern reads code units, which is the level a lone half exists at.
+ * Nor is there a `g` flag, so `test` keeps no state between calls.
+ *
+ * Exported for the findings writer, whose text lands in this file too.
  */
-const LONE_SURROGATE =
+export const LONE_SURROGATE =
   /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 /** One row of a batch, keyed and serialised, ready to insert. */
@@ -344,11 +394,14 @@ export function migrateSchema(
 }
 
 /**
- * Opens the store, brings its schema forward, hands it to `use`, and
- * closes it whatever `use` did. Only a caller with a row to add passes
- * `create`, and only then is the directory made.
+ * Opens the store at `path`, brings its schema forward, hands it to
+ * `use`, and closes it whatever `use` did. Only a caller with a row to
+ * add passes `create`, and only then is the directory made.
+ *
+ * Exported for the findings writer, so its table is opened, migrated
+ * and closed exactly as every kind's is.
  */
-function withStore<T>(
+export function withSqliteStore<T>(
   path: string,
   create: boolean,
   use: (db: Database) => T,
@@ -396,7 +449,7 @@ function appendKind<K extends EffortRowKind>(
   if (entries.length === 0) return { path, appended: 0, skipped: 0 };
 
   const table = KIND_TABLES[kind];
-  const appended = withStore(
+  const appended = withSqliteStore(
     path,
     !existsSync(path),
     (db) => insertBatch(db, table, entries),
@@ -409,7 +462,7 @@ function keysOfKind(path: string, kind: EffortRowKind): Set<string> {
   if (!existsSync(path)) return new Set();
 
   const { name, keyColumn } = KIND_TABLES[kind];
-  const keys = withStore(path, false, (db) => db
+  const keys = withSqliteStore(path, false, (db) => db
     .query<{ key: string }, []>(
       `SELECT ${keyColumn} AS key FROM ${name} ORDER BY seq`,
     )
@@ -456,7 +509,7 @@ function readKind<K extends EffortRowKind>(
   if (!existsSync(path)) return [];
 
   const { name } = KIND_TABLES[kind];
-  const stored = withStore(path, false, (db) => db
+  const stored = withSqliteStore(path, false, (db) => db
     .query<{ seq: number; body: string }, []>(
       `SELECT seq, row_json AS body FROM ${name} ORDER BY seq`,
     )
@@ -488,7 +541,7 @@ export interface SqliteEffortStore extends EffortStore {
  * why the port has no `close` for this backend to need.
  */
 export function openSqliteStore(repoRoot: string): SqliteEffortStore {
-  const path = join(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAME);
+  const path = sqliteStorePath(repoRoot);
   return {
     append: (kind, rows) => appendKind(path, kind, rows),
     keys: (kind) => keysOfKind(path, kind),

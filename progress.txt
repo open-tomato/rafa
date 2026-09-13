@@ -46,8 +46,7 @@
   `stage`, which the runbook's "one-line default flip" must check.
 - `progress.txt` is TRACKED despite `.gitignore` (committed first):
   `git add -A` commits every edit until `git rm --cached progress.txt`;
-  `git ls-files` lists it, `git check-ignore` is silent. `@progress.txt`
-  (root, also tracked) holds task summaries; findings go here.
+  `git ls-files` lists it, `git check-ignore` is silent.
 - Store port, `src/effort/store/types.ts`: `EffortStore` (`append`,
   `keys`, `read`, per `EffortRowKind`), `EffortRowByKind`,
   `EFFORT_KEY_PROJECTIONS`, `SessionEffortRow` (re-exported by
@@ -315,10 +314,29 @@
 - `.claude/skills/dev-planner/SKILL.md`'s `rafa:report` section (field
   tables, the parser-contract paragraph) restates
   `src/report/parse.ts`'s rules: change the two together.
-- zsh does not word-split an unquoted `$var`: `for n in $names` runs
-  ONCE with the whole list, so a generated probe collapses onto one line
-  and tsc prints TS1005/TS1434 syntax errors, not a type reading. Use
-  `${=names}`.
 - A mutation leg widening a constant that a test `it.each`es over adds
   cases, so the denominator moves (`red 4 of 72` over a 71-case file):
   read M from each leg, never from the control.
+- `src/effort/store/findings.ts`: `writeFindings(root, { dispatch:
+  { sessionId, planStub, taskLine }, outcome, findings }, seams?)` writes
+  the `findings` table (migration 2) into `effort.sqlite` WHATEVER
+  `store` selects (no NDJSON counterpart; not a port kind, not in the
+  `./store` barrel). Dedupe is per SESSION (artifact, else exact trigger
+  + what), never table-wide: phase 5 promotes on one artifact recurring
+  across sessions. Bad dispatch/outcome throws before opening; a bad
+  entry is answered in `rejected` and the rest are written.
+- `claudeArgs` passes no `--session-id` and `start.ts` holds none, so
+  the loop does not know a task session's id at dispatch: wiring
+  `writeFindings` needs one obtained first.
+- A SQLite-only table: append to `SQLITE_MIGRATIONS` and write through
+  `sqlite.ts`'s exported `sqliteStorePath`/`withSqliteStore`
+  (`LONE_SURROGATE` too); update the two `tablesOf(...)` expectations in
+  `sqlite.test.ts` (layout, zero-byte cases).
+- SQLite 3.51.0 upsert: a conflict target on a PARTIAL unique index must
+  repeat its `WHERE` (else `ON CONFLICT clause does not match any
+  PRIMARY KEY or UNIQUE constraint`); several `ON CONFLICT` clauses
+  stack; a bare `ON CONFLICT DO NOTHING` also swallows a clash on any
+  other UNIQUE column (a generated id). No `ALTER TABLE` changes a CHECK
+  (syntax error), so leave a column that will widen CHECK-free.
+- `it.each(CONST)` over an `as const` tuple is TS2769 (readonly): spread
+  it, `it.each([...CONST])`. `check-types` skips tests, the IDE does not.
