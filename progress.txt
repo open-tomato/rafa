@@ -1,8 +1,8 @@
 - The plan's "Structured task report" stage deletes
   `.claude/skills/progress-hygiene`; docs must not treat it as permanent.
-- The sandbox blocks `rm -r`/`rm -rf` anywhere, /tmp too: empty a
-  directory by `mv`-ing its contents out; `cp -R src/. dest/` copies into
-  an existing one.
+- The sandbox blocks `rm -r`/`rm -rf` everywhere, /tmp too: empty a dir by
+  `mv`-ing its contents out; `cp -R src/. dest/` copies into an existing
+  one.
 - Relative imports under `src/` use `.js` specifiers for `.ts` files;
   keep them when moving files.
 - Tests use `bun:test`'s `spyOn` + `mock.restore()` (restores every spy),
@@ -16,7 +16,7 @@
   re-derive the rationale, don't swap the word. Editing `store.ts`
   falsifies `store/ndjson.ts`'s note that it is byte-identical to the
   sibling's: fix both, or wait for its (unscheduled) retirement.
-- Never rewrite fixture text in a path-literal sweep of `src/`:
+- A path-literal sweep of `src/` must not rewrite fixture text:
   `LONG_TASK` is length-pinned (181 chars,
   `src/tests/commit-refusals.test.ts`); `RESIDUE`
   (`src/tests/agents-split-accounting.test.ts`) snapshots the sibling's
@@ -50,8 +50,9 @@
   `stage`, which the runbook's "one-line default flip" must check.
 - `progress.txt` is TRACKED despite `.gitignore` (committed first):
   `git add -A` commits every edit until `git rm --cached progress.txt`;
-  `git ls-files` lists it, `git check-ignore` is silent. `@progress.txt`
-  (tracked) holds task summaries; findings go here.
+  `git ls-files` lists it, `git check-ignore` is silent. The root file
+  literally named `@progress.txt`, also tracked, holds task summaries;
+  findings go here.
 - Store port, `src/effort/store/types.ts`: `EffortStore` (`append`,
   `keys`, `read`, per `EffortRowKind`), `EffortRowByKind`,
   `EFFORT_KEY_PROJECTIONS`, `SessionEffortRow` (re-exported by
@@ -92,7 +93,7 @@
   `SQLITE_MIGRATIONS` (version = its length, in `PRAGMA user_version`),
   never editing a shipped entry; exported `migrateSchema(db, path,
   migrations?)` runs synthetic histories on `:memory:`.
-- `bun:sqlite`, missing from `sqlite.ts`'s header: `new Database(path)`
+- `bun:sqlite`, beyond `sqlite.ts`'s header: `new Database(path)`
   CREATES a missing file; `OR IGNORE` swallows CHECK violations too;
   `Statement.run` is sync (`{ changes, lastInsertRowid }`); a trailing
   lone high surrogate binds as `''`; `close()` finalizes `db.query`
@@ -259,28 +260,32 @@
 - `planStubFromPrompt` answers the FIRST `<!-- ralph:plan=... -->` in
   a prompt, and task and wrap-up prompts embed plan text ABOVE the
   appended stamp, so a plan quoting a marker misattributes its
-  sessions. None of the `PLAN-*.md` files in either `.plans/` (2 here,
-  13 in the sibling) carries one today.
-- eslint ignores `.claude/skills/*/SKILL.md` (measured on
-  `dev-planner`: exit 0 with "File ignored because of a matching ignore
-  pattern"), so skill prose has no lint gate.
-- A dedicated "add negative parser tests covering X, Y, Z..." task
-  (plan or report) tends to find most named cases already pinned in
-  the module's colocated test file, written when it shipped
+  sessions. No `PLAN*.md` in either `.plans/` carries one today.
+- eslint ignores `.claude/skills/*/SKILL.md` (measured: "File ignored
+  because of a matching ignore pattern", exit 0), so skill prose has no
+  lint gate.
+- A task to "add negative parser tests covering X, Y, Z" usually finds
+  most named cases already pinned in the module's colocated test file
   (`parse.test.ts` held 4 of `parse.ts`'s 5): grep the suite for each
   named case first and add only the gap.
-- `.plans/PLAN-*.md` is the frozen template a real-plan-file test can
-  pin against; `PLAN_TRACKER-*.md` is the copy the loop ticks `[ ]` to
-  `[x]` on dispatch, so it drifts task by task and is the wrong file
-  for a characterization test expecting a fixed stage/task/declaration
-  shape. `src/plan/*.test.ts` reaches repo root the same way
-  `src/tests/*.test.ts` does — `fileURLToPath(new URL('../../',
-  import.meta.url))` — both being one level under `src/`.
-- Two eslint-autofix traps on `bunx eslint --fix`: a nested
-  `a < b ? -1 : a > b ? 1 : 0` sort comparator gets reformatted onto
-  four lines by `@stylistic/multiline-ternary` rather than flagged for
-  a rewrite — use `a.localeCompare(b)` instead when sorting strings;
-  and an apostrophe inside a single-quoted `it(...)`/`describe(...)`
-  string gets backslash-escaped (`\'s`) rather than requoted, since the
-  project forbids double quotes — write test titles with no apostrophe
-  rather than let autofix escape one in.
+- Pin a real-plan-file test to `.plans/PLAN-*.md`, the frozen template:
+  the loop ticks `PLAN_TRACKER-*.md` `[ ]` to `[x]` on dispatch, so it
+  drifts task by task under a fixed stage/task/declaration expectation.
+- `bunx eslint --fix` traps: a nested `a < b ? -1 : a > b ? 1 : 0`
+  comparator is reflowed onto four lines by `@stylistic/multiline-ternary`,
+  not flagged, so sort strings with `a.localeCompare(b)`; an apostrophe
+  in a single-quoted `it(...)`/`describe(...)` title is backslash-escaped
+  (`\'s`), not requoted (double quotes are forbidden), so write titles
+  without one.
+- A "strip-proof" test over a `rafa:*` block needs the block's body
+  written AS a checklist line (`- [ ] <marker>`), not as plain prose: a
+  prose-only block body can never be mistaken for a task regardless of
+  whether `findNextTask`'s exclusion still works, so every downstream
+  absence assertion (prompt head, operator log, commit subject/body)
+  passes whether or not the strip is doing anything. Confirmed by
+  mutating `findNextTask` to drop its `inBlock.has(i)` skip: only the
+  checklist-shaped marker reddens (`src/tests/rafa-block-strip.test.ts`).
+- `renderInjection({ mode: 'full', ... })` (`src/plan/inject.ts`) never
+  falls back — `fallback` is always null under `full`, which locates no
+  task by line at all — so a dispatch test driven under `full` asserts
+  zero warnings without a positive control for that absence.
