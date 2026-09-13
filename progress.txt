@@ -269,3 +269,12 @@
   `dev-planner`): `bunx eslint <skill>` exits 0 with the warning "File
   ignored because of a matching ignore pattern", so skill prose has no
   lint gate; read the warning, not the exit code.
+- A dedicated "add negative parser tests covering X, Y, Z..." task
+  (plan or report) tends to find most named cases already pinned in
+  the module's own colocated test file, written when the module
+  shipped (`parse.test.ts` already held 4 of `parse.ts`'s 5 named
+  negative cases). Grep the suite for each named case first and add
+  only the gap. Here the gap was "a `rafa:` fence opened mid-paragraph"
+  at the `parsePlan` level: `blocks.test.ts` already held the
+  block-reader-level version ("a line that opens no fence"), so
+  `parse.test.ts` needed the model-level near-miss pair only.

@@ -224,6 +224,42 @@ describe('a plan with no block', () => {
   });
 });
 
+describe('a rafa: fence opened mid-paragraph', () => {
+  it('reads no block, so the plan holds only what surrounds it, and reports nothing', () => {
+    const midParagraph = doc(
+      'A block opens with ```rafa:context',
+      'c',
+      '```',
+      '# Stage: one',
+      '- [ ] A',
+    );
+    const model = parsePlan(midParagraph);
+    expect(model.blocks).toEqual([]);
+    expect(model.context).toBeNull();
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(stageNamesOf(model)).toEqual(['one']);
+    expect(textsOf(model)).toEqual(['A']);
+    expect(model.issues).toEqual([]);
+  });
+
+  it('reads the block once the fence opens its own line, the near miss', () => {
+    const opened = doc(
+      'A block opens with',
+      '```rafa:context',
+      'c',
+      '```',
+      '# Stage: one',
+      '- [ ] A',
+    );
+    const model = parsePlan(opened);
+    expect(model.blocks).toHaveLength(1);
+    expect(model.context).toBe('c');
+    expect(stageNamesOf(model)).toEqual(['one']);
+    expect(textsOf(model)).toEqual(['A']);
+    expect(model.issues).toEqual([]);
+  });
+});
+
 describe('the checklist, held against findNextTask', () => {
   let dir = '';
   beforeAll(() => {
