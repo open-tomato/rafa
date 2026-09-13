@@ -343,22 +343,18 @@
   skipped, rejected }`. The dispatch check is shared: `checkDispatch(
   subject, dispatch, outcome)`, `describeValue`, `textProblem` are
   exported from `findings.ts`. Neither table has `tracker_ref`.
-- `.specs/` and `.plans/` are BOTH gitignored at the repo root (`.gitignore`
-  lines 37-38: `.specs`, `.plans`), so `git ls-files` never lists a path
-  under either — a "sweep every reference across tracked files" task
-  naturally excludes them; don't rewrite a plan/spec's own illustrative
-  text (or a test's verbatim quotation of it, flagged by a comment like
-  "the spec's own example") to chase a dead-code sweep, since neither is
-  tracked and the quoting test doesn't assert the referenced file exists.
+- `.specs/` and `.plans/` are BOTH gitignored (`.gitignore` lines 37-38),
+  so a sweep of tracked files never reaches them: don't rewrite a plan's
+  or spec's illustrative text, or a test quoting it verbatim (flagged
+  "the spec's own example", asserting no referenced file exists), to
+  chase a dead-code sweep.
 - A fixture that must be a genuinely model-generated `rafa:report` (not one
-  a test author typed) has no source in a real task dispatch yet —
-  `src/PROMPT.md` still asks for no such block. Spawn `claude` directly
-  instead: `claude -p --dangerously-skip-permissions < prompt.txt`, the same
-  invocation `claudeArgs`/`spawnClaudeCaptured` build for a real task
-  session. Freeze the raw stdout ONCE as a file rather than regenerating it
-  per test run (nondeterministic, slow, needs network); read it back with
-  the `readFileSync(new URL('./x', import.meta.url), 'utf8')` idiom
-  `plan/parse.test.ts`'s real-plan-file case already uses. Placed at
+  a test author typed) cannot come from a real task dispatch yet: run
+  `claude -p --dangerously-skip-permissions < prompt.txt`, the invocation
+  `claudeArgs`/`spawnClaudeCaptured` build for a task session, freeze its
+  raw stdout ONCE as a file (nondeterministic, slow, needs network) and
+  read it back with `readFileSync(new URL('./x', import.meta.url),
+  'utf8')`, as `src/report/parse.test.ts` reads
   `src/report/testdata/live-session-report.txt`.
 - A field typed nullable in a parsed model (`ReportFinding.trigger:
   string | null`) fails a matcher's non-null parameter (`toContain(expected:
@@ -374,13 +370,12 @@
   `ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
   constraint`: a PARTIAL unique index's `WHERE`, an expression index's
   expressions (`IFNULL(a,'')` matches `ifnull(a, '')`, while `coalesce`
-  or the bare columns throw). A UNIQUE index treats NULLs as distinct,
-  so dedupe a nullable column through an expression index
-  (`ifnull(col, sentinel)`, with a CHECK refusing the sentinel). Several
-  `ON CONFLICT` clauses stack; a bare `ON CONFLICT DO NOTHING` also
-  swallows a clash on any other UNIQUE column (a generated id). No
-  `ALTER TABLE` changes a CHECK (syntax error), so leave a column that
-  will widen CHECK-free; `ALTER TABLE ... ADD COLUMN` leaves an
+  or the bare columns throw). Dedupe a nullable column through an
+  expression index (`ifnull(col, sentinel)`, with a CHECK refusing the
+  sentinel). Several `ON CONFLICT` clauses stack; a bare `ON CONFLICT DO
+  NOTHING` also swallows a clash on any other UNIQUE column (a generated
+  id). No `ALTER TABLE` changes a CHECK (syntax error), so leave a column
+  that will widen CHECK-free; `ALTER TABLE ... ADD COLUMN` leaves an
   expression index in force.
 - `bun:sqlite` binds `true`/`false` as integers 1/0, and INTEGER affinity
   stores the STRING `'1'` as 1, which `CHECK (x IN (0, 1))` accepts:
@@ -452,3 +447,13 @@
   prompt shape classifiable` case and its module-note shape count hold
   a shape's prefix literal too: grep all of `src/` for the prefix literal
   and the `kind` string.
+- A later plan task that says "add tests covering X, Y, Z" for a module
+  already shipped whole (implementation + colocated tests in one earlier
+  task, per this plan's task-sizing rule) is usually already satisfied:
+  `git log --oneline -- <the test file>` showing one commit — the
+  implementation task's — confirms the named cases were pinned then, not
+  left as a gap. Verify each named case is present and passing before
+  writing anything; a matching one already existed for
+  `findings.test.ts`'s three named dedupe cases (shared artifact, shared
+  trigger+what with no artifact, differ-only-in-resolution), so the task
+  needed no new test, only confirmation.
