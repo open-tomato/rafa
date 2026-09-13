@@ -218,7 +218,6 @@
   `./plan/index.js` (bun 1.3.14). It re-exports `src/report/parse.ts`
   too: a name added there moves `RUNTIME_EXPORTS`/`REEXPORTS` and the
   type-name count in that test's header.
-  `package.json` has NO `main`, `exports`, `bin` or `files` yet.
 - `CLAUDECODE` (set in Claude Code sessions) makes `bun test` print
   counts only (no `(pass)`/`(skip)` lines, skip reasons, file names), so
   grepping a full-suite capture for a file finds nothing;
@@ -460,10 +459,29 @@
   output, signal listener, exit code or file). A name added to either
   barrel or to `config.ts` must be added to the root too. Never import
   `src/rafa.ts` from a library module: it dispatches on `process.argv`
-  when imported. `package.json` `module` still names the root
-  `index.ts`, the `bun init` `console.log` placeholder.
+  when imported. `package.json` has no `main`, `exports`, `bin` or
+  `files` yet, and its `module` still names the root `index.ts`, the
+  `bun init` `console.log` placeholder.
 - `bun build src/index.ts --target bun` inlines `start.ts` and `plan.ts`,
   whose `__dirname` comes from `import.meta.url`, so the bundle reads
   `plan-prompt.md` (and `PROMPT.md` when the repo root has none) beside
   the bundle file, not beside `src/`: a build must place both next to
   every bundle that inlines those modules (measured on the index bundle).
+- `src/ports/index.ts` is the `./ports` entry, TYPES ONLY (`index.test.ts`
+  pins zero runtime exports and a spelled `TYPE_EXPORTS` list read off
+  the compiler): Tracker (open-tomato issue-tracker `port.ts` copy,
+  source commit in the header), `Store` (= `EffortStore`, re-exported,
+  never redeclared), Learning, Output (cli-core `CliEvent` copy),
+  Planner. Its header's "Left open for phase 1" list names the shapes
+  phase 0 chose without a spec signature.
+- Type-level claims CAN run inside `bun test`: `import ts from
+  'typescript'`, `ts.parseJsonConfigFileContent` over the root
+  tsconfig, `ts.createProgram` over probe files in a tmpdir importing
+  `src/` by absolute `.js` path (~0.4s), then `getPreEmitDiagnostics(
+  program, file)` per probe and `checker.getExportsOfModule` for a type
+  name list (`src/ports/index.test.ts`). Hold each refusal to its code
+  AND message text: unrelated refusals share TS2322.
+- `noUnusedLocals` does not flag an unused, unexported top-level
+  interface (tsc 5.9, `export` dropped from a port: `check-types` exit
+  0), so a type losing its `export` passes every gate unless a case
+  lists the module's type exports.

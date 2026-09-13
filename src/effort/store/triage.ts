@@ -4,10 +4,10 @@
  * `out_of_scope_bugs` table for each entry of its out-of-scope bugs.
  *
  * This phase stores both lists and acts on neither. Phase 1 triages them
- * once the Tracker port exists: a blocker marks its task blocked, and a
- * bug is filed through the tracker, or commented on where the tracker
- * already holds one for its artifact. {@link writeTriage} keeps both
- * lists, entry for entry, until then.
+ * once the Tracker port has an adapter: a blocker marks its task
+ * blocked, and a bug is filed through the tracker, or commented on where
+ * the tracker already holds one for its artifact. {@link writeTriage}
+ * keeps both lists, entry for entry, until then.
  *
  * ## The rows
  *
