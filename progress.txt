@@ -360,9 +360,9 @@
 - `bun:sqlite` binds `true`/`false` as integers 1/0, and INTEGER affinity
   stores the STRING `'1'` as 1, which `CHECK (x IN (0, 1))` accepts:
   check a boolean in JS before binding it.
-- `@progress.txt` (literal `@`) is a stray TRACKED file at the root, added
-  in `00a8a14` and committed to since (last `f4215ba`); the notes file is
-  `progress.txt`. Never append to the `@` one.
+- `@progress.txt` (literal `@`) is a stray TRACKED file at the root, still
+  committed to; the notes file is `progress.txt`. Never append to the `@`
+  one.
 - `src/utils/progress.ts` is the `progress.txt` RENDERER, which `start.ts`
   (`renderProgressForDispatch`) calls before every dispatch, the
   wrap-up's included: `writeProgress(root, planStub)` = `readProgressFindings`
@@ -373,11 +373,11 @@
   stops at the first misfit, an entry over the cap alone is skipped as
   `oversized`). A render over an empty store BLANKS an authored
   `progress.txt`, this repo's tracked one included.
-- Between-task compaction is gone from `start.ts` (`maybeCompactProgress`,
-  its counter, `src/tests/progress-compaction.test.ts`). Still standing:
-  `buildCompactionPrompt` (takes a local `CompactionPromptInput`, called
-  by nothing), the `compaction` `PROMPT_SHAPES` entry, its cases in
-  `classify.test.ts`, and the wrap-up prompt's compaction bullets.
+- Between-task compaction and the compaction session are gone from
+  `src/` (cadence, prompt builder, `PROMPT_SHAPES` entry, their tests).
+  Still standing in `start.ts`: the wrap-up prompt's compaction bullet
+  naming `.claude/skills/progress-hygiene/SKILL.md`, and the wrap-up
+  banner's "compact it".
 - `plan.ts` `formatProgressSection` truncates at 16,000 CHARACTERS keeping
   the TAIL, which in a most-recent-first render is the OLDEST entry; it
   never acts while the renderer's byte cap stays <= that, pinned in
@@ -421,18 +421,14 @@
 - `src/tests/declaration-dispatch.test.ts` wraps `runClaude` as its
   runner (answering `stdout: ''`) so its 21-leg grid stays valid; the
   loop's real runner and its argv are pinned in `task-report.test.ts`.
-- Retiring a `PROMPT_SHAPES` kind from `effort/classify.ts` is not
-  contained to `classify.ts`/`classify.test.ts`: `src/tests/parity-lineage.test.ts`
-  holds the LIVE sibling store's rows (`~/projects/agentic-research/.ralph/effort/`)
-  to full byte equality against a fresh reclassify, so a stored row of the
-  retired kind now reads `kind: 'other'` fresh and reds that suite until a
-  new accounted-for exception excludes `kind` for exactly those rows (and,
-  where a stored row is ALSO hand-patched — measured 2026-09-13: 37 of 38
-  `compaction`-kind rows are — excludes `planStub` too, in the SAME
-  comparison). Any future kind removal should grep
-  `src/tests/parity-lineage.test.ts` for the kind's name before declaring
-  the classifier change done. `src/tests/plan-stamp.test.ts`'s
-  `keeps every prompt shape classifiable` test and its own module-note
-  count of shapes are a second, cheaper place a retired shape's literal
-  prefix lingers — grep the whole `src/` tree for a shape's prefix
-  literal and its `kind` string, not just its own two files.
+- Retiring a `PROMPT_SHAPES` kind reaches past `classify.ts` and its
+  test: `src/tests/parity-lineage.test.ts` holds the LIVE sibling store's
+  rows (`~/projects/agentic-research/.ralph/effort/`) byte-equal to a
+  fresh reclassify, so a stored row of the retired kind reads
+  `kind: 'other'` and reds it until an accounted-for exception excludes
+  `kind` for exactly those rows, and `planStub` too, in the SAME
+  comparison, where the stored row was also hand-patched (most
+  `compaction` rows were). `src/tests/plan-stamp.test.ts`'s `keeps every
+  prompt shape classifiable` case and its module-note shape count hold
+  a shape's prefix literal too: grep all of `src/` for the prefix literal
+  and the `kind` string.
