@@ -75,9 +75,6 @@
   `.text()` throws EISDIR, so use `existsSync` where unreadable must not
   read as absent. Planting one tests "unreadable" portably
   (`readFileSync` throws EISDIR even as root: no `it.skipIf(isRoot)`).
-- Quote grep globs in the Bash tool: zsh expands an unquoted
-  `--include=*.ts`, prints `no matches found` and never runs grep, which
-  reads like "no hits".
 - `src/effort/store/sqlite.ts`: one file (`.ralph/effort/effort.sqlite`),
   a table per kind, `row_json` = the NDJSON line. Schema changes APPEND to
   `SQLITE_MIGRATIONS` (version = its length, in `PRAGMA user_version`),
@@ -406,8 +403,10 @@
   that (cached `db.query`) statement: the next `iterate()` throws `bad
   parameter or other API misuse`, and `reset()` then `iterate()` silently
   yields one row fewer (4 of 5). `.all()` and a fresh `prepare` are fine.
-- In the Bash tool (zsh), a bare `=====` word is zsh `=cmd` expansion
-  (`not found`) and aborts the rest of the command.
+- In the Bash tool, a zsh expansion error kills that command and the rest
+  of the line, which reads like "no hits": quote grep globs (an unquoted
+  `--include=*.ts` prints `no matches found`) and separators (a bare
+  `=====` is `=cmd` expansion, `not found`).
 - `src/report/record.ts`: `recordTaskReport(root, { dispatch, outcome,
   output }, seams?)` parses, then writes findings + triage, or ONE
   `report_absences` row (`src/effort/store/absences.ts`
@@ -459,14 +458,23 @@
   output, signal listener, exit code or file). A name added to either
   barrel or to `config.ts` must be added to the root too. Never import
   `src/rafa.ts` from a library module: it dispatches on `process.argv`
-  when imported. `package.json` has no `main`, `exports`, `bin` or
-  `files` yet, and its `module` still names the root `index.ts`, the
-  `bun init` `console.log` placeholder.
-- `bun build src/index.ts --target bun` inlines `start.ts` and `plan.ts`,
-  whose `__dirname` comes from `import.meta.url`, so the bundle reads
-  `plan-prompt.md` (and `PROMPT.md` when the repo root has none) beside
-  the bundle file, not beside `src/`: a build must place both next to
-  every bundle that inlines those modules (measured on the index bundle).
+  when imported.
+- `package.json` maps `bin` `rafa` and `exports` (`.`, `./cli`, `./plan`,
+  `./store`, `./ports`) into `./dist/`, `files: ["dist"]`. `bun run
+  build`: `rm -rf dist`, `src/rafa.ts` to `dist/cli.js` (`--outfile`,
+  shebang and exec bit kept), the four library entries in ONE
+  `--splitting --root=src --outdir=dist` call, then `cp` of `PROMPT.md`
+  and `plan-prompt.md` into `dist/` (`start.ts`/`plan.ts` read them
+  beside whichever bundle inlines them, via `import.meta.url`). Without
+  `--splitting` a subpath's names are COPIES of the root's; without the
+  `rm`, hash-named stale chunks are published. A new entry or template
+  goes in the script AND `src/tests/package-build.test.ts`, which builds
+  a scratch copy of the package. `module` still names the root
+  `index.ts` placeholder (unpublished; `exports` wins).
+- The build ships no type declarations: the spec's `exports` map has no
+  `types`, so a TS consumer gets TS7016 on `.` and `./ports` (whose
+  bundle is 8 bytes, `// @bun`). `bun pm pack --dry-run` lists the
+  published set, and runs under `private: true`.
 - `src/ports/index.ts` is the `./ports` entry, TYPES ONLY (`index.test.ts`
   pins zero runtime exports and a spelled `TYPE_EXPORTS` list read off
   the compiler): Tracker (open-tomato issue-tracker `port.ts` copy,
