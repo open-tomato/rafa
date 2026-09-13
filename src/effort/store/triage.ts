@@ -45,9 +45,9 @@
  * ## Where the tables live
  *
  * In the SQLite store's file, created by the third entry of
- * `SQLITE_MIGRATIONS` and opened through `withSqliteStore`, and written
- * there whichever backend the `store` setting selects, as the findings
- * table is. `findings.ts` says why a table like these is not a kind.
+ * `SQLITE_MIGRATIONS` and written through `writeSqliteStore`, whichever
+ * backend the `store` setting selects, as the findings table is.
+ * `findings.ts` says why a table like these is not a kind.
  *
  * ## Deduplication
  *
@@ -113,11 +113,15 @@
  * constraints, so a row written from outside cannot hold a missing or
  * empty `what`, an empty artifact, or a flag other than 0 or 1.
  *
- * ## Writing nothing writes nothing
+ * ## Writing nothing writes nothing, and still checks the schema
  *
  * A write left with no entry to insert in either list, because both were
- * empty or every entry was refused, never opens the store, and creates
- * no file and no directory.
+ * empty or every entry was refused, inserts no row. On a store that does
+ * not exist it opens nothing, and creates no file and no directory. On
+ * one that exists it still opens the store, through `writeSqliteStore`,
+ * as the findings writer does: a store past this rafa's version is
+ * refused with no byte changed, one below it is brought forward, and one
+ * already at this version changes no byte.
  */
 import type {
   FindingOutcome,
@@ -128,10 +132,9 @@ import type { ReportBlocker, ReportBug } from '../../report/parse.js';
 import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
-import { sqliteStorePath, withSqliteStore } from './sqlite.js';
+import { sqliteStorePath, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's blockers and bugs, their dispatch, and the outcome. */
 export interface TriageWrite {
@@ -347,9 +350,11 @@ function listResult<E>(checked: CheckedList<E>, appended: number): TriageListRes
  * transaction.
  *
  * Throws, having opened nothing, when the dispatch or the outcome cannot
- * be stored. An entry that cannot be stored is left out and answered in
- * its list's `rejected`, and the others are written. See the module note
- * for the dedupe rule and each refusal.
+ * be stored. Throws the store's own refusal of a schema past this rafa's
+ * version whenever the store exists, even with both lists left with
+ * nothing to insert. An entry that cannot be stored is left out and
+ * answered in its list's `rejected`, and the others are written. See the
+ * module note for the dedupe rule and each refusal.
  */
 export function writeTriage(
   repoRoot: string,
@@ -361,18 +366,16 @@ export function writeTriage(
 
   const blockers = checkList(BLOCKERS, write.blockers);
   const bugs = checkList(OUT_OF_SCOPE_BUGS, write.outOfScopeBugs);
-  if (blockers.stored.length === 0 && bugs.stored.length === 0) {
-    return { path, blockers: listResult(blockers, 0), outOfScopeBugs: listResult(bugs, 0) };
-  }
 
   const collectedAt = (seams.now ?? (() => new Date()))().toISOString();
   const newId = seams.newId ?? randomUUID;
   const blockerRows = rowsOf(BLOCKERS, blockers.stored, write, newId, collectedAt);
   const bugRows = rowsOf(OUT_OF_SCOPE_BUGS, bugs.stored, write, newId, collectedAt);
 
-  const [blockersAdded, bugsAdded] = withSqliteStore(
+  const [blockersAdded, bugsAdded] = writeSqliteStore<readonly [number, number]>(
     path,
-    !existsSync(path),
+    blockerRows.length + bugRows.length,
+    [0, 0],
     (db) => insertBoth(db, blockerRows, bugRows),
   );
   return {

@@ -10,22 +10,24 @@
  * Entries are built in the shape `parseReport` answers, and one case
  * feeds the writer a report parsed for real.
  *
- * Fifteen mutations of the writer and its migration were driven against
+ * Sixteen mutations of the writer and its migration were driven against
  * this file alone, with the unmutated sources green before and after and
- * restored byte-identical. Fourteen reddened at least one of its 43
+ * restored byte-identical. Fifteen reddened at least one of its 44
  * cases: dedupe made table-wide, `security` dropped from the bug key,
  * the blockers index on the bare artifact column, rejected entries
  * written anyway, the whole-write check dropped, the clock read once per
- * list, a write with nothing to insert opening the store, the two lists
- * inserted outside one transaction, any flag accepted, a missing `what`
- * accepted, the security CHECK dropped from the migration, the outcome
- * ignored, the refusal naming the findings write, and bug ids generated
- * before blocker ids. The fifteenth stayed green, as expected: binding
+ * list, a write with nothing to insert creating a store that does not
+ * exist, one leaving a store that exists unopened (red only on the empty
+ * write past the last version), the two lists inserted outside one
+ * transaction, any flag accepted, a missing `what` accepted, the
+ * security CHECK dropped from the migration, the outcome ignored, the
+ * refusal naming the findings write, and bug ids generated before
+ * blocker ids. The sixteenth stayed green, as expected: binding
  * `security` as the raw boolean, which bun 1.3.14 binds as 1 or 0, so
  * the explicit conversion is not something this file can pin. A
- * sixteenth, the refusal subject ignored inside `findings.ts`, reddened
- * five cases of `findings.test.ts`, which pins the wording the two
- * writers share.
+ * seventeenth, the refusal subject ignored inside `findings.ts`,
+ * reddened five cases of `findings.test.ts`, which pins the wording the
+ * two writers share.
  */
 import type { FindingsWriterSeams } from './findings.js';
 import type { TriageWrite, TriageWriteResult } from './triage.js';
@@ -769,6 +771,32 @@ describe('whole-write refusals', () => {
 
     expect(() => writeTriage(root, writeOf({ outOfScopeBugs: [bug()] }), seams('newer-2')))
       .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  it('refuses an empty write on a store past the version this rafa knows, bytes untouched', () => {
+    const root = freshRoot('newer-empty');
+    writeTriage(root, writeOf({ blockers: [blocker()] }), seams('newer-empty'));
+    const current = readRaw(root);
+    const control = writeTriage(root, writeOf());
+
+    expect(counts(control)).toEqual({ blockers: listOf(0, 0), outOfScopeBugs: listOf(0, 0) });
+    expect(readRaw(root)).toEqual(current);
+
+    const newer = SQLITE_SCHEMA_VERSION + 1;
+    const db = new Database(storeFile(root));
+    db.run(`PRAGMA user_version = ${newer}`);
+    db.close();
+    const before = readRaw(root);
+    const refusal = `is at schema version ${newer}, past the`
+      + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+    const allRefused = writeOf({
+      blockers: [blocker({ what: null })],
+      outOfScopeBugs: [bug({ security: 'maybe' as never })],
+    });
+
+    expect(() => writeTriage(root, writeOf())).toThrow(refusal);
+    expect(() => writeTriage(root, allRefused)).toThrow(refusal);
     expect(readRaw(root)).toEqual(before);
   });
 });

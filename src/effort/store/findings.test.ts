@@ -11,19 +11,21 @@
  * Findings are built in the shape `parseReport` answers, and one case
  * feeds the writer the report the spec illustrates, parsed for real.
  *
- * Nineteen mutations of the writer and its migration were driven
+ * Twenty mutations of the writer and its migration were driven
  * against this file alone, and every one reddened at least one of its
- * 42 cases, with the unmutated sources green before and after and
+ * 43 cases, with the unmutated sources green before and after and
  * restored byte-identical: dedupe made table-wide (session id dropped
  * from both indexes and both conflict targets), one bare `ON CONFLICT
  * DO NOTHING`, rejected entries written anyway, the whole-write check
  * dropped, the clock read per row, blank text accepted, a lone
  * surrogate accepted, the kind and signal sets unchecked, an unkeyed
- * entry accepted, an empty write opening the store, `tracker_ref`
- * written non-null, the outcome set unchecked, an empty session id
- * accepted, a lone surrogate in the dispatch accepted, the store never
- * created, `skill-suggestion` dropped from the migration's kind set, a
- * CHECK added on outcome, and the unkeyed-row and blank-artifact CHECKs
+ * entry accepted, an empty write creating a store that does not exist,
+ * an empty write leaving a store that exists unopened (red only on the
+ * empty write past the last version), `tracker_ref` written non-null,
+ * the outcome set unchecked, an empty session id accepted, a lone
+ * surrogate in the dispatch accepted, the store never created,
+ * `skill-suggestion` dropped from the migration's kind set, a CHECK
+ * added on outcome, and the unkeyed-row and blank-artifact CHECKs
  * dropped from the migration.
  */
 import type { FindingsWrite, FindingsWriterSeams } from './findings.js';
@@ -666,6 +668,29 @@ describe('whole-write refusals', () => {
 
     expect(() => writeFindings(root, writeOf([finding({ artifact: 'new' })]), seams('newer-2')))
       .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  it('refuses an empty write on a store past the version this rafa knows, bytes untouched', () => {
+    const root = freshRoot('newer-empty');
+    writeFindings(root, writeOf([finding()]), seams('newer-empty'));
+    const current = readRaw(root);
+    const control = writeFindings(root, writeOf([]));
+
+    expect(counts(control)).toEqual({ appended: 0, skipped: 0, rejected: [] });
+    expect(readRaw(root)).toEqual(current);
+
+    const newer = SQLITE_SCHEMA_VERSION + 1;
+    const db = new Database(storeFile(root));
+    db.run(`PRAGMA user_version = ${newer}`);
+    db.close();
+    const before = readRaw(root);
+    const refusal = `is at schema version ${newer}, past the`
+      + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+    const allRefused = [finding({ artifact: null, trigger: null })];
+
+    expect(() => writeFindings(root, writeOf([]))).toThrow(refusal);
+    expect(() => writeFindings(root, writeOf(allRefused))).toThrow(refusal);
     expect(readRaw(root)).toEqual(before);
   });
 });

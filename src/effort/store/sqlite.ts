@@ -42,7 +42,10 @@
  * whose output held no report to read. The port's row map names none
  * of them, and nothing in this module reads or writes them.
  * `findings.ts` writes the first, `triage.ts` the next two and
- * `absences.ts` the last, all through {@link withSqliteStore}, so each
+ * `absences.ts` the last. `findings.ts` and `triage.ts` write through
+ * {@link writeSqliteStore}, as an append does, so a write left with
+ * nothing to insert still meets the schema check. `absences.ts` always
+ * has its one row and opens {@link withSqliteStore} directly. Each table
  * is opened, migrated and closed as every kind's table is. Each writer
  * says why its tables have a column per field and their own
  * deduplication keys, where a kind has `row_json` and one key.
@@ -459,8 +462,9 @@ export function migrateSchema(
  * `use`, and closes it whatever `use` did. Only a caller with a row to
  * add passes `create`, and only then is the directory made.
  *
- * Exported for the report writers, so their tables are opened, migrated
- * and closed exactly as every kind's is.
+ * Exported so the tables outside the port are opened, migrated and
+ * closed exactly as every kind's is. A write that can be left with
+ * nothing to insert goes through {@link writeSqliteStore} instead.
  */
 export function withSqliteStore<T>(
   path: string,
@@ -501,8 +505,9 @@ function insertBatch(
 }
 
 /**
- * The one path a write into the store takes, whatever its batch size,
- * so no writer can skip the schema check by having nothing to insert.
+ * The one path every write that can be left with nothing to insert
+ * takes, whatever its batch size, so no writer can skip the schema
+ * check by having nothing to insert.
  *
  * With rows to insert, it opens the store, creating the file and its
  * directory when absent, and answers what `insert` answers. With none,
