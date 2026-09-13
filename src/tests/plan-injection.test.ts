@@ -3,8 +3,9 @@
  *
  * `config.ts` ranks a setting's layers and `plan/inject.ts` renders a
  * mode, and each is tested beside its own module. `start.ts` is where
- * the two meet: it hands `--inject=` to the config as the command-line
- * layer, hands the mode that comes back to `start/dispatch.ts`, which
+ * the two meet: through `start/run-config.ts` it hands `--inject=` to
+ * the config as the command-line layer, hands the mode that comes back
+ * to `start/dispatch.ts`, which
  * renders every task prompt in it, and hands the wrap-up the plan with
  * no mode at all, for `start/wrap-up.ts` to build its prompt from. The
  * cases here drive those seams through the real resolver over a real
@@ -58,8 +59,8 @@ import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
+import { announcePlanIssues, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import { announcePlanIssues, loadRunConfig } from '../start.js';
 import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
 import { findNextTask } from '../utils/tracker.js';
 
