@@ -157,10 +157,8 @@ became the dispatcher's answer for task one.
   invariant sweeps), live-seam runs, migrations, and close-out — these
   preserve resumability where a halt is most likely.
 * The RUNNER owns the push, the pull request, the merge with the base,
-  and the wait for CI. It also compacts `progress.txt` BETWEEN tasks, on
-  its own decision, once the file outgrows what the next task should
-  have to read. After the last task it runs a wrap-up session that
-  promotes findings, compacts `progress.txt`, merges `origin/main`,
+  and the wait for CI. After the last task it runs a wrap-up session
+  that promotes findings, compacts `progress.txt`, merges `origin/main`,
   commits, pushes and opens (or updates) the PR — and then polls that
   PR's checks, spending repair sessions on a red or conflicting result.
   So a plan must NOT carry a task that opens a PR, resolves a merge

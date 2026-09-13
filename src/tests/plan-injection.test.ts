@@ -23,9 +23,8 @@
  * ## What is not driven
  *
  * `start()` itself is not: it spawns the real CLI with no seam. What it
- * threads is pinned instead, the way `progress-compaction.test.ts` pins
- * its compaction call, by reading its source for the two calls that
- * carry the mode to the dispatch and the plan to the wrap-up.
+ * threads is pinned instead, by reading its source for the two calls
+ * that carry the mode to the dispatch and the plan to the wrap-up.
  */
 import type { InjectMode } from '../config.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start.js';

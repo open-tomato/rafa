@@ -330,12 +330,6 @@
   write through `sqlite.ts`'s exported `sqliteStorePath`/`withSqliteStore`
   (`LONE_SURROGATE` too) and update the two `tablesOf(...)` expectations
   in `sqlite.test.ts` (layout, zero-byte cases).
-- SQLite 3.51.0 upsert: a conflict target on a PARTIAL unique index must
-  repeat its `WHERE` (else `ON CONFLICT clause does not match any
-  PRIMARY KEY or UNIQUE constraint`); several `ON CONFLICT` clauses
-  stack; a bare `ON CONFLICT DO NOTHING` also swallows a clash on any
-  other UNIQUE column (a generated id). No `ALTER TABLE` changes a CHECK
-  (syntax error), so leave a column that will widen CHECK-free.
 - `it.each(CONST)` over an `as const` tuple is TS2769 (readonly): spread
   it, `it.each([...CONST])`. `check-types` skips tests, the IDE does not.
 - `src/effort/store/triage.ts`: `writeTriage(root, { dispatch, outcome,
@@ -347,15 +341,55 @@
   skipped, rejected }`. The dispatch check is shared: `checkDispatch(
   subject, dispatch, outcome)`, `describeValue`, `textProblem` are
   exported from `findings.ts`. Neither table has `tracker_ref`.
-- SQLite 3.51.0: a UNIQUE index treats NULLs as distinct, so dedupe a
-  nullable column through an expression index (`ifnull(col, sentinel)`,
-  with a CHECK refusing the sentinel). The upsert target must repeat the
-  expressions: `IFNULL(a,'')` matches `ifnull(a, '')`, while `coalesce` or
-  the bare columns throw `ON CONFLICT clause does not match`.
-  `ALTER TABLE ... ADD COLUMN` leaves an expression index in force.
+- SQLite 3.51.0 upsert: the conflict target must repeat its index, else
+  `ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
+  constraint`: a PARTIAL unique index's `WHERE`, an expression index's
+  expressions (`IFNULL(a,'')` matches `ifnull(a, '')`, while `coalesce`
+  or the bare columns throw). A UNIQUE index treats NULLs as distinct,
+  so dedupe a nullable column through an expression index
+  (`ifnull(col, sentinel)`, with a CHECK refusing the sentinel). Several
+  `ON CONFLICT` clauses stack; a bare `ON CONFLICT DO NOTHING` also
+  swallows a clash on any other UNIQUE column (a generated id). No
+  `ALTER TABLE` changes a CHECK (syntax error), so leave a column that
+  will widen CHECK-free; `ALTER TABLE ... ADD COLUMN` leaves an
+  expression index in force.
 - `bun:sqlite` binds `true`/`false` as integers 1/0, and INTEGER affinity
   stores the STRING `'1'` as 1, which `CHECK (x IN (0, 1))` accepts:
   check a boolean in JS before binding it.
 - `@progress.txt` (literal `@`) is a stray TRACKED file at the root, added
-  in `f4215ba`; the notes file is `progress.txt`. Never append to the
-  `@` one.
+  in `00a8a14` and committed to since (last `f4215ba`); the notes file is
+  `progress.txt`. Never append to the `@` one.
+- `src/utils/progress.ts` is the `progress.txt` RENDERER (nothing calls
+  it yet): `writeProgress(root, planStub)` = `readProgressFindings`
+  (SQLite `findings`, `plan_stub = stub OR plan_stub IS NULL` as
+  "global", `seq DESC`; no store file answers [] and creates nothing; an
+  unreadable store throws BEFORE the write) then replaces the file whole
+  with pure `renderProgressText(findings, cap = 16_000)` (whole entries,
+  stops at the first misfit, an entry over the cap alone is skipped as
+  `oversized`). A render over an empty store BLANKS an authored
+  `progress.txt`, this repo's tracked one included.
+- Between-task compaction is gone from `start.ts` (`maybeCompactProgress`,
+  its counter, `src/tests/progress-compaction.test.ts`). Still standing:
+  `buildCompactionPrompt` (takes a local `CompactionPromptInput`, called
+  by nothing), the `compaction` `PROMPT_SHAPES` entry, its cases in
+  `classify.test.ts` and `plan-stamp.test.ts`, and the wrap-up prompt's
+  compaction bullets.
+- `plan.ts` `formatProgressSection` truncates at 16,000 CHARACTERS keeping
+  the TAIL, which in a most-recent-first render is the OLDEST entry; it
+  never acts while the renderer's byte cap stays <= that, pinned in
+  `src/utils/progress.test.ts`.
+- Loop-generated text landing in a TRACKED file must escape the
+  control-byte gate's refusals: `core.hooksPath` is `.githooks`, so
+  `git add -A` then the hook refuses (measured exit 1 on one ESC in a
+  staged `progress.txt`). Tests import `scanBuffer`, `scanText`,
+  `FORBIDDEN_BYTES`, `FORBIDDEN_CODEPOINTS`, `EMOJI_JOINERS` from
+  `../../scripts/control-byte-gate/control-byte-gate.js` (no CLI side
+  effect on import).
+- `bun:sqlite` (1.3.14): breaking out of `stmt.iterate()` early breaks
+  that (cached `db.query`) statement: the next `iterate()` throws `bad
+  parameter or other API misuse`, and `reset()` then `iterate()` silently
+  yields one row fewer (4 of 5). `.all()` and a fresh `prepare` are fine.
+- The Bash tool's shell is zsh: `${PIPESTATUS[0]}` is EMPTY (zsh spells
+  it `$pipestatus[1]`), so `cmd | tail; echo ${PIPESTATUS[0]}` records no
+  exit code. Redirect to a file, then `echo $?`. A bare `=====` word is
+  zsh `=cmd` expansion (`not found`) and aborts the rest of the command.

@@ -221,14 +221,11 @@ describe('the shape table', () => {
     // call.
     const shape = PROMPT_SHAPES.find((s) => s.kind === 'compaction');
     const prompt = buildCompactionPrompt({
-      due: true,
       reason: 'hard-cap',
       sizeBytes: 20_000,
-      tasksSinceCompaction: 1,
       thresholds: {
         hardCapBytes: 16_000,
         softCapBytes: 8_000,
-        cadenceTasks: 10,
       },
     });
 

@@ -25,11 +25,6 @@
  * answers to refuses the run. Every part of the plan `parsePlan` does not read
  * as written is named to the operator once, at start.
  *
- * Between tasks the loop also asks `utils/progress.ts` whether `progress.txt`
- * has grown past what the next task should have to read, and spends a
- * compaction session on it when it has. That session belongs to no task: it
- * writes no tracker line and makes no commit.
- *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
  * --plan        plan file to execute (default: PLAN.md at the repo root). The
@@ -56,10 +51,6 @@ import type { ConfigSource, InjectMode, ResolvedConfig } from './config.js';
 import type { PlanInjection, PlanIssue } from './plan/index.js';
 import type { CommitAttempt, CommitOptions } from './utils/commit.js';
 import type { TaskDeclaration } from './utils/declaration.js';
-import type {
-  CompactionDecision,
-  CompactionThresholds,
-} from './utils/progress.js';
 import type { TaskInfo } from './utils/tracker.js';
 
 import fs from 'fs';
@@ -86,11 +77,6 @@ import {
   readMergeState,
   waitForChecks,
 } from './utils/pr.js';
-import {
-  isCompactionDue,
-  progressFilePath,
-  readProgressSizeBytes,
-} from './utils/progress.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
 
@@ -676,39 +662,26 @@ export function commitFinishedTask(options: FinishedTaskOptions): CommitAttempt 
   return attempt;
 }
 
-/** How a compaction session is spawned. Takes no flags: it is unrouted. */
-export type CompactionSessionRunner = (prompt: string) => Promise<number>;
-
-/** What {@link maybeCompactProgress} needs to decide, and to act. */
-export interface CompactionOptions {
-  /** Repo root. `progress.txt` sits at its top level. */
-  repoRoot: string;
-  /** Tasks finished since the last compaction, this one included. */
-  tasksSinceCompaction: number;
-  /** Threshold overrides, merged over the module's own defaults. */
-  thresholds?: Partial<CompactionThresholds>;
-  /** Size reader seam. Defaults to the real `statSync`. */
-  readSizeBytes?: (filePath: string) => number;
-  /** Session seam. Defaults to the real CLI. */
-  run?: CompactionSessionRunner;
-}
-
-/** What one between-tasks compaction decision did. */
-export interface CompactionRun {
-  /** The decision, carrying the size and counter it was taken on. */
-  decision: CompactionDecision;
-  /** True when a session was actually spawned. */
-  dispatched: boolean;
-  /** That session's exit code, or null when none ran. */
-  exitCode: number | null;
-  /** The file's size after it, or null when none ran. */
-  sizeAfterBytes: number | null;
-  /** The counter the next task carries in. Zero once one was asked for. */
-  tasksSinceCompaction: number;
+/** What the compaction prompt quotes. */
+interface CompactionPromptInput {
+  /** The size `progress.txt` was at, in bytes. */
+  readonly sizeBytes: number;
+  /** The rule that asked for the compaction. */
+  readonly reason: string;
+  /** The two caps the prompt names. */
+  readonly thresholds: {
+    readonly hardCapBytes: number;
+    readonly softCapBytes: number;
+  };
 }
 
 /**
- * Assembles the prompt a mid-run compaction session is given.
+ * Assembles the prompt a mid-run compaction session was given.
+ *
+ * Nothing dispatches it now. `progress.txt` is rendered from the findings
+ * store (`utils/progress.ts`), so the between-task decision that called
+ * this is gone. The builder stays while `effort/classify.ts` still keys
+ * its `compaction` shape on this prompt's first line.
  *
  * Its FIRST LINE is a classifier key: `effort/classify.ts` buckets a
  * session log by the prefix its prompt begins with, and `compaction`
@@ -734,7 +707,7 @@ export interface CompactionRun {
  * standing between an unshrinkable file and a finding thrown away to
  * satisfy a number is the instruction not to.
  */
-export function buildCompactionPrompt(decision: CompactionDecision): string {
+export function buildCompactionPrompt(decision: CompactionPromptInput): string {
   const { sizeBytes, reason, thresholds } = decision;
 
   return [
@@ -745,89 +718,6 @@ export function buildCompactionPrompt(decision: CompactionDecision): string {
     '* Keep everything else, in its original order and its original one-finding-per-bullet shape. Recency is meaningful — plan generation injects this file and truncates it oldest-first. Do not add a heading, a date, or a summary of what you removed.',
     `* Get under ${thresholds.softCapBytes} bytes if the file honestly allows it. If it does not, stop there rather than deleting a finding that is still true and unpromoted. The loop will ask again after the next task; a finding deleted here is gone for good.`,
   ].join('\n');
-}
-
-/**
- * Decides whether `progress.txt` is due a compaction, and runs one.
- *
- * Called between tasks, after the finished task has been committed and
- * ticked. Two things it deliberately does NOT do, both of which the
- * scoped task it implements names. It never touches the tracker: it is
- * handed no tracker path, so a compaction cannot tick, block or shift
- * a line, and a session that fails leaves the finished task's `[x]`
- * exactly as the commit left it. And it never stops the loop — a
- * failed compaction is warned about and stepped over, because
- * `progress.txt` is scratch memory and the next task can still read an
- * uncompacted file, where a blocked task would re-dispatch forever.
- *
- * The counter resets on DISPATCH and not on success, which is what
- * bounds the file the model cannot shrink: a session that ran and
- * removed nothing has still been asked, so the next ask waits for the
- * next completed task. `utils/progress.ts` carries the rest of that
- * reasoning.
- *
- * The size is read twice — once for the decision, once after the
- * session — and both reads go through the same seam. A `statSync`
- * failure that is not simple absence throws, by that module's
- * deliberate choice: a file nobody can read must not pass for a small
- * one and silently suppress every compaction the run needed.
- *
- * `tests/progress-compaction.test.ts` is the integration over this,
- * and it re-drove every leg named here as its own landing check:
- * return before the run when the decision is not due, dispatch on a
- * `due` decision that is not hard-cap, reset the counter to zero on a
- * FAILED session as well as a passing one, keep the counter unchanged
- * when nothing was dispatched, and hand `run` a prompt built from
- * THIS decision rather than a constant. All five redden there. The
- * under-cap case is the control that keeps them honest: it must reach
- * the runner zero times, which no assertion on a returned record can
- * say by itself.
- */
-export async function maybeCompactProgress(
-  options: CompactionOptions,
-): Promise<CompactionRun> {
-  const readSize = options.readSizeBytes ?? readProgressSizeBytes;
-  const run = options.run ?? ((prompt: string) => runClaude(withStamp(prompt)));
-  const filePath = progressFilePath(options.repoRoot);
-
-  const decision = isCompactionDue(
-    {
-      sizeBytes: readSize(filePath),
-      tasksSinceCompaction: options.tasksSinceCompaction,
-    },
-    options.thresholds ?? {},
-  );
-
-  if (!decision.due) {
-    return {
-      decision,
-      dispatched: false,
-      exitCode: null,
-      sizeAfterBytes: null,
-      tasksSinceCompaction: options.tasksSinceCompaction,
-    };
-  }
-
-  console.log(`\n🧹 progress.txt is ${decision.sizeBytes} bytes (${decision.reason}) — compacting before the next task.`);
-  console.log('   One Claude session over that one gitignored file: no tracker line, no commit.');
-
-  const exitCode = await run(buildCompactionPrompt(decision));
-  const sizeAfterBytes = readSize(filePath);
-
-  if (exitCode === 0) {
-    console.log(`✅ progress.txt compacted: ${decision.sizeBytes} → ${sizeAfterBytes} bytes.`);
-  } else {
-    console.warn(`\n⚠️  Compaction session failed (exit ${exitCode}); progress.txt is ${sizeAfterBytes} bytes.`);
-    console.warn('   Continuing anyway — the file is scratch memory, and the next task can read it as it stands.');
-  }
-
-  return {
-    decision,
-    dispatched: true,
-    exitCode,
-    sizeAfterBytes,
-    tasksSinceCompaction: 0,
-  };
 }
 
 export default async function start(args: string[]): Promise<void> {
@@ -899,11 +789,6 @@ export default async function start(args: string[]): Promise<void> {
     interrupted = true;
   });
 
-  // Tasks finished since the last compaction. In memory on purpose: a fresh
-  // `ralph start` begins at zero, so a restart cannot dispatch a compaction
-  // before it has a task's worth of appended findings to compact.
-  let tasksSinceCompaction = 0;
-
   while (true) {
     if (interrupted) break;
 
@@ -945,17 +830,6 @@ export default async function start(args: string[]): Promise<void> {
 
     const attempt = commitFinishedTask({ trackerPath, taskInfo, repoRoot });
     if (attempt.outcome === 'failed') return;
-
-    // Between tasks, and BEFORE the usage gate: a compaction bounds what
-    // every task after this one has to read, so a run that pauses here
-    // without taking it hands the whole oversized file to the next run's
-    // first task, which starts the counter at zero and cannot compact.
-    tasksSinceCompaction += 1;
-    const compaction = await maybeCompactProgress({
-      repoRoot,
-      tasksSinceCompaction,
-    });
-    tasksSinceCompaction = compaction.tasksSinceCompaction;
 
     const shouldPause = await checkUsage('task');
     if (shouldPause) {
