@@ -254,9 +254,6 @@
   No `PLAN*.md` in either `.plans/` carries one today.
 - eslint ignores `.claude/**` (`eslint.config.mjs`), so skill prose has
   no lint gate.
-- A task to "add negative parser tests covering X, Y, Z" usually finds
-  most named cases already pinned in the module's colocated test file:
-  grep the suite for each named case first and add only the gap.
 - Pin a real-plan-file test to `.plans/PLAN-*.md`, the frozen template:
   the loop ticks `PLAN_TRACKER-*.md` `[ ]` to `[x]` on dispatch, so it
   drifts task by task under a fixed stage/task/declaration expectation.
@@ -447,13 +444,9 @@
   prompt shape classifiable` case and its module-note shape count hold
   a shape's prefix literal too: grep all of `src/` for the prefix literal
   and the `kind` string.
-- A later plan task that says "add tests covering X, Y, Z" for a module
-  already shipped whole (implementation + colocated tests in one earlier
-  task, per this plan's task-sizing rule) is usually already satisfied:
-  `git log --oneline -- <the test file>` showing one commit — the
-  implementation task's — confirms the named cases were pinned then, not
-  left as a gap. Verify each named case is present and passing before
-  writing anything; a matching one already existed for
-  `findings.test.ts`'s three named dedupe cases (shared artifact, shared
-  trigger+what with no artifact, differ-only-in-resolution), so the task
-  needed no new test, only confirmation.
+- A plan task to "add tests covering X, Y, Z" for a module already
+  shipped whole (implementation + colocated tests in one earlier task)
+  usually finds most or all named cases pinned: grep the colocated test
+  file for each named case and confirm it passes (`git log --oneline --
+  <the test file>` showing only the implementation commit says they were
+  pinned then), then add only the gap.
