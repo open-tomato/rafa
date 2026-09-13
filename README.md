@@ -17,6 +17,23 @@ bun src/rafa.ts start --plan=<file>
 
 This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
 
+## Running rafa from a snapshot
+
+Run the global `rafa` from a copy of the build, never from this
+checkout's `dist/`: `bun run build` opens with `rm -rf dist`, so a loop
+running from `dist/` has its runner replaced by the first task that
+builds. `bun run snapshot` builds, copies `dist/` into
+`~/.rafa/runtime/<version>/` with the version from `package.json`,
+points `~/.bun/bin/rafa` (under `HOME`, whatever `BUN_INSTALL` names)
+at the copied `cli.js`, and prints the path the link resolves to,
+exiting 0. It exits 1 before building anything while a plan tracker in
+`.plans/` or the repo root still holds an open or blocked task, and
+names every such tracker. It exits 2 when it could not run: a tracker or
+`package.json` it could not read, or a build, copy or link that failed.
+A loop may be running from the runtime it replaces, so each file and
+then the link land by a rename, and nothing already in the runtime
+directory is deleted.
+
 ## Runtime
 
 The build targets bun. The package root, `./cli` and `./store` import
