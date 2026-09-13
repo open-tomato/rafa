@@ -62,10 +62,8 @@ or a spec, and nothing reviews their text: leave a plan's or a spec's
 illustrative text, and a test quoting it verbatim, alone when a sweep
 turns up its subject.
 
-**`progress.txt` is tracked although `.gitignore` names it.** It was
-committed before the ignore line, so `git add -A` stages every edit to it
-and `git check-ignore progress.txt` answers nothing. It is also derived:
-`src/utils/progress.ts` rewrites it whole from the store's `findings`
+**`progress.txt` is not tracked**, living only via `.gitignore`. It is
+derived: `src/utils/progress.ts` rewrites it whole from the store's `findings`
 rows before every dispatch, so a render over an empty store blanks what a
-session wrote there by hand. `@progress.txt`, with a literal `@`, is a
-stray tracked file from an early session and not the notes file.
+session wrote there by hand. The stray `@progress.txt` file has been
+deleted.
