@@ -2,10 +2,28 @@
  * Tests for the per-plan effort report.
  *
  * Every case drives PLANTED rows. The report is pure over them, so no
- * case here needs a store, a session log, a repository or a clock —
- * and the two that do touch disk plant a store file with `node:fs`
- * rather than by appending through the store module, so a truncated
- * or legacy file is distinguishable from one this repo wrote wrongly.
+ * case needs a session log or a clock, and only the cases over the
+ * store and the command touch disk.
+ *
+ * The `buildReport` cases plant an NDJSON sessions file with `node:fs`
+ * rather than by appending through the store module, so a truncated or
+ * legacy file is distinguishable from one this repo wrote wrongly. Each
+ * plants a `.rafa/config.yaml` selecting `ndjson` beside it, because the
+ * report reads the store the config selects, and under the `sqlite`
+ * default a planted NDJSON file is a store nothing reads. The SQLite
+ * plants go through that backend's own `append`: a database cannot be
+ * written a line at a time.
+ *
+ * The cases over which store is read plant DIFFERENT rows in the two
+ * backends under one root, so a report reading the wrong one answers
+ * the other's count rather than a plausible empty. The command cases
+ * spawn `effort report` in a scratch git repository, since the command
+ * resolves its root through git and takes no seam. The refusal's
+ * control is the same command over a config it can run on, which exits
+ * 0 and prints a document `JSON.parse` reads. The refused config holds
+ * a problem in each of its two settings, so a command printing the
+ * error's message as one line cannot pass for one printing a line per
+ * problem: measured, with only the `store` problem planted, it did.
  *
  * The plants are shaped around the three claims the module makes that
  * a plausible-looking implementation would get wrong.
@@ -62,17 +80,22 @@
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
+import type { SessionEffortRow } from './store/types.js';
 
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { ConfigError, loadConfig } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import {
@@ -93,7 +116,9 @@ import {
   summariseSessions,
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
-import { effortStorePath } from './store.js';
+import { openNdjsonStore, openSqliteStore } from './store/index.js';
+
+const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'ralph-report-'));
 let planted = 0;
@@ -753,18 +778,62 @@ describe('parseReportArgs', () => {
   });
 });
 
-/** A store file written directly, in a directory of its own. */
-function plantStore(rows: readonly unknown[]): string {
+/** A directory of its own under the suite's temporary root. */
+function freshRoot(): string {
   planted += 1;
   const root = join(tempRoot, `${planted}-repo`);
-  const path = effortStorePath(root, 'sessions');
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+
+/** Plants `.rafa/config.yaml` under a root. */
+function writeConfig(root: string, text: string): void {
+  mkdirSync(join(root, '.rafa'), { recursive: true });
+  writeFileSync(join(root, '.rafa', 'config.yaml'), text, 'utf8');
+}
+
+/** An NDJSON sessions file written directly under a root. */
+function writeNdjsonSessions(root: string, rows: readonly unknown[]): void {
+  const path = openNdjsonStore(root).path('sessions');
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(
     path,
     `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`,
     'utf8',
   );
+}
+
+/** Rows appended to the SQLite store under a root, through its backend. */
+function appendSqliteSessions(
+  root: string,
+  rows: readonly ReportSessionRow[],
+): void {
+  const stored = rows as unknown as readonly SessionEffortRow[];
+  const result = openSqliteStore(root).append('sessions', stored);
+  if (result.appended !== rows.length) {
+    throw new Error(`planted ${result.appended} of ${rows.length} rows`);
+  }
+}
+
+/**
+ * A store file written directly, in a directory of its own, beside the
+ * config selecting the backend that file belongs to.
+ */
+function plantStore(rows: readonly unknown[]): string {
+  const root = freshRoot();
+  writeConfig(root, 'store: ndjson\n');
+  writeNdjsonSessions(root, rows);
   return root;
+}
+
+/** What a call threw, or null when it returned. */
+function thrownBy(call: () => unknown): unknown {
+  try {
+    call();
+  } catch (error) {
+    return error;
+  }
+  return null;
 }
 
 describe('buildReport', () => {
@@ -799,5 +868,148 @@ describe('buildReport', () => {
     const report = buildReport({ repoRoot: root });
 
     expect(report.totals.sessionsWithoutEffort).toBe(1);
+  });
+});
+
+/** Rows the SQLite store holds when both backends are planted. */
+const SQLITE_ROWS = ROWS.slice(0, 2);
+
+/** Rows the NDJSON store holds when both backends are planted. */
+const NDJSON_ROWS = ROWS.slice(2);
+
+/** A root holding different rows in each backend, and a config. */
+function plantBothBackends(config: string | null): string {
+  const root = freshRoot();
+  if (config !== null) writeConfig(root, config);
+  appendSqliteSessions(root, SQLITE_ROWS);
+  writeNdjsonSessions(root, NDJSON_ROWS);
+  return root;
+}
+
+describe('the store a report reads', () => {
+  it('reads the SQLite store when no config names one', () => {
+    const report = buildReport({ repoRoot: plantBothBackends(null) });
+
+    expect(report.rowsRead).toBe(SQLITE_ROWS.length);
+    expect(report.groups.map((group) => group.key))
+      .toEqual(['q19-loop-economics']);
+  });
+
+  it.each([
+    ['sqlite', SQLITE_ROWS.length],
+    ['ndjson', NDJSON_ROWS.length],
+  ])('reads the rows of the backend store: %s selects', (backend, rows) => {
+    const root = plantBothBackends(`store: ${backend}\n`);
+
+    const report = buildReport({ repoRoot: root });
+
+    expect(report.rowsRead).toBe(rows);
+  });
+
+  it('rolls the same rows up to the same bytes from either backend', () => {
+    const sqliteRoot = freshRoot();
+    appendSqliteSessions(sqliteRoot, ROWS);
+    const ndjsonRoot = plantStore(ROWS);
+
+    const fromSqlite = buildReport({ repoRoot: sqliteRoot });
+    const fromNdjson = buildReport({ repoRoot: ndjsonRoot });
+
+    expect(fromSqlite.rowsRead).toBe(ROWS.length);
+    expect(fromSqlite.totals.sessionsWithoutEffort).toBe(1);
+    expect(JSON.stringify(fromSqlite)).toBe(JSON.stringify(fromNdjson));
+  });
+
+  it('never reads the config when a store is passed', () => {
+    // The config names a store no backend opens, so a report that read
+    // it at all would refuse; the one below reads the store it was given.
+    const root = plantBothBackends('store: postgres\n');
+
+    const report = buildReport({
+      repoRoot: root,
+      store: openNdjsonStore(root),
+    });
+
+    expect(report.rowsRead).toBe(NDJSON_ROWS.length);
+  });
+
+  it('refuses a config it cannot run on', () => {
+    const root = plantBothBackends('store: postgres\n');
+
+    const refusal = thrownBy(() => buildReport({ repoRoot: root }));
+
+    expect(refusal).toBeInstanceOf(ConfigError);
+    expect((refusal as ConfigError).problems).toEqual([
+      expect.stringContaining('store is "postgres"'),
+    ]);
+  });
+});
+
+/** A config holding a problem in each of its two settings. */
+const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
+
+/** What one run of the command printed, and how it exited. */
+interface CommandRun {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * A scratch git repository with a config and a planted NDJSON store,
+ * answered as its real path. The command takes its root from git, which
+ * resolves macOS's `/var` symlink to `/private/var`, and a refusal quotes
+ * the config path under that root.
+ */
+function makeRepo(config: string): string {
+  const root = realpathSync(freshRoot());
+  const init = Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+  if (init.exitCode !== 0) {
+    throw new Error(`git init: ${init.stderr.toString()}`);
+  }
+  writeConfig(root, config);
+  writeNdjsonSessions(root, ROWS);
+  return root;
+}
+
+/** Runs `effort report` inside a repository, as the dispatcher would. */
+function runReport(root: string, args: readonly string[]): CommandRun {
+  const run = Bun.spawnSync(
+    [process.execPath, RAFA_ENTRY, 'effort', 'report', ...args],
+    { cwd: root },
+  );
+  return {
+    exitCode: run.exitCode,
+    stdout: run.stdout.toString(),
+    stderr: run.stderr.toString(),
+  };
+}
+
+describe('the report command', () => {
+  it('reads the store the config selects, warning on stderr alone', () => {
+    const root = makeRepo('store: ndjson\ntracker: linear\n');
+
+    const run = runReport(root, ['--json']);
+
+    expect(run.exitCode).toBe(0);
+    expect((JSON.parse(run.stdout) as { rowsRead: number }).rowsRead)
+      .toBe(ROWS.length);
+    expect(run.stderr).toContain('"tracker"');
+  });
+
+  it('prints a config it cannot run on as one refusal per problem', () => {
+    const root = makeRepo(TWO_PROBLEM_CONFIG);
+    const refusal = thrownBy(() => loadConfig(root)) as ConfigError;
+
+    const run = runReport(root, ['--json']);
+
+    expect(refusal.problems).toEqual([
+      expect.stringContaining('store is "postgres"'),
+      expect.stringContaining('bogus'),
+    ]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr.trimEnd().split('\n')).toEqual(
+      refusal.problems.map((problem) => `ralph effort report: ${problem}`),
+    );
+    expect(run.stdout).toBe('');
   });
 });
