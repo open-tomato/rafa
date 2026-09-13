@@ -350,6 +350,26 @@
   text (or a test's verbatim quotation of it, flagged by a comment like
   "the spec's own example") to chase a dead-code sweep, since neither is
   tracked and the quoting test doesn't assert the referenced file exists.
+- A fixture that must be a genuinely model-generated `rafa:report` (not one
+  a test author typed) has no source in a real task dispatch yet —
+  `src/PROMPT.md` still asks for no such block. Spawn `claude` directly
+  instead: `claude -p --dangerously-skip-permissions < prompt.txt`, the same
+  invocation `claudeArgs`/`spawnClaudeCaptured` build for a real task
+  session. Freeze the raw stdout ONCE as a file rather than regenerating it
+  per test run (nondeterministic, slow, needs network); read it back with
+  the `readFileSync(new URL('./x', import.meta.url), 'utf8')` idiom
+  `plan/parse.test.ts`'s real-plan-file case already uses. Placed at
+  `src/report/testdata/live-session-report.txt`.
+- A field typed nullable in a parsed model (`ReportFinding.trigger:
+  string | null`) fails a matcher's non-null parameter (`toContain(expected:
+  string)`, TS2769) even where a test's literal is plainly non-null: narrow
+  it through a small throwing helper (`textOf` in `parse.test.ts`), not `!`
+  or `as string`. Comparing a hand-written array against a field typed as a
+  closed-set union (`ReportFinding.kind`/`.signal`) needs the array literal
+  ANNOTATED with the domain type (`: ReportFinding[]`), else its string
+  literals widen to `string` and fail assignability; `toEqual`'s own type is
+  `toEqual(expected: T)` bound to whatever `expect(actual)` inferred, so only
+  the expected side needs the annotation.
 - SQLite 3.51.0 upsert: the conflict target must repeat its index, else
   `ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
   constraint`: a PARTIAL unique index's `WHERE`, an expression index's
@@ -378,8 +398,6 @@
   stops at the first misfit, an entry over the cap alone is skipped as
   `oversized`). A render over an empty store BLANKS an authored
   `progress.txt`, this repo's tracked one included.
-- Between-task compaction and the compaction session are gone from
-  `src/` (cadence, prompt builder, `PROMPT_SHAPES` entry, their tests).
 - `plan.ts` `formatProgressSection` truncates at 16,000 CHARACTERS keeping
   the TAIL, which in a most-recent-first render is the OLDEST entry; it
   never acts while the renderer's byte cap stays <= that, pinned in

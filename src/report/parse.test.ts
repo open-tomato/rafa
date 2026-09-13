@@ -38,6 +38,8 @@
  */
 import type { ReportAbsent, ReportFinding, ReportPresent, ReportReading } from './parse.js';
 
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'bun:test';
 
 import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from './parse.js';
@@ -70,6 +72,13 @@ function absentOf(reading: ReportReading): ReportAbsent {
 /** A session output whose final message ends with a report of `body`. */
 function reportOf(...body: string[]): ReportPresent {
   return presentOf(parseReport(doc('Done.', '', ...reportBlock(body))));
+}
+
+/** A finding's `trigger` and `what`, both required in every entry here. */
+function textOf(finding: ReportFinding): readonly [string, string] {
+  const { trigger, what } = finding;
+  if (trigger === null || what === null) throw new Error('expected trigger and what, got null');
+  return [trigger, what];
 }
 
 /** Issues as `<reason> <field>` pairs, in the order they were answered. */
@@ -604,5 +613,133 @@ describe('keys the parser does not know', () => {
 
     expect(reading.report.findings[0]).toMatchObject({ signal: null, extras: [{ key: 'signl', value: 'loud' }] });
     expect(issuePairs(reading)).toEqual(['missing-field findings[0].signal']);
+  });
+});
+
+describe('the final message a real session ended with', () => {
+  /**
+   * A real `claude -p --dangerously-skip-permissions` invocation's raw
+   * stdout, captured once and frozen at `testdata/live-session-report.txt`
+   * — not a fixture built by hand like every block above. The prompt
+   * asked for seven distinct findings and told the model not to merge or
+   * summarise any of them into fewer entries. What follows reads that
+   * answer back through the real parser and checks the whole findings
+   * list survived, entry for entry, against the raw text rather than
+   * against a copy of what the parser itself already says.
+   */
+  const output = readFileSync(new URL('./testdata/live-session-report.txt', import.meta.url), 'utf8');
+  const reading = presentOf(parseReport(output));
+
+  const EXPECTED_FINDINGS: ReportFinding[] = [
+    {
+      trigger: 'Running bun test in a freshly created git worktree',
+      kind: 'gotcha',
+      what: 'bun test fails in a fresh worktree because node_modules is missing',
+      cause: 'Creating a git worktree does not run an install step',
+      resolution: 'Run `bun install` in the worktree before `bun test`',
+      artifact: 'Cannot find package',
+      signal: 'loud',
+      extras: [],
+    },
+    {
+      trigger: 'Writing boolean values into a column guarded by a CHECK constraint',
+      kind: 'gotcha',
+      what: 'bun:sqlite binds JS true/false as 1/0, so `CHECK (x IN (0, 1))` accepts a boolean never validated as one in app code',
+      cause: 'bun:sqlite coerces JavaScript booleans to the integers 1 and 0 when binding',
+      resolution: 'Validate boolean inputs in application code; do not rely on the CHECK constraint',
+      artifact: null,
+      signal: 'loud',
+      extras: [],
+    },
+    {
+      trigger: 'Reading update functions across the codebase',
+      kind: 'pattern',
+      what: 'Existing objects are never mutated; every update function returns a new object via spread syntax',
+      cause: null,
+      resolution: null,
+      artifact: null,
+      signal: 'silent',
+      extras: [],
+    },
+    {
+      trigger: 'Exiting a `Statement.iterate()` loop early with break',
+      kind: 'gotcha',
+      what: 'Breaking out of `Statement.iterate()` early in bun:sqlite leaves the cached statement broken for the next call',
+      cause: null,
+      resolution: null,
+      artifact: 'bad parameter or other API misuse',
+      signal: 'loud',
+      extras: [],
+    },
+    {
+      trigger: 'Locating the code under test for the report parser',
+      kind: 'location',
+      what: 'Task report parser is at `src/report/parse.ts`, with colocated tests in `src/report/parse.test.ts`',
+      cause: null,
+      resolution: null,
+      artifact: null,
+      signal: 'silent',
+      extras: [],
+    },
+    {
+      trigger: 'Scoping which fixtures the characterization tests should use',
+      kind: 'skill-suggestion',
+      what: 'A skill for writing characterization tests against real model-generated fixtures, not only hand-authored ones, would have scoped this task faster',
+      cause: null,
+      resolution: null,
+      artifact: null,
+      signal: 'silent',
+      extras: [],
+    },
+    {
+      trigger: 'Writing this YAML report with inline code references',
+      kind: 'gotcha',
+      what: 'A string containing a backtick, such as an inline reference to `bun test`, must be double-quoted in YAML',
+      cause: 'An unquoted backtick is a reserved YAML indicator',
+      resolution: 'Wrap any value containing a backtick, colon, or other special character in double quotes',
+      artifact: null,
+      signal: 'silent',
+      extras: [],
+    },
+  ];
+
+  it('reads the block cleanly, with no issue', () => {
+    expect(reading.report.status).toBe('done');
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('counts the same number of findings the raw block lists, by an independent count of trigger lines', () => {
+    const triggerLines = output.match(/^ {2}- trigger:/gm) ?? [];
+
+    expect(triggerLines).toHaveLength(EXPECTED_FINDINGS.length);
+    expect(reading.report.findings).toHaveLength(triggerLines.length);
+  });
+
+  it('carries every finding entry for entry, in order, none merged and none dropped', () => {
+    expect(reading.report.findings).toEqual(EXPECTED_FINDINGS);
+  });
+
+  it('keeps every finding exactly as written, not paraphrased or shortened', () => {
+    for (const finding of EXPECTED_FINDINGS) {
+      const [trigger, what] = textOf(finding);
+      expect(output).toContain(trigger);
+      expect(output).toContain(what);
+    }
+  });
+
+  it('reads the skills, the empty blockers list and the out-of-scope bug the block carries', () => {
+    expect(reading.report.skillsUsed).toEqual([
+      'superpowers:test-driven-development',
+      'superpowers:verification-before-completion',
+    ]);
+    expect(reading.report.blockers).toEqual([]);
+    expect(reading.report.outOfScopeBugs).toEqual([
+      {
+        what: 'Early break from a `Statement.iterate()` loop in an existing query helper poisons its cached statement',
+        artifact: 'bad parameter or other API misuse',
+        security: false,
+        extras: [],
+      },
+    ]);
   });
 });
