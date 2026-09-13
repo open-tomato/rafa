@@ -73,6 +73,7 @@ import { fileURLToPath } from 'url';
 import { ConfigError, loadConfig } from './config.js';
 import { parsePlan, renderInjection } from './plan/index.js';
 import { describeTaskReportRecord, recordTaskReport } from './report/record.js';
+import { setActivePlanStub, withStamp } from './start/stamp.js';
 import { runClaude, runClaudeCaptured, checkUsage } from './utils/claude.js';
 import { commitTaskWork } from './utils/commit.js';
 import {
@@ -81,7 +82,7 @@ import {
   stripTaskDeclaration,
 } from './utils/declaration.js';
 import { getCurrentBranch, getRepoRoot } from './utils/git.js';
-import { planStubFromPath, stampPrompt } from './utils/plan-stamp.js';
+import { planStubFromPath } from './utils/plan-stamp.js';
 import {
   failingRows,
   findOpenPullRequest,
@@ -98,31 +99,6 @@ import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let interrupted = false;
-
-/**
- * The plan this run is executing, or null when nothing set one.
- *
- * Module state rather than a threaded argument because it is read by
- * four prompt builders whose signatures are driven directly by tests,
- * and a fifth parameter on each would change every one of those call
- * sites to carry a value none of them is about. Null is the default
- * and {@link withStamp} is then the identity, so a builder called
- * from a test dispatches the exact bytes it dispatched before
- * stamping existed.
- */
-let activePlanStub: string | null = null;
-
-/** Sets the plan every prompt this run dispatches is stamped with. */
-export function setActivePlanStub(stub: string | null): void {
-  activePlanStub = stub;
-}
-
-/** Stamps a prompt with the active plan, or returns it unchanged. */
-function withStamp(prompt: string): string {
-  return activePlanStub === null
-    ? prompt
-    : stampPrompt(activePlanStub, prompt);
-}
 
 /** Branches a plan run is refused on. */
 const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
