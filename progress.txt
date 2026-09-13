@@ -493,3 +493,27 @@
   interface (tsc 5.9, `export` dropped from a port: `check-types` exit
   0), so a type losing its `export` passes every gate unless a case
   lists the module's type exports.
+- End-to-end link verification, 2026-09-13, bun 1.3.14: `bun run build`
+  then `bun link` at the repo root, `bun link @open-tomato/rafa` in a
+  scratch dir under `/tmp` created with `bun init`. `bun run rafa usage`
+  and `./node_modules/.bin/rafa usage` both resolve the `bin` entry and
+  run `dist/cli.js` correctly (`bun link`'s symlink targets the REPO
+  ROOT, not `dist/`; resolution follows `package.json`'s `bin`/`exports`
+  through it either way). All five subpaths (`.`, `./cli`, `./plan`,
+  `./store`, `./ports`) resolve under `bun`'s dynamic `import()`;
+  `./cli` runs the CLI's usage banner as a side effect on import
+  (expected: `src/rafa.ts` dispatches on `process.argv` when loaded, per
+  the existing `src/index.ts` note). `./ports` answers zero runtime
+  exports, matching the types-only entry.
+- The `--target=bun` build makes `.`, `./cli` and `./store` BUN-ONLY at
+  runtime: under plain `node -e` dynamic import, `bun:sqlite` (pulled in
+  by `src/index.ts` via the store barrel, and by `cli.js`) throws
+  `Only URLs with a scheme in: file, data, and node are supported by the
+  default ESM loader. Received protocol 'bun:'` before any of the
+  module's own code runs. Only `./plan` and `./ports` (neither imports
+  `bun:sqlite`) resolve under Node. `package.json`'s `"engines": {"node":
+  ">=22"}` is therefore inaccurate for three of the five entries as
+  currently built; a Node-compatible build would need `--target=node`
+  plus a `bun:sqlite`-free store path, which is out of this phase's
+  scope — record as debt alongside the `.ralph/` naming and `bun@1.3.9`
+  items.
