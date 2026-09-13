@@ -26,19 +26,21 @@ with no `packages/` directory and no workspace boundaries to navigate.
   `avoidEscape`, three-line ternaries, `import type` first in its own
   block, parent and sibling as separate import groups. Write it, run
   `lint`, and take the ordering from the message rather than reasoning it
-  out. Never run `lint:fix` over hand-wrapped prose — it joins lines past
-  the width cap.
+  out. Never run `eslint --fix` over hand-wrapped prose — it joins lines
+  past the width cap.
 - **Never widen scope.** The task is the deliverable. A real problem found
   outside it is reported, not fixed.
 
 ## Verification
 
 Run the gates this repo needs — `bun test`, `bunx tsc --noEmit`,
-`bunx eslint .` — then read the `Exited with code N` lines as a SET —
-never a positional read, and never a grep of the capture for `failed`,
-which appears in deliberate log fixtures. A test that fails under the
-full suite and passes alone is the known parallel-load flake, not a
-regression: run the file alone before reporting it as one.
+`bunx eslint .` — and read each one's exit code and its own summary
+line (`N pass, N fail` for the suite); never grep the capture for
+`failed`, which appears in deliberate log fixtures. `bun test` runs
+files one after another, so a test that fails under the full suite and
+passes alone is state leaking from an earlier file into it, not a
+flake: find the file that runs before it and the state it leaves, and
+report both.
 
 ## Boundaries
 
