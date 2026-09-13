@@ -3,8 +3,9 @@
  *
  * Every prompt here is PLANTED — assembled the way the loop assembles
  * it, never copied out of a real log. Two cases reach outside that: the
- * drift guard reads `start.ts`, `start/wrap-up.ts` and `plan-prompt.md`,
- * which is the point of it, and neither reads a session log.
+ * drift guard reads `start.ts`, `start/wrap-up.ts`,
+ * `start/pr-lifecycle.ts` and `plan-prompt.md`, which is the point of
+ * it, and neither reads a session log.
  *
  * The foreign needle is built from fragments in the same style
  * `naming-patterns.ts` uses for the de-origination set, for the same

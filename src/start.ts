@@ -53,9 +53,9 @@
  *
  * After the last task the loop runs a wrap-up session (`start/wrap-up.ts`:
  * promote findings, sync with main, commit, push, open or update the PR)
- * and then WAITS on that PR's checks. A conflicting PR gets no CI run at
- * all, so without this last stage the loop can report a finished plan
- * whose code was never checked once.
+ * and then WAITS on that PR's checks (`start/pr-lifecycle.ts`). A
+ * conflicting PR gets no CI run at all, so without this last stage the
+ * loop can report a finished plan whose code was never checked once.
  */
 import type { ConfigSource, InjectMode, ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -73,9 +73,14 @@ import { fileURLToPath } from 'url';
 import { ConfigError, loadConfig } from './config.js';
 import { parsePlan, renderInjection } from './plan/index.js';
 import { describeTaskReportRecord, recordTaskReport } from './report/record.js';
+import {
+  DEFAULT_CI_ATTEMPTS,
+  DEFAULT_CI_TIMEOUT_MIN,
+  verifyPullRequest,
+} from './start/pr-lifecycle.js';
 import { setActivePlanStub, withStamp } from './start/stamp.js';
 import { preserveProgress } from './start/wrap-up.js';
-import { runClaude, runClaudeCaptured, checkUsage } from './utils/claude.js';
+import { runClaudeCaptured, checkUsage } from './utils/claude.js';
 import { commitTaskWork } from './utils/commit.js';
 import {
   parseTaskDeclaration,
@@ -84,15 +89,6 @@ import {
 } from './utils/declaration.js';
 import { getCurrentBranch, getRepoRoot } from './utils/git.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
-import {
-  failingRows,
-  findOpenPullRequest,
-  formatRows,
-  isGhUsable,
-  probeChecks,
-  readMergeState,
-  waitForChecks,
-} from './utils/pr.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from './utils/progress.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
@@ -154,143 +150,6 @@ export function guardRunBranch(
     console.warn('   The run proceeds; the convention is `feat/<plan-stub>`.');
   }
   return true;
-}
-
-/** How long to keep polling a PR's checks before giving up on them. */
-const DEFAULT_CI_TIMEOUT_MIN = 20;
-
-/** Seconds between polls. CI here settles in 2-5 minutes. */
-const CI_POLL_INTERVAL_MS = 20_000;
-
-/** Repair sessions spent on a red or conflicting PR before escalating. */
-const DEFAULT_CI_ATTEMPTS = 2;
-
-/**
- * Runs one Claude session to repair a PR that CI has rejected.
- *
- * The session is told what failed and where, and explicitly told not to
- * open a second PR — the branch already has one, and a new branch would
- * split a single plan across two reviews.
- */
-async function repairPullRequest(
-  prNumber: number,
-  branch: string,
-  reason: string,
-  detail: string,
-): Promise<number> {
-  const prompt = [
-    `The pull request for branch \`${branch}\` (#${prNumber}) is not mergeable: ${reason}`,
-    '',
-    detail,
-    '',
-    '* Diagnose the ACTUAL cause before changing anything. For a failing GitHub Actions job, read its log: `gh run view <run-id> --log-failed`, or `gh api repos/<owner>/<repo>/actions/jobs/<job-id>/logs` while other jobs in the run are still going. Identify which STEP failed — a job that dies at `Install dependencies` says nothing about the tests, and the fix is not in the test files.',
-    '* A `lockfile had changes, but lockfile is frozen` failure means `bun.lock` no longer matches the manifests. Restore the base copy with `git checkout origin/main -- bun.lock`, run a plain `bun install` to re-add this branch\'s own dependencies, and verify with `bun install --frozen-lockfile`. Never hand-edit the lockfile.',
-    '* Reproduce locally before pushing a fix, and re-run the affected gate (`bun run lint:all`, `bun run check-types:all`, `bun run test:all`) so the push is not a guess.',
-    '* A test that fails under the full suite and passes when run alone is the known parallel-load flake, not a regression. Re-run the file alone to establish which it is, and if it is the flake, say so and change nothing.',
-    `* Commit the fix and push to the CURRENT branch (${branch}). Do NOT create a branch and do NOT open a second PR — #${prNumber} already exists and will pick the push up.`,
-    '* If the cause is a genuine semantic conflict or a real defect you cannot fix without a product decision, change nothing, and report what you found and what the options are.',
-    '* Do not include Claude attribution in the commit message.',
-  ].join('\n');
-
-  return runClaude(withStamp(prompt));
-}
-
-/**
- * The wrap-up's last gate: a PR is not done until CI has spoken about it.
- *
- * Polls the PR's checks, and spends up to `maxAttempts` repair sessions on
- * a red or conflicting result before escalating to the operator. Skips
- * itself cleanly when `gh` is unusable, so the loop still works offline.
- */
-async function verifyPullRequest(timeoutMs: number, maxAttempts: number): Promise<void> {
-  const branch = getCurrentBranch();
-
-  if (!isGhUsable()) {
-    console.warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
-    console.warn('   The PR has been pushed but nothing here confirms CI agreed with it.');
-    return;
-  }
-
-  for (let attempt = 0; attempt <= maxAttempts; attempt++) {
-    const prNumber = findOpenPullRequest(branch);
-    if (prNumber === null) {
-      console.warn(`\n⚠️  No open PR found for ${branch}. Nothing to verify.`);
-      return;
-    }
-
-    console.log(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
-
-    const result = await waitForChecks({
-      probe: () => Promise.resolve(probeChecks(prNumber)),
-      timeoutMs,
-      intervalMs: CI_POLL_INTERVAL_MS,
-      onPoll: (rows, verdict, elapsedMs) => {
-        const secs = Math.round(elapsedMs / 1000);
-        console.log(`   [${secs}s] ${verdict} — ${rows.length} check(s)`);
-      },
-    });
-
-    if (result.verdict === 'green') {
-      console.log(`\n✅ CI green on PR #${prNumber}:`);
-      console.log(formatRows(result.rows));
-      return;
-    }
-
-    if (result.verdict === 'timeout') {
-      console.warn(`\n⚠️  CI still running after ${Math.round(result.elapsedMs / 1000)}s. Not waiting further.`);
-      console.warn(formatRows(result.rows));
-      console.warn(`   Check it yourself: gh pr checks ${prNumber}`);
-      return;
-    }
-
-    if (attempt === maxAttempts) break;
-
-    // `none` and `red` both get a repair session, with different framing:
-    // no checks at all is almost always a conflict, since GitHub cannot
-    // build a merge ref for a PR that does not merge cleanly.
-    const merge = readMergeState(prNumber);
-    if (result.verdict === 'none') {
-      if (merge?.state === 'MERGED') {
-        console.log(`\n✅ PR #${prNumber} is already merged.`);
-        return;
-      }
-      if (merge !== null && merge.mergeStateStatus !== 'DIRTY') {
-        console.warn(`\n⚠️  PR #${prNumber} reports no checks and is not conflicting`);
-        console.warn(`   (mergeable=${merge.mergeable} state=${merge.mergeStateStatus}).`);
-        console.warn('   Most likely no workflow matches the changed paths. Nothing to repair.');
-        return;
-      }
-      console.warn(`\n❌ PR #${prNumber} has no checks — it does not merge cleanly, so GitHub scheduled no run.`);
-      const exitCode = await repairPullRequest(
-        prNumber,
-        branch,
-        'it conflicts with the base branch, so GitHub scheduled no CI run at all.',
-        'Merge `origin/main` into this branch and resolve the conflicts, then push. Mechanical conflicts (versions, lockfiles, complementary additions) are yours to resolve; a genuine semantic conflict is not.',
-      );
-      if (exitCode !== 0) {
-        console.error(`\n❌ Conflict-repair session failed (exit ${exitCode}).`);
-        return;
-      }
-      continue;
-    }
-
-    console.warn(`\n❌ CI red on PR #${prNumber}:`);
-    console.warn(formatRows(result.rows));
-    const failed = failingRows(result.rows);
-    const exitCode = await repairPullRequest(
-      prNumber,
-      branch,
-      'its CI checks failed.',
-      ['The failing checks are:', formatRows(failed)].join('\n'),
-    );
-    if (exitCode !== 0) {
-      console.error(`\n❌ CI-repair session failed (exit ${exitCode}).`);
-      return;
-    }
-  }
-
-  console.error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
-  console.error('   Stopping rather than looping. Read the failing jobs and decide.');
 }
 
 function argValue(args: readonly string[], flag: string): string | undefined {

@@ -28,10 +28,10 @@
  *
  * A second guard runs in the same test file: every shape's prefix is
  * asserted present in the source file named on its record. The prompts
- * are ordinary string literals in `start.ts`, `start/wrap-up.ts` and
- * `plan-prompt.md` with nothing tying them to this module, so an edit
- * there would otherwise silently re-bucket every later session as
- * `other`.
+ * are ordinary string literals in `start.ts`, `start/wrap-up.ts`,
+ * `start/pr-lifecycle.ts` and `plan-prompt.md` with nothing tying them
+ * to this module, so an edit there would otherwise silently re-bucket
+ * every later session as `other`.
  *
  * Snapshot at the time of writing, over 896 loose session logs — the
  * counts move with every run and are meant to be re-derived, the SHAPE
@@ -118,7 +118,7 @@ export const PROMPT_SHAPES: readonly PromptShape[] = [
     label: 'CI repair',
     prefix: 'The pull request for branch ',
     firstLineInfix: ' is not mergeable: ',
-    source: 'src/start.ts',
+    source: 'src/start/pr-lifecycle.ts',
   },
 ];
 
