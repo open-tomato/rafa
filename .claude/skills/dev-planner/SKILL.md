@@ -145,7 +145,7 @@ findings:
     resolution: "check both version and table existence"
     artifact: null
     signal: silent
-skills_used: [progress-hygiene, sqlite-patterns]
+skills_used: [git-workflow, sqlite-patterns]
 blockers:
   - what: "Concurrent writes to NDJSON file"
     artifact: "EBADF: bad file descriptor"

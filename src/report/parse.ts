@@ -19,7 +19,7 @@
  *     resolution: "run bun install before the first test"
  *     artifact: "Cannot find package"
  *     signal: loud
- * skills_used: [progress-hygiene]
+ * skills_used: [git-workflow]
  * blockers:
  *   - what: "LINEAR_API_KEY unset"
  *     artifact: "401 Unauthorized"

@@ -122,7 +122,7 @@
   `checkedVersion`/`migrateSchema`: past `SQLITE_MIGRATIONS`,
   `append(kind, [])` answers `{ appended: 0, skipped: 0 }` where every
   other call refuses, and `effort/collect.ts` appends `[]` on each
-  "nothing new" run. Finding 1 of `.plans/REVIEW-phase-0-store.md`.
+  "nothing new" run.
 - `resolveIssueIdentifier({ branch, planStub, planIssue? }, teamKeys?)`
   (`src/effort/attribution.ts`) ranks plan `issue:` > plan stub > WHOLE
   branch name and answers null, never a stub; the grammar is team-keyed
@@ -335,7 +335,7 @@
   `sqlite.test.ts` (layout, zero-byte cases), `triage.test.ts` and
   `absences.test.ts` (their migration cases).
 - `it.each(CONST)` over an `as const` tuple is TS2769 (readonly): spread
-  it, `it.each([...CONST])`. `check-types` skips tests, the IDE does not.
+  it, `it.each([...CONST])`.
 - `src/effort/store/triage.ts`: `writeTriage(root, { dispatch, outcome,
   blockers, outOfScopeBugs }, seams?)` writes the `blockers` and
   `out_of_scope_bugs` tables (migration 3) in ONE transaction, into
@@ -345,6 +345,13 @@
   skipped, rejected }`. The dispatch check is shared: `checkDispatch(
   subject, dispatch, outcome)`, `describeValue`, `textProblem` are
   exported from `findings.ts`. Neither table has `tracker_ref`.
+- `.specs/` and `.plans/` are BOTH gitignored at the repo root (`.gitignore`
+  lines 37-38: `.specs`, `.plans`), so `git ls-files` never lists a path
+  under either — a "sweep every reference across tracked files" task
+  naturally excludes them; don't rewrite a plan/spec's own illustrative
+  text (or a test's verbatim quotation of it, flagged by a comment like
+  "the spec's own example") to chase a dead-code sweep, since neither is
+  tracked and the quoting test doesn't assert the referenced file exists.
 - SQLite 3.51.0 upsert: the conflict target must repeat its index, else
   `ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
   constraint`: a PARTIAL unique index's `WHERE`, an expression index's

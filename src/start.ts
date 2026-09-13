@@ -202,7 +202,6 @@ export function buildWrapUpPrompt(branch: string, planContent: string): string {
     '* If there\'s anything worth keeping, grab what\'s generally relevant from `@progress.txt` and include it in the `context/` page that owns its subject (repo-root `context/` for tree-wide law, `packages/<pkg>/context/` for one package\'s), `@README.md`, `@CONTRIBUTING.md` or a pertinent skill under `.claude/skills/`. The root `@AGENTS.md` is a capped map read into every turn of every session: point at the page from there if a new one is needed, never inline the finding itself.',
     '* Promote a finding ONLY when all three hold, and delete or keep it rather than promoting it when any one fails. It is PROJECT-SPECIFIC — a fact about THIS tree (its layout, its gates, its conventions, what a command here actually answers) and not a general technique, which belongs in a skill and not in this repo\'s docs. It is NOT ALREADY COVERED by a skill under `.claude/skills/` — read the skill that matches the finding\'s subject before writing anything, and extend that skill in place rather than restating it in a second document. And it NAMES WHAT IT REPLACES — the sentence, bullet or table row it supersedes, deleted in the SAME edit — or, when it replaces nothing, says so. A promotion landing beside the claim it should have replaced leaves two authorities on one subject, and nothing here compares two documents, so the stale one is never reported again.',
     '* If a learn/learn-eval skill is available in this session, invoke it now so reusable patterns from this run are persisted as skills.',
-    '* Then compact `@progress.txt` per `.claude/skills/progress-hygiene/SKILL.md`: drop every finding that was just persisted somewhere durable and anything stale or task-specific; keep only broadly-relevant findings not yet promoted. The file must stay small — future plan generation injects it as context.',
     '* If it\'s present, extract the issue reference from the plan below (e.g. "#42") to be used in the PR title.',
     `* If the reference is not present on the plan check if the branch name (${branch}) carries one (e.g. feat/42-slug).`,
     '* Use the plan title as the PR title, include the issue reference if you found it, e.g. "Implement user authentication (#42)".',
@@ -898,7 +897,7 @@ export default async function start(args: string[]): Promise<void> {
 
     if (!taskInfo) {
       console.log('\n✅ All tasks completed!');
-      console.log('🧹 Wrap-up session starting: promote progress.txt findings, compact it, sync with main, then commit, push and open the PR.');
+      console.log('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
       console.log('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
       await preserveProgress(planContent);
       if (ciWait) {
