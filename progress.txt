@@ -1,5 +1,3 @@
-- The plan's "Structured task report" stage deletes
-  `.claude/skills/progress-hygiene`; docs must not treat it as permanent.
 - The sandbox blocks `rm -r`/`rm -rf` everywhere, /tmp too: empty a dir by
   `mv`-ing its contents out; `cp -R src/. dest/` copies into an existing
   one.
@@ -382,9 +380,6 @@
   `progress.txt`, this repo's tracked one included.
 - Between-task compaction and the compaction session are gone from
   `src/` (cadence, prompt builder, `PROMPT_SHAPES` entry, their tests).
-  Still standing in `start.ts`: the wrap-up prompt's compaction bullet
-  naming `.claude/skills/progress-hygiene/SKILL.md`, and the wrap-up
-  banner's "compact it".
 - `plan.ts` `formatProgressSection` truncates at 16,000 CHARACTERS keeping
   the TAIL, which in a most-recent-first render is the OLDEST entry; it
   never acts while the renderer's byte cap stays <= that, pinned in
