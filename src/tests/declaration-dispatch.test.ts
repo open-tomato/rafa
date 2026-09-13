@@ -78,13 +78,13 @@
  *
  * Twenty-one mutations of `start.ts`, `utils/claude.ts` and
  * `utils/declaration.ts` were driven against this file, while
- * `start.ts` still held what `start/dispatch.ts` holds now, and all
- * TWENTY-ONE reddened at least one case. Every leg ran TWICE and
- * named the IDENTICAL red set on both passes, asked for through
- * `--reporter=json` so a red SET is comparable member for member — a
- * red COUNT cannot separate two legs reddening the same number of
- * different cases. All three modules were restored bytes-identical
- * and all 14 cases were green either side.
+ * `start.ts` still held what `start/dispatch.ts` and `start/commit.ts`
+ * hold now, and all TWENTY-ONE reddened at least one case. Every leg
+ * ran TWICE and named the IDENTICAL red set on both passes, asked for
+ * through `--reporter=json` so a red SET is comparable member for
+ * member — a red COUNT cannot separate two legs reddening the same
+ * number of different cases. All three modules were restored
+ * bytes-identical and all 14 cases were green either side.
  *
  * The wide legs are the ones reaching the argument list. Spawning
  * twice reddens 6; dropping the flags from `claudeArgs`, putting them
@@ -145,8 +145,8 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
-import { commitFinishedTask } from '../start.js';
 import { runClaude } from '../utils/claude.js';
 
 /** The two spaces a tracker line puts between text and block. */

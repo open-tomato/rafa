@@ -48,8 +48,8 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
-import { commitFinishedTask } from '../start.js';
 import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '../utils/commit.js';
 import { findNextTask } from '../utils/tracker.js';
 

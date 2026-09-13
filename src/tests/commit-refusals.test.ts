@@ -27,12 +27,12 @@
  *
  * ## What the loop's next task needs from here
  *
- * `start.ts` is about to branch on the outcome, marking a tracker
- * line `[BLOCKED]` when the commit failed and ticking it otherwise.
- * That makes the discrimination between the two refusals — the clean
- * tree, which is a SUCCESS, and the rejected hook, which is not — the
- * property the loop actually rests on, so it is asserted as a pair in
- * one case rather than left implied by two separate ones.
+ * `start/commit.ts` is about to branch on the outcome, marking a
+ * tracker line `[BLOCKED]` when the commit failed and ticking it
+ * otherwise. That makes the discrimination between the two refusals —
+ * the clean tree, which is a SUCCESS, and the rejected hook, which is
+ * not — the property the loop actually rests on, so it is asserted as
+ * a pair in one case rather than left implied by two separate ones.
  *
  * ## Two characterizations, both measured before they were written
  *
@@ -302,8 +302,8 @@ describe('the clean-tree refusal', () => {
   });
 
   it('is a success a hook refusal is not', () => {
-    // The discrimination `start.ts` is about to branch on. Both are
-    // refusals and only one blocks, so they are read side by side:
+    // The discrimination `start/commit.ts` is about to branch on. Both
+    // are refusals and only one blocks, so they are read side by side:
     // any record shape that cannot separate them either blocks a
     // correct task or reports a commit nobody made.
     const clean = plantRepo();
