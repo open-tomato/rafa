@@ -1,0 +1,62 @@
+# Progress: Phase 0 — package, parity, cutover
+
+## Completed Tasks
+
+### Stage: Import the sibling loop
+
+- [x] Remove vitest from the repo by deleting `vitest.config.ts` and dropping the `vitest` devDependency from `package.json`
+  - Deleted `vitest.config.ts` (which contained node and include configuration for `tools/**/*.test.ts`)
+  - Removed `"vitest": "^4.1.7"` from `package.json` devDependencies
+  - Status: Complete
+
+- [x] Add the `package.json` scripts `test` running `bun test`, `lint` running `eslint .`, `check-types` running `tsc --noEmit`, and a temporary `ralph` script pointing at the sibling's `tools/ralph/ralph.ts` by absolute path
+  - Added `scripts` section to package.json with all four entries
+  - `test` script runs `bun test` for the native test runner
+  - `lint` script runs `eslint .` for linting the entire project
+  - `check-types` script runs `tsc --noEmit` for type checking
+  - `ralph` script points to `/Users/marcos/projects/agentic-research/tools/ralph/ralph.ts` by absolute path (temporary bootstrap before bin entry)
+  - Status: Complete
+
+## Findings
+
+### Patterns
+- The project is transitioning from vitest to bun's native test runner (`bun:test`)
+- vitest.config.ts pointed to `tools/**/*.test.ts` which no longer exists in this repo (src layout imported from sibling)
+
+#- [x] Add the repo-root `AGENTS.md` map listing `context/workflow.md` and `context/verification.md` as plain paths, write both pages with the task-shape-to-agent routing table on the workflow page and the gate order on the verification page, and add the `@AGENTS.md` import line to `CLAUDE.md`
+  - Created root-level `AGENTS.md` (25 lines, under 80-line cap)
+  - Created `context/workflow.md` with task-shape-to-agent routing table
+  - Created `context/verification.md` with gate order and capture-reading guidance
+  - Added `@AGENTS.md` import line to `CLAUDE.md` at line 1
+  - Both test suites now pass: routing-table-agents (21 tests) and context-page-imports (9 tests)
+  - Status: Complete
+
+- [x] Rewrite `.claude/skills/dev-planner/SKILL.md` with the same structured plan format, so a hand-written plan matches a generated one
+  - Documented the structured plan format with fenced blocks (`rafa:plan`, `rafa:context`, `rafa:stage-context`, `rafa:report`)
+  - Documented task declaration syntax with `{agent=..., effort=..., model=..., skills=..., tools=...}` keys
+  - Documented three injection modes (full, stage, task) and their contents
+  - Documented report format with findings, blockers, and out_of_scope_bugs structures
+  - Added examples for both minimal and full-featured plans
+  - Clarified block retention and stripping rules
+  - Status: Complete
+
+## Findings
+
+### Patterns
+- Structured plan format uses fenced code blocks for metadata and context (rafa:plan, rafa:context, rafa:stage-context)
+- Task declarations (trailing {key=value pairs}) are stripped from all quoted output (prompts, commits, logs)
+- Report blocks are YAML-based and contain structured lists for findings, blockers, and bugs
+- Three injection modes control task context scope: full (whole plan), stage (plan + stage context), task (single task)
+- Unknown rafa:* block kinds are retained and ignored, providing extension points for future phases
+- Unknown declaration keys (like skills=) are kept in extras map and don't cause parsing failure
+
+### Skills referenced in phase 0
+- dev-planner (for plan structure)
+- bun-testing (for test migration)
+- vitest-migration (for test framework transition)
+- progress-hygiene (for findings and report management)
+- sqlite-patterns (for store implementation)
+
+## Next Steps
+- Test files under src/ will need migration from vitest imports to bun:test imports
+- A task follows to port test files and replace vitest API calls (vi.spyOn, vi.restoreAllMocks)

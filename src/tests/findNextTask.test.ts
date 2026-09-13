@@ -10,7 +10,9 @@
  * findNextTask is tested as a pure function without mocking.
  */
 
-import { describe, expect, it } from 'vitest';
+import type { TaskInfo } from '../utils/tracker.js';
+
+import { describe, expect, it } from 'bun:test';
 
 // ── Pure unit tests for tracker helpers ──────────────────────────────────────
  
@@ -47,5 +49,75 @@ describe('findNextTask', () => {
   it('trims whitespace from task names', () => {
     const content = '- [ ]   Padded task   \n';
     expect(findNextTask(content)?.task).toBe('Padded task');
+  });
+});
+
+/** Joins lines into a document ending in a newline, as an editor saves one. */
+function doc(...lines: string[]): string {
+  return `${lines.join('\n')}\n`;
+}
+
+describe('findNextTask over a plan carrying rafa blocks', () => {
+  /** A blocked and an open line in the plan context, one in a stage's. */
+  const QUOTED = [
+    '# Plan: quoted',
+    '```rafa:context',
+    '- [BLOCKED] Blocked inside the context',
+    '- [ ] Open inside the context',
+    '```',
+    '# Stage: one',
+    '```rafa:stage-context',
+    '- [ ] Open inside the stage context',
+    '```',
+    '- [ ] The planned task  {agent=loop-implementer}',
+  ];
+
+  const PLANNED: TaskInfo = {
+    task: 'The planned task  {agent=loop-implementer}',
+    lineNum: 9,
+    status: 'unchecked',
+  };
+
+  it('dispatches the task after the blocks, never a line inside one', () => {
+    expect(findNextTask(doc(...QUOTED))).toEqual(PLANNED);
+  });
+
+  it('dispatches those lines once no fence opens a rafa block, the near miss', () => {
+    const plain = QUOTED.map((line) => line.replace('```rafa:', '```text-'));
+    expect(findNextTask(doc(...plain))).toEqual({
+      task: 'Blocked inside the context',
+      lineNum: 2,
+      status: 'blocked',
+    });
+
+    const unblocked = plain.map((line) => line.replace('- [BLOCKED] ', '- [x] '));
+    expect(findNextTask(doc(...unblocked))).toMatchObject({ task: 'Open inside the context', lineNum: 3 });
+  });
+
+  it('keeps every line number when the document is CRLF', () => {
+    expect(findNextTask(doc(...QUOTED).replaceAll('\n', '\r\n'))).toEqual(PLANNED);
+  });
+
+  it('skips a line inside a block of a kind no phase reads yet', () => {
+    const later = doc('```rafa:future-thing', '- [ ] Inside', '```', '- [ ] Outside');
+    expect(findNextTask(later)).toMatchObject({ task: 'Outside', lineNum: 3 });
+  });
+
+  it('answers null when the only open line sits inside a block', () => {
+    expect(findNextTask(doc('```rafa:context', '- [ ] Inside', '```'))).toBeNull();
+    // Near miss: the same line after the closing fence.
+    expect(findNextTask(doc('```rafa:context', '```', '- [ ] Inside'))).toMatchObject({ task: 'Inside', lineNum: 2 });
+  });
+
+  it('dispatches a line in a rafa fence an illustration holds, which is no block', () => {
+    const illustration = doc('````markdown', '```rafa:context', '- [ ] Illustrated', '```', '````', '- [ ] Planned');
+    expect(findNextTask(illustration)).toMatchObject({ task: 'Illustrated', lineNum: 2 });
+  });
+
+  it('dispatches the lines after a block never closed, as it always did', () => {
+    const unclosed = doc('- [x] Done', '```rafa:context', '- [ ] After the fence');
+    expect(findNextTask(unclosed)).toMatchObject({ task: 'After the fence', lineNum: 2 });
+    // Near miss: closed, the same line is block body.
+    expect(findNextTask(doc('- [x] Done', '```rafa:context', '- [ ] After the fence', '```'))).toBeNull();
   });
 });

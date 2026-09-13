@@ -6,4 +6,4 @@
 #
 # Enable once per clone:
 #   git config core.hooksPath .githooks
-exec bun src/utils/control-byte-gate/control-byte-gate.ts --staged
+exec bun scripts/control-byte-gate/control-byte-gate.ts --staged

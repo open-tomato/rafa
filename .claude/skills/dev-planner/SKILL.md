@@ -1,11 +1,11 @@
 ---
 name: dev-planner
-description: Use when producing or parsing a plan document (PLAN-<stub>.md, PLAN_TRACKER-<stub>.md, PREREQUISITES-<stub>.md) for the ralph agent loop — establishes the checkbox/stage-heading syntax the tracker parser requires, task granularity rules, and testing-task insertion patterns.
+description: Use when producing or parsing a plan document (PLAN-<stub>.md, PREREQUISITES-<stub>.md) for the rafa agent loop — establishes the structured plan format with fenced blocks, task declaration syntax, and report format the loop parses and the planner generates.
 ---
 
-# dev-planner — Plan Document Format Specification
+# dev-planner — Structured Plan Format Specification
 
-This skill specifies the format of plan documents produced for feature development work and consumed by the ralph agent loop (`tools/ralph/`). It does not define agent behavior, personas, or workflow — those belong in agent profiles.
+This skill specifies the format of plan documents produced for feature development work and consumed by the rafa agent loop (`src/rafa.ts`). It does not define agent behavior, personas, or workflow — those belong in agent profiles.
 
 ---
 
@@ -13,80 +13,221 @@ This skill specifies the format of plan documents produced for feature developme
 
 | File | Purpose |
 | --- | --- |
-| `PLAN-<stub>.md` | Full task checklist with technical context, stage labels, and code examples |
-| `PLAN_TRACKER-<stub>.md` | Loop-parsed checklist; must use the exact format the parser expects |
+| `PLAN-<stub>.md` | Full task checklist with structured blocks and technical context |
 | `PREREQUISITES-<stub>.md` | Non-automatable setup steps required before the plan can run (only when any exist) |
 
-Plans are generated with `bun run ralph plan --spec=specs/<file>.md` (optionally `--stub=<name>`; the stub defaults to the spec's basename) and live at the repo root. The tracker is derived from the plan file by `trackerPathFor()` in `tools/ralph/utils/tracker.ts` (`PLAN-foo.md` → `PLAN_TRACKER-foo.md`) — never create or edit the tracker by hand during planning; the loop owns it. The unstubbed forms `PLAN.md` / `PLAN_TRACKER.md` / `PREREQUISITES.md` are also valid and are the loop's default (`bun run ralph start` with no `--plan`).
+Plans are generated with `bun run rafa plan --spec=.specs/<file>.md` (optionally `--stub=<name>`; the stub defaults to the spec's basename) and live at the repo root. The unstubbed form `PLAN.md` / `PREREQUISITES.md` are also valid and are the loop's default (`bun run rafa start` with no `--plan`).
 
-Execute a plan with `bun run ralph start --plan=PLAN-<stub>.md`.
+Execute a plan with `bun run rafa start --plan=PLAN-<stub>.md`.
 
 ---
 
-## PLAN.md format
+## Structured PLAN.md format
 
-`PLAN-<stub>.md` is the human-readable plan. Its task lines are injected directly into agent prompts by the loop.
+`PLAN-<stub>.md` is the human-readable plan. It consists of:
 
-```markdown
+1. A `# Plan:` heading
+2. Optional structured blocks (`rafa:*` fenced code blocks)
+3. One or more `# Stage:` sections with tasks
+
+````markdown
 # Plan: {Feature Title}
+
+```rafa:plan
+stub: my-feature
+issue: OPT-123
+spec: .specs/my-feature.md
+```
+
+```rafa:context
+Prose injected into the context of EVERY task in this plan.
+Useful for linking to related files or stating common constraints.
+```
 
 ## Description
 
 {Technical context and background. No behavioral instructions.}
 
 # Stage: {Stage Name}
-- [ ] Task one
-- [ ] Task two
+
+```rafa:stage-context
+Prose injected only into tasks under THIS stage heading.
+Links to files relevant to this stage, domain-specific guidelines, etc.
+```
+
+- [ ] Task one  {agent=loop-implementer effort=high skills=skill-name}
+- [ ] Task two  {model=haiku}
 
 # Stage: {Next Stage}
-- [ ] Task three
-```
 
-Rules:
-- Stage labels use `# Stage: {name}` (top-level heading, not `##`).
-- Tasks use `- [ ]` checkbox syntax.
-- Keep the plan focused on tasks and technical context only. Link to relevant `.claude/skills/` files where they clarify a task, but do not embed behavioral prose.
-- Code snippets are allowed to illustrate a desired pattern. Keep them minimal and directly relevant to the task.
-- Do not use words like "current", "previous", or "next" in task descriptions. The loop injects the task text directly into agent prompts; relative references confuse the agent about what has already been done.
-- If the plan is long, add a `PLAN_SUMMARY-<stub>.md` with a high-level overview of stages for quick reference.
-
-### Plan header: `Implements`
-
-A plan that implements a GitHub issue opens with, near the top of the Description:
-
-```markdown
-**Implements:** #<n>
-```
-
-so the work stays traceable back to the issue it delivers.
+- [ ] Task three  {agent=tdd-guide effort=medium}
+````
 
 ---
 
-## PLAN_TRACKER.md format
+## Structured blocks (`rafa:*` fenced code blocks)
 
-`PLAN_TRACKER-<stub>.md` is consumed line-by-line by `findNextTask()` in `tools/ralph/utils/tracker.ts`. The parser applies strict prefix matching — any deviation in syntax will cause tasks to be skipped or misread.
+Structured blocks are optional fenced code blocks that provide metadata and context to the loop. They are **stripped from any output the loop quotes back** (prompt headers, commit messages, operator logs, etc.), so they carry information only for the loop and the planner.
 
-```markdown
-# Stage: {Stage Name}
+### `rafa:plan`
 
-- [ ] Open task — not yet started
-- [x] Completed task
-- [BLOCKED] Blocked task — {reason why it is blocked}
+Header metadata for the entire plan. Fields are YAML key-value pairs.
+
+````markdown
+```rafa:plan
+stub: my-feature
+issue: OPT-123
+spec: .specs/my-feature.md
+```
+````
+
+Recognized fields:
+- `stub` — The plan identifier (string). Used to organize findings and dedupe rows across runs.
+- `issue` — Optional GitHub issue number (string, e.g., `"OPT-123"`). Links the work back to a tracker.
+- `spec` — Optional path to the specification document that guided the plan.
+
+Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
+
+### `rafa:context`
+
+Prose that the loop injects into the context of **every task** in the plan. Appears between the plan-wide description and the task prompt.
+
+````markdown
+```rafa:context
+This plan rewrites the authentication layer. See auth-design.md.
+All tasks share the test fixtures in tests/auth-fixtures.ts.
+```
+````
+
+One `rafa:context` block per plan. Appears at the top level (not inside a stage).
+
+### `rafa:stage-context`
+
+Prose that the loop injects into the context of **only the tasks in the immediately following stage**. Appears before the first task of that stage.
+
+````markdown
+# Stage: Database Schema
+
+```rafa:stage-context
+All schema changes go in migrations/ under a new timestamped file.
+Run tests/schema-integration.test.ts after each migration.
 ```
 
-### Parser format contract
+- [ ] Add users table
+- [ ] Add posts table
+````
 
-| Status | Exact line prefix | Parser regex |
+One `rafa:stage-context` block per stage (optional). If present, it must appear immediately after the `# Stage:` heading and before the first task line.
+
+### `rafa:report` (agent output only)
+
+Agents return a structured report block at the end of their output. The loop parses this to record findings, blockers, and other metadata.
+
+````markdown
+```rafa:report
+status: done
+feedback: |
+  Implemented the store interface with both NDJSON and SQLite backends.
+  All parity tests pass against the sibling's session logs.
+findings:
+  - trigger: "when appending to an empty NDJSON store"
+    kind: gotcha
+    what: "file descriptor left open on failed writes"
+    cause: "resource cleanup not in finally block"
+    resolution: "wrap append in try/finally"
+    artifact: "EMFILE: too many open files"
+    signal: loud
+  - trigger: "SQLite schema migration timing"
+    kind: pattern
+    what: "migrations run on every store init, not just schema changes"
+    cause: "versioning check too coarse"
+    resolution: "check both version and table existence"
+    artifact: null
+    signal: silent
+skills_used: [git-workflow, sqlite-patterns]
+blockers:
+  - what: "Concurrent writes to NDJSON file"
+    artifact: "EBADF: bad file descriptor"
+out_of_scope_bugs:
+  - what: "bun:sqlite connection pooling"
+    artifact: "SQLITE_MISUSE"
+    security: false
+```
+````
+
+Report fields:
+
+| Field | Type | Description |
 | --- | --- | --- |
-| Unchecked | `- [ ] ` | `^- \[ \] (.+)` |
-| Completed | `- [x] ` | written by the loop's `updateTrackerLine()`; skipped by the parser |
-| Blocked | `- [BLOCKED] ` | `^- \[BLOCKED\] (.+)` |
+| `status` | string | The session's claim for its task: `done` or `blocked`. Required |
+| `feedback` | string | One block of prose describing what was done and how it went |
+| `findings` | list of objects | Findings discovered during the task (see below) |
+| `skills_used` | list of strings | Names of skills referenced or applied |
+| `blockers` | list of objects | What blocked the task (only if status is `blocked`) |
+| `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
 
-Important notes:
-- `[BLOCKED]` uses uppercase only. `[blocked]` or `[Blocked]` will not be matched.
-- There is one space between `]` and the task text for both `- [ ]` and `- [BLOCKED]`.
-- Stage heading lines (`# Stage: ...`) are **not parsed** by the loop. They are visual separators only and do not affect task selection — as is any other prose or code between task lines.
-- `findNextTask()` prefers blocked tasks over unchecked ones — it resumes interrupted work before starting new tasks.
+Finding entry fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `trigger` | string | yes | When/how the finding surfaced (e.g., "when running bun test under Docker") |
+| `kind` | string | yes | Category: `gotcha`, `pattern`, `location` or `skill-suggestion` |
+| `what` | string | yes | The finding itself |
+| `cause` | string | no | Root cause or explanation |
+| `resolution` | string | no | How to fix or work around it |
+| `artifact` | string | no | Error message, file path, or code snippet that signals the finding |
+| `signal` | string | yes | `loud` (it surfaced as a failure) or `silent` (it passed while wrong) |
+
+Blocker/bug entry fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `what` | string | yes | Description of the blocker or bug |
+| `artifact` | string | no | Error message or diagnostic output |
+| `security` | boolean | yes (bugs only) | Whether this is a security issue; never defaulted when missing |
+
+---
+
+## Task declaration syntax
+
+Each task line ends with a **declaration** — a comma-separated list of key-value pairs in curly braces.
+
+```markdown
+- [ ] Add Zod schema for CreateJobRequest  {agent=loop-implementer effort=high skills=zod-schemas model=sonnet tools=Read,Write,Edit}
+```
+
+Recognized keys, the `DECLARATION_KEYS` of `src/utils/declaration.ts`:
+
+| Key | Values | Purpose |
+| --- | --- | --- |
+| `agent` | agent name | Dispatch to a specific agent. Default: `loop-implementer` |
+| `effort` | `low`, `medium`, `high` | Task complexity estimate |
+| `model` | `haiku`, `sonnet`, `opus` | Model override for this task |
+| `tools` | comma-separated list | Tools the agent will need |
+
+A brace block is a declaration only when at least one of its keys is in the table above. Beside such a key, any other key (`skills` included) is retained in the task's extras map, maps to no flag and is stripped with the rest of the block; it does not cause parsing to fail, and serves as an extensibility point for future phases. A block with no recognized key is not a declaration at all: it stays in the task text, and so reaches the prompt header, the operator log line and the commit subject.
+
+### `skills=` declaration
+
+The `skills=` key lists skills the task applies or tests, comma-separated. These are referenced (not implemented) in phase 0; phase 3 resolves them into manifest entries. `skills` is an extras key rather than a recognized one, so give the task a recognized key beside it — `{skills=bun-testing}` alone is left in the task text:
+
+```markdown
+- [ ] Port vitest tests to bun:test  {agent=build-error-resolver skills=bun-testing,vitest-migration}
+```
+
+---
+
+## Three task-context injection modes
+
+The loop supports three modes of injecting task context, configured at plan start via `--inject=` or in `.rafa/config.yaml`:
+
+| Mode | Contents | Use case |
+| --- | --- | --- |
+| `full` | Whole plan (title, description, all stages, all tasks) | Wrap-up session; full context for retrospective |
+| `stage` | Plan context, stage context, stage's checklist with earlier tasks shown as done, stage list | Task session; focused scope |
+| `task` | Plan context, stage context, single task line | Minimal task focus (not used in phase 0) |
+
+The wrap-up session always receives `full` regardless of the configured mode.
 
 ---
 
@@ -121,6 +262,7 @@ Rules:
 - No compound tasks joined by "and". Split "implement X and write tests for X" into two tasks.
 - Tasks must be independently completable in the order listed.
 - Use imperative, specific wording: "Add Zod schema for `CreateJobRequest`" rather than "Handle input validation".
+- When several tasks wire into one file, give one of them the file's split before the file nears the 800-line cap. No single "wire X into `src/start.ts`" task grows it enough for its own diff to flag, and phase 0's six took `src/start.ts` from 798 lines to 960 with no task owning the split; only a whole-change-set review caught it.
 
 ---
 
@@ -134,20 +276,114 @@ Rules:
 
 ---
 
-## `[BLOCKED]` marker
+## Block retention and stripping
 
-The `[BLOCKED]` marker is written by the loop (via `updateTrackerLine()`) when a task fails or is interrupted. Format:
+Every `rafa:*` block is **stripped from the output the loop quotes back**. This means:
 
-```text
-- [BLOCKED] {task description} — {reason why it is blocked}
-```
+- A block planted in a task line does not appear in the dispatched prompt header
+- A block in a stage description does not appear in the operator log line
+- A block anywhere in the plan does not appear in a commit subject or commit body
 
-- The em dash (`—`) separates the task description from the reason. Do not use a hyphen (`-`) or colon.
-- The full line including reason is passed back to the agent as the scoped task on the next run.
-- Do not reformat `[BLOCKED]` lines manually unless correcting a syntax error — the loop will re-parse them on the next iteration.
+The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/plan/blocks.ts`):
+
+- Only a closed, top-level `rafa:*` block hides its lines. Every other fence is transparent, so a `- [ ] ` line at column 0 inside a `markdown` or `text` illustration, or inside a `rafa:` fence nested in one, is dispatched as a task. A plan that illustrates the format indents its example lines.
+- A `rafa:` fence that is never closed hides nothing, because taking the rest of the document as its body would end the plan with its tasks unrun. `parsePlan` reports it as `unclosed-block`, and each open task line after it as `task-in-block`.
+- A caller that builds its own `TaskInfo`, such as a Tracker port implementation, bypasses the strip.
+- An example that shows a `rafa:*` fence inside a larger fence needs the larger one to be longer, four backticks as in this skill: inside a three-backtick fence the first inner closing fence closes the outer one, and every later `rafa:` fence becomes a real block to any CommonMark reader.
+
+Unknown block kinds (e.g., `rafa:design-notes`) are retained by the parser and ignored, following the same rule as unknown declaration keys. They do not cause parsing to fail and are stripped on output.
 
 ---
 
-## Format validation
+## Format validation and parser contract
 
-Before changing checkbox syntax or stage heading format, verify compatibility against `findNextTask()` and `updateTrackerLine()` in `tools/ralph/utils/tracker.ts`. The parser uses simple prefix regex matching with no tolerance for whitespace variations or casing differences.
+The loop parses plan files through `src/plan/parse.ts`:
+
+- **Block parsing** (`src/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
+- **Plan parsing** (`src/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and any `rafa:stage-context` block immediately after the heading.
+- **Declaration parsing** (`src/utils/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declaration syntax).
+- **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
+
+The parser is liberal with unknown input: unknown block kinds are kept, unknown declaration keys are kept, unknown YAML keys are kept. A report yields no report only when its last `rafa:report` block is missing, never closed, not valid YAML, or not a mapping. A field that is missing, or holds a value it cannot take (a `findings` that is not a list, a `signal` other than `loud` or `silent`), is reported as an issue and the rest of the report is still read. Quote every string value in a report: an unquoted value that opens with a backtick, `@`, `%` or `[` makes the whole block unreadable, and a `#` after a space starts a comment that silently cuts the value short.
+
+Line numbers count two ways. A block's `span` (`readRafaBlocks`) and a `PlanIssue.line` count from one; `TaskInfo.lineNum` and the stage and task `lineNum` of the plan model count from zero, so compare `lineNum + 1` against either.
+
+The report rules in this skill restate `src/report/parse.ts`, which is the authority: change the two together.
+
+---
+
+## Examples
+
+### Minimal plan with no structured blocks
+
+```markdown
+# Plan: Add API logging
+
+## Description
+
+We need request/response logging on all endpoints.
+
+# Stage: Core logger
+
+- [ ] Add logger utility to src/lib/logger.ts  {effort=low}
+- [ ] Wire logger to request handler middleware  {effort=medium}
+
+# Stage: Testing
+
+- [ ] Add tests for logger output format  {effort=medium}
+```
+
+### Plan with full structured blocks and multiple stages
+
+````markdown
+# Plan: Refactor authentication layer
+
+```rafa:plan
+stub: refactor-auth
+issue: OPT-456
+spec: .specs/auth-refactor.md
+```
+
+```rafa:context
+All changes live under src/auth/. Test fixtures in tests/auth-fixtures.ts.
+See docs/AUTH_ARCHITECTURE.md for the domain model.
+```
+
+## Description
+
+The current auth system couples user identity to session state. This refactor separates concerns into three modules: identity verification, session management, and role-based access control.
+
+# Stage: Identity layer
+
+```rafa:stage-context
+Identity is stateless. Each module imports its own verification logic, never reaching back to sessions.
+```
+
+- [ ] Add cryptographic identity module at src/auth/identity.ts  {agent=loop-implementer effort=high skills=crypto}
+- [ ] Add identity unit tests  {agent=tdd-guide effort=medium}
+
+# Stage: Session management
+
+```rafa:stage-context
+Sessions are keyed by session ID, never by user. One session can hold multiple identities (e.g., impersonation for debugging).
+```
+
+- [ ] Rewrite session store to decouple from identity  {agent=loop-implementer effort=high}
+- [ ] Migrate session tests to new store API  {agent=tdd-guide effort=medium}
+
+# Stage: Access control
+
+- [ ] Implement role-based access control gating  {agent=loop-implementer effort=medium skills=rbac}
+- [ ] Add RBAC integration tests  {agent=tdd-guide effort=high}
+````
+
+---
+
+## Hand-written vs. generated plans
+
+Both follow the same structured format. The difference is:
+
+- **Hand-written plans** (by a planner agent): Prose in the description, stage contexts, and task granularity reflect careful thought about the work.
+- **Generated plans** (by `bun run rafa plan`): Produced from a spec document; structure is the same.
+
+A hand-written plan read by `src/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.

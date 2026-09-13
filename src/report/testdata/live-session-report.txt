@@ -1,0 +1,49 @@
+I finished the test suite work and wrote up what I found below. Before sending, I ran the report block through a YAML parser. It loads as a mapping with seven separate findings, no `blockers` key, and `security` read as a boolean false.
+
+```rafa:report
+status: done
+feedback: |
+  Worked through the TypeScript/Bun test suite, adding characterization coverage around the task report parser and the bun:sqlite-backed persistence code. Along the way several Bun and SQLite behaviors caused problems or were easy to miss, and each one is recorded as its own finding below. No blockers remained at the end.
+findings:
+  - trigger: "Running bun test in a freshly created git worktree"
+    kind: gotcha
+    what: "bun test fails in a fresh worktree because node_modules is missing"
+    cause: "Creating a git worktree does not run an install step"
+    resolution: "Run `bun install` in the worktree before `bun test`"
+    artifact: "Cannot find package"
+    signal: loud
+  - trigger: "Writing boolean values into a column guarded by a CHECK constraint"
+    kind: gotcha
+    what: "bun:sqlite binds JS true/false as 1/0, so `CHECK (x IN (0, 1))` accepts a boolean never validated as one in app code"
+    cause: "bun:sqlite coerces JavaScript booleans to the integers 1 and 0 when binding"
+    resolution: "Validate boolean inputs in application code; do not rely on the CHECK constraint"
+    signal: loud
+  - trigger: "Reading update functions across the codebase"
+    kind: pattern
+    what: "Existing objects are never mutated; every update function returns a new object via spread syntax"
+    signal: silent
+  - trigger: "Exiting a `Statement.iterate()` loop early with break"
+    kind: gotcha
+    what: "Breaking out of `Statement.iterate()` early in bun:sqlite leaves the cached statement broken for the next call"
+    artifact: "bad parameter or other API misuse"
+    signal: loud
+  - trigger: "Locating the code under test for the report parser"
+    kind: location
+    what: "Task report parser is at `src/report/parse.ts`, with colocated tests in `src/report/parse.test.ts`"
+    signal: silent
+  - trigger: "Scoping which fixtures the characterization tests should use"
+    kind: skill-suggestion
+    what: "A skill for writing characterization tests against real model-generated fixtures, not only hand-authored ones, would have scoped this task faster"
+    signal: silent
+  - trigger: "Writing this YAML report with inline code references"
+    kind: gotcha
+    what: "A string containing a backtick, such as an inline reference to `bun test`, must be double-quoted in YAML"
+    cause: "An unquoted backtick is a reserved YAML indicator"
+    resolution: "Wrap any value containing a backtick, colon, or other special character in double quotes"
+    signal: silent
+skills_used: ["superpowers:test-driven-development", "superpowers:verification-before-completion"]
+out_of_scope_bugs:
+  - what: "Early break from a `Statement.iterate()` loop in an existing query helper poisons its cached statement"
+    artifact: "bad parameter or other API misuse"
+    security: false
+```
