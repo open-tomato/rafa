@@ -23,21 +23,23 @@
  * refusal, the same rows, and bodies whose text, joined in append
  * order, is the NDJSON file.
  *
- * Twenty-five module mutations were driven against this file and every
+ * Twenty-six module mutations were driven against this file and every
  * one reddened at least one case, with the unmutated module green
  * before them and restored byte-identical after: `INSERT OR IGNORE` for
  * the upsert form, the lone-surrogate refusal dropped, the keyless
  * refusal dropped, the refusal worded differently from the NDJSON
  * backend's, the directory made before the batch is checked or when
  * the store is opened, rows serialised inside the transaction, an empty
- * batch opening the store, `read` and `keys` each ordered by something
- * other than `seq`, `keys` opening an absent store with the create flag,
- * `read` skipping the existence check, the key columns swapped between
- * kinds, keys projected from the bodies instead of the key column, the
- * key set cached across calls, the file renamed, the last occurrence of
- * a key winning, the batch inserted outside a transaction, the version
- * bump dropped, the newer-version refusal dropped, `IF NOT EXISTS` in
- * the migration, one transaction per migration, reads skipping the
+ * batch creating a store that does not exist, an empty batch leaving a
+ * store that exists unopened (red only on the empty append past the
+ * last version), `read` and `keys` each ordered by something other than
+ * `seq`, `keys` opening an absent store with the create flag, `read`
+ * skipping the existence check, the key columns swapped between kinds,
+ * keys projected from the bodies instead of the key column, the key set
+ * cached across calls, the file renamed, the last occurrence of a key
+ * winning, the batch inserted outside a transaction, the version bump
+ * dropped, the newer-version refusal dropped, `IF NOT EXISTS` in the
+ * migration, one transaction per migration, reads skipping the
  * migration, a malformed body tolerated, and the schema accepting an
  * empty key.
  *
@@ -585,18 +587,30 @@ describe('schema versioning', () => {
     expect(store.append('sessions', [S_A]).appended).toBe(1);
   });
 
+  const NEWER = SQLITE_SCHEMA_VERSION + 1;
+  const NEWER_REFUSAL = `is at schema version ${NEWER}, past the`
+    + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+
   it('refuses a store past the last version, touching nothing', () => {
     const root = freshRoot('newer');
-    const newer = SQLITE_SCHEMA_VERSION + 1;
-    rawExec(root, `PRAGMA user_version = ${newer}`);
+    rawExec(root, `PRAGMA user_version = ${NEWER}`);
     const before = readRaw(root);
     const store = openSqliteStore(root);
-    const refusal = `is at schema version ${newer}, past the`
-      + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
 
-    expect(() => store.append('sessions', [S_A])).toThrow(refusal);
-    expect(() => store.keys('sessions')).toThrow(refusal);
-    expect(() => store.read('commits')).toThrow(refusal);
+    expect(() => store.append('sessions', [S_A])).toThrow(NEWER_REFUSAL);
+    expect(() => store.keys('sessions')).toThrow(NEWER_REFUSAL);
+    expect(() => store.read('commits')).toThrow(NEWER_REFUSAL);
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  it('refuses an empty append on a store past the last version, bytes untouched', () => {
+    const root = freshRoot('newer-empty');
+    rawExec(root, `PRAGMA user_version = ${NEWER}`);
+    const before = readRaw(root);
+    const store = openSqliteStore(root);
+
+    expect(() => store.append('sessions', [])).toThrow(NEWER_REFUSAL);
+    expect(() => store.append('commits', [])).toThrow(NEWER_REFUSAL);
     expect(readRaw(root)).toEqual(before);
   });
 
