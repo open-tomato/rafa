@@ -56,6 +56,24 @@
  * driven against it, each twice: handing the repository root as the
  * home, and the home as the repository root, each redden that case
  * alone.
+ *
+ * The blocker case came after both. The stand-in's `MARK-REPORT` report
+ * lists `blockers: []`, so its task ticks, and the `MARK-BLOCKER` call
+ * answers that same report with one blocker added: its task has to be
+ * committed, marked `[BLOCKED]` and stored as `blocked`, and the run has to
+ * stop. Its control is the first case, whose reports differ only in listing
+ * none and whose run goes on through three tasks and the wrap-up. It is the
+ * only reading of `start.ts` handing the session's output to
+ * `finishCleanExit` and stopping on the outcome that answers. Three legs of
+ * `start.ts` were driven against this file, each restored sha256-identical:
+ * the run stopping on a refused commit alone, the report stored as `done`
+ * whatever became of the task, and the output not handed over. Each
+ * reddened the blocker case, and the second the refused commit's case too.
+ * The first, like `commit.ts` answering `done` for a held task, dispatches
+ * the task it has just blocked again and again. It held the suite until
+ * its run was killed by hand, which is why {@link runStart} kills a run
+ * past {@link START_KILL_AFTER_MS}; since then both legs fail the blocker
+ * case on their own, 52s into the file.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -203,6 +221,7 @@ const LATE_TASK = 'Add the third module MARK-REPORT';
 const FAILING_TASK = 'Add a module whose session fails MARK-FAIL';
 const BREAKING_TASK = 'Add a module whose session breaks the store MARK-BREAK';
 const INTERRUPTED_TASK = 'Add a module whose session is interrupted MARK-HANG';
+const BLOCKER_TASK = 'Add a module whose report lists a blocker MARK-BLOCKER';
 
 /** What the stand-in replaces with its call number. */
 const CALL_PLACEHOLDER = 'CALL-NUMBER';
@@ -224,14 +243,23 @@ const REPORT = [
   `    what: "${findingOf(CALL_PLACEHOLDER)}"`,
   '    artifact: "stand-in artifact"',
   '    signal: loud',
-  'blockers:',
-  '  - what: "a stand-in blocker"',
+  'blockers: []',
   'out_of_scope_bugs:',
   '  - what: "a stand-in bug"',
   '    security: false',
   FENCE,
   '',
 ].join('\n');
+
+/**
+ * The output a session ends with when it claims `done` beside a blocker,
+ * its call number still a placeholder: a report the loop holds its task
+ * on.
+ */
+const BLOCKER_REPORT = REPORT.replace('blockers: []', [
+  'blockers:',
+  `  - what: "a stand-in blocker of call ${CALL_PLACEHOLDER}"`,
+].join('\n'));
 
 /** Everything one scratch run lives in. */
 interface Scratch {
@@ -259,8 +287,9 @@ afterAll(() => {
  * marker. An interrupted call prints its report, says it is waiting, and
  * exits 130 once the case releases it, at most 30s later.
  */
-function standInScript(calls: string, reportPath: string): string {
+function standInScript(calls: string, reportPath: string, blockerReportPath: string): string {
   const report = `/usr/bin/sed "s/${CALL_PLACEHOLDER}/$n/" '${reportPath}'`;
+  const blockerReport = `/usr/bin/sed "s/${CALL_PLACEHOLDER}/$n/" '${blockerReportPath}'`;
   const release = [
     ': > "$calls/$n.waiting"',
     'i=0',
@@ -280,6 +309,7 @@ function standInScript(calls: string, reportPath: string): string {
     'case "$head" in',
     `  *MARK-REPORT*) echo work > "work-$n.txt"; ${report} ;;`,
     '  *MARK-SILENT*) echo work > "work-$n.txt"; echo "Done, and nothing to report." ;;',
+    `  *MARK-BLOCKER*) echo work > "work-$n.txt"; ${blockerReport} ;;`,
     `  *MARK-FAIL*) ${report}; exit 3 ;;`,
     `  *MARK-BREAK*) /bin/mkdir -p .ralph/effort/effort.sqlite; ${report} ;;`,
     `  *MARK-HANG*) ${report}; ${release} ;;`,
@@ -292,6 +322,12 @@ function standInScript(calls: string, reportPath: string): string {
 /** Runs git in a scratch repository, its output kept off the test's. */
 function git(dir: string, ...args: string[]): void {
   execFileSync('git', args, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/** Runs git in a scratch repository and answers its trimmed stdout. */
+function gitOutput(dir: string, ...args: string[]): string {
+  const stdout = execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return stdout.trim();
 }
 
 /** Writes an executable shell script. */
@@ -317,8 +353,10 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
 
   const reportPath = join(root, 'report.md');
   writeFileSync(reportPath, REPORT, 'utf8');
+  const blockerReportPath = join(root, 'blocker-report.md');
+  writeFileSync(blockerReportPath, BLOCKER_REPORT, 'utf8');
   const claude = join(bin, 'claude');
-  writeScript(claude, standInScript(calls, reportPath));
+  writeScript(claude, standInScript(calls, reportPath, blockerReportPath));
   if (refuseCommits) writeScript(join(hooks, 'pre-commit'), '#!/bin/sh\nexit 1\n');
 
   git(repo, 'init', '-q', '.');
@@ -365,10 +403,22 @@ interface StartRun {
   readonly output: string;
 }
 
-/** Runs `rafa start` to its end. */
+/**
+ * How long one `rafa start` may run before it is killed. It sits under a
+ * case's own timeout, which cannot interrupt a synchronous spawn, so a run
+ * that never stops, as one re-dispatching the task it has just blocked
+ * would, fails its case instead of holding the suite until someone kills it.
+ */
+const START_KILL_AFTER_MS = 45_000;
+
+/** Runs `rafa start` to its end, or kills it past {@link START_KILL_AFTER_MS}. */
 function runStart(scratch: Scratch): StartRun {
   assertStandIn(scratch);
-  const run = Bun.spawnSync(startCommand(), { cwd: scratch.repo, env: startEnv(scratch) });
+  const run = Bun.spawnSync(startCommand(), {
+    cwd: scratch.repo,
+    env: startEnv(scratch),
+    timeout: START_KILL_AFTER_MS,
+  });
   return {
     exitCode: run.exitCode,
     output: `${run.stdout.toString()}${run.stderr.toString()}`,
@@ -479,7 +529,9 @@ describe('rafa start, over a stand-in claude', () => {
     const third = { session_id: late, plan_stub: STUB, task_line: LATE_TASK, outcome: 'done' };
     expect(rowsOf(scratch, 'findings', `${provenance}, what`))
       .toEqual([{ ...first, what: findingOf(1) }, { ...third, what: findingOf(3) }]);
-    expect(rowsOf(scratch, 'blockers', provenance)).toEqual([first, third]);
+    expect(rowsOf(scratch, 'blockers', provenance)).toEqual([]);
+    expect(rowsOf(scratch, 'task_reports', `${provenance}, status`))
+      .toEqual([{ ...first, status: 'done' }, { ...third, status: 'done' }]);
     expect(rowsOf(scratch, 'out_of_scope_bugs', `${provenance}, security`))
       .toEqual([{ ...first, security: 0 }, { ...third, security: 0 }]);
     expect(rowsOf(scratch, 'report_absences', `${provenance}, reason`)).toEqual([{
@@ -521,6 +573,29 @@ describe('rafa start, over a stand-in claude', () => {
     expect(rowsOf(scratch, 'findings', 'session_id, outcome'))
       .toEqual([{ session_id: requireSessionId(scratch, 1), outcome: 'blocked' }]);
     expect(trackerTasks(scratch)).toEqual([`- [BLOCKED] ${REPORTING_TASK}`]);
+  }, RUN_TIMEOUT);
+
+  it('commits the work of a session whose report lists a blocker, marks it blocked and stops', () => {
+    const scratch = plantScratch([BLOCKER_TASK, REPORTING_TASK]);
+    expect(gitOutput(scratch.repo, 'rev-list', '--count', 'HEAD')).toBe('1');
+
+    const run = runStart(scratch);
+
+    // Stopped as a failed session stops it: no second task, no wrap-up.
+    expect(callCount(scratch)).toBe(1);
+    expect(trackerTasks(scratch)).toEqual([`- [BLOCKED] ${BLOCKER_TASK}`, `- [ ] ${REPORTING_TASK}`]);
+    expect(run.output).toContain(`Task blocked by its own report: ${BLOCKER_TASK}`);
+    expect(run.output).toContain('blocker: a stand-in blocker of call 1');
+
+    // Its partial work was committed, and nothing else.
+    expect(gitOutput(scratch.repo, 'rev-list', '--count', 'HEAD')).toBe('2');
+    expect(gitOutput(scratch.repo, 'show', '--name-only', '--format=', 'HEAD')).toBe('work-1.txt');
+
+    const stored = { session_id: requireSessionId(scratch, 1), task_line: BLOCKER_TASK, outcome: 'blocked' };
+    expect(rowsOf(scratch, 'blockers', 'session_id, task_line, outcome, what'))
+      .toEqual([{ ...stored, what: 'a stand-in blocker of call 1' }]);
+    expect(rowsOf(scratch, 'task_reports', 'session_id, task_line, outcome, status'))
+      .toEqual([{ ...stored, status: 'done' }]);
   }, RUN_TIMEOUT);
 
   it('stores the report of an interrupted session as blocked, then exits', async () => {

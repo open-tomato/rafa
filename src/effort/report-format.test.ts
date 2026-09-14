@@ -22,8 +22,19 @@
  * into the sessions cell, renders a table every case accepts. The same
  * four stayed green against these cases' predecessors in
  * `report.test.ts`, which rendered rolled-up rows, before the move.
+ *
+ * The task report section came later. Six legs of `report-format.ts` were
+ * driven against this file and `report.test.ts`, each restored
+ * sha256-identical, and each reddened at least one case here: the status
+ * and outcome cells swapped (1), the filter note dropped (1), the section
+ * left out of `formatReport` (1), a section printed for no tallies (1),
+ * right alignment ignored (2, the session table's alignment case among
+ * them), and a NULL status written as `null` (1). The command case in
+ * `report.test.ts` reddened too for the swap, the empty section and the
+ * alignment.
  */
 import type { EffortGroup, EffortReport, GroupKind } from './report.js';
+import type { TaskReportTally } from './store/reports.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -32,7 +43,9 @@ import {
   formatHistogram,
   formatMinutes,
   formatReport,
+  formatReportHeader,
   formatReportTable,
+  formatTaskReports,
 } from './report-format.js';
 import { emptyGroup } from './report.js';
 
@@ -53,6 +66,7 @@ function plantReport(fields: Partial<EffortReport> = {}): EffortReport {
     rowsRead: 0,
     rowsExcluded: 0,
     filters: { kinds: null, entrypoints: null },
+    taskReports: [],
     ...fields,
   };
 }
@@ -199,5 +213,66 @@ describe('formatReportTable', () => {
 
     expect(lines[1]).toBe('');
     expect(lines.join('\n')).not.toContain('note');
+  });
+});
+
+/** One tally, every field named. */
+function tally(
+  planStub: string | null,
+  status: TaskReportTally['status'],
+  outcome: string,
+  reports: number,
+): TaskReportTally {
+  return { planStub, status, outcome, reports };
+}
+
+/**
+ * Tallies holding a plan with no stub, a NULL status, a row where status
+ * and outcome differ beside one where they agree, and a count past a
+ * thousand, wider than every cell above it but not than its header.
+ */
+const TALLIES: readonly TaskReportTally[] = [
+  tally(null, 'done', 'done', 1),
+  tally('phase-1-installable', null, 'failed', 2),
+  tally('phase-1-installable', 'done', 'blocked', 1),
+  tally('phase-1-installable', 'done', 'done', 1204),
+];
+
+describe('formatTaskReports', () => {
+  it('renders the status beside the outcome, one aligned row per tally', () => {
+    expect(formatTaskReports(plantReport({ taskReports: TALLIES }))).toEqual([
+      '',
+      'task reports: 1,208 stored, by plan, status and outcome',
+      'plan                 status  outcome  reports',
+      '(no plan)            done    done           1',
+      'phase-1-installable  -       failed         2',
+      'phase-1-installable  done    blocked        1',
+      'phase-1-installable  done    done       1,204',
+    ]);
+  });
+
+  it('adds nothing to a report that stores no task report', () => {
+    const before = [...formatReportHeader(REPORT), '', ...formatReportTable(REPORT)];
+
+    expect(formatTaskReports(REPORT)).toEqual([]);
+    expect(formatReport(REPORT)).toEqual(before);
+
+    // The control: the same report holding tallies ends with their section.
+    const withTallies = { ...REPORT, taskReports: TALLIES };
+    expect(formatReport(withTallies))
+      .toEqual([...before, ...formatTaskReports(withTallies)]);
+    expect(formatTaskReports(withTallies)).toHaveLength(7);
+  });
+
+  it('notes under a filter that the tallies are not narrowed', () => {
+    const filtered = formatTaskReports(plantReport({
+      taskReports: TALLIES,
+      filters: { kinds: ['wrap-up'], entrypoints: null },
+    }));
+
+    expect(filtered[2]).toBe('  note        the filters narrow session rows, not task reports');
+    expect(filtered).toHaveLength(8);
+    expect(formatTaskReports(plantReport({ taskReports: TALLIES })).join('\n'))
+      .not.toContain('note');
   });
 });

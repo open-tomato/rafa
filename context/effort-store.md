@@ -35,8 +35,10 @@ and `writeTriage` do, so an empty write on a store that exists still
 meets the schema check. `writeReportAbsence` always has its one row and
 opens `withSqliteStore` directly. `writeTaskReport` always has its one
 row too, and passes `writeSqliteStore` a count of one, which opens the
-store as that direct call does. A new table moves every full table-list
-expectation with it: two in `sqlite.test.ts`, one each in
+store as that direct call does. `readTaskReportTallies` reads that table
+back for `rafa effort report`, under the repo root whatever `store`
+selects, and opens nothing when the file is absent. A new table moves
+every full table-list expectation with it: two in `sqlite.test.ts`, one each in
 `triage.test.ts`, `absences.test.ts` and `reports.test.ts`.
 
 ### Attribution

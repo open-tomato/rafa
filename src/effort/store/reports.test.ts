@@ -20,8 +20,18 @@
  * row count of 0 passed to `writeSqliteStore` (17), the dispatch
  * unchecked (3), and the version-5 entry removed (17, and 4 in the three
  * suites whose full table lists name the table).
+ *
+ * The reader's cases came after that grid. Four legs of
+ * `readTaskReportTallies` were driven against this file and
+ * `effort/report.test.ts`, restored the same way: the tallies ordered
+ * otherwise (1 red here, 1 there), every count written as 1 (1), an absent
+ * store opened with `create` (1, here alone, since a report over the store
+ * it creates still reads empty), and `status` dropped from the GROUP BY.
+ * That last leg reddened nothing while the counting case held no plan and
+ * outcome under two statuses, SQLite answering one of them for the bare
+ * column; with its seventh row it reddens that case.
  */
-import type { FindingsWriterSeams } from './findings.js';
+import type { FindingOutcome, FindingsWriterSeams } from './findings.js';
 import type { TaskReportWrite } from './reports.js';
 import type { ReportStatus, TaskReport } from '../../report/parse.js';
 
@@ -44,7 +54,7 @@ import { loadConfig } from '../../config.js';
 import { parseReport, REPORT_STATUSES } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES } from './findings.js';
-import { writeTaskReport } from './reports.js';
+import { readTaskReportTallies, writeTaskReport } from './reports.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 
 /** A task report row as the table holds it. */
@@ -368,6 +378,70 @@ describe('writeTaskReport rows', () => {
 
     expect(readdirSync(dirname(storeFile(root)))).toEqual(['effort.sqlite']);
     expect(rowsOf(root).map(({ id }) => id)).toEqual(['ndjson-selected-1']);
+  });
+});
+
+describe('readTaskReportTallies', () => {
+  it('answers none and creates nothing when no store exists', () => {
+    const root = freshRoot('tallies-absent');
+
+    expect(readTaskReportTallies(root)).toEqual([]);
+    expect(existsSync(root)).toBe(false);
+  });
+
+  it('counts the rows sharing a plan, a status and an outcome, NULL first in each', () => {
+    const root = freshRoot('tallies');
+    const writes: readonly (readonly [string, string | null, ReportStatus | null, FindingOutcome])[] = [
+      ['s1', 'phase-1', 'done', 'done'],
+      ['s2', 'phase-1', 'done', 'done'],
+      ['s3', 'phase-1', 'done', 'blocked'],
+      ['s4', 'phase-1', null, 'failed'],
+      ['s5', null, 'blocked', 'blocked'],
+      ['s6', 'phase-0', 'blocked', 'blocked'],
+      ['s7', 'phase-1', 'blocked', 'blocked'],
+    ];
+    for (const [sessionId, planStub, status, outcome] of writes) {
+      writeTaskReport(root, { dispatch: { ...DISPATCH, sessionId, planStub }, outcome, report: { status } });
+    }
+
+    // The control, read without the module: seven rows went in. `phase-1`
+    // holds two statuses under the outcome `blocked`, so a tally that did
+    // not group by status would merge them into one row.
+    expect(rowsOf(root)).toHaveLength(7);
+    expect(readTaskReportTallies(root)).toEqual([
+      { planStub: null, status: 'blocked', outcome: 'blocked', reports: 1 },
+      { planStub: 'phase-0', status: 'blocked', outcome: 'blocked', reports: 1 },
+      { planStub: 'phase-1', status: null, outcome: 'failed', reports: 1 },
+      { planStub: 'phase-1', status: 'blocked', outcome: 'blocked', reports: 1 },
+      { planStub: 'phase-1', status: 'done', outcome: 'blocked', reports: 1 },
+      { planStub: 'phase-1', status: 'done', outcome: 'done', reports: 2 },
+    ]);
+  });
+
+  it('leaves a store at the last version byte-identical', () => {
+    const root = freshRoot('tallies-bytes');
+    writeTaskReport(root, writeOf(), seams('tallies-bytes'));
+    const before = readRaw(root);
+
+    expect(readTaskReportTallies(root)).toHaveLength(1);
+    expect(before).not.toBeNull();
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  it('refuses a store past the last version, as a write does', () => {
+    const root = freshRoot('tallies-newer');
+    writeTaskReport(root, writeOf(), seams('tallies-newer'));
+
+    // The control: the same store reads before its version is moved.
+    expect(readTaskReportTallies(root)).toHaveLength(1);
+
+    const db = new Database(storeFile(root), { readwrite: true });
+    db.run(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION + 1}`);
+    db.close();
+    const before = readRaw(root);
+
+    expect(() => readTaskReportTallies(root)).toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+    expect(readRaw(root)).toEqual(before);
   });
 });
 

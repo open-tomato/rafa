@@ -10,10 +10,16 @@
  *
  * Five mutations of `record.ts` were driven against this file alone, with
  * the unmutated file green before and after and the module restored
- * byte-identical, and every one reddened at least one of its 11 cases:
- * triage never written (4 red), findings stored as `done` whatever the
- * outcome (1), refused entries not warned (1), the already-recorded
- * wording flipped (1), and an absence row written beside a report (3).
+ * byte-identical, and every one reddened at least one of the 11 cases it
+ * then held: triage never written (4 red), findings stored as `done`
+ * whatever the outcome (1), refused entries not warned (1), the
+ * already-recorded wording flipped (1), and an absence row written beside
+ * a report (3).
+ *
+ * Two more came with the `task_reports` row, driven the same way once the
+ * cases reading that table were in, the module restored sha256-identical:
+ * the row never written (4 of the 12 cases red) and the row written with a
+ * NULL status whatever the report said (3).
  */
 import type { TaskReportInput } from './record.js';
 
@@ -127,6 +133,11 @@ describe('recordTaskReport', () => {
     expect(rowsOf(root, 'out_of_scope_bugs', `${PROVENANCE}, what, security`))
       .toEqual([{ ...stored, what: 'the collector double counts', security: 0 }]);
     expect(rowsOf(root, 'report_absences', PROVENANCE)).toEqual([]);
+
+    // The session claimed done and the loop made its task blocked: the
+    // one status row holds the two side by side.
+    expect(rowsOf(root, 'task_reports', `${PROVENANCE}, status`))
+      .toEqual([{ ...stored, status: 'done' }]);
   });
 
   it('stores an output with no report as one absence row and nothing else', () => {
@@ -136,7 +147,7 @@ describe('recordTaskReport', () => {
     expect(record.present).toBe(false);
     expect(rowsOf(root, 'report_absences', `${PROVENANCE}, reason, block_body`))
       .toEqual([{ ...DISPATCHED, outcome: 'failed', reason: 'no-block', block_body: null }]);
-    for (const table of ['findings', 'blockers', 'out_of_scope_bugs']) {
+    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'task_reports']) {
       expect(rowsOf(root, table, 'id')).toEqual([]);
     }
   });
@@ -151,14 +162,35 @@ describe('recordTaskReport', () => {
     expect(absence?.['reason']).toBe('malformed-block');
     expect(String(absence?.['block_body'])).toContain('feedback: it broke: twice');
     expect(rowsOf(root, 'findings', 'id')).toEqual([]);
+    expect(rowsOf(root, 'task_reports', 'id')).toEqual([]);
   });
 
-  it('opens no store for a report whose lists are all empty', () => {
+  it('stores the status of a report whose lists are all empty as its one row', () => {
     const root = freshRoot('empty-lists');
     const record = recordTaskReport(root, inputOf(outputOf(reportBlock('status: done'))));
 
     expect(record.present).toBe(true);
-    expect(existsSync(root)).toBe(false);
+    expect(rowsOf(root, 'task_reports', `${PROVENANCE}, status`))
+      .toEqual([{ ...DISPATCHED, outcome: 'done', status: 'done' }]);
+    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'report_absences']) {
+      expect(rowsOf(root, table, 'id')).toEqual([]);
+    }
+  });
+
+  it('stores a report with no usable status as NULL beside the outcome', () => {
+    const root = freshRoot('no-status');
+    const report = reportBlock('feedback: "the status was left out"');
+    recordTaskReport(root, inputOf(outputOf(report), { outcome: 'failed' }));
+
+    // The control: a status the parser reads is stored as written.
+    const other = { ...DISPATCH, sessionId: 'bbbb-2222' };
+    const blocked = reportBlock('status: blocked');
+    recordTaskReport(root, inputOf(outputOf(blocked), { dispatch: other, outcome: 'failed' }));
+
+    expect(rowsOf(root, 'task_reports', 'session_id, status, outcome')).toEqual([
+      { session_id: 'aaaa-1111', status: null, outcome: 'failed' },
+      { session_id: 'bbbb-2222', status: 'blocked', outcome: 'failed' },
+    ]);
   });
 
   it('adds no row when one session output is recorded twice', () => {
@@ -173,6 +205,8 @@ describe('recordTaskReport', () => {
     expect([again.findings.appended, again.findings.skipped]).toEqual([0, 2]);
     expect([again.triage.blockers.skipped, again.triage.outOfScopeBugs.skipped]).toEqual([1, 1]);
     expect([absentAgain.absence.appended, absentAgain.absence.skipped]).toEqual([0, 1]);
+    expect([again.taskReport.appended, again.taskReport.skipped]).toEqual([0, 1]);
+    expect(rowsOf(root, 'task_reports', 'session_id')).toEqual([{ session_id: 'aaaa-1111' }]);
     expect(rowsOf(root, 'findings', 'id')).toHaveLength(2);
     expect(rowsOf(root, 'report_absences', 'id')).toHaveLength(1);
   });

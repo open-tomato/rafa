@@ -3,9 +3,10 @@
  *
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
- * reads the config and the store the config selects, and nothing else
- * — no log, no clock — so a report is a pure projection of rows already
- * on disk and two runs over an unchanged store produce identical bytes.
+ * reads the config, the store the config selects and the task reports
+ * the loop stored, and nothing else — no log, no clock — so a report is
+ * a pure projection of rows already on disk and two runs over an
+ * unchanged store produce identical bytes.
  *
  * ## Which store it reads
  *
@@ -23,6 +24,19 @@
  * command prints one line per problem and exits 1. A warning about an
  * unknown key goes to stderr through `loadConfig`'s default sink, so
  * the `--json` document on stdout stays parseable.
+ *
+ * ## Task reports beside the sessions
+ *
+ * {@link EffortReport.taskReports} is read from the `task_reports`
+ * table, tallied by plan, by the report's `status` and by the loop's
+ * outcome (`store/reports.ts`). The table sits in the SQLite file
+ * whichever backend `store` selects, so it is read under the repo root
+ * even when {@link ReportOptions.store} passes a store. A tally whose
+ * status and outcome differ counts sessions whose claim the loop did
+ * not take: a `done` beside a listed blocker, a commit git refused, a
+ * nonzero exit. The filters do not narrow the tallies, because a task
+ * report carries neither a kind nor an entrypoint to test them on, and
+ * the table printed under a filter says so.
  *
  * ## What a group is keyed on
  *
@@ -103,6 +117,7 @@
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { SessionUsageTotals } from './session-log.js';
+import type { TaskReportTally } from './store/reports.js';
 import type { EffortStore } from './store/types.js';
 
 import { ConfigError, loadConfig } from '../config.js';
@@ -110,8 +125,9 @@ import { getRepoRoot } from '../utils/git.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
-import { formatReport } from './report-format.js';
+import { formatReport, formatTaskReports } from './report-format.js';
 import { selectEffortStore } from './store/index.js';
+import { readTaskReportTallies } from './store/reports.js';
 
 /** Decimal places a summed minute figure is re-rounded to. */
 const SUM_MINUTE_DECIMALS = 3;
@@ -209,6 +225,11 @@ export interface EffortReport {
   /** Rows a filter removed. `rowsRead - rowsExcluded` were folded. */
   rowsExcluded: number;
   filters: ReportFilters;
+  /**
+   * The stored task reports, one tally per plan, status and outcome.
+   * The filters do not narrow them; see the module note.
+   */
+  taskReports: readonly TaskReportTally[];
 }
 
 /** What the parsed argv asked for. */
@@ -454,11 +475,13 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  * Rolls rows up into the report.
  *
  * Pure over its inputs, which is the seam the whole suite drives: a
- * planted row needs no store, no log and no repository.
+ * planted row needs no store, no log and no repository. `taskReports`
+ * is carried into the report as it is handed in, never filtered.
  */
 export function summariseSessions(
   rows: readonly ReportSessionRow[],
   filters: ReportFilters = { kinds: null, entrypoints: null },
+  taskReports: readonly TaskReportTally[] = [],
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -492,6 +515,7 @@ export function summariseSessions(
     rowsRead: rows.length,
     rowsExcluded,
     filters,
+    taskReports,
   };
 }
 
@@ -581,12 +605,14 @@ function resolveStore(
 }
 
 /**
- * Reads the session rows of the selected store and rolls them up.
+ * Reads the session rows of the selected store and the task report
+ * tallies under the repo root, and rolls the rows up.
  *
  * A missing store answers an EMPTY report rather than throwing — every
  * backend answers absence as the first-run case — so the command below
  * is what says "nothing collected yet" in words, which is the one thing
- * a table of zeroes cannot convey.
+ * a table of zeroes cannot convey. A missing SQLite file answers no
+ * tallies the same way.
  *
  * Throws a `ConfigError`, having read no row, when no store is passed
  * and the config under the repo root is one the loop cannot run on.
@@ -595,10 +621,14 @@ export function buildReport(options: ReportOptions = {}): EffortReport {
   const repoRoot = options.repoRoot ?? getRepoRoot();
   const store = resolveStore(options.store, repoRoot);
 
-  return summariseSessions(asReportRows(store.read('sessions')), {
-    kinds: options.kinds ?? null,
-    entrypoints: options.entrypoints ?? null,
-  });
+  return summariseSessions(
+    asReportRows(store.read('sessions')),
+    {
+      kinds: options.kinds ?? null,
+      entrypoints: options.entrypoints ?? null,
+    },
+    readTaskReportTallies(repoRoot),
+  );
 }
 
 /** Prints each refusal on its own line and marks the run failed. */
@@ -646,6 +676,7 @@ export default async function report(args: string[]): Promise<void> {
   if (built.rowsRead === 0) {
     console.log('effort report: no session rows stored yet'
       + ' (run `ralph effort collect` first)');
+    for (const line of formatTaskReports(built)) console.log(line);
     return;
   }
   for (const line of formatReport(built)) {

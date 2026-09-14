@@ -5,27 +5,31 @@
  * {@link recordTaskReport} reads the output with `parseReport` and writes
  * one of two things, never both:
  *
- *   - A report. Its findings go through `writeFindings`, then its
- *     blockers and out-of-scope bugs through `writeTriage`. A report whose
- *     three lists are all empty writes no row, as each writer does with
- *     nothing to insert. Each writer still opens a store that exists, for
- *     its schema check, so a store past this rafa's version is refused,
- *     and neither opens nor creates a store that does not exist.
+ *   - A report. Its findings go through `writeFindings`, its blockers and
+ *     out-of-scope bugs through `writeTriage`, and its `status` through
+ *     `writeTaskReport`, one `task_reports` row per session. A report
+ *     whose three lists are all empty writes no finding, blocker or bug
+ *     row, as each list writer does with nothing to insert, and still
+ *     writes its status row, creating the store when it is absent. Each
+ *     list writer still opens a store that exists, for its schema check,
+ *     so a store past this rafa's version is refused before any row is
+ *     written.
  *   - No report, for whatever reason. One telemetry row goes through
  *     `writeReportAbsence`, so a session that reported nothing is still a
  *     row.
  *
  * Every row one output writes carries the same dispatch and the same
  * outcome, so the tables it fills join on `session_id`. The report's own
- * `status` is the session's claim and is not stored; the loop's outcome
- * is.
+ * `status` is the session's claim and the outcome is the loop's; the
+ * `task_reports` row holds the two side by side, so a claim the loop did
+ * not take reads back beside what the loop made of the task.
  *
  * A writer that refuses throws, and nothing here catches it: what a store
  * the loop cannot write means for the run is `start.ts`'s decision.
- * Findings are written before triage, each writer in its own transaction,
- * so a triage write that throws leaves the findings stored. Every table is
- * deduplicated per session, so recording the same output for the same
- * session again adds no row.
+ * Findings are written first, then triage, then the status row, each
+ * writer in its own transaction, so a writer that throws leaves what the
+ * writers before it stored. Every table is deduplicated per session, so
+ * recording the same output for the same session again adds no row.
  *
  * {@link describeTaskReportRecord} is the operator's view of a record:
  * a summary of what was stored, and one warning for each thing that was
@@ -40,10 +44,12 @@ import type {
   FindingsWriterSeams,
   FindingsWriteResult,
 } from '../effort/store/findings.js';
+import type { TaskReportWriteResult } from '../effort/store/reports.js';
 import type { TriageListResult, TriageWriteResult } from '../effort/store/triage.js';
 
 import { writeReportAbsence } from '../effort/store/absences.js';
 import { writeFindings } from '../effort/store/findings.js';
+import { writeTaskReport } from '../effort/store/reports.js';
 import { writeTriage } from '../effort/store/triage.js';
 
 import { parseReport } from './parse.js';
@@ -62,6 +68,8 @@ export interface RecordedReport {
   readonly reading: ReportPresent;
   readonly findings: FindingsWriteResult;
   readonly triage: TriageWriteResult;
+  /** The session's one `task_reports` row, its status beside the outcome. */
+  readonly taskReport: TaskReportWriteResult;
 }
 
 /** What recording an output that held no report did. */
@@ -112,7 +120,8 @@ export function recordTaskReport(
     { dispatch, outcome, blockers: report.blockers, outOfScopeBugs: report.outOfScopeBugs },
     seams,
   );
-  return { present: true, reading, findings, triage };
+  const taskReport = writeTaskReport(repoRoot, { dispatch, outcome, report }, seams);
+  return { present: true, reading, findings, triage, taskReport };
 }
 
 /** One writer's counts for one list, whichever writer answered them. */

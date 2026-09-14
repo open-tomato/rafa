@@ -26,7 +26,7 @@ const HELP = [
   '                                                 (--inject=<full|stage|task>, --no-ci-wait, --ci-timeout=<min>, --ci-attempts=<n>)',
   '  usage                                          Show Claude usage (CLAUDE_USAGE_PERCENT override)',
   '  effort collect [--since=<date>] [--no-git]     Collect session and commit rows into .ralph/effort/ (--no-sessions, --verbose)',
-  '  effort report [--kind=<k>] [--entrypoint=<e>]  Roll the stored session rows up per plan (--json)',
+  '  effort report [--kind=<k>] [--entrypoint=<e>]  Roll the stored session rows up per plan, then task reports by status and outcome (--json)',
 ].join('\n');
 
 /**

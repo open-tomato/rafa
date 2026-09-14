@@ -78,6 +78,12 @@
  * a figure already exact at three places. It exists for the float tail
  * a longer sum grows, and a fixture chosen to produce one would be
  * asserting JavaScript's arithmetic rather than this module's.
+ *
+ * The task report cases came later, with three legs of their own driven
+ * against this file and `tests/effort-pipeline.test.ts`, each restored
+ * sha256-identical: the tallies never read (3 red), the tallies emptied
+ * under a `--kind` filter (1), and the command's no-rows branch printing no
+ * tallies (1). None reddened the pipeline suite.
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
@@ -113,6 +119,7 @@ import {
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
+import { writeTaskReport } from './store/reports.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
@@ -854,6 +861,49 @@ describe('the store a report reads', () => {
   });
 });
 
+/** Records one task report under a root, as the loop records one. */
+function plantTaskReport(
+  root: string,
+  sessionId: string,
+  status: 'done' | 'blocked' | null,
+  outcome: 'done' | 'blocked' | 'failed',
+): void {
+  writeTaskReport(root, {
+    dispatch: { sessionId, planStub: 'q19-loop-economics', taskLine: 'A task' },
+    outcome,
+    report: { status },
+  });
+}
+
+describe('the task reports a report carries', () => {
+  it('carries the tallies under the root beside the session rows the config selects', () => {
+    const root = plantStore(ROWS);
+    plantTaskReport(root, 'q19-a', 'done', 'blocked');
+    plantTaskReport(root, 'q19-b', 'done', 'done');
+
+    const report = buildReport({ repoRoot: root });
+
+    expect(report.rowsRead).toBe(ROWS.length);
+    expect(report.taskReports).toEqual([
+      { planStub: 'q19-loop-economics', status: 'done', outcome: 'blocked', reports: 1 },
+      { planStub: 'q19-loop-economics', status: 'done', outcome: 'done', reports: 1 },
+    ]);
+  });
+
+  it('carries them unfiltered, and none from a root that stores none', () => {
+    const root = plantStore(ROWS);
+    plantTaskReport(root, 'q19-a', 'blocked', 'blocked');
+
+    const filtered = buildReport({ repoRoot: root, kinds: ['other'] });
+
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.taskReports).toHaveLength(1);
+
+    // The control: the same session rows with no task report stored.
+    expect(buildReport({ repoRoot: plantStore(ROWS) }).taskReports).toEqual([]);
+  });
+});
+
 /** A config holding a problem in each of its two settings. */
 const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
 
@@ -904,6 +954,30 @@ describe('the report command', () => {
     expect((JSON.parse(run.stdout) as { rowsRead: number }).rowsRead)
       .toBe(ROWS.length);
     expect(run.stderr).toContain('"tracker"');
+  });
+
+  it('prints the stored task reports when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    plantTaskReport(root, 'aaaa-1111', 'done', 'blocked');
+    const bare = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: bare });
+    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'task reports: 1 stored, by plan, status and outcome',
+      'plan                status  outcome  reports',
+      'q19-loop-economics  done    blocked        1',
+      '',
+    ]);
+
+    // The control: a root storing neither prints the one line alone.
+    expect(runReport(bare, []).stdout).toBe(`${noRows}\n`);
   });
 
   it('prints a config it cannot run on as one refusal per problem', () => {

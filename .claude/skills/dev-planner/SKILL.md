@@ -205,9 +205,7 @@ findings:
     artifact: null
     signal: silent
 skills_used: [git-workflow, sqlite-patterns]
-blockers:
-  - what: "Concurrent writes to NDJSON file"
-    artifact: "EBADF: bad file descriptor"
+blockers: []
 out_of_scope_bugs:
   - what: "bun:sqlite connection pooling"
     artifact: "SQLITE_MISUSE"
@@ -219,11 +217,11 @@ Report fields:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `status` | string | The session's claim for its task: `done` or `blocked`. Required |
+| `status` | string | The session's claim for its task: `done` or `blocked`. Required. `blocked` marks the task `[BLOCKED]` once its work is committed, and stops the run |
 | `feedback` | string | One block of prose describing what was done and how it went |
 | `findings` | list of objects | Findings discovered during the task (see below) |
 | `skills_used` | list of strings | Names of skills referenced or applied |
-| `blockers` | list of objects | What blocked the task (only if status is `blocked`) |
+| `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
 | `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
 
 Finding entry fields:

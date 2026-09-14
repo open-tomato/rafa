@@ -6,8 +6,10 @@
  * Walks the plan's tracker checklist one task at a time, delegating each task
  * to a Claude Code session and then staging and committing whatever that
  * session left in the tree (`start/commit.ts`). `[x]` is marked once git has
- * answered; `[BLOCKED]` on a failed or interrupted session, and on a commit git
- * refused. Re-running resumes: blocked tasks are retried first.
+ * answered; `[BLOCKED]` on a failed or interrupted session, on a commit git
+ * refused, and on a task whose own report says `status: blocked` or lists a
+ * blocker, its partial work committed first. Each of those stops the run.
+ * Re-running resumes: blocked tasks are retried first.
  *
  * A task line may carry a trailing routing declaration (`utils/declaration.ts`).
  * The loop reads it, dispatches that task under the flags it names, and keeps
@@ -27,14 +29,16 @@
  * does both.
  *
  * Each task session is spawned under an id the loop picks, with its stdout
- * captured (`start/dispatch.ts`). Once the loop knows what became of the
- * task, `done`, `blocked` or `failed`, the `rafa:report` block that output
- * ends with is read and stored: its findings, blockers and out-of-scope
- * bugs, or, with no block the loop could read, one telemetry row saying why
+ * captured (`start/dispatch.ts`). The exit code alone decides `failed`; a
+ * clean exit is `blocked` when git refuses its commit or the `rafa:report`
+ * block that output ends with holds the task, and `done` otherwise
+ * (`start/commit.ts`). Once the loop knows what became of the task, the
+ * report is stored: its status, findings, blockers and out-of-scope bugs,
+ * or, with no block the loop could read, one telemetry row saying why
  * (`report/record.ts`). Before every dispatch, the wrap-up's included,
  * `progress.txt` is rendered from the stored findings (`utils/progress.ts`).
  * A store the loop cannot read or write stops the run: before a dispatch,
- * nothing is dispatched; after a task, its commit and its tick stand.
+ * nothing is dispatched; after a task, its commit and its mark stand.
  *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
@@ -67,7 +71,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { ConfigError } from './config.js';
-import { commitFinishedTask } from './start/commit.js';
+import { finishCleanExit } from './start/commit.js';
 import {
   dispatchTask,
   renderProgressForDispatch,
@@ -276,12 +280,14 @@ export default async function start(args: string[]): Promise<void> {
       return;
     }
 
-    const attempt = commitFinishedTask({ trackerPath, taskInfo, repoRoot });
-    const committed = attempt.outcome !== 'failed';
-    const stored = storeReport(committed
-      ? 'done'
-      : 'blocked');
-    if (!committed) return;
+    const finished = finishCleanExit({
+      trackerPath,
+      taskInfo,
+      repoRoot,
+      output: dispatch.output,
+    });
+    const stored = storeReport(finished.outcome);
+    if (finished.outcome !== 'done') return;
     if (!stored) {
       console.error('   Stopping here. The task stays ticked, so the next run starts after it.');
       return;

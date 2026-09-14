@@ -1,6 +1,7 @@
 /**
  * Renders a rolled-up effort report as the lines `rafa effort report`
- * prints in table mode.
+ * prints in table mode: the per-plan session table, then, when any task
+ * report is stored, the reports tallied by plan, status and outcome.
  *
  * Pure over an {@link EffortReport}: no store, no config and no clock
  * reach it, so `report.ts` decides every figure and this module decides
@@ -15,6 +16,7 @@
  * again rather than deriving one of its own.
  */
 import type { EffortGroup, EffortReport } from './report.js';
+import type { TaskReportTally } from './store/reports.js';
 
 /** Decimal places a formatted minute figure carries in the table. */
 const TABLE_MINUTE_DECIMALS = 1;
@@ -78,6 +80,18 @@ const RIGHT_ALIGNED: ReadonlySet<string> = new Set([
   'span-min',
 ]);
 
+/** The task report table's columns, in order. */
+const TASK_REPORT_COLUMNS = ['plan', 'status', 'outcome', 'reports'] as const;
+
+/** The task report columns rendered right-aligned. */
+const TASK_REPORT_RIGHT_ALIGNED: ReadonlySet<string> = new Set(['reports']);
+
+/** Written for a tally of reports dispatched under no plan. */
+const NO_PLAN_CELL = '(no plan)';
+
+/** Written for a tally of reports that gave no usable status. */
+const NO_STATUS_CELL = '-';
+
 /** One group as its table cells, in {@link TABLE_COLUMNS} order. */
 function groupCells(group: EffortGroup): string[] {
   return [
@@ -96,12 +110,47 @@ function groupCells(group: EffortGroup): string[] {
   ];
 }
 
+/** One tally as its table cells, in {@link TASK_REPORT_COLUMNS} order. */
+function tallyCells(tally: TaskReportTally): string[] {
+  return [
+    tally.planStub ?? NO_PLAN_CELL,
+    tally.status ?? NO_STATUS_CELL,
+    tally.outcome,
+    formatCount(tally.reports),
+  ];
+}
+
 /** Pads one cell to a column width, on the side its alignment wants. */
 function padCell(cell: string, width: number, right: boolean): string {
   const pad = ' '.repeat(Math.max(0, width - cell.length));
   return right
     ? `${pad}${cell}`
     : `${cell}${pad}`;
+}
+
+/**
+ * A header row and its data rows as space-padded columns two spaces
+ * apart, each column as wide as its widest cell, header included, and
+ * every line trimmed of trailing whitespace.
+ */
+function alignRows(
+  columns: readonly string[],
+  rows: readonly (readonly string[])[],
+  rightAligned: ReadonlySet<string>,
+): string[] {
+  const table = [columns, ...rows];
+  const widths = columns.map((_column, index) => Math.max(
+    ...table.map((row) => (row[index] ?? '').length),
+  ));
+
+  return table.map((row) => columns
+    .map((column, index) => padCell(
+      row[index] ?? '',
+      widths[index] ?? 0,
+      rightAligned.has(column),
+    ))
+    .join('  ')
+    .trimEnd());
 }
 
 /**
@@ -117,23 +166,8 @@ function padCell(cell: string, width: number, right: boolean): string {
  * column cannot leave a ragged right edge in a captured diff.
  */
 export function formatReportTable(report: EffortReport): string[] {
-  const rows = [
-    [...TABLE_COLUMNS],
-    ...report.groups.map(groupCells),
-    groupCells(report.totals),
-  ];
-  const widths = TABLE_COLUMNS.map((_column, index) => Math.max(
-    ...rows.map((row) => (row[index] ?? '').length),
-  ));
-
-  return rows.map((row) => TABLE_COLUMNS
-    .map((column, index) => padCell(
-      row[index] ?? '',
-      widths[index] ?? 0,
-      RIGHT_ALIGNED.has(column),
-    ))
-    .join('  ')
-    .trimEnd());
+  const rows = [...report.groups.map(groupCells), groupCells(report.totals)];
+  return alignRows(TABLE_COLUMNS, rows, RIGHT_ALIGNED);
 }
 
 /** The lines describing what was read and what was filtered out. */
@@ -165,7 +199,36 @@ export function formatReportHeader(report: EffortReport): string[] {
   return lines;
 }
 
+/**
+ * The task report section: a blank line, a heading counting the stored
+ * reports, and one row per plan, status and outcome, the report's status
+ * beside the loop's outcome so a row where the two differ reads as one.
+ *
+ * Nothing at all when no report is stored, so a store holding none
+ * prints what it printed before the table existed. A report narrowed by
+ * `--kind` or `--entrypoint` gets a note under the heading, because the
+ * tallies are not narrowed and a table that looked filtered would
+ * misstate what it counts.
+ */
+export function formatTaskReports(report: EffortReport): string[] {
+  const tallies = report.taskReports;
+  if (tallies.length === 0) return [];
+
+  const stored = tallies.reduce((sum, tally) => sum + tally.reports, 0);
+  const lines = ['', `task reports: ${formatCount(stored)} stored, by plan, status and outcome`];
+  if (report.filters.kinds !== null || report.filters.entrypoints !== null) {
+    lines.push('  note        the filters narrow session rows, not task reports');
+  }
+  const rows = tallies.map(tallyCells);
+  return [...lines, ...alignRows(TASK_REPORT_COLUMNS, rows, TASK_REPORT_RIGHT_ALIGNED)];
+}
+
 /** Everything the command prints in table mode. */
 export function formatReport(report: EffortReport): string[] {
-  return [...formatReportHeader(report), '', ...formatReportTable(report)];
+  return [
+    ...formatReportHeader(report),
+    '',
+    ...formatReportTable(report),
+    ...formatTaskReports(report),
+  ];
 }
