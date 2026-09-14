@@ -1,0 +1,156 @@
+/**
+ * A command line run, and what it wrote, for the tests of a command:
+ * dispatched in-process over a registry a case builds, or spawned as
+ * `bun src/rafa.ts` in a scratch git repository.
+ *
+ * In-process, the invocation gets streams, an environment and a clock of
+ * its own, so a case reads exactly what that invocation wrote and no
+ * `RAFA_OUTPUT` the suite runs under reaches it.
+ *
+ * Spawned, the child runs under a scratch repository whose HOME, `bin/`
+ * directory and call log sit beside it in a temporary directory, never
+ * the real home. Its environment holds a PATH of that `bin/` directory
+ * then git's own, the scratch HOME, and nothing else but what the case
+ * names. So `claude` resolves to the stand-in {@link plantStandInClaude}
+ * writes there, or to nothing: {@link runRafa} refuses to spawn when it
+ * resolves anywhere else.
+ */
+import type { OutputStream } from '../adapters/output/stream.js';
+import type { RafaCommand } from '../cli/command.js';
+import type { SubjectSpec } from '../cli/registry.js';
+import type { CliEvent } from '../ports/index.js';
+
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { dispatch } from '../cli/dispatch.js';
+import { createCommandRegistry } from '../cli/registry.js';
+
+/** The CLI entry a spawned run executes. */
+const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
+
+/** How long a spawned run may take before it is killed. */
+const KILL_AFTER_MS = 30_000;
+
+/** What one run wrote, and how it ended. */
+export interface CapturedRun {
+  /** Null when a spawned run was killed. */
+  readonly exitCode: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+/** A stream collecting what is written to it. */
+function memoryStream(): { stream: OutputStream; text: () => string } {
+  const chunks: string[] = [];
+  return {
+    stream: {
+      write: (chunk) => {
+        chunks.push(chunk);
+        return true;
+      },
+    },
+    text: () => chunks.join(''),
+  };
+}
+
+/**
+ * Dispatches `words` in-process over a registry of `subjects` and
+ * `commands`, with streams, a clock and the environment `env` of its own.
+ */
+export async function dispatchCaptured(
+  words: readonly string[],
+  subjects: readonly SubjectSpec[],
+  commands: readonly RafaCommand[],
+  env: Readonly<Record<string, string>> = {},
+): Promise<CapturedRun> {
+  const stdout = memoryStream();
+  const stderr = memoryStream();
+  const { exitCode } = await dispatch(words, {
+    registry: createCommandRegistry({ subjects, commands }),
+    env,
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+    now: () => new Date('2026-09-15T12:00:00.000Z'),
+  });
+  return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
+}
+
+/** Every line of a json-mode stdout, parsed. Throws on a line that is no JSON. */
+export function eventsOf(stdout: string): CliEvent[] {
+  return stdout
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => JSON.parse(line) as CliEvent);
+}
+
+/** A scratch repository, and the directories beside it a spawned run reads. */
+export interface ScratchRepo {
+  /** The git repository, its path resolved through every link, as git answers its root. */
+  readonly repo: string;
+  /** The HOME a spawned run gets. */
+  readonly home: string;
+  /** The directory first on the PATH a spawned run gets. */
+  readonly bin: string;
+  /** The file a stand-in `claude` appends one line to per call. */
+  readonly callLog: string;
+  /** The PATH a spawned run gets: `bin`, then git's own directory. */
+  readonly path: string;
+}
+
+/** Plants an empty git repository under a fresh directory in `base`, with its HOME and `bin/` beside it. */
+export function plantScratchRepo(base: string): ScratchRepo {
+  const root = realpathSync(mkdtempSync(join(base, 'scratch-')));
+  const repo = join(root, 'repo');
+  const home = join(root, 'home');
+  const bin = join(root, 'bin');
+  for (const dir of [repo, home, bin]) mkdirSync(dir, { recursive: true });
+
+  execFileSync('git', ['init', '-q', '.'], {
+    cwd: repo,
+    stdio: 'pipe',
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+  });
+
+  const gitBinary = Bun.which('git');
+  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
+  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+}
+
+/** Writes a stand-in `claude` into the scratch `bin/`, which reads its stdin, logs the call and exits 0. */
+export function plantStandInClaude(scratch: ScratchRepo): string {
+  const claude = join(scratch.bin, 'claude');
+  writeFileSync(claude, [
+    '#!/bin/sh',
+    'while read -r _line; do :; done',
+    `echo called >> '${scratch.callLog}'`,
+    'exit 0',
+    '',
+  ].join('\n'), 'utf8');
+  chmodSync(claude, 0o755);
+  return claude;
+}
+
+/**
+ * Spawns `bun src/rafa.ts` with `words` in `cwd`, under the scratch PATH
+ * and HOME and the variables `env` names; see the module note.
+ */
+export function runRafa(
+  scratch: ScratchRepo,
+  cwd: string,
+  words: readonly string[],
+  env: Readonly<Record<string, string>> = {},
+): CapturedRun {
+  const resolved = Bun.which('claude', { PATH: scratch.path });
+  if (resolved !== null && resolved !== join(scratch.bin, 'claude')) {
+    throw new Error(`claude resolves to ${resolved}, not to the stand-in or to nothing`);
+  }
+  const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
+    cwd,
+    env: { ...env, PATH: scratch.path, HOME: scratch.home },
+    timeout: KILL_AFTER_MS,
+  });
+  return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
+}

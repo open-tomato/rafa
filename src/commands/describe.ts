@@ -3,8 +3,8 @@
  * document `src/cli/describe.ts` builds, for an agent or the TUI to read.
  *
  * A top-level command, its action spelled as its subject, so it sits
- * directly under `src/commands/`. It is the one core command wrapping no
- * phase 0 command. It reads the registry its own line was routed through
+ * directly under `src/commands/`. It wraps no phase 0 command, as
+ * `plan list`, `plan show` and `plan validate` wrap none. It reads the registry its own line was routed through
  * off its context, so the document holds exactly what that invocation
  * dispatches, every module the dispatcher mounted included, and never a
  * roster of its own.

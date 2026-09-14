@@ -1,10 +1,12 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the six commands it registers: what the registry
+ * declarations of the nine commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe` wraps none, and declares no flag.
+ * `describe`, `plan list`, `plan show` and `plan validate` wrap none,
+ * and each is held to the arguments and flags spelled for it here. Every
+ * command is held to exactly one of the two lists.
  *
  * The routing cases dispatch over a registry built from the roster's own
  * subjects and commands, each `run` swapped for one recording what ran
@@ -72,11 +74,22 @@ const READERS: Readonly<Record<string, readonly string[]>> = {
 /** The outputs each command declares: text and json, each phase 0 command now writing through the active output. */
 const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'plan create': ['text', 'json'],
+  'plan list': ['text', 'json'],
+  'plan show': ['text', 'json'],
+  'plan validate': ['text', 'json'],
   'loop start': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
   'usage': ['text', 'json'],
   'describe': ['text', 'json'],
+};
+
+/** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
+const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
+  'plan list': [[], []],
+  'plan show': [['stub'], ['tracker']],
+  'plan validate': [['file'], []],
+  'describe': [[], []],
 };
 
 /** The deprecation line typing `typed` writes, as stderr holds it. */
@@ -89,6 +102,9 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['plan create --spec=.specs/a.md --stub=a', 'plan create', ['--spec=.specs/a.md', '--stub=a'], ''],
   ['plan --spec=.specs/a.md', 'plan create', ['--spec=.specs/a.md'], deprecation('plan', 'plan create')],
   ['plan', 'plan create', [], deprecation('plan', 'plan create')],
+  ['plan list', 'plan list', [], ''],
+  ['plans show my-plan --tracker', 'plan show', ['my-plan', '--tracker'], ''],
+  ['plan validate .plans/PLAN-a.md', 'plan validate', ['.plans/PLAN-a.md'], ''],
   ['loop start --plan=.plans/PLAN-a.md --no-ci-wait', 'loop start', ['--plan=.plans/PLAN-a.md', '--no-ci-wait'], ''],
   ['start --plan=.plans/PLAN-a.md', 'loop start', ['--plan=.plans/PLAN-a.md'], deprecation('start', 'loop start')],
   ['loops start', 'loop start', [], ''],
@@ -163,9 +179,12 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers the five phase 0 commands, then describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, the four other phase 0 commands, then describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
+      'plan list',
+      'plan show',
+      'plan validate',
       'loop start',
       'effort collect',
       'effort report',
@@ -215,7 +234,7 @@ describe('how the command tree routes', () => {
     expect(run.outcome.exitCode).toBe(0);
   });
 
-  it.each(['--help', 'start --help', 'plan --help', 'effort report --help'])('answers rafa %s with help, running nothing', async (line) => {
+  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'effort report --help'])('answers rafa %s with help, running nothing', async (line) => {
     const run = await dispatchRecorded(line);
 
     expect(run.ran).toEqual([]);
@@ -236,14 +255,19 @@ describe('how the command tree routes', () => {
 });
 
 describe('the flags each command declares', () => {
-  it('declares no argument and no flag for describe, which wraps no phase 0 command and reads no command line', () => {
-    const own = CORE_REGISTRY.topLevel('describe');
+  it('holds each core command to the flags its phase 0 module reads or to its own declaration, never both or neither', () => {
+    const neitherOrBoth = COMMANDS
+      .map(([spelling]) => spelling)
+      .filter((spelling) => Object.hasOwn(READERS, spelling) === Object.hasOwn(OWN_DECLARATIONS, spelling));
 
-    expect(own).toBeDefined();
-    expect([own?.args, own?.flags]).toEqual([[], []]);
+    expect(neitherOrBoth).toEqual([]);
   });
 
-  it.each(COMMANDS.filter(([spelling]) => spelling !== 'describe'))('declares for %s exactly the flags its phase 0 module reads', (spelling, command) => {
+  it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(OWN_DECLARATIONS, spelling)))('declares for %s, which wraps no phase 0 command, the arguments and flags spelled here', (spelling, command) => {
+    expect([command.args.map((arg) => arg.name), command.flags.map((flag) => flag.name)]).toEqual(OWN_DECLARATIONS[spelling] ?? []);
+  });
+
+  it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(READERS, spelling)))('declares for %s exactly the flags its phase 0 module reads', (spelling, command) => {
     const readers = READERS[spelling] ?? [];
     const read = literalFlags(readers.map((file) => readFileSync(join(SRC_DIR, file), 'utf8')).join('\n'));
 

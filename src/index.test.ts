@@ -23,9 +23,11 @@
  * a command registered and not spelled goes red. Each of those modules
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
- * terminal runs and a service cannot import goes red. `describe` is held
- * to be the one module wrapping none: it runs the roster builder of
- * `src/cli/describe.ts`, which is no root export. A binding a module
+ * terminal runs and a service cannot import goes red. `describe` and the
+ * three plan readers, `plan list`, `plan show` and `plan validate`, are
+ * held to be the modules wrapping none. `describe` runs the roster builder
+ * of `src/cli/describe.ts`, which is no root export, and each plan reader
+ * imports `parsePlan` from the `./plan` entry, which is one. A binding a module
  * takes by name, as `loop start` takes the CI defaults its flags show,
  * is a value and not a command, and is not held. Every parsed import list
  * is also held to the spelled one, which is what keeps a parser that
@@ -241,6 +243,23 @@ const CLI_IMPORTS: ImportList = [
  */
 const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/plan/create.js', [['../../plan.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/plan/list.js', [
+    ['../../plan/index.js', ['parsePlan']],
+    ['../../utils/git.js', ['getRepoRoot']],
+    ['./plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts', 'isFile', 'planFileName', 'PLANS_DIR', 'plural', 'stubOfPlanFile']],
+  ]],
+  ['./commands/plan/show.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../plan/index.js', ['parsePlan']],
+    ['../../utils/git.js', ['getRepoRoot']],
+    ['../../utils/plan-stamp.js', ['isStampableStub']],
+    ['./plan-files.js', ['checkbox', 'countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'planFileName', 'PLANS_DIR']],
+  ]],
+  ['./commands/plan/validate.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../plan/index.js', ['parsePlan']],
+    ['./plan-files.js', ['countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'plural']],
+  ]],
   ['./commands/loop/start.js', [
     ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS', 'DEFAULT_CI_TIMEOUT_MIN']],
     ['../../start.js', ['default']],
@@ -252,8 +271,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
 ];
 
-/** A static relative import, possibly spanning lines, type-only or not. */
-const IMPORT_PATTERN = /^import\s+(type\s+)?([\s\S]+?)\s+from\s+'(\.\.?\/[^']+)';$/gm;
+/**
+ * A static relative import, possibly spanning lines, type-only or not.
+ * Its clause holds no `;`, so a match never runs on from an import of a
+ * bare module above it, such as `node:fs`, to the next relative one.
+ */
+const IMPORT_PATTERN = /^import\s+(type\s+)?([^;]+?)\s+from\s+'(\.\.?\/[^']+)';$/gm;
 
 /** One import's clause read as the bindings it takes. */
 function bindingsOf(clause: string): string[] {
@@ -400,7 +423,12 @@ describe('what the CLI reaches, through the entry', () => {
       }
     }
 
-    expect(COMMAND_MODULES.filter((module) => !wrapping.includes(module)).map(([path]) => path)).toEqual(['./commands/describe.js']);
+    expect(COMMAND_MODULES.filter((module) => !wrapping.includes(module)).map(([path]) => path)).toEqual([
+      './commands/plan/list.js',
+      './commands/plan/show.js',
+      './commands/plan/validate.js',
+      './commands/describe.js',
+    ]);
     expect(defaultImports).toEqual(wrapping.map(() => 1));
     expect(unreached).toEqual([]);
   });

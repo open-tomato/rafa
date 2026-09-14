@@ -5,6 +5,7 @@
  * core registry.
  *
  *   rafa plan create --spec=.specs/<file>.md [--stub=<name>]
+ *   rafa plan list | show <stub> [--tracker] | validate <file>
  *   rafa loop start [--plan=.plans/PLAN-<stub>.md] [--start-at=HH:MM] [--inject=<mode>]
  *   rafa usage
  *   rafa describe [--output=json]

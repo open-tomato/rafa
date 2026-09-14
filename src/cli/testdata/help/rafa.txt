@@ -13,7 +13,7 @@ Quick start:
   rafa describe --output=json
 
 Subjects:
-  plan     create a plan from a spec
+  plan     create a plan from a spec; list, show and validate plans
   loop     start a plan through the loop, one task per session
   effort   collect session and commit rows; report per plan
 
