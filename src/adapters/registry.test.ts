@@ -18,7 +18,9 @@
  * it answered, with the file names spelled here. The output cases read
  * what an adapter wrote off a stream the case hands it, or off a spy on
  * `process.stdout.write` the case restores, and each `text` reading
- * spells a line the `json` adapter could not have written.
+ * spells a line the `json` adapter could not have written. The tracker
+ * case reads the issues the `local` adapter wrote off the disk under a
+ * fresh temporary root, and the reason each records off its file.
  *
  * No case changes `CORE_ADAPTER_REGISTRY`. An add-on is registered on it
  * through `register`, which answers a new registry, and a case holds the
@@ -54,12 +56,25 @@
  * output made at verbosity 0 whatever its context reddened the stream
  * and verbosity case alone, and a default stream of `process.stderr` the
  * `text` stdout case alone.
+ *
+ * Three more were driven the same way on 2026-09-14, once the `local`
+ * tracker was registered, with `src/adapters/` at 242 pass before and
+ * after. The context's reason defaulting to a string, the context's
+ * reason ignored, and the issues written at the repository root in place
+ * of `.rafa/issues/` each reddened the tracker case alone.
  */
 import type { AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
 import type { Tracker } from '../ports/index.js';
 
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +87,8 @@ import {
   createAdapterRegistry,
   PORT_VERSIONS,
 } from './registry.js';
+import { draftFixture } from './tracker/contract.js';
+import { parseLocalIssue } from './tracker/local.js';
 
 /** The repository root, whose tsconfig the compiler reads under. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -104,7 +121,7 @@ const STORE_LAYOUTS: readonly (readonly [string, readonly string[]])[] = [
 ];
 
 /** Port types core registers no adapter for yet. */
-const UNREGISTERED_PORTS = ['tracker', 'learning', 'planner'] as const;
+const UNREGISTERED_PORTS = ['learning', 'planner'] as const;
 
 /** What a second terminal result from one json output is refused with. */
 const SECOND_RESULT_REFUSAL
@@ -312,9 +329,31 @@ describe('the core adapter registry', () => {
     expect(written[0]).toContain(line);
   });
 
+  it('registers the local tracker', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local']);
+  });
+
+  it('makes the local tracker under .rafa/issues of its root, recording the reason its context names', async () => {
+    const root = freshRoot('tracker');
+    const issuesDir = join(root, '.rafa', 'issues');
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('tracker', 'local');
+
+    const fellBack = adapter.create({ repoRoot: root, fallbackReason: 'github: gh auth status exited 1' });
+    const chosenFirst = adapter.create({ repoRoot: root });
+    expect(existsSync(root)).toBe(false);
+    await fellBack.create(draftFixture());
+    await chosenFirst.create(draftFixture());
+
+    expect(root.startsWith(tempDir)).toBe(true);
+    expect(readdirSync(issuesDir).sort()).toEqual(['1.md', '2.md']);
+    expect(parseLocalIssue(readFileSync(join(issuesDir, '1.md'), 'utf8')).fallbackReason)
+      .toBe('github: gh auth status exited 1');
+    expect(parseLocalIssue(readFileSync(join(issuesDir, '2.md'), 'utf8')).fallbackReason).toBeNull();
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const port of ['store', 'output'] as const) {
+    for (const port of ['store', 'output', 'tracker'] as const) {
       expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
       for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
         expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);
@@ -328,11 +367,11 @@ describe('registering an adapter', () => {
     const extended = CORE_ADAPTER_REGISTRY.register(addOn());
 
     expect(extended).not.toBe(CORE_ADAPTER_REGISTRY);
-    expect(extended.kinds('tracker')).toEqual(['obsidian']);
+    expect(extended.kinds('tracker')).toEqual(['local', 'obsidian']);
     expect(extended.kinds('store')).toEqual(['sqlite', 'ndjson']);
     expect(extended.resolve('tracker', 'obsidian').create({ repoRoot: '/nonexistent' }))
       .toBe(FIXTURE_TRACKER);
-    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual([]);
+    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local']);
     expect(CORE_ADAPTER_REGISTRY.find('tracker', 'obsidian')).toBeUndefined();
   });
 
@@ -397,7 +436,7 @@ describe('registering an adapter', () => {
     expect(() => CORE_ADAPTER_REGISTRY.register(again))
       .toThrow('adapter registry: store/sqlite is already registered');
     expect(CORE_ADAPTER_REGISTRY.register(addOn({ kind: 'sqlite' })).kinds('tracker'))
-      .toEqual(['sqlite']);
+      .toEqual(['local', 'sqlite']);
   });
 
   it.each([
@@ -497,7 +536,10 @@ describe('looking an adapter up', () => {
       'adapter registry: no store adapter is registered as "constructor"; registered: sqlite, ndjson',
     );
     expect(() => CORE_ADAPTER_REGISTRY.resolve('tracker', 'github')).toThrow(
-      'adapter registry: no tracker adapter is registered as "github"; registered: none',
+      'adapter registry: no tracker adapter is registered as "github"; registered: local',
+    );
+    expect(() => CORE_ADAPTER_REGISTRY.resolve('learning', 'local')).toThrow(
+      'adapter registry: no learning adapter is registered as "local"; registered: none',
     );
   });
 

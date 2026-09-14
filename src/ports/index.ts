@@ -38,8 +38,10 @@
  *     1 spec asks for a copy rather than a dependency, with its source
  *     commit recorded, so the monorepo can later be pointed at this
  *     export and the port does not live twice. Member types and their
- *     TSDoc are carried over as written, {@link TrackerKind} aside, so
- *     they speak of open-tomato's OPT numbers, CLI and ledger. Left
+ *     TSDoc are carried over as written, so they speak of open-tomato's
+ *     OPT numbers, CLI and ledger, with two exceptions: {@link TrackerKind}
+ *     is opened, and the note on `IssueRef.externalId` names the `local`
+ *     adapter's issue number where the source named a file path. Left
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
  *     `LedgerEntry`, the local ledger's line, which arrives with the
@@ -177,7 +179,10 @@ export interface IssueRef {
   /** Internal OPT number — stable across trackers. */
   opt: number;
   kind: TrackerKind;
-  /** GitHub issue number as a string, Linear uuid, or local file path. */
+  /**
+   * GitHub issue number as a string, Linear uuid, or the number the `local`
+   * adapter gave the issue under `.rafa/issues/`, as a string.
+   */
   externalId: string;
   url: string | null;
   /**

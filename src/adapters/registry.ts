@@ -58,11 +58,12 @@
  *
  * The two store backends, `store/sqlite` and `store/ndjson`, which
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
- * and the two outputs under `src/adapters/output/`, `output/text` and
- * `output/json`. The phase 1 table names the other ports' core adapters,
- * `tracker/github`, `tracker/local`, `learning/local` and
- * `planner/claude`; none is registered yet, and each joins
- * `CORE_ADAPTERS` as it lands under `src/adapters/`.
+ * the two outputs under `src/adapters/output/`, `output/text` and
+ * `output/json`, and the `local` tracker under `src/adapters/tracker/`,
+ * `tracker/local`. The phase 1 table names the other ports' core
+ * adapters, `tracker/github`, `learning/local` and `planner/claude`;
+ * none is registered yet, and each joins `CORE_ADAPTERS` as it lands
+ * under `src/adapters/`.
  *
  * ## What an adapter answers
  *
@@ -78,8 +79,11 @@
  * repository root, the one thing a store opens under. A port whose
  * adapter needs more gains a field when that adapter lands, optional so
  * that no other port's caller has to pass it: the outputs added `stream`
- * and `verbosity`. Each output `create` makes a new output, so a `json`
- * output's one terminal result belongs to the command it was made for.
+ * and `verbosity`, and the `local` tracker added `fallbackReason`. Each
+ * output `create` makes a new output, so a `json` output's one terminal
+ * result belongs to the command it was made for. Each tracker `create`
+ * makes a new tracker, so the reason a `local` tracker records is the
+ * one its own context named.
  */
 import type { StoreBackend } from '../config.js';
 import type { OutputStream } from './output/stream.js';
@@ -100,6 +104,7 @@ import { openSqliteStore } from '../effort/store/sqlite.js';
 
 import { createJsonOutput } from './output/json.js';
 import { createTextOutput } from './output/text.js';
+import { createLocalTracker, localIssuesDir } from './tracker/local.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'adapter registry';
@@ -145,6 +150,11 @@ export interface AdapterContext {
   readonly stream?: OutputStream;
   /** How much the `text` output writes. Read by it alone; 0 when left out. */
   readonly verbosity?: number;
+  /**
+   * Why the trackers ahead of this one were passed over, recorded in each
+   * issue the `local` tracker creates. Read by it alone; null when left out.
+   */
+  readonly fallbackReason?: string | null;
 }
 
 /**
@@ -321,7 +331,7 @@ const STORE_OPENERS: {
 /**
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
- * and `json` outputs.
+ * and `json` outputs, then the `local` tracker.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -343,6 +353,15 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     kind: 'json',
     portVersion: PORT_VERSIONS.output,
     create: ({ stream = process.stdout }) => createJsonOutput({ stream }),
+  },
+  {
+    port: 'tracker',
+    kind: 'local',
+    portVersion: PORT_VERSIONS.tracker,
+    create: ({ repoRoot, fallbackReason = null }) => createLocalTracker({
+      issuesDir: localIssuesDir(repoRoot),
+      fallbackReason,
+    }),
   },
 ];
 
