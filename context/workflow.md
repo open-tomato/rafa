@@ -14,17 +14,17 @@ the shape discriminates where the verb does not.
 | Task shape | Agent | Where it lives |
 |---|---|---|
 | Prose — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `.claude/agents/doc-updater.md` |
-| Tests — a suite over code that already exists, or a red-first case | `tdd-guide` | user-level |
-| Repair — a red gate, a type error, a broken build | `build-error-resolver` | user-level |
+| Tests — a suite over code that already exists, or a red-first case | `tdd-guide` | `.claude/agents/tdd-guide.md` |
+| Repair — a red gate, a type error, a broken build | `build-error-resolver` | `.claude/agents/build-error-resolver.md` |
 | Cleanup — dead code, duplicates, a consolidation | `refactor-cleaner` | user-level |
 | Review of a TypeScript change | `typescript-reviewer` | user-level |
-| Review of a change as a whole | `code-reviewer` | user-level |
+| Review of a change as a whole | `code-reviewer` | `.claude/agents/code-reviewer.md` |
 | Implementation — a module plus its TSDoc plus its colocated tests | `loop-implementer` | `.claude/agents/loop-implementer.md` |
 
 **`user-level` in the third column is a portability warning and not a
-footnote.** Those five definitions live outside the repo, so a fresh
+footnote.** Those two definitions live outside the repo, so a fresh
 clone receives none of them and the name resolves against whatever that
-machine happens to hold — or against nothing. The two tracked rows
+machine happens to hold — or against nothing. The five tracked rows
 travel. A project file also SHADOWS a user-level agent of the same name
 rather than merging with it, and the roster is blind to the difference:
 a shadowed name appears exactly ONCE in the CLI's own list of available
