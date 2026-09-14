@@ -9,6 +9,18 @@
  * dispatch spawns its session through {@link runTaskSession} unless its
  * `run` seam names another runner.
  *
+ * What the operator is told goes through the active output
+ * (`adapters/output/active.ts`): the task, its routing and what was
+ * stored through `info`; a declaration token dropped, a plan injection
+ * that fell back, an overfull `progress.txt` and a stored report's
+ * warnings through `warn`; and a store that could not be rendered or
+ * written through `error`. In json mode each dispatch first emits one
+ * `step` event named by the task sentence, ahead of the line announcing
+ * the task. Text mode emits none, since the `text` adapter would render
+ * it as a `step: ` line beside that announcement. The session's own
+ * stdout reaches the operator through `utils/claude.ts`, as `log` events
+ * in json mode.
+ *
  * The task prompt's first line carries the `task` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix from.
@@ -22,6 +34,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 
 import { randomUUID } from 'crypto';
 
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { renderInjection } from '../plan/index.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
@@ -114,6 +127,8 @@ export interface TaskDispatchOptions {
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
   newSessionId?: () => string;
+  /** The clock the json-mode `step` event is stamped from. Defaults to the system clock. */
+  now?: () => Date;
 }
 
 /** What one dispatched task actually ran as. */
@@ -215,6 +230,10 @@ export function buildTaskPrompt(
  * line hands the session the whole plan instead, and that is warned
  * about, because the prompt is then several times the size the run
  * asked for and nothing else would show it.
+ *
+ * In json mode the dispatch opens with its one `step` event, named by
+ * the sentence the prompt quotes and stamped from `now`, before any line
+ * about the task; see the module note.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -229,21 +248,26 @@ export async function dispatchTask(
   );
   const { args: flags, suppressed } = resolveDeclarationFlags(declaration, agentDeclaresEffort);
 
+  if (activeOutputMode() === 'json') {
+    const now = options.now ?? (() => new Date());
+    activeOutput().emit({ type: 'step', name: taskText, ts: now().toISOString() });
+  }
+
   if (taskInfo.status === 'blocked') {
-    console.log(`\n⚠️  Resuming blocked task: ${taskText}`);
+    activeOutput().info(`\n⚠️  Resuming blocked task: ${taskText}`);
   } else {
-    console.log(`\n🔄 Executing task: ${taskText}`);
+    activeOutput().info(`\n🔄 Executing task: ${taskText}`);
   }
 
   if (flags.length > 0) {
     const note = suppressed.length === 0
       ? ''
       : ` (${suppressed.join(', ')} left to the agent)`;
-    console.log(`   Routed as: ${flags.join(' ')}${note}`);
+    activeOutput().info(`   Routed as: ${flags.join(' ')}${note}`);
   }
 
   for (const issue of declaration?.issues ?? []) {
-    console.warn(`   Declaration: ignoring ${issue.reason} \`${issue.text}\`.`);
+    activeOutput().warn(`   Declaration: ignoring ${issue.reason} \`${issue.text}\`.`);
   }
 
   const injection = renderInjection({
@@ -252,7 +276,7 @@ export async function dispatchTask(
     task: taskInfo,
   });
   if (injection.fallback !== null) {
-    console.warn(`   Injection: \`${injection.requested}\` not rendered: ${injection.fallback.text}.`);
+    activeOutput().warn(`   Injection: \`${injection.requested}\` not rendered: ${injection.fallback.text}.`);
   }
 
   const prompt = withStamp(buildTaskPrompt(
@@ -303,12 +327,12 @@ export function renderProgressForDispatch(repoRoot: string, planStub: string | n
     const render = writeProgress(repoRoot, planStub);
     const left = render.oversized + render.omitted;
     if (left > 0) {
-      console.warn(`📝 progress.txt holds ${render.rendered} finding(s); ${left} more did not fit its ${PROGRESS_CAP_BYTES} bytes.`);
+      activeOutput().warn(`📝 progress.txt holds ${render.rendered} finding(s); ${left} more did not fit its ${PROGRESS_CAP_BYTES} bytes.`);
     }
     return true;
   } catch (error) {
-    console.error(`\n❌ progress.txt could not be rendered from the findings store: ${messageOf(error)}`);
-    console.error('   Nothing was dispatched. Make the store readable, then run again.');
+    activeOutput().error(`\n❌ progress.txt could not be rendered from the findings store: ${messageOf(error)}`);
+    activeOutput().error('   Nothing was dispatched. Make the store readable, then run again.');
     return false;
   }
 }
@@ -353,12 +377,12 @@ export function storeTaskReport(options: TaskReportStoreOptions): boolean {
       output: dispatch.output,
     });
     const { notes, warnings } = describeTaskReportRecord(record);
-    for (const note of notes) console.log(`   ${note}`);
-    for (const warning of warnings) console.warn(`   ${warning}`);
+    for (const note of notes) activeOutput().info(`   ${note}`);
+    for (const warning of warnings) activeOutput().warn(`   ${warning}`);
     return true;
   } catch (error) {
-    console.error(`\n❌ The report of session ${dispatch.sessionId} was not stored: ${messageOf(error)}`);
-    console.error('   The session printed it above as it ran.');
+    activeOutput().error(`\n❌ The report of session ${dispatch.sessionId} was not stored: ${messageOf(error)}`);
+    activeOutput().error('   The session printed it above as it ran.');
     return false;
   }
 }

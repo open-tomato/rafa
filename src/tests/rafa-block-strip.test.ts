@@ -44,8 +44,6 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
@@ -125,21 +123,18 @@ function taskOrThrow(content: string): TaskInfo {
 let logs: string[] = [];
 
 /**
- * Captures what the loop printed, through a spy on `console`: bun:test
- * replaces the console object, so a `process.stdout.write` patch would
- * read nothing and every absence assertion below would pass against a
- * loop that announced the block in full. What `start/commit.ts` tells
- * the operator goes through the active output instead: its `info` lines
- * are read into the same array through a `sinkOutput` set for each case,
- * and the default is put back after it.
+ * Captures what the loop told the operator. `start/dispatch.ts` and
+ * `start/commit.ts` write through the active output, whose `info` lines
+ * are read into this array through a `sinkOutput` set for each case, and
+ * the default is put back after it. Every other level is dropped. The
+ * sink holds each message as it was handed, so an absence assertion below
+ * reads the announced line itself, and a loop that announced the block in
+ * full would redden it. The line announcing a task put back on
+ * `console.log`, driven on 2026-09-15 and restored sha256-identical,
+ * reddened the prompt head and log line case.
  */
 beforeEach(() => {
   logs = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation(() => {});
-  spyOn(console, 'error').mockImplementation(() => {});
   setActiveOutput(sinkOutput({
     info: (message) => {
       logs.push(message);
@@ -149,7 +144,6 @@ beforeEach(() => {
 
 afterEach(() => {
   setActiveOutput(null);
-  mock.restore();
 });
 
 describe('a task dispatched from a plan carrying rafa:* blocks', () => {

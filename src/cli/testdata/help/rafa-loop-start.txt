@@ -45,4 +45,4 @@ Examples:
       line, and finishes at the push.
 
 Outputs:
-  text
+  text, json

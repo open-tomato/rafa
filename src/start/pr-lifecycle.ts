@@ -13,6 +13,14 @@
  * repair session loads settings from the sources `start()` hands over,
  * the run's `loop.settingSources`.
  *
+ * What the gate tells the operator goes through the active output
+ * (`adapters/output/active.ts`): the wait, each poll, a green verdict
+ * and a merged PR through `info`; a skipped check, a PR not found, a
+ * deadline passed, a PR with no checks and a red one through `warn`; and
+ * a failed repair session and the escalation through `error`. A repair
+ * session's own stdout reaches the operator through `utils/claude.ts`,
+ * as `log` events in json mode.
+ *
  * The repair prompt's first line is the `ci-repair` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
@@ -20,6 +28,7 @@
 import type { ClaudeSettingSource } from '../config.js';
 import type { CheckRow, WaitOptions, WaitResult } from '../utils/pr.js';
 
+import { activeOutput } from '../adapters/output/active.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 import {
@@ -162,8 +171,8 @@ export async function verifyPullRequest(
   const branch = io.currentBranch();
 
   if (!io.isGhUsable()) {
-    console.warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
-    console.warn('   The PR has been pushed but nothing here confirms CI agreed with it.');
+    activeOutput().warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
+    activeOutput().warn('   The PR has been pushed but nothing here confirms CI agreed with it.');
     return;
   }
 
@@ -172,8 +181,8 @@ export async function verifyPullRequest(
     if (await verifyAttempt(io, branch, timeoutMs, isLastAttempt) === 'stop') return;
   }
 
-  console.error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
-  console.error('   Stopping rather than looping. Read the failing jobs and decide.');
+  activeOutput().error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
+  activeOutput().error('   Stopping rather than looping. Read the failing jobs and decide.');
 }
 
 /**
@@ -189,7 +198,7 @@ async function verifyAttempt(
 ): Promise<AttemptEnd> {
   const prNumber = io.findOpenPullRequest(branch);
   if (prNumber === null) {
-    console.warn(`\n⚠️  No open PR found for ${branch}. Nothing to verify.`);
+    activeOutput().warn(`\n⚠️  No open PR found for ${branch}. Nothing to verify.`);
     return 'stop';
   }
 
@@ -212,7 +221,7 @@ function pollChecks(
   prNumber: number,
   timeoutMs: number,
 ): Promise<WaitResult> {
-  console.log(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
+  activeOutput().info(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
 
   return waitForChecks({
     probe: () => Promise.resolve(io.probeChecks(prNumber)),
@@ -222,7 +231,7 @@ function pollChecks(
     sleep: io.sleep,
     onPoll: (rows, verdict, elapsedMs) => {
       const secs = Math.round(elapsedMs / 1000);
-      console.log(`   [${secs}s] ${verdict} — ${rows.length} check(s)`);
+      activeOutput().info(`   [${secs}s] ${verdict} — ${rows.length} check(s)`);
     },
   });
 }
@@ -233,15 +242,15 @@ function pollChecks(
  */
 function reportSettledVerdict(prNumber: number, result: WaitResult): boolean {
   if (result.verdict === 'green') {
-    console.log(`\n✅ CI green on PR #${prNumber}:`);
-    console.log(formatRows(result.rows));
+    activeOutput().info(`\n✅ CI green on PR #${prNumber}:`);
+    activeOutput().info(formatRows(result.rows));
     return true;
   }
 
   if (result.verdict === 'timeout') {
-    console.warn(`\n⚠️  CI still running after ${Math.round(result.elapsedMs / 1000)}s. Not waiting further.`);
-    console.warn(formatRows(result.rows));
-    console.warn(`   Check it yourself: gh pr checks ${prNumber}`);
+    activeOutput().warn(`\n⚠️  CI still running after ${Math.round(result.elapsedMs / 1000)}s. Not waiting further.`);
+    activeOutput().warn(formatRows(result.rows));
+    activeOutput().warn(`   Check it yourself: gh pr checks ${prNumber}`);
     return true;
   }
   return false;
@@ -259,16 +268,16 @@ async function handleNoChecks(
   merge: MergeState,
 ): Promise<AttemptEnd> {
   if (merge?.state === 'MERGED') {
-    console.log(`\n✅ PR #${prNumber} is already merged.`);
+    activeOutput().info(`\n✅ PR #${prNumber} is already merged.`);
     return 'stop';
   }
   if (merge !== null && merge.mergeStateStatus !== 'DIRTY') {
-    console.warn(`\n⚠️  PR #${prNumber} reports no checks and is not conflicting`);
-    console.warn(`   (mergeable=${merge.mergeable} state=${merge.mergeStateStatus}).`);
-    console.warn('   Most likely no workflow matches the changed paths. Nothing to repair.');
+    activeOutput().warn(`\n⚠️  PR #${prNumber} reports no checks and is not conflicting`);
+    activeOutput().warn(`   (mergeable=${merge.mergeable} state=${merge.mergeStateStatus}).`);
+    activeOutput().warn('   Most likely no workflow matches the changed paths. Nothing to repair.');
     return 'stop';
   }
-  console.warn(`\n❌ PR #${prNumber} has no checks — it does not merge cleanly, so GitHub scheduled no run.`);
+  activeOutput().warn(`\n❌ PR #${prNumber} has no checks — it does not merge cleanly, so GitHub scheduled no run.`);
   const exitCode = await repairPullRequest(
     prNumber,
     branch,
@@ -277,7 +286,7 @@ async function handleNoChecks(
     io.runRepair,
   );
   if (exitCode !== 0) {
-    console.error(`\n❌ Conflict-repair session failed (exit ${exitCode}).`);
+    activeOutput().error(`\n❌ Conflict-repair session failed (exit ${exitCode}).`);
     return 'stop';
   }
   return 'next';
@@ -290,8 +299,8 @@ async function handleRedChecks(
   prNumber: number,
   rows: CheckRow[],
 ): Promise<AttemptEnd> {
-  console.warn(`\n❌ CI red on PR #${prNumber}:`);
-  console.warn(formatRows(rows));
+  activeOutput().warn(`\n❌ CI red on PR #${prNumber}:`);
+  activeOutput().warn(formatRows(rows));
   const failed = failingRows(rows);
   const exitCode = await repairPullRequest(
     prNumber,
@@ -301,7 +310,7 @@ async function handleRedChecks(
     io.runRepair,
   );
   if (exitCode !== 0) {
-    console.error(`\n❌ CI-repair session failed (exit ${exitCode}).`);
+    activeOutput().error(`\n❌ CI-repair session failed (exit ${exitCode}).`);
     return 'stop';
   }
   return 'next';

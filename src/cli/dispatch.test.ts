@@ -42,6 +42,11 @@
  * handed the whole line. One more for a process exit code a command set
  * read as a failure, run against the child-process case with the suites
  * at exit 0 before and after.
+ *
+ * The output mode case came after that grid. Two more mutations were
+ * driven on 2026-09-15, each restored sha256-identical: the context's
+ * output set with no mode, and the invocation's mode put back in place of
+ * the previous one. Each reddened that case, and it alone in this file.
  */
 import type { RafaCommand, RafaContext } from './command.js';
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
@@ -56,7 +61,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { activeOutput, setActiveOutput } from '../adapters/output/active.js';
+import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 import { createJsonOutput } from '../adapters/output/json.js';
 
 import { CommandExit } from './command.js';
@@ -653,6 +658,30 @@ describe('the active output and the exit code', () => {
     await run(['loop', 'crash']);
 
     expect(activeOutput()).toBe(before);
+  });
+
+  it('sets the invocation output mode beside the active output while the command runs, and puts the previous mode back', async () => {
+    const during: string[] = [];
+    const after: string[] = [];
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'loop', summary: 'the loop' }],
+      commands: [command('loop', 'mode', {
+        run: async () => {
+          during.push(activeOutputMode());
+        },
+      })],
+    });
+
+    setActiveOutput(createJsonOutput({ stream: memoryStream().stream }), 'json');
+    await run(['loop', 'mode'], { registry });
+    after.push(activeOutputMode());
+
+    setActiveOutput(null);
+    await run(['--output=json', 'loop', 'mode'], { registry });
+    after.push(activeOutputMode());
+
+    expect(during).toEqual(['text', 'json']);
+    expect(after).toEqual(['json', 'text']);
   });
 
   it('reads no process exit code a command sets, ending that command as a success, in a process of its own', () => {

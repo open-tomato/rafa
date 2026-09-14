@@ -16,16 +16,17 @@
  * LOOP reads as well, and the per-task dispatch is its caller, through
  * `runTaskSession` in `start/dispatch.ts`. A task session ends its
  * final message with a `rafa:report` block, and {@link spawnClaude}
- * inherits stdout, so a loop holding that session's exit code holds
- * nothing else. Its flags are the ones a task's routing declaration
- * resolved to, with the `--session-id` the loop picked for that session
- * ahead of them. The captured entry builds its argument list through
- * the same {@link claudeArgs} and hands the prompt over the same way;
- * only the spawner differs, {@link spawnClaudeCaptured} piping stdout,
- * writing each chunk on to the operator as it arrives and keeping the
+ * answers the exit code alone, so a loop holding that session's exit
+ * code holds nothing else. Its flags are the ones a task's routing
+ * declaration resolved to, with the `--session-id` the loop picked for
+ * that session ahead of them. The captured entry builds its argument
+ * list through the same {@link claudeArgs} and hands the prompt over the
+ * same way; only the spawner differs, {@link spawnClaudeCaptured} piping
+ * stdout, echoing it on to the operator as it arrives and keeping the
  * same bytes for the answer. It sits BESIDE `runClaude` rather than
- * replacing its spawner, so a session nothing parses keeps spawning
- * exactly what it spawned before.
+ * replacing its spawner, so in text mode a session nothing parses keeps
+ * spawning exactly what it spawned before. What json mode changes is in
+ * the section "What reaches the operator" below.
  *
  * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
  * rather than before, and the ordering is load-bearing rather than
@@ -81,8 +82,30 @@
  * unavailable. Override via CLAUDE_USAGE_PERCENT env var for testing or manual
  * control. A real data source (Anthropic billing API, CLI flag, or injected
  * env var) should be wired in once reliably identified.
+ *
+ * ## What reaches the operator
+ *
+ * A session's stdout reaches the operator in the mode of the active
+ * output (`adapters/output/active.ts`). In text mode it is the bytes the
+ * session wrote, in the order it wrote them: {@link spawnClaude} inherits
+ * the stream, and {@link spawnClaudeCaptured} writes each chunk to
+ * `process.stdout` as it arrives. In json mode those bytes would put
+ * lines no NDJSON reader parses among the events, so neither door lets
+ * them through. {@link spawnClaudeCaptured} hands each line, its newline
+ * off, to the active output's `info`, which the `json` adapter writes as
+ * one `log` event. {@link spawnClaude} spawns through
+ * {@link spawnClaudeCaptured} and answers its exit code alone. A last
+ * line with no newline goes once stdout closes, and a blank line is an
+ * event with an empty message, so the messages joined with newlines are
+ * the session's stdout. The argument list, the prompt, the environment
+ * and the inherited stderr are the same in both modes.
+ *
+ * {@link checkUsage} writes through the active output too: each warning
+ * through `warn`, and the usage it read through `info`.
  */
 import type { ClaudeSettingSource } from '../config.js';
+
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 
 export async function getClaudeUsagePercent(): Promise<number | null> {
   const envPct = process.env['CLAUDE_USAGE_PERCENT'];
@@ -109,21 +132,21 @@ export async function checkUsage(context: 'issue' | 'task'): Promise<boolean> {
   if (pct === null) return false;
 
   if (context === 'task' && pct >= 90) {
-    console.warn(
+    activeOutput().warn(
       `\nClaude usage at ${pct.toFixed(0)}% (>=90%). Pausing after current task to avoid hitting the limit.`,
     );
     return true;
   }
   if (pct >= 80) {
-    console.warn(
+    activeOutput().warn(
       `\nClaude usage at ${pct.toFixed(0)}% (>=80%). Monitor closely — tasks may be interrupted.`,
     );
   } else if (context === 'issue' && pct >= 70) {
-    console.warn(
+    activeOutput().warn(
       `\nClaude usage at ${pct.toFixed(0)}% (>=70%). Consider whether to start the next issue.`,
     );
   } else {
-    console.info(`\nClaude usage: ${pct.toFixed(0)}%`);
+    activeOutput().info(`\nClaude usage: ${pct.toFixed(0)}%`);
   }
   return false;
 }
@@ -211,6 +234,11 @@ function claudeSessionEnv(): Record<string, string | undefined> {
  * The real spawner: `Bun.spawn`, streams inherited so the session's
  * output reaches the operator as it happens.
  *
+ * In json mode it spawns through {@link spawnClaudeCaptured} instead and
+ * answers that session's exit code, so the session's stdout reaches the
+ * operator as `log` events and never as bytes among them; see the module
+ * note.
+ *
  * An exit code of `undefined` — which is what a signalled process
  * answers — is reported as 1, because every caller here treats a
  * non-zero as a failed session and a killed one is not a success.
@@ -219,6 +247,10 @@ export async function spawnClaude(
   args: readonly string[],
   prompt: string,
 ): Promise<number> {
+  if (activeOutputMode() === 'json') {
+    const { exitCode } = await spawnClaudeCaptured(args, prompt);
+    return exitCode;
+  }
   const proc = Bun.spawn([CLAUDE_BIN, ...args], {
     stdin: new TextEncoder().encode(prompt),
     stdout: 'inherit',
@@ -269,19 +301,51 @@ export type CapturingSpawner = (
 ) => Promise<CapturedSession>;
 
 /**
- * Writes each chunk of `stream` to the operator's stdout as it
- * arrives, and answers all of them decoded as one string.
+ * Hands each whole line of `text` to `write`, its newline off, and
+ * answers what follows the last newline, which is no line yet.
+ */
+function writeWholeLines(text: string, write: (line: string) => void): string {
+  const lines = text.split('\n');
+  const rest = lines.pop() ?? '';
+  for (const line of lines) write(line);
+  return rest;
+}
+
+/**
+ * Echoes each chunk of `stream` on to the operator as it arrives, and
+ * answers all of them decoded as one string.
+ *
+ * The mode is read once, before the first chunk, off the active output
+ * (`adapters/output/active.ts`). In text mode each chunk is written to
+ * `process.stdout` as its bytes. In json mode nothing is: each line the
+ * decoded text completes goes to that output's `info`, and what follows
+ * the last newline goes once the stream ends, unless it is empty. See
+ * the module note.
  */
 async function teeToOperator(
   stream: ReadableStream<Uint8Array>,
 ): Promise<string> {
   const decoder = new TextDecoder();
+  const jsonOutput = activeOutputMode() === 'json'
+    ? activeOutput()
+    : null;
+  const writeLine = (line: string): void => {
+    jsonOutput?.info(line);
+  };
   let text = '';
+  let pending = '';
   for await (const chunk of stream) {
-    process.stdout.write(chunk);
-    text += decoder.decode(chunk, { stream: true });
+    if (jsonOutput === null) process.stdout.write(chunk);
+    const decoded = decoder.decode(chunk, { stream: true });
+    text += decoded;
+    if (jsonOutput !== null) pending = writeWholeLines(pending + decoded, writeLine);
   }
-  return text + decoder.decode();
+  const tail = decoder.decode();
+  if (jsonOutput !== null) {
+    const rest = writeWholeLines(pending + tail, writeLine);
+    if (rest !== '') writeLine(rest);
+  }
+  return text + tail;
 }
 
 /**

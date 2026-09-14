@@ -163,22 +163,15 @@ let logs: string[] = [];
 let warnings: string[] = [];
 
 /**
- * Captures what the loop printed, by level, from both places it writes.
- * `start/run-config.ts` writes through the active output, read through a
- * `sinkOutput` set for each case and put back to the default after it.
- * `start/dispatch.ts` still prints through `console`, read through a spy:
- * bun:test replaces the console object, so a `process.stdout.write` patch
- * would read nothing and every absence below would pass.
+ * Captures what the loop told the operator, by level. `start/run-config.ts`
+ * and `start/dispatch.ts` both write through the active output, read
+ * through a `sinkOutput` set for each case and put back to the default
+ * after it. The one case asking whether a line reached `console` spies on
+ * `console.warn` itself.
  */
 beforeEach(() => {
   logs = [];
   warnings = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    warnings.push(args.map(String).join(' '));
-  });
   setActiveOutput(sinkOutput({
     info: (message) => {
       logs.push(message);
@@ -308,7 +301,11 @@ describe('the injection mode a run resolves', () => {
 
   it('writes a warning per unknown key through the active output when it is given no sink', () => {
     const routed: string[] = [];
+    const consoleWarned: string[] = [];
     const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
+    spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      consoleWarned.push(args.map(String).join(' '));
+    });
     setActiveOutput(sinkOutput({
       warn: (message) => {
         routed.push(message);
@@ -323,7 +320,7 @@ describe('the injection mode a run resolves', () => {
 
     // The console spy read nothing: the warning went through the active
     // output alone, where `loadConfig` left to itself prints it there.
-    expect(warnings).toEqual([]);
+    expect(consoleWarned).toEqual([]);
   });
 });
 

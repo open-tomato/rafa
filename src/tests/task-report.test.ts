@@ -35,6 +35,15 @@
  * report stops for that reason only because its store rendered: that
  * store is readable, and refuses writes alone.
  *
+ * ## The operator's lines
+ *
+ * Two cases read what `renderProgressForDispatch` and `storeTaskReport`
+ * tell the operator when the store refuses them, level by level through a
+ * `sinkOutput` set as the active output. The store is a file of bytes no
+ * SQLite reads, so neither case needs a permission to fail and both run
+ * as root. Each refusal written at `warn`, driven on 2026-09-15 and
+ * restored sha256-identical, reddened its own case alone.
+ *
  * ## Mutations
  *
  * Fifteen mutations of `start.ts` were driven against this file alone,
@@ -114,13 +123,20 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
-import { dispatchTask, runTaskSession, SESSION_ID_FLAG } from '../start/dispatch.js';
+import {
+  dispatchTask,
+  renderProgressForDispatch,
+  runTaskSession,
+  SESSION_ID_FLAG,
+  storeTaskReport,
+} from '../start/dispatch.js';
 import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** What a run with no config spawns every session under, spelled out. */
 const DEFAULT_SOURCE_ARGS = ['--setting-sources', 'project,local'];
@@ -178,12 +194,11 @@ describe('a dispatched task session', () => {
   const taskInfo: TaskInfo = { task: 'Record the report', lineNum: 2, status: 'unchecked' };
 
   beforeEach(() => {
-    spyOn(console, 'log').mockImplementation(() => {});
-    spyOn(console, 'warn').mockImplementation(() => {});
+    setActiveOutput(sinkOutput({}));
   });
 
   afterEach(() => {
-    mock.restore();
+    setActiveOutput(null);
   });
 
   /** Dispatches the fixture task, the runner recording every id it is handed. */
@@ -513,6 +528,67 @@ function trackerTasks(scratch: Scratch): string[] {
 
 /** A command run takes about a second, more under a loaded suite. */
 const RUN_TIMEOUT = { timeout: 60_000 };
+
+describe('what a store the loop cannot use tells the operator', () => {
+  /** Every line written, tagged by its level. */
+  let seen: string[] = [];
+
+  beforeEach(() => {
+    seen = [];
+    setActiveOutput(sinkOutput({
+      info: (message) => {
+        seen.push(`info:${message}`);
+      },
+      warn: (message) => {
+        seen.push(`warn:${message}`);
+      },
+      error: (message) => {
+        seen.push(`error:${message}`);
+      },
+    }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** A repo root whose store file holds bytes no SQLite reads. */
+  function brokenStoreRoot(name: string): string {
+    const root = join(tempRoot, name);
+    const store = sqliteStorePath(root);
+    mkdirSync(dirname(store), { recursive: true });
+    writeFileSync(store, 'not a database\n'.repeat(64), 'utf8');
+    return root;
+  }
+
+  it('writes the render refusal through error, and answers false', () => {
+    const root = brokenStoreRoot('broken-render');
+
+    expect(renderProgressForDispatch(root, 'probe')).toBe(false);
+
+    expect(seen).toEqual([
+      expect.stringMatching(/^error:\n❌ progress\.txt could not be rendered from the findings store: .+$/),
+      'error:   Nothing was dispatched. Make the store readable, then run again.',
+    ]);
+  });
+
+  it('writes a report the store refuses through error, and answers false', () => {
+    const root = brokenStoreRoot('broken-store');
+
+    const stored = storeTaskReport({
+      repoRoot: root,
+      planStub: 'probe',
+      dispatch: { sessionId: 'aaaa-1111', taskText: 'Record the report', output: '' },
+      outcome: 'done',
+    });
+
+    expect(stored).toBe(false);
+    expect(seen).toEqual([
+      expect.stringMatching(/^error:\n❌ The report of session aaaa-1111 was not stored: .+$/),
+      'error:   The session printed it above as it ran.',
+    ]);
+  });
+});
 
 describe('rafa start, over a stand-in claude', () => {
   it('stores each report under the id its session ran with, rendering progress.txt first', () => {

@@ -72,7 +72,7 @@ const READERS: Readonly<Record<string, readonly string[]>> = {
 /** The outputs each command declares: text alone for a phase 0 command, until it writes through the active output. */
 const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'plan create': ['text'],
-  'loop start': ['text'],
+  'loop start': ['text', 'json'],
   'effort collect': ['text'],
   'effort report': ['text'],
   'usage': ['text'],

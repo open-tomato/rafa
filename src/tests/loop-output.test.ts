@@ -4,8 +4,10 @@
  *
  * ## The source cases
  *
- * `src/start.ts`, `src/start/run-config.ts`, `src/start/commit.ts` and
- * `src/start/wrap-up.ts` hold no `console` member and no `process.exit`
+ * `src/start.ts`, `src/start/run-config.ts`, `src/start/commit.ts`,
+ * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
+ * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
+ * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`. Each is parsed with
  * TypeScript and walked, so a comment or a string naming either is no
  * reading. The control walks a planted source holding each in code, in a
@@ -19,8 +21,8 @@
  * directory, in an environment holding nothing else but `RAFA_OUTPUT` for
  * json mode. Each run first asserts that `claude` resolves to the
  * stand-in. The stand-in drains its prompt with the shell's own `read`,
- * notes the call outside the repository and exits with the code its
- * planting names.
+ * notes the call outside the repository, writes the stdout its planting
+ * names with `/bin/cat`, and exits with the code its planting names.
  *
  *   - **The three refusals**: an unusable config, a plan file that does
  *     not exist and the `main` branch. In text mode each writes its
@@ -36,10 +38,22 @@
  *     `info` lines are written as `console.log` wrote them, and each
  *     warning as the `text` adapter writes one: on stdout, after
  *     `warn: `, where `console.warn` wrote it bare on stderr.
- *   - **A failed session**: its line as an `error` event, and the run
- *     ended by its return, as a success with exit code 0.
- *     `start/dispatch.ts` still prints through `console`, so only the
- *     lines opening with `{` are read as events here.
+ *   - **A failed session**, whose stand-in writes a blank line and a last
+ *     line with no newline: every line NDJSON, from the task's one `step`
+ *     event to the result. The step comes ahead of the line announcing the
+ *     task, each line of the session's stdout is an `info` event, the
+ *     failure is the run's one error event, and the missing report is
+ *     warned about after it. The run ends by its return, as a success
+ *     with exit code 0.
+ *   - **A run whose task and wrap-up sessions both write that stdout**: in
+ *     json mode the same step, and the session lines twice, once through
+ *     the task session's tee and once through the wrap-up, which spawns
+ *     through `runClaude`. In text mode there is no step line and no
+ *     event, and the bytes of both sessions come out as they were written,
+ *     the last line running into the loop's next one.
+ *
+ * Both session cases run under `--inject=full`, so no injection fallback
+ * warning sits among the lines they read.
  *
  * ## Readings
  *
@@ -62,6 +76,24 @@
  * refusal thrown with no message; the plan-not-found message changed; the
  * branch refusal thrown with exit code 2; and an interrupted task exiting
  * 1, which reddened the interrupt case of `task-report.test.ts` alone.
+ *
+ * The session cases came with `start/dispatch.ts`, `start/pr-lifecycle.ts`,
+ * `utils/claude.ts` and `utils/schedule.ts` joining the scan. Twenty
+ * mutations of those modules, the dispatcher and `active.ts` were driven
+ * on 2026-09-15, one run each over ten suites, with 228 pass before and
+ * after and every file restored sha256-identical. These cases reddened
+ * under each leg reaching `loop start`'s stream:
+ *   - the step never emitted, or named otherwise: both json cases;
+ *   - the step emitted in text mode too: the text case alone;
+ *   - the tee's mode inverted: all three session cases;
+ *   - a last line left unflushed, blank lines dropped, or bytes written in
+ *     json mode as well: both json cases;
+ *   - `spawnClaude` never piping in json mode: the json run with a
+ *     wrap-up alone;
+ *   - the dispatcher setting no mode, or a stored report's warning written
+ *     at `info`: both json cases;
+ *   - the line announcing a task back on `console.log`: both json cases
+ *     and the source case of `start/dispatch.ts`.
  */
 import type { CliEvent } from '../ports/index.js';
 
@@ -98,6 +130,10 @@ const ROUTED_MODULES: string[] = [
   'start/run-config.ts',
   'start/commit.ts',
   'start/wrap-up.ts',
+  'start/dispatch.ts',
+  'start/pr-lifecycle.ts',
+  'utils/claude.ts',
+  'utils/schedule.ts',
 ];
 
 /** The owner and member a property or element access names, or null for any other node. */
@@ -171,11 +207,35 @@ const STUB = 'probe';
 /** The flag naming the planted plan. */
 const PLAN_FLAG = `--plan=.plans/PLAN-${STUB}.md`;
 
+/** The one task the open plan holds. */
+const TASK = 'A task for the stand-in';
+
 /** A plan holding one open task. */
-const PLAN_OPEN = `# Plan: ${STUB}\n\n- [ ] A task for the stand-in\n`;
+const PLAN_OPEN = `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`;
 
 /** A plan holding no open task, and a block never closed after its last task. */
 const PLAN_DONE = `# Plan: ${STUB}\n\n- [x] A finished task\n\n\`\`\`rafa:notes\na note never closed\n`;
+
+/** What a session stand-in writes to stdout: a blank line, and a last line with no newline. */
+const SESSION_STDOUT = 'session line one\n\nsession line two';
+
+/** {@link SESSION_STDOUT} as json mode carries it, one `info` event per line, each as {@link labelOf} spells it. */
+const SESSION_LINES: readonly string[] = ['info:session line one', 'info:', 'info:session line two'];
+
+/** The flags a session case runs with: the whole plan injected, so no fallback warning sits among its lines. */
+const SESSION_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
+
+/** The line announcing the wrap-up session. */
+const WRAP_UP_STARTING = '🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.';
+
+/** The line after it, saying the wrap-up is one quiet session. */
+const WRAP_UP_QUIET = '   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.';
+
+/** The line a wrap-up session that exited 0 ends with. */
+const PROGRESS_PRESERVED = '\n✅ Progress preserved; PR opened or updated on this branch.';
+
+/** The warning a session that wrote no report is stored with, as {@link labelOf} spells it. */
+const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/;
 
 /** How long a case may run, over the kill below. */
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -193,6 +253,8 @@ interface Planting {
   readonly config?: string;
   /** The exit code the stand-in answers every call with. Defaults to 0. */
   readonly claudeExit?: number;
+  /** What the stand-in writes to stdout on every call, byte for byte. Defaults to nothing. */
+  readonly claudeStdout?: string;
 }
 
 /** One planted scratch repository and what a run under it reads. */
@@ -228,11 +290,14 @@ function plant(planting: Planting): Scratch {
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
 
   const callLog = join(root, 'calls.log');
+  const claudeStdout = join(root, 'claude-stdout.txt');
+  writeFileSync(claudeStdout, planting.claudeStdout ?? '', 'utf8');
   const claude = join(bin, 'claude');
   writeFileSync(claude, [
     '#!/bin/sh',
     'while read -r _line; do :; done',
     `echo called >> '${callLog}'`,
+    `/bin/cat '${claudeStdout}'`,
     `exit ${planting.claudeExit ?? 0}`,
     '',
   ].join('\n'), 'utf8');
@@ -290,6 +355,31 @@ function eventsOf(stdout: string): CliEvent[] {
     .split('\n')
     .filter((line) => line !== '')
     .map((line) => JSON.parse(line) as CliEvent);
+}
+
+/** An event as one string: `<level>:<message>` for a log, `step:<name>` for a step, and its type for the rest. */
+function labelOf(event: CliEvent): string {
+  switch (event.type) {
+    case 'log':
+      return `${event.level}:${event.message}`;
+    case 'step':
+      return `step:${event.name}`;
+    case 'start':
+    case 'result':
+      return event.type;
+  }
+}
+
+/** The labels from `first` to the next `last` after it, both kept. Throws when either is missing. */
+function span(labels: readonly string[], first: string, last: string): string[] {
+  const from = labels.indexOf(first);
+  const to = from === -1
+    ? -1
+    : labels.indexOf(last, from);
+  if (to === -1) {
+    throw new Error(`no span from ${JSON.stringify(first)} to ${JSON.stringify(last)} in ${JSON.stringify(labels)}`);
+  }
+  return labels.slice(from, to + 1);
 }
 
 /** How one refusal is planted and run, and the refusal it answers. */
@@ -366,9 +456,9 @@ function noTaskLines(): readonly (readonly ['info' | 'warn', string])[] {
     ...issues.map((issue) => ['warn', `   line ${issue.line}: ${issue.text}`] as const),
     ['info', `📋 Creating new plan tracker at PLAN_TRACKER-${STUB}.md...`],
     ['info', '\n✅ All tasks completed!'],
-    ['info', '🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.'],
-    ['info', '   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.'],
-    ['info', '\n✅ Progress preserved; PR opened or updated on this branch.'],
+    ['info', WRAP_UP_STARTING],
+    ['info', WRAP_UP_QUIET],
+    ['info', PROGRESS_PRESERVED],
   ];
 }
 
@@ -405,28 +495,82 @@ describe('a loop start run with no open task', () => {
 });
 
 describe('a loop start run whose session fails', () => {
-  it('writes the failure as its one error event and ends the run as a success, with exit code 0', () => {
-    const scratch = plant({ branch: `feat/${STUB}`, plan: PLAN_OPEN, claudeExit: 3 });
+  it('writes its one step, the session lines as info events and the failure as its one error event, every line NDJSON, and exits 0', () => {
+    const scratch = plant({ branch: `feat/${STUB}`, plan: PLAN_OPEN, claudeExit: 3, claudeStdout: SESSION_STDOUT });
 
-    const run = runLoopStart(scratch, 'json', [PLAN_FLAG, '--no-ci-wait']);
-    const events = eventsOf(run.stdout
-      .split('\n')
-      .filter((line) => line.startsWith('{'))
-      .join('\n'));
-    const failure = {
-      type: 'log' as const,
-      level: 'error' as const,
-      message: '\n❌ Task failed (exit 3). Marked as blocked. Run again to retry.',
-      ts: expect.any(String),
-    };
+    const run = runLoopStart(scratch, 'json', SESSION_FLAGS);
+    const events = eventsOf(run.stdout);
+    const labels = events.map(labelOf);
+    const failure = 'error:\n❌ Task failed (exit 3). Marked as blocked. Run again to retry.';
 
     expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
     expect(existsSync(scratch.callLog)).toBe(true);
-    expect(events[0]).toMatchObject({ type: 'start', command: 'loop start' });
+    expect(labels[0]).toBe('start');
     expect(events.at(-1)).toMatchObject({ type: 'result', ok: true });
-    expect(events.filter((event) => event.type === 'result')).toHaveLength(1);
-    expect(events.filter((event) => event.type === 'log' && event.level === 'error')).toEqual([failure]);
+    expect(labels.filter((label) => label === 'result')).toEqual(['result']);
+    expect(events.filter((event) => event.type === 'step')).toEqual([{ type: 'step', name: TASK, ts: expect.any(String) }]);
+    expect(labels.filter((label) => label.startsWith('error:'))).toEqual([failure]);
+    expect(span(labels, `step:${TASK}`, 'result')).toEqual([
+      `step:${TASK}`,
+      `info:\n🔄 Executing task: ${TASK}`,
+      ...SESSION_LINES,
+      failure,
+      expect.stringMatching(NO_REPORT_WARNING),
+      'result',
+    ]);
     expect(readFileSync(join(scratch.repo, '.plans', `PLAN_TRACKER-${STUB}.md`), 'utf8'))
-      .toContain('- [BLOCKED] A task for the stand-in');
+      .toContain(`- [BLOCKED] ${TASK}`);
+  }, RUN_TIMEOUT);
+});
+
+describe('a loop start run whose task and wrap-up sessions write to stdout', () => {
+  const planting: Planting = { branch: `feat/${STUB}`, plan: PLAN_OPEN, claudeStdout: SESSION_STDOUT };
+
+  it('writes one step and each session line as an info event in json mode, every line NDJSON', () => {
+    const scratch = plant(planting);
+
+    const run = runLoopStart(scratch, 'json', SESSION_FLAGS);
+    const events = eventsOf(run.stdout);
+    const labels = events.map(labelOf);
+    const steps = events.filter((event) => event.type === 'step');
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(labels[0]).toBe('start');
+    expect(events.at(-1)).toMatchObject({ type: 'result', ok: true });
+    expect(labels.filter((label) => label === 'result')).toEqual(['result']);
+    expect(steps).toEqual([{ type: 'step', name: TASK, ts: expect.any(String) }]);
+    expect(new Date(steps[0]?.ts ?? '').toISOString()).toBe(steps[0]?.ts ?? 'no step');
+    expect(span(labels, `step:${TASK}`, 'result')).toEqual([
+      `step:${TASK}`,
+      `info:\n🔄 Executing task: ${TASK}`,
+      ...SESSION_LINES,
+      `info:✅ Task done: ${TASK}`,
+      'info:   Nothing to commit: the task changed no tracked file.',
+      expect.stringMatching(NO_REPORT_WARNING),
+      'info:\n✅ All tasks completed!',
+      `info:${WRAP_UP_STARTING}`,
+      `info:${WRAP_UP_QUIET}`,
+      ...SESSION_LINES,
+      `info:${PROGRESS_PRESERVED}`,
+      'result',
+    ]);
+    expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');
+  }, RUN_TIMEOUT);
+
+  it('echoes the bytes of both sessions in text mode, with no step line and no event', () => {
+    const scratch = plant(planting);
+
+    const run = runLoopStart(scratch, 'text', SESSION_FLAGS);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.stdout).toContain(`\n🔄 Executing task: ${TASK}\n${SESSION_STDOUT}✅ Task done: ${TASK}\n`);
+    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${SESSION_STDOUT}${PROGRESS_PRESERVED}\n`);
+    expect(run.stdout.split(SESSION_STDOUT)).toHaveLength(3);
+    expect(run.stdout).not.toContain('step: ');
+    expect(run.stdout.split('\n').filter((line) => line.startsWith('{'))).toEqual([]);
+    expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');
   }, RUN_TIMEOUT);
 });

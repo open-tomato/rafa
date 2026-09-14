@@ -29,6 +29,12 @@
  * wait outlasting it, and not through any assertion. Leg counts are not
  * recorded; they drift with every case added here.
  *
+ * Once the gate wrote through the active output, three level mutations
+ * were driven on 2026-09-15, each restored sha256-identical. The deadline
+ * warning at `info` reddened the deadline case. A failed CI-repair session
+ * at `warn` reddened the case stopping after one. The poll line at `warn`
+ * reddened the green case and both zero-attempt cases.
+ *
  * Every repair session records the setting sources it was handed beside
  * its prompt. The sources the cases hand over are not the default, so a
  * gate that bound the default in their place reddens.
@@ -41,9 +47,11 @@ import type { ClaudeSettingSource } from '../config.js';
 
 import { readFileSync } from 'node:fs';
 
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { classifyPromptContent } from '../effort/classify.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 import { planStubFromPrompt } from '../utils/plan-stamp.js';
@@ -191,27 +199,30 @@ let warnings: string[] = [];
 let errors: string[] = [];
 
 /**
- * Captures what the gate printed, through a spy on `console`: bun:test
- * replaces the console object, so a `process.stdout.write` patch would
- * read nothing and every absence below would pass.
+ * Captures what the gate told the operator, one array per level, through
+ * a `sinkOutput` set as the active output for each case. A line written
+ * at another level lands in another array, so each `toEqual([])` below
+ * is a reading of the level as well as of the line.
  */
 beforeEach(() => {
   logs = [];
   warnings = [];
   errors = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    warnings.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-    errors.push(args.map(String).join(' '));
-  });
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    warn: (message) => {
+      warnings.push(message);
+    },
+    error: (message) => {
+      errors.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
-  mock.restore();
+  setActiveOutput(null);
   setActivePlanStub(null);
 });
 

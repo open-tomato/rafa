@@ -40,23 +40,29 @@ module's note is the long form.
   declared `default` or flag alias fills the context's `flags` alone:
   `rafa loop start -p x.md` hands `start` `-p x.md`, which it does not
   read. `describe` reads the registry off its context instead.
-- **Where a wrapped command writes**: `src/start.ts`,
-  `start/run-config.ts`, `start/commit.ts` and `start/wrap-up.ts` write
-  through the active output, `console.log`'s lines at `info`,
-  `console.warn`'s at `warn` and `console.error`'s at `error`, each
-  message as it was. In text mode an `info` line is the bytes
+- **Where a wrapped command writes**: `loop start` writes through the
+  active output in every module it prints from: `src/start.ts`,
+  `start/run-config.ts`, `start/commit.ts`, `start/wrap-up.ts`,
+  `start/dispatch.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts` and
+  `utils/schedule.ts`. `console.log`'s and `console.info`'s lines go at
+  `info`, `console.warn`'s at `warn` and `console.error`'s at `error`,
+  each message as it was. In text mode an `info` line is the bytes
   `console.log` wrote, and a warning or an error goes to stdout after
   `warn: ` or `error: `, where `console` wrote it bare on stderr.
-  `start/dispatch.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts` and
-  `utils/schedule.ts`, which `loop start` also reaches, still print
-  through `console`, as `plan.ts`, `usage.ts` and the effort commands do.
-  `src/tests/loop-output.test.ts` spawns `loop start` in both modes.
+- **What json mode adds for `loop start`**: each dispatched task first
+  emits one `step` event named by its sentence, and a session's stdout,
+  whether task, wrap-up or CI repair, arrives as one `info` `log` event
+  per line. Text mode emits no step and echoes a session's bytes as
+  before. Both read the mode the dispatcher sets beside the active
+  output. `plan.ts`, `usage.ts` and the effort commands still print
+  through `console`. `src/tests/loop-output.test.ts` spawns `loop start`
+  in both modes.
 - **A wrapped command declares exactly the flags its phase 0 module
   reads**, as the line types them. `src/commands/index.test.ts` holds
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
-  through the active output; `describe` declares `text` and `json`, and
-  no flag.
+  through the active output, so `loop start` declares `text` and `json`;
+  `describe` declares `text` and `json`, and no flag.
 - **How they refuse**: `effort collect` and `effort report` throw
   `CommandExit(1)` once the refusal is printed. `loop start` throws
   `CommandExit(1)` with the whole refusal as its message for an unusable
@@ -154,8 +160,9 @@ the clock, the importer and the help renderer are options.
   a second result and any `start` or `result` handed to `emit`. A refusal
   there ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
-  (`src/adapters/output/active.ts`). The one active before is put back
-  afterwards, when the command throws too.
+  (`src/adapters/output/active.ts`), set in the invocation's output mode,
+  which `activeOutputMode()` answers. The output and the mode active
+  before are put back afterwards, when the command throws too.
 - **An alias, or a command declaring `deprecated`, writes one line to
   stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help

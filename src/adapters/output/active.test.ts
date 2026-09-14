@@ -19,12 +19,19 @@
  * module restored byte-identical (sha256): `null` leaving the current
  * output in place reddened the reset case alone, and the default made at
  * verbosity 2 the default-output case alone.
+ *
+ * The mode cases read the mode set beside the output: `text` while
+ * nothing is set, the mode named with an output, `text` for an output
+ * set with no mode over one set in `json`, and `text` again with the
+ * default, whatever mode `null` is named with. `null` keeping the mode it
+ * was named with, driven on 2026-09-15 and restored sha256-identical,
+ * reddened the third mode case alone.
  */
 import type { OutputStream } from './stream.js';
 
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
-import { activeOutput, setActiveOutput } from './active.js';
+import { activeOutput, activeOutputMode, setActiveOutput } from './active.js';
 import { createJsonOutput } from './json.js';
 
 /** The output active when this file was loaded, before any case set one. */
@@ -114,5 +121,36 @@ describe('the active output', () => {
     setActiveOutput(null);
 
     expect(activeOutput()).toBe(DEFAULT_OUTPUT);
+  });
+});
+
+describe('the active output mode', () => {
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('is text while nothing is set, and the mode named with an output once one is', () => {
+    expect(activeOutputMode()).toBe('text');
+
+    setActiveOutput(createJsonOutput(memoryStream()), 'json');
+
+    expect(activeOutputMode()).toBe('json');
+  });
+
+  it('is text for an output set with no mode, even over one set in json', () => {
+    setActiveOutput(createJsonOutput(memoryStream()), 'json');
+
+    setActiveOutput(createJsonOutput(memoryStream()));
+
+    expect(activeOutputMode()).toBe('text');
+  });
+
+  it('goes back to text with the default when null is set, whatever mode is named', () => {
+    setActiveOutput(createJsonOutput(memoryStream()), 'json');
+
+    setActiveOutput(null, 'json');
+
+    expect(activeOutput()).toBe(DEFAULT_OUTPUT);
+    expect(activeOutputMode()).toBe('text');
   });
 });

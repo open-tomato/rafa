@@ -79,5 +79,5 @@ export default wrapPhaseZeroCommand({
     },
   ],
   aliases: ['start'],
-  outputs: ['text'],
+  outputs: ['text', 'json'],
 }, start);

@@ -112,6 +112,31 @@
  * through one spy, so whether the failed-write case reddens as well is
  * a race, and the five recording cases plus the chunk case are what
  * both passes agree on.
+ *
+ * ## Json mode and the usage check
+ *
+ * The json-mode cases run the same kind of stand-in with a recording
+ * output set as the active output in `json` (`adapters/output/active.ts`)
+ * and the `process.stdout.write` spy still in place, so a byte reaching
+ * stdout is a reading beside the lines the output was handed. The split
+ * character is forced as above, the marker created by the output's first
+ * `info` line, and the stand-in writes `marker never seen` in place of
+ * the rest when its poll ran out, so a split left to chance reddens
+ * rather than passing. The control sets that same output in `text`, and
+ * reads the bytes on stdout and no line.
+ *
+ * `checkUsage` is read through a `sinkOutput` recording every level, with
+ * `CLAUDE_USAGE_PERCENT` set for the case and put back after it: one case
+ * per branch, and one for a usage that cannot be read.
+ *
+ * Six mutations of `claude.ts` were driven against these cases on
+ * 2026-09-15, each restored sha256-identical with the suites green before
+ * and after, and every one reddened at least one case of this file. The
+ * tee's mode inverted reddened all four json cases and two text ones. A
+ * last line left unflushed reddened 2, and blank lines dropped 1. Bytes
+ * written in json mode as well reddened 2. `spawnClaude` never handing a
+ * json-mode session to the capturing spawner reddened 1, and so did the
+ * usage line written at `warn`.
  */
 import type {
   CapturedSession,
@@ -127,8 +152,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
+import { sinkOutput } from '../tests/output-sinks.js';
+
 import {
   CLAUDE_BASE_ARGS,
+  checkUsage,
   claudeArgs,
   runClaude,
   runClaudeCaptured,
@@ -660,5 +689,198 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
       .rejects.toThrow('operator stdout is gone');
 
     expect(existsSync(exited)).toBe(true);
+  });
+});
+
+/** Every line a json-mode case handed the active output's `info`, in order. */
+let infoLines: string[] = [];
+
+/** Every line it handed any other level, tagged by that level. */
+let otherLines: string[] = [];
+
+/** When set, the output's `info` throws this instead of recording. */
+let infoFailure: Error | undefined;
+
+/**
+ * An output recording what it is handed, level by level. Its first
+ * `info` line creates the marker a split-character stand-in polls for.
+ */
+function recordingOutput(): ReturnType<typeof sinkOutput> {
+  return sinkOutput({
+    info: (message) => {
+      if (infoFailure !== undefined) throw infoFailure;
+      if (infoLines.length === 0) writeFileSync(join(binDir, FIRST_WRITE_MARKER), '');
+      infoLines.push(message);
+    },
+    warn: (message) => {
+      otherLines.push(`warn:${message}`);
+    },
+    error: (message) => {
+      otherLines.push(`error:${message}`);
+    },
+    debug: (message) => {
+      otherLines.push(`debug:${message}`);
+    },
+  });
+}
+
+describe('both doors in json mode, against a stand-in claude on PATH', () => {
+  beforeEach(() => {
+    binDir = mkdtempSync(join(tmpdir(), 'rafa-claude-stand-in-'));
+    savedEnv = {
+      PATH: process.env['PATH'],
+      CLAUDE_CODE_ENTRYPOINT: process.env['CLAUDE_CODE_ENTRYPOINT'],
+    };
+    written = [];
+    infoLines = [];
+    otherLines = [];
+    infoFailure = undefined;
+    spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      const bytes = typeof chunk === 'string'
+        ? Buffer.from(chunk)
+        : chunk;
+      written.push(bytes);
+      return true;
+    });
+    setActiveOutput(recordingOutput(), 'json');
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+    restoreEnv('PATH', savedEnv.PATH);
+    restoreEnv('CLAUDE_CODE_ENTRYPOINT', savedEnv.CLAUDE_CODE_ENTRYPOINT);
+    mock.restore();
+    rmSync(binDir, { recursive: true, force: true });
+  });
+
+  it('hands each line of a captured session to info with its newline off, and writes no byte to stdout', async () => {
+    const marker = join(binDir, FIRST_WRITE_MARKER);
+    standInClaude([
+      'printf \'first line\\n\\nx\\342\'',
+      'n=0',
+      `while [ ! -e '${marker}' ] && [ "$n" -lt 100 ]; do /bin/sleep 0.01; n=$((n + 1)); done`,
+      `if [ -e '${marker}' ]; then printf '\\202\\254y\\nlast words'; else printf 'marker never seen'; fi`,
+    ]);
+
+    const session = await runClaudeCaptured('echo as events', DEFAULT_SOURCES);
+
+    const euro = String.fromCodePoint(0x20ac);
+    expect(infoLines).toEqual(['first line', '', `x${euro}y`, 'last words']);
+    expect(session).toEqual({ exitCode: 0, stdout: `first line\n\nx${euro}y\nlast words` });
+    expect(written).toEqual([]);
+    expect(otherLines).toEqual([]);
+  });
+
+  it('writes the bytes to stdout and hands the output no line when that same output is set in text mode', async () => {
+    setActiveOutput(recordingOutput(), 'text');
+    standInClaude(['printf \'one line\\nno newline\'']);
+
+    const session = await runClaudeCaptured('the text control', DEFAULT_SOURCES);
+
+    expect(infoLines).toEqual([]);
+    expect(Buffer.concat(written).toString('utf8')).toBe('one line\nno newline');
+    expect(session.stdout).toBe('one line\nno newline');
+  });
+
+  it('spawns runClaude through a pipe, handing its lines to info and answering its exit code', async () => {
+    process.env['CLAUDE_CODE_ENTRYPOINT'] = 'rafa-test-sentinel';
+    standInClaude([
+      'for arg in "$@"; do printf \'arg:%s\\n\' "$arg"; done',
+      'printf \'entrypoint:%s\\n\' "$CLAUDE_CODE_ENTRYPOINT"',
+      'printf \'stdin:\'',
+      '/bin/cat',
+      'exit 4',
+    ]);
+
+    const exitCode = await runClaude('Preserve progress\nline two', UNSORTED_SOURCES);
+
+    expect(exitCode).toBe(4);
+    expect(infoLines).toEqual([
+      'arg:-p',
+      'arg:--dangerously-skip-permissions',
+      'arg:--setting-sources',
+      'arg:user,local,project',
+      'entrypoint:cli',
+      'stdin:Preserve progress',
+      'line two',
+    ]);
+    expect(written).toEqual([]);
+    expect(otherLines).toEqual([]);
+  });
+
+  it('waits for the session to exit before rejecting on a line the output refuses', async () => {
+    const exited = join(binDir, 'stand-in-exited');
+    infoFailure = new Error('the event stream is gone');
+    standInClaude([
+      'printf \'first chunk\\n\'',
+      '/bin/sleep 0.3',
+      `: > '${exited}'`,
+    ]);
+
+    await expect(runClaudeCaptured('outlive the output', DEFAULT_SOURCES))
+      .rejects.toThrow('the event stream is gone');
+
+    expect(existsSync(exited)).toBe(true);
+  });
+});
+
+describe('checkUsage', () => {
+  /** Every line a check wrote, tagged by its level. */
+  let seen: string[] = [];
+
+  /** `CLAUDE_USAGE_PERCENT` as the case found it. */
+  let savedPercent: string | undefined;
+
+  beforeEach(() => {
+    seen = [];
+    savedPercent = process.env['CLAUDE_USAGE_PERCENT'];
+    setActiveOutput(sinkOutput({
+      info: (message) => {
+        seen.push(`info:${message}`);
+      },
+      warn: (message) => {
+        seen.push(`warn:${message}`);
+      },
+      error: (message) => {
+        seen.push(`error:${message}`);
+      },
+      debug: (message) => {
+        seen.push(`debug:${message}`);
+      },
+    }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+    if (savedPercent === undefined) {
+      delete process.env['CLAUDE_USAGE_PERCENT'];
+    } else {
+      process.env['CLAUDE_USAGE_PERCENT'] = savedPercent;
+    }
+  });
+
+  /** Each reading: what it shows, its context, the percent, whether it pauses, and its one line. */
+  const READINGS: readonly (readonly [string, 'issue' | 'task', string, boolean, string])[] = [
+    ['pauses a task at 90 or more, through warn', 'task', '95', true, 'warn:\nClaude usage at 95% (>=90%). Pausing after current task to avoid hitting the limit.'],
+    ['warns a task at 80 or more without pausing it', 'task', '85', false, 'warn:\nClaude usage at 85% (>=80%). Monitor closely — tasks may be interrupted.'],
+    ['warns an issue at 90 or more without pausing it', 'issue', '92', false, 'warn:\nClaude usage at 92% (>=80%). Monitor closely — tasks may be interrupted.'],
+    ['warns an issue at 70 or more', 'issue', '75', false, 'warn:\nClaude usage at 75% (>=70%). Consider whether to start the next issue.'],
+    ['tells a task under 80 its usage through info', 'task', '75', false, 'info:\nClaude usage: 75%'],
+  ];
+
+  it.each(READINGS)('%s', async (_label, context, percent, pauses, line) => {
+    process.env['CLAUDE_USAGE_PERCENT'] = percent;
+
+    await expect(checkUsage(context)).resolves.toBe(pauses);
+
+    expect(seen).toEqual([line]);
+  });
+
+  it('writes nothing and never pauses when no usage can be read', async () => {
+    delete process.env['CLAUDE_USAGE_PERCENT'];
+
+    await expect(checkUsage('task')).resolves.toBe(false);
+
+    expect(seen).toEqual([]);
   });
 });

@@ -168,8 +168,6 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
@@ -463,14 +461,18 @@ let logs: string[] = [];
 let warnings: string[] = [];
 
 /**
- * Captures what the dispatch printed.
+ * Captures what the dispatch told the operator.
  *
- * Through a spy on `console` and not a `process.stdout.write` patch:
- * bun:test replaces the console object, so a stream capture reads zero
- * lines here and every absence assertion would pass against a loop
- * that announced the block in full. What `start/commit.ts` tells the
- * operator goes through the active output instead, read into the same
- * arrays through a `sinkOutput` set for each case and put back after it.
+ * `start/dispatch.ts` and `start/commit.ts` both write through the
+ * active output, read into these arrays by level through a `sinkOutput`
+ * set for each case and put back after it. The sink holds each message
+ * as it was handed, so an absence assertion reads the announced line
+ * itself, and a loop that announced the block in full would redden it.
+ * Two mutations were driven on 2026-09-15, each restored
+ * sha256-identical. The line announcing a task put back on `console.log`
+ * reddened `keeps the block out of what it announces`. A dropped token's
+ * warning written at `info` reddened
+ * `drops a value it cannot use and says which`.
  *
  * {@link dispatchSpec} empties both arrays again before each dispatch,
  * so a case driving the whole table reads one dispatch at a time.
@@ -478,12 +480,6 @@ let warnings: string[] = [];
 beforeEach(() => {
   logs = [];
   warnings = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    warnings.push(args.map(String).join(' '));
-  });
   setActiveOutput(sinkOutput({
     info: (message) => {
       logs.push(message);
@@ -496,7 +492,6 @@ beforeEach(() => {
 
 afterEach(() => {
   setActiveOutput(null);
-  mock.restore();
 });
 
 /** The one announced line carrying `marker`, or the empty string. */

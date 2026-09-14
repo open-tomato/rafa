@@ -18,8 +18,9 @@
  *   5. The route is settled. A help request writes the help text; a
  *      refusal writes nothing yet; a command prints its deprecation line
  *      when it has one and runs with its context's output set as the
- *      active output (`src/adapters/output/active.ts`), the output
- *      active before being put back once it ends. Its context's
+ *      active output (`src/adapters/output/active.ts`) in the
+ *      invocation's output mode, the output and the mode active before
+ *      being put back once it ends. Its context's
  *      `registry` is the one the line was routed through, with every
  *      module that loaded mounted on it.
  *   6. The terminal result event is written, and the exit code answered.
@@ -83,7 +84,7 @@ import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { CliEvent, CliEventResult, Output } from '../ports/index.js';
 
-import { activeOutput, setActiveOutput } from '../adapters/output/active.js';
+import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 
 import { CommandExit } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
@@ -267,7 +268,8 @@ async function runCommand(
     registry,
   });
   const previous = activeOutput();
-  setActiveOutput(guarded.output);
+  const previousMode = activeOutputMode();
+  setActiveOutput(guarded.output, base.outputMode);
   try {
     await route.command.run(context);
     return success(guarded.payload());
@@ -294,7 +296,7 @@ async function runCommand(
         : error.message,
     };
   } finally {
-    setActiveOutput(previous);
+    setActiveOutput(previous, previousMode);
   }
 }
 

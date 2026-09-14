@@ -2,7 +2,11 @@
  * Deferred-start support for the loop: `--start-at=HH:MM` sleeps until the
  * given local time (tomorrow if the time already passed today), so a run can
  * be queued for off-hours without cron.
+ *
+ * The line announcing the deferral goes through the active output's `info`
+ * (`adapters/output/active.ts`), so json mode reads it as a `log` event.
  */
+import { activeOutput } from '../adapters/output/active.js';
 
 /** Parses `HH:MM` (24h) into a delay in milliseconds from `now`. */
 export function msUntil(startAt: string, now: Date = new Date()): number {
@@ -25,9 +29,25 @@ export function msUntil(startAt: string, now: Date = new Date()): number {
   return target.getTime() - now.getTime();
 }
 
-/** Sleeps until the given `HH:MM`, logging the deferral. */
-export async function deferUntil(startAt: string): Promise<void> {
-  const delayMs = msUntil(startAt);
-  console.log(`Deferring execution. Sleeping ${Math.round(delayMs / 1000)}s until ${startAt}...`);
-  await new Promise((resolve) => setTimeout(resolve, delayMs));
+/** Waits `ms` milliseconds on a real timer. */
+function sleepFor(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Sleeps until the given `HH:MM`, announcing the deferral first.
+ *
+ * `now` is the moment the delay is measured from and `sleep` the wait,
+ * the system clock and a real timer unless a test hands others.
+ */
+export async function deferUntil(
+  startAt: string,
+  now: Date = new Date(),
+  sleep: (ms: number) => Promise<void> = sleepFor,
+): Promise<void> {
+  const delayMs = msUntil(startAt, now);
+  activeOutput().info(`Deferring execution. Sleeping ${Math.round(delayMs / 1000)}s until ${startAt}...`);
+  await sleep(delayMs);
 }

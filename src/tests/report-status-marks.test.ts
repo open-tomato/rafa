@@ -52,8 +52,6 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
@@ -102,20 +100,16 @@ afterAll(() => {
 });
 
 /**
- * Silences the loop: `start/dispatch.ts` prints through `console`, and
- * `start/commit.ts` writes through the active output, set to one that
- * drops every line and put back to the default after each case.
+ * Silences the loop: `start/dispatch.ts` and `start/commit.ts` write
+ * through the active output, set to one that drops every line and put
+ * back to the default after each case.
  */
 beforeEach(() => {
-  spyOn(console, 'log').mockImplementation(() => {});
-  spyOn(console, 'warn').mockImplementation(() => {});
-  spyOn(console, 'error').mockImplementation(() => {});
   setActiveOutput(sinkOutput({}));
 });
 
 afterEach(() => {
   setActiveOutput(null);
-  mock.restore();
 });
 
 /** Runs git in a repository, reading back rather than through git.ts. */

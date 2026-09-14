@@ -10,14 +10,21 @@
  * The rescan and dollar-sequence cases were shown to fail: with
  * `buildPlanPrompt` put back to chained `replaceAll` calls, one per slot,
  * those two reddened and every other case here stayed green.
+ *
+ * The deferral case sets a `sinkOutput` recording every level beside the
+ * wait, so the announcement is read at its level and ahead of the sleep,
+ * and puts the default output back after it. Sleeping ahead of the
+ * announcement, driven on 2026-09-15 and restored sha256-identical,
+ * reddened it alone.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import {
   buildPlanPrompt,
   formatProgressSection,
@@ -26,8 +33,10 @@ import {
   readPlanFormat,
   stubFromSpecPath,
 } from '../plan.js';
-import { msUntil } from '../utils/schedule.js';
+import { deferUntil, msUntil } from '../utils/schedule.js';
 import { trackerPathFor } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 describe('trackerPathFor', () => {
   it('maps the default plan to the default tracker', () => {
@@ -53,6 +62,35 @@ describe('msUntil', () => {
   it('rejects malformed input', () => {
     expect(() => msUntil('9pm')).toThrow(/HH:MM/);
     expect(() => msUntil('25:00')).toThrow(/valid time/);
+  });
+});
+
+describe('deferUntil', () => {
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('announces the deferral through the active output info, then sleeps the delay msUntil answers', async () => {
+    const now = new Date(2026, 8, 14, 22, 0, 0, 0);
+    const seen: string[] = [];
+    setActiveOutput(sinkOutput({
+      info: (message) => {
+        seen.push(`info:${message}`);
+      },
+      warn: (message) => {
+        seen.push(`warn:${message}`);
+      },
+      error: (message) => {
+        seen.push(`error:${message}`);
+      },
+    }));
+
+    await deferUntil('23:00', now, (ms) => {
+      seen.push(`sleep:${ms}`);
+      return Promise.resolve();
+    });
+
+    expect(seen).toEqual(['info:Deferring execution. Sleeping 3600s until 23:00...', 'sleep:3600000']);
   });
 });
 
