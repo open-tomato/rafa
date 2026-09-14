@@ -46,6 +46,8 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { finishCleanExit, readReportHolds } from './commit.js';
@@ -122,24 +124,42 @@ afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
-/** Lines reported on stdout. */
+/** Lines written through the active output at info level. */
 let logs: string[] = [];
 
-/** Lines reported on stderr. */
+/** Lines written through it at error level. */
 let errors: string[] = [];
 
+/** Lines written through it at warn or debug level, which settling writes none of. */
+let others: string[] = [];
+
+/**
+ * Reads what settling told the operator through a `sinkOutput` set as the
+ * active output, which `start/commit.ts` writes through, and puts the
+ * default back after each case.
+ */
 beforeEach(() => {
   logs = [];
   errors = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-    errors.push(args.map(String).join(' '));
-  });
+  others = [];
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    error: (message) => {
+      errors.push(message);
+    },
+    warn: (message) => {
+      others.push(message);
+    },
+    debug: (message) => {
+      others.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
+  setActiveOutput(null);
   mock.restore();
 });
 
@@ -324,5 +344,27 @@ describe('finishCleanExit', () => {
     expect(logs.join('\n')).toContain(`Task done: ${FIRST_TASK}`);
     expect(logs.join('\n')).toContain('Committed abc1234');
     expect(errors).toEqual([]);
+  });
+
+  it('tells the operator through the active output and never through the console', () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
+
+    settle(CLEAN, COMMITTED);
+    settle(DONE_WITH_BLOCKER, COMMITTED);
+    settle(CLEAN, REFUSED);
+
+    expect([log, warn, error].map((spy) => spy.mock.calls.length)).toEqual([0, 0, 0]);
+    expect(logs).toContain(`✅ Task done: ${FIRST_TASK}`);
+    expect(errors).toContain('\n❌ Commit refused at the commit step (exit 1).');
+    expect(errors).toContain('   gate says no');
+    expect(others).toEqual([]);
+
+    // The control: each spy counts a call made through it.
+    console.log('counted');
+    console.warn('counted');
+    console.error('counted');
+    expect([log, warn, error].map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1]);
   });
 });

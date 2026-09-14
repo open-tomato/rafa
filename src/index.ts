@@ -45,12 +45,15 @@
  * A command is the terminal's contract, not a library call. Each takes
  * the argument list the command line would get, prints what the command
  * prints, and answers the working directory's git root as the repo it
- * acts on. `startCommand` and `planCommand` call `process.exit` on a
- * refusal and on some failures, and `startCommand` adds a `SIGINT`
- * listener once it runs. `effortCollectCommand` and
- * `effortReportCommand` instead throw `CommandExit`
- * (`src/cli/command.ts`) with exit code 1 once a refusal is printed,
- * which the dispatcher behind the terminal turns into its exit code. The
+ * acts on. `planCommand` calls `process.exit` on a refusal and on some
+ * failures. `effortCollectCommand` and `effortReportCommand` instead
+ * throw `CommandExit` (`src/cli/command.ts`) with exit code 1 once a
+ * refusal is printed, and `startCommand` throws it with exit code 1 and
+ * the refusal as its message, which it leaves to its caller to print, or
+ * with exit code 0 once an interrupted task is marked. The dispatcher
+ * behind the terminal turns each into its exit code, and writes a
+ * refusal's message to stderr. `startCommand` also adds a `SIGINT`
+ * listener once it runs. The
  * suffix keeps those names apart from the library's own: `planCommand`
  * generates a plan with a Claude session, which `parsePlan` does not, and
  * `effortReportCommand` rolls up effort rows, which `parseReport` does

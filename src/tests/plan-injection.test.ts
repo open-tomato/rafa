@@ -56,6 +56,7 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
@@ -64,6 +65,8 @@ import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/r
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
 import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -160,9 +163,12 @@ let logs: string[] = [];
 let warnings: string[] = [];
 
 /**
- * Captures what the loop printed, through a spy on `console`: bun:test
- * replaces the console object, so a `process.stdout.write` patch would
- * read nothing and every absence below would pass.
+ * Captures what the loop printed, by level, from both places it writes.
+ * `start/run-config.ts` writes through the active output, read through a
+ * `sinkOutput` set for each case and put back to the default after it.
+ * `start/dispatch.ts` still prints through `console`, read through a spy:
+ * bun:test replaces the console object, so a `process.stdout.write` patch
+ * would read nothing and every absence below would pass.
  */
 beforeEach(() => {
   logs = [];
@@ -173,9 +179,18 @@ beforeEach(() => {
   spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
     warnings.push(args.map(String).join(' '));
   });
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    warn: (message) => {
+      warnings.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
+  setActiveOutput(null);
   mock.restore();
 });
 
@@ -288,6 +303,26 @@ describe('the injection mode a run resolves', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]).toContain('"nonesuch"');
     expect(resolved.config.inject).toBe(FILE_MODE);
+    expect(warnings).toEqual([]);
+  });
+
+  it('writes a warning per unknown key through the active output when it is given no sink', () => {
+    const routed: string[] = [];
+    const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
+    setActiveOutput(sinkOutput({
+      warn: (message) => {
+        routed.push(message);
+      },
+    }));
+
+    const resolved = loadRunConfig(scopesOf(root), []);
+
+    expect(routed).toHaveLength(1);
+    expect(routed[0]).toContain('"nonesuch"');
+    expect(resolved.config.inject).toBe(FILE_MODE);
+
+    // The console spy read nothing: the warning went through the active
+    // output alone, where `loadConfig` left to itself prints it there.
     expect(warnings).toEqual([]);
   });
 });

@@ -22,9 +22,10 @@
  *
  * The function's promise is the command's, so whatever it throws is
  * thrown on to the dispatcher: a `CommandExit` ends the invocation with
- * its exit code, and anything else as `command_error`. `start` and
- * `plan` still call `process.exit` on a refusal, which ends the process
- * before the dispatcher writes a terminal event.
+ * its exit code, and anything else as `command_error`. `start` throws
+ * one on a refusal and when a task is interrupted. `plan` still calls
+ * `process.exit` on a refusal, which ends the process before the
+ * dispatcher writes a terminal event.
  */
 import type { RafaCommand } from '../cli/command.js';
 

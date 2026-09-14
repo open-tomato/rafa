@@ -36,10 +36,21 @@ module's note is the long form.
   first action, never ahead of it.
 - **Each but `describe` wraps a phase 0 command** through
   `wrapPhaseZeroCommand`. The command is handed a fresh copy of `argv`
-  and nothing else, so it keeps its own parser and its own console
-  writes. A declared `default` or flag alias fills the context's `flags`
-  alone: `rafa loop start -p x.md` hands `start` `-p x.md`, which it does
-  not read. `describe` reads the registry off its context instead.
+  and nothing else, so it keeps its own parser and its own writes. A
+  declared `default` or flag alias fills the context's `flags` alone:
+  `rafa loop start -p x.md` hands `start` `-p x.md`, which it does not
+  read. `describe` reads the registry off its context instead.
+- **Where a wrapped command writes**: `src/start.ts`,
+  `start/run-config.ts`, `start/commit.ts` and `start/wrap-up.ts` write
+  through the active output, `console.log`'s lines at `info`,
+  `console.warn`'s at `warn` and `console.error`'s at `error`, each
+  message as it was. In text mode an `info` line is the bytes
+  `console.log` wrote, and a warning or an error goes to stdout after
+  `warn: ` or `error: `, where `console` wrote it bare on stderr.
+  `start/dispatch.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts` and
+  `utils/schedule.ts`, which `loop start` also reaches, still print
+  through `console`, as `plan.ts`, `usage.ts` and the effort commands do.
+  `src/tests/loop-output.test.ts` spawns `loop start` in both modes.
 - **A wrapped command declares exactly the flags its phase 0 module
   reads**, as the line types them. `src/commands/index.test.ts` holds
   each list equal to the quoted `--` literals of the modules reading that
@@ -47,9 +58,15 @@ module's note is the long form.
   through the active output; `describe` declares `text` and `json`, and
   no flag.
 - **How they refuse**: `effort collect` and `effort report` throw
-  `CommandExit(1)` once the refusal is printed. `plan create` and
-  `loop start` still call `process.exit`, which ends the process before a
-  terminal event is written.
+  `CommandExit(1)` once the refusal is printed. `loop start` throws
+  `CommandExit(1)` with the whole refusal as its message for an unusable
+  config, a plan file that does not exist and a default branch, so text
+  mode writes it to stderr as the loop printed it before and json mode
+  carries it in the terminal result. An interrupted task throws
+  `CommandExit(0)` once it is marked and its report stored; a failed,
+  blocked or unstored task still returns, and ends with exit code 0.
+  `plan create` still calls `process.exit`, which ends the process before
+  a terminal event is written.
 - **What changed for a phase 0 spelling**: `rafa effort` alone and
   `rafa effort help` refuse with exit code 1, where the phase 0 CLI
   printed its help and exited 0. An unknown first word writes

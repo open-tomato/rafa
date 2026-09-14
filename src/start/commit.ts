@@ -9,11 +9,17 @@
  * outcome the loop stores the report under. `start()` stops the run on
  * every outcome but `done`. The commit goes through `utils/commit.ts`
  * unless the `commit` seam names another runner.
+ *
+ * What the operator is told goes through the active output
+ * (`adapters/output/active.ts`): the done, commit and nothing-to-commit
+ * lines through `info`, and a refused commit and what held a task
+ * through `error`.
  */
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
+import { activeOutput } from '../adapters/output/active.js';
 import { parseReport } from '../report/parse.js';
 import { commitTaskWork } from '../utils/commit.js';
 import { stripTaskDeclaration } from '../utils/declaration.js';
@@ -154,13 +160,14 @@ export function commitFinishedTask(options: FinishedTaskOptions): CommitAttempt 
   const taskText = stripTaskDeclaration(taskInfo.task);
 
   const attempt = commit({ taskText, cwd: options.repoRoot });
+  const out = activeOutput();
 
   if (attempt.outcome === 'failed') {
     updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
-    console.error(`\n❌ Commit refused at the ${attempt.failedStep} step (exit ${attempt.exitCode}).`);
-    if (attempt.message.length > 0) console.error(indentBlock(attempt.message));
-    console.error('   The work is staged and still in the tree. Task marked as blocked.');
-    console.error('   Fix the cause and run again to retry this task.');
+    out.error(`\n❌ Commit refused at the ${attempt.failedStep} step (exit ${attempt.exitCode}).`);
+    if (attempt.message.length > 0) out.error(indentBlock(attempt.message));
+    out.error('   The work is staged and still in the tree. Task marked as blocked.');
+    out.error('   Fix the cause and run again to retry this task.');
     return attempt;
   }
 
@@ -169,19 +176,19 @@ export function commitFinishedTask(options: FinishedTaskOptions): CommitAttempt 
     ? 'blocked'
     : 'done');
   if (held) {
-    console.error(`\n⛔ Task blocked by its own report: ${taskText}`);
-    for (const hold of holds) console.error(indentBlock(hold));
+    out.error(`\n⛔ Task blocked by its own report: ${taskText}`);
+    for (const hold of holds) out.error(indentBlock(hold));
   } else {
-    console.log(`✅ Task done: ${taskText}`);
+    out.info(`✅ Task done: ${taskText}`);
   }
   if (attempt.outcome === 'committed') {
     const sha = attempt.sha?.slice(0, 7) ?? 'unknown sha';
-    console.log(`   Committed ${sha} ${attempt.subject}`);
+    out.info(`   Committed ${sha} ${attempt.subject}`);
   } else {
-    console.log('   Nothing to commit: the task changed no tracked file.');
+    out.info('   Nothing to commit: the task changed no tracked file.');
   }
   if (held) {
-    console.error('   Task marked as blocked. Resolve what its report names, then run again to resume it.');
+    out.error('   Task marked as blocked. Resolve what its report names, then run again to resume it.');
   }
 
   return attempt;

@@ -56,10 +56,13 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { finishCleanExit } from '../start/commit.js';
 import { dispatchTask, storeTaskReport } from '../start/dispatch.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -98,13 +101,20 @@ afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
+/**
+ * Silences the loop: `start/dispatch.ts` prints through `console`, and
+ * `start/commit.ts` writes through the active output, set to one that
+ * drops every line and put back to the default after each case.
+ */
 beforeEach(() => {
   spyOn(console, 'log').mockImplementation(() => {});
   spyOn(console, 'warn').mockImplementation(() => {});
   spyOn(console, 'error').mockImplementation(() => {});
+  setActiveOutput(sinkOutput({}));
 });
 
 afterEach(() => {
+  setActiveOutput(null);
   mock.restore();
 });
 

@@ -116,12 +116,13 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** The first open task in every planted tracker. */
 const FIRST_TASK = 'Capture the three gates into per-run capture files';
@@ -180,26 +181,26 @@ let logs: string[] = [];
 let errors: string[] = [];
 
 /**
- * Captures the helper's own output.
- *
- * Through a spy on `console` and not a `process.stdout.write` patch:
- * bun:test replaces the console object, so a stream capture reads zero
- * lines here and every absence assertion below would pass against a
- * helper that reported nothing at all.
+ * Captures the helper's own output, through a `sinkOutput` set as the
+ * active output, which `start/commit.ts` writes through: `info` lines are
+ * what it reported, `error` lines the problems. The default output is put
+ * back after each case, so no file bun runs later writes through this one.
  */
 beforeEach(() => {
   logs = [];
   errors = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-    errors.push(args.map(String).join(' '));
-  });
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    error: (message) => {
+      errors.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
-  mock.restore();
+  setActiveOutput(null);
 });
 
 /** Runs git in a repository, reading back rather than through git.ts. */

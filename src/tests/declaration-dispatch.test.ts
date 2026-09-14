@@ -172,9 +172,12 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { runClaude } from '../utils/claude.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';
@@ -465,7 +468,9 @@ let warnings: string[] = [];
  * Through a spy on `console` and not a `process.stdout.write` patch:
  * bun:test replaces the console object, so a stream capture reads zero
  * lines here and every absence assertion would pass against a loop
- * that announced the block in full.
+ * that announced the block in full. What `start/commit.ts` tells the
+ * operator goes through the active output instead, read into the same
+ * arrays through a `sinkOutput` set for each case and put back after it.
  *
  * {@link dispatchSpec} empties both arrays again before each dispatch,
  * so a case driving the whole table reads one dispatch at a time.
@@ -479,9 +484,18 @@ beforeEach(() => {
   spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
     warnings.push(args.map(String).join(' '));
   });
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    warn: (message) => {
+      warnings.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
+  setActiveOutput(null);
   mock.restore();
 });
 

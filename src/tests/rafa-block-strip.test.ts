@@ -48,10 +48,13 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '../utils/commit.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -125,7 +128,10 @@ let logs: string[] = [];
  * Captures what the loop printed, through a spy on `console`: bun:test
  * replaces the console object, so a `process.stdout.write` patch would
  * read nothing and every absence assertion below would pass against a
- * loop that announced the block in full.
+ * loop that announced the block in full. What `start/commit.ts` tells
+ * the operator goes through the active output instead: its `info` lines
+ * are read into the same array through a `sinkOutput` set for each case,
+ * and the default is put back after it.
  */
 beforeEach(() => {
   logs = [];
@@ -134,9 +140,15 @@ beforeEach(() => {
   });
   spyOn(console, 'warn').mockImplementation(() => {});
   spyOn(console, 'error').mockImplementation(() => {});
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
+  setActiveOutput(null);
   mock.restore();
 });
 

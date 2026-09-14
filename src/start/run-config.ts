@@ -7,11 +7,15 @@
  * names where the injection mode came from with
  * {@link injectSourceLabel}, and hands the plan to
  * {@link announcePlanIssues} once, at start.
+ *
+ * Every line either writes goes through the active output
+ * (`adapters/output/active.ts`), at warn level.
  */
 import type { ConfigRoots } from '../config-load.js';
 import type { ConfigSource, ResolvedConfig } from '../config.js';
 import type { PlanIssue } from '../plan/index.js';
 
+import { activeOutput } from '../adapters/output/active.js';
 import { loadConfig } from '../config-load.js';
 import { parsePlan } from '../plan/index.js';
 
@@ -53,15 +57,21 @@ function injectFlagValue(args: readonly string[]): string | undefined {
  * `plan.inject:` does.
  *
  * Throws the {@link ConfigError} `loadConfig` throws, naming every
- * problem. A warning per unknown key goes to `warn`, `console.warn`
- * when none is given.
+ * problem. A warning per unknown key goes to `warn`, or through the
+ * active output's `warn` when none is given, where `loadConfig` alone
+ * would print it with `console.warn`.
  */
 export function loadRunConfig(
   roots: ConfigRoots,
   args: readonly string[],
-  warn?: (message: string) => void,
+  warn: (message: string) => void = warnThroughActiveOutput,
 ): ResolvedConfig {
   return loadConfig(roots, { inject: injectFlagValue(args) }, warn);
+}
+
+/** Writes one config warning through the active output. */
+function warnThroughActiveOutput(message: string): void {
+  activeOutput().warn(message);
 }
 
 /**
@@ -98,7 +108,8 @@ export function announcePlanIssues(planContent: string): readonly PlanIssue[] {
   const { issues } = parsePlan(planContent);
   if (issues.length === 0) return issues;
 
-  console.warn(`\n⚠️  The plan holds ${issues.length} part(s) the loop does not read as written:`);
-  for (const issue of issues) console.warn(`   line ${issue.line}: ${issue.text}`);
+  const output = activeOutput();
+  output.warn(`\n⚠️  The plan holds ${issues.length} part(s) the loop does not read as written:`);
+  for (const issue of issues) output.warn(`   line ${issue.line}: ${issue.text}`);
   return issues;
 }

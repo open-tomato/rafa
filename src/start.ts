@@ -63,6 +63,23 @@
  * and then WAITS on that PR's checks (`start/pr-lifecycle.ts`). A
  * conflicting PR gets no CI run at all, so without this last stage the
  * loop can report a finished plan whose code was never checked once.
+ *
+ * Every line this module, `start/run-config.ts`, `start/commit.ts` and
+ * `start/wrap-up.ts` write goes through the active output
+ * (`adapters/output/active.ts`): what went to `console.log` through
+ * `info`, `console.warn` through `warn` and `console.error` through
+ * `error`, each message as it was. Under the dispatcher that is the
+ * invocation's output, so json mode reads each as a `log` event.
+ *
+ * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
+ * never by `process.exit`, so the dispatcher writes the terminal event.
+ * An unusable config, a plan file that does not exist and a default
+ * branch each throw exit code 1 with the whole refusal as the message,
+ * which the dispatcher writes to stderr in text mode as the loop printed
+ * it before and carries in the result in json mode. An interrupted task
+ * throws exit code 0 once it is marked and its report stored. A failed
+ * task, a blocked one and a report left unstored still stop the run by
+ * returning, which the dispatcher ends as a success, with exit code 0.
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -72,6 +89,8 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { activeOutput } from './adapters/output/active.js';
+import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { finishCleanExit } from './start/commit.js';
 import {
@@ -128,33 +147,37 @@ const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
  * so a refusal keyed on it would reject the project's own convention.
  * Attribution no longer depends on it either, the stamp having taken
  * that job over.
+ *
+ * The refusal is thrown as a `CommandExit` with exit code 1 whose
+ * message is the whole refusal, the lines the guard printed before it
+ * threw, joined. Both warnings go through the active output.
  */
 export function guardRunBranch(
   planStub: string | null,
   branch: string,
   args: readonly string[],
-): boolean {
+): void {
   if (args.includes('--any-branch')) {
-    console.warn(`\n⚠️  --any-branch: running on \`${branch}\` without the branch check.`);
-    return true;
+    activeOutput().warn(`\n⚠️  --any-branch: running on \`${branch}\` without the branch check.`);
+    return;
   }
 
   if (DEFAULT_BRANCHES.includes(branch)) {
     const name = planStub ?? 'this-plan';
-    console.error(`\n❌ Refusing to run a plan on \`${branch}\`.`);
-    console.error('   A plan run needs its own branch: that is what gives it a PR to');
-    console.error('   review, and what lets the wrap-up\'s CI stage have something to');
-    console.error('   wait on. Run on main and both are silently skipped.');
-    console.error(`\n   git checkout -b feat/${name}`);
-    console.error('\n   Pass --any-branch to run here anyway.');
-    return false;
+    throw new CommandExit(1, [
+      `\n❌ Refusing to run a plan on \`${branch}\`.`,
+      '   A plan run needs its own branch: that is what gives it a PR to',
+      '   review, and what lets the wrap-up\'s CI stage have something to',
+      '   wait on. Run on main and both are silently skipped.',
+      `\n   git checkout -b feat/${name}`,
+      '\n   Pass --any-branch to run here anyway.',
+    ].join('\n'));
   }
 
   if (planStub !== null && !branch.includes('/')) {
-    console.warn(`\n⚠️  Branch \`${branch}\` carries no \`<type>/\` prefix.`);
-    console.warn('   The run proceeds; the convention is `feat/<plan-stub>`.');
+    activeOutput().warn(`\n⚠️  Branch \`${branch}\` carries no \`<type>/\` prefix.`);
+    activeOutput().warn('   The run proceeds; the convention is `feat/<plan-stub>`.');
   }
-  return true;
 }
 
 export default async function start(args: string[]): Promise<void> {
@@ -167,9 +190,8 @@ export default async function start(args: string[]): Promise<void> {
     runConfig = loadRunConfig({ root: repoRoot, home: homedir() }, args);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
-    console.error('❌ Refusing to start on this configuration:');
-    for (const problem of error.problems) console.error(`   ${problem}`);
-    process.exit(1);
+    const problems = error.problems.map((problem) => `   ${problem}`);
+    throw new CommandExit(1, ['❌ Refusing to start on this configuration:', ...problems].join('\n'));
   }
   const { inject: injectMode, settingSources } = runConfig.config;
 
@@ -198,30 +220,29 @@ export default async function start(args: string[]): Promise<void> {
   const trackerPath = trackerPathFor(planPath);
 
   if (!fs.existsSync(planPath)) {
-    console.error(`❌ Plan file not found: ${planPath}`);
-    process.exit(1);
+    throw new CommandExit(1, `❌ Plan file not found: ${planPath}`);
   }
 
   const planStub = planStubFromPath(planPath);
-  if (!guardRunBranch(planStub, getCurrentBranch(), args)) process.exit(1);
+  guardRunBranch(planStub, getCurrentBranch(), args);
   setActivePlanStub(planStub);
 
   const planContent = fs.readFileSync(planPath, 'utf8');
   const promptContent = fs.readFileSync(promptPath, 'utf8');
 
   const injectSource = injectSourceLabel(runConfig);
-  console.log(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
+  activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
   announcePlanIssues(planContent);
 
   // Initialize tracker only if it doesn't exist
   if (!fs.existsSync(trackerPath)) {
-    console.log(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
+    activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
     fs.copyFileSync(planPath, trackerPath);
   } else {
-    console.log(`📋 Resuming from existing ${path.basename(trackerPath)}...`);
+    activeOutput().info(`📋 Resuming from existing ${path.basename(trackerPath)}...`);
   }
 
-  // SIGINT: flag and finish cleanup (mark blocked + exit) after the await returns.
+  // SIGINT: flag and finish cleanup (mark blocked, throw exit 0) after the await returns.
   process.on('SIGINT', () => {
     interrupted = true;
   });
@@ -236,9 +257,9 @@ export default async function start(args: string[]): Promise<void> {
     if (!renderProgressForDispatch(repoRoot, planStub)) return;
 
     if (!taskInfo) {
-      console.log('\n✅ All tasks completed!');
-      console.log('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
-      console.log('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
+      activeOutput().info('\n✅ All tasks completed!');
+      activeOutput().info('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
+      activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
       await preserveProgress(planContent, settingSources);
       if (ciWait) {
         await verifyPullRequest(
@@ -272,14 +293,14 @@ export default async function start(args: string[]): Promise<void> {
 
     if (interrupted) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
-      console.log('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
+      activeOutput().info('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
       storeReport('blocked');
-      process.exit(0);
+      throw new CommandExit(0);
     }
 
     if (exitCode !== 0) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
-      console.error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
+      activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
       storeReport('failed');
       return;
     }
@@ -293,13 +314,13 @@ export default async function start(args: string[]): Promise<void> {
     const stored = storeReport(finished.outcome);
     if (finished.outcome !== 'done') return;
     if (!stored) {
-      console.error('   Stopping here. The task stays ticked, so the next run starts after it.');
+      activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');
       return;
     }
 
     const shouldPause = await checkUsage('task');
     if (shouldPause) {
-      console.log('\n⚠️  Pausing task loop due to high Claude usage. Run again when usage is lower.');
+      activeOutput().info('\n⚠️  Pausing task loop due to high Claude usage. Run again when usage is lower.');
       break;
     }
   }
