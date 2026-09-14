@@ -22,11 +22,21 @@
  *
  * Expected argument lists are pinned to LITERALS and never built from
  * {@link CLAUDE_BASE_ARGS}. A case comparing a constant against itself
- * moves with the constant, so it cannot tell `-p` from its absence,
- * and these two arguments are the compatibility promise this task is
- * about: `plan.ts`, the wrap-up and the CI-repair session all call
- * `runClaude(prompt)` and must keep spawning exactly what they spawned
- * before declarations existed.
+ * moves with the constant, so it cannot tell `-p` from its absence.
+ * The setting sources are pinned the same way. Most cases hand over
+ * `project,local`, the sources a run with no config resolves to, and
+ * each door has a case handing over {@link UNSORTED_SOURCES}, in an
+ * order neither the CLI's help nor a sort gives, so a door that spelled
+ * the default, or sorted what it was handed, reddens there rather than
+ * agreeing with a fixture that holds the default.
+ *
+ * Four mutations of `claudeArgs` were run once each against this file and
+ * the six other suites that reach the setting sources, each restored
+ * sha256-identical: dropping the sources (28 of 154 cases red across the
+ * seven), spelling `project,local` whatever was handed (9), sorting them
+ * (25) and putting them after the flags (18). In this file only the cases
+ * handing over {@link UNSORTED_SOURCES} redden under the spelled default,
+ * which is what those cases are for.
  *
  * The flag fixtures are chosen to VIOLATE the rules they defend, which
  * is what a rule needs to be reddenable at all. They are deliberately
@@ -109,6 +119,7 @@ import type {
   ClaudeSpawner,
 } from './claude.js';
 import type { AgentEffortLookup } from './declaration.js';
+import type { ClaudeSettingSource } from '../config.js';
 
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -121,6 +132,7 @@ import {
   claudeArgs,
   runClaude,
   runClaudeCaptured,
+  SETTING_SOURCES_FLAG,
   spawnClaude,
 } from './claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from './declaration.js';
@@ -167,19 +179,46 @@ const HAS_BUN = (globalThis as Record<string, unknown>)['Bun'] !== undefined;
 /** Flags out of both alphabetical and resolver order, on purpose. */
 const UNSORTED_FLAGS = ['--effort', 'low', '--agent', 'doc-updater'];
 
+/** The setting sources a run with no config resolves to. */
+const DEFAULT_SOURCES: readonly ClaudeSettingSource[] = ['project', 'local'];
+
+/** Setting sources in an order neither the CLI help nor a sort gives. */
+const UNSORTED_SOURCES: readonly ClaudeSettingSource[] = ['user', 'local', 'project'];
+
 describe('claudeArgs', () => {
-  it('answers the two arguments the loop always spawned', () => {
-    expect(claudeArgs()).toEqual(['-p', '--dangerously-skip-permissions']);
-  });
-
-  it('answers those same two for an explicitly empty flag list', () => {
-    expect(claudeArgs([])).toEqual(['-p', '--dangerously-skip-permissions']);
-  });
-
-  it('appends flags after the base arguments in the order given', () => {
-    expect(claudeArgs(UNSORTED_FLAGS)).toEqual([
+  it('answers the base arguments and the setting sources', () => {
+    expect(claudeArgs(DEFAULT_SOURCES)).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+    ]);
+  });
+
+  it('answers those same four for an explicitly empty flag list', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, [])).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+    ]);
+  });
+
+  it('joins the setting sources with commas in the order given', () => {
+    expect(claudeArgs(UNSORTED_SOURCES)).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'user,local,project',
+    ]);
+  });
+
+  it('appends flags after the setting sources in the order given', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS)).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--effort',
       'low',
       '--agent',
@@ -189,9 +228,11 @@ describe('claudeArgs', () => {
 
   it('passes a repeated flag through rather than deduping it', () => {
     const flags = ['--tools', 'Read', '--tools', 'Write'];
-    expect(claudeArgs(flags)).toEqual([
+    expect(claudeArgs(DEFAULT_SOURCES, flags)).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--tools',
       'Read',
       '--tools',
@@ -200,44 +241,56 @@ describe('claudeArgs', () => {
   });
 
   it('answers a fresh array, so a caller cannot mutate the base', () => {
-    const first = claudeArgs(['--effort', 'max']);
+    const first = claudeArgs(DEFAULT_SOURCES, ['--effort', 'max']);
     first.push('--zz-not-a-flag');
-    expect(claudeArgs()).toEqual(['-p', '--dangerously-skip-permissions']);
+    expect(claudeArgs(DEFAULT_SOURCES)).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+    ]);
     expect(CLAUDE_BASE_ARGS).toEqual(['-p', '--dangerously-skip-permissions']);
+    expect(SETTING_SOURCES_FLAG).toBe('--setting-sources');
   });
 });
 
 describe('runClaude', () => {
-  it('spawns the base arguments alone for a plan or wrap-up call', async () => {
+  it('spawns the base arguments and setting sources alone for a plan or wrap-up call', async () => {
     const { calls, spawn } = recordingSpawner();
 
-    await runClaude('generate the plan', [], spawn);
+    await runClaude('generate the plan', DEFAULT_SOURCES, [], spawn);
 
     expect(onlyCall(calls).args).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
     ]);
   });
 
-  it('spawns the base arguments when no flag argument is passed', async () => {
+  it('spawns the base arguments and setting sources when no flag argument is passed', async () => {
     const { calls, spawn } = recordingSpawner();
 
-    await runClaude('preserve progress', undefined, spawn);
+    await runClaude('preserve progress', DEFAULT_SOURCES, undefined, spawn);
 
     expect(onlyCall(calls).args).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
     ]);
   });
 
-  it('spawns the base arguments plus the flags it was handed', async () => {
+  it('spawns the base arguments, the setting sources and the flags it was handed', async () => {
     const { calls, spawn } = recordingSpawner();
 
-    await runClaude('do the scoped task', UNSORTED_FLAGS, spawn);
+    await runClaude('do the scoped task', DEFAULT_SOURCES, UNSORTED_FLAGS, spawn);
 
     expect(onlyCall(calls).args).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--effort',
       'low',
       '--agent',
@@ -245,11 +298,24 @@ describe('runClaude', () => {
     ]);
   });
 
+  it('spawns under the setting sources it was handed, in their order', async () => {
+    const { calls, spawn } = recordingSpawner();
+
+    await runClaude('repair the PR', UNSORTED_SOURCES, [], spawn);
+
+    expect(onlyCall(calls).args).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'user,local,project',
+    ]);
+  });
+
   it('hands the prompt to the spawner unchanged', async () => {
     const { calls, spawn } = recordingSpawner();
     const prompt = 'Your scoped task is: measure the thing\nline two';
 
-    await runClaude(prompt, ['--model', 'haiku'], spawn);
+    await runClaude(prompt, DEFAULT_SOURCES, ['--model', 'haiku'], spawn);
 
     expect(onlyCall(calls).prompt).toBe(prompt);
   });
@@ -258,7 +324,7 @@ describe('runClaude', () => {
     const { calls, spawn } = recordingSpawner();
     const prompt = 'Your scoped task is: measure the thing';
 
-    await runClaude(prompt, ['--model', 'haiku'], spawn);
+    await runClaude(prompt, DEFAULT_SOURCES, ['--model', 'haiku'], spawn);
 
     const { args } = onlyCall(calls);
     expect(args.filter((arg) => arg.includes('scoped'))).toEqual([]);
@@ -267,19 +333,19 @@ describe('runClaude', () => {
   it('answers the exit code the spawner answered', async () => {
     const { spawn } = recordingSpawner(7);
 
-    await expect(runClaude('a failing session', [], spawn)).resolves.toBe(7);
+    await expect(runClaude('a failing session', DEFAULT_SOURCES, [], spawn)).resolves.toBe(7);
   });
 
   it('spawns exactly once per call', async () => {
     const { calls, spawn } = recordingSpawner();
 
-    await runClaude('one session', ['--effort', 'low'], spawn);
+    await runClaude('one session', DEFAULT_SOURCES, ['--effort', 'low'], spawn);
 
     expect(calls).toHaveLength(1);
   });
 
   it.skipIf(HAS_BUN)('defaults to the real spawner', async () => {
-    await expect(runClaude('would spawn for real'))
+    await expect(runClaude('would spawn for real', DEFAULT_SOURCES))
       .rejects.toThrow(ReferenceError);
     expect(spawnClaude).toBeTypeOf('function');
   });
@@ -292,9 +358,9 @@ describe('the argument list a declaration resolves to', () => {
     const { declaration } = parseTaskDeclaration(taskLine);
     const resolved = resolveDeclarationFlags(declaration, NO_OWN_EFFORT);
 
-    const args = claudeArgs(resolved.args);
+    const args = claudeArgs(DEFAULT_SOURCES, resolved.args);
 
-    expect(args.slice(0, 2)).toEqual(['-p', '--dangerously-skip-permissions']);
+    expect(args.slice(0, 4)).toEqual(['-p', '--dangerously-skip-permissions', '--setting-sources', 'project,local']);
     expect(args.slice(-2)).toEqual(['--tools', 'Read,Write,Edit']);
   });
 
@@ -305,11 +371,13 @@ describe('the argument list a declaration resolves to', () => {
     const resolved = resolveDeclarationFlags(declaration, NO_OWN_EFFORT);
     const { calls, spawn } = recordingSpawner();
 
-    await runClaude('the task prompt', resolved.args, spawn);
+    await runClaude('the task prompt', DEFAULT_SOURCES, resolved.args, spawn);
 
     expect(onlyCall(calls).args).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--agent',
       'doc-updater',
     ]);
@@ -336,25 +404,29 @@ function recordingCapturingSpawner(answer: CapturedSession): {
 const QUIET_SESSION: CapturedSession = { exitCode: 0, stdout: '' };
 
 describe('runClaudeCaptured', () => {
-  it('spawns the base arguments alone when no flag argument is passed', async () => {
+  it('spawns the base arguments and setting sources alone when no flag argument is passed', async () => {
     const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
 
-    await runClaudeCaptured('do the scoped task', undefined, spawn);
+    await runClaudeCaptured('do the scoped task', DEFAULT_SOURCES, undefined, spawn);
 
     expect(onlyCall(calls).args).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
     ]);
   });
 
-  it('spawns the base arguments plus the flags it was handed', async () => {
+  it('spawns the base arguments, the setting sources and the flags it was handed', async () => {
     const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
 
-    await runClaudeCaptured('do the scoped task', UNSORTED_FLAGS, spawn);
+    await runClaudeCaptured('do the scoped task', DEFAULT_SOURCES, UNSORTED_FLAGS, spawn);
 
     expect(onlyCall(calls).args).toEqual([
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--effort',
       'low',
       '--agent',
@@ -362,11 +434,26 @@ describe('runClaudeCaptured', () => {
     ]);
   });
 
+  it('spawns under the setting sources it was handed, in their order', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+
+    await runClaudeCaptured('do the scoped task', UNSORTED_SOURCES, ['--model', 'haiku'], spawn);
+
+    expect(onlyCall(calls).args).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'user,local,project',
+      '--model',
+      'haiku',
+    ]);
+  });
+
   it('hands the prompt to the spawner unchanged', async () => {
     const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
     const prompt = 'Your scoped task is: measure the thing\nline two';
 
-    await runClaudeCaptured(prompt, ['--model', 'haiku'], spawn);
+    await runClaudeCaptured(prompt, DEFAULT_SOURCES, ['--model', 'haiku'], spawn);
 
     expect(onlyCall(calls).prompt).toBe(prompt);
   });
@@ -375,7 +462,7 @@ describe('runClaudeCaptured', () => {
     const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
     const prompt = 'Your scoped task is: measure the thing';
 
-    await runClaudeCaptured(prompt, ['--model', 'haiku'], spawn);
+    await runClaudeCaptured(prompt, DEFAULT_SOURCES, ['--model', 'haiku'], spawn);
 
     const { args } = onlyCall(calls);
     expect(args.filter((arg) => arg.includes('scoped'))).toEqual([]);
@@ -387,14 +474,14 @@ describe('runClaudeCaptured', () => {
       stdout: 'the final message\n',
     });
 
-    await expect(runClaudeCaptured('a failing session', [], spawn))
+    await expect(runClaudeCaptured('a failing session', DEFAULT_SOURCES, [], spawn))
       .resolves.toEqual({ exitCode: 7, stdout: 'the final message\n' });
   });
 
   it('spawns exactly once per call', async () => {
     const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
 
-    await runClaudeCaptured('one session', ['--effort', 'low'], spawn);
+    await runClaudeCaptured('one session', DEFAULT_SOURCES, ['--effort', 'low'], spawn);
 
     expect(calls).toHaveLength(1);
   });
@@ -493,6 +580,7 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
 
     const session = await runClaudeCaptured(
       'Your scoped task is: measure the thing\nline two',
+      UNSORTED_SOURCES,
       UNSORTED_FLAGS,
     );
 
@@ -501,6 +589,8 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
       stdout: [
         'arg:-p',
         'arg:--dangerously-skip-permissions',
+        'arg:--setting-sources',
+        'arg:user,local,project',
         'arg:--effort',
         'arg:low',
         'arg:--agent',
@@ -515,7 +605,7 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
   it('writes each stdout chunk on to the operator as it arrives', async () => {
     splitCharacterStandIn();
 
-    await runClaudeCaptured('split the character');
+    await runClaudeCaptured('split the character', DEFAULT_SOURCES);
 
     expect(written.map((chunk) => Array.from(chunk))).toEqual([
       [0x78, 0xe2],
@@ -526,7 +616,7 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
   it('decodes a character split across two chunks as that character', async () => {
     splitCharacterStandIn();
 
-    const session = await runClaudeCaptured('split the character');
+    const session = await runClaudeCaptured('split the character', DEFAULT_SOURCES);
 
     expect(Array.from(written[0] ?? [])).toEqual([0x78, 0xe2]);
     expect(session.stdout).toBe(`x${String.fromCodePoint(0x20ac)}y\n`);
@@ -536,7 +626,7 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
     standInClaude(['printf \'ok\\n\\377\\342\'']);
 
     const replacement = String.fromCodePoint(0xfffd);
-    await expect(runClaudeCaptured('write a broken tail'))
+    await expect(runClaudeCaptured('write a broken tail', DEFAULT_SOURCES))
       .resolves.toEqual({
         exitCode: 0,
         stdout: `ok\n${replacement}${replacement}`,
@@ -546,14 +636,14 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
   it('answers a failing exit code with the output written before it', async () => {
     standInClaude(['printf \'partial report\\n\'', 'exit 3']);
 
-    await expect(runClaudeCaptured('fail after writing'))
+    await expect(runClaudeCaptured('fail after writing', DEFAULT_SOURCES))
       .resolves.toEqual({ exitCode: 3, stdout: 'partial report\n' });
   });
 
   it('answers a killed session as 128 plus the signal number', async () => {
     standInClaude(['printf \'before the signal\\n\'', 'kill -KILL $$']);
 
-    await expect(runClaudeCaptured('be killed'))
+    await expect(runClaudeCaptured('be killed', DEFAULT_SOURCES))
       .resolves.toEqual({ exitCode: 137, stdout: 'before the signal\n' });
   });
 
@@ -566,7 +656,7 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
       `: > '${exited}'`,
     ]);
 
-    await expect(runClaudeCaptured('outlive the reader'))
+    await expect(runClaudeCaptured('outlive the reader', DEFAULT_SOURCES))
       .rejects.toThrow('operator stdout is gone');
 
     expect(existsSync(exited)).toBe(true);

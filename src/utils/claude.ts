@@ -5,11 +5,11 @@
  * {@link runClaude} is the loop's door onto the CLI for a session whose
  * output only the operator reads. It has three call sites: plan
  * generation in `plan.ts`, the wrap-up session in `start/wrap-up.ts`
- * and the CI-repair session in `start/pr-lifecycle.ts`, all of which
- * want today's behaviour exactly — one model, one effort, every tool.
- * So the flags are a parameter with an EMPTY default:
- * `runClaude(prompt)` spawns exactly the process the loop spawned
- * before declarations existed.
+ * and the CI-repair session in `start/pr-lifecycle.ts`, none of which
+ * is routed — one model, one effort, every tool. So the flags are a
+ * parameter with an EMPTY default: `runClaude(prompt, settingSources)`
+ * spawns the base arguments and the setting sources, and nothing a
+ * declaration could add.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
  * LOOP reads as well, and the per-task dispatch is its caller, through
@@ -26,8 +26,9 @@
  * replacing its spawner, so a session nothing parses keeps spawning
  * exactly what it spawned before.
  *
- * The flags land AFTER {@link CLAUDE_BASE_ARGS} rather than before,
- * and the ordering is load-bearing rather than cosmetic. `--tools` is
+ * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
+ * rather than before, and the ordering is load-bearing rather than
+ * cosmetic. `--tools` is
  * VARIADIC in the CLI's own help (`--tools <tools...>`), so it keeps
  * consuming tokens until one that starts with a dash. `--tools` is the
  * LAST flag `resolveDeclarationFlags` emits, and the resolved flags are
@@ -37,6 +38,29 @@
  * the one arrangement that breaks. `-p` itself takes no value
  * (`-p, --print` is a boolean in the same help text), so nothing after
  * it is at risk either.
+ *
+ * ## Setting sources
+ *
+ * Every session, through either door, is spawned with
+ * {@link SETTING_SOURCES_FLAG} naming the run's `loop.settingSources`
+ * (`config.ts`), `project,local` unless a config names others. Finding
+ * 3 of `.specs/phase-1-installable.md` measured the user scope at about
+ * 14,900 tokens of a 58,989-token turn. The sources are a REQUIRED
+ * parameter of {@link claudeArgs} and of both doors. A default here
+ * would be a second one beside `CONFIG_DEFAULTS`, and a caller that
+ * forgot to hand on the value its config resolved to would spawn under
+ * that default with nothing to say so; with no default, that caller
+ * does not compile.
+ *
+ * They go between the base arguments and the flags. The CLI's help, on
+ * Claude Code 2.1.268, lists `--setting-sources <sources>` as one
+ * comma-separated value where `--tools <tools...>` is variadic, so the
+ * sources swallow nothing and `--tools` stays last. What they change is
+ * measurable without a model call: an `--agent` name no scope defines
+ * exits 1 and lists the agents it could have run. That list held this
+ * repo's `.claude/agents` and none of `~/.claude/agents` under
+ * `project,local`, both under `user,project,local`, and neither under
+ * `local`.
  *
  * The prompt goes on STDIN and never into the argument list. That is
  * not a style choice: a plan's task prompt here is the injected
@@ -57,6 +81,7 @@
  * control. A real data source (Anthropic billing API, CLI flag, or injected
  * env var) should be wired in once reliably identified.
  */
+import type { ClaudeSettingSource } from '../config.js';
 
 export async function getClaudeUsagePercent(): Promise<number | null> {
   const envPct = process.env['CLAUDE_USAGE_PERCENT'];
@@ -124,7 +149,19 @@ export const CLAUDE_BASE_ARGS: readonly string[] = [
 ];
 
 /**
- * Builds the argument list for one session.
+ * The flag every session names its setting sources with. See the
+ * module note.
+ */
+export const SETTING_SOURCES_FLAG = '--setting-sources';
+
+/**
+ * Builds the argument list for one session: the base arguments, the
+ * setting sources, then the flags.
+ *
+ * `settingSources` is the run's resolved `loop.settingSources`, joined
+ * with commas in the order given. `config.ts` has already refused a
+ * source the CLI does not name, a repeat and an empty list, so nothing
+ * is checked again here.
  *
  * `flags` is whatever a task's declaration resolved to, already
  * validated and already ordered by its own resolver. Nothing is
@@ -132,8 +169,11 @@ export const CLAUDE_BASE_ARGS: readonly string[] = [
  * which flags are legal, and one that did would be a second authority
  * for a decision `utils/declaration.ts` already makes.
  */
-export function claudeArgs(flags: readonly string[] = []): string[] {
-  return [...CLAUDE_BASE_ARGS, ...flags];
+export function claudeArgs(
+  settingSources: readonly ClaudeSettingSource[],
+  flags: readonly string[] = [],
+): string[] {
+  return [...CLAUDE_BASE_ARGS, SETTING_SOURCES_FLAG, settingSources.join(','), ...flags];
 }
 
 /**
@@ -188,19 +228,21 @@ export async function spawnClaude(
 }
 
 /**
- * Spawns one Claude session with `prompt` on stdin.
+ * Spawns one Claude session with `prompt` on stdin, loading settings
+ * from `settingSources`.
  *
- * `flags` defaults to empty, which is the whole of the compatibility
- * promise: `runClaude(prompt)` builds the identical argument list the
- * loop always spawned, so `plan.ts`, the wrap-up and the CI-repair
- * session need no change and cannot be routed by accident.
+ * `flags` defaults to empty, so plan generation, the wrap-up and the
+ * CI-repair session, which hand over none, cannot be routed by
+ * accident: each spawns the base arguments and its setting sources
+ * alone. `settingSources` has no default; see the module note.
  */
 export function runClaude(
   prompt: string,
+  settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
   spawn: ClaudeSpawner = spawnClaude,
 ): Promise<number> {
-  return spawn(claudeArgs(flags), prompt);
+  return spawn(claudeArgs(settingSources, flags), prompt);
 }
 
 /**
@@ -301,15 +343,16 @@ export async function spawnClaudeCaptured(
  * exit code together with everything it wrote to stdout.
  *
  * The argument list is the one {@link runClaude} builds for the same
- * flags, both going through {@link claudeArgs}, so capturing a session
- * changes where its stdout goes and nothing about what is run. The
- * operator still sees that output as it is written, through the tee in
- * {@link spawnClaudeCaptured}.
+ * setting sources and flags, both going through {@link claudeArgs}, so
+ * capturing a session changes where its stdout goes and nothing about
+ * what is run. The operator still sees that output as it is written,
+ * through the tee in {@link spawnClaudeCaptured}.
  */
 export function runClaudeCaptured(
   prompt: string,
+  settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
   spawn: CapturingSpawner = spawnClaudeCaptured,
 ): Promise<CapturedSession> {
-  return spawn(claudeArgs(flags), prompt);
+  return spawn(claudeArgs(settingSources, flags), prompt);
 }

@@ -1,8 +1,9 @@
 /**
  * The session the loop runs once the tracker holds no task left.
  *
- * `start()` hands {@link preserveProgress} the plan it was started on,
- * and the session built here promotes the run's findings, syncs the
+ * `start()` hands {@link preserveProgress} the plan it was started on
+ * and the setting sources its config resolved to, and the session built
+ * here, loading settings from those sources, promotes the run's findings, syncs the
  * branch with main, commits, pushes and opens or updates the PR.
  * `start()` waits on that PR's checks after it returns.
  *
@@ -10,6 +11,8 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
  */
+import type { ClaudeSettingSource } from '../config.js';
+
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 import { findOpenPullRequest } from '../utils/pr.js';
@@ -80,11 +83,17 @@ function pullRequestStep(branch: string, openPullRequest: number | null): string
     : `* PR #${openPullRequest} is already open for ${branch}, likely opened by the plan's close-out: push to it and update its body with \`gh pr edit ${openPullRequest}\` so the description covers the promotions this session committed.`;
 }
 
-/** Runs the wrap-up session over the plan the run was started on. */
-export async function preserveProgress(planContent: string): Promise<void> {
+/**
+ * Runs the wrap-up session over the plan the run was started on, loading
+ * settings from `settingSources`, the run's `loop.settingSources`.
+ */
+export async function preserveProgress(
+  planContent: string,
+  settingSources: readonly ClaudeSettingSource[],
+): Promise<void> {
   const branch = getCurrentBranch();
   const prompt = buildWrapUpPrompt(branch, planContent, findOpenPullRequest(branch));
-  const exitCode = await runClaude(withStamp(prompt));
+  const exitCode = await runClaude(withStamp(prompt), settingSources);
   if (exitCode !== 0) {
     console.error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);
   } else {

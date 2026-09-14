@@ -13,9 +13,25 @@
  * ## Where a definition resolves
  *
  * `.claude/agents/<name>.md` under the repo root, then the same path
- * under the home directory. A project file SHADOWS a user-level agent
- * of the same name rather than merging with it (`context/workflow.md`),
- * so the first file that answers is the only one read.
+ * under the home directory when the run's setting sources include
+ * `user`. A project file SHADOWS a user-level agent of the same name
+ * rather than merging with it (`context/workflow.md`), so the first
+ * file that answers is the only one read.
+ *
+ * The home is searched only under `user` because the CLI resolves a
+ * name there only under `user`. Measured on Claude Code 2.1.268, an
+ * `--agent` name no scope defines exits 1 before any model call and
+ * lists the agents it could have run. Under `project,local`, the loop's
+ * default, that list held this repo's definitions and none of
+ * `~/.claude/agents`; under `user,project,local` it held both. A home
+ * definition read under `project,local` would be one the CLI never
+ * dispatches, and an effort it declared would keep `--effort` off a
+ * session that then exits 1 on the name.
+ *
+ * The repo root is searched whatever the sources say, which is wider
+ * than the CLI: under `local` alone the same list held no project
+ * definition either. No session runs under a wrong effort for it, since
+ * a name missing from that list is refused the same way.
  *
  * A file answers only when its frontmatter `name` is the name asked
  * for, because that `name` is what the CLI resolves `--agent` by.
@@ -56,6 +72,7 @@
  * passes `--effort` and the CLI is left to refuse the name.
  */
 import type { AgentEffortLookup } from './declaration.js';
+import type { ClaudeSettingSource } from '../config.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -72,7 +89,10 @@ export type AgentDefinitionScope = 'project' | 'user';
 export interface AgentDefinitionRoots {
   /** The repo root, searched first. */
   readonly repoRoot: string;
-  /** The home directory, searched when the repo holds no answer. */
+  /**
+   * The home directory, searched when the repo holds no answer and the
+   * setting sources include `user`.
+   */
   readonly home: string;
 }
 
@@ -132,20 +152,25 @@ export function readFrontmatter(
 
 /**
  * The paths a definition named `name` is looked for at, in search
- * order. None for a name that is not a bare file stem, so no name can
- * reach a file outside either `.claude/agents/`.
+ * order: the repo root's, then the home's when `settingSources`
+ * includes `user`. None for a name that is not a bare file stem, so no
+ * name can reach a file outside either `.claude/agents/`.
  */
 export function agentDefinitionCandidates(
   name: string,
   roots: AgentDefinitionRoots,
+  settingSources: readonly ClaudeSettingSource[],
 ): readonly AgentDefinitionCandidate[] {
   if (!isAgentName(name)) return [];
 
   const file = `${name}.md`;
-  return [
-    { scope: 'project', path: join(roots.repoRoot, AGENT_DEFINITION_DIR, file) },
-    { scope: 'user', path: join(roots.home, AGENT_DEFINITION_DIR, file) },
-  ];
+  const project: AgentDefinitionCandidate = {
+    scope: 'project',
+    path: join(roots.repoRoot, AGENT_DEFINITION_DIR, file),
+  };
+  if (!settingSources.includes('user')) return [project];
+
+  return [project, { scope: 'user', path: join(roots.home, AGENT_DEFINITION_DIR, file) }];
 }
 
 /** A file's text, or null when no readable file sits at `path`. */
@@ -159,13 +184,15 @@ function readText(path: string): string | null {
 
 /**
  * The definition `--agent <name>` would dispatch: the first candidate
- * whose frontmatter names `name`, or null when neither root holds one.
+ * whose frontmatter names `name`, or null when no root `settingSources`
+ * lets this module search holds one.
  */
 export function findAgentDefinition(
   name: string,
   roots: AgentDefinitionRoots,
+  settingSources: readonly ClaudeSettingSource[],
 ): AgentDefinition | null {
-  for (const candidate of agentDefinitionCandidates(name, roots)) {
+  for (const candidate of agentDefinitionCandidates(name, roots, settingSources)) {
     const text = readText(candidate.path);
     if (text === null) continue;
 
@@ -188,10 +215,14 @@ export function declaresEffort(definition: AgentDefinition | null): boolean {
 
 /**
  * The lookup the resolver asks whether a named agent's definition
- * declares an effort of its own, reading definitions under `roots`.
- * Each answer reads the disk afresh, so a definition edited mid-run is
- * read as it stands at the next dispatch.
+ * declares an effort of its own, reading definitions under `roots`, the
+ * home only when `settingSources` includes `user`. Each answer reads the
+ * disk afresh, so a definition edited mid-run is read as it stands at
+ * the next dispatch.
  */
-export function agentEffortLookup(roots: AgentDefinitionRoots): AgentEffortLookup {
-  return (agent) => declaresEffort(findAgentDefinition(agent, roots));
+export function agentEffortLookup(
+  roots: AgentDefinitionRoots,
+  settingSources: readonly ClaudeSettingSource[],
+): AgentEffortLookup {
+  return (agent) => declaresEffort(findAgentDefinition(agent, roots, settingSources));
 }

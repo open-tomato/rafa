@@ -12,6 +12,17 @@
  * for every name satisfies each of those. So each such case also plants
  * the file that does answer, in the same body, and asserts it is found.
  *
+ * The home is searched only under setting sources that name `user`, so
+ * every case reading a home definition hands over {@link WITH_USER}.
+ * The cases under `the setting sources` read the same roots under
+ * {@link WITHOUT_USER}, the loop's default, beside `WITH_USER`, so a
+ * home left unread is a reading and not a definition nothing planted.
+ * Two legs over that rule were run once each against this file and the
+ * six other suites that reach the sources, each restored
+ * sha256-identical: searching the home whatever the sources say reddened
+ * the three cases here that read under `WITHOUT_USER`, and never
+ * searching it reddened ten.
+ *
  * ## The mutation grid
  *
  * Eighteen mutations of `utils/agent-definition.ts` were driven against
@@ -35,7 +46,12 @@
  * home first reddens 3, dropping the home 7, letting a read error
  * propagate 6, and swapping the lookup's roots 1.
  */
-import type { AgentDefinition, AgentDefinitionRoots } from './agent-definition.js';
+import type {
+  AgentDefinition,
+  AgentDefinitionCandidate,
+  AgentDefinitionRoots,
+} from './agent-definition.js';
+import type { ClaudeSettingSource } from '../config.js';
 
 import {
   mkdirSync,
@@ -60,6 +76,12 @@ import {
 
 /** This repo's root, whose own definitions the last case reads. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/** Setting sources naming the user scope, so the home is searched. */
+const WITH_USER: readonly ClaudeSettingSource[] = ['user', 'project', 'local'];
+
+/** The sources a run with no config resolves to, leaving the user scope out. */
+const WITHOUT_USER: readonly ClaudeSettingSource[] = ['project', 'local'];
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-agent-definition-'));
 
@@ -103,7 +125,7 @@ function definitionOf(frontmatter: Record<string, unknown>): AgentDefinition {
 describe('where a definition is looked for', () => {
   it('looks under the repo root, then under the home', () => {
     const roots = freshRoots();
-    const candidates = agentDefinitionCandidates('doc-updater', roots);
+    const candidates = agentDefinitionCandidates('doc-updater', roots, WITH_USER);
 
     expect(candidates).toEqual([
       { scope: 'project', path: join(roots.repoRoot, '.claude', 'agents', 'doc-updater.md') },
@@ -125,9 +147,9 @@ describe('where a definition is looked for', () => {
       'utf8',
     );
 
-    expect(agentDefinitionCandidates('../outside', roots)).toEqual([]);
-    expect(findAgentDefinition('../outside', roots)).toBeNull();
-    expect(findAgentDefinition('inside', roots)?.scope).toBe('project');
+    expect(agentDefinitionCandidates('../outside', roots, WITH_USER)).toEqual([]);
+    expect(findAgentDefinition('../outside', roots, WITH_USER)).toBeNull();
+    expect(findAgentDefinition('inside', roots, WITH_USER)?.scope).toBe('project');
   });
 });
 
@@ -137,7 +159,7 @@ describe('findAgentDefinition', () => {
     const project = plant(roots.repoRoot, 'doc-updater.md', definitionText('name: doc-updater', 'model: haiku'));
     plant(roots.home, 'doc-updater.md', definitionText('name: doc-updater', 'model: opus'));
 
-    const found = findAgentDefinition('doc-updater', roots);
+    const found = findAgentDefinition('doc-updater', roots, WITH_USER);
 
     expect(found?.scope).toBe('project');
     expect(found?.path).toBe(project);
@@ -148,7 +170,7 @@ describe('findAgentDefinition', () => {
     const roots = freshRoots();
     const user = plant(roots.home, 'tdd-guide.md', definitionText('name: tdd-guide'));
 
-    expect(findAgentDefinition('tdd-guide', roots)).toEqual({
+    expect(findAgentDefinition('tdd-guide', roots, WITH_USER)).toEqual({
       name: 'tdd-guide',
       scope: 'user',
       path: user,
@@ -159,31 +181,31 @@ describe('findAgentDefinition', () => {
   it('answers null when neither root holds the name', () => {
     const roots = freshRoots();
 
-    expect(findAgentDefinition('code-reviewer', roots)).toBeNull();
+    expect(findAgentDefinition('code-reviewer', roots, WITH_USER)).toBeNull();
 
     plant(roots.home, 'code-reviewer.md', definitionText('name: code-reviewer'));
-    expect(findAgentDefinition('code-reviewer', roots)?.scope).toBe('user');
+    expect(findAgentDefinition('code-reviewer', roots, WITH_USER)?.scope).toBe('user');
   });
 
   it('passes over a file whose frontmatter names another agent', () => {
     const roots = freshRoots();
     plant(roots.repoRoot, 'doc-updater.md', definitionText('name: other-name'));
 
-    expect(findAgentDefinition('doc-updater', roots)).toBeNull();
-    expect(findAgentDefinition('other-name', roots)).toBeNull();
+    expect(findAgentDefinition('doc-updater', roots, WITH_USER)).toBeNull();
+    expect(findAgentDefinition('other-name', roots, WITH_USER)).toBeNull();
 
     const user = plant(roots.home, 'doc-updater.md', definitionText('name: doc-updater'));
-    expect(findAgentDefinition('doc-updater', roots)?.path).toBe(user);
+    expect(findAgentDefinition('doc-updater', roots, WITH_USER)?.path).toBe(user);
   });
 
   it('passes over a file whose frontmatter carries no name', () => {
     const roots = freshRoots();
     plant(roots.repoRoot, 'doc-updater.md', definitionText('model: haiku'));
 
-    expect(findAgentDefinition('doc-updater', roots)).toBeNull();
+    expect(findAgentDefinition('doc-updater', roots, WITH_USER)).toBeNull();
 
     const user = plant(roots.home, 'doc-updater.md', definitionText('name: doc-updater'));
-    expect(findAgentDefinition('doc-updater', roots)?.path).toBe(user);
+    expect(findAgentDefinition('doc-updater', roots, WITH_USER)?.path).toBe(user);
   });
 
   it('passes over a directory where a file was expected', () => {
@@ -191,7 +213,7 @@ describe('findAgentDefinition', () => {
     mkdirSync(join(roots.repoRoot, '.claude', 'agents', 'doc-updater.md'), { recursive: true });
     const user = plant(roots.home, 'doc-updater.md', definitionText('name: doc-updater'));
 
-    expect(findAgentDefinition('doc-updater', roots)?.path).toBe(user);
+    expect(findAgentDefinition('doc-updater', roots, WITH_USER)?.path).toBe(user);
   });
 });
 
@@ -272,8 +294,8 @@ describe('agentEffortLookup', () => {
     plant(declaring.repoRoot, 'doc-updater.md', definitionText('name: doc-updater', 'effort: high'));
     plant(silent.repoRoot, 'doc-updater.md', definitionText('name: doc-updater'));
 
-    expect(agentEffortLookup(declaring)('doc-updater')).toBe(true);
-    expect(agentEffortLookup(silent)('doc-updater')).toBe(false);
+    expect(agentEffortLookup(declaring, WITH_USER)('doc-updater')).toBe(true);
+    expect(agentEffortLookup(silent, WITH_USER)('doc-updater')).toBe(false);
   });
 
   it('reads the effort off the definition that shadows, not the one shadowed', () => {
@@ -282,7 +304,7 @@ describe('agentEffortLookup', () => {
     plant(roots.home, 'doc-updater.md', definitionText('name: doc-updater', 'effort: high'));
     plant(roots.repoRoot, 'tdd-guide.md', definitionText('name: tdd-guide', 'effort: low'));
     plant(roots.home, 'tdd-guide.md', definitionText('name: tdd-guide'));
-    const lookup = agentEffortLookup(roots);
+    const lookup = agentEffortLookup(roots, WITH_USER);
 
     expect(lookup('doc-updater')).toBe(false);
     expect(lookup('tdd-guide')).toBe(true);
@@ -291,10 +313,46 @@ describe('agentEffortLookup', () => {
   it('answers false for a name neither root holds', () => {
     const roots = freshRoots();
     plant(roots.home, 'code-reviewer.md', definitionText('name: code-reviewer', 'effort: max'));
-    const lookup = agentEffortLookup(roots);
+    const lookup = agentEffortLookup(roots, WITH_USER);
 
     expect(lookup('loop-implementer')).toBe(false);
     expect(lookup('code-reviewer')).toBe(true);
+  });
+});
+
+describe('the setting sources', () => {
+  it('looks under the home only when the sources include user', () => {
+    const roots = freshRoots();
+    const project: AgentDefinitionCandidate = { scope: 'project', path: join(roots.repoRoot, '.claude', 'agents', 'doc-updater.md') };
+    const user: AgentDefinitionCandidate = { scope: 'user', path: join(roots.home, '.claude', 'agents', 'doc-updater.md') };
+
+    expect(agentDefinitionCandidates('doc-updater', roots, WITHOUT_USER)).toEqual([project]);
+    expect(agentDefinitionCandidates('doc-updater', roots, ['project', 'user'])).toEqual([project, user]);
+    expect(agentDefinitionCandidates('doc-updater', roots, WITH_USER)).toEqual([project, user]);
+  });
+
+  it('finds no user-level definition under sources without user', () => {
+    const roots = freshRoots();
+    const user = plant(roots.home, 'tdd-guide.md', definitionText('name: tdd-guide'));
+
+    expect(findAgentDefinition('tdd-guide', roots, WITHOUT_USER)).toBeNull();
+    expect(findAgentDefinition('tdd-guide', roots, WITH_USER)?.path).toBe(user);
+  });
+
+  it('still takes the project definition under sources without user', () => {
+    const roots = freshRoots();
+    const project = plant(roots.repoRoot, 'doc-updater.md', definitionText('name: doc-updater'));
+    plant(roots.home, 'doc-updater.md', definitionText('name: doc-updater', 'effort: high'));
+
+    expect(findAgentDefinition('doc-updater', roots, WITHOUT_USER)?.path).toBe(project);
+  });
+
+  it('reads no effort off a user-level definition under sources without user', () => {
+    const roots = freshRoots();
+    plant(roots.home, 'code-reviewer.md', definitionText('name: code-reviewer', 'effort: max'));
+
+    expect(agentEffortLookup(roots, WITHOUT_USER)('code-reviewer')).toBe(false);
+    expect(agentEffortLookup(roots, WITH_USER)('code-reviewer')).toBe(true);
   });
 });
 
@@ -307,7 +365,7 @@ describe('the definitions under this repo', () => {
     const roots = { repoRoot: REPO_ROOT, home: join(tempBase, 'empty-home') };
 
     for (const name of names) {
-      expect(findAgentDefinition(name, roots)?.scope).toBe('project');
+      expect(findAgentDefinition(name, roots, WITHOUT_USER)?.scope).toBe('project');
     }
     for (const routed of ['doc-updater', 'tdd-guide', 'build-error-resolver', 'code-reviewer', 'loop-implementer']) {
       expect(names).toContain(routed);

@@ -24,8 +24,11 @@ the shape discriminates where the verb does not.
 **`user-level` in the third column is a portability warning and not a
 footnote.** Those two definitions live outside the repo, so a fresh
 clone receives none of them and the name resolves against whatever that
-machine happens to hold — or against nothing. The five tracked rows
-travel. A project file also SHADOWS a user-level agent of the same name
+machine happens to hold — or against nothing. Under the default
+`loop.settingSources` of `project,local` it resolves against nothing on
+any machine: every loop session is spawned with `--setting-sources`,
+and the CLI lists no agent from `~/.claude/agents` until the sources
+include `user`. The five tracked rows travel. A project file also SHADOWS a user-level agent of the same name
 rather than merging with it, and the roster is blind to the difference:
 a shadowed name appears exactly ONCE in the CLI's own list of available
 agents, so only a behavioural probe separates a shadow from an
@@ -47,7 +50,8 @@ set, and every tracked file the table names carries a `model:`.
 reach the session: `--effort` joins `--agent` unless the definition
 declares an `effort` of its own. `src/utils/agent-definition.ts`
 answers that from `.claude/agents/<name>.md` under the repo root, then
-under the home directory, and takes a file only when its frontmatter
+under the home directory when `loop.settingSources` includes `user`,
+and takes a file only when its frontmatter
 `name` is the name asked for, because the CLI resolves `--agent` by
 that `name` and not by the file name. A name found in neither still
 passes `--effort`, leaving the CLI to refuse the name. All three keys

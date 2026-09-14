@@ -26,11 +26,24 @@
  * {@link readPlanFormat} looks there first: beside this module, which is
  * `dist/` in a build, then at the checkout's own skill, which is what this
  * module finds when it runs from `src/`.
+ *
+ * ## The settings the session loads
+ *
+ * The session loads settings from the sources `loop.settingSources`
+ * names, resolved from the project's and the user scope's
+ * `.rafa/config.yaml` as `rafa start` resolves them (`config-load.ts`),
+ * so a plan is generated under the sources its tasks run under. A config
+ * the loop cannot run on refuses the command before any session starts.
  */
+import type { ClaudeSettingSource } from './config.js';
+
 import fs from 'fs';
+import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { loadConfig } from './config-load.js';
+import { ConfigError } from './config.js';
 import { checkUsage, runClaude } from './utils/claude.js';
 import { getRepoRoot } from './utils/git.js';
 
@@ -165,8 +178,31 @@ export function stubFromSpecPath(specPath: string): string {
   return path.basename(specPath).replace(/\.md$/, '');
 }
 
+/**
+ * The setting sources the plan session loads: `loop.settingSources` from
+ * the project's config under `repoRoot` and the user scope's under
+ * `home`, over the default.
+ *
+ * A config the loop cannot run on refuses the command with every problem
+ * named, as `rafa start` refuses one, before any session starts.
+ */
+function resolvePlanSettingSources(
+  repoRoot: string,
+  home: string,
+): readonly ClaudeSettingSource[] {
+  try {
+    return loadConfig({ root: repoRoot, home }).config.settingSources;
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    console.error('❌ Refusing to generate a plan on this configuration:');
+    for (const problem of error.problems) console.error(`   ${problem}`);
+    process.exit(1);
+  }
+}
+
 export default async function plan(args: string[]): Promise<void> {
   const repoRoot = getRepoRoot();
+  const settingSources = resolvePlanSettingSources(repoRoot, homedir());
 
   const specArg = argValue(args, '--spec');
   if (!specArg) {
@@ -209,7 +245,7 @@ export default async function plan(args: string[]): Promise<void> {
   const prompt = buildPlanPrompt(template, planFormat, specContent, stub, progressContent);
 
   console.log(`📝 Generating .plans/PLAN-${stub}.md from ${path.basename(specPath)}...`);
-  const exitCode = await runClaude(prompt);
+  const exitCode = await runClaude(prompt, settingSources);
 
   if (exitCode !== 0) {
     console.error(`\n❌ Plan generation failed (exit ${exitCode}).`);

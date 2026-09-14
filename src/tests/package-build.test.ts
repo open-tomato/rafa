@@ -47,8 +47,8 @@
  *
  * Copying the templates is held by behaviour as well as by bytes: `rafa
  * plan` runs from the build in a scratch repository, under a PATH holding
- * git and a stand-in `claude` that keeps the prompt it is handed, and that
- * prompt is held equal to what `buildPlanPrompt` makes of the source
+ * git and a stand-in `claude` that keeps the prompt and the arguments it is
+ * handed, and that prompt is held equal to what `buildPlanPrompt` makes of the source
  * template and the source skill. It runs three times: through
  * `dist/cli.js` and through the root bundle's `planCommand`, both inside
  * the scratch package, where the package's own skill also sits one
@@ -58,6 +58,12 @@
  * without `plan-prompt.md` and one without `SKILL.md`, and each refuses
  * before any session starts, so the check can see a template that is not
  * there.
+ *
+ * The `dist/cli.js` run also holds the session's argument list to the
+ * base arguments and `--setting-sources project,local`, the sources a run
+ * with no config resolves to. Its control runs under a user-scope config
+ * naming `local,user` and holds those instead, and a config whose sources
+ * the loop refuses stops the command before the stand-in is reached.
  *
  * ## How the cases were shown to fail
  *
@@ -263,6 +269,8 @@ interface PlanScratch {
   readonly repo: string;
   /** Where the stand-in keeps the prompt it is handed, outside the repository. */
   readonly prompt: string;
+  /** Where the stand-in keeps the arguments it is handed, one per line. */
+  readonly args: string;
   /** The stand-in, then git, on PATH, and a HOME of its own. */
   readonly env: Record<string, string>;
 }
@@ -279,8 +287,10 @@ function plantPlanScratch(name: string): PlanScratch {
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
 
   const prompt = join(root, 'prompt.md');
+  const args = join(root, 'args.txt');
   const claude = join(bin, 'claude');
-  writeFileSync(claude, ['#!/bin/sh', `/bin/cat > '${prompt}'`, 'exit 0', ''].join('\n'), 'utf8');
+  const keepArgs = `for arg in "$@"; do printf '%s\\n' "$arg"; done > '${args}'`;
+  writeFileSync(claude, ['#!/bin/sh', keepArgs, `/bin/cat > '${prompt}'`, 'exit 0', ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
 
   const init = Bun.spawnSync(['git', 'init', '-q', '.'], { cwd: repo });
@@ -293,7 +303,20 @@ function plantPlanScratch(name: string): PlanScratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { root, repo, prompt, env: { PATH: path, HOME: home } };
+  return { root, repo, prompt, args, env: { PATH: path, HOME: home } };
+}
+
+/** The arguments the stand-in keeps for a plan session under `sources`, one per line. */
+function planSessionArgs(sources: string): string {
+  return ['-p', '--dangerously-skip-permissions', '--setting-sources', sources, ''].join('\n');
+}
+
+/** Writes `text` as the user scope's `.rafa/config.yaml` under the scratch HOME. */
+function plantUserConfig(scratch: PlanScratch, text: string): void {
+  const home = scratch.env['HOME'] ?? '';
+  expect(home.startsWith(tempRoot)).toBe(true);
+  mkdirSync(join(home, '.rafa'), { recursive: true });
+  writeFileSync(join(home, '.rafa', 'config.yaml'), text, 'utf8');
 }
 
 /**
@@ -432,7 +455,30 @@ describe('the prompt templates in the build', () => {
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
     expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
+  it('spawns rafa plan under the setting sources a user config names', () => {
+    const scratch = plantPlanScratch('sources');
+    plantUserConfig(scratch, 'loop:\n  settingSources: local,user\n');
+    const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
+  it('refuses rafa plan on a config it cannot run on, before any session starts', () => {
+    const scratch = plantPlanScratch('refused-config');
+    plantUserConfig(scratch, 'loop:\n  settingSources: everyone\n');
+    const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(plan.exitCode).toBe(1);
+    expect(plan.stderr).toContain('Refusing to generate a plan on this configuration');
+    expect(plan.stderr).toContain('loop.settingSources is "everyone"');
+    expect(existsSync(scratch.prompt)).toBe(false);
+    expect(existsSync(scratch.args)).toBe(false);
   }, 30_000);
 
   it('hands planCommand the template beside dist/index.js', () => {

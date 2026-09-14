@@ -57,6 +57,19 @@
  * home, and the home as the repository root, each redden that case
  * alone.
  *
+ * Since every session names `--setting-sources`, that case runs `rafa
+ * start` twice over the same plantings, once with no config and once
+ * under a user-scope config naming `user`, and only the second reads the
+ * HOME definition. It is the one reading of `start.ts` handing the
+ * dispatch and the wrap-up the sources its config resolved to. Four legs
+ * were run once each against this file and the six other suites that
+ * reach the sources, each restored sha256-identical: `start.ts`
+ * dispatching under `project,local`, `start.ts` handing the repository
+ * root as the home, and `start/wrap-up.ts` spawning under
+ * `project,local` each reddened this case alone, and `start.ts` handing
+ * the wrap-up `project,local` reddened it and the source-text case in
+ * `tests/plan-injection.test.ts`.
+ *
  * The blocker case came after both. The stand-in's `MARK-REPORT` report
  * lists `blockers: []`, so its task ticks, and the `MARK-BLOCKER` call
  * answers that same report with one blocker added: its task has to be
@@ -109,6 +122,9 @@ import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { dispatchTask, runTaskSession, SESSION_ID_FLAG } from '../start/dispatch.js';
 import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
 
+/** What a run with no config spawns every session under, spelled out. */
+const DEFAULT_SOURCE_ARGS = ['--setting-sources', 'project,local'];
+
 /** A version-4 UUID, as `randomUUID` writes one. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -126,18 +142,20 @@ describe('the task session runner', () => {
       calls.push([...args]);
       return Promise.resolve({ exitCode: 3, stdout: 'the final message' });
     };
-    const session = await runTaskSession('do the task', flags, 'aaaa-1111', spawn);
+    const session = await runTaskSession('do the task', flags, 'aaaa-1111', ['local', 'user'], spawn);
 
     expect(session).toEqual({ exitCode: 3, stdout: 'the final message' });
     return calls;
   }
 
-  it('puts the session id between the base arguments and the flags', async () => {
+  it('puts the setting sources, then the session id, between the base arguments and the flags', async () => {
     const calls = await spawnedArgs(['--model', 'haiku', '--tools', 'Read,Write']);
 
     expect(calls).toEqual([[
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'local,user',
       '--session-id',
       'aaaa-1111',
       '--model',
@@ -147,10 +165,10 @@ describe('the task session runner', () => {
     ]]);
   });
 
-  it('spawns an undeclared task with its id and nothing else', async () => {
+  it('spawns an undeclared task with its setting sources and id and nothing else', async () => {
     const calls = await spawnedArgs([]);
 
-    expect(calls).toEqual([['-p', '--dangerously-skip-permissions', '--session-id', 'aaaa-1111']]);
+    expect(calls).toEqual([['-p', '--dangerously-skip-permissions', '--setting-sources', 'local,user', '--session-id', 'aaaa-1111']]);
     expect(SESSION_ID_FLAG).toBe('--session-id');
   });
 });
@@ -181,6 +199,7 @@ describe('a dispatched task session', () => {
       inject: 'full',
       repoRoot: tempRoot,
       home: join(tempRoot, 'home'),
+      settingSources: ['project', 'local'],
       run,
       newSessionId,
     });
@@ -508,11 +527,11 @@ describe('rafa start, over a stand-in claude', () => {
     const [reporting, silent, late] = ids;
     for (const id of ids) expect(id).toMatch(UUID);
     expect(new Set(ids).size).toBe(3);
-    expect(argsOf(scratch, 1)).toEqual([...CLAUDE_BASE_ARGS, '--session-id', reporting]);
+    expect(argsOf(scratch, 1)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', reporting]);
     expect(promptHeadOf(scratch, 1)).toBe(`Your scoped task is: ${REPORTING_TASK}`);
 
     // The wrap-up is the fourth call: no id, and nothing stored for it.
-    expect(argsOf(scratch, 4)).toEqual([...CLAUDE_BASE_ARGS]);
+    expect(argsOf(scratch, 4)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS]);
     expect(promptHeadOf(scratch, 4)).toBe('* Read `@progress.txt` in full.');
 
     // Rendered before every dispatch: empty before the first task, the
@@ -662,26 +681,40 @@ describe('rafa start, over a stand-in claude', () => {
     expect(trackerTasks(scratch)).toEqual([`- [x] ${BREAKING_TASK}`, `- [ ] ${REPORTING_TASK}`]);
   }, RUN_TIMEOUT);
 
-  it('passes a routed effort unless the definition under the repo or the HOME declares its own', () => {
-    const scratch = plantScratch([ROUTED_HOME_TASK, ROUTED_REPO_TASK, ROUTED_NOWHERE_TASK]);
-    plantDefinition(scratch.home, 'doc-updater', 'high');
-    plantDefinition(scratch.repo, 'tdd-guide', 'high');
-    git(scratch.repo, 'add', '-A');
-    git(scratch.repo, 'commit', '-q', '--no-verify', '-m', 'agents');
+  it('passes a routed effort unless a definition it reads declares one, reading the HOME only under a user source', () => {
+    const byDefault = plantRoutedScratch();
+    const withUser = plantRoutedScratch();
+    plantUserConfig(withUser.home, ['loop:', '  settingSources: user,project,local']);
 
-    const run = runStart(scratch);
+    const defaultRun = runStart(byDefault);
+    const userRun = runStart(withUser);
 
-    expect(run).toMatchObject({ exitCode: 0 });
-    expect(callCount(scratch)).toBe(4);
-    const idArgs = (n: number) => [...CLAUDE_BASE_ARGS, '--session-id', requireSessionId(scratch, n)];
-    expect(argsOf(scratch, 1)).toEqual([...idArgs(1), '--agent', 'doc-updater']);
-    expect(argsOf(scratch, 2)).toEqual([...idArgs(2), '--agent', 'tdd-guide']);
+    expect(defaultRun).toMatchObject({ exitCode: 0 });
+    expect(userRun).toMatchObject({ exitCode: 0 });
+    expect(callCount(byDefault)).toBe(4);
+    expect(callCount(withUser)).toBe(4);
 
-    // The control: an agent neither root defines still passes the plan
-    // level, so the two absences above are definitions read, one under
-    // the HOME the run was given and one under its repository.
-    expect(argsOf(scratch, 3)).toEqual([...idArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
-  }, RUN_TIMEOUT);
+    // With no config every session, the wrap-up included, loads
+    // `project,local`, and the definition under the HOME is not read: its
+    // effort keeps nothing off the first task. The repository's is read.
+    const defaultArgs = (n: number) => [...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', requireSessionId(byDefault, n)];
+    expect(argsOf(byDefault, 1)).toEqual([...defaultArgs(1), '--agent', 'doc-updater', '--effort', 'low']);
+    expect(argsOf(byDefault, 2)).toEqual([...defaultArgs(2), '--agent', 'tdd-guide']);
+    expect(argsOf(byDefault, 3)).toEqual([...defaultArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+    expect(argsOf(byDefault, 4)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS]);
+
+    // The control: the same plantings under a user config naming `user`
+    // load those sources in every session and read the HOME definition, so
+    // the effort passed above is the sources and not a definition nothing
+    // could read. The third task, whose agent neither root defines, still
+    // passes its level under both.
+    const userSourceArgs = ['--setting-sources', 'user,project,local'];
+    const userArgs = (n: number) => [...CLAUDE_BASE_ARGS, ...userSourceArgs, '--session-id', requireSessionId(withUser, n)];
+    expect(argsOf(withUser, 1)).toEqual([...userArgs(1), '--agent', 'doc-updater']);
+    expect(argsOf(withUser, 2)).toEqual([...userArgs(2), '--agent', 'tdd-guide']);
+    expect(argsOf(withUser, 3)).toEqual([...userArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+    expect(argsOf(withUser, 4)).toEqual([...CLAUDE_BASE_ARGS, ...userSourceArgs]);
+  }, { timeout: 2 * RUN_TIMEOUT.timeout });
 });
 
 /** A task routed to an agent whose only definition sits under the HOME. */
@@ -699,4 +732,23 @@ function plantDefinition(root: string, name: string, effort: string): void {
   mkdirSync(dir, { recursive: true });
   const text = ['---', `name: ${name}`, 'description: A stand-in definition.', `effort: ${effort}`, '---', 'The body.', ''];
   writeFileSync(join(dir, `${name}.md`), text.join('\n'), 'utf8');
+}
+
+/**
+ * A scratch run of the three routed tasks: `doc-updater` defined under its
+ * HOME and `tdd-guide` in its repository, each declaring an effort.
+ */
+function plantRoutedScratch(): Scratch {
+  const scratch = plantScratch([ROUTED_HOME_TASK, ROUTED_REPO_TASK, ROUTED_NOWHERE_TASK]);
+  plantDefinition(scratch.home, 'doc-updater', 'high');
+  plantDefinition(scratch.repo, 'tdd-guide', 'high');
+  git(scratch.repo, 'add', '-A');
+  git(scratch.repo, 'commit', '-q', '--no-verify', '-m', 'agents');
+  return scratch;
+}
+
+/** Writes the user scope's `.rafa/config.yaml` under `home`, one line per element. */
+function plantUserConfig(home: string, lines: readonly string[]): void {
+  mkdirSync(join(home, '.rafa'), { recursive: true });
+  writeFileSync(join(home, '.rafa', 'config.yaml'), [...lines, ''].join('\n'), 'utf8');
 }

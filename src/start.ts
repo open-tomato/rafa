@@ -26,7 +26,9 @@
  * over `.rafa/config.yaml` over the default (`config.ts`), and a value no mode
  * answers to refuses the run. Every part of the plan `parsePlan` does not read
  * as written is named to the operator once, at start. `start/run-config.ts`
- * does both.
+ * does both. The same resolution names the setting sources every session the
+ * run spawns loads, task, wrap-up and CI repair alike: `loop.settingSources`,
+ * `project,local` unless a config names others (`utils/claude.ts`).
  *
  * Each task session is spawned under an id the loop picks, with its stdout
  * captured (`start/dispatch.ts`). The exit code alone decides `failed`; a
@@ -169,7 +171,7 @@ export default async function start(args: string[]): Promise<void> {
     for (const problem of error.problems) console.error(`   ${problem}`);
     process.exit(1);
   }
-  const injectMode = runConfig.config.inject;
+  const { inject: injectMode, settingSources } = runConfig.config;
 
   const startAt = argValue(args, '--start-at');
   if (startAt) await deferUntil(startAt);
@@ -237,11 +239,12 @@ export default async function start(args: string[]): Promise<void> {
       console.log('\n✅ All tasks completed!');
       console.log('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
       console.log('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
-      await preserveProgress(planContent);
+      await preserveProgress(planContent, settingSources);
       if (ciWait) {
         await verifyPullRequest(
           Math.max(1, ciTimeoutMin) * 60_000,
           Math.max(0, ciAttempts),
+          settingSources,
         );
       }
       break;
@@ -254,6 +257,7 @@ export default async function start(args: string[]): Promise<void> {
       inject: injectMode,
       repoRoot,
       home: homedir(),
+      settingSources,
     });
     const { exitCode } = dispatch;
 

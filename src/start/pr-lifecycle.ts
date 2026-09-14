@@ -9,12 +9,15 @@
  * {@link PrLifecycleSeams}: `gh` through `utils/pr.ts`, the branch
  * through `utils/git.ts`, a repair session through `runClaude`, and the
  * poll's clock and wait through `waitForChecks`. So a test drives each
- * verdict with no network, no session and no 20-second wait.
+ * verdict with no network, no session and no 20-second wait. Every
+ * repair session loads settings from the sources `start()` hands over,
+ * the run's `loop.settingSources`.
  *
  * The repair prompt's first line is the `ci-repair` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
  */
+import type { ClaudeSettingSource } from '../config.js';
 import type { CheckRow, WaitOptions, WaitResult } from '../utils/pr.js';
 
 import { runClaude } from '../utils/claude.js';
@@ -59,8 +62,14 @@ export interface PrLifecycleSeams {
   readonly probeChecks: (prNumber: number) => string;
   /** The PR's merge state, or null when it cannot be read. */
   readonly readMergeState: (prNumber: number) => MergeState;
-  /** Spawns one repair session with the prompt on stdin; answers its exit code. */
-  readonly runClaude: (prompt: string) => Promise<number>;
+  /**
+   * Spawns one repair session with the prompt on stdin, loading settings
+   * from the sources named; answers its exit code.
+   */
+  readonly runClaude: (
+    prompt: string,
+    settingSources: readonly ClaudeSettingSource[],
+  ) => Promise<number>;
   /** The poll's clock. Absent, `waitForChecks` reads the real one. */
   readonly now?: WaitOptions['now'];
   /** The wait between polls. Absent, `waitForChecks` sets a real timer. */
@@ -76,6 +85,16 @@ export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
   readMergeState,
   runClaude,
 };
+
+/**
+ * The effects one attempt reaches through: {@link PrLifecycleSeams} with
+ * its repair session bound to the run's setting sources by
+ * {@link verifyPullRequest}.
+ */
+interface AttemptSeams extends Omit<PrLifecycleSeams, 'runClaude'> {
+  /** Spawns one repair session with the prompt on stdin; answers its exit code. */
+  readonly runRepair: (prompt: string) => Promise<number>;
+}
 
 /**
  * How one attempt at the PR ended. `stop` when there is nothing more to
@@ -97,7 +116,7 @@ async function repairPullRequest(
   branch: string,
   reason: string,
   detail: string,
-  run: PrLifecycleSeams['runClaude'],
+  run: AttemptSeams['runRepair'],
 ): Promise<number> {
   const prompt = [
     `The pull request for branch \`${branch}\` (#${prNumber}) is not mergeable: ${reason}`,
@@ -123,15 +142,23 @@ async function repairPullRequest(
  * a red or conflicting result before escalating to the operator. Skips
  * itself cleanly when `gh` is unusable, so the loop still works offline.
  *
+ * Every repair session loads settings from `settingSources`, bound once
+ * here so no attempt can spawn one under any other.
+ *
  * `seams` replaces any of the effects {@link PrLifecycleSeams} names; a
  * key left out runs the real helper.
  */
 export async function verifyPullRequest(
   timeoutMs: number,
   maxAttempts: number,
+  settingSources: readonly ClaudeSettingSource[],
   seams: Partial<PrLifecycleSeams> = {},
 ): Promise<void> {
-  const io: PrLifecycleSeams = { ...PR_LIFECYCLE_SEAMS, ...seams };
+  const given: PrLifecycleSeams = { ...PR_LIFECYCLE_SEAMS, ...seams };
+  const io: AttemptSeams = {
+    ...given,
+    runRepair: (prompt) => given.runClaude(prompt, settingSources),
+  };
   const branch = io.currentBranch();
 
   if (!io.isGhUsable()) {
@@ -155,7 +182,7 @@ export async function verifyPullRequest(
  * unless this is the last attempt.
  */
 async function verifyAttempt(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   branch: string,
   timeoutMs: number,
   isLastAttempt: boolean,
@@ -181,7 +208,7 @@ async function verifyAttempt(
 
 /** Polls one PR's checks until they settle or the deadline passes. */
 function pollChecks(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   prNumber: number,
   timeoutMs: number,
 ): Promise<WaitResult> {
@@ -226,7 +253,7 @@ function reportSettledVerdict(prNumber: number, result: WaitResult): boolean {
  * a conflict-repair session.
  */
 async function handleNoChecks(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   branch: string,
   prNumber: number,
   merge: MergeState,
@@ -247,7 +274,7 @@ async function handleNoChecks(
     branch,
     'it conflicts with the base branch, so GitHub scheduled no CI run at all.',
     'Merge `origin/main` into this branch and resolve the conflicts, then push. Mechanical conflicts (versions, lockfiles, complementary additions) are yours to resolve; a genuine semantic conflict is not.',
-    io.runClaude,
+    io.runRepair,
   );
   if (exitCode !== 0) {
     console.error(`\n❌ Conflict-repair session failed (exit ${exitCode}).`);
@@ -258,7 +285,7 @@ async function handleNoChecks(
 
 /** A red PR gets a CI-repair session, handed its failing checks. */
 async function handleRedChecks(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   branch: string,
   prNumber: number,
   rows: CheckRow[],
@@ -271,7 +298,7 @@ async function handleRedChecks(
     branch,
     'its CI checks failed.',
     ['The failing checks are:', formatRows(failed)].join('\n'),
-    io.runClaude,
+    io.runRepair,
   );
   if (exitCode !== 0) {
     console.error(`\n❌ CI-repair session failed (exit ${exitCode}).`);

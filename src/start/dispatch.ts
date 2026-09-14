@@ -13,7 +13,7 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix from.
  */
-import type { InjectMode } from '../config.js';
+import type { ClaudeSettingSource, InjectMode } from '../config.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { PlanInjection } from '../plan/index.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
@@ -36,23 +36,25 @@ export const SESSION_ID_FLAG = '--session-id';
 
 /**
  * How one task's Claude session is spawned: `prompt` on stdin, the
- * `flags` its declaration resolved to, and `sessionId` as its id. It
- * answers the exit code together with everything the session wrote to
- * stdout.
+ * `flags` its declaration resolved to, `sessionId` as its id, and
+ * settings loaded from `settingSources`. It answers the exit code
+ * together with everything the session wrote to stdout.
  */
 export type TaskSessionRunner = (
   prompt: string,
   flags: readonly string[],
   sessionId: string,
+  settingSources: readonly ClaudeSettingSource[],
 ) => Promise<CapturedSession>;
 
 /**
  * The loop's task session runner: the CLI through `runClaudeCaptured`,
- * run under the id the dispatch picked.
+ * run under the id the dispatch picked and the run's setting sources.
  *
- * The id goes AHEAD of the declaration's flags. `--tools` is variadic
- * and is the last flag a declaration resolves to (`utils/claude.ts`), so
- * a `--session-id` placed after it would be read as a tool name.
+ * The id goes AHEAD of the declaration's flags, and `runClaudeCaptured`
+ * puts the setting sources ahead of both. `--tools` is variadic and is
+ * the last flag a declaration resolves to (`utils/claude.ts`), so a
+ * `--session-id` placed after it would be read as a tool name.
  *
  * The loop picks the id rather than reading it back, because nothing
  * would tell it: under `claude -p` stdout is the session's final message
@@ -66,9 +68,10 @@ export function runTaskSession(
   prompt: string,
   flags: readonly string[],
   sessionId: string,
+  settingSources: readonly ClaudeSettingSource[],
   spawn?: CapturingSpawner,
 ): Promise<CapturedSession> {
-  return runClaudeCaptured(prompt, [SESSION_ID_FLAG, sessionId, ...flags], spawn);
+  return runClaudeCaptured(prompt, settingSources, [SESSION_ID_FLAG, sessionId, ...flags], spawn);
 }
 
 /** What {@link dispatchTask} needs to run one task. */
@@ -94,11 +97,19 @@ export interface TaskDispatchOptions {
    */
   repoRoot: string;
   /**
-   * The home directory a user-level agent definition resolves under.
-   * Required rather than defaulted to `homedir()`, so a dispatch reads
-   * the real home only when its caller names it.
+   * The home directory a user-level agent definition resolves under,
+   * searched only when {@link TaskDispatchOptions.settingSources}
+   * includes `user`. Required rather than defaulted to `homedir()`, so a
+   * dispatch reads the real home only when its caller names it.
    */
   home: string;
+  /**
+   * The setting sources the session loads, the run's
+   * `loop.settingSources`. They reach the spawn, and they decide whether
+   * a routed agent's definition is looked for under the home at all
+   * (`utils/agent-definition.ts`). Required for the reason `inject` is.
+   */
+  settingSources: readonly ClaudeSettingSource[];
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -166,8 +177,9 @@ export function buildTaskPrompt(
  * Everything a declaration changes happens here: the block comes off
  * the text before the prompt is built, and the flags it resolved to go
  * to the spawn. A task carrying no block resolves to no flags at all,
- * so its session is spawned with the base arguments and its session id
- * and nothing else, the arguments every task session shares. That is
+ * so its session is spawned with the base arguments, the run's setting
+ * sources and its session id and nothing else, the arguments every task
+ * session shares. That is
  * the compatibility promise, and it is kept by the resolver rather than
  * by a branch here. Both halves are driven through the real `claudeArgs`
  * in `tests/declaration-dispatch.test.ts`, which is the only place the
@@ -175,8 +187,8 @@ export function buildTaskPrompt(
  * than off this function's own record.
  *
  * A routed task's effort turns on its agent's definition, so the
- * resolver is handed a lookup over `repoRoot` and `home`
- * (`utils/agent-definition.ts`). The lookup reads a definition only for
+ * resolver is handed a lookup over `repoRoot`, and over `home` when the
+ * run's setting sources include `user` (`utils/agent-definition.ts`). The lookup reads a definition only for
  * a block pairing `agent=` with `effort=`; every other block resolves
  * without touching the disk.
  *
@@ -211,10 +223,10 @@ export async function dispatchTask(
   const run = options.run ?? runTaskSession;
 
   const { text: taskText, declaration } = parseTaskDeclaration(taskInfo.task);
-  const agentDeclaresEffort = agentEffortLookup({
-    repoRoot: options.repoRoot,
-    home: options.home,
-  });
+  const agentDeclaresEffort = agentEffortLookup(
+    { repoRoot: options.repoRoot, home: options.home },
+    options.settingSources,
+  );
   const { args: flags, suppressed } = resolveDeclarationFlags(declaration, agentDeclaresEffort);
 
   if (taskInfo.status === 'blocked') {
@@ -250,7 +262,7 @@ export async function dispatchTask(
   ));
 
   const sessionId = (options.newSessionId ?? randomUUID)();
-  const session = await run(prompt, flags, sessionId);
+  const session = await run(prompt, flags, sessionId, options.settingSources);
 
   return {
     taskText,
