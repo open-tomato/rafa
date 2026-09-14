@@ -36,17 +36,21 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds four tables that are not kinds, all filled from task
+ * The file holds five tables that are not kinds, all filled from task
  * reports: `findings`, `blockers` and `out_of_scope_bugs`, one per list
- * a report carries, and `report_absences`, one row per task session
- * whose output held no report to read. The port's row map names none
- * of them, and nothing in this module reads or writes them.
- * `findings.ts` writes the first, `triage.ts` the next two and
- * `absences.ts` the last. `findings.ts` and `triage.ts` write through
- * {@link writeSqliteStore}, as an append does, so a write left with
- * nothing to insert still meets the schema check. `absences.ts` always
- * has its one row and opens {@link withSqliteStore} directly. Each table
- * is opened, migrated and closed as every kind's table is. Each writer
+ * a report carries, `report_absences`, one row per task session whose
+ * output held no report to read, and `task_reports`, one row per task
+ * session whose output carried one, holding its status. The port's row
+ * map names none of them, and nothing in this module reads or writes
+ * them. `findings.ts` writes the first, `triage.ts` the next two,
+ * `absences.ts` the fourth and `reports.ts` the last. `findings.ts` and
+ * `triage.ts` write through {@link writeSqliteStore}, as an append does,
+ * so a write left with nothing to insert still meets the schema check.
+ * `absences.ts` always has its one row and opens {@link withSqliteStore}
+ * directly. `reports.ts` always has its one row too, and passes
+ * {@link writeSqliteStore} a count of one, which opens the store as that
+ * direct call does. Each table is opened, migrated and closed as every
+ * kind's table is. Each writer
  * says why its tables have a column per field and their own
  * deduplication keys, where a kind has `row_json` and one key.
  *
@@ -290,6 +294,22 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     reason       TEXT NOT NULL CHECK (reason <> ''),
     detail       TEXT NOT NULL CHECK (detail <> ''),
     block_body   TEXT,
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
+  // Version 5: one row per task session whose output carried a report,
+  // holding the report's status beside the loop's outcome, outside the
+  // port's row map. `reports.ts` writes it and says why `status` has a
+  // CHECK and `outcome` has none.
+  `
+  CREATE TABLE task_reports (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    status       TEXT CHECK (status IN ('done', 'blocked')),
     outcome      TEXT NOT NULL,
     collected_at TEXT NOT NULL
   );

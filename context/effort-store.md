@@ -25,17 +25,19 @@ is copied there as well.
 
 ### Tables outside the port
 
-`findings`, `blockers`, `out_of_scope_bugs` and `report_absences` are
-SQLite-only and stay out of the port's row map. Each arrives as a new
-`SQLITE_MIGRATIONS` entry, is written under the `sqliteStorePath` that
-`store/sqlite.ts` exports, and lands in `effort.sqlite` whatever `store`
-selects. A writer that can be left with nothing to insert goes through
-`writeSqliteStore`, as `writeFindings` and `writeTriage` do, so an empty
-write on a store that exists still meets the schema check.
-`writeReportAbsence` always has its one row and opens `withSqliteStore`
-directly. A new table moves every full table-list expectation with it:
-two in `sqlite.test.ts`, one each in `triage.test.ts` and
-`absences.test.ts`.
+`findings`, `blockers`, `out_of_scope_bugs`, `report_absences` and
+`task_reports` are SQLite-only and stay out of the port's row map. Each
+arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
+`sqliteStorePath` that `store/sqlite.ts` exports, and lands in
+`effort.sqlite` whatever `store` selects. A writer that can be left with
+nothing to insert goes through `writeSqliteStore`, as `writeFindings`
+and `writeTriage` do, so an empty write on a store that exists still
+meets the schema check. `writeReportAbsence` always has its one row and
+opens `withSqliteStore` directly. `writeTaskReport` always has its one
+row too, and passes `writeSqliteStore` a count of one, which opens the
+store as that direct call does. A new table moves every full table-list
+expectation with it: two in `sqlite.test.ts`, one each in
+`triage.test.ts`, `absences.test.ts` and `reports.test.ts`.
 
 ### Attribution
 
