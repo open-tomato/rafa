@@ -26,7 +26,11 @@
  * over that root answers. The `github` tracker cases hand that adapter
  * the recorded fake as its `gh` runner and read what it filed off the
  * fake. No case runs the runner the adapter makes when its context names
- * none, which spawns the real `gh`.
+ * none, which spawns the real `gh`. The `claude` planner case hands that
+ * adapter a recording spawner as its `claude` and reads the plan it
+ * answers off a fresh temporary root. No case makes a planner without a
+ * spawner of its own, whose default spawns the real `claude`; the
+ * refusals throw before one is made.
  *
  * No case changes `CORE_ADAPTER_REGISTRY`. An add-on is registered on it
  * through `register`, which answers a new registry, and a case holds the
@@ -86,13 +90,24 @@
  * frozen-registry case and the refusal naming the kinds held. The entry
  * making the stub at the root in place of `.rafa/instincts/` reddened
  * the learning case alone.
+ *
+ * Five more were driven the same way on 2026-09-14, once the `claude`
+ * planner was registered, over this file,
+ * `src/adapters/planner/claude.test.ts` and `src/plan.test.ts` at 79 pass
+ * before and after, with `registry.ts` restored byte-identical (sha256)
+ * and a PATH on which no `claude` resolves. The entry registered under
+ * another kind reddened the four planner cases. Each refusal dropped
+ * reddened its own case alone. The context's spawner ignored, and the
+ * context's sources ignored, each reddened the planner case alone.
  */
-import type { AnyAdapter } from './registry.js';
+import type { AdapterContext, AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
 import type { InstinctRecord, Tracker } from '../ports/index.js';
+import type { ClaudeSpawner } from '../utils/claude.js';
 
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -144,9 +159,6 @@ const STORE_LAYOUTS: readonly (readonly [string, readonly string[]])[] = [
   ['sqlite', ['effort.sqlite']],
   ['ndjson', ['sessions.ndjson']],
 ];
-
-/** Port types core registers no adapter for yet. */
-const UNREGISTERED_PORTS = ['planner'] as const;
 
 /** The record the learning case pushes. */
 const INSTINCT: InstinctRecord = {
@@ -301,10 +313,6 @@ describe('the core adapter registry', () => {
     expect(CORE_ADAPTER_REGISTRY.kinds('store')).toEqual(['sqlite', 'ndjson']);
   });
 
-  it.each([...UNREGISTERED_PORTS])('holds no %s adapter until core registers one', (port) => {
-    expect(CORE_ADAPTER_REGISTRY.kinds(port)).toEqual([]);
-  });
-
   it.each(STORE_LAYOUTS)('opens the %s backend under the root it is made with', (kind, files) => {
     const root = freshRoot(kind);
     const store = CORE_ADAPTER_REGISTRY.resolve('store', kind).create({ repoRoot: root });
@@ -436,9 +444,50 @@ describe('the core adapter registry', () => {
     expect(bundle.instincts).toEqual([INSTINCT]);
   });
 
+  it('registers the claude planner alone', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('planner')).toEqual(['claude']);
+  });
+
+  it('makes the claude planner over the sources, prompt and spawner its context names', async () => {
+    const root = freshRoot('planner');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, 'spec.md'), 'the spec\n', 'utf8');
+    const sessions: string[][] = [];
+    const claude: ClaudeSpawner = async (args, prompt) => {
+      sessions.push([...args, prompt]);
+      writeFileSync(join(root, '.plans', 'PLAN-probe.md'), 'the plan\n', 'utf8');
+      return 0;
+    };
+
+    const planner = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude').create({
+      repoRoot: root,
+      settingSources: ['local'],
+      planPrompt: (specContent, stub) => `${stub}: ${specContent}`,
+      claude,
+    });
+    const generated = await planner.create({ specPath: 'spec.md', stub: 'probe' });
+
+    expect(root.startsWith(tempDir)).toBe(true);
+    expect(generated).toEqual({ planPath: '.plans/PLAN-probe.md', prerequisitesPath: null });
+    expect(sessions).toEqual([
+      ['-p', '--dangerously-skip-permissions', '--setting-sources', 'local', 'probe: the spec\n'],
+    ]);
+  });
+
+  it.each([
+    ['settingSources', { planPrompt: () => 'prompt' }, 'settingSources undefined in its context, expected a list of setting sources'],
+    ['planPrompt', { settingSources: ['project', 'local'] }, 'planPrompt undefined in its context, expected a function'],
+  ])('refuses to make the claude planner when its context names no %s', (_field, fields, named) => {
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude');
+    const attempt = (): unknown => adapter.create({ repoRoot: '/nonexistent', ...fields } as AdapterContext);
+
+    expect(attempt).toThrow(TypeError);
+    expect(attempt).toThrow(`adapter registry: planner/claude has ${named}`);
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const port of ['store', 'output', 'tracker', 'learning'] as const) {
+    for (const port of ['store', 'output', 'tracker', 'learning', 'planner'] as const) {
       expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
       for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
         expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);
@@ -626,8 +675,8 @@ describe('looking an adapter up', () => {
     expect(() => CORE_ADAPTER_REGISTRY.resolve('learning', 'remote')).toThrow(
       'adapter registry: no learning adapter is registered as "remote"; registered: local',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('planner', 'claude')).toThrow(
-      'adapter registry: no planner adapter is registered as "claude"; registered: none',
+    expect(() => CORE_ADAPTER_REGISTRY.resolve('planner', 'webhook')).toThrow(
+      'adapter registry: no planner adapter is registered as "webhook"; registered: claude',
     );
   });
 

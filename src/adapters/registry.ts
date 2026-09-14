@@ -60,10 +60,11 @@
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
  * the two outputs under `src/adapters/output/`, `output/text` and
  * `output/json`, the two trackers under `src/adapters/tracker/`,
- * `tracker/local` and `tracker/github`, and the learning stub under
- * `src/adapters/learning/`, `learning/local`. The phase 1 table names
- * one more core adapter, `planner/claude`; it is not registered yet, and
- * joins `CORE_ADAPTERS` as it lands under `src/adapters/`.
+ * `tracker/local` and `tracker/github`, the learning stub under
+ * `src/adapters/learning/`, `learning/local`, and the planner under
+ * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
+ * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
+ * the phase 1 table names.
  *
  * ## What an adapter answers
  *
@@ -79,15 +80,20 @@
  * repository root, the one thing a store opens under. A port whose
  * adapter needs more gains a field when that adapter lands, optional so
  * that no other port's caller has to pass it: the outputs added `stream`
- * and `verbosity`, the `local` tracker added `fallbackReason`, and the
- * `github` tracker added `gh`. Each output `create` makes a new output,
+ * and `verbosity`, the `local` tracker added `fallbackReason`, the
+ * `github` tracker added `gh`, and the `claude` planner added
+ * `settingSources`, `planPrompt` and `claude`. The planner's first two are
+ * optional to the type and not to the adapter: neither has a default it
+ * could fall back on (`src/adapters/planner/claude.ts` says why), so its
+ * `create` throws when either is left out. Each output `create` makes a new output,
  * so a `json` output's one terminal result belongs to the command it was
  * made for. Each tracker `create` makes a new tracker, so the reason a
  * `local` tracker records is the one its own context named, and the
  * labels a `github` tracker remembers making are the ones it made itself.
  */
-import type { StoreBackend } from '../config.js';
+import type { ClaudeSettingSource, StoreBackend } from '../config.js';
 import type { OutputStream } from './output/stream.js';
+import type { PlanPromptBuilder } from './planner/claude.js';
 import type { GhRunner } from './tracker/github.js';
 import type { SelectedEffortStore } from '../effort/store/index.js';
 import type {
@@ -98,6 +104,7 @@ import type {
   PortVersions,
   Tracker,
 } from '../ports/index.js';
+import type { ClaudeSpawner } from '../utils/claude.js';
 
 import { describeValue } from '../config-sections.js';
 import { STORE_BACKENDS } from '../config.js';
@@ -107,6 +114,7 @@ import { openSqliteStore } from '../effort/store/sqlite.js';
 import { createLocalLearning, localInstinctsDir } from './learning/local.js';
 import { createJsonOutput } from './output/json.js';
 import { createTextOutput } from './output/text.js';
+import { createClaudePlanner } from './planner/claude.js';
 import { createGhRunner, createGithubTracker } from './tracker/github.js';
 import { createLocalTracker, localIssuesDir } from './tracker/local.js';
 
@@ -164,6 +172,22 @@ export interface AdapterContext {
    * tracker alone; a runner spawning `gh` in `repoRoot` when left out.
    */
   readonly gh?: GhRunner;
+  /**
+   * What the `claude` planner's session loads settings from: the run's
+   * resolved `loop.settingSources`. Read by it alone, which is refused
+   * without them.
+   */
+  readonly settingSources?: readonly ClaudeSettingSource[];
+  /**
+   * The prompt the `claude` planner's session is handed for one spec and
+   * stub. Read by it alone, which is refused without one.
+   */
+  readonly planPrompt?: PlanPromptBuilder;
+  /**
+   * The spawner the `claude` planner's session goes through. Read by it
+   * alone; a spawner running `claude` when left out.
+   */
+  readonly claude?: ClaudeSpawner;
 }
 
 /**
@@ -341,7 +365,7 @@ const STORE_OPENERS: {
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
  * and `json` outputs, then the `local` and `github` trackers, then the
- * `local` learning stub.
+ * `local` learning stub, then the `claude` planner.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -384,6 +408,26 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     kind: 'local',
     portVersion: PORT_VERSIONS.learning,
     create: ({ repoRoot }) => createLocalLearning({ instinctsDir: localInstinctsDir(repoRoot) }),
+  },
+  {
+    port: 'planner',
+    kind: 'claude',
+    portVersion: PORT_VERSIONS.planner,
+    create: ({ repoRoot, settingSources, planPrompt, claude }) => {
+      if (!Array.isArray(settingSources)) {
+        throw new TypeError(
+          `${REFUSAL}: planner/claude has settingSources ${describeValue(settingSources)} in its context,`
+            + ' expected a list of setting sources',
+        );
+      }
+      if (typeof planPrompt !== 'function') {
+        throw new TypeError(
+          `${REFUSAL}: planner/claude has planPrompt ${describeValue(planPrompt)} in its context,`
+            + ' expected a function',
+        );
+      }
+      return createClaudePlanner({ repoRoot, settingSources, buildPrompt: planPrompt, spawn: claude });
+    },
   },
 ];
 

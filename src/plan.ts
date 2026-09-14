@@ -5,9 +5,10 @@
  *
  *   bun src/rafa.ts plan --spec=specs/my-feature.md [--stub=my-feature]
  *
- * Reads the spec, wraps it in the plan-generation instructions
- * (`plan-prompt.md`) with the plan format inlined from the dev-planner
- * skill, and hands it to a Claude Code session that writes:
+ * Wraps the spec in the plan-generation instructions (`plan-prompt.md`)
+ * with the plan format inlined from the dev-planner skill, and hands it
+ * to the Planner port's `claude` adapter (`adapters/planner/claude.ts`),
+ * resolved through the adapter registry, whose Claude Code session writes:
  *
  *   .plans/PLAN-<stub>.md            the flat checklist + technical context
  *   .plans/PREREQUISITES-<stub>.md   non-automatable setup steps (only if any)
@@ -15,6 +16,22 @@
  * The stub defaults to the spec's basename. Execute the result with:
  *
  *   bun src/rafa.ts start --plan=.plans/PLAN-<stub>.md
+ *
+ * ## What the command keeps, and what the adapter does
+ *
+ * The command checks its command line (the config, `--spec`, `--stub`
+ * and a plan already there), runs the usage check, reads `progress.txt`
+ * unless `--no-progress` is given, and reads the template and the plan
+ * format beside itself. It makes the adapter with the setting sources and
+ * with {@link buildPlanPrompt} bound to what it read. The adapter reads
+ * the spec, makes `.plans/`, runs the session, and answers the paths the
+ * session wrote or rejects. The command prints every line the operator
+ * reads, a rejection's message among them, and exits with the exit code a
+ * `claude` planner's rejection carries, or 1 for any other rejection.
+ *
+ * The registry is a parameter, {@link CORE_ADAPTER_REGISTRY} unless one
+ * is handed over, so `plan.test.ts` resolves a fixture planner under the
+ * same kind and spawns no session.
  *
  * ## One source for the plan format
  *
@@ -35,16 +52,21 @@
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
+import type { AdapterRegistry } from './adapters/registry.js';
 import type { ClaudeSettingSource } from './config.js';
+import type { GeneratedPlan, Planner, PlanRequest } from './ports/index.js';
 
 import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { ClaudePlannerError } from './adapters/planner/claude.js';
+import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { loadConfig } from './config-load.js';
+import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
-import { checkUsage, runClaude } from './utils/claude.js';
+import { checkUsage } from './utils/claude.js';
 import { getRepoRoot } from './utils/git.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -200,7 +222,26 @@ function resolvePlanSettingSources(
   }
 }
 
-export default async function plan(args: string[]): Promise<void> {
+/**
+ * The plan `planner` generates for `request`, or the command's exit when
+ * it rejects: the rejection's message on stderr, then the exit code a
+ * `claude` planner's rejection carries, or 1 for any other.
+ */
+async function generateOrExit(planner: Planner, request: PlanRequest): Promise<GeneratedPlan> {
+  try {
+    return await planner.create(request);
+  } catch (error) {
+    console.error(`\n❌ ${messageOf(error)}`);
+    process.exit(error instanceof ClaudePlannerError
+      ? error.exitCode
+      : 1);
+  }
+}
+
+export default async function plan(
+  args: string[],
+  registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
+): Promise<void> {
   const repoRoot = getRepoRoot();
   const settingSources = resolvePlanSettingSources(repoRoot, homedir());
 
@@ -218,13 +259,11 @@ export default async function plan(args: string[]): Promise<void> {
   }
 
   const stub = argValue(args, '--stub') ?? stubFromSpecPath(specPath);
-  const plansDir = path.join(repoRoot, '.plans');
-  const planPath = path.join(plansDir, `PLAN-${stub}.md`);
+  const planPath = path.join(repoRoot, '.plans', `PLAN-${stub}.md`);
   if (fs.existsSync(planPath)) {
     console.error(`❌ .plans/${path.basename(planPath)} already exists — remove it or pass a different --stub.`);
     process.exit(1);
   }
-  fs.mkdirSync(plansDir, { recursive: true });
 
   await checkUsage('issue');
 
@@ -241,26 +280,24 @@ export default async function plan(args: string[]): Promise<void> {
 
   const template = fs.readFileSync(path.join(__dirname, 'plan-prompt.md'), 'utf8');
   const planFormat = readPlanFormat(__dirname);
-  const specContent = fs.readFileSync(specPath, 'utf8');
-  const prompt = buildPlanPrompt(template, planFormat, specContent, stub, progressContent);
+  const planner = registry.resolve('planner', 'claude').create({
+    repoRoot,
+    settingSources,
+    planPrompt: (specContent, planStub) => buildPlanPrompt(
+      template,
+      planFormat,
+      specContent,
+      planStub,
+      progressContent,
+    ),
+  });
 
   console.log(`📝 Generating .plans/PLAN-${stub}.md from ${path.basename(specPath)}...`);
-  const exitCode = await runClaude(prompt, settingSources);
+  const generated = await generateOrExit(planner, { specPath: specArg, stub });
 
-  if (exitCode !== 0) {
-    console.error(`\n❌ Plan generation failed (exit ${exitCode}).`);
-    process.exit(exitCode);
+  console.log(`\n✅ Plan ready: ${generated.planPath}`);
+  if (generated.prerequisitesPath !== null) {
+    console.log(`⚠️  Prerequisites detected: complete ${generated.prerequisitesPath} before starting the loop.`);
   }
-
-  if (!fs.existsSync(planPath)) {
-    console.error(`\n❌ The session finished but .plans/${path.basename(planPath)} was not created — inspect the output above.`);
-    process.exit(1);
-  }
-
-  console.log(`\n✅ Plan ready: .plans/${path.basename(planPath)}`);
-  const prereqPath = path.join(plansDir, `PREREQUISITES-${stub}.md`);
-  if (fs.existsSync(prereqPath)) {
-    console.log(`⚠️  Prerequisites detected: complete .plans/${path.basename(prereqPath)} before starting the loop.`);
-  }
-  console.log(`▶ Execute with: bun src/rafa.ts start --plan=.plans/PLAN-${stub}.md`);
+  console.log(`▶ Execute with: bun src/rafa.ts start --plan=${generated.planPath}`);
 }

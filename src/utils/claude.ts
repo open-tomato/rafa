@@ -4,7 +4,8 @@
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
  * output only the operator reads. It has three call sites: plan
- * generation in `plan.ts`, the wrap-up session in `start/wrap-up.ts`
+ * generation in the `claude` planner, `adapters/planner/claude.ts`,
+ * which `plan.ts` makes, the wrap-up session in `start/wrap-up.ts`
  * and the CI-repair session in `start/pr-lifecycle.ts`, none of which
  * is routed — one model, one effort, every tool. So the flags are a
  * parameter with an EMPTY default: `runClaude(prompt, settingSources)`
