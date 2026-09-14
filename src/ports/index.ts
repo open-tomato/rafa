@@ -44,8 +44,10 @@
  *     adapter's issue number where the source named a file path. Left
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
- *     `LedgerEntry`, the local ledger's line, which arrives with the
- *     degradation chain.
+ *     `LedgerEntry`, the local ledger's line. rafa ports no OPT ledger,
+ *     so the degradation chain (`src/adapters/tracker/resolve.ts`)
+ *     arrived without it, and the `local` adapter records the reason the
+ *     chain hands it in each issue file instead.
  *   - {@link Store}: the effort store port phase 0 already built, in
  *     `src/effort/store/types.ts`, re-exported under the port's name
  *     rather than declared again. `Store` is `EffortStore`, and the rows
