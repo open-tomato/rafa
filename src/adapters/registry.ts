@@ -59,11 +59,11 @@
  * The two store backends, `store/sqlite` and `store/ndjson`, which
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
  * the two outputs under `src/adapters/output/`, `output/text` and
- * `output/json`, and the two trackers under `src/adapters/tracker/`,
- * `tracker/local` and `tracker/github`. The phase 1 table names the
- * other ports' core adapters, `learning/local` and `planner/claude`;
- * neither is registered yet, and each joins `CORE_ADAPTERS` as it lands
- * under `src/adapters/`.
+ * `output/json`, the two trackers under `src/adapters/tracker/`,
+ * `tracker/local` and `tracker/github`, and the learning stub under
+ * `src/adapters/learning/`, `learning/local`. The phase 1 table names
+ * one more core adapter, `planner/claude`; it is not registered yet, and
+ * joins `CORE_ADAPTERS` as it lands under `src/adapters/`.
  *
  * ## What an adapter answers
  *
@@ -104,6 +104,7 @@ import { STORE_BACKENDS } from '../config.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
 
+import { createLocalLearning, localInstinctsDir } from './learning/local.js';
 import { createJsonOutput } from './output/json.js';
 import { createTextOutput } from './output/text.js';
 import { createGhRunner, createGithubTracker } from './tracker/github.js';
@@ -339,7 +340,8 @@ const STORE_OPENERS: {
 /**
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
- * and `json` outputs, then the `local` and `github` trackers.
+ * and `json` outputs, then the `local` and `github` trackers, then the
+ * `local` learning stub.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -376,6 +378,12 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     kind: 'github',
     portVersion: PORT_VERSIONS.tracker,
     create: ({ repoRoot, gh }) => createGithubTracker({ gh: gh ?? createGhRunner({ cwd: repoRoot }) }),
+  },
+  {
+    port: 'learning',
+    kind: 'local',
+    portVersion: PORT_VERSIONS.learning,
+    create: ({ repoRoot }) => createLocalLearning({ instinctsDir: localInstinctsDir(repoRoot) }),
   },
 ];
 

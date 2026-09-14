@@ -21,10 +21,12 @@
  * spells a line the `json` adapter could not have written. The `local`
  * tracker case reads the issues that adapter wrote off the disk under a
  * fresh temporary root, and the reason each records off its file. The
- * `github` tracker cases hand that adapter the recorded fake as its `gh`
- * runner and read what it filed off the fake. No case runs the runner
- * the adapter makes when its context names none, which spawns the real
- * `gh`.
+ * `local` learning case reads the line that adapter stored off the disk
+ * under a fresh temporary root, and the bundle a second adapter made
+ * over that root answers. The `github` tracker cases hand that adapter
+ * the recorded fake as its `gh` runner and read what it filed off the
+ * fake. No case runs the runner the adapter makes when its context names
+ * none, which spawns the real `gh`.
  *
  * No case changes `CORE_ADAPTER_REGISTRY`. An add-on is registered on it
  * through `register`, which answers a new registry, and a case holds the
@@ -75,10 +77,19 @@
  * runner case alone. The first ran no `gh`: that case's root,
  * `/nonexistent`, was checked absent first, and `Bun.spawn` throws for a
  * missing `cwd` before it runs anything, as `github.ts` notes.
+ *
+ * Two more were driven the same way on 2026-09-14, once the `local`
+ * learning stub was registered, over this file and
+ * `src/adapters/learning/local.test.ts` at 101 pass before and after,
+ * with `registry.ts` restored byte-identical (sha256). The entry removed
+ * reddened four cases: the learning kinds case, the learning case, the
+ * frozen-registry case and the refusal naming the kinds held. The entry
+ * making the stub at the root in place of `.rafa/instincts/` reddened
+ * the learning case alone.
  */
 import type { AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
-import type { Tracker } from '../ports/index.js';
+import type { InstinctRecord, Tracker } from '../ports/index.js';
 
 import {
   existsSync,
@@ -135,7 +146,21 @@ const STORE_LAYOUTS: readonly (readonly [string, readonly string[]])[] = [
 ];
 
 /** Port types core registers no adapter for yet. */
-const UNREGISTERED_PORTS = ['learning', 'planner'] as const;
+const UNREGISTERED_PORTS = ['planner'] as const;
+
+/** The record the learning case pushes. */
+const INSTINCT: InstinctRecord = {
+  id: 'instinct-1',
+  trigger: 'a test fails under the full suite and passes alone',
+  action: 'find the file that runs before it and the state it leaves',
+  action_hash: 'a'.repeat(64),
+  confidence: 0.5,
+  usage_count: 1,
+  signal: 'loud',
+  status: 'active',
+  created_at: '2026-09-14T10:00:00.000Z',
+  updated_at: '2026-09-14T10:00:00.000Z',
+};
 
 /** What a second terminal result from one json output is refused with. */
 const SECOND_RESULT_REFUSAL
@@ -389,9 +414,31 @@ describe('the core adapter registry', () => {
     expect(tracker.capabilities()).toEqual({ projects: false, customFields: false, issueTypes: false });
   });
 
+  it('registers the local learning stub alone', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('learning')).toEqual(['local']);
+  });
+
+  it('makes the local learning stub under .rafa/instincts of its root', async () => {
+    const root = freshRoot('learning');
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
+
+    const pushing = adapter.create({ repoRoot: root });
+    const pulling = adapter.create({ repoRoot: root });
+    expect(existsSync(root)).toBe(false);
+    const result = await pushing.push({ source_id: 'session-1', instincts: [INSTINCT] });
+    const bundle = await pulling.pullBlessed();
+
+    expect(root.startsWith(tempDir)).toBe(true);
+    expect(readdirSync(join(root, '.rafa', 'instincts'))).toEqual(['instincts.ndjson']);
+    expect(JSON.parse(readFileSync(join(root, '.rafa', 'instincts', 'instincts.ndjson'), 'utf8')))
+      .toEqual({ source_id: 'session-1', instinct: INSTINCT });
+    expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger']);
+    expect(bundle.instincts).toEqual([INSTINCT]);
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const port of ['store', 'output', 'tracker'] as const) {
+    for (const port of ['store', 'output', 'tracker', 'learning'] as const) {
       expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
       for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
         expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);
@@ -576,8 +623,11 @@ describe('looking an adapter up', () => {
     expect(() => CORE_ADAPTER_REGISTRY.resolve('tracker', 'linear')).toThrow(
       'adapter registry: no tracker adapter is registered as "linear"; registered: local, github',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('learning', 'local')).toThrow(
-      'adapter registry: no learning adapter is registered as "local"; registered: none',
+    expect(() => CORE_ADAPTER_REGISTRY.resolve('learning', 'remote')).toThrow(
+      'adapter registry: no learning adapter is registered as "remote"; registered: local',
+    );
+    expect(() => CORE_ADAPTER_REGISTRY.resolve('planner', 'claude')).toThrow(
+      'adapter registry: no planner adapter is registered as "claude"; registered: none',
     );
   });
 
