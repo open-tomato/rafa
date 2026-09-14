@@ -3,12 +3,11 @@
  * refusals.
  *
  * The rules are tested where they live. `parseConfigText` and
- * `resolveConfig` are pure, so every precedence and refusal case runs
- * without a disk; only the `readConfigFile` and `loadConfig` cases
- * touch one, each under a fresh temporary root, so the suite reads no
- * `.rafa/` anywhere and runs on a machine that has never held one. The
- * value readers are driven one by one in `config-sections.test.ts`;
- * here each section is reached through a file.
+ * `resolveConfig` are pure, so every precedence and refusal case here
+ * runs without a disk. Reading the files, from a project root and a
+ * home, is `config-load.ts`, driven in `config-load.test.ts`. The value
+ * readers are driven one by one in `config-sections.test.ts`; here each
+ * section is reached through a file's text.
  *
  * Every precedence case plants values that DIFFER from the defaults in
  * each layer it names, which is what lets it fail: a resolver that
@@ -46,6 +45,10 @@
  * given-twice check dropped; warnings never printed; the command line
  * judged before the file; its label spelling the file key; the known
  * keys not deduplicated; and command-line problems ignored.
+ *
+ * Two of those, warnings never printed and the command line judged
+ * before the file, were mutations of `loadConfig`, which has since
+ * moved to `config-load.ts` with the cases that caught them.
  */
 import type {
   ConfigLayer,
@@ -55,32 +58,24 @@ import type {
   RafaConfig,
 } from './config.js';
 
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 import {
   CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,
-  loadConfig,
   parseConfigText,
-  readConfigFile,
   resolveConfig,
 } from './config.js';
 
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
+
+/** The label a user scope file parses under. No file is read at it. */
+const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
@@ -203,19 +198,9 @@ const FULL_VALUES: RafaConfig = {
   settingSources: ['user', 'project'],
 };
 
-/** Chmod cannot deny a read to root; see the unreadable-file case. */
-const isRoot = process.getuid?.() === 0;
-
-const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-'));
-let planted = 0;
-
-afterAll(() => {
-  rmSync(tempRoot, { recursive: true, force: true });
-});
-
-/** Parses `text` as a file labelled {@link PATH}. */
-function fileOf(text: string) {
-  return parseConfigText(text, PATH);
+/** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
+function fileOf(text: string, path = PATH) {
+  return parseConfigText(text, path);
 }
 
 /** The {@link ConfigError} `run` throws. Fails when it throws none. */
@@ -242,27 +227,6 @@ function sourcesWith(
 function expectSilent(values: ConfigLayer): void {
   expect(Object.keys(values)).toEqual([...SETTINGS]);
   expect(Object.values(values).filter((value) => value !== undefined)).toEqual([]);
-}
-
-/** A fresh repo root holding no config. */
-function emptyRoot(): string {
-  planted += 1;
-  const root = join(tempRoot, `root-${planted}`);
-  mkdirSync(root);
-  return root;
-}
-
-/** The literal config path under `root`, spelled without the module. */
-function literalPath(root: string): string {
-  return join(root, '.rafa', 'config.yaml');
-}
-
-/** A fresh repo root with `text` planted at `.rafa/config.yaml`. */
-function rootWith(text: string): string {
-  const root = emptyRoot();
-  mkdirSync(join(root, '.rafa'));
-  writeFileSync(literalPath(root), text);
-  return root;
 }
 
 describe('CONFIG_FILE', () => {
@@ -582,7 +546,9 @@ describe('resolveConfig', () => {
       config: DEFAULTS,
       sources: sourcesWith({}),
       path: null,
+      userPath: null,
       extras: [],
+      userExtras: [],
       warnings: [],
     });
   });
@@ -593,6 +559,47 @@ describe('resolveConfig', () => {
     expect(resolved.config).toEqual(FULL_VALUES);
     expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
     expect(resolved.path).toBe(PATH);
+  });
+
+  it('lets the user file outrank the default, for every setting', () => {
+    const resolved = resolveConfig({ user: fileOf(FULL, USER_PATH) });
+
+    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.sources).toEqual(sourcesWith({}, 'user'));
+    expect([resolved.path, resolved.userPath]).toEqual([null, USER_PATH]);
+  });
+
+  it('lets the project file outrank the user file, setting by setting', () => {
+    const user = fileOf(FULL, USER_PATH);
+    const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
+    const resolved = resolveConfig({ file, user });
+
+    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'project-plans' });
+    expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'file' }, 'user'));
+    expect([resolved.path, resolved.userPath]).toEqual([PATH, USER_PATH]);
+  });
+
+  it('lets the command line outrank both files', () => {
+    const user = fileOf(FULL, USER_PATH);
+    const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
+    const resolved = resolveConfig({ file, user, cli: { planDir: 'cli-plans' } });
+
+    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'cli-plans' });
+    expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'cli' }, 'user'));
+  });
+
+  it('warns about the user file unknown keys first, each naming its own file', () => {
+    const user = fileOf('nonesuch: a\n', USER_PATH);
+    const file = fileOf('plan:\n  depth: 3\n');
+    const resolved = resolveConfig({ file, user });
+
+    expect(resolved.warnings).toEqual([
+      `rafa config: unknown key "nonesuch" in ${USER_PATH} has no effect in this version ${KNOWN}`,
+      `rafa config: unknown key "plan.depth" in ${PATH} has no effect in this version `
+        + '(known keys under plan: inject, dir)',
+    ]);
+    expect(resolved.userExtras).toEqual([{ key: 'nonesuch', value: 'a' }]);
+    expect(resolved.extras).toEqual([{ key: 'plan.depth', value: 3 }]);
   });
 
   it('lets the command line outrank the file, for every setting it can name', () => {
@@ -762,122 +769,5 @@ describe('resolveConfig', () => {
     expect(() => fromDefaults.push('x')).toThrow(TypeError);
     expect(() => fromFile.push('x')).toThrow(TypeError);
     expect(CONFIG_DEFAULTS.trackerFallback).toEqual(['local']);
-  });
-});
-
-describe('readConfigFile', () => {
-  it('answers null for a root with no config, and creates nothing', () => {
-    const root = emptyRoot();
-
-    expect(readConfigFile(root)).toBeNull();
-    expect(existsSync(join(root, '.rafa'))).toBe(false);
-  });
-
-  it('reads the file planted at .rafa/config.yaml', () => {
-    const root = rootWith('store: ndjson\n');
-    const file = readConfigFile(root);
-
-    expect(file?.values.store).toBe('ndjson');
-    expect(file?.path).toBe(literalPath(root));
-  });
-
-  it('refuses a directory at the config path rather than reading it as absent', () => {
-    const root = emptyRoot();
-    mkdirSync(literalPath(root), { recursive: true });
-    const error = refusal(() => readConfigFile(root));
-
-    expect(error.problems).toHaveLength(1);
-    expect(error.problems[0]).toStartWith(`${literalPath(root)}: cannot be read (`);
-  });
-
-  it('characterizes Bun.file().exists() as false for a directory', async () => {
-    const root = emptyRoot();
-    mkdirSync(literalPath(root), { recursive: true });
-
-    expect(existsSync(literalPath(root))).toBe(true);
-    expect(await Bun.file(literalPath(root)).exists()).toBe(false);
-  });
-
-  it.skipIf(isRoot)('refuses a config file it cannot read', () => {
-    const root = rootWith('store: ndjson\n');
-    chmodSync(literalPath(root), 0o000);
-    const error = refusal(() => readConfigFile(root));
-
-    expect(error.problems[0]).toStartWith(`${literalPath(root)}: cannot be read (`);
-    expect(error.cause).toMatchObject({ code: 'EACCES' });
-  });
-
-  it('passes the parser refusals through', () => {
-    const root = rootWith('store: postgres\n');
-
-    expect(refusal(() => readConfigFile(root)).problems).toEqual([
-      `${literalPath(root)}: store is "postgres", expected one of: sqlite, ndjson`,
-    ]);
-  });
-});
-
-describe('loadConfig', () => {
-  it('resolves the defaults silently for a root with no config', () => {
-    const lines: string[] = [];
-    const resolved = loadConfig(emptyRoot(), {}, (line) => lines.push(line));
-
-    expect(resolved.config).toEqual(DEFAULTS);
-    expect(resolved.sources).toEqual(sourcesWith({}));
-    expect(lines).toEqual([]);
-  });
-
-  it('reads the file and lets the command line outrank it', () => {
-    const root = rootWith('store: ndjson\nplan:\n  inject: full\nloop:\n  settingSources: user\n');
-    const resolved = loadConfig(root, { inject: 'task' }, () => {});
-
-    expect(resolved.config).toEqual({
-      ...DEFAULTS,
-      store: 'ndjson',
-      inject: 'task',
-      settingSources: ['user'],
-    });
-    expect(resolved.sources).toEqual(sourcesWith({
-      store: 'file',
-      inject: 'cli',
-      settingSources: 'file',
-    }));
-    expect(resolved.path).toBe(literalPath(root));
-  });
-
-  it('prints one warning per unknown key and still resolves', () => {
-    const root = rootWith('nonesuch: linear\nstore: ndjson\n');
-    const lines: string[] = [];
-    const resolved = loadConfig(root, {}, (line) => lines.push(line));
-
-    expect(lines).toEqual([
-      `rafa config: unknown key "nonesuch" in ${literalPath(root)} has no effect in this version ${KNOWN}`,
-    ]);
-    expect(resolved.config.store).toBe('ndjson');
-  });
-
-  it('prints through console.warn by default', () => {
-    const root = rootWith('nonesuch: linear\n');
-    const warned: unknown[][] = [];
-    spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-      warned.push(args);
-    });
-
-    try {
-      loadConfig(root);
-    } finally {
-      mock.restore();
-    }
-
-    expect(warned).toHaveLength(1);
-    expect(String(warned[0]?.[0])).toContain('unknown key "nonesuch"');
-  });
-
-  it('judges the file before it looks at the command line', () => {
-    const root = rootWith('store: postgres\n');
-    const error = refusal(() => loadConfig(root, { inject: 'bogus' }, () => {}));
-
-    expect(error.problems).toEqual([
-      `${literalPath(root)}: store is "postgres", expected one of: sqlite, ndjson`,
-    ]);
   });
 });

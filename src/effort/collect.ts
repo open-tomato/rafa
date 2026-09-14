@@ -78,14 +78,15 @@
  * the reading that says the collector's key and the store's agree.
  *
  * The store is the one a caller passes as {@link CollectOptions.store},
- * else the one `.rafa/config.yaml` under the repo root selects, which
- * is `sqlite` when the file names none. That selection is made ONCE per
- * run, before either half reads a log or runs git, and both halves use
- * the one store it answered. So the two halves cannot land in two
- * backends, and a config the loop cannot run on refuses the run before
- * anything is read. This command has no store flag, so the file
- * outranks only the default. A store passed in means the file is not
- * read at all. An unknown key in the file is warned about through
+ * else the one the config selects: `.rafa/config.yaml` under the repo
+ * root over the user scope's under {@link CollectOptions.home}, and
+ * `sqlite` when neither names one. That selection is made ONCE per run,
+ * before either half reads a log or runs git, and both halves use the
+ * one store it answered. So the two halves cannot land in two backends,
+ * and a config the loop cannot run on refuses the run before anything
+ * is read. This command has no store flag, so the files outrank only
+ * the default. A store passed in means neither file is read at all. An
+ * unknown key in either file is warned about through
  * {@link CollectOptions.log}, with everything else the run reports.
  *
  * ## `--since` is one instant, resolved once
@@ -156,6 +157,7 @@ import type {
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
+import type { ConfigRoots } from '../config-load.js';
 import type {
   EffortStore,
   SessionEffortRow,
@@ -166,7 +168,8 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigError, loadConfig } from '../config.js';
+import { loadConfig } from '../config-load.js';
+import { ConfigError } from '../config.js';
 import { getRepoRoot } from '../utils/git.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
@@ -309,9 +312,15 @@ export interface CollectOptions {
   /** The resolved `--since` instant, shared by both halves. */
   sinceEpochMs?: number | null;
   /**
+   * The home the user scope's config is read under. No default: the
+   * command passes `homedir()`, so a caller cannot reach the real home by
+   * leaving it out. Unread when a store is passed.
+   */
+  home: string;
+  /**
    * The store both halves read their keys from and append to. Defaults
-   * to the backend `.rafa/config.yaml` under the repo root selects; a
-   * store passed here means that file is not read. See the module note.
+   * to the backend the config under the repo root and the home selects;
+   * a store passed here means neither file is read. See the module note.
    */
   store?: EffortStore;
   collectSessions?: boolean;
@@ -651,20 +660,20 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
 
 /**
  * The store a run goes through: the one passed, else the one the config
- * under `repoRoot` selects, with the config's warnings sent to `log`.
+ * under `roots` selects, with the config's warnings sent to `log`.
  *
- * Called once per run, so the file is read and warned about once.
+ * Called once per run, so each file is read and warned about once.
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
 function resolveStore(
   store: EffortStore | undefined,
-  repoRoot: string,
+  roots: ConfigRoots,
   log: (line: string) => void,
 ): EffortStore {
   if (store !== undefined) return store;
 
-  const resolved = loadConfig(repoRoot, {}, log);
-  return selectEffortStore(repoRoot, resolved.config);
+  const resolved = loadConfig(roots, {}, log);
+  return selectEffortStore(roots.root, resolved.config);
 }
 
 /**
@@ -675,11 +684,11 @@ function resolveStore(
  * share one store, resolved before either runs; see the module note.
  *
  * Rejects with a `ConfigError`, having read no log and run no git, when
- * no store is passed and the config under the repo root is one the
- * loop cannot run on.
+ * no store is passed and a config file under the repo root or the home
+ * is one the loop cannot run on.
  */
 export async function collectEffort(
-  options: CollectOptions = {},
+  options: CollectOptions,
 ): Promise<CollectResult> {
   const repoRoot = options.repoRoot ?? getRepoRoot();
   const verbose = options.verbose ?? false;
@@ -689,7 +698,7 @@ export async function collectEffort(
     logDir: options.logDir ?? sessionLogDir(repoRoot),
     plansDir: options.plansDir ?? join(repoRoot, PLANS_DIR),
     sinceEpochMs: options.sinceEpochMs ?? null,
-    store: resolveStore(options.store, repoRoot, log),
+    store: resolveStore(options.store, { root: repoRoot, home: options.home }, log),
     log,
     note: (line: string) => {
       if (verbose) log(line);
@@ -770,6 +779,7 @@ export default async function collect(args: string[]): Promise<void> {
   let result: CollectResult;
   try {
     result = await collectEffort({
+      home: homedir(),
       sinceEpochMs: parsed.sinceEpochMs,
       collectSessions: parsed.collectSessions,
       collectCommits: parsed.collectCommits,

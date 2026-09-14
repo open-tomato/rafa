@@ -11,8 +11,8 @@
  * ## Which store it reads
  *
  * The one `rafa effort collect` writes. Both resolve it the same way,
- * `loadConfig` over the repo root and then `selectEffortStore` over the
- * resolved config, so under the `sqlite` default a report reads
+ * `loadConfig` over the repo root and the home, then `selectEffortStore`
+ * over the resolved config, so under the `sqlite` default a report reads
  * `effort.sqlite` and under `store: ndjson` the sessions file. A report
  * reading one backend's file directly reads nothing right after a
  * successful collect into the other, and says nothing was collected.
@@ -117,10 +117,14 @@
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { SessionUsageTotals } from './session-log.js';
+import type { ConfigRoots } from '../config-load.js';
 import type { TaskReportTally } from './store/reports.js';
 import type { EffortStore } from './store/types.js';
 
-import { ConfigError, loadConfig } from '../config.js';
+import { homedir } from 'node:os';
+
+import { loadConfig } from '../config-load.js';
+import { ConfigError } from '../config.js';
 import { getRepoRoot } from '../utils/git.js';
 
 import { PROMPT_SHAPES } from './classify.js';
@@ -246,9 +250,15 @@ export interface ReportOptions {
   /** Defaults to the git repo root. Governs the config and the store. */
   repoRoot?: string;
   /**
+   * The home the user scope's config is read under. No default: the
+   * command passes `homedir()`, so a caller cannot reach the real home by
+   * leaving it out. Unread when a store is passed.
+   */
+  home: string;
+  /**
    * The store the session rows are read from. Defaults to the backend
-   * `.rafa/config.yaml` under the repo root selects; a store passed here
-   * means that file is not read. See the module note.
+   * the config under the repo root and the home selects; a store passed
+   * here means neither file is read. See the module note.
    */
   store?: EffortStore;
   kinds?: readonly SessionKind[] | null;
@@ -589,19 +599,19 @@ export function parseReportArgs(args: readonly string[]): ReportArgs {
 
 /**
  * The store a report reads: the one passed, else the one the config
- * under `repoRoot` selects, resolved as `rafa effort collect` resolves
- * its own.
+ * under `roots` selects, resolved as `rafa effort collect` resolves its
+ * own.
  *
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
 function resolveStore(
   store: EffortStore | undefined,
-  repoRoot: string,
+  roots: ConfigRoots,
 ): EffortStore {
   if (store !== undefined) return store;
 
-  const resolved = loadConfig(repoRoot);
-  return selectEffortStore(repoRoot, resolved.config);
+  const resolved = loadConfig(roots);
+  return selectEffortStore(roots.root, resolved.config);
 }
 
 /**
@@ -615,11 +625,12 @@ function resolveStore(
  * tallies the same way.
  *
  * Throws a `ConfigError`, having read no row, when no store is passed
- * and the config under the repo root is one the loop cannot run on.
+ * and a config file under the repo root or the home is one the loop
+ * cannot run on.
  */
-export function buildReport(options: ReportOptions = {}): EffortReport {
+export function buildReport(options: ReportOptions): EffortReport {
   const repoRoot = options.repoRoot ?? getRepoRoot();
-  const store = resolveStore(options.store, repoRoot);
+  const store = resolveStore(options.store, { root: repoRoot, home: options.home });
 
   return summariseSessions(
     asReportRows(store.read('sessions')),
@@ -661,6 +672,7 @@ export default async function report(args: string[]): Promise<void> {
   let built: EffortReport;
   try {
     built = buildReport({
+      home: homedir(),
       kinds: parsed.kinds,
       entrypoints: parsed.entrypoints,
     });

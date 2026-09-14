@@ -25,11 +25,13 @@
  *     answer.
  *   - The whole `./store` surface: the port, both backends and the
  *     selector.
- *   - The whole config module: {@link loadConfig}, which reads
- *     `.rafa/config.yaml` under a root and ranks the command line over
- *     it, the pure {@link parseConfigText} and {@link resolveConfig} it
- *     is built from, {@link readConfigFile}, {@link ConfigError}, and the
- *     names and defaults every setting takes.
+ *   - The whole config, `config.ts` and `config-load.ts`:
+ *     {@link loadConfig}, which reads the project's `.rafa/config.yaml`
+ *     under a root and the user scope's under a home and ranks the
+ *     command line over both, the pure {@link parseConfigText} and
+ *     {@link resolveConfig} it is built from, {@link readConfigFile},
+ *     {@link ConfigError}, and the names and defaults every setting
+ *     takes.
  *
  * Every subpath's names are on the root too, the same bindings, so a
  * service that starts from the root never has to learn a subpath to
@@ -70,6 +72,7 @@
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.
  */
+export type { ConfigRoots } from './config-load.js';
 export type {
   ClaudeSettingSource,
   CommandLineSetting,
@@ -143,6 +146,7 @@ export type {
   TaskReport,
 } from './plan/index.js';
 
+export { loadConfig, readConfigFile } from './config-load.js';
 export {
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
@@ -151,12 +155,10 @@ export {
   ConfigError,
   configFilePath,
   INJECT_MODES,
-  loadConfig,
   MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
   parseConfigText,
   PREREQUISITE_KINDS,
-  readConfigFile,
   resolveConfig,
   STORE_BACKENDS,
 } from './config.js';

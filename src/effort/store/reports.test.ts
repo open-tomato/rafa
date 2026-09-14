@@ -50,7 +50,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../../config.js';
+import { loadConfig } from '../../config-load.js';
 import { parseReport, REPORT_STATUSES } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES } from './findings.js';
@@ -372,7 +372,8 @@ describe('writeTaskReport rows', () => {
     writeFileSync(join(root, '.rafa', 'config.yaml'), 'store: ndjson\n');
 
     // The control: the planted config really selects the other backend.
-    expect(loadConfig(root, {}, () => undefined).config.store).toBe('ndjson');
+    expect(loadConfig({ root, home: join(tempBase, 'home') }, {}, () => undefined).config.store)
+      .toBe('ndjson');
 
     writeTaskReport(root, writeOf(), seams('ndjson-selected'));
 

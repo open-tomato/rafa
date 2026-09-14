@@ -57,7 +57,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig, resolveConfig, STORE_BACKENDS } from '../../config.js';
+import { loadConfig } from '../../config-load.js';
+import { resolveConfig, STORE_BACKENDS } from '../../config.js';
 
 import { openNdjsonStore } from './ndjson.js';
 import { openSqliteStore } from './sqlite.js';
@@ -175,12 +176,12 @@ function writeConfig(root: string, text: string): void {
   writeFileSync(join(root, '.rafa', 'config.yaml'), text);
 }
 
-/** Resolves the config under a root and selects from it. */
+/** Resolves the config under a root, beside an empty home, and selects from it. */
 function selectFromDisk(
   root: string,
   cli: { store?: string } = {},
 ): SelectedEffortStore {
-  const resolved = loadConfig(root, cli, () => undefined);
+  const resolved = loadConfig({ root, home: join(tempBase, 'home') }, cli, () => undefined);
   return selectEffortStore(root, resolved.config);
 }
 

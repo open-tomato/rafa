@@ -162,7 +162,7 @@ export default async function start(args: string[]): Promise<void> {
   // config then has lost the night, where refusing now costs one command.
   let runConfig: ResolvedConfig;
   try {
-    runConfig = loadRunConfig(repoRoot, args);
+    runConfig = loadRunConfig({ root: repoRoot, home: homedir() }, args);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     console.error('❌ Refusing to start on this configuration:');
@@ -207,7 +207,7 @@ export default async function start(args: string[]): Promise<void> {
   const planContent = fs.readFileSync(planPath, 'utf8');
   const promptContent = fs.readFileSync(promptPath, 'utf8');
 
-  const injectSource = injectSourceLabel(runConfig.sources.inject, runConfig.path);
+  const injectSource = injectSourceLabel(runConfig);
   console.log(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
   announcePlanIssues(planContent);
 

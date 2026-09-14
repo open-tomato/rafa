@@ -10,7 +10,7 @@
  * answering the same thing.
  *
  * The containment cases are computed instead: every runtime name the
- * `./plan` entry, the `./store` entry and the config module export is
+ * `./plan` entry, the `./store` entry and the two config modules export is
  * held to be on the root as the same binding. Paired with the spelled
  * list, a name added to a subpath and not to the root reds the
  * containment case, and one added to both reds the spelled list, so
@@ -45,8 +45,9 @@
  *
  * The type names are not checked here, and `check-types` skips this
  * file. Checked through a tsconfig outside the repo, a probe
- * re-exporting from the entry all sixty-six type names the `./plan`
- * entry, the `./store` entry and the config module export compiled, and
+ * re-exporting from the entry all sixty-seven type names the `./plan`
+ * entry, the `./store` entry and the two config modules export compiled,
+ * and
  * one naming `TaskDeclaration`, which the entry leaves out, failed with
  * TS2305.
  */
@@ -57,6 +58,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { loadConfig, readConfigFile } from './config-load.js';
+import * as configLoadModule from './config-load.js';
 import {
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
@@ -65,12 +68,10 @@ import {
   ConfigError,
   configFilePath,
   INJECT_MODES,
-  loadConfig,
   MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
   parseConfigText,
   PREREQUISITE_KINDS,
-  readConfigFile,
   resolveConfig,
   STORE_BACKENDS,
 } from './config.js';
@@ -187,6 +188,7 @@ const CONTAINED: readonly (readonly [string, Record<string, unknown>])[] = [
   ['the ./plan entry', planEntry],
   ['the ./store entry', storeEntry],
   ['the config module', configModule],
+  ['the config loader', configLoadModule],
 ];
 
 /** The `src/` directory, which the entry and the CLI both sit in. */

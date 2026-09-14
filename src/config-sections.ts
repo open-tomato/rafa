@@ -121,6 +121,13 @@ export function describeValue(value: unknown): string {
   return String(value);
 }
 
+/** The message of whatever was thrown, for a refusal to quote. */
+export function messageOf(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : String(error);
+}
+
 /** The schema versions `config.ts` reads. */
 export const CONFIG_VERSIONS = [1] as const;
 

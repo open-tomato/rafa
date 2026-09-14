@@ -17,7 +17,7 @@
  * The SQLite repo is also read by a SPAWNED `rafa effort report --json`
  * process, since that is the one path with no store seam at all: the
  * command resolves its root through git and its store through
- * `.rafa/config.yaml`, exactly the two steps `buildReport({ repoRoot })`
+ * `.rafa/config.yaml`, exactly the two steps `buildReport({ repoRoot, home })`
  * exercises in-process above it. Reading the same two rows there closes
  * a gap the two in-process cases cannot: a resolver wired correctly for
  * a function call and wrong for the command's own argv-free entry would
@@ -162,11 +162,15 @@ function noCommits(): (options: CommitLogOptions) => CommitLogParseResult {
   return () => ({ rows: [], lineCount: 0, unparsedLineCount: 0 });
 }
 
-/** Collects the two planted sessions into a fresh repo under one backend. */
+/**
+ * Collects the two planted sessions into a fresh repo under one backend,
+ * beside a home of its own holding no config.
+ */
 async function collectPlantedSessions(
   backend: 'sqlite' | 'ndjson',
-): Promise<{ root: string; logDir: string }> {
+): Promise<{ root: string; logDir: string; home: string }> {
   const root = makeRepo();
+  const home = makeScratch();
   const logDir = join(makeScratch(), 'logs');
   const plansDir = join(root, '.plans');
   mkdirSync(logDir, { recursive: true });
@@ -174,6 +178,7 @@ async function collectPlantedSessions(
   for (const session of SESSIONS) writeSessionLog(logDir, session);
 
   const options: CollectOptions = {
+    home,
     repoRoot: root,
     logDir,
     plansDir,
@@ -184,7 +189,7 @@ async function collectPlantedSessions(
   if (result.sessions?.appended !== SESSIONS.length) {
     throw new Error(`planted ${result.sessions?.appended ?? 0} of ${SESSIONS.length} rows`);
   }
-  return { root, logDir };
+  return { root, logDir, home };
 }
 
 /** The two planted branches, sorted, as a report's group keys should read. */
@@ -195,9 +200,9 @@ describe('buildReport over a real collect, per backend', () => {
     ['sqlite'],
     ['ndjson'],
   ] as const)('answers both planted rows under store: %s', async (backend) => {
-    const { root } = await collectPlantedSessions(backend);
+    const { root, home } = await collectPlantedSessions(backend);
 
-    const report = buildReport({ repoRoot: root });
+    const report = buildReport({ home, repoRoot: root });
 
     expect(report.rowsRead).toBe(SESSIONS.length);
     expect(report.totals.sessions).toBe(SESSIONS.length);
@@ -213,11 +218,11 @@ interface CommandRun {
   stderr: string;
 }
 
-/** Runs `effort report --json` inside a repository, as the dispatcher would. */
-function runReportJson(root: string): CommandRun {
+/** Runs `effort report --json` inside a repository under `home`, as the dispatcher would. */
+function runReportJson(root: string, home: string): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'report', '--json'],
-    { cwd: root },
+    { cwd: root, env: { ...process.env, HOME: home } },
   );
   return {
     exitCode: run.exitCode,
@@ -228,10 +233,10 @@ function runReportJson(root: string): CommandRun {
 
 describe('a spawned effort report over the SQLite store a collect wrote', () => {
   it('reads the same two rows buildReport reads in-process', async () => {
-    const { root } = await collectPlantedSessions('sqlite');
-    const inProcess = buildReport({ repoRoot: root });
+    const { root, home } = await collectPlantedSessions('sqlite');
+    const inProcess = buildReport({ home, repoRoot: root });
 
-    const run = runReportJson(root);
+    const run = runReportJson(root, home);
 
     expect(run.exitCode).toBe(0);
     const spawned = JSON.parse(run.stdout) as EffortReport;

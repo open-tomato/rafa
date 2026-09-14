@@ -2,16 +2,20 @@
  * Reading rafa's settings: the phase 1 schema of `.rafa/config.yaml`.
  *
  * Every setting takes the value the COMMAND LINE gave it, else the
- * value `.rafa/config.yaml` gave it, else its default. Each setting is
- * ranked on its own, so a flag naming one leaves the others to the file,
- * and {@link ResolvedConfig.sources} records which layer answered each.
- * That record keeps precedence observable when two layers agree: a file
- * spelling the default still reports `file`, where the value alone could
- * not tell a file that was read from one that was skipped.
+ * value the project's `.rafa/config.yaml` gave it, else the value the
+ * user scope's `~/.rafa/config.yaml` gave it, else its default. Each
+ * setting is ranked on its own, so a flag naming one leaves the others
+ * to the files and a project file naming one leaves the others to the
+ * user's, and {@link ResolvedConfig.sources} records which layer
+ * answered each. That record keeps precedence observable when two
+ * layers agree: a file spelling the default still reports `file`, where
+ * the value alone could not tell a file that was read from one that was
+ * skipped. `file` names the project's file, as it did when that was the
+ * only file read, and `user` names the user scope's.
  *
- * This module answers from one file, under a root its caller supplies.
- * Scope resolution, the user-level `~/.rafa/config.yaml` and `rafa init`
- * are not here.
+ * This module is the pure half: text into a layer, layers into one
+ * resolution. Finding and reading the two files, behind a home seam, is
+ * `config-load.ts`. Scope resolution and `rafa init` are not here.
  *
  * ## The schema
  *
@@ -51,8 +55,8 @@
  *
  * {@link parseConfigText} turns YAML text into one file layer and
  * {@link resolveConfig} ranks the layers. Both are pure, so every
- * precedence case is tested without a disk. {@link readConfigFile} is
- * the only read, and {@link loadConfig} the only place that prints.
+ * precedence case is tested without a disk. The only read and the only
+ * place that prints are in `config-load.ts`.
  *
  * ## Unknown keys and unusable values
  *
@@ -123,15 +127,6 @@
  *     boolean. So a `tracking` flag spelled `yes` is refused rather
  *     than read as true.
  *
- * ## Existence
- *
- * "When the file exists" is decided with `existsSync`, and the choice
- * is measured rather than habitual: `Bun.file(path).exists()` answers
- * false for a DIRECTORY, so a `.rafa/config.yaml` that is one would
- * pass for no config and the run would go on at defaults. Only absence
- * is absorbed — the rule `effort/store.ts` applies to its own files —
- * and anything at the path that cannot be read is refused.
- *
  * ## Defaults
  *
  * {@link CONFIG_DEFAULTS} spells every default once, frozen, with each
@@ -154,7 +149,6 @@ import type {
   ValueAt,
 } from './config-sections.js';
 
-import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -165,6 +159,7 @@ import {
   INJECT_MODES,
   isMapping,
   listOf,
+  messageOf,
   MODULE_SOURCE_KEYS,
   moduleSource,
   OPTIONAL_ITEM_KEYS,
@@ -202,7 +197,8 @@ export {
 } from './config-sections.js';
 
 /**
- * The config file, relative to the repo root.
+ * The config file, relative to the directory it sits under: the project
+ * root for the project's, the home directory for the user scope's.
  *
  * `join` rather than a literal, as `effort/store.ts` spells its own
  * directory, so a path built here compares equal to one a caller built
@@ -260,8 +256,11 @@ export type ConfigSetting = keyof RafaConfig;
 export type CommandLineSetting = 'store' | 'inject' | 'planDir' | 'specsDir'
   | 'trackerDefault' | 'learningAdapter' | 'outputMode' | 'settingSources';
 
-/** The layer that answered a setting. */
-export type ConfigSource = 'cli' | 'file' | 'default';
+/**
+ * The layer that answered a setting: the command line, the project's
+ * file, the user scope's file, or the default.
+ */
+export type ConfigSource = 'cli' | 'file' | 'user' | 'default';
 
 /** What every setting resolves to when no layer names it. */
 export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
@@ -320,8 +319,10 @@ export interface ConfigFile {
 export interface ConfigLayers {
   /** Command-line values. Absent is the same as no flag given. */
   cli?: ConfigOverrides;
-  /** The parsed file, or null when there is none. */
+  /** The project's parsed file, or null when there is none. */
   file?: ConfigFile | null;
+  /** The user scope's parsed file, or null when there is none. */
+  user?: ConfigFile | null;
 }
 
 /** Every setting resolved, with the layer each value came from. */
@@ -330,11 +331,15 @@ export interface ResolvedConfig {
   config: RafaConfig;
   /** The layer that answered each setting. */
   sources: Readonly<Record<ConfigSetting, ConfigSource>>;
-  /** The file consulted, or null when there was none. */
+  /** The project's file consulted, or null when there was none. */
   path: string | null;
-  /** The file's unknown keys, retained. Empty with no file. */
+  /** The user scope's file consulted, or null when there was none. */
+  userPath: string | null;
+  /** The project file's unknown keys, retained. Empty with no file. */
   extras: readonly ConfigExtra[];
-  /** One sentence per retained unknown key, for an operator to read. */
+  /** The user file's unknown keys, retained. Empty with no file. */
+  userExtras: readonly ConfigExtra[];
+  /** One sentence per retained unknown key, the user file's first. */
   warnings: readonly string[];
 }
 
@@ -498,13 +503,6 @@ function knownKeysAbove(key: string): [string, readonly string[]] {
   return ['', KNOWN_UNDER.get('') ?? []];
 }
 
-/** The message of whatever was thrown. */
-function messageOf(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : String(error);
-}
-
 /** A layer read, with what its readers found. */
 interface LayerReading {
   layer: ConfigLayer;
@@ -663,26 +661,6 @@ export function parseConfigText(text: string, path: string): ConfigFile {
   return { path, values: read.layer, extras: [...sorted.extras, ...read.extras] };
 }
 
-/**
- * Reads `.rafa/config.yaml` under `root`, or answers null when nothing
- * is at that path. Anything there that cannot be read — a directory,
- * a file without read permission — is refused with a
- * {@link ConfigError} rather than read as absent; see the module note.
- */
-export function readConfigFile(root: string): ConfigFile | null {
-  const path = configFilePath(root);
-  if (!existsSync(path)) return null;
-
-  let text: string;
-  try {
-    text = readFileSync(path, 'utf8');
-  } catch (error) {
-    const problem = `${path}: cannot be read (${messageOf(error)})`;
-    throw new ConfigError([problem], { cause: error });
-  }
-  return parseConfigText(text, path);
-}
-
 /** One setting's answer, and the layer that gave it. */
 interface Ranked<K extends ConfigSetting> {
   value: RafaConfig[K];
@@ -706,11 +684,12 @@ function unknownKeyWarning(key: string, path: string): string {
 }
 
 /**
- * Ranks the layers: for each setting, the command line over the file
- * and the file over {@link CONFIG_DEFAULTS}.
+ * Ranks the layers: for each setting, the command line over the
+ * project's file, the project's over the user scope's, and the user's
+ * over {@link CONFIG_DEFAULTS}.
  *
- * Pure. Warnings come back as data — one per unknown key the file
- * retained — and are never printed here. A command-line value no
+ * Pure. Warnings come back as data — one per unknown key either file
+ * retained, the user file's first — and are never printed here. A command-line value no
  * setting accepts throws a {@link ConfigError} naming every one, and
  * is never downgraded to the file's value: an operator who mistyped a
  * flag asked for something, and running on something else is the
@@ -718,6 +697,7 @@ function unknownKeyWarning(key: string, path: string): string {
  */
 export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
   const file = layers.file ?? null;
+  const user = layers.user ?? null;
   const overrides = layers.cli ?? {};
   const { layer: cli, problems } = readLayer(
     (setting) => isCommandLineSetting(setting)
@@ -732,12 +712,14 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     if (fromCli !== undefined) return { value: fromCli, source: 'cli' };
     const fromFile = file?.values[setting];
     if (fromFile !== undefined) return { value: fromFile, source: 'file' };
+    const fromUser = user?.values[setting];
+    if (fromUser !== undefined) return { value: fromUser, source: 'user' };
     return { value: CONFIG_DEFAULTS[setting], source: 'default' };
   };
   const ranked = SETTING_NAMES.map((setting) => [setting, rank(setting)] as const);
-  const warnings = file === null
+  const warnings = [user, file].flatMap((layer) => layer === null
     ? []
-    : file.extras.map((extra) => unknownKeyWarning(extra.key, file.path));
+    : layer.extras.map((extra) => unknownKeyWarning(extra.key, layer.path)));
 
   return {
     config: Object.fromEntries(
@@ -747,29 +729,9 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
       ranked.map(([setting, { source }]) => [setting, source]),
     ) as Record<ConfigSetting, ConfigSource>,
     path: file?.path ?? null,
+    userPath: user?.path ?? null,
     extras: file?.extras ?? [],
+    userExtras: user?.extras ?? [],
     warnings,
   };
-}
-
-/** The default warning sink. */
-function printWarning(message: string): void {
-  console.warn(message);
-}
-
-/**
- * Reads the config under `root`, ranks it against `cli`, and prints a
- * warning per unknown key through `warn`.
- *
- * The file is read and judged before the command line is looked at,
- * so a run with problems in both reports the file's first.
- */
-export function loadConfig(
-  root: string,
-  cli: ConfigOverrides = {},
-  warn: (message: string) => void = printWarning,
-): ResolvedConfig {
-  const resolved = resolveConfig({ cli, file: readConfigFile(root) });
-  for (const warning of resolved.warnings) warn(warning);
-  return resolved;
 }

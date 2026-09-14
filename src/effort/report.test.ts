@@ -102,7 +102,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError, loadConfig } from '../config.js';
+import { loadConfig } from '../config-load.js';
+import { ConfigError } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import {
@@ -125,6 +126,14 @@ const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'ralph-report-'));
 let planted = 0;
+
+/**
+ * The home every case reads the user scope's config under, in-process
+ * and spawned: a directory of this file's own holding none, so no case
+ * reads the real home.
+ */
+const HOME = join(tempRoot, 'home');
+mkdirSync(HOME);
 
 afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
@@ -755,14 +764,14 @@ function thrownBy(call: () => unknown): unknown {
 
 describe('buildReport', () => {
   it('answers an empty report when no store exists', () => {
-    const report = buildReport({ repoRoot: join(tempRoot, 'nothing-here') });
+    const report = buildReport({ home: HOME, repoRoot: join(tempRoot, 'nothing-here') });
 
     expect(report.rowsRead).toBe(0);
     expect(report.groups).toEqual([]);
   });
 
   it('rolls up the rows a store holds', () => {
-    const report = buildReport({ repoRoot: plantStore(ROWS) });
+    const report = buildReport({ home: HOME, repoRoot: plantStore(ROWS) });
 
     expect(report.rowsRead).toBe(ROWS.length);
     expect(report.groups).toHaveLength(4);
@@ -771,7 +780,7 @@ describe('buildReport', () => {
 
   it('applies its filters to what the store held', () => {
     const root = plantStore(ROWS);
-    const report = buildReport({ repoRoot: root, kinds: ['task'] });
+    const report = buildReport({ home: HOME, repoRoot: root, kinds: ['task'] });
 
     expect(report.totals.sessions).toBe(4);
     expect(report.filters.kinds).toEqual(['task']);
@@ -782,7 +791,7 @@ describe('buildReport', () => {
       ...plantRow({ sessionId: 'legacy', branch: 'feat/x' }),
       effortCounts: undefined,
     }]);
-    const report = buildReport({ repoRoot: root });
+    const report = buildReport({ home: HOME, repoRoot: root });
 
     expect(report.totals.sessionsWithoutEffort).toBe(1);
   });
@@ -805,7 +814,7 @@ function plantBothBackends(config: string | null): string {
 
 describe('the store a report reads', () => {
   it('reads the SQLite store when no config names one', () => {
-    const report = buildReport({ repoRoot: plantBothBackends(null) });
+    const report = buildReport({ home: HOME, repoRoot: plantBothBackends(null) });
 
     expect(report.rowsRead).toBe(SQLITE_ROWS.length);
     expect(report.groups.map((group) => group.key))
@@ -818,7 +827,7 @@ describe('the store a report reads', () => {
   ])('reads the rows of the backend store: %s selects', (backend, rows) => {
     const root = plantBothBackends(`store: ${backend}\n`);
 
-    const report = buildReport({ repoRoot: root });
+    const report = buildReport({ home: HOME, repoRoot: root });
 
     expect(report.rowsRead).toBe(rows);
   });
@@ -828,8 +837,8 @@ describe('the store a report reads', () => {
     appendSqliteSessions(sqliteRoot, ROWS);
     const ndjsonRoot = plantStore(ROWS);
 
-    const fromSqlite = buildReport({ repoRoot: sqliteRoot });
-    const fromNdjson = buildReport({ repoRoot: ndjsonRoot });
+    const fromSqlite = buildReport({ home: HOME, repoRoot: sqliteRoot });
+    const fromNdjson = buildReport({ home: HOME, repoRoot: ndjsonRoot });
 
     expect(fromSqlite.rowsRead).toBe(ROWS.length);
     expect(fromSqlite.totals.sessionsWithoutEffort).toBe(1);
@@ -842,6 +851,7 @@ describe('the store a report reads', () => {
     const root = plantBothBackends('store: postgres\n');
 
     const report = buildReport({
+      home: HOME,
       repoRoot: root,
       store: openNdjsonStore(root),
     });
@@ -852,7 +862,7 @@ describe('the store a report reads', () => {
   it('refuses a config it cannot run on', () => {
     const root = plantBothBackends('store: postgres\n');
 
-    const refusal = thrownBy(() => buildReport({ repoRoot: root }));
+    const refusal = thrownBy(() => buildReport({ home: HOME, repoRoot: root }));
 
     expect(refusal).toBeInstanceOf(ConfigError);
     expect((refusal as ConfigError).problems).toEqual([
@@ -881,7 +891,7 @@ describe('the task reports a report carries', () => {
     plantTaskReport(root, 'q19-a', 'done', 'blocked');
     plantTaskReport(root, 'q19-b', 'done', 'done');
 
-    const report = buildReport({ repoRoot: root });
+    const report = buildReport({ home: HOME, repoRoot: root });
 
     expect(report.rowsRead).toBe(ROWS.length);
     expect(report.taskReports).toEqual([
@@ -894,13 +904,13 @@ describe('the task reports a report carries', () => {
     const root = plantStore(ROWS);
     plantTaskReport(root, 'q19-a', 'blocked', 'blocked');
 
-    const filtered = buildReport({ repoRoot: root, kinds: ['other'] });
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
 
     expect(filtered.totals.sessions).toBe(2);
     expect(filtered.taskReports).toHaveLength(1);
 
     // The control: the same session rows with no task report stored.
-    expect(buildReport({ repoRoot: plantStore(ROWS) }).taskReports).toEqual([]);
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).taskReports).toEqual([]);
   });
 });
 
@@ -935,7 +945,7 @@ function makeRepo(config: string): string {
 function runReport(root: string, args: readonly string[]): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'report', ...args],
-    { cwd: root },
+    { cwd: root, env: { ...process.env, HOME } },
   );
   return {
     exitCode: run.exitCode,
@@ -982,7 +992,7 @@ describe('the report command', () => {
 
   it('prints a config it cannot run on as one refusal per problem', () => {
     const root = makeRepo(TWO_PROBLEM_CONFIG);
-    const refusal = thrownBy(() => loadConfig(root)) as ConfigError;
+    const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
 
     const run = runReport(root, ['--json']);
 

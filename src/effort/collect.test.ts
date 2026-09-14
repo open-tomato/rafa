@@ -715,10 +715,12 @@ function makeTree(sessionIds: readonly string[]): Tree {
 
 /**
  * A quiet run over a planted tree, reading the planted commits. It
- * passes no store, so the run selects one from the tree's config.
+ * passes no store, so the run selects one from the tree's config, under
+ * a home of its own holding none.
  */
 function optionsFor(tree: Tree, commits: PlantedCommits): CollectOptions {
   return {
+    home: makeScratch(),
     repoRoot: tree.root,
     logDir: tree.logDir,
     plansDir: tree.plansDir,
@@ -1125,6 +1127,7 @@ describe('formatCollectSummary', () => {
     const tree = makeTree(['s1']);
     const commits = plantedCommits([commitRow('aaa')]);
     const result = await collectEffort({
+      home: makeScratch(),
       repoRoot: tree.root,
       logDir: tree.logDir,
       plansDir: tree.plansDir,
@@ -1192,7 +1195,7 @@ function makeRepo(config: string): string {
 function runCollect(root: string, args: readonly string[]): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'collect', ...args],
-    { cwd: root },
+    { cwd: root, env: { ...process.env, HOME: makeScratch() } },
   );
   return {
     exitCode: run.exitCode,

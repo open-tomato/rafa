@@ -8,10 +8,11 @@
  * {@link injectSourceLabel}, and hands the plan to
  * {@link announcePlanIssues} once, at start.
  */
+import type { ConfigRoots } from '../config-load.js';
 import type { ConfigSource, ResolvedConfig } from '../config.js';
 import type { PlanIssue } from '../plan/index.js';
 
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../config-load.js';
 import { parsePlan } from '../plan/index.js';
 
 /**
@@ -41,11 +42,13 @@ function injectFlagValue(args: readonly string[]): string | undefined {
 }
 
 /**
- * Resolves the settings a run starts on: `--inject=` over
- * `.rafa/config.yaml` over the defaults, as `config.ts` ranks them.
+ * Resolves the settings a run starts on: `--inject=` over the project's
+ * `.rafa/config.yaml` under `roots.root`, that over the user scope's
+ * under `roots.home`, and both over the defaults, as `config.ts` ranks
+ * them.
  *
- * `--inject` is the one flag. `store` resolves from the file and the
- * default and the loop acts on nothing it says, but the file is judged
+ * `--inject` is the one flag. `store` resolves from the files and the
+ * default and the loop acts on nothing it says, but each file is judged
  * whole, so an unusable `store:` refuses the run as an unusable
  * `plan.inject:` does.
  *
@@ -54,18 +57,27 @@ function injectFlagValue(args: readonly string[]): string | undefined {
  * when none is given.
  */
 export function loadRunConfig(
-  repoRoot: string,
+  roots: ConfigRoots,
   args: readonly string[],
   warn?: (message: string) => void,
 ): ResolvedConfig {
-  return loadConfig(repoRoot, { inject: injectFlagValue(args) }, warn);
+  return loadConfig(roots, { inject: injectFlagValue(args) }, warn);
 }
 
-/** Where the injection mode came from, as the operator log names it. */
-export function injectSourceLabel(source: ConfigSource, configPath: string | null): string {
-  if (source === 'cli') return INJECT_FLAG;
-  if (source === 'file') return configPath ?? 'the config file';
-  return 'the default';
+/**
+ * Where the injection mode came from, as the operator log names it: the
+ * flag, the file that answered, or the default. The labels sit in a
+ * record over every source, so a source added to `ConfigSource` fails to
+ * compile here until it has one, rather than being named the default.
+ */
+export function injectSourceLabel({ sources, path, userPath }: ResolvedConfig): string {
+  const labels: Record<ConfigSource, string> = {
+    cli: INJECT_FLAG,
+    file: path ?? 'the config file',
+    user: userPath ?? 'the user config file',
+    default: 'the default',
+  };
+  return labels[sources.inject];
 }
 
 /**
