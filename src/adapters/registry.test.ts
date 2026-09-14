@@ -15,7 +15,10 @@
  * registry accepts, so a registry refusing everything fails as surely as
  * one refusing nothing. The store cases read which backend an adapter
  * opened off the disk under a fresh temporary root, never off the store
- * it answered, with the file names spelled here.
+ * it answered, with the file names spelled here. The output cases read
+ * what an adapter wrote off a stream the case hands it, or off a spy on
+ * `process.stdout.write` the case restores, and each `text` reading
+ * spells a line the `json` adapter could not have written.
  *
  * No case changes `CORE_ADAPTER_REGISTRY`. An add-on is registered on it
  * through `register`, which answers a new registry, and a case holds the
@@ -42,6 +45,15 @@
  *     unknown port reddened its refusal case. The store backends
  *     registered in reverse reddened the order case, and with it the
  *     store entry's refusals, which list the kinds in that order.
+ *
+ * Three more were driven the same way on 2026-09-14, once the outputs
+ * were registered, with `src/adapters/` at 112 pass before and after. The
+ * `json` output made once and shared across creates reddened the
+ * fresh-output case and the `json` stdout case, whose line went to the
+ * stream an earlier case had made the shared output with. The `text`
+ * output made at verbosity 0 whatever its context reddened the stream
+ * and verbosity case alone, and a default stream of `process.stderr` the
+ * `text` stdout case alone.
  */
 import type { AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
@@ -52,7 +64,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import ts from 'typescript';
 
 import {
@@ -92,7 +104,25 @@ const STORE_LAYOUTS: readonly (readonly [string, readonly string[]])[] = [
 ];
 
 /** Port types core registers no adapter for yet. */
-const UNREGISTERED_PORTS = ['tracker', 'learning', 'output', 'planner'] as const;
+const UNREGISTERED_PORTS = ['tracker', 'learning', 'planner'] as const;
+
+/** What a second terminal result from one json output is refused with. */
+const SECOND_RESULT_REFUSAL
+  = 'json output: refused a second terminal result event; a command emits exactly one';
+
+/** A stream of its own, and the chunks written to it. */
+function memoryStream(): { stream: { write: (chunk: string) => unknown }; chunks: string[] } {
+  const chunks: string[] = [];
+  return {
+    stream: {
+      write: (chunk) => {
+        chunks.push(chunk);
+        return true;
+      },
+    },
+    chunks,
+  };
+}
 
 /** A tracker every fixture adapter answers. Never called. */
 const FIXTURE_TRACKER: Tracker = {
@@ -229,10 +259,66 @@ describe('the core adapter registry', () => {
     expect(store.read('sessions')).toEqual([SESSION]);
   });
 
+  it('registers both outputs, text before json', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('output')).toEqual(['text', 'json']);
+  });
+
+  it('makes the text output over the stream and verbosity its context names', () => {
+    const { stream, chunks } = memoryStream();
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('output', 'text');
+
+    const quiet = adapter.create({ repoRoot: '/nonexistent', stream });
+    quiet.debug('hidden');
+    quiet.info('loop line');
+    adapter.create({ repoRoot: '/nonexistent', stream, verbosity: 2 }).debug('shown');
+
+    expect(chunks).toEqual(['loop line\n', 'debug: shown\n']);
+  });
+
+  it('makes a new json output on each create, each writing one result of its own', () => {
+    const { stream, chunks } = memoryStream();
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('output', 'json');
+
+    const first = adapter.create({ repoRoot: '/nonexistent', stream });
+    first.result('one');
+    adapter.create({ repoRoot: '/nonexistent', stream }).result('two');
+
+    expect(chunks.map((chunk) => JSON.parse(chunk) as unknown)).toMatchObject([
+      { type: 'result', ok: true, data: 'one' },
+      { type: 'result', ok: true, data: 'two' },
+    ]);
+    expect(() => first.result('three')).toThrow(SECOND_RESULT_REFUSAL);
+    expect(chunks).toHaveLength(2);
+  });
+
+  it.each([
+    ['text', 'warn: careful\n'],
+    ['json', '"level":"warn","message":"careful"'],
+  ])('makes the %s output over process.stdout when its context names no stream', (kind, line) => {
+    const written: string[] = [];
+    const spy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      CORE_ADAPTER_REGISTRY.resolve('output', kind)
+        .create({ repoRoot: '/nonexistent' })
+        .warn('careful');
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(written).toHaveLength(1);
+    expect(written[0]).toContain(line);
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const kind of CORE_ADAPTER_REGISTRY.kinds('store')) {
-      expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve('store', kind))).toBe(true);
+    for (const port of ['store', 'output'] as const) {
+      expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
+      for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
+        expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);
+      }
     }
   });
 });

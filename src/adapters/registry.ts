@@ -57,11 +57,12 @@
  * ## What core registers
  *
  * The two store backends, `store/sqlite` and `store/ndjson`, which
- * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY}.
- * The phase 1 table names the other ports' core adapters,
- * `tracker/github`, `tracker/local`, `learning/local`, `output/text`,
- * `output/json` and `planner/claude`; none is registered yet, and each
- * joins `CORE_ADAPTERS` as it lands under `src/adapters/`.
+ * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
+ * and the two outputs under `src/adapters/output/`, `output/text` and
+ * `output/json`. The phase 1 table names the other ports' core adapters,
+ * `tracker/github`, `tracker/local`, `learning/local` and
+ * `planner/claude`; none is registered yet, and each joins
+ * `CORE_ADAPTERS` as it lands under `src/adapters/`.
  *
  * ## What an adapter answers
  *
@@ -75,9 +76,13 @@
  *
  * Every adapter is made with an {@link AdapterContext}, which holds the
  * repository root, the one thing a store opens under. A port whose
- * adapter needs more gains a field when that adapter lands.
+ * adapter needs more gains a field when that adapter lands, optional so
+ * that no other port's caller has to pass it: the outputs added `stream`
+ * and `verbosity`. Each output `create` makes a new output, so a `json`
+ * output's one terminal result belongs to the command it was made for.
  */
 import type { StoreBackend } from '../config.js';
+import type { OutputStream } from './output/stream.js';
 import type { SelectedEffortStore } from '../effort/store/index.js';
 import type {
   Learning,
@@ -92,6 +97,9 @@ import { describeValue } from '../config-sections.js';
 import { STORE_BACKENDS } from '../config.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
+
+import { createJsonOutput } from './output/json.js';
+import { createTextOutput } from './output/text.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'adapter registry';
@@ -133,6 +141,10 @@ export interface PortImplementations {
 export interface AdapterContext {
   /** The repository the adapter acts on. */
   readonly repoRoot: string;
+  /** Where an output adapter writes. Read by the outputs alone; `process.stdout` when left out. */
+  readonly stream?: OutputStream;
+  /** How much the `text` output writes. Read by it alone; 0 when left out. */
+  readonly verbosity?: number;
 }
 
 /**
@@ -308,16 +320,31 @@ const STORE_OPENERS: {
 
 /**
  * The adapters core registers, in the order `kinds` answers them: the
- * store backends, in the order the config names them.
+ * store backends, in the order the config names them, then the `text`
+ * and `json` outputs.
  */
-const CORE_ADAPTERS: readonly AnyAdapter[] = STORE_BACKENDS.map(
-  (backend): AnyAdapter => ({
-    port: 'store',
-    kind: backend,
-    portVersion: PORT_VERSIONS.store,
-    create: ({ repoRoot }) => STORE_OPENERS[backend](repoRoot),
-  }),
-);
+const CORE_ADAPTERS: readonly AnyAdapter[] = [
+  ...STORE_BACKENDS.map(
+    (backend): AnyAdapter => ({
+      port: 'store',
+      kind: backend,
+      portVersion: PORT_VERSIONS.store,
+      create: ({ repoRoot }) => STORE_OPENERS[backend](repoRoot),
+    }),
+  ),
+  {
+    port: 'output',
+    kind: 'text',
+    portVersion: PORT_VERSIONS.output,
+    create: ({ stream = process.stdout, verbosity = 0 }) => createTextOutput({ verbosity, stream }),
+  },
+  {
+    port: 'output',
+    kind: 'json',
+    portVersion: PORT_VERSIONS.output,
+    create: ({ stream = process.stdout }) => createJsonOutput({ stream }),
+  },
+];
 
 /**
  * Core's registry: every adapter core registers, and nothing else. An
