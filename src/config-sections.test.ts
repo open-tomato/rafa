@@ -1,0 +1,385 @@
+/**
+ * Tests for the value readers behind `config.ts`.
+ *
+ * Every reader is driven directly, with no file, so a case names the
+ * raw value it hands over. Three cases parse YAML first, because the
+ * reading they pin is the parser's: a `__proto__` key in an item, a
+ * `toString` key in an item, and a `constructor` key beside a kind.
+ * The path from a file through `config.ts` is `config.test.ts`'s.
+ *
+ * Every refusal sits beside an accepting control of the same reader,
+ * so a reader refusing everything fails here as surely as one
+ * accepting everything.
+ *
+ * Twenty-five of the fifty mutations `config.test.ts` describes were
+ * aimed at this module, and on the last pass each reddened at least one
+ * case across the two files. One stayed green on the first two passes:
+ * an item refused on its kind key answering a value beside its problem.
+ * Every caller in `config.ts` discards a refused value, and no case read
+ * one. The case answering no value beside a problem was added for it,
+ * and is the one case that leg reddens.
+ */
+import type { Reader, ValueAt } from './config-sections.js';
+
+import { describe, expect, it } from 'bun:test';
+
+import {
+  CLAUDE_SETTING_SOURCES,
+  describeValue,
+  flag,
+  isMapping,
+  listOf,
+  MODULE_SOURCE_KINDS,
+  moduleSource,
+  oneOf,
+  optionalPrerequisite,
+  PREREQUISITE_KINDS,
+  requiredPrerequisite,
+  STORE_BACKENDS,
+  subsetOf,
+  text,
+} from './config-sections.js';
+
+/** Where every case reads its value. */
+const AT: ValueAt = { label: 'F: s', key: 's' };
+
+/** The choices a prerequisite refusal lists. */
+const KINDS = 'tool, env, service, lsp';
+
+/** The problems `read` names for `raw`; empty when it accepts it. */
+function problemsOf<T>(read: Reader<T>, raw: unknown): readonly string[] {
+  return read(raw, AT).problems;
+}
+
+/** The value `read` accepts `raw` as. Fails the case on a refusal. */
+function valueOf<T>(read: Reader<T>, raw: unknown): T {
+  const reading = read(raw, AT);
+  expect(reading.problems).toEqual([]);
+  if (reading.value === undefined) throw new Error('accepted, with no value');
+  return reading.value;
+}
+
+/** The first item of a one-item YAML list, as the parser returns it. */
+function parsedItem(yaml: string): unknown {
+  const [item] = Bun.YAML.parse(yaml) as unknown[];
+  return item;
+}
+
+describe('describeValue', () => {
+  it.each([
+    ['a string, quoted', 'x', '"x"'],
+    ['a string holding a quote, escaped', 'a"b', '"a\\"b"'],
+    ['null', null, 'null'],
+    ['a list, never serialised', [1, 2], 'a list'],
+    ['a mapping, never serialised', { a: 1 }, 'a mapping'],
+    ['a number', 3, '3'],
+    ['a boolean', true, 'true'],
+  ])('describes %s', (_label, value, described) => {
+    expect(describeValue(value)).toBe(described);
+  });
+});
+
+describe('isMapping', () => {
+  it('is true for a mapping and false for a list, null and a scalar', () => {
+    expect(isMapping({})).toBe(true);
+    expect([[], null, 'x', 1].map(isMapping)).toEqual([false, false, false, false]);
+  });
+});
+
+describe('oneOf', () => {
+  it('accepts each of its values as itself', () => {
+    const read = oneOf(STORE_BACKENDS);
+
+    expect(STORE_BACKENDS.map((value) => valueOf(read, value))).toEqual(['sqlite', 'ndjson']);
+  });
+
+  it.each([
+    ['a different case', 'SQLite', '"SQLite"'],
+    ['a number', 3, '3'],
+    ['a list', ['sqlite'], 'a list'],
+  ])('refuses %s, naming the label and the choices', (_label, raw, found) => {
+    expect(problemsOf(oneOf(STORE_BACKENDS), raw)).toEqual([
+      `F: s is ${found}, expected one of: sqlite, ndjson`,
+    ]);
+  });
+
+  it('compares with ===, so the number 1 is not the string "1"', () => {
+    expect(valueOf(oneOf([1]), 1)).toBe(1);
+    expect(problemsOf(oneOf([1]), '1')).toEqual(['F: s is "1", expected one of: 1']);
+  });
+});
+
+describe('text', () => {
+  it('accepts a string as written, never trimmed', () => {
+    expect(valueOf(text('a name'), ' linear ')).toBe(' linear ');
+  });
+
+  it.each([
+    ['an empty string', '', '""'],
+    ['a whitespace-only string', '  \t', '"  \\t"'],
+    ['a number', 3, '3'],
+    ['a list', ['a'], 'a list'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(text('a name'), raw)).toEqual([`F: s is ${found}, expected a name`]);
+  });
+});
+
+describe('flag', () => {
+  it('accepts true and false, false as a value rather than silence', () => {
+    expect(valueOf(flag, true)).toBe(true);
+    expect(flag(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+  });
+
+  it.each([
+    ['the string true', 'true', '"true"'],
+    ['yes', 'yes', '"yes"'],
+    ['the number 1', 1, '1'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(flag, raw)).toEqual([`F: s is ${found}, expected true or false`]);
+  });
+});
+
+describe('listOf', () => {
+  const names = listOf(text('a name'), 'names');
+
+  it('accepts an empty list, frozen', () => {
+    const value = valueOf(names, []);
+
+    expect(value).toEqual([]);
+    expect(Object.isFrozen(value)).toBe(true);
+  });
+
+  it('accepts a list in its order, as a frozen copy of what it was handed', () => {
+    const raw = ['local', 'github'];
+    const value = valueOf(names, raw);
+
+    expect(value).toEqual(['local', 'github']);
+    expect(value).not.toBe(raw);
+    expect(Object.isFrozen(value)).toBe(true);
+    expect(Object.isFrozen(raw)).toBe(false);
+    expect(() => (value as string[]).push('x')).toThrow(TypeError);
+  });
+
+  it('refuses a value that is not a list, a lone name included', () => {
+    expect(problemsOf(names, 'local')).toEqual(['F: s is "local", expected a list of names']);
+  });
+
+  it('names every unusable entry by its index, and answers no value', () => {
+    const reading = names(['a', 3, ''], AT);
+
+    expect(reading.problems).toEqual([
+      'F: s[1] is 3, expected a name',
+      'F: s[2] is "", expected a name',
+    ]);
+    expect(reading.value).toBeUndefined();
+  });
+
+  it('keeps the unknown keys of its items under their indexed paths', () => {
+    const reading = listOf(moduleSource, 'sources')([{ npm: 'a' }, { npm: 'b', tag: 1 }], AT);
+
+    expect(reading.problems).toEqual([]);
+    expect(reading.extras).toEqual([{ key: 's[1].tag', value: 1 }]);
+  });
+});
+
+describe('subsetOf', () => {
+  const sources = subsetOf(CLAUDE_SETTING_SOURCES);
+
+  it.each([
+    ['project,local', ['project', 'local']],
+    ['local,project', ['local', 'project']],
+    ['user', ['user']],
+    ['user, project , local', ['user', 'project', 'local']],
+  ])('accepts %s, in the order written', (raw, expected) => {
+    const value = valueOf(sources, raw);
+
+    expect<readonly string[]>(value).toEqual(expected);
+    expect(Object.isFrozen(value)).toBe(true);
+  });
+
+  it.each([
+    ['an empty value', ''],
+    ['a trailing comma', 'project,'],
+    ['a leading comma', ',local'],
+    ['an empty entry', 'project,,local'],
+    ['an entry given twice', 'project,project'],
+    ['a different case', 'Project'],
+    ['a source Claude Code has not', 'global'],
+  ])('refuses %s', (_label, raw) => {
+    expect(problemsOf(sources, raw)).toEqual([
+      `F: s is ${JSON.stringify(raw)}, expected a comma-separated subset of: user, project, local`,
+    ]);
+  });
+
+  it('refuses a YAML list rather than joining it', () => {
+    expect(problemsOf(sources, ['project', 'local'])).toEqual([
+      'F: s is a list, expected a comma-separated subset of: user, project, local',
+    ]);
+  });
+});
+
+describe('requiredPrerequisite', () => {
+  it.each([...PREREQUISITE_KINDS])('reads an item keyed by %s, with no probe', (kind) => {
+    expect(valueOf(requiredPrerequisite, { [kind]: 'x' })).toEqual({
+      kind,
+      name: 'x',
+      probe: null,
+    });
+  });
+
+  it('reads a probe, and answers the item frozen', () => {
+    const item = valueOf(requiredPrerequisite, { tool: 'bun', probe: 'bun --version' });
+
+    expect(item).toEqual({ kind: 'tool', name: 'bun', probe: 'bun --version' });
+    expect(Object.isFrozen(item)).toBe(true);
+  });
+
+  it('reads a null probe as no probe', () => {
+    expect(valueOf(requiredPrerequisite, { env: 'A', probe: null }).probe).toBeNull();
+  });
+
+  it('retains a reason and an unknown key as extras, never refusing them', () => {
+    const reading = requiredPrerequisite({ env: 'A', reason: 'why', timeout: 30 }, AT);
+
+    expect(reading.problems).toEqual([]);
+    expect(reading.value).toEqual({ kind: 'env', name: 'A', probe: null });
+    expect(reading.extras).toEqual([
+      { key: 's.reason', value: 'why' },
+      { key: 's.timeout', value: 30 },
+    ]);
+  });
+
+  it.each([
+    ['a scalar', 'bun', '"bun"'],
+    ['a list', ['bun'], 'a list'],
+    ['null', null, 'null'],
+  ])('refuses an item that is %s', (_label, raw, found) => {
+    expect(problemsOf(requiredPrerequisite, raw)).toEqual([
+      `F: s is ${found}, expected a mapping naming one of: ${KINDS}`,
+    ]);
+  });
+
+  it('refuses an item naming none of the kinds', () => {
+    expect(problemsOf(requiredPrerequisite, { probe: 'x' })).toEqual([
+      `F: s names none of: ${KINDS}`,
+    ]);
+  });
+
+  it.each([
+    ['tool before env', { tool: 'a', env: 'B' }],
+    ['env before tool', { env: 'B', tool: 'a' }],
+  ])('refuses an item naming two kinds, written %s', (_label, raw) => {
+    expect(problemsOf(requiredPrerequisite, raw)).toEqual([
+      `F: s names tool and env, expected exactly one of: ${KINDS}`,
+    ]);
+  });
+
+  it.each([
+    ['null', null, 'null'],
+    ['empty', '', '""'],
+    ['a number', 3, '3'],
+  ])('refuses a kind naming a value that is %s', (_label, raw, found) => {
+    expect(problemsOf(requiredPrerequisite, { tool: raw })).toEqual([
+      `F: s.tool is ${found}, expected a non-empty string`,
+    ]);
+  });
+
+  it('answers no value beside a problem, whichever key the problem is on', () => {
+    expect(requiredPrerequisite({ tool: '' }, AT).value).toBeUndefined();
+    expect(requiredPrerequisite({ tool: 'bun', probe: 3 }, AT).value).toBeUndefined();
+    expect(requiredPrerequisite({ tool: 'bun', probe: 'bun -v' }, AT).value).toBeDefined();
+  });
+
+  it('names every problem one item has', () => {
+    expect(problemsOf(requiredPrerequisite, { tool: '', probe: 3 })).toEqual([
+      'F: s.tool is "", expected a non-empty string',
+      'F: s.probe is 3, expected a non-empty string',
+    ]);
+  });
+
+  it('retains a __proto__ key as an extra, the parser keeping it as an own key', () => {
+    const item = parsedItem('- __proto__: x\n  tool: bun\n');
+    const reading = requiredPrerequisite(item, AT);
+
+    expect(Object.hasOwn(item as object, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(item)).toBe(Object.prototype);
+    expect(reading.value).toEqual({ kind: 'tool', name: 'bun', probe: null });
+    expect(reading.extras).toEqual([{ key: 's.__proto__', value: 'x' }]);
+  });
+
+  it('reads a toString key as no kind, though every mapping answers it to in', () => {
+    const item = parsedItem('- toString: bun\n');
+
+    expect('toString' in (item as object)).toBe(true);
+    expect(problemsOf(requiredPrerequisite, item)).toEqual([`F: s names none of: ${KINDS}`]);
+  });
+
+  it('retains a constructor key beside a kind as an extra', () => {
+    const reading = requiredPrerequisite(parsedItem('- constructor: a\n  env: B\n'), AT);
+
+    expect(reading.value).toEqual({ kind: 'env', name: 'B', probe: null });
+    expect(reading.extras).toEqual([{ key: 's.constructor', value: 'a' }]);
+  });
+});
+
+describe('optionalPrerequisite', () => {
+  it('reads a reason beside a probe', () => {
+    const raw = { tool: 'mgrep', probe: 'mgrep --version', reason: 'faster search' };
+
+    expect(valueOf(optionalPrerequisite, raw)).toEqual({
+      kind: 'tool',
+      name: 'mgrep',
+      probe: 'mgrep --version',
+      reason: 'faster search',
+    });
+  });
+
+  it('reads a missing reason and a null one as no reason', () => {
+    expect(valueOf(optionalPrerequisite, { lsp: 'typescript' }).reason).toBeNull();
+    expect(valueOf(optionalPrerequisite, { lsp: 'typescript', reason: null }).reason).toBeNull();
+  });
+
+  it('refuses a reason that is not a string', () => {
+    expect(problemsOf(optionalPrerequisite, { lsp: 'typescript', reason: 4 })).toEqual([
+      'F: s.reason is 4, expected a non-empty string',
+    ]);
+  });
+});
+
+describe('moduleSource', () => {
+  it.each([...MODULE_SOURCE_KINDS])('reads a %s source, with no ref', (kind) => {
+    const source = valueOf(moduleSource, { [kind]: 'x' });
+
+    expect(source).toEqual({ kind, location: 'x', ref: null });
+    expect(Object.isFrozen(source)).toBe(true);
+  });
+
+  it('reads a ref beside a github source', () => {
+    expect(valueOf(moduleSource, { github: 'someone/rafa-obsidian', ref: 'v0.3.0' })).toEqual({
+      kind: 'github',
+      location: 'someone/rafa-obsidian',
+      ref: 'v0.3.0',
+    });
+  });
+
+  it.each(['npm', 'path'])('retains a ref beside a %s source as an extra', (kind) => {
+    const reading = moduleSource({ [kind]: 'x', ref: 'v1' }, AT);
+
+    expect(reading.value?.ref).toBeNull();
+    expect(reading.extras).toEqual([{ key: 's.ref', value: 'v1' }]);
+  });
+
+  it('refuses a source naming two kinds, one naming none, and a ref that is no string', () => {
+    const choices = 'npm, github, path';
+
+    expect(problemsOf(moduleSource, { npm: 'a', path: 'b' })).toEqual([
+      `F: s names npm and path, expected exactly one of: ${choices}`,
+    ]);
+    expect(problemsOf(moduleSource, {})).toEqual([`F: s names none of: ${choices}`]);
+    expect(problemsOf(moduleSource, { github: 'a/b', ref: 2 })).toEqual([
+      'F: s.ref is 2, expected a non-empty string',
+    ]);
+  });
+});

@@ -1106,7 +1106,7 @@ describe('the store a run goes through', () => {
 
   it('warns once, through the log sink, about an unknown key', async () => {
     const tree = makeTree(['s1']);
-    writeConfig(tree.root, 'store: ndjson\ntracker: linear\n');
+    writeConfig(tree.root, 'store: ndjson\nnonesuch: linear\n');
     const commits = plantedCommits([commitRow('aaa')]);
     const lines: string[] = [];
 
@@ -1115,7 +1115,7 @@ describe('the store a run goes through', () => {
       log: (line) => lines.push(line),
     });
 
-    expect(lines.filter((line) => line.includes('"tracker"'))).toHaveLength(1);
+    expect(lines.filter((line) => line.includes('"nonesuch"'))).toHaveLength(1);
     expect(result.commits?.appended).toBe(1);
   });
 });

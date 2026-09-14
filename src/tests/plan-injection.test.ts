@@ -254,13 +254,13 @@ describe('the injection mode a run resolves', () => {
 
   it('hands a warning per unknown key to the sink it is given', () => {
     const seen: string[] = [];
-    const root = rootWith(`${FILE_CONFIG}tracker: linear\n`);
+    const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
     const resolved = loadRunConfig(root, [], (message) => {
       seen.push(message);
     });
 
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toContain('"tracker"');
+    expect(seen[0]).toContain('"nonesuch"');
     expect(resolved.config.inject).toBe(FILE_MODE);
     expect(warnings).toEqual([]);
   });

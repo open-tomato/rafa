@@ -21,7 +21,7 @@
  * resolves its root through git and takes no seam. The refusal's
  * control is the same command over a config it can run on, which exits
  * 0 and prints a document `JSON.parse` reads. The refused config holds
- * a problem in each of its two settings, so a command printing the
+ * a problem in each of two settings, so a command printing the
  * error's message as one line cannot pass for one printing a line per
  * problem: measured, with only the `store` problem planted, it did.
  *
@@ -904,7 +904,7 @@ describe('the task reports a report carries', () => {
   });
 });
 
-/** A config holding a problem in each of its two settings. */
+/** A config holding a problem in each of two settings, `store` and `plan.inject`. */
 const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
 
 /** What one run of the command printed, and how it exited. */
@@ -946,14 +946,14 @@ function runReport(root: string, args: readonly string[]): CommandRun {
 
 describe('the report command', () => {
   it('reads the store the config selects, warning on stderr alone', () => {
-    const root = makeRepo('store: ndjson\ntracker: linear\n');
+    const root = makeRepo('store: ndjson\nnonesuch: linear\n');
 
     const run = runReport(root, ['--json']);
 
     expect(run.exitCode).toBe(0);
     expect((JSON.parse(run.stdout) as { rowsRead: number }).rowsRead)
       .toBe(ROWS.length);
-    expect(run.stderr).toContain('"tracker"');
+    expect(run.stderr).toContain('"nonesuch"');
   });
 
   it('prints the stored task reports when no session row is stored yet', () => {

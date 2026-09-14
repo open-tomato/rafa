@@ -71,6 +71,8 @@
  * it, so the entry needs Bun.
  */
 export type {
+  ClaudeSettingSource,
+  CommandLineSetting,
   ConfigExtra,
   ConfigFile,
   ConfigLayer,
@@ -78,7 +80,14 @@ export type {
   ConfigOverrides,
   ConfigSetting,
   ConfigSource,
+  ConfigVersion,
   InjectMode,
+  ModuleSource,
+  ModuleSourceKind,
+  OptionalPrerequisiteItem,
+  OutputMode,
+  PrerequisiteItem,
+  PrerequisiteKind,
   RafaConfig,
   ResolvedConfig,
   StoreBackend,
@@ -135,13 +144,18 @@ export type {
 } from './plan/index.js';
 
 export {
+  CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
   CONFIG_FILE,
+  CONFIG_VERSIONS,
   ConfigError,
   configFilePath,
   INJECT_MODES,
   loadConfig,
+  MODULE_SOURCE_KINDS,
+  OUTPUT_MODES,
   parseConfigText,
+  PREREQUISITE_KINDS,
   readConfigFile,
   resolveConfig,
   STORE_BACKENDS,

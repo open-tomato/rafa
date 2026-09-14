@@ -45,7 +45,7 @@
  *
  * The type names are not checked here, and `check-types` skips this
  * file. Checked through a tsconfig outside the repo, a probe
- * re-exporting from the entry all fifty-seven type names the `./plan`
+ * re-exporting from the entry all sixty-six type names the `./plan`
  * entry, the `./store` entry and the config module export compiled, and
  * one naming `TaskDeclaration`, which the entry leaves out, failed with
  * TS2305.
@@ -58,13 +58,18 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
+  CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
   CONFIG_FILE,
+  CONFIG_VERSIONS,
   ConfigError,
   configFilePath,
   INJECT_MODES,
   loadConfig,
+  MODULE_SOURCE_KINDS,
+  OUTPUT_MODES,
   parseConfigText,
+  PREREQUISITE_KINDS,
   readConfigFile,
   resolveConfig,
   STORE_BACKENDS,
@@ -101,15 +106,20 @@ import * as entry from './index.js';
 
 /** The runtime names the entry exposes, sorted as `sort` sorts them. */
 const RUNTIME_EXPORTS = [
+  'CLAUDE_SETTING_SOURCES',
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
+  'CONFIG_VERSIONS',
   'ConfigError',
   'EFFORT_KEY_PROJECTIONS',
   'FINDING_KINDS',
   'FINDING_SIGNALS',
   'INJECT_MODES',
+  'MODULE_SOURCE_KINDS',
+  'OUTPUT_MODES',
   'PLAN_BLOCK_KINDS',
   'PLAN_HEADER_FIELDS',
+  'PREREQUISITE_KINDS',
   'RAFA_BLOCK_KINDS',
   'REPORT_STATUSES',
   'STORE_BACKENDS',
@@ -135,15 +145,20 @@ const RUNTIME_EXPORTS = [
 
 /** Each runtime name, the entry's value for it, and its module's own. */
 const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
+  ['CLAUDE_SETTING_SOURCES', entry.CLAUDE_SETTING_SOURCES, CLAUDE_SETTING_SOURCES],
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],
+  ['CONFIG_VERSIONS', entry.CONFIG_VERSIONS, CONFIG_VERSIONS],
   ['ConfigError', entry.ConfigError, ConfigError],
   ['EFFORT_KEY_PROJECTIONS', entry.EFFORT_KEY_PROJECTIONS, EFFORT_KEY_PROJECTIONS],
   ['FINDING_KINDS', entry.FINDING_KINDS, FINDING_KINDS],
   ['FINDING_SIGNALS', entry.FINDING_SIGNALS, FINDING_SIGNALS],
   ['INJECT_MODES', entry.INJECT_MODES, INJECT_MODES],
+  ['MODULE_SOURCE_KINDS', entry.MODULE_SOURCE_KINDS, MODULE_SOURCE_KINDS],
+  ['OUTPUT_MODES', entry.OUTPUT_MODES, OUTPUT_MODES],
   ['PLAN_BLOCK_KINDS', entry.PLAN_BLOCK_KINDS, PLAN_BLOCK_KINDS],
   ['PLAN_HEADER_FIELDS', entry.PLAN_HEADER_FIELDS, PLAN_HEADER_FIELDS],
+  ['PREREQUISITE_KINDS', entry.PREREQUISITE_KINDS, PREREQUISITE_KINDS],
   ['RAFA_BLOCK_KINDS', entry.RAFA_BLOCK_KINDS, RAFA_BLOCK_KINDS],
   ['REPORT_STATUSES', entry.REPORT_STATUSES, REPORT_STATUSES],
   ['STORE_BACKENDS', entry.STORE_BACKENDS, STORE_BACKENDS],
