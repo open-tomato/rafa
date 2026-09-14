@@ -1,0 +1,227 @@
+/**
+ * The command rafa's dispatcher routes to: `RafaCommand`, the context it
+ * runs with, and `CommandExit`, the one way it refuses.
+ *
+ * `.specs/cli-surface.md` declares `RafaCommand` as a superset of
+ * `cli-core`'s `CliCommand`, so a `cli-core` command still loads. The
+ * superset is spelled here over the copy in `./core/types.ts`.
+ *
+ * ## Routing keys
+ *
+ * `subject` and `action` are the words a line routes by: `rafa loop start`
+ * runs the command whose subject is `loop` and whose action is `start`.
+ * A command whose action is its subject is a top-level command, reached
+ * by its one word: `usage`, with subject and action both `usage`. That is
+ * open-tomato's rule for a single-token verb, which it registers with
+ * tool and command equal. `name` is for display, and routes nothing.
+ *
+ * ## The context
+ *
+ * {@link RafaContext} is `CliContext` plus `argv`, the words of the line
+ * after the last word the dispatcher routed by, as they were typed. The
+ * phase 0 commands read their own flags, so a wrapper hands `argv` to
+ * the parser it already has. `args` and `flags` are the rest of the
+ * line read against the command's own `args` and `flags`, flags typed
+ * ahead of the subject included.
+ *
+ * `run` takes a `RafaContext`, where `CliCommand.run` takes a
+ * `CliContext`, so the interface extends `CliCommand` without its `run`.
+ * A `RafaContext` is a `CliContext`, so a `run` written against
+ * `CliContext` is assignable to this one.
+ *
+ * ## Refusing
+ *
+ * A command refuses by throwing {@link CommandExit} with an exit code. The
+ * dispatcher is the only place that turns one into the process's exit
+ * code and the invocation's terminal event. A `process.exitCode` a
+ * command sets is not read, and a command setting one and returning is
+ * a success to the dispatcher.
+ *
+ * ## The shape check
+ *
+ * {@link commandProblem} answers what keeps a value from being a
+ * `RafaCommand`, for a roster the type checker never saw: a module's
+ * command entry is imported at run time. It checks the shape and not
+ * the content, so an empty `summary` or an empty `examples` list passes.
+ * The registry refuses a core command it answers for, and the module
+ * loader skips the file of a module command it answers for.
+ */
+import type { CliCommand, CliContext } from './core/types.js';
+
+import { describeValue } from '../config-sections.js';
+
+/** What an action can render: text a person reads, NDJSON events, or the TUI. */
+export const COMMAND_OUTPUTS = ['text', 'json', 'tui'] as const;
+
+/** One of the three renderings an action declares. */
+export type CommandOutput = (typeof COMMAND_OUTPUTS)[number];
+
+/** One example a command's help lists. */
+export interface CommandExample {
+  /** The line as a person types it: `rafa loop start --plan=PLAN-x.md`. */
+  readonly cmd: string;
+  /** What the line does, in a sentence. */
+  readonly note: string;
+}
+
+/** Why a command is deprecated, and what to type instead. */
+export interface CommandDeprecation {
+  /** The version the command was deprecated in. */
+  readonly since: string;
+  /** The spelling to use instead, after `rafa`: `loop start`. */
+  readonly use: string;
+}
+
+/** Everything a rafa command runs with. */
+export interface RafaContext extends CliContext {
+  /** The words after the last word the line was routed by, as typed. */
+  readonly argv: readonly string[];
+}
+
+/** A command the dispatcher routes to by its subject and action. */
+export interface RafaCommand extends Omit<CliCommand, 'run'> {
+  /** The first routing word: `loop` in `rafa loop start`. */
+  readonly subject: string;
+  /** The second routing word: `start`. Equal to `subject` for a top-level command. */
+  readonly action: string;
+  /** One line for the subject's roster. `description` may be longer. */
+  readonly summary: string;
+  /** The examples help lists. */
+  readonly examples: readonly CommandExample[];
+  /**
+   * Whole other spellings of the command, each printing one deprecation
+   * line when typed: `start` for `loop start`. Routed for a core command
+   * only; a module's command is reached through an `exec` action alone.
+   */
+  readonly aliases?: readonly string[];
+  /** What the action can render. */
+  readonly outputs: readonly CommandOutput[];
+  /** Set when the command itself is deprecated; typing it prints one deprecation line. */
+  readonly deprecated?: CommandDeprecation;
+  /** Out of every roster, and still dispatched. */
+  readonly hidden?: boolean;
+  /**
+   * The action delegates to a module: the word after it names a module
+   * mounted as `module/<name>`, and the word after that one of the
+   * module's actions.
+   */
+  readonly exec?: true;
+  /** Runs the command. Throws {@link CommandExit} to refuse. */
+  readonly run: (context: RafaContext) => Promise<void>;
+}
+
+/** The highest exit code a process can report. */
+const MAX_EXIT_CODE = 255;
+
+/**
+ * Thrown by a command to end its invocation with an exit code: nonzero to
+ * refuse, 0 to stop early as a success.
+ *
+ * The message, when it is not empty, is what the dispatcher tells the
+ * reader: on stderr in text mode, in the terminal event in json mode.
+ */
+export class CommandExit extends Error {
+  /** The exit code the invocation ends with, from 0 to 255. */
+  readonly exitCode: number;
+
+  /** Throws a `TypeError` when `exitCode` is not a whole number from 0 to 255. */
+  constructor(exitCode: number, message = '') {
+    super(message);
+    if (!Number.isInteger(exitCode) || exitCode < 0 || exitCode > MAX_EXIT_CODE) {
+      throw new TypeError(
+        `CommandExit: exit code is ${describeValue(exitCode)}, expected a whole number from 0 to ${MAX_EXIT_CODE}`,
+      );
+    }
+    this.name = 'CommandExit';
+    this.exitCode = exitCode;
+  }
+}
+
+/** A command as a record of unknown fields, for the shape check. */
+type CommandFields = Partial<Record<keyof RafaCommand, unknown>>;
+
+/** True when a value is a list whose every item passes `check`. */
+function isListOf(value: unknown, check: (item: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.every(check);
+}
+
+/** True when a value is a mapping holding a string under each key. */
+function hasStrings(value: unknown, keys: readonly string[]): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return keys.every((key) => typeof record[key] === 'string');
+}
+
+/**
+ * True when a value is a word a line can route by: no space, no slash and
+ * no leading dash. The slash is kept for the `module/<name>` mount keys,
+ * so no subject is spelled as one.
+ */
+export function isRoutingWord(value: unknown): value is string {
+  return typeof value === 'string' && /^[^\s/-][^\s/]*$/.test(value);
+}
+
+/** The first field of a command failing its check, as a sentence, or null. */
+function fieldProblem(fields: CommandFields): string | null {
+  const checks: readonly (readonly [keyof RafaCommand, boolean, string])[] = [
+    ['subject', isRoutingWord(fields.subject), 'a word with no space, no slash and no leading dash'],
+    ['action', isRoutingWord(fields.action), 'a word with no space, no slash and no leading dash'],
+    ['name', typeof fields.name === 'string', 'a string'],
+    ['summary', typeof fields.summary === 'string', 'a string'],
+    ['description', typeof fields.description === 'string', 'a string'],
+    ['args', isListOf(fields.args, (item) => hasStrings(item, ['name'])), 'a list of named arguments'],
+    ['flags', isListOf(fields.flags, (item) => hasStrings(item, ['name'])), 'a list of named flags'],
+    ['examples', isListOf(fields.examples, (item) => hasStrings(item, ['cmd', 'note'])), 'a list of examples'],
+    [
+      'outputs',
+      isListOf(fields.outputs, (item) => (COMMAND_OUTPUTS as readonly unknown[]).includes(item)),
+      `a list of ${COMMAND_OUTPUTS.join(', ')}`,
+    ],
+    [
+      'aliases',
+      fields.aliases === undefined || isListOf(fields.aliases, (item) => typeof item === 'string'),
+      'absent or a list of strings',
+    ],
+    [
+      'deprecated',
+      fields.deprecated === undefined || hasStrings(fields.deprecated, ['since', 'use']),
+      'absent or a mapping of since and use',
+    ],
+    ['hidden', fields.hidden === undefined || typeof fields.hidden === 'boolean', 'absent or a boolean'],
+    ['exec', fields.exec === undefined || fields.exec === true, 'absent or true'],
+    ['run', typeof fields.run === 'function', 'a function'],
+  ];
+  const failed = checks.find(([, passes]) => !passes);
+  if (failed === undefined) return null;
+  const [key, , expected] = failed;
+  return `${key} is ${describeValue(fields[key])}, expected ${expected}`;
+}
+
+/**
+ * What keeps `value` from being a `RafaCommand`, as a sentence naming the
+ * command when it can, or null when nothing does. See the module note.
+ */
+export function commandProblem(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return `a command is ${describeValue(value)}, expected a mapping`;
+  }
+  const fields = value as CommandFields;
+  const problem = fieldProblem(fields);
+  if (problem === null) return null;
+  const named = isRoutingWord(fields.subject) && isRoutingWord(fields.action)
+    ? `command "${commandSpelling(fields as Pick<RafaCommand, 'subject' | 'action'>)}"`
+    : 'a command';
+  return `${named}: ${problem}`;
+}
+
+/** True when a command is top-level: its action is its subject. */
+export function isTopLevel(command: Pick<RafaCommand, 'subject' | 'action'>): boolean {
+  return command.subject === command.action;
+}
+
+/** A command's canonical spelling after `rafa`: `loop start`, or `usage` for a top-level command. */
+export function commandSpelling(command: Pick<RafaCommand, 'subject' | 'action'>): string {
+  return isTopLevel(command)
+    ? command.subject
+    : `${command.subject} ${command.action}`;
+}
