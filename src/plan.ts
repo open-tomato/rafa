@@ -6,15 +6,26 @@
  *   bun src/rafa.ts plan --spec=specs/my-feature.md [--stub=my-feature]
  *
  * Reads the spec, wraps it in the plan-generation instructions
- * (plan-prompt.md — the dev-planner format contract), and hands it to a
- * Claude Code session that writes:
+ * (`plan-prompt.md`) with the plan format inlined from the dev-planner
+ * skill, and hands it to a Claude Code session that writes:
  *
- *   PLAN-<stub>.md            the flat checklist + technical context
- *   PREREQUISITES-<stub>.md   non-automatable setup steps (only if any)
+ *   .plans/PLAN-<stub>.md            the flat checklist + technical context
+ *   .plans/PREREQUISITES-<stub>.md   non-automatable setup steps (only if any)
  *
  * The stub defaults to the spec's basename. Execute the result with:
  *
- *   bun src/rafa.ts start --plan=PLAN-<stub>.md
+ *   bun src/rafa.ts start --plan=.plans/PLAN-<stub>.md
+ *
+ * ## One source for the plan format
+ *
+ * `.claude/skills/dev-planner/SKILL.md` is the only file the plan format
+ * is written in. The template carries a `{PLAN_FORMAT}` slot where the
+ * format goes, and {@link buildPlanPrompt} fills it with the skill's body.
+ * A project running an installed rafa has no copy of the skill, so the
+ * build copies it into `dist/` beside `plan-prompt.md`, and
+ * {@link readPlanFormat} looks there first: beside this module, which is
+ * `dist/` in a build, then at the checkout's own skill, which is what this
+ * module finds when it runs from `src/`.
  */
 import fs from 'fs';
 import path from 'path';
@@ -60,18 +71,93 @@ export function formatProgressSection(progressContent: string | undefined): stri
   ].join('\n');
 }
 
-/** Builds the full plan-generation prompt. Exported for tests. */
+/** The dev-planner skill, relative to the root of a rafa checkout. */
+export const PLAN_FORMAT_SKILL = path.join('.claude', 'skills', 'dev-planner', 'SKILL.md');
+
+/**
+ * Where {@link readPlanFormat} looks for the skill, in order: beside the
+ * module, where the build copies it, then the checkout's own skill one
+ * directory up, where a module running from `src/` finds it.
+ */
+export function planFormatCandidates(moduleDir: string): string[] {
+  return [
+    path.join(moduleDir, path.basename(PLAN_FORMAT_SKILL)),
+    path.join(moduleDir, '..', PLAN_FORMAT_SKILL),
+  ];
+}
+
+/**
+ * Reads the dev-planner skill the plan prompt inlines, from the first of
+ * {@link planFormatCandidates} that exists.
+ *
+ * @throws Error when none exists, naming every path it looked at, so a
+ * build that lost its copy refuses before any session starts.
+ */
+export function readPlanFormat(moduleDir: string): string {
+  const candidates = planFormatCandidates(moduleDir);
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  if (found === undefined) {
+    throw new Error(`The plan format is missing: no dev-planner SKILL.md at ${candidates.join(' or ')}`);
+  }
+  return fs.readFileSync(found, 'utf8');
+}
+
+/** A YAML frontmatter block opening a file, and the blank lines after it. */
+const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n(?:\r?\n)*/;
+
+/**
+ * The skill as the prompt inlines it: the body, without the frontmatter
+ * that names the skill to its loader, and without trailing whitespace. A
+ * file with no frontmatter is inlined whole.
+ */
+export function planFormatBody(skill: string): string {
+  return skill.replace(FRONTMATTER, '').trimEnd();
+}
+
+/** The slots a plan-prompt template carries. */
+export const PLAN_PROMPT_SLOTS = [
+  'PLAN_FILE',
+  'PREREQUISITES_FILE',
+  'PROGRESS_SECTION',
+  'PLAN_FORMAT',
+  'SPEC_CONTENT',
+] as const;
+
+/** One of {@link PLAN_PROMPT_SLOTS}. */
+export type PlanPromptSlot = (typeof PLAN_PROMPT_SLOTS)[number];
+
+/** Any slot, braces included, with its name captured. */
+const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
+
+/**
+ * Builds the full plan-generation prompt. Exported for tests.
+ *
+ * `planFormat` is the dev-planner skill as read ({@link readPlanFormat});
+ * its frontmatter is dropped here ({@link planFormatBody}).
+ *
+ * Every slot is filled in ONE pass over the template, through a replacer
+ * function. Filled text is never scanned again, so a spec, a progress
+ * note or the skill that names a slot keeps the name as written, and no
+ * filled text is read as a replacement pattern, so a `$&` in it stays
+ * two characters. Measured on the chained `replaceAll` calls this
+ * replaced: a spec holding `$&` came out holding `{SPEC_CONTENT}`, and a
+ * progress note naming `{SPEC_CONTENT}` came out holding the spec.
+ */
 export function buildPlanPrompt(
   template: string,
+  planFormat: string,
   specContent: string,
   stub: string,
   progressContent?: string,
 ): string {
-  return template
-    .replaceAll('{PLAN_FILE}', `.plans/PLAN-${stub}.md`)
-    .replaceAll('{PREREQUISITES_FILE}', `.plans/PREREQUISITES-${stub}.md`)
-    .replaceAll('{PROGRESS_SECTION}', formatProgressSection(progressContent))
-    .replaceAll('{SPEC_CONTENT}', specContent);
+  const values: Record<PlanPromptSlot, string> = {
+    PLAN_FILE: `.plans/PLAN-${stub}.md`,
+    PREREQUISITES_FILE: `.plans/PREREQUISITES-${stub}.md`,
+    PROGRESS_SECTION: formatProgressSection(progressContent),
+    PLAN_FORMAT: planFormatBody(planFormat),
+    SPEC_CONTENT: specContent,
+  };
+  return template.replace(SLOT_PATTERN, (_slot: string, name: PlanPromptSlot) => values[name]);
 }
 
 /** Derives the plan stub from a spec path: specs/my-feature.md → my-feature. */
@@ -118,8 +204,9 @@ export default async function plan(args: string[]): Promise<void> {
   }
 
   const template = fs.readFileSync(path.join(__dirname, 'plan-prompt.md'), 'utf8');
+  const planFormat = readPlanFormat(__dirname);
   const specContent = fs.readFileSync(specPath, 'utf8');
-  const prompt = buildPlanPrompt(template, specContent, stub, progressContent);
+  const prompt = buildPlanPrompt(template, planFormat, specContent, stub, progressContent);
 
   console.log(`📝 Generating .plans/PLAN-${stub}.md from ${path.basename(specPath)}...`);
   const exitCode = await runClaude(prompt);

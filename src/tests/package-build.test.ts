@@ -6,10 +6,10 @@
  * The three fields are spelled HERE, as the phase 0 spec gives them, so a
  * target renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest, both tsconfig files, the README and `src/`) into a
- * scratch directory and runs `bun run build` there, the script as the
- * manifest holds it, so nothing is written into the repository's own
- * `dist/`.
+ * (its manifest, both tsconfig files, the README, the dev-planner skill
+ * and `src/`) into a scratch directory and runs `bun run build` there,
+ * the script as the manifest holds it, so nothing is written into the
+ * repository's own `dist/`.
  *
  * ## What each clause of the build script is for
  *
@@ -34,11 +34,14 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
- *   - `src/PROMPT.md` and `src/plan-prompt.md` are copied into `dist/`.
+ *   - `src/PROMPT.md`, `src/plan-prompt.md` and
+ *     `.claude/skills/dev-planner/SKILL.md` are copied into `dist/`.
  *     `start.ts` and `plan.ts` find them beside themselves through
  *     `import.meta.url`, and a bundle inlining either module answers its
  *     OWN directory. The two built files reading `import.meta.url` are
- *     `cli.js` and `index.js`, both directly in `dist/`.
+ *     `cli.js` and `index.js`, both directly in `dist/`. The skill is the
+ *     plan format `buildPlanPrompt` inlines into the plan prompt, and a
+ *     project running an installed rafa carries no copy of its own.
  *
  * ## The template cases
  *
@@ -46,10 +49,15 @@
  * plan` runs from the build in a scratch repository, under a PATH holding
  * git and a stand-in `claude` that keeps the prompt it is handed, and that
  * prompt is held equal to what `buildPlanPrompt` makes of the source
- * template. It runs twice, through `dist/cli.js` and through the root
- * bundle's `planCommand`. The control runs the same command from a copy of
- * the build without `plan-prompt.md`, which refuses before any session
- * starts, so the check can see a template that is not there.
+ * template and the source skill. It runs three times: through
+ * `dist/cli.js` and through the root bundle's `planCommand`, both inside
+ * the scratch package, where the package's own skill also sits one
+ * directory above `dist/`, and through a copy of the build outside the
+ * package, where only the copy beside `cli.js` exists. Two controls run
+ * the same command from a copy of the build outside the package, one
+ * without `plan-prompt.md` and one without `SKILL.md`, and each refuses
+ * before any session starts, so the check can see a template that is not
+ * there.
  *
  * ## How the cases were shown to fail
  *
@@ -57,12 +65,21 @@
  * run each, with the unmutated manifest green before and after them and
  * restored byte-identical. Seven reddened at least one case: `--splitting`
  * dropped (the two binding cases), `rm -rf dist` dropped (the stale chunk
- * case), the template copy dropped (all five template cases, the control
- * among them since the file it removes was never written), `bin` renamed,
+ * case), the template copy dropped (re-measured below), `bin` renamed,
  * the ports entry dropped from the build, the CLI built from
  * `src/index.ts`, and `files` widened to `src`. The eighth, `--root=src`
  * dropped, is equivalent: bun's default root for these four entries is
  * their common directory, `src`, and every case stayed green.
+ *
+ * Once the skill joined the copy, two mutations of the copy clause were
+ * run the same way. Dropping the whole clause reddened all eight template
+ * cases that need a copied file: the three byte cases, the three `rafa
+ * plan` runs, and both controls, since the file each removes was never
+ * written. Dropping only the skill reddened three: its byte case, the
+ * run outside the package and the skill control. The two runs inside the
+ * scratch package stayed green, because `readPlanFormat` falls back to
+ * the package's own skill one directory above `dist/`; that blind spot is
+ * why the run outside the package exists.
  *
  * `check-types` skips this file. Checked through a tsconfig outside the
  * repo, it compiled clean, and a planted TS2322 in a second file of the
@@ -89,7 +106,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import * as storeSource from '../effort/store/index.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
-import { buildPlanPrompt } from '../plan.js';
+import { buildPlanPrompt, planFormatCandidates } from '../plan.js';
 import * as portsSource from '../ports/index.js';
 
 /** The repository root: this file sits in `src/tests/`. */
@@ -110,8 +127,11 @@ const EXPORTS = {
 /** What the manifest publishes. */
 const FILES = ['dist'];
 
+/** The dev-planner skill, from the repository root: the plan format. */
+const SKILL = '.claude/skills/dev-planner/SKILL.md';
+
 /** The files the scratch copy of the package takes besides `src/`. */
-const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md'];
+const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md', SKILL];
 
 /** Each library entry: its path under `dist/`, and its source module. */
 const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
@@ -124,8 +144,15 @@ const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
 /** The subpath bundles whose every name the root bundle carries too. */
 const CONTAINED_SUBPATHS = ['plan/index.js', 'effort/store/index.js'];
 
-/** The templates the build copies beside its bundles. */
-const TEMPLATES = ['PROMPT.md', 'plan-prompt.md'];
+/**
+ * The templates the build copies beside its bundles: each one's source,
+ * from the repository root, and its name in `dist/`.
+ */
+const TEMPLATES: [string, string][] = [
+  ['src/PROMPT.md', 'PROMPT.md'],
+  ['src/plan-prompt.md', 'plan-prompt.md'],
+  [SKILL, 'SKILL.md'],
+];
 
 /** The spec the template cases plan from, and what `rafa plan` is told. */
 const SPEC = '# Spec: a build probe\n\nNothing to build.\n';
@@ -269,10 +296,27 @@ function plantPlanScratch(name: string): PlanScratch {
   return { root, repo, prompt, env: { PATH: path, HOME: home } };
 }
 
-/** The prompt `rafa plan` builds from the source template for {@link SPEC}. */
+/**
+ * A copy of the build at `dist/` under a scratch root, outside the
+ * scratch package, with `removed` taken out of it.
+ */
+function copyBuildOutsidePackage(scratch: PlanScratch, removed: string | null): string {
+  const copy = join(scratch.root, 'dist');
+  cpSync(DIST, copy, { recursive: true });
+  if (removed !== null) rmSync(join(copy, removed));
+  return copy;
+}
+
+/** The candidates `readPlanFormat` would find from `moduleDir`. */
+function presentPlanFormats(moduleDir: string): string[] {
+  return planFormatCandidates(moduleDir).filter((candidate) => existsSync(candidate));
+}
+
+/** The prompt `rafa plan` builds from the source template and skill for {@link SPEC}. */
 function expectedPlanPrompt(): string {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
-  return buildPlanPrompt(template, SPEC, 'spec');
+  const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
+  return buildPlanPrompt(template, skill, SPEC, 'spec');
 }
 
 describe('the package manifest', () => {
@@ -367,11 +411,11 @@ describe('the built library entries', () => {
 });
 
 describe('the prompt templates in the build', () => {
-  it.each(TEMPLATES)('copies src/%s into dist unchanged', (name) => {
+  it.each(TEMPLATES)('copies %s into dist as %s, unchanged', (source, name) => {
     const built = join(DIST, name);
 
     expect(existsSync(built)).toBe(true);
-    expect(readFileSync(built, 'utf8')).toBe(readFileSync(join(REPO_ROOT, 'src', name), 'utf8'));
+    expect(readFileSync(built, 'utf8')).toBe(readFileSync(join(REPO_ROOT, source), 'utf8'));
   });
 
   it('writes every built file that reads import.meta.url directly into dist', () => {
@@ -405,16 +449,36 @@ describe('the prompt templates in the build', () => {
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
+  it('hands rafa plan the format from a copy of the build outside the package', () => {
+    const scratch = plantPlanScratch('outside');
+    const copy = copyBuildOutsidePackage(scratch, null);
+    const plan = run([process.execPath, join(copy, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(presentPlanFormats(copy)).toEqual([join(copy, 'SKILL.md')]);
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
   it('refuses before any session when the template is missing beside the bundle', () => {
     const scratch = plantPlanScratch('control');
-    const bare = join(scratch.root, 'dist');
-    cpSync(DIST, bare, { recursive: true });
-    rmSync(join(bare, 'plan-prompt.md'));
+    const bare = copyBuildOutsidePackage(scratch, 'plan-prompt.md');
     const plan = run([process.execPath, join(bare, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(plan.exitCode).not.toBe(0);
     expect(plan.stderr).toContain('ENOENT');
     expect(plan.stderr).toContain('plan-prompt.md');
+    expect(existsSync(scratch.prompt)).toBe(false);
+  }, 30_000);
+
+  it('refuses before any session when the skill is missing beside a bundle outside the package', () => {
+    const scratch = plantPlanScratch('control-skill');
+    const bare = copyBuildOutsidePackage(scratch, 'SKILL.md');
+    const plan = run([process.execPath, join(bare, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(presentPlanFormats(bare)).toEqual([]);
+    expect(plan.exitCode).not.toBe(0);
+    expect(plan.stderr).toContain('The plan format is missing');
+    expect(plan.stderr).toContain(join(bare, 'SKILL.md'));
     expect(existsSync(scratch.prompt)).toBe(false);
   }, 30_000);
 });

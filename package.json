@@ -24,7 +24,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "rm -rf dist && bun build src/rafa.ts --target=bun --outfile=dist/cli.js && bun build src/index.ts src/plan/index.ts src/effort/store/index.ts src/ports/index.ts --target=bun --splitting --root=src --outdir=dist && cp src/PROMPT.md src/plan-prompt.md dist/",
+    "build": "rm -rf dist && bun build src/rafa.ts --target=bun --outfile=dist/cli.js && bun build src/index.ts src/plan/index.ts src/effort/store/index.ts src/ports/index.ts --target=bun --splitting --root=src --outdir=dist && cp src/PROMPT.md src/plan-prompt.md .claude/skills/dev-planner/SKILL.md dist/",
     "test": "bun test",
     "lint": "eslint .",
     "check-types": "tsc --noEmit",
