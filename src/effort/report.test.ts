@@ -51,8 +51,8 @@
  * landing in `classify.ts` reaches the `--kind` validator without an
  * edit here, and a shape dropped from the derivation reds.
  *
- * Twenty-one module mutations were driven against this file and
- * TWENTY reddened at least one case, none of them missing its target,
+ * Nineteen module mutations were driven against this file and
+ * EIGHTEEN reddened at least one case, none of them missing its target,
  * with the restored module green either side and byte-identical:
  * grouping on the branch before the plan stub, dropping the branch
  * fallback so every unattributed row lands in one bucket, keying the
@@ -66,9 +66,10 @@
  * entrypoint instead of the dominant one, letting a row with no
  * entrypoint pass an entrypoint filter, breaking a dominance tie on
  * insertion order, sorting groups ascending, sorting on sessions
- * instead of tokens, rendering an empty histogram as an empty string,
- * dropping the TOTAL row from the table, accepting an unrecognised
- * argument, and keeping a duplicate on a repeated `--kind`.
+ * instead of tokens, accepting an unrecognised argument, and keeping a
+ * duplicate on a repeated `--kind`. The two aimed at the table, an
+ * empty histogram rendered as an empty string and the TOTAL row
+ * dropped, moved with its cases to `report-format.test.ts`.
  *
  * ONE stayed green and is named rather than dropped, because it is a
  * property of the FIXTURES rather than a hole in the suite: dropping
@@ -102,11 +103,6 @@ import {
   buildReport,
   dominantEntrypoint,
   emptyGroup,
-  formatCount,
-  formatHistogram,
-  formatMinutes,
-  formatReport,
-  formatReportTable,
   groupKeyOf,
   matchesFilters,
   parseReportArgs,
@@ -616,92 +612,6 @@ describe('sortGroups', () => {
     sortGroups(groups);
 
     expect(groups.map((group) => group.key)).toEqual(['b', 'a']);
-  });
-});
-
-describe('formatting', () => {
-  it('groups a count in threes without a locale', () => {
-    expect(formatCount(0)).toBe('0');
-    expect(formatCount(999)).toBe('999');
-    expect(formatCount(1000)).toBe('1,000');
-    expect(formatCount(84053)).toBe('84,053');
-    expect(formatCount(1234567)).toBe('1,234,567');
-  });
-
-  it('renders a missing span as a dash', () => {
-    expect(formatMinutes(null)).toBe('-');
-    expect(formatMinutes(0)).toBe('0.0');
-    expect(formatMinutes(12.34)).toBe('12.3');
-  });
-
-  it('renders a histogram commonest first, ties by key', () => {
-    expect(formatHistogram({})).toBe('-');
-    expect(formatHistogram({ low: 2, xhigh: 9 })).toBe('xhigh=9 low=2');
-    expect(formatHistogram({ b: 1, a: 1 })).toBe('a=1 b=1');
-  });
-});
-
-describe('formatReportTable', () => {
-  it('renders a header, every group and a TOTAL row', () => {
-    const lines = formatReportTable(summariseSessions(ROWS));
-
-    expect(lines).toHaveLength(6);
-    expect(lines[0]?.startsWith('plan / branch')).toBe(true);
-    expect(lines[5]?.startsWith('TOTAL')).toBe(true);
-  });
-
-  it('carries no pipe, so no markdown row can split', () => {
-    for (const line of formatReportTable(summariseSessions(ROWS))) {
-      expect(line).not.toContain('|');
-    }
-  });
-
-  it('aligns every cell into one column per header', () => {
-    const lines = formatReportTable(summariseSessions(ROWS));
-    const header = lines[0] ?? '';
-    const offset = header.indexOf('sessions');
-
-    expect(offset).toBeGreaterThan(0);
-    for (const line of lines.slice(1)) {
-      // Right-aligned, so the column's last character is its end.
-      expect(line.slice(offset - 2, offset + 8)).toMatch(/^ +\d[\d,]*$/);
-    }
-  });
-
-  it('leaves no trailing whitespace on any line', () => {
-    for (const line of formatReportTable(summariseSessions(ROWS))) {
-      expect(line).toBe(line.trimEnd());
-    }
-  });
-
-  it('names both filters, and what they left', () => {
-    const lines = formatReport(summariseSessions(ROWS, {
-      kinds: ['task', 'other'],
-      entrypoints: ['sdk-cli'],
-    }));
-
-    expect(lines[0]).toContain('4 of 6 session rows');
-    expect(lines[1]).toContain('task, other');
-    expect(lines[2]).toContain('sdk-cli');
-  });
-
-  it('notes the spanless rows and the legacy ones', () => {
-    const text = formatReport(summariseSessions(ROWS)).join('\n');
-
-    expect(text).toContain('1 sessions contributed no span');
-    expect(text).toContain('1 rows predate the effort field');
-  });
-
-  it('omits both notes when neither applies', () => {
-    const clean = [plantRow({
-      branch: 'b',
-      firstTimestamp: '2026-09-08T10:00:00.000Z',
-      lastTimestamp: '2026-09-08T10:01:00.000Z',
-    })];
-    const lines = formatReport(summariseSessions(clean));
-
-    expect(lines[1]).toBe('');
-    expect(lines.join('\n')).not.toContain('note');
   });
 });
 

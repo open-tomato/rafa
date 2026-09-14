@@ -1,7 +1,7 @@
 /**
  * End-to-end test for the effort pipeline: collect, then report.
  *
- * The effort stack's seven modules each have a colocated suite
+ * The effort stack's eight modules each have a colocated suite
  * driving their own seam, and between them every function here is
  * already covered.
  * What none of them drives is the JOIN — a row the COLLECTOR wrote,
@@ -84,7 +84,7 @@
  * kinds the classifier declares rather than over the ones observed.
  *
  * Twenty-one module mutations were driven against this file, across
- * six of the stack's seven modules, and EIGHTEEN reddened at least
+ * six of the stack's eight modules, and EIGHTEEN reddened at least
  * one case, with the restored modules green either side and
  * byte-identical: making either store key projection a constant,
  * recursing the log walk into the subagent directory, attributing a
@@ -133,10 +133,10 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { PROMPT_SHAPES } from '../effort/classify.js';
 import { collectEffort } from '../effort/collect.js';
+import { formatReport } from '../effort/report-format.js';
 import {
   SESSION_KINDS,
   buildReport,
-  formatReport,
 } from '../effort/report.js';
 import { readStoreRows } from '../effort/store.js';
 
