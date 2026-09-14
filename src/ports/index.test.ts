@@ -11,8 +11,9 @@
  * written to a temporary directory outside the repository and import the
  * entry by absolute path, so no gate ever reads one.
  *
- * One probe implements all five ports, assigns both store backends to
- * `Store`, and compiles clean. Every other probe changes one thing
+ * One probe implements all five ports, its tracker under a kind an
+ * add-on brings, assigns both store backends to `Store`, states every
+ * port version, and compiles clean. Every other probe changes one thing
  * against one port and is held to exactly one diagnostic: its code, and
  * message text naming what the probe changed, so a probe failing for
  * some other reason does not pass as the refusal it is there to show.
@@ -32,13 +33,22 @@
  * open-tomato's own `Tracker`, at the source commit the module note
  * records, and the `github`, `linear` and `local` adapters built against
  * it were each assignable to the copy, and the copy to the source's
- * `Tracker`, with no diagnostic. A `Tracker` assigned to `Planner` in the
- * same program failed with TS2322. A `transition` taking only `done`
- * compiled against the source's method signatures and failed with TS2322
- * against the copy's property signatures, which is the module note's
- * claim.
+ * `Tracker`, with no diagnostic, while the copy's `TrackerKind` was
+ * still closed. A `Tracker` assigned to `Planner` in the same program
+ * failed with TS2322. A `transition` taking only `done` compiled against
+ * the source's method signatures and failed with TS2322 against the
+ * copy's property signatures, which is the module note's claim.
  *
- * Twelve mutations of the entry were driven against this file, one run
+ * Re-measured on 2026-09-14 once `TrackerKind` was opened, the source
+ * still at that commit: each `Tracker` assigned to the other now fails
+ * with TS2322 on `kind`. The copy's is refused by the source's at `kind`
+ * itself. The source's is refused by the copy's through `get`, whose
+ * `ref` may carry a kind the source's `IssueRef` does not admit. An
+ * adapter typed against the source is retyped against the copy when it
+ * is ported.
+ *
+ * Twelve mutations of the entry were driven against this file while
+ * `TrackerKind` was closed and before the port versions existed, one run
  * each, with the unmutated entry green before them and restored
  * byte-identical after, and every one reddened at least one case.
  * `Planner` left unexported reddened the name list, the clean probe and
@@ -49,7 +59,18 @@
  * `transition` made optional, `transition` spelled as a method,
  * `TrackerKind`, `signal` and `MergeRule` each widened to `string`, `push`
  * allowed to answer synchronously, `CliEvent` opened to any `type`, and
- * `prerequisitesPath` made optional.
+ * `prerequisitesPath` made optional. The `TrackerKind` refusal then was
+ * of `obsidian`, which the entry now accepts.
+ *
+ * Five more were driven the same way on 2026-09-14, once the versions
+ * were added and `TrackerKind` opened, with the suite at 20 pass before
+ * and after. `TrackerKind` closed again reddened the clean probe and the
+ * named-kinds case. `TrackerKind` opened with a plain `| string`
+ * reddened the named-kinds case and the non-string kind refusal.
+ * `PortType` widened to `string` reddened its own refusal alone.
+ * `TrackerPortVersion` widened to `number` reddened the drifted version
+ * refusal, and `PortVersions` without `planner` the clean probe; each
+ * also reddened the registry suite's literal case.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -96,22 +117,32 @@ const TYPE_EXPORTS = [
   'IssueState',
   'IssueType',
   'Learning',
+  'LearningPortVersion',
   'MergeDecision',
   'MergeResult',
   'MergeRule',
   'Output',
+  'OutputPortVersion',
   'PlanRequest',
   'Planner',
+  'PlannerPortVersion',
+  'PortType',
+  'PortVersions',
   'PreflightResult',
   'SessionEffortRow',
   'SessionMode',
   'Store',
+  'StorePortVersion',
   'SyncPayload',
   'Tracker',
   'TrackerCapabilities',
   'TrackerKind',
+  'TrackerPortVersion',
   'TransitionResult',
 ];
+
+/** The members of `TrackerKind`, as the checker prints each, sorted. */
+const TRACKER_KIND_MEMBERS = ['"github"', '"linear"', '"local"', 'string & {}'];
 
 /** A module a probe imports, as a quoted absolute specifier. */
 function specifierOf(...segments: string[]): string {
@@ -158,7 +189,7 @@ function instinctLiteral(signal: string): string {
 const CONFORMING_PROBE = probeSource(
   `import { openNdjsonStore } from ${specifierOf('effort', 'store', 'ndjson.js')};`,
   `import { openSqliteStore } from ${specifierOf('effort', 'store', 'sqlite.js')};`,
-  ...trackerLiteral('"local"', 'async () => ({})'),
+  ...trackerLiteral('"obsidian"', 'async () => ({})'),
   'export const ndjson: P.Store = openNdjsonStore("/nonexistent");',
   'export const sqlite: P.Store = openSqliteStore("/nonexistent");',
   `export const instinct: P.InstinctRecord = ${instinctLiteral('"silent"')};`,
@@ -185,6 +216,10 @@ const CONFORMING_PROBE = probeSource(
   '    prerequisitesPath: null,',
   '  }),',
   '};',
+  'export const versions: P.PortVersions = {',
+  '  tracker: 1, store: 1, learning: 1, output: 1, planner: 1,',
+  '};',
+  'export const port: P.PortType = "planner";',
 );
 
 /** One probe changing one thing, and the one diagnostic it must draw. */
@@ -225,11 +260,11 @@ const REFUSALS: readonly Refusal[] = [
     names: '_state: "done"',
   },
   {
-    title: 'a tracker kind outside the copied union',
-    file: 'tracker-add-on-kind.ts',
-    source: probeSource(...trackerLiteral('"obsidian"', 'async () => ({})')),
+    title: 'a tracker kind that is not a string',
+    file: 'tracker-number-kind.ts',
+    source: probeSource(...trackerLiteral('42', 'async () => ({})')),
     code: 2322,
-    names: '"obsidian"',
+    names: 'Type \'number\' is not assignable to type \'TrackerKind\'',
   },
   {
     title: 'a store whose keys accepts one kind only',
@@ -297,6 +332,24 @@ const REFUSALS: readonly Refusal[] = [
     code: 2322,
     names: 'prerequisitesPath',
   },
+  {
+    title: 'a port version other than the one its port declares',
+    file: 'port-version-drifted.ts',
+    source: probeSource(
+      'export const versions: P.PortVersions = {',
+      '  tracker: 2, store: 1, learning: 1, output: 1, planner: 1,',
+      '};',
+    ),
+    code: 2322,
+    names: 'Type \'2\' is not assignable to type \'1\'',
+  },
+  {
+    title: 'a port type the entry does not declare',
+    file: 'port-type-unknown.ts',
+    source: probeSource('export const port: P.PortType = "storage";'),
+    code: 2820,
+    names: '"storage"',
+  },
 ];
 
 /** One diagnostic, as a case reads it. */
@@ -331,6 +384,18 @@ function readingsOf(file: string): Reading[] {
     code: diagnostic.code,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   }));
+}
+
+/** The symbols the entry exports, as the compiler holds them. */
+function entryExports(): ts.Symbol[] {
+  const { program } = compiledProbes();
+  const checker = program.getTypeChecker();
+  const source = program.getSourceFile(ENTRY_FILE);
+  const symbol = source === undefined
+    ? undefined
+    : checker.getSymbolAtLocation(source);
+  if (symbol === undefined) throw new Error('the compiler holds no symbol for the entry');
+  return checker.getExportsOfModule(symbol);
 }
 
 beforeAll(() => {
@@ -394,19 +459,24 @@ describe('the ports entry as the compiler reads it', () => {
   });
 
   it('exports exactly the type names it declares', () => {
-    const { program } = compiledProbes();
-    const checker = program.getTypeChecker();
-    const source = program.getSourceFile(ENTRY_FILE);
-    const symbol = source === undefined
-      ? undefined
-      : checker.getSymbolAtLocation(source);
-    if (symbol === undefined) throw new Error('the compiler holds no symbol for the entry');
-
-    const names = checker.getExportsOfModule(symbol)
+    const names = entryExports()
       .map((exported) => exported.name)
       .sort();
 
     expect(names).toEqual(TYPE_EXPORTS);
+  });
+
+  it('keeps the three named tracker kinds in a union that admits any other', () => {
+    const checker = compiledProbes().program.getTypeChecker();
+    const kind = entryExports().find((exported) => exported.name === 'TrackerKind');
+    if (kind === undefined) throw new Error('the entry exports no TrackerKind');
+    const type = checker.getDeclaredTypeOfSymbol(kind);
+    const members = type.isUnion()
+      ? type.types
+      : [type];
+
+    expect(members.map((member) => checker.typeToString(member)).sort())
+      .toEqual(TRACKER_KIND_MEMBERS);
   });
 
   it('accepts an implementation of every port, and both store backends as Store', () => {

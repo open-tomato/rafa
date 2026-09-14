@@ -22,10 +22,13 @@
  *   - The Tracker source's `as const` tuples. Each union they derived
  *     is spelled out as a literal union instead, keeping the members and
  *     dropping the tuple, so nothing here enumerates them at runtime.
- *   - A port version number. The modules spec gives every port one and
- *     has core refuse a module whose version it no longer serves, but a
- *     number core compares at runtime is a value, and the comparison is
- *     phase 1's seam.
+ *   - The number core compares a port version against. The modules spec
+ *     gives every port a version and has core refuse a module whose
+ *     version it no longer serves. Each version is declared here as a
+ *     number literal type, gathered in {@link PortVersions} under the
+ *     port types the adapter registry keys by. The number core compares
+ *     is `PORT_VERSIONS` in `src/adapters/registry.ts`, held equal to
+ *     these literals there.
  *
  * ## Where each port comes from
  *
@@ -35,11 +38,12 @@
  *     1 spec asks for a copy rather than a dependency, with its source
  *     commit recorded, so the monorepo can later be pointed at this
  *     export and the port does not live twice. Member types and their
- *     TSDoc are carried over as written, so they speak of open-tomato's
- *     OPT numbers, CLI and ledger. Left out: `BOARD_COLUMNS`,
- *     `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`, which are values and the
- *     GitHub adapter's projections, and `LedgerEntry`, the local
- *     ledger's line, which arrives with the degradation chain.
+ *     TSDoc are carried over as written, {@link TrackerKind} aside, so
+ *     they speak of open-tomato's OPT numbers, CLI and ledger. Left
+ *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
+ *     which are values and the GitHub adapter's projections, and
+ *     `LedgerEntry`, the local ledger's line, which arrives with the
+ *     degradation chain.
  *   - {@link Store}: the effort store port phase 0 already built, in
  *     `src/effort/store/types.ts`, re-exported under the port's name
  *     rather than declared again. `Store` is `EffortStore`, and the rows
@@ -65,15 +69,12 @@
  * method's parameters bivariantly and a property's strictly, so an
  * adapter accepting less than the port hands it, such as a `transition`
  * taking only `done`, compiles against a method and is refused against a
- * property. The Tracker source and the Learning spec both spell methods;
- * this is the one change their copies make to a member's type.
+ * property. The Tracker source and the Learning spec both spell methods.
+ * This is the one change the Learning copy makes to a member's type; the
+ * Tracker copy makes one more, opening {@link TrackerKind}.
  *
  * ## Left open for phase 1
  *
- *   - {@link TrackerKind} is copied closed, `github`, `linear` or
- *     `local`, while the phase 1 table names `obsidian` as a Tracker
- *     add-on and lets an add-on register an adapter by name. The union
- *     admits no kind an add-on brings.
  *   - {@link MergeResult}: the spec names `discarded` and describes the
  *     rest, a list saying which rule applied to each incoming record and
  *     what it produced, without naming it. `decisions`,
@@ -97,11 +98,60 @@ export type {
 } from '../effort/store/types.js';
 
 // ---------------------------------------------------------------------
+// Port versions
+// ---------------------------------------------------------------------
+
+/** The version of the {@link Tracker} port this entry declares. */
+export type TrackerPortVersion = 1;
+
+/** The version of the {@link Store} port this entry declares. */
+export type StorePortVersion = 1;
+
+/** The version of the {@link Learning} port this entry declares. */
+export type LearningPortVersion = 1;
+
+/** The version of the {@link Output} port this entry declares. */
+export type OutputPortVersion = 1;
+
+/** The version of the {@link Planner} port this entry declares. */
+export type PlannerPortVersion = 1;
+
+/**
+ * Each port's version, under the port type the adapter registry keys its
+ * adapters by. An adapter states the version of its port it implements,
+ * and the registry refuses one core does not serve.
+ */
+export interface PortVersions {
+  tracker: TrackerPortVersion;
+  store: StorePortVersion;
+  learning: LearningPortVersion;
+  output: OutputPortVersion;
+  planner: PlannerPortVersion;
+}
+
+/** The five port types: `tracker`, `store`, `learning`, `output` and `planner`. */
+export type PortType = keyof PortVersions;
+
+// ---------------------------------------------------------------------
 // Tracker
 // ---------------------------------------------------------------------
 
-/** The platforms a tracker adapter projects issues onto. */
-export type TrackerKind = 'github' | 'linear' | 'local';
+/**
+ * The platform a tracker adapter projects issues onto, named as the
+ * adapter registry keys it.
+ *
+ * The source closes this over `github`, `linear` and `local`. The copy
+ * keeps those three and admits any other name, because an add-on
+ * registers a tracker under a kind core has never heard of (`obsidian`
+ * in the phase 1 table), and the config accepts any kind name for
+ * `tracker.default` and `tracker.fallback`. Whether a kind has an
+ * adapter is the registry's answer, not this type's.
+ *
+ * `string & {}` is a string the checker does not merge with the three
+ * named members. Under `| string` the union reduces to `string`, and the
+ * three names are gone from the type.
+ */
+export type TrackerKind = 'github' | 'linear' | 'local' | (string & {});
 
 /** What an issue is for. */
 export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api';
