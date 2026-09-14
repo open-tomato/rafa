@@ -49,6 +49,13 @@
  * id seam ignored (1), the output dropped (5), the task line replaced
  * (3), the plan stub dropped (1), and a failed render that does not stop
  * the run (1).
+ *
+ * The routed-effort case came after those fifteen, and it is the only
+ * reading of `start.ts` handing the dispatch its repository root and
+ * `homedir()`, which reads the HOME each run is given. Two legs were
+ * driven against it, each twice: handing the repository root as the
+ * home, and the home as the repository root, each redden that case
+ * alone.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -154,6 +161,8 @@ describe('a dispatched task session', () => {
       promptContent: 'The loop stages and commits on your behalf.',
       planContent: plan,
       inject: 'full',
+      repoRoot: tempRoot,
+      home: join(tempRoot, 'home'),
       run,
       newSessionId,
     });
@@ -577,4 +586,42 @@ describe('rafa start, over a stand-in claude', () => {
     expect(callCount(scratch)).toBe(1);
     expect(trackerTasks(scratch)).toEqual([`- [x] ${BREAKING_TASK}`, `- [ ] ${REPORTING_TASK}`]);
   }, RUN_TIMEOUT);
+
+  it('passes a routed effort unless the definition under the repo or the HOME declares its own', () => {
+    const scratch = plantScratch([ROUTED_HOME_TASK, ROUTED_REPO_TASK, ROUTED_NOWHERE_TASK]);
+    plantDefinition(scratch.home, 'doc-updater', 'high');
+    plantDefinition(scratch.repo, 'tdd-guide', 'high');
+    git(scratch.repo, 'add', '-A');
+    git(scratch.repo, 'commit', '-q', '--no-verify', '-m', 'agents');
+
+    const run = runStart(scratch);
+
+    expect(run).toMatchObject({ exitCode: 0 });
+    expect(callCount(scratch)).toBe(4);
+    const idArgs = (n: number) => [...CLAUDE_BASE_ARGS, '--session-id', requireSessionId(scratch, n)];
+    expect(argsOf(scratch, 1)).toEqual([...idArgs(1), '--agent', 'doc-updater']);
+    expect(argsOf(scratch, 2)).toEqual([...idArgs(2), '--agent', 'tdd-guide']);
+
+    // The control: an agent neither root defines still passes the plan
+    // level, so the two absences above are definitions read, one under
+    // the HOME the run was given and one under its repository.
+    expect(argsOf(scratch, 3)).toEqual([...idArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+  }, RUN_TIMEOUT);
 });
+
+/** A task routed to an agent whose only definition sits under the HOME. */
+const ROUTED_HOME_TASK = 'Add the first routed module MARK-SILENT  {agent=doc-updater effort=low}';
+
+/** A task routed to an agent whose only definition sits in the repository. */
+const ROUTED_REPO_TASK = 'Add the second routed module MARK-SILENT  {agent=tdd-guide effort=low}';
+
+/** A task routed to an agent neither root defines. */
+const ROUTED_NOWHERE_TASK = 'Add the third routed module MARK-SILENT  {agent=code-reviewer effort=medium}';
+
+/** Writes a definition of `name` under `root`, declaring `effort`. */
+function plantDefinition(root: string, name: string, effort: string): void {
+  const dir = join(root, '.claude', 'agents');
+  mkdirSync(dir, { recursive: true });
+  const text = ['---', `name: ${name}`, 'description: A stand-in definition.', `effort: ${effort}`, '---', 'The body.', ''];
+  writeFileSync(join(dir, `${name}.md`), text.join('\n'), 'utf8');
+}

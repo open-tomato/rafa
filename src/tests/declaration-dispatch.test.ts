@@ -118,6 +118,22 @@
  * recognised-key rule together. Neither half reddens anything alone
  * (measured, 0 of 14 each): each shadows the other, so only the pair
  * can say which two layers that case rests on.
+ *
+ * ## The agent's own effort
+ *
+ * That grid counts 14 cases because it predates the two under
+ * `a routed task whose agent declares its own effort`, which plant
+ * `doc-updater` definitions under roots of their own and read whether
+ * the dispatch passed `--effort`. Every other dispatch here is handed
+ * roots that hold nothing, so its effort always passes. Both cases were
+ * driven against legs over `start/dispatch.ts`,
+ * `utils/agent-definition.ts` and `utils/declaration.ts`, each run
+ * twice with identical red sets, and both redden. Handing the resolver
+ * a lookup that ignores the definitions reddens both; swapping
+ * `repoRoot` and `home` on their way to the lookup reddens the home
+ * case ALONE, because its shadowed dispatch is the only one here with a
+ * definition in each root, where only the search ORDER tells the two
+ * roots apart.
  */
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
@@ -226,14 +242,16 @@ const DISPATCHES: readonly DispatchSpec[] = [
   {
     text: 'Update the skill cap sentence',
     block: '{agent=doc-updater model=haiku effort=low}',
-    flags: ['--agent', 'doc-updater'],
+    flags: ['--agent', 'doc-updater', '--effort', 'low'],
     argv: [
       '-p',
       '--dangerously-skip-permissions',
       '--agent',
       'doc-updater',
+      '--effort',
+      'low',
     ],
-    suppressed: ['model', 'effort'],
+    suppressed: ['model'],
   },
   {
     text: ROUTING_TASK,
@@ -338,6 +356,11 @@ interface DispatchOverrides {
   exitCode?: number;
   /** The tracker status the loop read. Defaults to unchecked. */
   status?: TaskInfo['status'];
+  /**
+   * The roots agent definitions resolve under. Defaults to two paths
+   * under this file's temporary directory that hold nothing.
+   */
+  roots?: { repoRoot: string; home: string };
 }
 
 /**
@@ -376,6 +399,8 @@ async function dispatchSpec(
     promptContent: PROMPT_CONTENT,
     planContent: PLAN_CONTENT,
     inject: 'full',
+    repoRoot: overrides.roots?.repoRoot ?? join(tempRoot, 'no-definitions', 'repo'),
+    home: overrides.roots?.home ?? join(tempRoot, 'no-definitions', 'home'),
     run,
   });
 
@@ -517,13 +542,15 @@ describe('a declaration-bearing task, dispatched', () => {
     await dispatchSpec(spec, AGENT_SPEC);
     const line = announced('Routed as: ');
 
-    expect(line).toContain('--agent doc-updater');
+    expect(line).toContain('--agent doc-updater --effort low');
     for (const key of spec.suppressed) expect(line).toContain(key);
 
-    // The granular keys are on the record and off the command line,
-    // so the only place a plan can see they were outranked is here.
+    // The model is on the record and off the command line, so the only
+    // place a plan can see it was outranked is here. The effort reached
+    // the command line, because no definition under this dispatch's
+    // roots declares one of its own.
+    expect(line).toContain('(model left to the agent)');
     expect(line).not.toContain('--model');
-    expect(line).not.toContain('--effort');
   });
 
   it('says nothing about routing for a plain task', async () => {
@@ -671,5 +698,86 @@ describe('what a finished declared task commits', () => {
 
     expect(seen[0]?.taskText).toBe(spec.text);
     expect(seen[0]?.taskText).toBe(taskInfoFor(spec, PLAIN_SPEC).task);
+  });
+});
+
+/** A `doc-updater` definition, declaring `effort` unless it is null. */
+function docUpdaterDefinition(effort: string | null): string {
+  const lines = [
+    '---',
+    'name: doc-updater',
+    'description: A stand-in for the vendored definition.',
+    'model: haiku',
+  ];
+  if (effort !== null) lines.push(`effort: ${effort}`);
+  return [...lines, '---', 'The agent body.', ''].join('\n');
+}
+
+/**
+ * Where each root's `doc-updater` definition declares its effort: a
+ * level, `null` for a definition silent on effort, and an absent key
+ * for no definition in that root at all.
+ */
+interface PlantedDefinitions {
+  project?: string | null;
+  user?: string | null;
+}
+
+let definitionSets = 0;
+
+/** Fresh roots under this file's temporary directory, planted as named. */
+function definitionRoots(definitions: PlantedDefinitions): { repoRoot: string; home: string } {
+  definitionSets += 1;
+  const base = join(tempRoot, `definitions-${definitionSets}`);
+  const roots = { repoRoot: join(base, 'repo'), home: join(base, 'home') };
+  const planted = [
+    { root: roots.repoRoot, effort: definitions.project },
+    { root: roots.home, effort: definitions.user },
+  ];
+
+  for (const { root, effort } of planted) {
+    if (effort === undefined) continue;
+    const dir = join(root, '.claude', 'agents');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'doc-updater.md'), docUpdaterDefinition(effort), 'utf8');
+  }
+
+  expect(roots.repoRoot.startsWith(tempRoot)).toBe(true);
+  expect(roots.home.startsWith(tempRoot)).toBe(true);
+  return roots;
+}
+
+describe('a routed task whose agent declares its own effort', () => {
+  it('leaves the effort to a project definition that declares one', async () => {
+    const spec = DISPATCHES[AGENT_SPEC]!;
+    const declaring = definitionRoots({ project: 'high' });
+    const { result, calls } = await dispatchSpec(spec, AGENT_SPEC, { roots: declaring });
+
+    expect(result.flags).toEqual(['--agent', 'doc-updater']);
+    expect(onlyCall(calls).args).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--agent',
+      'doc-updater',
+    ]);
+    expect(announced('Routed as: ')).toContain('(model, effort left to the agent)');
+
+    // The control: the same dispatch over a project definition silent
+    // on effort passes the plan level on.
+    const silent = definitionRoots({ project: null });
+    const passed = await dispatchSpec(spec, AGENT_SPEC, { roots: silent });
+    expect(passed.result.flags).toEqual(['--agent', 'doc-updater', '--effort', 'low']);
+  });
+
+  it('reads the home definition only when the repo holds none', async () => {
+    const spec = DISPATCHES[AGENT_SPEC]!;
+    const userOnly = definitionRoots({ user: 'high' });
+    const shadowed = definitionRoots({ project: null, user: 'high' });
+
+    const owned = await dispatchSpec(spec, AGENT_SPEC, { roots: userOnly });
+    const passed = await dispatchSpec(spec, AGENT_SPEC, { roots: shadowed });
+
+    expect(owned.result.flags).toEqual(['--agent', 'doc-updater']);
+    expect(passed.result.flags).toEqual(['--agent', 'doc-updater', '--effort', 'low']);
   });
 });

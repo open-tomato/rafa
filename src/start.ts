@@ -62,6 +62,7 @@ import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 
 import fs from 'fs';
+import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -247,6 +248,8 @@ export default async function start(args: string[]): Promise<void> {
       promptContent,
       planContent,
       inject: injectMode,
+      repoRoot,
+      home: homedir(),
     });
     const { exitCode } = dispatch;
 

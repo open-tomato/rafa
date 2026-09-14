@@ -1,28 +1,38 @@
 /**
- * The declaration-to-flag mapping, both halves of the priority rule.
+ * The declaration-to-flag mapping, every side of the priority rule.
  *
  * `utils/declaration.test.ts` beside the module drives the grammar and
  * hands this matrix here by name, keeping exactly one claim of its own:
  * a null declaration resolves to no flags at all. What is left is the
- * rule the grammar duplicates ON PURPOSE — an `agent` outranks
- * `model`, `effort` and `tools` entirely, because an agent definition
- * already names a model and a tool set and a flag beside it would be
- * two authorities for one decision. The outranked keys stay ON THE
- * RECORD so a later report can say what a planner asked for against
- * what the agent supplied, and {@link ResolvedFlags.suppressed} names
- * which ones those were.
+ * rule the grammar duplicates ON PURPOSE. An `agent` outranks `model`
+ * and `tools` whenever it is named, because an agent definition already
+ * names a model and a tool set and a flag beside it would be two
+ * authorities for one decision. It outranks `effort` only when its
+ * definition declares an effort of its own; otherwise `--effort` joins
+ * `--agent`. The outranked keys stay ON THE RECORD, and
+ * {@link ResolvedFlags.suppressed} names which ones those were.
  *
- * Half of that is a REFUSAL — the resolver emitting no `--model` for a
- * block that plainly carried one — and a refusal case is satisfied by a
- * resolver that emits nothing whatever it is handed. So the shape here
- * is a PAIRED TABLE rather than a list of assertions: every entry in
- * `ROUTING_PAIRS` carries one granular half, and the table is driven
- * TWICE — once by the case that puts `agent=` in front of that half
- * and once by the case that does not — varying the single axis the
- * rule is about while the granular spelling stays byte-identical
- * across the pair. The suppression reading and the mapping reading
- * are therefore each other's positive control, and neither can pass
- * against a resolver that has stopped emitting.
+ * Whether a definition declares an effort is a lookup the caller hands
+ * in, which `utils/agent-definition.ts` answers for the loop from the
+ * definition's frontmatter. That module's suite reads files; this one
+ * hands in a lookup that RECORDS the names it is asked about, so a case
+ * can tell an effort decided by the named agent's definition from one
+ * decided by any definition at all. Every case naming no agent hands in
+ * a lookup that THROWS, so a resolver consulting definitions for an
+ * unrouted block reddens rather than passing.
+ *
+ * Half of the rule is a REFUSAL — the resolver emitting no `--model`
+ * for a block that plainly carried one — and a refusal case is
+ * satisfied by a resolver that emits nothing whatever it is handed. So
+ * the shape here is a TABLE rather than a list of assertions: every
+ * entry in `ROUTING_PAIRS` carries one granular half, and the table is
+ * driven from THREE sides — no agent in front of that half, `agent=`
+ * with a definition silent on effort, and `agent=` with one declaring
+ * it — varying one axis at a time while the granular spelling stays
+ * byte-identical across all three. The mapping reading and the two
+ * suppression readings are therefore each other's positive controls,
+ * and none of them can pass against a resolver that has stopped
+ * emitting.
  *
  * Flag names are pinned to LITERALS. `--agent`, `--model`, `--effort`
  * and `--tools` are the CLI's spellings and not this module's, so a
@@ -41,31 +51,37 @@
  *
  * ## The mutation grid
  *
- * Thirteen module mutations were driven against this file and TWELVE
- * reddened at least one case. Every leg ran TWICE and named the
- * IDENTICAL red set on both passes, asked for through
- * `--reporter=json` so a red SET is comparable member for member — a
- * red COUNT cannot separate two legs reddening the same number of
- * different cases, which is exactly the split that says which fixture
- * carries which claim. The module was restored bytes-identical and all
- * 11 cases were green either side.
+ * Twenty mutations of `utils/declaration.ts` were driven against this
+ * file, each run TWICE with the failing case NAMES identical on both
+ * passes, and the module restored byte-identical (sha256 checked) after
+ * each. NINETEEN reddened at least one of the 14 cases here, and their
+ * union covers all 14.
  *
- * The twelve, with the cases each took: inverting the agent test 10,
- * dropping the agent branch 5, clearing the outranked values off the
- * record 5, renaming `--model` 5, renaming `--effort` 5, emitting a
- * granular flag beside `--agent` 4, naming nothing as suppressed 4,
- * space-joining the tool list 4, naming all three as suppressed
- * regardless 3, dropping the model presence guard 3, taking source
- * order for the suppressed list 2, and dropping the tools presence
- * guard 2. The union covers all 11 cases, so no fixture here is
- * riding along.
+ * Ten legs aim at the agent branch: never passing an effort beside an
+ * agent 6, ignoring the lookup 6, inverting it 6, asking it about
+ * another name 6, putting `--effort` ahead of `--agent` 3, passing
+ * `--model` beside both 3, naming a passed effort as suppressed 3,
+ * leaving an owned effort unnamed 3, reversing `AGENT_OWNED_KEYS` 2,
+ * and asking the lookup about a block with no effort 1. That last leg
+ * reddens the recorder case ALONE, which is what the recorder is for.
  *
- * The ONE green is named rather than dropped and is not a hole: making
- * a null declaration resolve to a flag reddens nothing, because that
- * claim is the colocated suite's and no fixture here hands the resolver
- * a null. Re-driving it there is what covers it.
+ * Nine rebuild the unrouted legs against the new resolver: consulting
+ * the lookup for a block naming no agent 6 (the throwing lookup),
+ * clearing an outranked model off the record 6, renaming `--model` 5,
+ * renaming the unrouted `--effort` 5, putting the unrouted effort ahead
+ * of the model 5, space-joining the tool list 4, naming all three as
+ * suppressed whatever the block held 4, dropping the model presence
+ * guard 3, and dropping the tools presence guard 2. Clearing the model
+ * off the record is the only leg reaching
+ * `keeps the outranked values on the record either way`.
+ *
+ * The ONE green is named rather than dropped: a null declaration
+ * resolving to a flag reddens nothing here, because no fixture here
+ * hands the resolver a null. It reddens the colocated suite (1 case)
+ * and `tests/declaration-negatives.test.ts` (13).
  */
 import type {
+  AgentEffortLookup,
   ResolvedFlags,
   TaskDeclaration,
 } from '../utils/declaration.js';
@@ -85,6 +101,9 @@ const TASK = 'Update the cap sentence';
 
 /** The agent every routed fixture below names. */
 const AGENT = 'doc-updater';
+
+/** A second agent, whose definition the name-keyed case varies. */
+const OTHER_AGENT = 'tdd-guide';
 
 /** The routing-table task of this plan, without its block. */
 const ROUTING_TASK = [
@@ -112,44 +131,89 @@ const HYGIENE_LINE =
 /** Three granular keys written in the opposite of module order. */
 const BACKWARDS = 'tools=Grep effort=high model=opus';
 
+/** A key the resolver can name as left to the agent. */
+type SuppressedKey = ResolvedFlags['suppressed'][number];
+
 /**
- * One granular half of a block, with what it resolves to on each side
- * of the single axis under test. `flags` is what the keys map to with
- * no agent named; `suppressed` is what they are reported as when one
- * is. The last entry writes its keys backwards on purpose.
+ * One granular half of a block, with what it resolves to from each of
+ * the three sides. `flags` is what the keys map to with no agent named.
+ * `routed` is what follows `--agent` when the definition is silent on
+ * effort, and `suppressed` what is left to the agent then; `owned` is
+ * what is left to it when the definition declares an effort.
  */
-const ROUTING_PAIRS = [
+interface RoutingPair {
+  id: string;
+  granular: string;
+  flags: string[];
+  routed: string[];
+  suppressed: SuppressedKey[];
+  owned: SuppressedKey[];
+}
+
+/** The granular halves, the last one written backwards on purpose. */
+const ROUTING_PAIRS: readonly RoutingPair[] = [
   {
     id: 'model alone',
     granular: 'model=haiku',
     flags: ['--model', 'haiku'],
+    routed: [],
     suppressed: ['model'],
+    owned: ['model'],
   },
   {
     id: 'effort alone',
     granular: 'effort=low',
     flags: ['--effort', 'low'],
-    suppressed: ['effort'],
+    routed: ['--effort', 'low'],
+    suppressed: [],
+    owned: ['effort'],
   },
   {
     id: 'tools alone',
     granular: 'tools=Read,Write',
     flags: ['--tools', 'Read,Write'],
+    routed: [],
     suppressed: ['tools'],
+    owned: ['tools'],
   },
   {
     id: 'model and effort',
     granular: 'model=opus effort=max',
     flags: ['--model', 'opus', '--effort', 'max'],
-    suppressed: ['model', 'effort'],
+    routed: ['--effort', 'max'],
+    suppressed: ['model'],
+    owned: ['model', 'effort'],
   },
   {
     id: 'all three, written backwards',
     granular: 'tools=Grep effort=high model=sonnet',
     flags: ['--model', 'sonnet', '--effort', 'high', '--tools', 'Grep'],
-    suppressed: ['model', 'effort', 'tools'],
+    routed: ['--effort', 'high'],
+    suppressed: ['model', 'tools'],
+    owned: ['model', 'effort', 'tools'],
   },
 ];
+
+/** A lookup over definitions, and every name it was asked about. */
+interface RecordingLookup {
+  lookup: AgentEffortLookup;
+  asked: string[];
+}
+
+/** Definitions in which exactly the `declaring` agents carry an effort. */
+function definitions(...declaring: string[]): RecordingLookup {
+  const asked: string[] = [];
+  const lookup: AgentEffortLookup = (agent) => {
+    asked.push(agent);
+    return declaring.includes(agent);
+  };
+  return { lookup, asked };
+}
+
+/** The lookup every case naming no agent hands in. */
+const NEVER_ASKED: AgentEffortLookup = (agent) => {
+  throw new Error(`a block naming no agent asked about ${agent}`);
+};
 
 /** The declaration a text carries, or a failure naming the text. */
 function declarationOf(taskText: string): TaskDeclaration {
@@ -160,9 +224,9 @@ function declarationOf(taskText: string): TaskDeclaration {
   return parsed.declaration;
 }
 
-/** What a task line's own block resolves to on the command line. */
-function flagsOf(taskText: string): ResolvedFlags {
-  return resolveDeclarationFlags(declarationOf(taskText));
+/** What a task line's own block resolves to under `lookup`. */
+function flagsOf(taskText: string, lookup: AgentEffortLookup): ResolvedFlags {
+  return resolveDeclarationFlags(declarationOf(taskText), lookup);
 }
 
 /** A line carrying `granular` alone. */
@@ -175,16 +239,49 @@ function routedLine(granular: string): string {
   return `${TASK}${GAP}{agent=${AGENT} ${granular}}`;
 }
 
-describe('an agent present suppresses the granular keys', () => {
-  it('passes the agent alone and names what it outranked', () => {
+describe('an agent present outranks its model and tools', () => {
+  it('passes the effort a silent definition leaves open', () => {
     for (const pair of ROUTING_PAIRS) {
-      const routed = flagsOf(routedLine(pair.granular));
+      const routed = flagsOf(routedLine(pair.granular), definitions().lookup);
 
-      expect(routed.args).toEqual(['--agent', 'doc-updater']);
+      expect([...routed.args]).toEqual(['--agent', 'doc-updater', ...pair.routed]);
       expect([...routed.suppressed]).toEqual(pair.suppressed);
     }
 
     expect(ROUTING_PAIRS).toHaveLength(5);
+  });
+
+  it('passes the agent alone when its definition declares an effort', () => {
+    for (const pair of ROUTING_PAIRS) {
+      const owned = flagsOf(routedLine(pair.granular), definitions(AGENT).lookup);
+
+      expect([...owned.args]).toEqual(['--agent', 'doc-updater']);
+      expect([...owned.suppressed]).toEqual(pair.owned);
+    }
+  });
+
+  it('asks about the named agent, and only for a block declaring effort', () => {
+    const withEffort = definitions();
+    const withoutEffort = definitions();
+
+    flagsOf(routedLine('model=haiku effort=low'), withEffort.lookup);
+    flagsOf(routedLine('model=haiku tools=Read'), withoutEffort.lookup);
+
+    // The first list is the second one's control: the same recorder,
+    // asked once, so an empty list is a lookup left alone rather than a
+    // recorder that stopped recording.
+    expect(withEffort.asked).toEqual(['doc-updater']);
+    expect(withoutEffort.asked).toEqual([]);
+  });
+
+  it('decides the effort by the named agent definition, not by any', () => {
+    const others = definitions(OTHER_AGENT);
+    const ownLine = `${TASK}${GAP}{agent=${OTHER_AGENT} effort=low}`;
+
+    expect([...flagsOf(routedLine('effort=low'), others.lookup).args])
+      .toEqual(['--agent', 'doc-updater', '--effort', 'low']);
+    expect([...flagsOf(ownLine, others.lookup).args])
+      .toEqual(['--agent', 'tdd-guide']);
   });
 
   it('keeps the outranked values on the record either way', () => {
@@ -203,14 +300,18 @@ describe('an agent present suppresses the granular keys', () => {
     expect(plain.agent).toBeNull();
   });
 
-  it('emits no granular flag beside the agent', () => {
+  it('emits no model or tools flag beside the agent', () => {
     const granular = 'model=haiku effort=low tools=Read,Write';
-    const routed = flagsOf(routedLine(granular));
+    const silent = flagsOf(routedLine(granular), definitions().lookup);
+    const owned = flagsOf(routedLine(granular), definitions(AGENT).lookup);
 
-    expect(routed.args).not.toContain('--model');
-    expect(routed.args).not.toContain('--effort');
-    expect(routed.args).not.toContain('--tools');
-    expect(flagsOf(granularLine(granular)).args).toEqual([
+    for (const routed of [silent, owned]) {
+      expect(routed.args).not.toContain('--model');
+      expect(routed.args).not.toContain('--tools');
+    }
+    expect(silent.args).toContain('--effort');
+    expect(owned.args).not.toContain('--effort');
+    expect(flagsOf(granularLine(granular), NEVER_ASKED).args).toEqual([
       '--model',
       'haiku',
       '--effort',
@@ -221,19 +322,21 @@ describe('an agent present suppresses the granular keys', () => {
   });
 
   it('names nothing when the block carried no granular key', () => {
-    const bare = flagsOf(`${TASK}${GAP}{agent=${AGENT}}`);
+    const bare = flagsOf(`${TASK}${GAP}{agent=${AGENT}}`, definitions(AGENT).lookup);
 
     expect(bare.args).toEqual(['--agent', 'doc-updater']);
     expect(bare.suppressed).toEqual([]);
-    expect([...flagsOf(routedLine('model=haiku')).suppressed])
+    expect([...flagsOf(routedLine('model=haiku'), definitions(AGENT).lookup).suppressed])
       .toEqual(['model']);
   });
 
   it('names the outranked keys in module order', () => {
-    const backwards = flagsOf(routedLine(BACKWARDS));
+    const owned = flagsOf(routedLine(BACKWARDS), definitions(AGENT).lookup);
+    const silent = flagsOf(routedLine(BACKWARDS), definitions().lookup);
     const written = declarationOf(routedLine('tools=Grep model=opus'));
 
-    expect([...backwards.suppressed]).toEqual(['model', 'effort', 'tools']);
+    expect([...owned.suppressed]).toEqual(['model', 'effort', 'tools']);
+    expect([...silent.suppressed]).toEqual(['model', 'tools']);
     expect(written.entries.map((entry) => entry.key)).toEqual([
       'agent',
       'tools',
@@ -241,18 +344,21 @@ describe('an agent present suppresses the granular keys', () => {
     ]);
   });
 
-  it('routes the plan hygiene task by its agent alone', () => {
-    const resolved = flagsOf(HYGIENE_LINE);
+  it('routes the plan hygiene task by its agent and its effort', () => {
+    const silent = flagsOf(HYGIENE_LINE, definitions().lookup);
+    const owned = flagsOf(HYGIENE_LINE, definitions(AGENT).lookup);
 
-    expect(resolved.args).toEqual(['--agent', 'doc-updater']);
-    expect([...resolved.suppressed]).toEqual(['model', 'effort']);
+    expect([...silent.args]).toEqual(['--agent', 'doc-updater', '--effort', 'low']);
+    expect([...silent.suppressed]).toEqual(['model']);
+    expect([...owned.args]).toEqual(['--agent', 'doc-updater']);
+    expect([...owned.suppressed]).toEqual(['model', 'effort']);
   });
 });
 
 describe('an agent absent maps the granular keys onto flags', () => {
   it('maps every granular key onto its own flag', () => {
     for (const pair of ROUTING_PAIRS) {
-      const resolved = flagsOf(granularLine(pair.granular));
+      const resolved = flagsOf(granularLine(pair.granular), NEVER_ASKED);
 
       expect([...resolved.args]).toEqual(pair.flags);
       expect(resolved.suppressed).toEqual([]);
@@ -262,7 +368,7 @@ describe('an agent absent maps the granular keys onto flags', () => {
   });
 
   it('emits the flags in module order, not source order', () => {
-    const resolved = flagsOf(granularLine(BACKWARDS));
+    const resolved = flagsOf(granularLine(BACKWARDS), NEVER_ASKED);
 
     expect([...resolved.args]).toEqual([
       '--model',
@@ -275,7 +381,7 @@ describe('an agent absent maps the granular keys onto flags', () => {
   });
 
   it('joins the tool list back with commas', () => {
-    const resolved = flagsOf(granularLine('tools=Read,Write,Read'));
+    const resolved = flagsOf(granularLine('tools=Read,Write,Read'), NEVER_ASKED);
 
     expect([...resolved.args]).toEqual(['--tools', 'Read,Write']);
     expect(declarationOf(granularLine('tools=Read,Write,Read')).tools)
@@ -283,16 +389,16 @@ describe('an agent absent maps the granular keys onto flags', () => {
   });
 
   it('emits nothing for a key whose value it could not use', () => {
-    const dropped = flagsOf(granularLine('model=opuss effort=low'));
+    const dropped = flagsOf(granularLine('model=opuss effort=low'), NEVER_ASKED);
 
     expect([...dropped.args]).toEqual(['--effort', 'low']);
     expect(dropped.suppressed).toEqual([]);
-    expect([...flagsOf(granularLine('model=opus effort=low')).args])
+    expect([...flagsOf(granularLine('model=opus effort=low'), NEVER_ASKED).args])
       .toEqual(['--model', 'opus', '--effort', 'low']);
   });
 
   it('maps the plan routing task onto its three flags', () => {
-    const resolved = flagsOf(ROUTING_LINE);
+    const resolved = flagsOf(ROUTING_LINE, NEVER_ASKED);
 
     expect([...resolved.args]).toEqual([
       '--model',

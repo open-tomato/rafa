@@ -13,7 +13,8 @@
  * nobody maintains: the six negative shapes (an unclosed brace, nested
  * braces, a trailing code span, an empty block, a block that is not
  * anchored at end of line, an unrecognised key on its own), and the
- * flag-mapping matrix (an `agent` suppressing the granular keys, and
+ * flag-mapping matrix (an `agent` suppressing its model and tools, its
+ * definition deciding whether the effort is passed or suppressed, and
  * the three mapping onto their flags in its absence). The negative
  * shapes now live in `tests/declaration-negatives.test.ts`, each with
  * its own positive control; the one line of overlap left here is the
@@ -52,11 +53,12 @@
  * re-driven against that file when it landed and redden 5 and 4 of its
  * 15 cases, which is how it knows its own fixtures reached the module.
  */
-import type { TaskDeclaration } from './declaration.js';
+import type { AgentEffortLookup, TaskDeclaration } from './declaration.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
+  AGENT_OWNED_KEYS,
   DECLARATION_KEYS,
   EFFORT_LEVELS,
   GRANULAR_KEYS,
@@ -71,6 +73,9 @@ import {
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';
+
+/** No agent definition here declares an effort of its own. */
+const NO_OWN_EFFORT: AgentEffortLookup = () => false;
 
 /** The routing-table task of this plan, without its block. */
 const ROUTING_TASK = [
@@ -122,6 +127,10 @@ describe('the recognised grammar', () => {
 
   it('names the three keys an agent outranks', () => {
     expect([...GRANULAR_KEYS]).toEqual(['model', 'effort', 'tools']);
+  });
+
+  it('names the two of them an agent outranks whatever its definition says', () => {
+    expect([...AGENT_OWNED_KEYS]).toEqual(['model', 'tools']);
   });
 
   it('carries the five levels the CLI documents', () => {
@@ -250,9 +259,11 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.extras).toEqual([
       { key: 'skills', value: 'zod-schemas' },
     ]);
-    expect(resolveDeclarationFlags(declaration).args).toEqual([
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT).args).toEqual([
       '--agent',
       'loop-implementer',
+      '--effort',
+      'high',
     ]);
     expect(parseTaskDeclaration(line).text).toBe(
       'Add the Zod schema for CreateJobRequest',
@@ -283,7 +294,7 @@ describe('parseTaskDeclaration', () => {
 
     expect(parsed.text).toBe('Do it');
     expect(parsed.declaration?.issues).toHaveLength(2);
-    expect(resolveDeclarationFlags(parsed.declaration).args).toEqual([]);
+    expect(resolveDeclarationFlags(parsed.declaration, NO_OWN_EFFORT).args).toEqual([]);
   });
 
   it('records a token inside the block carrying no equals', () => {
@@ -328,7 +339,7 @@ describe('stripTaskDeclaration', () => {
 
 describe('resolveDeclarationFlags', () => {
   it('answers no flags at all for no declaration', () => {
-    const resolved = resolveDeclarationFlags(null);
+    const resolved = resolveDeclarationFlags(null, NO_OWN_EFFORT);
 
     expect(resolved.args).toEqual([]);
     expect(resolved.suppressed).toEqual([]);

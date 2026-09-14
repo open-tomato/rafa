@@ -39,14 +39,20 @@ makes a wrong row something a test can find rather than a silent
 downgrade: an unresolvable agent exits 1 with NO JSON at all and the
 whole roster on stderr, before any model call.
 
-**`agent=` outranks the other three declaration keys because routing
-supplies the model.** A declaration carrying an agent passes only
-`--agent`; its `model`, `effort` and `tools` stay on the record so the
-collector can report what the planner expected against what ran, and
-none of the three reaches the CLI. The model comes from the agent
-file's own frontmatter — `doc-updater` and `loop-implementer` carry
-their own models, every user-level row defaults — and the collector
-uses this to report routed versus unrouted session models.
+**`agent=` outranks `model` and `tools` because routing supplies
+both.** A declaration carrying an agent never passes `--model` or
+`--tools`: the agent file's own frontmatter names its model and tool
+set, and every tracked file the table names carries a `model:`.
+`effort` is the exception, being the cost lever a plan most needs to
+reach the session: `--effort` joins `--agent` unless the definition
+declares an `effort` of its own. `src/utils/agent-definition.ts`
+answers that from `.claude/agents/<name>.md` under the repo root, then
+under the home directory, and takes a file only when its frontmatter
+`name` is the name asked for, because the CLI resolves `--agent` by
+that `name` and not by the file name. A name found in neither still
+passes `--effort`, leaving the CLI to refuse the name. All three keys
+stay on the dispatch record whatever reached the CLI, and the
+`Routed as:` line names the ones left to the agent.
 
 **Routing also changes what a session can be read back from.** The
 prompt is untouched, byte-identical to what was piped in, but record 0

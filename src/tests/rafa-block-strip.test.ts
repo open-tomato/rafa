@@ -161,6 +161,8 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
       promptContent: PROMPT_CONTENT,
       planContent: PLAN,
       inject: 'full',
+      repoRoot: tempRoot,
+      home: join(tempRoot, 'home'),
       run,
     });
 

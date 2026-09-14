@@ -57,12 +57,17 @@
  * Nothing is stripped and no flag is resolved.
  *
  * Priority inside a block is duplicated ON PURPOSE. With `agent`
- * present the loop passes only `--agent`, because an agent definition
- * carries its own model and tool set and a flag beside it would be two
- * authorities for one decision. The other keys are still PARSED and
- * still sit on the record, so the effort collector can report what a
- * planner asked for against what the agent's definition supplied —
- * {@link ResolvedFlags.suppressed} names exactly which ones that was.
+ * present the loop never passes `--model` or `--tools`, because an
+ * agent definition carries its own model and tool set and a flag beside
+ * it would be two authorities for one decision. `--effort` joins
+ * `--agent` unless the agent's definition declares an effort of its
+ * own, which the caller answers through an {@link AgentEffortLookup}
+ * (`utils/agent-definition.ts` reads it off the definition's
+ * frontmatter): effort is the cost lever a plan most needs to reach the
+ * session, and a definition silent on it leaves the plan's level the
+ * only one there is. Every key is still PARSED and still sits on the
+ * record whether or not it became a flag, and
+ * {@link ResolvedFlags.suppressed} names exactly the ones that did not.
  *
  * Nothing here throws. A recognised key whose value this module cannot
  * use lands in {@link TaskDeclaration.issues} and maps to no flag, so
@@ -83,11 +88,18 @@ export const DECLARATION_KEYS = [
 /** One of the four keys the grammar recognises. */
 export type DeclarationKey = (typeof DECLARATION_KEYS)[number];
 
-/** The granular keys, which an `agent` suppresses. */
+/** The granular keys, each mapping to a flag of its own with no agent. */
 export const GRANULAR_KEYS = ['model', 'effort', 'tools'] as const;
 
 /** A key that maps to a flag of its own when no agent is named. */
 export type GranularKey = (typeof GRANULAR_KEYS)[number];
+
+/**
+ * The granular keys an `agent` outranks whenever it is named, its
+ * definition supplying a model and a tool set. `effort` is outranked
+ * only by a definition declaring one ({@link resolveDeclarationFlags}).
+ */
+export const AGENT_OWNED_KEYS = ['model', 'tools'] as const;
 
 /**
  * Model aliases the CLI documents, which is what a plan should spell.
@@ -124,6 +136,14 @@ const FULL_MODEL_NAME = /^claude-[a-z0-9][a-z0-9.-]*$/;
 
 /** An agent name, as a file under `.claude/agents/` is named. */
 const AGENT_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+/**
+ * True when `value` is an agent name this module passes on: a bare
+ * file stem, so no name can reach a path outside `.claude/agents/`.
+ */
+export function isAgentName(value: string): boolean {
+  return AGENT_NAME.test(value);
+}
 
 /** One tool name from the built-in set. */
 const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -347,14 +367,32 @@ export function stripTaskDeclaration(taskText: string): string {
 }
 
 /**
+ * Answers whether the named agent's definition declares an effort of
+ * its own. The loop's answer comes from the definition's frontmatter
+ * (`utils/agent-definition.ts`); a test hands in whatever its case is
+ * about.
+ */
+export type AgentEffortLookup = (agent: string) => boolean;
+
+/**
  * Maps a declaration onto the flags the loop spawns Claude with.
  *
- * An `agent` outranks the granular keys entirely: the agent definition
- * already names a model and a tool set, and passing a flag beside it
- * would leave two authorities for one decision with no way to tell
- * which won. The suppressed keys are named rather than dropped, which
- * is what lets a report say a plan asked for something the agent did
- * not supply.
+ * An `agent` outranks `model` and `tools` whenever it is named: the
+ * agent definition already names a model and a tool set, and passing
+ * a flag beside it would leave two authorities for one decision with
+ * no way to tell which won. `effort` is the exception. It joins
+ * `--agent` as `--effort` unless `agentDeclaresEffort` answers that
+ * the named agent's definition declares an effort of its own, because
+ * a definition silent on effort leaves the plan's level the only one
+ * there is. The lookup is asked only about a block carrying both keys,
+ * so every other block resolves without reading a definition. A name
+ * no definition answers for is the lookup's `false` and still passes
+ * `--effort`, leaving the CLI to refuse the name before any model
+ * call.
+ *
+ * Keys that map to no flag are named in
+ * {@link ResolvedFlags.suppressed} rather than dropped, which is what
+ * lets the dispatch say what it left to the agent.
  *
  * A key whose value did not parse is absent from the record and so
  * emits nothing here — the task runs at the loop's defaults, which is
@@ -362,13 +400,21 @@ export function stripTaskDeclaration(taskText: string): string {
  */
 export function resolveDeclarationFlags(
   declaration: TaskDeclaration | null,
+  agentDeclaresEffort: AgentEffortLookup,
 ): ResolvedFlags {
   if (declaration === null) return { args: [], suppressed: [] };
 
-  if (declaration.agent !== null) {
-    const isPresent = (key: GranularKey) => declaration[key] !== null;
-    const suppressed = GRANULAR_KEYS.filter(isPresent);
-    return { args: ['--agent', declaration.agent], suppressed };
+  const { agent, effort } = declaration;
+  const isPresent = (key: GranularKey) => declaration[key] !== null;
+
+  if (agent !== null) {
+    if (effort === null || agentDeclaresEffort(agent)) {
+      return { args: ['--agent', agent], suppressed: GRANULAR_KEYS.filter(isPresent) };
+    }
+    return {
+      args: ['--agent', agent, '--effort', effort],
+      suppressed: AGENT_OWNED_KEYS.filter(isPresent),
+    };
   }
 
   const args: string[] = [];

@@ -108,6 +108,7 @@ import type {
   CapturingSpawner,
   ClaudeSpawner,
 } from './claude.js';
+import type { AgentEffortLookup } from './declaration.js';
 
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -123,6 +124,9 @@ import {
   spawnClaude,
 } from './claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from './declaration.js';
+
+/** No agent definition here declares an effort of its own. */
+const NO_OWN_EFFORT: AgentEffortLookup = () => false;
 
 /** One spawn the module asked for. */
 interface SpawnCall {
@@ -286,7 +290,7 @@ describe('the argument list a declaration resolves to', () => {
     const taskLine =
       'Add the routing table  {tools=Read,Write,Edit effort=low}';
     const { declaration } = parseTaskDeclaration(taskLine);
-    const resolved = resolveDeclarationFlags(declaration);
+    const resolved = resolveDeclarationFlags(declaration, NO_OWN_EFFORT);
 
     const args = claudeArgs(resolved.args);
 
@@ -294,11 +298,11 @@ describe('the argument list a declaration resolves to', () => {
     expect(args.slice(-2)).toEqual(['--tools', 'Read,Write,Edit']);
   });
 
-  it('emits only --agent when the declaration named an agent', async () => {
+  it('emits no --model beside --agent when the declaration named an agent', async () => {
     const taskLine =
       'Update the cap sentence  {agent=doc-updater model=haiku}';
     const { declaration } = parseTaskDeclaration(taskLine);
-    const resolved = resolveDeclarationFlags(declaration);
+    const resolved = resolveDeclarationFlags(declaration, NO_OWN_EFFORT);
     const { calls, spawn } = recordingSpawner();
 
     await runClaude('the task prompt', resolved.args, spawn);

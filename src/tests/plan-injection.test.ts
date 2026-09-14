@@ -285,6 +285,8 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
     promptContent: PROMPT_CONTENT,
     planContent: PLAN,
     inject: mode,
+    repoRoot: tempRoot,
+    home: join(tempRoot, 'home'),
     run,
   });
   return { result, prompts };

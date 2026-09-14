@@ -76,7 +76,10 @@
  * Dropping the whole-text rule on its own has no fixture here to
  * bite, that claim being the colocated suite's.
  */
-import type { TaskDeclaration } from '../utils/declaration.js';
+import type {
+  AgentEffortLookup,
+  TaskDeclaration,
+} from '../utils/declaration.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -88,6 +91,9 @@ import {
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';
+
+/** No agent definition here declares an effort of its own. */
+const NO_OWN_EFFORT: AgentEffortLookup = () => false;
 
 /** A code span's delimiter, kept out of the template literals. */
 const TICK = '`';
@@ -113,7 +119,7 @@ function expectTaskText(taskText: string): void {
   expect(parsed.declaration).toBeNull();
   expect(parsed.text).toBe(taskText);
   expect(stripTaskDeclaration(taskText)).toBe(taskText);
-  expect(resolveDeclarationFlags(parsed.declaration).args).toEqual([]);
+  expect(resolveDeclarationFlags(parsed.declaration, NO_OWN_EFFORT).args).toEqual([]);
 }
 
 /**

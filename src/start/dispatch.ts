@@ -24,6 +24,7 @@ import { randomUUID } from 'crypto';
 
 import { renderInjection } from '../plan/index.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
+import { agentEffortLookup } from '../utils/agent-definition.js';
 import { runClaudeCaptured } from '../utils/claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
@@ -87,6 +88,17 @@ export interface TaskDispatchOptions {
    * `CONFIG_DEFAULTS`, free to disagree with it.
    */
   inject: InjectMode;
+  /**
+   * The repo root. A routed agent's project definition resolves under
+   * it (`utils/agent-definition.ts`).
+   */
+  repoRoot: string;
+  /**
+   * The home directory a user-level agent definition resolves under.
+   * Required rather than defaulted to `homedir()`, so a dispatch reads
+   * the real home only when its caller names it.
+   */
+  home: string;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -162,6 +174,12 @@ export function buildTaskPrompt(
  * flags a block resolved to are read off an argument list rather
  * than off this function's own record.
  *
+ * A routed task's effort turns on its agent's definition, so the
+ * resolver is handed a lookup over `repoRoot` and `home`
+ * (`utils/agent-definition.ts`). The lookup reads a definition only for
+ * a block pairing `agent=` with `effort=`; every other block resolves
+ * without touching the disk.
+ *
  * Each session runs under a fresh id, `randomUUID` unless
  * `newSessionId` replaces it, and the record carries that id beside
  * everything the session wrote to stdout. Nothing here reads the report
@@ -193,7 +211,11 @@ export async function dispatchTask(
   const run = options.run ?? runTaskSession;
 
   const { text: taskText, declaration } = parseTaskDeclaration(taskInfo.task);
-  const { args: flags, suppressed } = resolveDeclarationFlags(declaration);
+  const agentDeclaresEffort = agentEffortLookup({
+    repoRoot: options.repoRoot,
+    home: options.home,
+  });
+  const { args: flags, suppressed } = resolveDeclarationFlags(declaration, agentDeclaresEffort);
 
   if (taskInfo.status === 'blocked') {
     console.log(`\n⚠️  Resuming blocked task: ${taskText}`);

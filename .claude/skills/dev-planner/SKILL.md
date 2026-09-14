@@ -285,11 +285,13 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   `agent`, `model`, `effort` and `tools`; an unrecognised key is kept for
   telemetry and maps to no flag. The key `skills` reserves a comma-separated
   list of skill names for phase 1 resolution and is stored for reporting.
-* `agent=<name>` outranks the other three — the loop passes only
-  `--agent`, the agent definition supplying its own model and tool set.
-  The three are still recorded, so the effort collector can report what
-  the plan asked for against what the agent supplied.
-* Otherwise `model` takes an alias (`opus`, `sonnet`, `haiku`, `fable`),
+* `agent=<name>` outranks `model` and `tools` — the loop never passes
+  `--model` or `--tools` beside `--agent`, the agent definition
+  supplying its own model and tool set. `effort` still reaches the
+  session: `--effort` joins `--agent` unless the agent's definition
+  declares an `effort` of its own in its frontmatter. The outranked keys
+  are still recorded, and the loop's routing line names them.
+* `model` takes an alias (`opus`, `sonnet`, `haiku`, `fable`),
   `effort` one of `low`, `medium`, `high`, `xhigh`, `max`, and `tools` a
   comma-separated list of tool names with no spaces.
 * A value the loop cannot use maps to no flag rather than failing the

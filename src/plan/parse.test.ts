@@ -18,6 +18,7 @@
  * closed block, and one it still picks after an unclosed fence.
  */
 import type { PlanModel } from './parse.js';
+import type { AgentEffortLookup } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -32,6 +33,9 @@ import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import { isRafaBlockKind, readRafaBlocks } from './blocks.js';
 import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from './parse.js';
+
+/** No agent definition here declares an effort of its own. */
+const NO_OWN_EFFORT: AgentEffortLookup = () => false;
 
 /** Joins lines into a document ending in a newline, as an editor saves one. */
 function doc(...lines: string[]): string {
@@ -79,7 +83,7 @@ function nextOf(model: PlanModel): TaskInfo | null {
 function declarationHistogram(model: PlanModel): [readonly string[], number][] {
   const buckets = new Map<string, { args: readonly string[]; count: number }>();
   for (const task of model.tasks) {
-    const { args } = resolveDeclarationFlags(task.declaration);
+    const { args } = resolveDeclarationFlags(task.declaration, NO_OWN_EFFORT);
     const key = JSON.stringify(args);
     const bucket = buckets.get(key);
     if (bucket === undefined) buckets.set(key, { args, count: 1 });
@@ -191,9 +195,9 @@ describe('a plan', () => {
   });
 
   it('carries each task declaration, a skills= key beside a known one in its extras', () => {
-    const flags = model.tasks.map((task) => resolveDeclarationFlags(task.declaration).args);
+    const flags = model.tasks.map((task) => resolveDeclarationFlags(task.declaration, NO_OWN_EFFORT).args);
     expect(flags).toEqual([
-      ['--agent', 'loop-implementer'],
+      ['--agent', 'loop-implementer', '--effort', 'high'],
       [],
       ['--agent', 'tdd-guide'],
       ['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Bash'],
@@ -772,6 +776,6 @@ describe('a real plan file on disk', () => {
     // other keys are suppressed, because none pairs `agent=` with
     // `model=`, `effort=` or `tools=`.
     expect(model.tasks.every((task) => task.declaration !== null)).toBe(true);
-    expect(model.tasks.every((task) => resolveDeclarationFlags(task.declaration).suppressed.length === 0)).toBe(true);
+    expect(model.tasks.every((task) => resolveDeclarationFlags(task.declaration, NO_OWN_EFFORT).suppressed.length === 0)).toBe(true);
   });
 });
