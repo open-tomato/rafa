@@ -151,7 +151,16 @@ describe('the shape check', () => {
       { args: [{ description: 'x' }] },
       'command "loop start": args is a list, expected a list of named arguments',
     ],
-    ['flags that are not a list', { flags: 'plan' }, 'command "loop start": flags is "plan", expected a list of named flags'],
+    [
+      'flags that are not a list',
+      { flags: 'plan' },
+      'command "loop start": flags is "plan", expected a list of named flags, each deprecation naming its use',
+    ],
+    [
+      'a flag deprecation naming no use',
+      { flags: [{ name: 'json', description: 'x', type: 'boolean', deprecated: { since: '0.2.0' } }] },
+      'command "loop start": flags is a list, expected a list of named flags, each deprecation naming its use',
+    ],
     [
       'an example with no note',
       { examples: [{ cmd: 'rafa loop start' }] },

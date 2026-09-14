@@ -20,7 +20,7 @@
  * spawn `effort report` in a scratch git repository, since the command
  * resolves its root through git and takes no seam. The refusal's
  * control is the same command over a config it can run on, which exits
- * 0 and prints a document `JSON.parse` reads. The refused config holds
+ * 0 and gives the report as its json terminal result. The refused config holds
  * a problem in each of two settings, so a command printing the
  * error's message as one line cannot pass for one printing a line per
  * problem: measured, with only the `store` problem planted, it did.
@@ -84,10 +84,21 @@
  * sha256-identical: the tallies never read (3 red), the tallies emptied
  * under a `--kind` filter (1), and the command's no-rows branch printing no
  * tallies (1). None reddened the pipeline suite.
+ *
+ * The json cases came when the command began writing through the active
+ * output, and each text case beside one reads the bytes phase 0 printed.
+ * Of the mutations driven on 2026-09-15 over this file and ten other
+ * suites, with 387 pass before and after and every module restored
+ * sha256-identical, these reddened cases here: `--output` handed to the
+ * parser (3), json mode's report written as an info line (2), the refusal
+ * thrown with no message (2), config warnings back on `console.warn` (2),
+ * and `--json` never read as `--output=json` or writing no deprecation
+ * line (1 each).
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { SessionEffortRow } from './store/types.js';
+import type { CliEvent } from '../ports/index.js';
 
 import {
   mkdirSync,
@@ -954,16 +965,56 @@ function runReport(root: string, args: readonly string[]): CommandRun {
   };
 }
 
+/** The events a json run wrote, one per line, each parsed. */
+function eventsOf(stdout: string): CliEvent[] {
+  return stdout
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line) as CliEvent);
+}
+
+/** An event without its stamp, which differs between two runs. */
+function withoutStamp(event: CliEvent): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'ts'));
+}
+
 describe('the report command', () => {
-  it('reads the store the config selects, warning on stderr alone', () => {
+  it('reads the store the config selects in json mode, its warning a warn event ahead of the result', () => {
     const root = makeRepo('store: ndjson\nnonesuch: linear\n');
 
-    const run = runReport(root, ['--json']);
+    const run = runReport(root, ['--output=json']);
 
     expect(run.exitCode).toBe(0);
-    expect((JSON.parse(run.stdout) as { rowsRead: number }).rowsRead)
-      .toBe(ROWS.length);
-    expect(run.stderr).toContain('"nonesuch"');
+    expect(run.stderr).toBe('');
+    const events = eventsOf(run.stdout);
+    expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
+    expect(events[1]).toMatchObject({ level: 'warn', message: expect.stringContaining('"nonesuch"') });
+    expect(events[2]).toMatchObject({ ok: true, data: { rowsRead: ROWS.length } });
+  });
+
+  it('warns about the same key on stdout in text mode, ahead of the tables', () => {
+    const root = makeRepo('store: ndjson\nnonesuch: linear\n');
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.stdout).toStartWith('warn: ');
+    expect(run.stdout.split('\n')[0]).toContain('"nonesuch"');
+  });
+
+  it('reads --json as --output=json after one deprecation line, writing the same events but their stamps', () => {
+    const root = makeRepo('store: ndjson\n');
+
+    const deprecated = runReport(root, ['--json']);
+    const canonical = runReport(root, ['--output=json']);
+
+    expect(deprecated.exitCode).toBe(0);
+    expect(deprecated.stderr)
+      .toBe('rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"\n');
+    expect(canonical.stderr).toBe('');
+    expect(eventsOf(deprecated.stdout).map(withoutStamp)).toEqual(eventsOf(canonical.stdout).map(withoutStamp));
+    expect(eventsOf(canonical.stdout).at(-1)).toMatchObject({ ok: true, data: { rowsRead: ROWS.length } });
   });
 
   it('prints the stored task reports when no session row is stored yet', () => {
@@ -994,7 +1045,7 @@ describe('the report command', () => {
     const root = makeRepo(TWO_PROBLEM_CONFIG);
     const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
 
-    const run = runReport(root, ['--json']);
+    const run = runReport(root, []);
 
     expect(refusal.problems).toEqual([
       expect.stringContaining('store is "postgres"'),
@@ -1005,5 +1056,24 @@ describe('the report command', () => {
       refusal.problems.map((problem) => `ralph effort report: ${problem}`),
     );
     expect(run.stdout).toBe('');
+  });
+
+  it('carries the same refusal in the terminal result in json mode, writing nothing to stderr', () => {
+    const root = makeRepo(TWO_PROBLEM_CONFIG);
+    const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
+
+    const run = runReport(root, ['--output=json']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toBe('');
+    const events = eventsOf(run.stdout);
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    expect(events[1]).toMatchObject({
+      ok: false,
+      error: {
+        code: 'command_exit',
+        message: refusal.problems.map((problem) => `ralph effort report: ${problem}`).join('\n'),
+      },
+    });
   });
 });

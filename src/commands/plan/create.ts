@@ -54,5 +54,5 @@ export default wrapPhaseZeroCommand({
     },
   ],
   aliases: ['plan'],
-  outputs: ['text'],
+  outputs: ['text', 'json'],
 }, plan);

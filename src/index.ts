@@ -45,15 +45,16 @@
  * A command is the terminal's contract, not a library call. Each takes
  * the argument list the command line would get, prints what the command
  * prints, and answers the working directory's git root as the repo it
- * acts on. `planCommand` calls `process.exit` on a refusal and on some
- * failures. `effortCollectCommand` and `effortReportCommand` instead
- * throw `CommandExit` (`src/cli/command.ts`) with exit code 1 once a
- * refusal is printed, and `startCommand` throws it with exit code 1 and
- * the refusal as its message, which it leaves to its caller to print, or
- * with exit code 0 once an interrupted task is marked. The dispatcher
- * behind the terminal turns each into its exit code, and writes a
- * refusal's message to stderr. `startCommand` also adds a `SIGINT`
- * listener once it runs. The
+ * acts on. Each writes through the active output
+ * (`src/adapters/output/active.ts`), the `text` adapter on
+ * `process.stdout` until something sets another. None calls
+ * `process.exit`: a refusal throws `CommandExit` (`src/cli/command.ts`)
+ * with the refusal as its message, which the command leaves to its caller
+ * to print. `planCommand` also throws it with the exit code a `claude`
+ * planner's rejection carries, and `startCommand` with exit code 0 once
+ * an interrupted task is marked. The dispatcher behind the terminal turns
+ * each into its exit code, and writes a refusal's message to stderr.
+ * `startCommand` also adds a `SIGINT` listener once it runs. The
  * suffix keeps those names apart from the library's own: `planCommand`
  * generates a plan with a Claude session, which `parsePlan` does not, and
  * `effortReportCommand` rolls up effort rows, which `parseReport` does

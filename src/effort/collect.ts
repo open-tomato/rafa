@@ -168,6 +168,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
@@ -328,8 +329,8 @@ export interface CollectOptions {
   collectCommits?: boolean;
   verbose?: boolean;
   /**
-   * Sink for progress, errors and config warnings. Defaults to
-   * `console.log`.
+   * Sink for progress, errors and config warnings. Defaults to the
+   * active output's `info`, read at each line.
    */
   log?: (line: string) => void;
   /** Commit reader seam, so a test needs no repository. */
@@ -693,7 +694,7 @@ export async function collectEffort(
 ): Promise<CollectResult> {
   const repoRoot = options.repoRoot ?? getRepoRoot();
   const verbose = options.verbose ?? false;
-  const log = options.log ?? ((line: string) => console.log(line));
+  const log = options.log ?? ((line: string) => activeOutput().info(line));
   const context: HalfContext = {
     repoRoot,
     logDir: options.logDir ?? sessionLogDir(repoRoot),
@@ -750,26 +751,29 @@ export function formatCollectSummary(result: CollectResult): string[] {
   return lines;
 }
 
-/** Prints each refusal on its own line, then refuses the run with exit code 1. */
+/** Refuses the run with exit code 1, its message one line per refusal. */
 function refuse(problems: readonly string[]): never {
-  for (const problem of problems) {
-    console.error(`ralph effort collect: ${problem}`);
-  }
-  throw new CommandExit(1);
+  throw new CommandExit(1, problems.map((problem) => `ralph effort collect: ${problem}`).join('\n'));
 }
 
 /**
  * `ralph effort collect` — the command entry.
  *
- * Refuses by throwing `CommandExit` with exit code 1 once the refusal is
- * printed, and neither sets `process.exitCode` nor calls `process.exit`:
- * the dispatcher is the one place that sets the exit code, and a
- * caller's own output is not truncated mid-flush.
+ * Writes the summary through the active output
+ * (`adapters/output/active.ts`), one `info` line each, as the run's
+ * progress and config warnings are written ({@link collectEffort}).
  *
- * A config the loop cannot run on is printed as a refusal, one line
- * per problem, the way a bad argument is. That is the use the config
- * module's own error class exists for. Anything else thrown is a fault
- * rather than a refusal, and is rethrown.
+ * Refuses by throwing `CommandExit` with exit code 1 and the refusal as
+ * its message, one line per problem, and neither sets `process.exitCode`
+ * nor calls `process.exit`: the dispatcher is the one place that sets
+ * the exit code. It writes the message to stderr in text mode, the bytes
+ * this command printed there before, and carries it in the terminal
+ * result in json mode.
+ *
+ * A config the loop cannot run on is refused, one line per problem, the
+ * way a bad argument is. That is the use the config module's own error
+ * class exists for. Anything else thrown is a fault rather than a
+ * refusal, and is rethrown.
  */
 export default async function collect(args: string[]): Promise<void> {
   const parsed = parseCollectArgs(args);
@@ -789,6 +793,6 @@ export default async function collect(args: string[]): Promise<void> {
     refuse(error.problems);
   }
   for (const line of formatCollectSummary(result)) {
-    console.log(line);
+    activeOutput().info(line);
   }
 }

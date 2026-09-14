@@ -319,7 +319,7 @@ describe('the injection mode a run resolves', () => {
     expect(resolved.config.inject).toBe(FILE_MODE);
 
     // The console spy read nothing: the warning went through the active
-    // output alone, where `loadConfig` left to itself prints it there.
+    // output alone, as `loadConfig` handed no sink writes it too.
     expect(consoleWarned).toEqual([]);
   });
 });

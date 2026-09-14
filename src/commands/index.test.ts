@@ -69,13 +69,13 @@ const READERS: Readonly<Record<string, readonly string[]>> = {
   'usage': ['usage.ts'],
 };
 
-/** The outputs each command declares: text alone for a phase 0 command, until it writes through the active output. */
+/** The outputs each command declares: text and json, each phase 0 command now writing through the active output. */
 const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
-  'plan create': ['text'],
+  'plan create': ['text', 'json'],
   'loop start': ['text', 'json'],
-  'effort collect': ['text'],
-  'effort report': ['text'],
-  'usage': ['text'],
+  'effort collect': ['text', 'json'],
+  'effort report': ['text', 'json'],
+  'usage': ['text', 'json'],
   'describe': ['text', 'json'],
 };
 
@@ -94,7 +94,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['loops start', 'loop start', [], ''],
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
-  ['efforts report --json', 'effort report', ['--json'], ''],
+  ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
   ['describe', 'describe', [], ''],
 ];
 
@@ -199,6 +199,19 @@ describe('how the command tree routes', () => {
     expect(run.ran).toEqual([[spelling, argv]]);
     expect(run.stderr).toBe(stderr);
     expect(run.stdout).toBe('');
+    expect(run.outcome.exitCode).toBe(0);
+  });
+
+  it('runs rafa effort report --json in json mode after one deprecation line, handed --json as typed', async () => {
+    const run = await dispatchRecorded('effort report --json');
+
+    expect(run.ran).toEqual([['effort report', ['--json']]]);
+    expect(run.stderr).toBe('rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"\n');
+    const types = run.stdout
+      .trimEnd()
+      .split('\n')
+      .map((line) => (JSON.parse(line) as { type: string }).type);
+    expect(types).toEqual(['start', 'result']);
     expect(run.outcome.exitCode).toBe(0);
   });
 

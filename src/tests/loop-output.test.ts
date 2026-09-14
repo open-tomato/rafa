@@ -9,9 +9,9 @@
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`. Each is parsed with
- * TypeScript and walked, so a comment or a string naming either is no
- * reading. The control walks a planted source holding each in code, in a
- * comment and in a string.
+ * TypeScript and walked by `source-uses.ts`, so a comment or a string
+ * naming either is no reading. The control walks a planted source holding
+ * each in code, in a comment and in a string.
  *
  * ## The command cases
  *
@@ -113,10 +113,11 @@ import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
-import ts from 'typescript';
 
 import { CONFIG_DEFAULTS } from '../config.js';
 import { parsePlan } from '../plan/index.js';
+
+import { consoleAndExitUses } from './source-uses.js';
 
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -135,42 +136,6 @@ const ROUTED_MODULES: string[] = [
   'utils/claude.ts',
   'utils/schedule.ts',
 ];
-
-/** The owner and member a property or element access names, or null for any other node. */
-function accessOf(node: ts.Node): readonly [string, string] | null {
-  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
-    return [node.expression.text, node.name.text];
-  }
-  if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression)) {
-    const member = ts.isStringLiteralLike(node.argumentExpression)
-      ? node.argumentExpression.text
-      : '[computed]';
-    return [node.expression.text, member];
-  }
-  return null;
-}
-
-/**
- * Each `console` member and each `process.exit` in the code of a source,
- * as `<line>: <owner>.<member>`, in source order.
- */
-function consoleAndExitUses(source: string): string[] {
-  const file = ts.createSourceFile('probe.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const found: string[] = [];
-  const visit = (node: ts.Node): void => {
-    const access = accessOf(node);
-    if (access !== null) {
-      const [owner, member] = access;
-      if (owner === 'console' || (owner === 'process' && member === 'exit')) {
-        const { line } = file.getLineAndCharacterOfPosition(node.getStart(file));
-        found.push(`${line + 1}: ${owner}.${member}`);
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return found;
-}
 
 describe('the modules loop start writes through', () => {
   it.each(ROUTED_MODULES)('holds no console member and no process.exit in the code of %s', (path) => {

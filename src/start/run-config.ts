@@ -58,8 +58,8 @@ function injectFlagValue(args: readonly string[]): string | undefined {
  *
  * Throws the {@link ConfigError} `loadConfig` throws, naming every
  * problem. A warning per unknown key goes to `warn`, or through the
- * active output's `warn` when none is given, where `loadConfig` alone
- * would print it with `console.warn`.
+ * active output's `warn` when none is given, as `loadConfig` writes one
+ * when it is handed no sink either.
  */
 export function loadRunConfig(
   roots: ConfigRoots,

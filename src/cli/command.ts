@@ -50,8 +50,18 @@
  * the content, so an empty `summary` or an empty `examples` list passes.
  * The registry refuses a core command it answers for, and the module
  * loader skips the file of a module command it answers for.
+ *
+ * ## Deprecated flags
+ *
+ * A flag a command declares is a {@link RafaFlagSpec}: a `FlagSpec` that
+ * may carry `deprecated`, naming the spelling to type instead. The
+ * dispatcher reads such a flag, typed bare, as that spelling and writes
+ * one deprecation line (`dispatch.ts`), so `rafa effort report --json`
+ * runs as `rafa effort report --output=json`. The field is declared here
+ * rather than on `FlagSpec`, so the copy of `cli-core` in `./core/` keeps
+ * the source's shape.
  */
-import type { CliCommand, CliContext } from './core/types.js';
+import type { CliCommand, CliContext, FlagSpec } from './core/types.js';
 import type { CommandRegistry } from './registry.js';
 
 import { describeValue } from '../config-sections.js';
@@ -78,6 +88,21 @@ export interface CommandDeprecation {
   readonly use: string;
 }
 
+/** What a deprecated flag is read as, which is also what to type instead. */
+export interface FlagDeprecation {
+  /**
+   * The spelling to type instead, `--output=json`: the words, joined by
+   * one space, the dispatcher reads the flag as.
+   */
+  readonly use: string;
+}
+
+/** A flag a rafa command declares: a `FlagSpec`, which may be a deprecated spelling. */
+export interface RafaFlagSpec extends FlagSpec {
+  /** Set when the flag is a deprecated spelling; see the module note. */
+  readonly deprecated?: FlagDeprecation;
+}
+
 /** Everything a rafa command runs with. */
 export interface RafaContext extends CliContext {
   /** The words after the last word the line was routed by, as typed. */
@@ -94,6 +119,8 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
   readonly action: string;
   /** One line for the subject's roster. `description` may be longer. */
   readonly summary: string;
+  /** The flags, any of them a deprecated spelling. */
+  flags: RafaFlagSpec[];
   /** The examples help lists. */
   readonly examples: readonly CommandExample[];
   /**
@@ -169,6 +196,13 @@ export function isRoutingWord(value: unknown): value is string {
   return typeof value === 'string' && /^[^\s/-][^\s/]*$/.test(value);
 }
 
+/** True when a value is a named flag whose deprecation, when it has one, names its use. */
+function isFlag(item: unknown): boolean {
+  if (!hasStrings(item, ['name'])) return false;
+  const { deprecated } = item as { readonly deprecated?: unknown };
+  return deprecated === undefined || hasStrings(deprecated, ['use']);
+}
+
 /** The first field of a command failing its check, as a sentence, or null. */
 function fieldProblem(fields: CommandFields): string | null {
   const checks: readonly (readonly [keyof RafaCommand, boolean, string])[] = [
@@ -178,7 +212,7 @@ function fieldProblem(fields: CommandFields): string | null {
     ['summary', typeof fields.summary === 'string', 'a string'],
     ['description', typeof fields.description === 'string', 'a string'],
     ['args', isListOf(fields.args, (item) => hasStrings(item, ['name'])), 'a list of named arguments'],
-    ['flags', isListOf(fields.flags, (item) => hasStrings(item, ['name'])), 'a list of named flags'],
+    ['flags', isListOf(fields.flags, isFlag), 'a list of named flags, each deprecation naming its use'],
     ['examples', isListOf(fields.examples, (item) => hasStrings(item, ['cmd', 'note'])), 'a list of examples'],
     [
       'outputs',

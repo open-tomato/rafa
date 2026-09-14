@@ -64,8 +64,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { setActiveOutput } from './adapters/output/active.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from './config.js';
+import { sinkOutput } from './tests/output-sinks.js';
 
 /** Chmod cannot deny a read to root; see the unreadable-file case. */
 const isRoot = process.getuid?.() === 0;
@@ -299,21 +301,29 @@ describe('loadConfig', () => {
     expect(resolved.extras).toEqual([{ key: 'plan.depth', value: 3 }]);
   });
 
-  it('prints through console.warn by default', () => {
+  it('writes through the active output warn by default, and nothing through console.warn', () => {
     const roots = scopes('nonesuch: linear\n', null);
-    const warned: unknown[][] = [];
+    const routed: string[] = [];
+    const consoleWarned: unknown[][] = [];
     spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-      warned.push(args);
+      consoleWarned.push(args);
     });
+    setActiveOutput(sinkOutput({
+      warn: (message) => {
+        routed.push(message);
+      },
+    }));
 
     try {
       loadConfig(roots);
     } finally {
+      setActiveOutput(null);
       mock.restore();
     }
 
-    expect(warned).toHaveLength(1);
-    expect(String(warned[0]?.[0])).toContain('unknown key "nonesuch"');
+    expect(routed).toHaveLength(1);
+    expect(routed[0]).toContain('unknown key "nonesuch"');
+    expect(consoleWarned).toEqual([]);
   });
 
   it('judges the files before it looks at the command line', () => {

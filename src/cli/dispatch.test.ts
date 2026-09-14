@@ -47,6 +47,15 @@
  * driven on 2026-09-15, each restored sha256-identical: the context's
  * output set with no mode, and the invocation's mode put back in place of
  * the previous one. Each reddened that case, and it alone in this file.
+ *
+ * The deprecated flag cases came with `effort report --json`, over a
+ * registry of their own whose command declares the flag deprecated or
+ * not. Four mutations of `dispatch.ts` were driven on 2026-09-15, one run
+ * each over this file and ten other suites, with 387 pass before and
+ * after and the module restored sha256-identical. The context assembled
+ * from the line as typed reddened four cases here, the flag's line never
+ * written five, a flag typed twice written twice the case typing it
+ * twice, and the words after a `--` read as flags the case typing one.
  */
 import type { RafaCommand, RafaContext } from './command.js';
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
@@ -562,6 +571,83 @@ describe('deprecation lines', () => {
     expect(route.kind === 'command'
       ? deprecationLine(route)
       : null).toBe('rafa: "rafa begin" is deprecated since 0.2.0; use "rafa loop start"');
+  });
+});
+
+describe('deprecated flags', () => {
+  /** The flag `effort report` keeps, declared here twice: deprecated, and not. */
+  const jsonFlag = (deprecated: boolean): RafaCommand['flags'][number] => ({
+    name: 'json',
+    description: 'The old spelling.',
+    type: 'boolean',
+    aliases: ['j'],
+    ...(deprecated
+      ? { deprecated: { use: '--output=json' } }
+      : {}),
+  });
+
+  /** A registry whose `effort report` declares the flag, answering the mode it ran in as its result. */
+  const registryWith = (deprecated: boolean): DispatchOptions['registry'] => createCommandRegistry({
+    subjects: [{ name: 'effort', summary: 'effort' }],
+    commands: [
+      command('effort', 'report', {
+        aliases: ['rep'],
+        flags: [jsonFlag(deprecated), { name: 'kind', description: 'The kind.', type: 'string' }],
+        run: async (context) => {
+          seen = { context, active: activeOutput() };
+          context.output.result({ mode: context.outputMode });
+        },
+      }),
+    ],
+  });
+
+  /** The line a typed spelling of the flag writes. */
+  const lineFor = (typed: string): string => `rafa: "rafa effort report ${typed}" is deprecated; use "rafa effort report --output=json"\n`;
+
+  it('reads the flag as its use, writing one line to stderr and handing argv as typed', async () => {
+    const { outcome, stdout, stderr } = await run(['effort', 'report', '--json', '--kind=task'], { registry: registryWith(true) });
+
+    expect(stderr).toBe(lineFor('--json'));
+    expect(eventsOf(stdout).map((event) => event.type)).toEqual(['start', 'result']);
+    expect(outcome.result).toMatchObject({ ok: true, data: { mode: 'json' } });
+    expect(seen?.context.argv).toEqual(['--json', '--kind=task']);
+    expect(seen?.context.flags).toEqual({ output: 'json', kind: 'task' });
+  });
+
+  it.each([
+    ['typed twice', ['--json', '--json'], '--json'],
+    ['typed with one dash', ['-json'], '-json'],
+    ['typed as its alias', ['-j'], '-j'],
+  ])('writes one line naming the first spelling, and runs in json mode, when %s', async (_title, words, typed) => {
+    const { outcome, stderr } = await run(['effort', 'report', ...words], { registry: registryWith(true) });
+
+    expect(stderr).toBe(lineFor(typed));
+    expect(outcome.result).toMatchObject({ ok: true, data: { mode: 'json' } });
+  });
+
+  it('writes the line after the deprecation line of the alias it is typed under', async () => {
+    const { stderr } = await run(['rep', '--json'], { registry: registryWith(true) });
+
+    expect(stderr).toBe(`rafa: "rafa rep" is deprecated; use "rafa effort report"\n${lineFor('--json')}`);
+  });
+
+  it.each([
+    ['after a --', ['--', '--json'], true],
+    ['with a value', ['--json=true'], true],
+    ['negated', ['--no-json'], true],
+    ['declared with no deprecation', ['--json'], false],
+  ])('reads no deprecated flag %s, writing no line and running in text mode', async (_title, words, deprecated) => {
+    const { stdout, stderr } = await run(['effort', 'report', ...words], { registry: registryWith(deprecated) });
+
+    expect(stderr).toBe('');
+    expect(stdout).toBe('result: {"mode":"text"}\n');
+  });
+
+  it('writes no line for a help request typing the flag', async () => {
+    const { stderr, outcome } = await run(['effort', 'report', '--json', '--help'], { registry: registryWith(true) });
+
+    expect(stderr).toBe('');
+    expect(outcome.exitCode).toBe(0);
   });
 });
 

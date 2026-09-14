@@ -5,8 +5,9 @@
  *
  * Pure over an {@link EffortReport}: no store, no config and no clock
  * reach it, so `report.ts` decides every figure and this module decides
- * only how each one is written. The `--json` document does not pass
- * through here; the command serialises the report as it stands.
+ * only how each one is written. The JSON document, json mode's result or
+ * the indented text `--json` writes outside the dispatcher, does not pass
+ * through here; the command hands on the report as it stands.
  *
  * The import back into `report.ts` is type-only, so the command module
  * importing {@link formatReport} forms no runtime cycle.

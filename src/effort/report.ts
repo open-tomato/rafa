@@ -21,9 +21,10 @@
  *
  * A config the loop cannot run on is refused as the collect command
  * refuses it: {@link buildReport} throws the `ConfigError`, and the
- * command prints one line per problem and exits 1. A warning about an
- * unknown key goes to stderr through `loadConfig`'s default sink, so
- * the `--json` document on stdout stays parseable.
+ * command refuses with exit code 1, one line per problem. A warning about
+ * an unknown key goes through `loadConfig`'s default sink, the active
+ * output's `warn`, so in json mode it is a `log` event of its own and the
+ * report stays whole in the terminal result.
  *
  * ## Task reports beside the sessions
  *
@@ -123,6 +124,7 @@ import type { EffortStore } from './store/types.js';
 
 import { homedir } from 'node:os';
 
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
@@ -643,26 +645,33 @@ export function buildReport(options: ReportOptions): EffortReport {
   );
 }
 
-/** Prints each refusal on its own line, then refuses the run with exit code 1. */
+/** Refuses the run with exit code 1, its message one line per refusal. */
 function refuse(problems: readonly string[]): never {
-  for (const problem of problems) {
-    console.error(`ralph effort report: ${problem}`);
-  }
-  throw new CommandExit(1);
+  throw new CommandExit(1, problems.map((problem) => `ralph effort report: ${problem}`).join('\n'));
 }
 
 /**
  * `ralph effort report` — the command entry.
  *
- * Refuses by throwing `CommandExit` with exit code 1 once the refusal is
- * printed, and neither sets `process.exitCode` nor calls `process.exit`:
- * the dispatcher is the one place that sets the exit code, and a
- * caller's output is not truncated mid-flush.
+ * Writes through the active output (`adapters/output/active.ts`), in the
+ * mode the dispatcher set beside it. In json mode the report is the
+ * command's result, the `data` of the invocation's terminal result event.
+ * In text mode each table line goes at `info`, and `--json` writes the
+ * report as JSON indented by two spaces through one `info` line, the
+ * bytes phase 0 printed. The dispatcher reads `--json` as `--output=json`
+ * (`src/commands/effort/report.ts`), so text mode meets `--json` only
+ * when this entry is called directly, as `effortReportCommand` is.
  *
- * A config the loop cannot run on is printed as a refusal, one line per
- * problem, the way a bad argument is and the way `rafa effort collect`
- * prints it. Anything else thrown is a fault rather than a refusal, and
- * is rethrown.
+ * Refuses by throwing `CommandExit` with exit code 1 and the refusal as
+ * its message, one line per problem, and neither sets `process.exitCode`
+ * nor calls `process.exit`: the dispatcher is the one place that sets
+ * the exit code. It writes the message to stderr in text mode, the bytes
+ * this command printed there before, and carries it in the terminal
+ * result in json mode.
+ *
+ * A config the loop cannot run on is refused, one line per problem, the
+ * way a bad argument is and the way `rafa effort collect` refuses it.
+ * Anything else thrown is a fault rather than a refusal, and is rethrown.
  */
 export default async function report(args: string[]): Promise<void> {
   const parsed = parseReportArgs(args);
@@ -679,17 +688,22 @@ export default async function report(args: string[]): Promise<void> {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);
   }
+  const output = activeOutput();
+  if (activeOutputMode() === 'json') {
+    output.result(built);
+    return;
+  }
   if (parsed.json) {
-    console.log(JSON.stringify(built, null, 2));
+    output.info(JSON.stringify(built, null, 2));
     return;
   }
   if (built.rowsRead === 0) {
-    console.log('effort report: no session rows stored yet'
+    output.info('effort report: no session rows stored yet'
       + ' (run `ralph effort collect` first)');
-    for (const line of formatTaskReports(built)) console.log(line);
+    for (const line of formatTaskReports(built)) output.info(line);
     return;
   }
   for (const line of formatReport(built)) {
-    console.log(line);
+    output.info(line);
   }
 }

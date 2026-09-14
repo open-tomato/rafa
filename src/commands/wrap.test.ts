@@ -24,6 +24,13 @@
  * microtask after it is called, which is still before `dispatch` answers.
  * Leaving the command unfrozen reddened the case on what the wrapper
  * keeps.
+ *
+ * The `--output` cases came with that flag left out of the words handed
+ * over. Two mutations of `wrap.ts` were driven on 2026-09-15, one run each
+ * over this file and ten other suites, with 387 pass before and after and
+ * the module restored sha256-identical. Handing `argv` with the flag in
+ * reddened the five cases dropping it, and keeping the value of
+ * `--output json` the case typing it as two words.
  */
 import type { CommandDeclaration, PhaseZeroCommand } from './wrap.js';
 import type { OutputStream } from '../adapters/output/stream.js';
@@ -120,6 +127,37 @@ describe('what a wrapped command is handed', () => {
     expect(calls).toEqual([['--plan=.plans/PLAN-a.md', '--no-ci-wait', 'extra']]);
     expect(run.outcome.exitCode).toBe(0);
     expect(run.stderr).toBe('');
+  });
+
+  it.each([
+    ['--output=json', ['--output=json', '--plan=a.md'], true],
+    ['--output json, its value the next word', ['--output', 'json', '--plan=a.md'], true],
+    ['-output=json', ['-output=json', '--plan=a.md'], true],
+    ['--no-output', ['--no-output', '--plan=a.md'], false],
+    ['a bare --output ahead of a flag', ['--output', '--plan=a.md'], false],
+  ])('hands no word of %s, the output flag the dispatcher reads', async (_title, words, json) => {
+    const { command, calls } = standIn();
+
+    const run = await dispatchOver(wrapPhaseZeroCommand(DECLARATION, command), ['loop', 'start', ...words]);
+
+    expect(calls).toEqual([['--plan=a.md']]);
+    expect(run.stdout.startsWith('{"type":"start"')).toBe(json);
+    expect(run.outcome.exitCode).toBe(0);
+  });
+
+  it('hands a flag spelled only like --output, and every word from a --, as typed', async () => {
+    const { command, calls } = standIn();
+
+    await dispatchOver(wrapPhaseZeroCommand(DECLARATION, command), [
+      'loop',
+      'start',
+      '--outputs=json',
+      '--output-file=x',
+      '--',
+      '--output=json',
+    ]);
+
+    expect(calls).toEqual([['--outputs=json', '--output-file=x', '--', '--output=json']]);
   });
 
   it('hands the same words through an alias, after one deprecation line', async () => {

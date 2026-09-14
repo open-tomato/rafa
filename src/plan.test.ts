@@ -4,11 +4,15 @@
  *
  * Each case runs the command in a child process, because the command
  * reads the git root of its working directory and the user scope's config
- * under the home, and exits its process on a refusal and on a rejection.
- * The child runs in a scratch git repository under this file's temporary
- * directory, with HOME a directory beside it. It imports `src/plan.ts` and
- * hands the command a registry holding a fixture `planner/claude` in place
- * of core's. The fixture spawns nothing: it writes what its context and
+ * under the home. The child runs in a scratch git repository under this
+ * file's temporary directory, with HOME a directory beside it. It imports
+ * `src/plan.ts` and hands the command a registry holding a fixture
+ * `planner/claude` in place of core's, and dispatches `plan create` as
+ * `src/rafa.ts` does: the declaration of `src/commands/plan/create.ts`
+ * wrapped around that call, run through `dispatch`, and the exit code it
+ * answers set on the child. So a refusal and a rejection reach stderr in
+ * text mode, and the terminal result in json mode, as they do behind the
+ * terminal. The fixture spawns nothing: it writes what its context and
  * its request held, and the prompt its context's builder makes, to a
  * record file outside the repository, then answers or rejects as the case
  * names.
@@ -34,7 +38,17 @@
  * line dropped, the plan-already-there refusal dropped and a rejection's
  * exit code ignored each reddened its own case alone. A rejection's
  * message dropped reddened both rejection cases.
+ *
+ * The json cases came when the command stopped calling `process.exit`.
+ * Three mutations were driven on 2026-09-15 over this file and ten other
+ * suites, one run each, with 387 pass before and after and every module
+ * restored sha256-identical. A rejection's exit code ignored reddened the
+ * text and the json rejection cases. The plan-ready line written at
+ * `warn`, and the usage refusal thrown with no message, each reddened its
+ * json case alone.
  */
+import type { CliEvent } from './ports/index.js';
+
 import {
   chmodSync,
   existsSync,
@@ -70,12 +84,18 @@ type Outcome = 'plan' | 'prerequisites' | 'session-failed' | 'other-rejection';
 
 /**
  * The child: a registry holding the fixture planner, handed to the
- * command with the arguments after the record path and the outcome.
+ * command with the arguments after the record path and the outcome, and
+ * the command dispatched as `src/rafa.ts` dispatches it; see the module
+ * note.
  */
 const PROBE = [
   'import { writeFileSync } from "node:fs";',
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+  `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
+  `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',
   'const [record, outcome, ...args] = process.argv.slice(2);',
@@ -100,7 +120,10 @@ const PROBE = [
   '    },',
   '  }),',
   '}]);',
-  'await plan(args, registry);',
+  'const command = wrapPhaseZeroCommand(declared, (words) => plan(words, registry));',
+  'const commands = createCommandRegistry({ subjects: [{ name: "plan", summary: "plans" }], commands: [command] });',
+  'const { exitCode } = await dispatch(["plan", "create", ...args], { registry: commands });',
+  'process.exitCode = exitCode;',
   '',
 ].join('\n');
 
@@ -263,5 +286,73 @@ describe('rafa plan through the adapter registry', () => {
     expect(run.stderr).toContain('❌ .plans/PLAN-spec.md already exists — remove it or pass a different --stub.');
     expect(existsSync(scratch.record)).toBe(false);
     expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+});
+
+/** The events a json run wrote, one per line, each parsed. */
+function eventsOf(stdout: string): CliEvent[] {
+  return stdout
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line) as CliEvent);
+}
+
+/** An event as a case reads it: `<level>:<message>` for a log, its type for any other. */
+function labelOf(event: CliEvent): string {
+  return event.type === 'log'
+    ? `${event.level}:${event.message}`
+    : event.type;
+}
+
+/** The refusal a line with no `--spec` gets. */
+const USAGE_REFUSAL = 'Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]\n'
+  + 'Specs live in specs/ (trackable follow-ups) or .specs/ (untracked, sensitive).';
+
+describe('rafa plan create in json mode', () => {
+  it('writes each line as an info event between the start and the one result', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'prerequisites', ['--spec=spec.md', '--no-progress', '--output=json']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(eventsOf(run.stdout).map(labelOf)).toEqual([
+      'start',
+      'info:📝 Generating .plans/PLAN-spec.md from spec.md...',
+      'info:\n✅ Plan ready: .plans/PLAN-spec.md',
+      'info:⚠️  Prerequisites detected: complete .plans/PREREQUISITES-spec.md before starting the loop.',
+      'info:▶ Execute with: bun src/rafa.ts start --plan=.plans/PLAN-spec.md',
+      'result',
+    ]);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('carries a claude planner rejection and its exit code in the terminal result, writing nothing to stderr', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'session-failed', ['--spec=spec.md', '--no-progress', '--output=json']);
+
+    expect(run.exitCode).toBe(3);
+    expect(run.stderr).toBe('');
+    const events = eventsOf(run.stdout);
+    expect(events.filter((event) => event.type === 'result')).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_exit', message: '\n❌ Plan generation failed (exit 3).' },
+    });
+  }, 30_000);
+
+  it('refuses a line with no --spec on stderr in text mode, and in the terminal result in json mode', () => {
+    const scratch = plantScratch();
+
+    const text = runPlan(scratch, 'plan', []);
+    const json = runPlan(scratch, 'plan', ['--output=json']);
+
+    expect([text.exitCode, text.stdout, text.stderr]).toEqual([1, '', `${USAGE_REFUSAL}\n`]);
+    expect([json.exitCode, json.stderr]).toEqual([1, '']);
+    expect(eventsOf(json.stdout).map(labelOf)).toEqual(['start', 'result']);
+    expect(eventsOf(json.stdout)[1]).toMatchObject({ ok: false, error: { code: 'command_exit', message: USAGE_REFUSAL } });
+    expect(existsSync(scratch.record)).toBe(false);
   }, 30_000);
 });

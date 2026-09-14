@@ -26,5 +26,5 @@ export default wrapPhaseZeroCommand({
       note: 'Prints the usage bar, or says the reading is unavailable.',
     },
   ],
-  outputs: ['text'],
+  outputs: ['text', 'json'],
 }, usage);

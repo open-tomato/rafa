@@ -25,9 +25,19 @@
  * format beside itself. It makes the adapter with the setting sources and
  * with {@link buildPlanPrompt} bound to what it read. The adapter reads
  * the spec, makes `.plans/`, runs the session, and answers the paths the
- * session wrote or rejects. The command prints every line the operator
- * reads, a rejection's message among them, and exits with the exit code a
- * `claude` planner's rejection carries, or 1 for any other rejection.
+ * session wrote or rejects.
+ *
+ * The command writes every line the operator reads through the active
+ * output (`adapters/output/active.ts`), at `info`, each message as
+ * `console.log` printed it in phase 0. It refuses by throwing
+ * `CommandExit` (`cli/command.ts`) and never by `process.exit`, so the
+ * dispatcher writes the terminal event. A rejection throws the exit code
+ * a `claude` planner's rejection carries, or 1 for any other, with the
+ * rejection's message. An unusable config, a missing `--spec`, a spec
+ * that does not exist and a plan already there each throw exit code 1
+ * with the whole refusal as the message. Text mode writes that message to
+ * stderr, the bytes the command printed there before; json mode carries it
+ * in the terminal result.
  *
  * The registry is a parameter, {@link CORE_ADAPTER_REGISTRY} unless one
  * is handed over, so `plan.test.ts` resolves a fixture planner under the
@@ -61,8 +71,10 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { activeOutput } from './adapters/output/active.js';
 import { ClaudePlannerError } from './adapters/planner/claude.js';
 import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
+import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
@@ -206,7 +218,8 @@ export function stubFromSpecPath(specPath: string): string {
  * `home`, over the default.
  *
  * A config the loop cannot run on refuses the command with every problem
- * named, as `rafa start` refuses one, before any session starts.
+ * named, as `rafa start` refuses one, before any session starts: a
+ * `CommandExit` with exit code 1 whose message is the whole refusal.
  */
 function resolvePlanSettingSources(
   repoRoot: string,
@@ -216,25 +229,24 @@ function resolvePlanSettingSources(
     return loadConfig({ root: repoRoot, home }).config.settingSources;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
-    console.error('❌ Refusing to generate a plan on this configuration:');
-    for (const problem of error.problems) console.error(`   ${problem}`);
-    process.exit(1);
+    const problems = error.problems.map((problem) => `   ${problem}`);
+    throw new CommandExit(1, ['❌ Refusing to generate a plan on this configuration:', ...problems].join('\n'));
   }
 }
 
 /**
- * The plan `planner` generates for `request`, or the command's exit when
- * it rejects: the rejection's message on stderr, then the exit code a
+ * The plan `planner` generates for `request`, or a `CommandExit` when it
+ * rejects: its message the rejection's, and its exit code the one a
  * `claude` planner's rejection carries, or 1 for any other.
  */
 async function generateOrExit(planner: Planner, request: PlanRequest): Promise<GeneratedPlan> {
   try {
     return await planner.create(request);
   } catch (error) {
-    console.error(`\n❌ ${messageOf(error)}`);
-    process.exit(error instanceof ClaudePlannerError
+    const exitCode = error instanceof ClaudePlannerError
       ? error.exitCode
-      : 1);
+      : 1;
+    throw new CommandExit(exitCode, `\n❌ ${messageOf(error)}`);
   }
 }
 
@@ -247,22 +259,21 @@ export default async function plan(
 
   const specArg = argValue(args, '--spec');
   if (!specArg) {
-    console.error('Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]');
-    console.error('Specs live in specs/ (trackable follow-ups) or .specs/ (untracked, sensitive).');
-    process.exit(1);
+    throw new CommandExit(1, [
+      'Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]',
+      'Specs live in specs/ (trackable follow-ups) or .specs/ (untracked, sensitive).',
+    ].join('\n'));
   }
 
   const specPath = path.resolve(repoRoot, specArg);
   if (!fs.existsSync(specPath)) {
-    console.error(`❌ Spec file not found: ${specPath}`);
-    process.exit(1);
+    throw new CommandExit(1, `❌ Spec file not found: ${specPath}`);
   }
 
   const stub = argValue(args, '--stub') ?? stubFromSpecPath(specPath);
   const planPath = path.join(repoRoot, '.plans', `PLAN-${stub}.md`);
   if (fs.existsSync(planPath)) {
-    console.error(`❌ .plans/${path.basename(planPath)} already exists — remove it or pass a different --stub.`);
-    process.exit(1);
+    throw new CommandExit(1, `❌ .plans/${path.basename(planPath)} already exists — remove it or pass a different --stub.`);
   }
 
   await checkUsage('issue');
@@ -275,7 +286,7 @@ export default async function plan(
     ? fs.readFileSync(progressPath, 'utf8')
     : undefined;
   if (progressContent?.trim()) {
-    console.log('📎 Including findings from progress.txt (disable with --no-progress).');
+    activeOutput().info('📎 Including findings from progress.txt (disable with --no-progress).');
   }
 
   const template = fs.readFileSync(path.join(__dirname, 'plan-prompt.md'), 'utf8');
@@ -292,12 +303,12 @@ export default async function plan(
     ),
   });
 
-  console.log(`📝 Generating .plans/PLAN-${stub}.md from ${path.basename(specPath)}...`);
+  activeOutput().info(`📝 Generating .plans/PLAN-${stub}.md from ${path.basename(specPath)}...`);
   const generated = await generateOrExit(planner, { specPath: specArg, stub });
 
-  console.log(`\n✅ Plan ready: ${generated.planPath}`);
+  activeOutput().info(`\n✅ Plan ready: ${generated.planPath}`);
   if (generated.prerequisitesPath !== null) {
-    console.log(`⚠️  Prerequisites detected: complete ${generated.prerequisitesPath} before starting the loop.`);
+    activeOutput().info(`⚠️  Prerequisites detected: complete ${generated.prerequisitesPath} before starting the loop.`);
   }
-  console.log(`▶ Execute with: bun src/rafa.ts start --plan=${generated.planPath}`);
+  activeOutput().info(`▶ Execute with: bun src/rafa.ts start --plan=${generated.planPath}`);
 }

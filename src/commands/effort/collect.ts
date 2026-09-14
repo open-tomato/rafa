@@ -56,5 +56,5 @@ export default wrapPhaseZeroCommand({
       note: 'Appends the sessions logged since 1 September 2026, and reads no commit.',
     },
   ],
-  outputs: ['text'],
+  outputs: ['text', 'json'],
 }, collect);

@@ -36,49 +36,66 @@ module's note is the long form.
   first action, never ahead of it.
 - **Each but `describe` wraps a phase 0 command** through
   `wrapPhaseZeroCommand`. The command is handed a fresh copy of `argv`
-  and nothing else, so it keeps its own parser and its own writes. A
-  declared `default` or flag alias fills the context's `flags` alone:
-  `rafa loop start -p x.md` hands `start` `-p x.md`, which it does not
-  read. `describe` reads the registry off its context instead.
-- **Where a wrapped command writes**: `loop start` writes through the
-  active output in every module it prints from: `src/start.ts`,
+  without the global `--output` flag, and nothing else, so it keeps its
+  own parser. Each word `parseArgs` reads as `--output` ahead of a `--`
+  is dropped, a value typed as the next word included, so
+  `rafa effort report --output=json` never reaches a parser refusing the
+  words it does not read. A declared `default` or flag alias fills the
+  context's `flags` alone: `rafa loop start -p x.md` hands `start`
+  `-p x.md`, which it does not read. `describe` reads the registry off its
+  context instead.
+- **Where a wrapped command writes**: through the active output, in every
+  module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/commit.ts`, `start/wrap-up.ts`,
   `start/dispatch.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts` and
-  `utils/schedule.ts`. `console.log`'s and `console.info`'s lines go at
+  `utils/schedule.ts`. For the others they are `src/plan.ts`,
+  `src/usage.ts`, `effort/collect.ts` and `effort/report.ts`, and for
+  every command `loadConfig`'s default warning sink in
+  `src/config-load.ts`. `console.log`'s and `console.info`'s lines go at
   `info`, `console.warn`'s at `warn` and `console.error`'s at `error`,
   each message as it was. In text mode an `info` line is the bytes
   `console.log` wrote, and a warning or an error goes to stdout after
-  `warn: ` or `error: `, where `console` wrote it bare on stderr.
+  `warn: ` or `error: `, where `console` wrote it bare on stderr. So
+  `plan create` and `effort report` warn about an unknown config key on
+  stdout in text mode.
 - **What json mode adds for `loop start`**: each dispatched task first
   emits one `step` event named by its sentence, and a session's stdout,
   whether task, wrap-up or CI repair, arrives as one `info` `log` event
   per line. Text mode emits no step and echoes a session's bytes as
   before. Both read the mode the dispatcher sets beside the active
-  output. `plan.ts`, `usage.ts` and the effort commands still print
-  through `console`. `src/tests/loop-output.test.ts` spawns `loop start`
-  in both modes.
+  output. `src/tests/loop-output.test.ts` spawns `loop start` in both
+  modes.
+- **What json mode gives for the others**: `effort report` gives the
+  report as the terminal result's `data`, the document phase 0's `--json`
+  printed, and writes no table line. `plan create`, `effort collect` and
+  `usage` write each line as a `log` event of its level and give no
+  result.
 - **A wrapped command declares exactly the flags its phase 0 module
   reads**, as the line types them. `src/commands/index.test.ts` holds
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
-  through the active output, so `loop start` declares `text` and `json`;
-  `describe` declares `text` and `json`, and no flag.
-- **How they refuse**: `effort collect` and `effort report` throw
-  `CommandExit(1)` once the refusal is printed. `loop start` throws
-  `CommandExit(1)` with the whole refusal as its message for an unusable
-  config, a plan file that does not exist and a default branch, so text
-  mode writes it to stderr as the loop printed it before and json mode
-  carries it in the terminal result. An interrupted task throws
+  through the active output, and each now declares `text` and `json`, as
+  `describe` does. `describe` declares no flag.
+- **How they refuse**: each wrapped command throws `CommandExit` with the
+  whole refusal as its message, so text mode writes it to stderr as the
+  phase 0 command printed it and json mode carries it in the terminal
+  result. `loop start` throws exit code 1 for an unusable config, a plan
+  file that does not exist and a default branch. `plan create` throws 1
+  for an unusable config, a missing `--spec`, a spec that does not exist
+  and a plan already there, and for a planner's rejection the exit code a
+  `claude` planner's rejection carries, or 1. `effort collect` and
+  `effort report` throw 1 for an unrecognised argument and an unusable
+  config, one line per problem. An interrupted task throws
   `CommandExit(0)` once it is marked and its report stored; a failed,
   blocked or unstored task still returns, and ends with exit code 0.
-  `plan create` still calls `process.exit`, which ends the process before
-  a terminal event is written.
 - **What changed for a phase 0 spelling**: `rafa effort` alone and
   `rafa effort help` refuse with exit code 1, where the phase 0 CLI
   printed its help and exited 0. An unknown first word writes
   `rafa: unknown subject or command "<word>"` and no help.
   `rafa start --help` answers help, where phase 0 handed `--help` to
-  `start`, which ignored it and ran the loop.
+  `start`, which ignored it and ran the loop. `rafa effort report --json`
+  writes one deprecation line and runs in json mode, where phase 0
+  printed the report as indented JSON with no event around it.
 
 ### Commands
 
@@ -167,6 +184,16 @@ the clock, the importer and the help renderer are options.
   stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help
   request writes none.
+- **A flag declaring `deprecated` is read as its `use`** when typed bare
+  ahead of a `--`, as `--<name>` or `-<name>` or as one of its aliases:
+  the words of `use` take its place in the line the context is assembled
+  from, and `argv` keeps it as typed. It writes one line to stderr after
+  the command's own, however often it is typed:
+  `rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"`.
+  `effort report`'s `--json` is the one such flag, so it runs in json
+  mode. `deprecated` sits on `RafaFlagSpec` (`src/cli/command.ts`), not
+  on the copied `FlagSpec`, and `commandProblem` refuses one naming no
+  `use`.
 - **The result error codes** are the four refusals, `invalid_spec` (a
   spec `parseArgs` refuses), `command_exit`, `command_error` and
   `result_unwritable`.

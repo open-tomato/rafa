@@ -14,8 +14,9 @@
  * named, and the reason `buildReport` no longer reads `./store.js`
  * directly.
  *
- * The SQLite repo is also read by a SPAWNED `rafa effort report --json`
- * process, since that is the one path with no store seam at all: the
+ * The SQLite repo is also read by a SPAWNED
+ * `rafa effort report --output=json` process, the report the data of its
+ * terminal result, since that is the one path with no store seam at all: the
  * command resolves its root through git and its store through
  * `.rafa/config.yaml`, exactly the two steps `buildReport({ repoRoot, home })`
  * exercises in-process above it. Reading the same two rows there closes
@@ -218,10 +219,10 @@ interface CommandRun {
   stderr: string;
 }
 
-/** Runs `effort report --json` inside a repository under `home`, as the dispatcher would. */
+/** Runs `effort report --output=json` inside a repository under `home`, as the dispatcher would. */
 function runReportJson(root: string, home: string): CommandRun {
   const run = Bun.spawnSync(
-    [process.execPath, RAFA_ENTRY, 'effort', 'report', '--json'],
+    [process.execPath, RAFA_ENTRY, 'effort', 'report', '--output=json'],
     { cwd: root, env: { ...process.env, HOME: home } },
   );
   return {
@@ -239,7 +240,12 @@ describe('a spawned effort report over the SQLite store a collect wrote', () => 
     const run = runReportJson(root, home);
 
     expect(run.exitCode).toBe(0);
-    const spawned = JSON.parse(run.stdout) as EffortReport;
+    const events = run.stdout
+      .trimEnd()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { type: string; data?: unknown });
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    const spawned = events[1]?.data as EffortReport;
     expect(spawned.rowsRead).toBe(SESSIONS.length);
     expect(spawned.groups.map((group) => group.key).sort())
       .toEqual(PLANTED_BRANCHES);

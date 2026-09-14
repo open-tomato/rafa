@@ -10,14 +10,15 @@
  *   2. The line is routed (`route.ts`): a command, a help request or a
  *      refusal.
  *   3. The context is assembled from the line without its routing
- *      words, read against the routed command's `args` and `flags`.
+ *      words, each deprecated flag typed read as the spelling it is
+ *      deprecated for, against the routed command's `args` and `flags`.
  *      A spec `parseArgs` refuses is the `invalid_spec` refusal, and the
  *      context is assembled again without it so the refusal can be told.
  *   4. The start event is written, then each module warning at warn
  *      level.
  *   5. The route is settled. A help request writes the help text; a
- *      refusal writes nothing yet; a command prints its deprecation line
- *      when it has one and runs with its context's output set as the
+ *      refusal writes nothing yet; a command prints its deprecation lines
+ *      when it has any and runs with its context's output set as the
  *      active output (`src/adapters/output/active.ts`) in the
  *      invocation's output mode, the output and the mode active before
  *      being put back once it ends. Its context's
@@ -75,8 +76,19 @@
  * ` since <version>` after `deprecated` and the declared `use` when the
  * command declares one. A help request names a command without running
  * it, and prints none.
+ *
+ * A flag declaring `deprecated` (`command.ts`) is read as its `use` when
+ * it is typed bare ahead of any `--`, spelled `--<name>` or `-<name>`, or
+ * so for one of its aliases, which `parseArgs` reads alike. The words of
+ * `use` take the typed word's place in the line the context is assembled
+ * from, so `rafa effort report --json` runs in json mode, as
+ * `rafa effort report --output=json` does, and the command's `argv` keeps
+ * the words as typed. Such a flag writes one line to stderr before the
+ * command runs, after the command's own and however often it is typed:
+ *
+ *   rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"
  */
-import type { RafaContext } from './command.js';
+import type { RafaContext, RafaFlagSpec } from './command.js';
 import type { CliContext } from './core/types.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
@@ -189,6 +201,58 @@ export function deprecationLine(route: CommandRoute): string | null {
   return `rafa: "rafa ${alias ?? label}" is deprecated${since}; use "rafa ${deprecated?.use ?? label}"`;
 }
 
+/** A deprecated flag a line typed: the word as typed, and the spelling it is deprecated for. */
+export interface DeprecatedFlagTyped {
+  readonly typed: string;
+  readonly use: string;
+}
+
+/** A command route's line as the context reads it, and the deprecated flags typed in it. */
+export interface DeprecatedFlagReading {
+  /** The line, each deprecated flag typed replaced by the words of its `use`. */
+  readonly line: readonly string[];
+  /** Each deprecated flag typed, once, in the order first typed. */
+  readonly typed: readonly DeprecatedFlagTyped[];
+}
+
+/** Each spelling `parseArgs` reads a deprecated flag of `flags` by, mapped to the flag. */
+function deprecatedSpellings(flags: readonly RafaFlagSpec[]): ReadonlyMap<string, RafaFlagSpec> {
+  const spellings = new Map<string, RafaFlagSpec>();
+  for (const flag of flags.filter((declared) => declared.deprecated !== undefined)) {
+    for (const word of [flag.name, ...(flag.aliases ?? [])]) {
+      spellings.set(`-${word}`, flag);
+      spellings.set(`--${word}`, flag);
+    }
+  }
+  return spellings;
+}
+
+/** A command route's line read for its deprecated flags; see the module note. */
+export function readDeprecatedFlags(route: CommandRoute): DeprecatedFlagReading {
+  const spellings = deprecatedSpellings(route.command.flags);
+  const line: string[] = [];
+  const typed = new Map<string, DeprecatedFlagTyped>();
+  let flagsEnded = false;
+  for (const word of route.line) {
+    flagsEnded = flagsEnded || word === '--';
+    const flag = flagsEnded
+      ? undefined
+      : spellings.get(word);
+    if (flag?.deprecated === undefined) {
+      line.push(word);
+      continue;
+    }
+    line.push(...flag.deprecated.use.split(' '));
+    if (!typed.has(flag.name)) typed.set(flag.name, { typed: word, use: flag.deprecated.use });
+  }
+  return { line, typed: [...typed.values()] };
+}
+
+/** The line a deprecated flag typed writes to stderr; see the module note. */
+export function deprecatedFlagLine(route: CommandRoute, flag: DeprecatedFlagTyped): string {
+  return `rafa: "rafa ${route.label} ${flag.typed}" is deprecated; use "rafa ${route.label} ${flag.use}"`;
+}
+
 /** What was thrown, as a message. */
 function messageOf(error: unknown): string {
   return error instanceof Error
@@ -238,7 +302,10 @@ function guardOutput(base: Output): GuardedOutput {
 
 /** The context for a route, and the `invalid_spec` message when its command's spec was refused. */
 function assemble(route: Route, settings: Settings): { base: CliContext; problem: string | null } {
-  const options = { argv: route.line, env: settings.env, stream: settings.stdout, signal: settings.signal };
+  const argv = route.kind === 'command'
+    ? readDeprecatedFlags(route).line
+    : route.line;
+  const options = { argv, env: settings.env, stream: settings.stdout, signal: settings.signal };
   if (route.kind !== 'command') return { base: assembleContext(options), problem: null };
   try {
     return { base: assembleContext({ ...options, spec: route.command }), problem: null };
@@ -259,6 +326,7 @@ async function runCommand(
 ): Promise<Ending> {
   const deprecation = deprecationLine(route);
   if (deprecation !== null) settings.stderr.write(`${deprecation}\n`);
+  for (const flag of readDeprecatedFlags(route).typed) settings.stderr.write(`${deprecatedFlagLine(route, flag)}\n`);
 
   const guarded = guardOutput(base.output);
   const context: RafaContext = Object.freeze({

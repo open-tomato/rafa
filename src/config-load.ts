@@ -64,6 +64,7 @@ import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './config.js';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 
+import { activeOutput } from './adapters/output/active.js';
 import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
 
@@ -124,15 +125,20 @@ function readUserConfigFile({ root, home }: ConfigRoots): ConfigFile | null {
     : readConfigFile(home);
 }
 
-/** The default warning sink. */
+/**
+ * The default warning sink: the active output's `warn`
+ * (`adapters/output/active.ts`), read at each warning, so a command
+ * under the dispatcher warns through its invocation's output.
+ */
 function printWarning(message: string): void {
-  console.warn(message);
+  activeOutput().warn(message);
 }
 
 /**
  * Reads the project's config under `roots.root` and the user scope's
  * under `roots.home`, ranks both against `cli`, and prints a warning per
- * unknown key through `warn`.
+ * unknown key through `warn`, the active output's `warn` when none is
+ * given.
  *
  * The files are read and judged before the command line is looked at,
  * the user's first, so a run with problems in all three reports the
