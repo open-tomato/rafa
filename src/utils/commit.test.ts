@@ -17,11 +17,11 @@
  * about; with it, the rejecting-hook case plants its own hook and the
  * refusal is the suite's rather than the environment's.
  *
- * Twenty-two module mutations were driven against this file and ALL
- * TWENTY-TWO reddened at least one case, with the module restored
- * byte-identical and green either side: staging without `-A`,
- * inspecting without `--cached`, committing with `--no-verify`,
- * committing under git's default cleanup, inverting the
+ * Twenty-two module mutations were driven against this file, before
+ * the first-clause rule, and ALL TWENTY-TWO reddened at least one case,
+ * with the module restored byte-identical and green either side:
+ * staging without `-A`, inspecting without `--cached`, committing with
+ * `--no-verify`, committing under git's default cleanup, inverting the
  * nothing-to-commit branch, accepting any `diff` exit code,
  * mislabelling which step failed, taking the sha whether or not the
  * read succeeded, raising the subject cap, cutting mid-word, leaving
@@ -31,6 +31,21 @@
  * always writing a body, ordering stdout ahead of stderr, never
  * marking a cut message, trimming instead of collapsing whitespace,
  * ignoring the caller's `cwd`, and emptying the fallback description.
+ * Always writing a body is the module's own rule since then, so that
+ * leg is retired and its inverse is in the grid below.
+ *
+ * The first-clause rule and the always-written body (finding 5 of the
+ * 2026-09-13 prompt audit) brought twelve more legs, and ALL TWELVE
+ * reddened a case here, the module restored byte-identical by sha256
+ * after each: the body written only for a cut subject, the subject
+ * taken from the whole text again, endings counted inside a code
+ * span, a span closed by a backtick run of any length, each of the
+ * four endings dropped from the set in turn, the empty clause kept
+ * with no whole-text fallback, an unclosed backtick run read as a span
+ * to the end, the space before an ending kept, and the type inferred
+ * from the clause alone. Five of them redden ONE case each, the case
+ * named for their branch: the run length, the closing parenthesis,
+ * the fallback, the unclosed run and the whole-text type.
  *
  * Three of those reached the module cleanly and stayed GREEN on the
  * first pass, and all three are recorded because they are the shape
@@ -72,6 +87,7 @@ import {
   DEFAULT_COMMIT_TYPE,
   deriveCommitSubject,
   FALLBACK_DESCRIPTION,
+  firstClause,
   headShaArgs,
   inferCommitType,
   MAX_MESSAGE_CHARS,
@@ -88,6 +104,17 @@ const LONG_TASK = [
   'committing with a subject derived from the task text, returning a',
   'distinct outcome for nothing-to-commit and for a hook or commit',
   'failure, plus its TSDoc and colocated unit tests',
+].join(' ');
+
+/**
+ * A task text whose first clause ends at a parenthesis well inside the
+ * cap. It opens the way the task did whose subject the 2026-09-14
+ * cutover run cut at width, mid-sentence; the words after `the loop`
+ * are this fixture's own.
+ */
+const AUDIT_TASK = [
+  'Add `docs/rafa-cutover.md` (under 60 lines) stating that the loop',
+  'owns staging and committing, and naming the gates it runs',
 ].join(' ');
 
 /** A sha shaped like git's, so a test cannot pass on a short string. */
@@ -259,11 +286,14 @@ describe('deriveCommitSubject', () => {
     expect(derived.subject.length).toBeLessThanOrEqual(30);
   });
 
+  // Semicolons and not commas: a comma outside a code span ends the
+  // first clause before the cut can reach it, so a comma fixture here
+  // would test the clause rule and never the dangling strip.
   it('drops punctuation the cut left dangling', () => {
-    const text = 'Capture one, two, three and four into a file';
+    const text = 'Capture one; two; three and four into a file';
     const derived = deriveCommitSubject(text, { maxLength: 24 });
 
-    expect(derived.subject).toBe('chore: capture one, two');
+    expect(derived.subject).toBe('chore: capture one; two');
     expect(derived.subject).not.toMatch(/[\s,;:-]$/);
   });
 
@@ -316,6 +346,127 @@ describe('deriveCommitSubject', () => {
   });
 });
 
+describe('firstClause', () => {
+  it('ends at the first comma', () => {
+    expect(firstClause('Add a thing, then another, then more'))
+      .toBe('Add a thing');
+  });
+
+  it('ends at a colon', () => {
+    expect(firstClause('Split the module: format and command'))
+      .toBe('Split the module');
+  });
+
+  it('ends at an opening parenthesis with the space before it', () => {
+    expect(firstClause(AUDIT_TASK)).toBe('Add `docs/rafa-cutover.md`');
+  });
+
+  it('ends at a closing parenthesis with no opener before it', () => {
+    expect(firstClause('Handle case a) before case b'))
+      .toBe('Handle case a');
+  });
+
+  it('ends at whichever ending comes first', () => {
+    expect(firstClause('Add a (b, c): d')).toBe('Add a');
+    expect(firstClause('Add a: b (c), d')).toBe('Add a');
+    expect(firstClause('Add a, b: c (d)')).toBe('Add a');
+  });
+
+  it('reads no ending inside a code span', () => {
+    const text = 'Wire `run(a, b): c` into the loop, then call it';
+
+    expect(firstClause(text)).toBe('Wire `run(a, b): c` into the loop');
+
+    // The control: the same words with the span unquoted end at the
+    // parenthesis, so the case above is the span and not a text whose
+    // ending sits somewhere else.
+    expect(firstClause(text.replaceAll('`', ''))).toBe('Wire run');
+  });
+
+  // A span closes on a backtick run of its OWN length, so a double
+  // backtick span can quote a single backtick. Counting backticks by
+  // parity instead reads everything after the lone one as inside a
+  // span and answers this text with no ending at all.
+  it('closes a span only on a run of the same length', () => {
+    const text = 'Quote ``a`, b`` in the header, then more';
+
+    expect(firstClause(text)).toBe('Quote ``a`, b`` in the header');
+  });
+
+  // CommonMark reads a backtick run that nothing closes as literal
+  // text, so it opens no span and hides no ending.
+  it('reads an unclosed backtick as literal text', () => {
+    expect(firstClause('Fix the `stray, tick')).toBe('Fix the `stray');
+
+    // The control: the same text with the span closed hides the comma.
+    expect(firstClause('Fix the `stray, tick`'))
+      .toBe('Fix the `stray, tick`');
+  });
+
+  it('answers the whole text when nothing ends the clause', () => {
+    expect(firstClause('Add a small thing')).toBe('Add a small thing');
+  });
+
+  it('answers an empty clause for a text opening on an ending', () => {
+    expect(firstClause('(Re)write the header, then more')).toBe('');
+  });
+});
+
+describe('deriveCommitSubject over the first clause', () => {
+  it('ends the subject at the first clause, well inside the cap', () => {
+    const derived = deriveCommitSubject(AUDIT_TASK);
+
+    expect(derived.subject).toBe('docs: add `docs/rafa-cutover.md`');
+    expect(derived.truncated).toBe(false);
+  });
+
+  // A whole-text cut reads the ending as part of the last word and
+  // drops that word, so this case is the one that separates cutting
+  // the clause from cutting the sentence at the same width.
+  it('keeps a clause that fills the budget to the character', () => {
+    const clause = 'Add a clause that runs to the sixty-six character budget precisely';
+    const derived = deriveCommitSubject(`${clause}, and then more words`);
+
+    expect(clause.length).toBe(66);
+    expect(derived.subject).toBe(
+      'feat: add a clause that runs to the sixty-six character budget precisely',
+    );
+    expect(derived.subject.length).toBe(72);
+    expect(derived.truncated).toBe(false);
+  });
+
+  it('cuts a clause longer than the budget at a word', () => {
+    const derived = deriveCommitSubject(LONG_TASK);
+    const expected = [
+      'feat: add `tools/ralph/utils/commit.ts` staging with',
+      '`git add -A` and',
+    ].join(' ');
+
+    expect(derived.subject).toBe(expected);
+    expect(derived.truncated).toBe(true);
+  });
+
+  it('reads past an ending inside a code span', () => {
+    const text = 'Wire `run(a, b)` into the loop, then call it twice';
+
+    expect(deriveCommitSubject(text).subject)
+      .toBe('feat: wire `run(a, b)` into the loop');
+  });
+
+  it('falls back to the whole text when the clause is empty', () => {
+    const derived = deriveCommitSubject('(Re)write the header, then more');
+
+    expect(derived.subject).toBe('chore: (Re)write the header, then more');
+    expect(derived.truncated).toBe(false);
+  });
+
+  it('still infers the type from the whole task text', () => {
+    const text = 'Tidy the loop, then split `context/workflow.md` in two';
+
+    expect(deriveCommitSubject(text).subject).toBe('docs: tidy the loop');
+  });
+});
+
 describe('buildCommitMessage', () => {
   it('carries the whole task text when the subject was cut', () => {
     const message = buildCommitMessage(LONG_TASK);
@@ -325,10 +476,31 @@ describe('buildCommitMessage', () => {
     expect(message.body).toContain('colocated unit tests');
   });
 
-  it('omits the body when the subject already says it', () => {
+  it('carries the whole task text when the clause ended the subject', () => {
+    const message = buildCommitMessage(AUDIT_TASK);
+
+    expect(message.subject).toBe('docs: add `docs/rafa-cutover.md`');
+    expect(message.truncated).toBe(false);
+    expect(message.body).toBe(normaliseTaskText(AUDIT_TASK));
+  });
+
+  it('carries the task line even when the subject says all of it', () => {
     const message = buildCommitMessage('Add a small thing');
 
+    expect(message.subject).toBe('feat: add a small thing');
     expect(message.truncated).toBe(false);
+    expect(message.body).toBe('Add a small thing');
+  });
+
+  it('collapses the body to one line', () => {
+    expect(buildCommitMessage('Add a\n  small\tthing').body)
+      .toBe('Add a small thing');
+  });
+
+  it('writes no body for a task text with no words', () => {
+    const message = buildCommitMessage('  \n ');
+
+    expect(message.subject).toBe('chore: complete the scoped task');
     expect(message.body).toBe('');
   });
 });
@@ -392,6 +564,22 @@ describe('commitTaskWork over a stubbed git', () => {
     const message = buildCommitMessage(LONG_TASK);
 
     expect(git.calls[2]).toEqual(commitArgs(message.subject, message.body));
+  });
+
+  // Spelled as a literal argv, not rebuilt through the module: a case
+  // reading `buildCommitMessage` on both sides agrees with any body.
+  it('passes the task line as the body when the subject carries it', () => {
+    const git = stubGit({});
+    commitTaskWork({ taskText: 'Add a thing', runGit: git.run });
+
+    expect(git.calls[2]).toEqual([
+      'commit',
+      '--cleanup=whitespace',
+      '-m',
+      'feat: add a thing',
+      '-m',
+      'Add a thing',
+    ]);
   });
 
   it('answers nothing-to-commit on an unchanged tree', () => {

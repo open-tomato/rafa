@@ -18,11 +18,11 @@
  *
  * Every absence here is paired with a control proving the fixture
  * really carries the block, so a passing case is a strip and not an
- * empty plan agreeing with itself. And the commit body is empty unless
- * the subject was truncated (72 characters, the `type: ` prefix
- * included), so the fixture's task sentence is long enough to force
- * that truncation — otherwise an absence assertion on the body would
- * pass vacuously.
+ * empty plan agreeing with itself. And the commit body is the whole
+ * task sentence whatever the subject kept of it, so the body is
+ * asserted equal to that sentence before its absence is read —
+ * otherwise an absence assertion on an empty body would pass
+ * vacuously.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -60,9 +60,9 @@ const FENCE = '```';
 const BLOCK_MARKER = 'RAFA-BLOCK-MARKER: never quoted back to a task';
 
 /**
- * The task sentence, long enough that its subject is truncated: 165
- * characters normalised against a 72-character cap, so the body below
- * is not an empty-string vacuous pass.
+ * The task sentence, 165 characters normalised, with its first comma
+ * at index 108: the subject quotes a part of it and only the body
+ * carries the whole, which is what the body assertions below read.
  */
 const TASK_TEXT = [
   'Add the strip-proof test that plants a rafa block into a plan and',
@@ -262,9 +262,9 @@ describe('what a finished task, dispatched from the same plan, commits', () => {
     expect(subject).toBe(expected.subject);
     expect(subject).not.toContain(BLOCK_MARKER);
 
-    // The vacuous-pass guard: the subject really was cut, so the body
-    // carries the whole sentence rather than staying empty.
-    expect(expected.truncated).toBe(true);
+    // The vacuous-pass guard: the body is the whole task sentence and
+    // never empty, so the absence below is read off a body that exists.
+    expect(body).toBe(TASK_TEXT);
     expect(body).toBe(expected.body);
     expect(body.length).toBeGreaterThan(0);
     expect(body).not.toContain(BLOCK_MARKER);
