@@ -1,7 +1,7 @@
 ## CLI
 
 How a line reaches a command under `src/cli/`: `RafaCommand`, the
-registry, routing, module command entries and the dispatcher.
+registry, routing, module command entries, the dispatcher and help.
 `.specs/cli-surface.md` owns the command tree, the aliases, the help
 levels and `describe`; this page holds what the code does. Each
 module's note is the long form.
@@ -16,9 +16,11 @@ module's note is the long form.
 | `src/cli/route.ts` | a line read into a command, a help request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
 | `src/cli/dispatch.ts` | one invocation: the context, the events, the deprecation line and the exit code |
+| `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
+| `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help` and `rafa loop start --help` |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY`, and the exit code set |
+| `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
 ### The core roster
 
@@ -138,5 +140,33 @@ the clock, the importer and the help renderer are options.
 - **The result error codes** are the four refusals, `invalid_spec` (a
   spec `parseArgs` refuses), `command_exit`, `command_error` and
   `result_unwritable`.
-- **Help is text only.** The default renderer, `renderUsage`, writes one
-  usage line per level until the three-level renderer is handed in.
+- **Help is text only.** `renderUsage`, one usage line per level, renders
+  it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
+
+### Help
+
+- **One renderer for the three levels.** `renderHelp` reads the request
+  and the registry it is handed and nothing else, so every command a level
+  names is one that dispatches. `rafa --help` lists the usage lines, a
+  quick start, the subjects, the top-level commands and the global flags.
+  `rafa <subject> --help` lists the actions and two examples.
+  `rafa <subject> <action> --help` gives the usage line, the description,
+  the argument and flag tables, the examples, the outputs and `See also`.
+- **Derived where the spec draws by hand.** The quick start is the first
+  example of each subject's first visible action, then of each top-level
+  command, so it reads `rafa effort collect` where the spec draws the
+  unregistered `rafa loop status`. A subject's two examples are taken
+  across its actions, the first of each before the second of any. The
+  global flags are `--output=json` and `-v, --verbose`, the two
+  `assembleContext` reads; the spec's `--runtime=<v>` joins when a command
+  reads it.
+- **A hidden action** is in no roster, quick start, example list or
+  `See also`, and its own help still renders.
+- **Prose wraps at 80 columns.** An example's command is never wrapped.
+- **The snapshots** under `src/cli/testdata/help/` are written by
+  `src/cli/help.test.ts` only when `RAFA_UPDATE_HELP_SNAPSHOTS=1` is set.
+  Unset, a missing or stale one is red and nothing is written. A task
+  that registers or changes a command, or a constant a declaration's
+  default reads, runs
+  `RAFA_UPDATE_HELP_SNAPSHOTS=1 bun test src/cli/help.test.ts`, reads the
+  diff, and keeps this page true.

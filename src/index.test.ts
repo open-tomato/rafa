@@ -17,7 +17,8 @@
  * neither grows the root unseen.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
- * dispatcher and the core registry alone, and that registry is held to
+ * dispatcher, the help renderer and the core registry alone, and that
+ * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
  * a sixth command registered and not spelled goes red. Each of those
  * modules takes the phase 0 command it runs as its one default import,
@@ -228,6 +229,7 @@ type ImportList = readonly (readonly [string, readonly string[]])[];
 /** What `src/rafa.ts` imports, spelled here. */
 const CLI_IMPORTS: ImportList = [
   ['./cli/dispatch.js', ['dispatch']],
+  ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
 ];
 

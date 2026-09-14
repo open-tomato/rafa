@@ -1,0 +1,16 @@
+rafa loop — start a plan through the loop, one task per session
+
+Usage:
+  rafa loop <action> [args] [flags]
+  rafa loop <action> --help   arguments, flags, examples
+
+Actions:
+  start   run a plan task by task, then wrap up, open the PR and wait for CI
+
+Examples:
+  rafa loop start --plan=.plans/PLAN-my-feature.md
+      Runs the plan from its first open task, then opens the PR and waits on its
+      checks.
+  rafa loop start --plan=.plans/PLAN-my-feature.md --start-at=23:00 --inject=task --no-ci-wait
+      Starts at 23:00, hands each task session the plan context and its own task
+      line, and finishes at the push.

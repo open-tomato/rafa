@@ -14,16 +14,19 @@
  * stderr.
  *
  * The module holds nothing but the dispatch. `src/commands/index.ts`
- * holds the roster, and `src/cli/dispatch.ts` routes the line, runs the
- * command, writes its events and answers the exit code, which this module
- * sets on the process. It sets `process.exitCode` rather than calling
- * `process.exit`, so nothing a command wrote is truncated mid-flush.
+ * holds the roster, `src/cli/help.ts` renders `rafa --help` and the help
+ * of each subject and action from it, and `src/cli/dispatch.ts` routes
+ * the line, runs the command, writes its events and answers the exit
+ * code, which this module sets on the process. It sets `process.exitCode`
+ * rather than calling `process.exit`, so nothing a command wrote is
+ * truncated mid-flush.
  *
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
  */
 import { dispatch } from './cli/dispatch.js';
+import { renderHelp } from './cli/help.js';
 import { CORE_REGISTRY } from './commands/index.js';
 
-const { exitCode } = await dispatch(process.argv.slice(2), { registry: CORE_REGISTRY });
+const { exitCode } = await dispatch(process.argv.slice(2), { registry: CORE_REGISTRY, renderHelp });
 process.exitCode = exitCode;

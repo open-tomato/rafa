@@ -6,7 +6,7 @@ To install dependencies:
 bun install
 ```
 
-To run the loop from a checkout (no arguments prints the usage line):
+To run the loop from a checkout (no arguments prints the help):
 
 ```bash
 bun src/rafa.ts loop start --plan=<file>

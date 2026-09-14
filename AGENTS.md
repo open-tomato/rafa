@@ -20,8 +20,8 @@ back into every turn and the split would save nothing.
 - `context/source.md` — import paths under `src/` and the shapes the lint
   config forces.
 - `context/cli.md` — `RafaCommand`, the command registry, routing, module
-  command entries, the core roster, and the dispatcher's events and exit
-  code.
+  command entries, the core roster, the dispatcher's events and exit code,
+  and the help levels with their snapshots.
 
 ## This file is capped
 
