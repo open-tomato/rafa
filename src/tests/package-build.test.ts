@@ -395,16 +395,16 @@ describe('the built CLI', () => {
 
     expect(readFileSync(cli, 'utf8').split('\n')[0]).toBe('#!/usr/bin/env bun');
     expect(fromSource.exitCode).toBe(0);
-    expect(fromSource.stdout).toContain('\nCommands:\n');
+    expect(fromSource.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
     expect(fromBuild).toEqual(fromSource);
   }, 30_000);
 
-  it('prints its help when imported, which the import probe can see', () => {
+  it('prints its help when imported and sets the exit code it answers, which the import probe can see', () => {
     const probe = probeImport(join(DIST, 'cli.js'));
 
     expect(probe.exitCode).toBe(0);
-    expect(probe.stdout).toContain('\nCommands:\n');
-    expect(probe.stdout.endsWith('\n[0,0,null]\n')).toBe(true);
+    expect(probe.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
+    expect(probe.stdout.endsWith('\n[0,0,0]\n')).toBe(true);
   }, 30_000);
 });
 

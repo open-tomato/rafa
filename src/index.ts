@@ -13,13 +13,14 @@
  * ## What the entry exports
  *
  *   - The CLI's commands, each under the name of the command line it
- *     answers: {@link startCommand} (`rafa start`, the loop),
- *     {@link planCommand} (`rafa plan`), {@link usageCommand}
+ *     answers: {@link startCommand} (`rafa loop start`, the loop),
+ *     {@link planCommand} (`rafa plan create`), {@link usageCommand}
  *     (`rafa usage`), {@link effortCollectCommand} (`rafa effort collect`)
  *     and {@link effortReportCommand} (`rafa effort report`). These are
- *     the five functions `src/rafa.ts` dispatches to, re-exported rather
- *     than wrapped, so a service calling one runs exactly what the
- *     terminal runs.
+ *     the five functions the core commands in `src/commands/` run, each
+ *     handed the words typed after its routing words. The entry
+ *     re-exports them as they are, so a service calling one runs exactly
+ *     what the terminal runs.
  *   - The whole `./plan` surface: the block reader, the plan parser, the
  *     report parser and the injection renderer, with the models they
  *     answer.
@@ -47,9 +48,11 @@
  * acts on. `startCommand` and `planCommand` call `process.exit` on a
  * refusal and on some failures, and `startCommand` adds a `SIGINT`
  * listener once it runs. `effortCollectCommand` and
- * `effortReportCommand` set `process.exitCode` instead. The suffix keeps
- * those names apart from the library's own: `planCommand` generates a
- * plan with a Claude session, which `parsePlan` does not, and
+ * `effortReportCommand` instead throw `CommandExit`
+ * (`src/cli/command.ts`) with exit code 1 once a refusal is printed,
+ * which the dispatcher behind the terminal turns into its exit code. The
+ * suffix keeps those names apart from the library's own: `planCommand`
+ * generates a plan with a Claude session, which `parsePlan` does not, and
  * `effortReportCommand` rolls up effort rows, which `parseReport` does
  * not.
  *

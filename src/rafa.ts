@@ -1,93 +1,29 @@
 #!/usr/bin/env bun
 
 /**
- * ralph — spec → plan → loop, in four commands.
+ * rafa's command line: the words after `rafa`, dispatched through the
+ * core registry.
  *
- *   bun src/rafa.ts plan  --spec=specs/<file>.md [--stub=<name>]
- *   bun src/rafa.ts start [--plan=PLAN-<name>.md] [--start-at=HH:MM] [--inject=<mode>]
- *   bun src/rafa.ts usage
- *   bun src/rafa.ts effort <collect|report> [flags]
+ *   rafa plan create --spec=.specs/<file>.md [--stub=<name>]
+ *   rafa loop start [--plan=.plans/PLAN-<stub>.md] [--start-at=HH:MM] [--inject=<mode>]
+ *   rafa usage
+ *   rafa effort collect|report [flags]
  *
- * (Also available as `bun run ralph <command>`.)
+ * From a checkout, `bun src/rafa.ts <words>`. `rafa start` and
+ * `rafa plan --spec=` still run, each after one deprecation line on
+ * stderr.
+ *
+ * The module holds nothing but the dispatch. `src/commands/index.ts`
+ * holds the roster, and `src/cli/dispatch.ts` routes the line, runs the
+ * command, writes its events and answers the exit code, which this module
+ * sets on the process. It sets `process.exitCode` rather than calling
+ * `process.exit`, so nothing a command wrote is truncated mid-flush.
+ *
+ * Importing the module dispatches `process.argv`, so no library module
+ * imports it (`src/index.ts`).
  */
-import collect from './effort/collect.js';
-import report from './effort/report.js';
-import plan from './plan.js';
-import start from './start.js';
-import usage from './usage.js';
+import { dispatch } from './cli/dispatch.js';
+import { CORE_REGISTRY } from './commands/index.js';
 
-const HELP = [
-  'ralph — agent task loop',
-  '',
-  'Commands:',
-  '  plan  --spec=specs/<file>.md [--stub=<name>]   Generate PLAN-<stub>.md (+ PREREQUISITES-<stub>.md) from a spec',
-  '  start [--plan=<file>] [--start-at=HH:MM]       Execute a plan task-by-task (resumes blocked tasks first),',
-  '                                                 then wrap up, open the PR and wait for CI',
-  '                                                 (--inject=<full|stage|task>, --no-ci-wait, --ci-timeout=<min>, --ci-attempts=<n>)',
-  '  usage                                          Show Claude usage (CLAUDE_USAGE_PERCENT override)',
-  '  effort collect [--since=<date>] [--no-git]     Collect session and commit rows into .ralph/effort/ (--no-sessions, --verbose)',
-  '  effort report [--kind=<k>] [--entrypoint=<e>]  Roll the stored session rows up per plan, then task reports by status and outcome (--json)',
-].join('\n');
-
-/**
- * True when argv asked for the help text rather than mistyping a
- * command. Shared by both dispatch levels so the two cannot drift.
- */
-function isHelpRequest(word: string | undefined): boolean {
-  return word === undefined || word === 'help' || word === '--help';
-}
-
-/**
- * Dispatches an `effort` sub-command.
- *
- * An unrecognised sub-command REFUSES rather than falling back to
- * either half, for the same reason both effort parsers refuse an
- * unrecognised flag: a `ralph effort reprot` that exited 0 having
- * neither collected nor reported is the silent success this stack
- * is built to avoid.
- *
- * Sets `process.exitCode` rather than calling `process.exit`, which
- * is what both dispatched commands do, so nothing is truncated
- * mid-flush.
- */
-async function effort(args: string[]): Promise<void> {
-  const [subcommand, ...flags] = args;
-
-  switch (subcommand) {
-    case 'collect':
-      await collect(flags);
-      return;
-    case 'report':
-      await report(flags);
-      return;
-    default:
-      console.log(HELP);
-      if (!isHelpRequest(subcommand)) {
-        console.error(`\nUnknown effort command: ${subcommand}`);
-        process.exitCode = 1;
-      }
-  }
-}
-
-const [command, ...rest] = process.argv.slice(2);
-
-switch (command) {
-  case 'plan':
-    await plan(rest);
-    break;
-  case 'start':
-    await start(rest);
-    break;
-  case 'usage':
-    await usage(rest);
-    break;
-  case 'effort':
-    await effort(rest);
-    break;
-  default:
-    console.log(HELP);
-    if (!isHelpRequest(command)) {
-      console.error(`\nUnknown command: ${command}`);
-      process.exit(1);
-    }
-}
+const { exitCode } = await dispatch(process.argv.slice(2), { registry: CORE_REGISTRY });
+process.exitCode = exitCode;

@@ -168,6 +168,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
 import { getRepoRoot } from '../utils/git.js';
@@ -749,20 +750,21 @@ export function formatCollectSummary(result: CollectResult): string[] {
   return lines;
 }
 
-/** Prints each refusal on its own line and marks the run failed. */
-function refuse(problems: readonly string[]): void {
+/** Prints each refusal on its own line, then refuses the run with exit code 1. */
+function refuse(problems: readonly string[]): never {
   for (const problem of problems) {
     console.error(`ralph effort collect: ${problem}`);
   }
-  process.exitCode = 1;
+  throw new CommandExit(1);
 }
 
 /**
  * `ralph effort collect` — the command entry.
  *
- * Sets `process.exitCode` rather than calling `process.exit`, so the
- * function is drivable from a test and so a caller's own output is
- * not truncated mid-flush.
+ * Refuses by throwing `CommandExit` with exit code 1 once the refusal is
+ * printed, and neither sets `process.exitCode` nor calls `process.exit`:
+ * the dispatcher is the one place that sets the exit code, and a
+ * caller's own output is not truncated mid-flush.
  *
  * A config the loop cannot run on is printed as a refusal, one line
  * per problem, the way a bad argument is. That is the use the config
@@ -771,10 +773,7 @@ function refuse(problems: readonly string[]): void {
  */
 export default async function collect(args: string[]): Promise<void> {
   const parsed = parseCollectArgs(args);
-  if (parsed.errors.length > 0) {
-    refuse(parsed.errors);
-    return;
-  }
+  if (parsed.errors.length > 0) refuse(parsed.errors);
 
   let result: CollectResult;
   try {
@@ -788,7 +787,6 @@ export default async function collect(args: string[]): Promise<void> {
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);
-    return;
   }
   for (const line of formatCollectSummary(result)) {
     console.log(line);
