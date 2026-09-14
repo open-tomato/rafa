@@ -18,9 +18,13 @@
  * it answered, with the file names spelled here. The output cases read
  * what an adapter wrote off a stream the case hands it, or off a spy on
  * `process.stdout.write` the case restores, and each `text` reading
- * spells a line the `json` adapter could not have written. The tracker
- * case reads the issues the `local` adapter wrote off the disk under a
- * fresh temporary root, and the reason each records off its file.
+ * spells a line the `json` adapter could not have written. The `local`
+ * tracker case reads the issues that adapter wrote off the disk under a
+ * fresh temporary root, and the reason each records off its file. The
+ * `github` tracker cases hand that adapter the recorded fake as its `gh`
+ * runner and read what it filed off the fake. No case runs the runner
+ * the adapter makes when its context names none, which spawns the real
+ * `gh`.
  *
  * No case changes `CORE_ADAPTER_REGISTRY`. An add-on is registered on it
  * through `register`, which answers a new registry, and a case holds the
@@ -62,6 +66,15 @@
  * after. The context's reason defaulting to a string, the context's
  * reason ignored, and the issues written at the repository root in place
  * of `.rafa/issues/` each reddened the tracker case alone.
+ *
+ * Two more were driven the same way on 2026-09-14, once the `github`
+ * tracker was registered, with this file and `github.test.ts` at 168 pass
+ * before and after and `registry.ts` restored byte-identical (sha256).
+ * The context's runner ignored for one spawning `gh` in the context's
+ * root, and one github tracker shared across creates, each reddened the
+ * runner case alone. The first ran no `gh`: that case's root,
+ * `/nonexistent`, was checked absent first, and `Bun.spawn` throws for a
+ * missing `cwd` before it runs anything, as `github.ts` notes.
  */
 import type { AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
@@ -88,6 +101,7 @@ import {
   PORT_VERSIONS,
 } from './registry.js';
 import { draftFixture } from './tracker/contract.js';
+import { createFakeGh } from './tracker/github-fake.js';
 import { parseLocalIssue } from './tracker/local.js';
 
 /** The repository root, whose tsconfig the compiler reads under. */
@@ -329,8 +343,8 @@ describe('the core adapter registry', () => {
     expect(written[0]).toContain(line);
   });
 
-  it('registers the local tracker', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local']);
+  it('registers both trackers, local before github', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local', 'github']);
   });
 
   it('makes the local tracker under .rafa/issues of its root, recording the reason its context names', async () => {
@@ -351,6 +365,30 @@ describe('the core adapter registry', () => {
     expect(parseLocalIssue(readFileSync(join(issuesDir, '2.md'), 'utf8')).fallbackReason).toBeNull();
   });
 
+  it('makes the github tracker over the gh runner its context names, a new tracker on each create', async () => {
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('tracker', 'github');
+    const fake = createFakeGh();
+
+    const first = adapter.create({ repoRoot: '/nonexistent', gh: fake.run });
+    const second = adapter.create({ repoRoot: '/nonexistent', gh: fake.run });
+    const preflight = await first.preflight();
+    await first.create(draftFixture());
+    await second.create(draftFixture());
+
+    expect(preflight).toEqual({ ok: true });
+    expect(second).not.toBe(first);
+    expect(fake.issueCount()).toBe(2);
+    // Each tracker remembers the labels it made, so the second makes its three again.
+    expect(fake.calls().filter((call) => call[0] === 'label')).toHaveLength(6);
+  });
+
+  it('makes the github tracker when its context names no runner', () => {
+    const tracker = CORE_ADAPTER_REGISTRY.resolve('tracker', 'github').create({ repoRoot: '/nonexistent' });
+
+    expect(tracker.kind).toBe('github');
+    expect(tracker.capabilities()).toEqual({ projects: false, customFields: false, issueTypes: false });
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
     for (const port of ['store', 'output', 'tracker'] as const) {
@@ -367,11 +405,11 @@ describe('registering an adapter', () => {
     const extended = CORE_ADAPTER_REGISTRY.register(addOn());
 
     expect(extended).not.toBe(CORE_ADAPTER_REGISTRY);
-    expect(extended.kinds('tracker')).toEqual(['local', 'obsidian']);
+    expect(extended.kinds('tracker')).toEqual(['local', 'github', 'obsidian']);
     expect(extended.kinds('store')).toEqual(['sqlite', 'ndjson']);
     expect(extended.resolve('tracker', 'obsidian').create({ repoRoot: '/nonexistent' }))
       .toBe(FIXTURE_TRACKER);
-    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local']);
+    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local', 'github']);
     expect(CORE_ADAPTER_REGISTRY.find('tracker', 'obsidian')).toBeUndefined();
   });
 
@@ -436,7 +474,7 @@ describe('registering an adapter', () => {
     expect(() => CORE_ADAPTER_REGISTRY.register(again))
       .toThrow('adapter registry: store/sqlite is already registered');
     expect(CORE_ADAPTER_REGISTRY.register(addOn({ kind: 'sqlite' })).kinds('tracker'))
-      .toEqual(['local', 'sqlite']);
+      .toEqual(['local', 'github', 'sqlite']);
   });
 
   it.each([
@@ -535,8 +573,8 @@ describe('looking an adapter up', () => {
     expect(() => CORE_ADAPTER_REGISTRY.resolve('store', 'constructor')).toThrow(
       'adapter registry: no store adapter is registered as "constructor"; registered: sqlite, ndjson',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('tracker', 'github')).toThrow(
-      'adapter registry: no tracker adapter is registered as "github"; registered: local',
+    expect(() => CORE_ADAPTER_REGISTRY.resolve('tracker', 'linear')).toThrow(
+      'adapter registry: no tracker adapter is registered as "linear"; registered: local, github',
     );
     expect(() => CORE_ADAPTER_REGISTRY.resolve('learning', 'local')).toThrow(
       'adapter registry: no learning adapter is registered as "local"; registered: none',

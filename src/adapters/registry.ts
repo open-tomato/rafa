@@ -59,10 +59,10 @@
  * The two store backends, `store/sqlite` and `store/ndjson`, which
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
  * the two outputs under `src/adapters/output/`, `output/text` and
- * `output/json`, and the `local` tracker under `src/adapters/tracker/`,
- * `tracker/local`. The phase 1 table names the other ports' core
- * adapters, `tracker/github`, `learning/local` and `planner/claude`;
- * none is registered yet, and each joins `CORE_ADAPTERS` as it lands
+ * `output/json`, and the two trackers under `src/adapters/tracker/`,
+ * `tracker/local` and `tracker/github`. The phase 1 table names the
+ * other ports' core adapters, `learning/local` and `planner/claude`;
+ * neither is registered yet, and each joins `CORE_ADAPTERS` as it lands
  * under `src/adapters/`.
  *
  * ## What an adapter answers
@@ -79,14 +79,16 @@
  * repository root, the one thing a store opens under. A port whose
  * adapter needs more gains a field when that adapter lands, optional so
  * that no other port's caller has to pass it: the outputs added `stream`
- * and `verbosity`, and the `local` tracker added `fallbackReason`. Each
- * output `create` makes a new output, so a `json` output's one terminal
- * result belongs to the command it was made for. Each tracker `create`
- * makes a new tracker, so the reason a `local` tracker records is the
- * one its own context named.
+ * and `verbosity`, the `local` tracker added `fallbackReason`, and the
+ * `github` tracker added `gh`. Each output `create` makes a new output,
+ * so a `json` output's one terminal result belongs to the command it was
+ * made for. Each tracker `create` makes a new tracker, so the reason a
+ * `local` tracker records is the one its own context named, and the
+ * labels a `github` tracker remembers making are the ones it made itself.
  */
 import type { StoreBackend } from '../config.js';
 import type { OutputStream } from './output/stream.js';
+import type { GhRunner } from './tracker/github.js';
 import type { SelectedEffortStore } from '../effort/store/index.js';
 import type {
   Learning,
@@ -104,6 +106,7 @@ import { openSqliteStore } from '../effort/store/sqlite.js';
 
 import { createJsonOutput } from './output/json.js';
 import { createTextOutput } from './output/text.js';
+import { createGhRunner, createGithubTracker } from './tracker/github.js';
 import { createLocalTracker, localIssuesDir } from './tracker/local.js';
 
 /** What every refusal opens with. */
@@ -155,6 +158,11 @@ export interface AdapterContext {
    * issue the `local` tracker creates. Read by it alone; null when left out.
    */
   readonly fallbackReason?: string | null;
+  /**
+   * The runner every `gh` command goes through. Read by the `github`
+   * tracker alone; a runner spawning `gh` in `repoRoot` when left out.
+   */
+  readonly gh?: GhRunner;
 }
 
 /**
@@ -331,7 +339,7 @@ const STORE_OPENERS: {
 /**
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
- * and `json` outputs, then the `local` tracker.
+ * and `json` outputs, then the `local` and `github` trackers.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -362,6 +370,12 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
       issuesDir: localIssuesDir(repoRoot),
       fallbackReason,
     }),
+  },
+  {
+    port: 'tracker',
+    kind: 'github',
+    portVersion: PORT_VERSIONS.tracker,
+    create: ({ repoRoot, gh }) => createGithubTracker({ gh: gh ?? createGhRunner({ cwd: repoRoot }) }),
   },
 ];
 
