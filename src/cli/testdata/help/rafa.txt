@@ -10,6 +10,7 @@ Quick start:
   rafa loop start --plan=.plans/PLAN-my-feature.md
   rafa effort collect
   rafa usage
+  rafa describe --output=json
 
 Subjects:
   plan     create a plan from a spec
@@ -17,7 +18,7 @@ Subjects:
   effort   collect session and commit rows; report per plan
 
 Commands:
-  usage
+  usage, describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)

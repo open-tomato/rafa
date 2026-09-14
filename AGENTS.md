@@ -21,7 +21,7 @@ back into every turn and the split would save nothing.
   config forces.
 - `context/cli.md` — `RafaCommand`, the command registry, routing, module
   command entries, the core roster, the dispatcher's events and exit code,
-  and the help levels with their snapshots.
+  the help levels with their snapshots, and the `describe` roster.
 
 ## This file is capped
 

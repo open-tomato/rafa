@@ -24,6 +24,11 @@
  * line read against the command's own `args` and `flags`, flags typed
  * ahead of the subject included.
  *
+ * It also carries `registry`, the registry the dispatcher routed the line
+ * through, every module mounted for the invocation included. `describe`
+ * reads it, so the roster it gives is the dispatcher's own and never a
+ * second one.
+ *
  * `run` takes a `RafaContext`, where `CliCommand.run` takes a
  * `CliContext`, so the interface extends `CliCommand` without its `run`.
  * A `RafaContext` is a `CliContext`, so a `run` written against
@@ -47,6 +52,7 @@
  * loader skips the file of a module command it answers for.
  */
 import type { CliCommand, CliContext } from './core/types.js';
+import type { CommandRegistry } from './registry.js';
 
 import { describeValue } from '../config-sections.js';
 
@@ -76,6 +82,8 @@ export interface CommandDeprecation {
 export interface RafaContext extends CliContext {
   /** The words after the last word the line was routed by, as typed. */
   readonly argv: readonly string[];
+  /** The registry the line was routed through, every module mounted for the invocation included. */
+  readonly registry: CommandRegistry;
 }
 
 /** A command the dispatcher routes to by its subject and action. */

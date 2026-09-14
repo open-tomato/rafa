@@ -585,6 +585,18 @@ describe('what a command runs with', () => {
     expect(given?.argv).toEqual(['stub-a', '-p', 'OTHER.md']);
   });
 
+  it('hands the registry the line was routed through: the caller one with no module, and one holding the mount otherwise', async () => {
+    await run(['loop', 'start']);
+    const bare = seen?.context.registry;
+    await run(['loop', 'start'], { modules: MODULES, importModule });
+    const mounted = seen?.context.registry;
+
+    expect(bare).toBe(REGISTRY);
+    expect(REGISTRY.mounts()).toEqual([]);
+    expect(mounted).not.toBe(REGISTRY);
+    expect(mounted?.mounts().map((mount) => [mount.name, mount.commands])).toEqual([['linear', [ISSUE_NEXT]]]);
+  });
+
   it('hands a mounted action the words after its module action', async () => {
     const { stdout, stderr } = await run(['module', 'exec', 'linear', 'next', '--since=today'], { modules: MODULES, importModule });
 

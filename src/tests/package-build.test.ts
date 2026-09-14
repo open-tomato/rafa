@@ -65,6 +65,24 @@
  * naming `local,user` and holds those instead, and a config whose sources
  * the loop refuses stops the command before the stand-in is reached.
  *
+ * ## The describe case
+ *
+ * `rafa describe` stamps its document with the `version` of
+ * `package.json`, which `src/commands/describe.ts` imports by name. The
+ * case runs it from a copy of the build outside the scratch package,
+ * where no `package.json` sits above the bundle, and holds its output to
+ * what `src/rafa.ts` prints and its version to the manifest's. So the
+ * version is the one `bun build` inlined, and nothing beside the bundle
+ * is read for it.
+ *
+ * Two mutations of `src/commands/describe.ts` were driven on 2026-09-14,
+ * one run of this file each, with the module restored byte-identical
+ * (sha256). A version other than the manifest's reddened this case alone.
+ * The version read at run time from the `package.json` beside the module
+ * reddened every case running the built CLI, 9 of 31 and this one among
+ * them: the bundle reads that file when it is imported, and the build has
+ * none there.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -396,6 +414,22 @@ describe('the built CLI', () => {
     expect(readFileSync(cli, 'utf8').split('\n')[0]).toBe('#!/usr/bin/env bun');
     expect(fromSource.exitCode).toBe(0);
     expect(fromSource.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
+    expect(fromBuild).toEqual(fromSource);
+  }, 30_000);
+
+  it('gives the roster from a copy of the build outside the package as src/rafa.ts does, stamped with the manifest version', () => {
+    const copy = join(tempRoot, 'describe-outside', 'dist');
+    cpSync(DIST, copy, { recursive: true });
+    const env = {
+      ...Object.fromEntries(Object.entries(withBunOnPath()).filter(([name]) => !name.startsWith('RAFA_'))),
+      HOME: tempRoot,
+    };
+    const fromSource = run([process.execPath, join(REPO_ROOT, 'src', 'rafa.ts'), 'describe'], tempRoot, env);
+    const fromBuild = run([process.execPath, join(copy, 'cli.js'), 'describe'], tempRoot, env);
+
+    expect(fromSource.exitCode).toBe(0);
+    expect(existsSync(join(copy, '..', 'package.json'))).toBe(false);
+    expect((JSON.parse(fromBuild.stdout) as { version?: unknown }).version).toBe(readManifest()['version']);
     expect(fromBuild).toEqual(fromSource);
   }, 30_000);
 

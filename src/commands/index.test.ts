@@ -1,9 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the five commands it registers: what the registry
+ * declarations of the six commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
- * deprecation line each alias prints, and that each command declares the
- * flags its phase 0 module reads.
+ * deprecation line each alias prints, and that each command wrapping a
+ * phase 0 command declares the flags its phase 0 module reads.
+ * `describe` wraps none, and declares no flag.
  *
  * The routing cases dispatch over a registry built from the roster's own
  * subjects and commands, each `run` swapped for one recording what ran
@@ -68,6 +69,16 @@ const READERS: Readonly<Record<string, readonly string[]>> = {
   'usage': ['usage.ts'],
 };
 
+/** The outputs each command declares: text alone for a phase 0 command, until it writes through the active output. */
+const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
+  'plan create': ['text'],
+  'loop start': ['text'],
+  'effort collect': ['text'],
+  'effort report': ['text'],
+  'usage': ['text'],
+  'describe': ['text', 'json'],
+};
+
 /** The deprecation line typing `typed` writes, as stderr holds it. */
 function deprecation(typed: string, spelling: string): string {
   return `rafa: "rafa ${typed}" is deprecated; use "rafa ${spelling}"\n`;
@@ -84,6 +95,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --json', 'effort report', ['--json'], ''],
+  ['describe', 'describe', [], ''],
 ];
 
 /** Each core command by its spelling. */
@@ -151,13 +163,14 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers the five phase 0 commands in roster order, none of them hidden', () => {
+  it('registers the five phase 0 commands, then describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'loop start',
       'effort collect',
       'effort report',
       'usage',
+      'describe',
     ]);
     expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length);
   });
@@ -169,13 +182,13 @@ describe('the core roster', () => {
     ]);
   });
 
-  it.each(COMMANDS)('declares for %s a summary, a description, examples of its own spelling and text output', (spelling, command) => {
+  it.each(COMMANDS)('declares for %s a summary, a description, examples of its own spelling and its outputs', (spelling, command) => {
     expect(commandProblem(command)).toBeNull();
     expect(command.summary.length).toBeGreaterThan(0);
     expect(command.description.length).toBeGreaterThan(command.summary.length);
     expect(command.examples.length).toBeGreaterThan(0);
     expect(command.examples.filter((example) => !example.cmd.startsWith(`rafa ${spelling}`))).toEqual([]);
-    expect(command.outputs).toEqual(['text']);
+    expect(command.outputs).toEqual(OUTPUTS[spelling] ?? []);
   });
 });
 
@@ -210,7 +223,14 @@ describe('how the command tree routes', () => {
 });
 
 describe('the flags each command declares', () => {
-  it.each(COMMANDS)('declares for %s exactly the flags its phase 0 module reads', (spelling, command) => {
+  it('declares no argument and no flag for describe, which wraps no phase 0 command and reads no command line', () => {
+    const own = CORE_REGISTRY.topLevel('describe');
+
+    expect(own).toBeDefined();
+    expect([own?.args, own?.flags]).toEqual([[], []]);
+  });
+
+  it.each(COMMANDS.filter(([spelling]) => spelling !== 'describe'))('declares for %s exactly the flags its phase 0 module reads', (spelling, command) => {
     const readers = READERS[spelling] ?? [];
     const read = literalFlags(readers.map((file) => readFileSync(join(SRC_DIR, file), 'utf8')).join('\n'));
 

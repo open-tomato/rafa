@@ -7,6 +7,7 @@
  *   rafa plan create --spec=.specs/<file>.md [--stub=<name>]
  *   rafa loop start [--plan=.plans/PLAN-<stub>.md] [--start-at=HH:MM] [--inject=<mode>]
  *   rafa usage
+ *   rafa describe [--output=json]
  *   rafa effort collect|report [flags]
  *
  * From a checkout, `bun src/rafa.ts <words>`. `rafa start` and

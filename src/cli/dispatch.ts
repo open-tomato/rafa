@@ -19,7 +19,9 @@
  *      refusal writes nothing yet; a command prints its deprecation line
  *      when it has one and runs with its context's output set as the
  *      active output (`src/adapters/output/active.ts`), the output
- *      active before being put back once it ends.
+ *      active before being put back once it ends. Its context's
+ *      `registry` is the one the line was routed through, with every
+ *      module that loaded mounted on it.
  *   6. The terminal result event is written, and the exit code answered.
  *
  * The dispatcher sets no `process.exitCode` and calls no
@@ -248,7 +250,12 @@ function assemble(route: Route, settings: Settings): { base: CliContext; problem
 }
 
 /** Runs a routed command with its context; see the module note. */
-async function runCommand(route: CommandRoute, base: CliContext, settings: Settings): Promise<Ending> {
+async function runCommand(
+  route: CommandRoute,
+  base: CliContext,
+  registry: CommandRegistry,
+  settings: Settings,
+): Promise<Ending> {
   const deprecation = deprecationLine(route);
   if (deprecation !== null) settings.stderr.write(`${deprecation}\n`);
 
@@ -257,6 +264,7 @@ async function runCommand(route: CommandRoute, base: CliContext, settings: Setti
     ...base,
     output: guarded.output,
     argv: Object.freeze([...route.argv]),
+    registry,
   });
   const previous = activeOutput();
   setActiveOutput(guarded.output);
@@ -306,7 +314,7 @@ async function settle(
       return failure(route.code satisfies RouteRefusalCode, route.message);
     case 'command':
       return problem === null
-        ? runCommand(route, base, settings)
+        ? runCommand(route, base, registry, settings)
         : failure('invalid_spec', problem);
   }
 }

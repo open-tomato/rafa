@@ -17,7 +17,7 @@
  *     {@link planCommand} (`rafa plan create`), {@link usageCommand}
  *     (`rafa usage`), {@link effortCollectCommand} (`rafa effort collect`)
  *     and {@link effortReportCommand} (`rafa effort report`). These are
- *     the five functions the core commands in `src/commands/` run, each
+ *     the five functions the core commands in `src/commands/` wrap, each
  *     handed the words typed after its routing words. The entry
  *     re-exports them as they are, so a service calling one runs exactly
  *     what the terminal runs.

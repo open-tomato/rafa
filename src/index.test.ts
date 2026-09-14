@@ -20,10 +20,12 @@
  * dispatcher, the help renderer and the core registry alone, and that
  * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
- * a sixth command registered and not spelled goes red. Each of those
- * modules takes the phase 0 command it runs as its one default import,
- * and that binding is held to be a root export's value, so a command the
- * terminal runs and a service cannot import goes red. A binding a module
+ * a command registered and not spelled goes red. Each of those modules
+ * wrapping a phase 0 command takes it as its one default import, and
+ * that binding is held to be a root export's value, so a command the
+ * terminal runs and a service cannot import goes red. `describe` is held
+ * to be the one module wrapping none: it runs the roster builder of
+ * `src/cli/describe.ts`, which is no root export. A binding a module
  * takes by name, as `loop start` takes the CI defaults its flags show,
  * is a value and not a command, and is not held. Every parsed import list
  * is also held to the spelled one, which is what keeps a parser that
@@ -247,6 +249,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/usage.js', [['../usage.js', ['default']], ['./wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
 ];
 
 /** A static relative import, possibly spanning lines, type-only or not. */
@@ -381,12 +384,13 @@ describe('what the CLI reaches, through the entry', () => {
       .toEqual(COMMAND_MODULES.map((_module, index) => index));
   });
 
-  it('reaches the phase 0 command each core command module runs, its one default import, as a root export', async () => {
+  it('reaches the phase 0 command each wrapping core command module runs, its one default import, as a root export', async () => {
     const rootValues = new Set<unknown>(Object.values(entry));
+    const wrapping = COMMAND_MODULES.filter(([, imports]) => imports.some(([, names]) => names.includes('wrapPhaseZeroCommand')));
     const defaultImports: number[] = [];
     const unreached: string[] = [];
 
-    for (const [path] of COMMAND_MODULES) {
+    for (const [path] of wrapping) {
       const modulePath = join(SRC_DIR, path);
       const runs = readImports(modulePath).filter(([, names]) => names.includes('default'));
       defaultImports.push(runs.length);
@@ -396,7 +400,8 @@ describe('what the CLI reaches, through the entry', () => {
       }
     }
 
-    expect(defaultImports).toEqual(COMMAND_MODULES.map(() => 1));
+    expect(COMMAND_MODULES.filter((module) => !wrapping.includes(module)).map(([path]) => path)).toEqual(['./commands/describe.js']);
+    expect(defaultImports).toEqual(wrapping.map(() => 1));
     expect(unreached).toEqual([]);
   });
 });

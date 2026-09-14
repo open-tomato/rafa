@@ -13,9 +13,10 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Each of the five registered so far wraps a
+ * of each is its command. Five of the six registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
- * writes.
+ * writes. `describe` wraps none: it builds its document from the registry
+ * its context carries.
  *
  * ## What is registered
  *
@@ -24,20 +25,23 @@
  *   - `loop start`, aliased `start`.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's.
  *   - `usage`, top-level.
+ *   - `describe`, top-level: the schema 2 roster of the registry the line
+ *     was routed through.
  *
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
  * The subjects are the three with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `issue` and
- * `module` join with their first action, as `init`, `doctor`, `describe`
- * and `self-update` join with the tasks that bring them.
+ * `module` join with their first action, as `init`, `doctor` and
+ * `self-update` join with the tasks that bring them.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
+import describe from './describe.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import loopStart from './loop/start.js';
@@ -58,6 +62,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortCollect,
   effortReport,
   usage,
+  describe,
 ]);
 
 /** The registry `src/rafa.ts` dispatches through. */
