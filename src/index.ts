@@ -1,7 +1,8 @@
 /**
- * The library's entry: the loop, the plan and report parsers, the effort
- * store and the config resolver, so a service importing the package
- * reaches everything the CLI reaches.
+ * The library's entry: the loop, the plan and report parsers, the
+ * preflight, the effort store, the config resolver, scope resolution,
+ * the adapter registry and the manifest validator, so a service
+ * importing the package reaches everything the CLI reaches.
  *
  * The spec's `exports` map points the package root, `.`, at
  * `./dist/index.js`, which is this module built, and names what the root
@@ -23,8 +24,8 @@
  *     re-exports them as they are, so a service calling one runs exactly
  *     what the terminal runs.
  *   - The whole `./plan` surface: the block reader, the plan parser, the
- *     report parser and the injection renderer, with the models they
- *     answer.
+ *     report parser, the injection renderer, the preflight runner and the
+ *     PREREQUISITES parser, with the models they answer.
  *   - The whole `./store` surface: the port, both backends and the
  *     selector.
  *   - The whole config, `config.ts` and `config-load.ts`:
@@ -34,6 +35,23 @@
  *     {@link resolveConfig} it is built from, {@link readConfigFile},
  *     {@link ConfigError}, and the names and defaults every setting
  *     takes.
+ *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
+ *     which walks up from a directory to the nearest one holding
+ *     `.rafa/config.yaml` and answers the project root with both scopes,
+ *     the `ConfigRoots` {@link loadConfig} reads, or the `rafa init` hint
+ *     when no directory holds one, with {@link ScopeError},
+ *     {@link scopeAt}, {@link initHint} and the filesystem seam the walk
+ *     reads.
+ *   - The whole adapter registry, `adapters/registry.ts`:
+ *     {@link createAdapterRegistry}, {@link CORE_ADAPTER_REGISTRY}, which
+ *     holds core's own adapters keyed by port type and kind, and
+ *     {@link PORT_VERSIONS}, the version core serves of each port.
+ *   - The whole manifest module, `modules/manifest.ts`:
+ *     {@link validateManifest}, which reads the `rafa` manifest of a
+ *     module's `package.json` and names every failure, with the schema's
+ *     closed lists and {@link RUNNING_MANIFEST_SEAMS}, the rafa version
+ *     and port versions a manifest is held against. It is how a module
+ *     author validates a manifest locally, as the modules spec asks.
  *
  * Every subpath's names are on the root too, the same bindings, so a
  * service that starts from the root never has to learn a subpath to
@@ -75,12 +93,23 @@
  *     them only through a command, and an entry is a public surface: a
  *     name added later breaks nobody, and a name removed breaks every
  *     caller that imported it.
+ *   - The rest of `src/project/` and `src/modules/`: the root candidates,
+ *     prompt and scaffold behind `rafa init`, and the module loader
+ *     behind `rafa module list` and the CLI's start-up. Each is reached
+ *     through a command, for the same reason.
  *   - `./ports`. The spec declares it in phase 0 and fills it in phase 1,
  *     from its own entry.
  *
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.
  */
+export type {
+  Adapter,
+  AdapterContext,
+  AdapterRegistry,
+  AnyAdapter,
+  PortImplementations,
+} from './adapters/registry.js';
 export type { ConfigRoots } from './config-load.js';
 export type {
   ClaudeSettingSource,
@@ -121,6 +150,20 @@ export type {
   StoreReadResult,
 } from './effort/store/index.js';
 export type {
+  AdapterProvision,
+  CommandsProvision,
+  FeatureType,
+  ManifestProvides,
+  ManifestSeams,
+  ManifestValidation,
+  McpServer,
+  ModuleFeatureType,
+  ModuleManifest,
+  OutputChannel,
+  OutputProvision,
+} from './modules/manifest.js';
+export type {
+  CheckOutcome,
   FindingKind,
   FindingSignal,
   InjectionFallback,
@@ -128,6 +171,7 @@ export type {
   InjectionRequest,
   InjectionTask,
   LineSpan,
+  MarkdownPrerequisite,
   PlanBlockKind,
   PlanHeader,
   PlanHeaderExtra,
@@ -136,9 +180,23 @@ export type {
   PlanIssue,
   PlanIssueReason,
   PlanModel,
+  PlanPrerequisites,
   PlanStage,
   PlanTask,
   PlanTaskStatus,
+  PreflightCheck,
+  PreflightEnv,
+  PreflightItems,
+  PreflightOptions,
+  PreflightReport,
+  PreflightTier,
+  PreflightTiers,
+  PrerequisiteReminder,
+  PrerequisiteSettings,
+  PrerequisiteTag,
+  ProbeOptions,
+  ProbeRun,
+  ProbeRunner,
   RafaBlock,
   RafaBlockKind,
   ReportAbsenceReason,
@@ -152,9 +210,20 @@ export type {
   ReportPresent,
   ReportReading,
   ReportStatus,
+  ServiceRequester,
+  ServiceRequestInit,
   TaskReport,
 } from './plan/index.js';
+export type {
+  NoProject,
+  ProjectFound,
+  Scope,
+  ScopeFileSystem,
+  ScopeResolution,
+  ScopeSeams,
+} from './project/scope.js';
 
+export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
 export { loadConfig, readConfigFile } from './config-load.js';
 export {
   CLAUDE_SETTING_SOURCES,
@@ -179,19 +248,44 @@ export {
   openSqliteStore,
   selectEffortStore,
 } from './effort/store/index.js';
+export {
+  FEATURE_TYPES,
+  MANIFEST_VERSION,
+  OUTPUT_CHANNELS,
+  RUNNING_MANIFEST_SEAMS,
+  validateManifest,
+} from './modules/manifest.js';
 export { default as planCommand } from './plan.js';
 export {
   FINDING_KINDS,
   FINDING_SIGNALS,
   isRafaBlockKind,
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
   parsePlan,
+  parsePrerequisites,
   parseReport,
   PLAN_BLOCK_KINDS,
   PLAN_HEADER_FIELDS,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+  PROBE_TIMEOUT_MS,
   RAFA_BLOCK_KINDS,
   readRafaBlocks,
   renderInjection,
   REPORT_STATUSES,
+  runPreflight,
+  runShellProbe,
 } from './plan/index.js';
+export {
+  DISK_FILE_SYSTEM,
+  INIT_COMMAND,
+  initHint,
+  resolveScope,
+  SCOPE_DIR,
+  scopeAt,
+  ScopeError,
+  selfAndAncestors,
+} from './project/scope.js';
 export { default as startCommand } from './start.js';
 export { default as usageCommand } from './usage.js';

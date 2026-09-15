@@ -11,7 +11,11 @@
  * The pipeline cases run a plan through the entry alone, the way a
  * caller importing only `./plan` would: read its blocks, parse it, and
  * render a declared task in every mode the entry names. One more reads a
- * session's report, and an output without one, through the entry.
+ * session's report, and an output without one, through the entry. And
+ * one checks a PREREQUISITES file the same way: parse it, merge it into
+ * a config holding no item, and run the preflight over the merge with a
+ * stand-in probe runner answering the probe's failure, so the halt it
+ * words is the one `loop start` would stop on.
  *
  * The resolution cases pin why the entry is imported as
  * `./plan/index.js` from `src/`. Measured on bun 1.3.14 before this
@@ -36,10 +40,26 @@
  * `FINDING_SIGNALS` exported as `REPORT_STATUSES`, each of the last
  * three red on its identity case alone.
  *
+ * Four more were driven on 2026-09-15 when the preflight and the
+ * PREREQUISITES parser joined the entry, one run each over this file,
+ * `src/index.test.ts` and `src/tests/package-build.test.ts`, with 161
+ * pass before and after and every file restored byte-identical (sha256):
+ * `runPreflight`'s export dropped (red on the name list, its identity
+ * case and the PREREQUISITES case, and the other two files each reported
+ * an error, both importing the root that re-exports it),
+ * `mergePlanPrerequisites` exported as a wrapper dropping the plan's
+ * items (red on its identity case and the PREREQUISITES case),
+ * `forkWorktree` exported as well (red on the name list), and `Database`
+ * re-exported from `bun:sqlite` (red on the name list, and on the node
+ * case of `package-build.test.ts`).
+ *
  * The type names are not checked here, and `check-types` skips this
  * file. Checked through a tsconfig outside the repo, a probe importing
  * all thirty-three compiled, and one importing `TaskDeclaration`, which
- * the entry leaves out, failed with TS2305.
+ * the entry leaves out, failed with TS2305. Checked again on 2026-09-15,
+ * a probe re-exporting all fifty-one the entry now exports compiled, and
+ * one naming `ForkOptions`, which the entry leaves out, failed with
+ * TS2305.
  */
 import type { PlanTask } from './index.js';
 
@@ -49,6 +69,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 import { INJECT_MODES } from '../config.js';
+import {
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
+  parsePrerequisites,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+} from '../preflight/prerequisites-md.js';
+import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '../preflight/run.js';
 import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '../report/parse.js';
 
 import { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from './blocks.js';
@@ -64,13 +92,21 @@ const RUNTIME_EXPORTS = [
   'INJECT_MODES',
   'PLAN_BLOCK_KINDS',
   'PLAN_HEADER_FIELDS',
+  'PROBE_TIMEOUT_MS',
   'RAFA_BLOCK_KINDS',
   'REPORT_STATUSES',
   'isRafaBlockKind',
+  'loadPlanPrerequisites',
+  'mergePlanPrerequisites',
   'parsePlan',
+  'parsePrerequisites',
   'parseReport',
+  'planPrerequisites',
+  'prerequisitesPathForPlan',
   'readRafaBlocks',
   'renderInjection',
+  'runPreflight',
+  'runShellProbe',
 ];
 
 /** Each runtime name, the entry's value for it, and its module's own. */
@@ -80,13 +116,21 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['INJECT_MODES', entry.INJECT_MODES, INJECT_MODES],
   ['PLAN_BLOCK_KINDS', entry.PLAN_BLOCK_KINDS, PLAN_BLOCK_KINDS],
   ['PLAN_HEADER_FIELDS', entry.PLAN_HEADER_FIELDS, PLAN_HEADER_FIELDS],
+  ['PROBE_TIMEOUT_MS', entry.PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS],
   ['RAFA_BLOCK_KINDS', entry.RAFA_BLOCK_KINDS, RAFA_BLOCK_KINDS],
   ['REPORT_STATUSES', entry.REPORT_STATUSES, REPORT_STATUSES],
   ['isRafaBlockKind', entry.isRafaBlockKind, isRafaBlockKind],
+  ['loadPlanPrerequisites', entry.loadPlanPrerequisites, loadPlanPrerequisites],
+  ['mergePlanPrerequisites', entry.mergePlanPrerequisites, mergePlanPrerequisites],
   ['parsePlan', entry.parsePlan, parsePlan],
+  ['parsePrerequisites', entry.parsePrerequisites, parsePrerequisites],
   ['parseReport', entry.parseReport, parseReport],
+  ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
+  ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['renderInjection', entry.renderInjection, renderInjection],
+  ['runPreflight', entry.runPreflight, runPreflight],
+  ['runShellProbe', entry.runShellProbe, runShellProbe],
 ];
 
 /** The `src/` directory, which the `rafa plan` command sits in. */
@@ -190,6 +234,48 @@ describe('a session output read through the entry alone', () => {
       issues: [],
     });
     expect(entry.parseReport(doc('Done.'))).toMatchObject({ present: false, reason: 'no-block' });
+  });
+});
+
+describe('a PREREQUISITES file checked through the entry alone', () => {
+  it('parses the file named beside a plan, merges it and halts on the probe that failed', async () => {
+    const content = doc(
+      '# Prerequisites',
+      '',
+      '## Checks [auto]',
+      '',
+      '- [ ] Bun is installed: `bun --version`',
+      '',
+      '## Manual',
+      '',
+      '- [ ] Merge the pull request',
+    );
+    const probes: string[] = [];
+    const warnings: string[] = [];
+    const items = entry.mergePlanPrerequisites({ prerequisitesRequired: [], prerequisitesOptional: [] }, content);
+    const report = await entry.runPreflight(items, {
+      cwd: SRC_DIR,
+      env: {},
+      timeoutMs: entry.PROBE_TIMEOUT_MS,
+      runProbe: (probe) => {
+        probes.push(probe);
+        return Promise.resolve({ exitCode: 127, stderr: 'sh: bun: not found\n', timedOut: false });
+      },
+      warn: (message) => {
+        warnings.push(message);
+      },
+      now: () => 0,
+    });
+
+    expect(entry.prerequisitesPathForPlan(join(SRC_DIR, 'PLAN-entry.md'))).toBe(join(SRC_DIR, 'PREREQUISITES-entry.md'));
+    expect(entry.parsePrerequisites(content).map((item) => item.tag)).toEqual(['auto', 'human']);
+    expect(items.required).toMatchObject([{ probe: 'bun --version' }]);
+    expect(items.reminders).toMatchObject([{ description: 'Merge the pull request', tag: 'human' }]);
+    expect(probes).toEqual(['bun --version']);
+    expect(report.halt).toContain('preflight halted: 1 required item failed');
+    expect(report.halt).toContain('probe `bun --version` exited 127: sh: bun: not found');
+    expect(report.knownMissing).toEqual([]);
+    expect(warnings).toEqual([]);
   });
 });
 

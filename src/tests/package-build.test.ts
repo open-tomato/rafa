@@ -83,6 +83,38 @@
  * them: the bundle reads that file when it is imported, and the build has
  * none there.
  *
+ * ## The names phase 1 adds
+ *
+ * The preflight and the PREREQUISITES parser joined `./plan` in phase 1,
+ * and scope resolution, the adapter registry and the manifest validator
+ * joined the root beside the config resolver it already carried. Those
+ * names are spelled here too, so a bundle that lost one fails a case
+ * naming it, where the computed case above compares a bundle with a
+ * source that could have lost it as well. The root bundle's
+ * `PORT_VERSIONS` is held to the source's, its `RUNNING_MANIFEST_SEAMS`
+ * to the manifest's `version`, which `src/modules/manifest.ts` imports
+ * from `package.json` as `describe` does, and its built `resolveScope`
+ * and `validateManifest` are run once each.
+ *
+ * `README.md` says only `./plan` and `./ports` load under node. The
+ * preflight brought `Bun.spawn`, `Bun.which` and `Bun.file` calls into
+ * `./plan`, so one case imports `dist/plan/index.js` under node and holds
+ * its names to its source's. It imports `dist/index.js` the same way as
+ * its control, which node refuses at `bun:sqlite`. The case needs `node`
+ * on the suite's PATH, and fails naming it when there is none.
+ *
+ * Driven on 2026-09-15 with node 22.14.0, one run each over this file,
+ * `src/index.test.ts` and `src/plan/index.test.ts`, with 161 pass before
+ * and after and every file restored byte-identical (sha256).
+ * `resolveScope` dropped from the root reddened the root names case, and
+ * so did `CORE_ADAPTER_REGISTRY` dropped. A bare `import 'bun:sqlite';`
+ * added to `src/plan/index.ts` left every case green, the node case
+ * among them. It is no control: in a scratch build under that mutation,
+ * the import landed in `cli.js` and the chunk `index-qebmbvjb.js`, not
+ * in `dist/plan/index.js`, and node loaded that entry's twenty names.
+ * `Database` re-exported from `bun:sqlite` there instead reddened the
+ * node case, which is the control that it can fail.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -123,7 +155,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
@@ -169,6 +201,47 @@ const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
 
 /** The subpath bundles whose every name the root bundle carries too. */
 const CONTAINED_SUBPATHS = ['plan/index.js', 'effort/store/index.js'];
+
+/**
+ * The names phase 1 adds to the `./plan` entry, the preflight and the
+ * PREREQUISITES parser, which the root bundle carries too.
+ */
+const PLAN_PREFLIGHT_NAMES = [
+  'PROBE_TIMEOUT_MS',
+  'loadPlanPrerequisites',
+  'mergePlanPrerequisites',
+  'parsePrerequisites',
+  'planPrerequisites',
+  'prerequisitesPathForPlan',
+  'runPreflight',
+  'runShellProbe',
+];
+
+/**
+ * The names phase 1 adds to the root alone, scope resolution, the adapter
+ * registry and the manifest validator, with the config resolver the root
+ * already carried.
+ */
+const ROOT_SEAM_NAMES = [
+  'CORE_ADAPTER_REGISTRY',
+  'DISK_FILE_SYSTEM',
+  'FEATURE_TYPES',
+  'INIT_COMMAND',
+  'MANIFEST_VERSION',
+  'OUTPUT_CHANNELS',
+  'PORT_VERSIONS',
+  'RUNNING_MANIFEST_SEAMS',
+  'SCOPE_DIR',
+  'ScopeError',
+  'createAdapterRegistry',
+  'initHint',
+  'loadConfig',
+  'resolveConfig',
+  'resolveScope',
+  'scopeAt',
+  'selfAndAncestors',
+  'validateManifest',
+];
 
 /**
  * The templates the build copies beside its bundles: each one's source,
@@ -467,6 +540,53 @@ describe('the built library entries', () => {
       stderr: '',
       files: ['probe.ts'],
     });
+  }, 30_000);
+});
+
+describe('the names phase 1 adds, in the built entries', () => {
+  it('carries the preflight and the PREREQUISITES parser in dist/plan/index.js, as the same bindings in dist/index.js', async () => {
+    const plan = await importBuilt('plan/index.js');
+    const root = await importBuilt('index.js');
+
+    expect(PLAN_PREFLIGHT_NAMES.filter((name) => !(name in plan))).toEqual([]);
+    expect(PLAN_PREFLIGHT_NAMES.filter((name) => root[name] !== plan[name])).toEqual([]);
+  });
+
+  it('carries the config resolver, scope resolution, the adapter registry and the manifest validator in dist/index.js', async () => {
+    const root = await importBuilt('index.js');
+    const start = mkdtempSync(join(tempRoot, 'scope-'));
+    const resolveScope = root['resolveScope'] as (start: string, seams: { home: string }) => unknown;
+    const validateManifest = root['validateManifest'] as (raw: unknown) => { ok: boolean };
+
+    expect(ROOT_SEAM_NAMES.filter((name) => !(name in root))).toEqual([]);
+    expect(root['PORT_VERSIONS']).toEqual(rootSource.PORT_VERSIONS);
+    expect(root['RUNNING_MANIFEST_SEAMS']).toEqual({
+      rafaVersion: readManifest()['version'],
+      portVersions: rootSource.PORT_VERSIONS,
+    });
+    expect(resolveScope(start, { home: tempRoot })).toMatchObject({ found: false, start, home: tempRoot });
+    expect(validateManifest({})).toMatchObject({ ok: false });
+  });
+
+  it('loads dist/plan/index.js under node with the names its source exports, where node refuses dist/index.js', () => {
+    const node = Bun.which('node');
+    if (node === null) throw new Error('node is not on the PATH this suite runs under');
+    const load = (path: string) => run([
+      node,
+      '--input-type=module',
+      '-e',
+      `console.log(JSON.stringify(Object.keys(await import(${JSON.stringify(pathToFileURL(path).href)})).sort()));`,
+    ], tempRoot, process.env);
+
+    expect(load(join(DIST, 'plan', 'index.js'))).toEqual({
+      exitCode: 0,
+      stdout: `${JSON.stringify(Object.keys(planSource).sort())}\n`,
+      stderr: '',
+    });
+    const root = load(join(DIST, 'index.js'));
+    expect(root.exitCode).not.toBe(0);
+    expect(root.stderr).toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
+    expect(root.stderr).toContain('bun:');
   }, 30_000);
 });
 

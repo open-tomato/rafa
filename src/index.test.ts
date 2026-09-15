@@ -10,8 +10,9 @@
  * answering the same thing.
  *
  * The containment cases are computed instead: every runtime name the
- * `./plan` entry, the `./store` entry and the two config modules export is
- * held to be on the root as the same binding. Paired with the spelled
+ * `./plan` entry, the `./store` entry, the two config modules, the scope
+ * module, the adapter registry and the manifest module export is held to
+ * be on the root as the same binding. Paired with the spelled
  * list, a name added to a subpath and not to the root reds the
  * containment case, and one added to both reds the spelled list, so
  * neither grows the root unseen.
@@ -71,13 +72,34 @@
  * longer loads. `src/rafa.ts` setting no exit code reddened the control
  * alone.
  *
+ * Five more were driven on 2026-09-15 once the preflight, the scope
+ * module, the adapter registry and the manifest module joined the entry,
+ * one run each over this file, `src/plan/index.test.ts` and
+ * `src/tests/package-build.test.ts`, with 161 pass before and after and
+ * every file restored byte-identical (sha256). `resolveScope` dropped
+ * from the root reddened the name list, its re-export case, the scope
+ * module's containment case and the import probe, whose export count
+ * moved, with the root names case of `package-build.test.ts`.
+ * `CORE_ADAPTER_REGISTRY` dropped reddened the same five for the
+ * registry. `validateManifest` exported as a wrapper reddened its
+ * re-export case and the manifest module's containment case.
+ * `mergePlanPrerequisites` exported from `./plan` as a wrapper reddened
+ * its re-export case here and in `src/plan/index.test.ts`. `forkWorktree`
+ * exported from `./plan` and not from the root reddened the `./plan`
+ * entry's containment case.
+ *
  * The type names are not checked here, and `check-types` skips this
  * file. Checked through a tsconfig outside the repo, a probe
  * re-exporting from the entry all sixty-seven type names the `./plan`
  * entry, the `./store` entry and the two config modules export compiled,
- * and
- * one naming `TaskDeclaration`, which the entry leaves out, failed with
- * TS2305.
+ * and one naming `TaskDeclaration`, which the entry leaves out, failed
+ * with TS2305. Checked again on 2026-09-15, a probe re-exporting all 107
+ * type names the entry now exports compiled, and one naming
+ * `RootCandidates` (`src/project/roots.ts`), which the entry leaves out,
+ * failed with TS2305. That tsconfig sets `module` to `ESNext`, as the
+ * repository's does: on `tsconfig.base.json` alone both probes also
+ * failed with TS1343, on the `import.meta` reads of `src/plan.ts` and
+ * `src/start.ts`.
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -86,6 +108,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
+import * as registryModule from './adapters/registry.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import * as configLoadModule from './config-load.js';
 import {
@@ -114,6 +138,14 @@ import {
 } from './effort/store/index.js';
 import * as storeEntry from './effort/store/index.js';
 import {
+  FEATURE_TYPES,
+  MANIFEST_VERSION,
+  OUTPUT_CHANNELS,
+  RUNNING_MANIFEST_SEAMS,
+  validateManifest,
+} from './modules/manifest.js';
+import * as manifestModule from './modules/manifest.js';
+import {
   FINDING_KINDS,
   FINDING_SIGNALS,
   isRafaBlockKind,
@@ -128,6 +160,25 @@ import {
 } from './plan/index.js';
 import * as planEntry from './plan/index.js';
 import plan from './plan.js';
+import {
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
+  parsePrerequisites,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+} from './preflight/prerequisites-md.js';
+import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './preflight/run.js';
+import {
+  DISK_FILE_SYSTEM,
+  INIT_COMMAND,
+  initHint,
+  resolveScope,
+  SCOPE_DIR,
+  scopeAt,
+  ScopeError,
+  selfAndAncestors,
+} from './project/scope.js';
+import * as scopeModule from './project/scope.js';
 import start from './start.js';
 import usage from './usage.js';
 
@@ -139,37 +190,61 @@ const RUNTIME_EXPORTS = [
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
   'CONFIG_VERSIONS',
+  'CORE_ADAPTER_REGISTRY',
   'ConfigError',
+  'DISK_FILE_SYSTEM',
   'EFFORT_KEY_PROJECTIONS',
+  'FEATURE_TYPES',
   'FINDING_KINDS',
   'FINDING_SIGNALS',
+  'INIT_COMMAND',
   'INJECT_MODES',
+  'MANIFEST_VERSION',
   'MODULE_SOURCE_KINDS',
+  'OUTPUT_CHANNELS',
   'OUTPUT_MODES',
   'PLAN_BLOCK_KINDS',
   'PLAN_HEADER_FIELDS',
+  'PORT_VERSIONS',
   'PREREQUISITE_KINDS',
+  'PROBE_TIMEOUT_MS',
   'RAFA_BLOCK_KINDS',
   'REPORT_STATUSES',
+  'RUNNING_MANIFEST_SEAMS',
+  'SCOPE_DIR',
   'STORE_BACKENDS',
+  'ScopeError',
   'configFilePath',
+  'createAdapterRegistry',
   'effortCollectCommand',
   'effortReportCommand',
+  'initHint',
   'isRafaBlockKind',
   'loadConfig',
+  'loadPlanPrerequisites',
+  'mergePlanPrerequisites',
   'openNdjsonStore',
   'openSqliteStore',
   'parseConfigText',
   'parsePlan',
+  'parsePrerequisites',
   'parseReport',
   'planCommand',
+  'planPrerequisites',
+  'prerequisitesPathForPlan',
   'readConfigFile',
   'readRafaBlocks',
   'renderInjection',
   'resolveConfig',
+  'resolveScope',
+  'runPreflight',
+  'runShellProbe',
+  'scopeAt',
   'selectEffortStore',
+  'selfAndAncestors',
   'startCommand',
   'usageCommand',
+  'validateManifest',
 ];
 
 /** Each runtime name, the entry's value for it, and its module's own. */
@@ -178,37 +253,61 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],
   ['CONFIG_VERSIONS', entry.CONFIG_VERSIONS, CONFIG_VERSIONS],
+  ['CORE_ADAPTER_REGISTRY', entry.CORE_ADAPTER_REGISTRY, CORE_ADAPTER_REGISTRY],
   ['ConfigError', entry.ConfigError, ConfigError],
+  ['DISK_FILE_SYSTEM', entry.DISK_FILE_SYSTEM, DISK_FILE_SYSTEM],
   ['EFFORT_KEY_PROJECTIONS', entry.EFFORT_KEY_PROJECTIONS, EFFORT_KEY_PROJECTIONS],
+  ['FEATURE_TYPES', entry.FEATURE_TYPES, FEATURE_TYPES],
   ['FINDING_KINDS', entry.FINDING_KINDS, FINDING_KINDS],
   ['FINDING_SIGNALS', entry.FINDING_SIGNALS, FINDING_SIGNALS],
+  ['INIT_COMMAND', entry.INIT_COMMAND, INIT_COMMAND],
   ['INJECT_MODES', entry.INJECT_MODES, INJECT_MODES],
+  ['MANIFEST_VERSION', entry.MANIFEST_VERSION, MANIFEST_VERSION],
   ['MODULE_SOURCE_KINDS', entry.MODULE_SOURCE_KINDS, MODULE_SOURCE_KINDS],
+  ['OUTPUT_CHANNELS', entry.OUTPUT_CHANNELS, OUTPUT_CHANNELS],
   ['OUTPUT_MODES', entry.OUTPUT_MODES, OUTPUT_MODES],
   ['PLAN_BLOCK_KINDS', entry.PLAN_BLOCK_KINDS, PLAN_BLOCK_KINDS],
   ['PLAN_HEADER_FIELDS', entry.PLAN_HEADER_FIELDS, PLAN_HEADER_FIELDS],
+  ['PORT_VERSIONS', entry.PORT_VERSIONS, PORT_VERSIONS],
   ['PREREQUISITE_KINDS', entry.PREREQUISITE_KINDS, PREREQUISITE_KINDS],
+  ['PROBE_TIMEOUT_MS', entry.PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS],
   ['RAFA_BLOCK_KINDS', entry.RAFA_BLOCK_KINDS, RAFA_BLOCK_KINDS],
   ['REPORT_STATUSES', entry.REPORT_STATUSES, REPORT_STATUSES],
+  ['RUNNING_MANIFEST_SEAMS', entry.RUNNING_MANIFEST_SEAMS, RUNNING_MANIFEST_SEAMS],
+  ['SCOPE_DIR', entry.SCOPE_DIR, SCOPE_DIR],
   ['STORE_BACKENDS', entry.STORE_BACKENDS, STORE_BACKENDS],
+  ['ScopeError', entry.ScopeError, ScopeError],
   ['configFilePath', entry.configFilePath, configFilePath],
+  ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],
   ['effortCollectCommand', entry.effortCollectCommand, effortCollect],
   ['effortReportCommand', entry.effortReportCommand, effortReport],
+  ['initHint', entry.initHint, initHint],
   ['isRafaBlockKind', entry.isRafaBlockKind, isRafaBlockKind],
   ['loadConfig', entry.loadConfig, loadConfig],
+  ['loadPlanPrerequisites', entry.loadPlanPrerequisites, loadPlanPrerequisites],
+  ['mergePlanPrerequisites', entry.mergePlanPrerequisites, mergePlanPrerequisites],
   ['openNdjsonStore', entry.openNdjsonStore, openNdjsonStore],
   ['openSqliteStore', entry.openSqliteStore, openSqliteStore],
   ['parseConfigText', entry.parseConfigText, parseConfigText],
   ['parsePlan', entry.parsePlan, parsePlan],
+  ['parsePrerequisites', entry.parsePrerequisites, parsePrerequisites],
   ['parseReport', entry.parseReport, parseReport],
   ['planCommand', entry.planCommand, plan],
+  ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
+  ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
+  ['resolveScope', entry.resolveScope, resolveScope],
+  ['runPreflight', entry.runPreflight, runPreflight],
+  ['runShellProbe', entry.runShellProbe, runShellProbe],
+  ['scopeAt', entry.scopeAt, scopeAt],
   ['selectEffortStore', entry.selectEffortStore, selectEffortStore],
+  ['selfAndAncestors', entry.selfAndAncestors, selfAndAncestors],
   ['startCommand', entry.startCommand, start],
   ['usageCommand', entry.usageCommand, usage],
+  ['validateManifest', entry.validateManifest, validateManifest],
 ];
 
 /** The modules whose every runtime name the root also carries. */
@@ -217,6 +316,9 @@ const CONTAINED: readonly (readonly [string, Record<string, unknown>])[] = [
   ['the ./store entry', storeEntry],
   ['the config module', configModule],
   ['the config loader', configLoadModule],
+  ['the scope module', scopeModule],
+  ['the adapter registry', registryModule],
+  ['the manifest module', manifestModule],
 ];
 
 /** The `src/` directory, which the entry and the CLI both sit in. */
