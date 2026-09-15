@@ -1,10 +1,12 @@
 /**
- * Tests for the package's published shape: the `bin`, `exports` and
- * `files` fields of `package.json`, and the `build` script that writes
- * what those fields name.
+ * Tests for the package's published shape: the `bin`, `exports`, `files`,
+ * `private`, `publishConfig`, `engines` and `module` fields of
+ * `package.json`, the dependency keys it does NOT carry, and the `build`
+ * script that writes what those fields name.
  *
- * The three fields are spelled HERE, as the phase 0 spec gives them, so a
- * target renamed in the manifest fails a case instead of agreeing with
+ * Each of those fields is spelled HERE, as the phase 0 spec gives the
+ * first three and phase 1's publishing stage the rest, so a target
+ * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
  * (its manifest, both tsconfig files, the README, the dev-planner skill
  * and `src/`) into a scratch directory and runs `bun run build` there,
@@ -115,6 +117,39 @@
  * `Database` re-exported from `bun:sqlite` there instead reddened the
  * node case, which is the control that it can fail.
  *
+ * ## The publishing fields phase 1 sets
+ *
+ * `private: false` with `publishConfig.access: public` is what lets the
+ * scoped name reach the registry at all; npm defaults a scoped package to
+ * a restricted publish, so the access is spelled out rather than left to
+ * the default. `engines` names `bun` alone, against a build that targets
+ * bun: the phase 0 manifest declared `engines.node >= 22`, which no
+ * reading supported, since the root, `./cli` and `./store` never load
+ * under node. `module` moved off `index.ts`, a `console.log` placeholder
+ * `bun init` had left at the repository root and `files` never published,
+ * onto `./dist/index.js`, the root of the exports map; the case holds the
+ * two equal and finds the file in the build, so a `module` naming an
+ * entry the build does not write cannot pass.
+ *
+ * The dependency case reads absence, so it names every key an install
+ * would resolve from, not just the two the manifest once carried, and it
+ * asserts `devDependencies` is non-empty beside them: a manifest that
+ * failed to parse into an object would otherwise satisfy it. What the
+ * absence buys was measured on npm 11.1.0, outside this suite, on two
+ * probe tarballs differing in that one key: with
+ * `peerDependencies: {typescript: ^5}`, `npm install --offline` against
+ * an empty cache exited 1 with `npm error code ENOTCACHED` on
+ * `https://registry.npmjs.org/typescript` and left `node_modules` empty,
+ * and without it the same install exited 0. Against a warm cache the
+ * peer-carrying tarball installed 2 packages where the other installed
+ * 1, so npm resolves a peer dependency as a real install rather than a
+ * hint.
+ *
+ * The README case reads the install section that ships in the tarball —
+ * `files` publishes only `dist`, but npm packs `README.md` regardless,
+ * which the pack case above pins. It builds both commands from the
+ * manifest's own `name`, so renaming the package reddens it too.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -184,6 +219,32 @@ const EXPORTS = {
 
 /** What the manifest publishes. */
 const FILES = ['dist'];
+
+/** How the manifest publishes: a scoped name needs the access spelled out. */
+const PUBLISH_CONFIG = { access: 'public' };
+
+/** The engine the build targets, and the only one the manifest names. */
+const ENGINES = { bun: '>=1.3.14' };
+
+/** The manifest's `module`: the root of the exports map, which the build writes. */
+const MODULE = './dist/index.js';
+
+/**
+ * Every manifest key an install would resolve packages from. All are
+ * absent, which is what lets a packed tarball install with no registry
+ * access: measured on npm 11.1.0, a probe tarball carrying only
+ * `peerDependencies: {typescript: ^5}` failed `npm install --offline`
+ * against an empty cache with `ENOTCACHED` on
+ * `https://registry.npmjs.org/typescript` and installed nothing, where
+ * the same tarball without that key installed offline, exit 0.
+ */
+const DEPENDENCY_KEYS = [
+  'dependencies',
+  'peerDependencies',
+  'optionalDependencies',
+  'bundleDependencies',
+  'bundledDependencies',
+];
 
 /** The dev-planner skill, from the repository root: the plan format. */
 const SKILL = '.claude/skills/dev-planner/SKILL.md';
@@ -447,6 +508,41 @@ describe('the package manifest', () => {
 
   it('publishes the build directory and nothing else', () => {
     expect(readManifest()['files']).toEqual(FILES);
+  });
+
+  it('is publishable, and publishes the scoped name publicly', () => {
+    const manifest = readManifest();
+
+    expect(manifest['private']).toBe(false);
+    expect(manifest['publishConfig']).toEqual(PUBLISH_CONFIG);
+    expect(String(manifest['name']).startsWith('@')).toBe(true);
+  });
+
+  it('names bun as its engine, and no node version', () => {
+    expect(readManifest()['engines']).toEqual(ENGINES);
+  });
+
+  it('points module at the built root export, not at a source placeholder', () => {
+    expect(readManifest()['module']).toBe(MODULE);
+    expect(MODULE).toBe(EXPORTS['.']);
+    expect(existsSync(join(PACKAGE_DIR, MODULE))).toBe(true);
+  });
+
+  it('declares no runtime dependency, so an install resolves nothing but the package', () => {
+    const manifest = readManifest();
+
+    expect(DEPENDENCY_KEYS.filter((key) => key in manifest)).toEqual([]);
+    expect(Object.keys(manifest['devDependencies'] as Record<string, unknown>).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the README', () => {
+  it('gives both global install commands, each naming the package the manifest does', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+    const name = String(readManifest()['name']);
+    const commands = [`npm i -g ${name}`, `bun add -g ${name}`];
+
+    expect(commands.filter((command) => !readme.includes(command))).toEqual([]);
   });
 });
 

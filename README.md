@@ -1,5 +1,28 @@
 # rafa
 
+## Install
+
+The package is `@open-tomato/rafa`, published to npm from this
+repository by an operator running `npm publish` with their own
+credentials. Once it is on the registry, it installs globally under
+either package manager:
+
+```bash
+npm i -g @open-tomato/rafa
+```
+
+```bash
+bun add -g @open-tomato/rafa
+```
+
+Either one puts the `rafa` binary on `PATH`. The package declares no
+runtime dependency — `dependencies`, `peerDependencies` and
+`optionalDependencies` are all absent — so the install resolves nothing
+beyond the package itself. The binary and every export run under bun,
+which `engines` names: see [Runtime](#runtime) below.
+
+## From a checkout
+
 To install dependencies:
 
 ```bash
@@ -47,11 +70,14 @@ the runtime directory is deleted.
 
 ## Runtime
 
-The build targets bun. The package root, `./cli` and `./store` import
-`bun:sqlite`, which node's ESM loader refuses before any module code runs,
-so only `./plan` and `./ports` load under node, whatever `engines.node`
-declares. The package ships no type declarations: `exports` names no
-`types`, and a TypeScript consumer gets TS7016 under `strict`.
+The build targets bun, and `engines` names `bun` alone: there is no
+`engines.node`, because no node version runs the binary. The package
+root, `./cli` and `./store` import `bun:sqlite`, which node's ESM loader
+refuses before any module code runs, so only `./plan` and `./ports` load
+under node at all. `module` points at `./dist/index.js`, the same build
+the root of `exports` names. The package ships no type declarations:
+`exports` names no `types`, and a TypeScript consumer gets TS7016 under
+`strict`.
 
 ## Attribution
 
