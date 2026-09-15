@@ -21,12 +21,18 @@
  * working unchanged, which is what shapes the grammar. `findNextTask`
  * matches `^- \[ \] (.+)` and trims the capture, so the block arrives
  * inside `taskInfo.task` and would otherwise reach the injected prompt
- * verbatim; `updateTrackerLine` rewrites only the checkbox prefix, so
- * the block survives a tick byte-identical. Neither needs a change —
- * the stripping happens here, at the point the text is used. Both
- * halves are driven over real trackers in
- * `tests/tracker-declarations.test.ts`, which is where that claim is
- * measured rather than stated.
+ * verbatim; `updateTrackerLine` rewrites the checkbox prefix and
+ * nothing before a blocker comment, so the block survives a tick
+ * byte-identical. Neither needed a change for the block — the
+ * stripping happens here, at the point the text is used. Both halves
+ * are driven over real trackers in `tests/tracker-declarations.test.ts`,
+ * which is where that claim is measured rather than stated.
+ *
+ * A blocker comment is the one thing a line may trail after the block,
+ * and it comes off in `findNextTask` rather than here
+ * (`utils/tracker.ts`). It has to come off first: the block is anchored
+ * at end of text, so with the comment still on it would read as task
+ * text.
  *
  * The strip rule reaches every `rafa:*` block too, but not from here.
  * A declaration sits ON a task line, so the text alone says where it

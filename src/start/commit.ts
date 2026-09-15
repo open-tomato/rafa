@@ -143,7 +143,9 @@ export function readReportHolds(output: string): readonly string[] {
  * from the task sentence, so a block left on it would reach the git
  * history — where nothing here can ever go back and take it out. A
  * `rafa:*` block needs no strip here: `findNextTask` never answers a
- * task line inside a closed one, so none reaches `taskInfo`.
+ * task line inside a closed one, so none reaches `taskInfo`. Nor does a
+ * blocker comment: `findNextTask` takes it off the task text, and the
+ * tick takes it off the line.
  *
  * A blocked task stops the loop rather than moving on, however it came
  * to be blocked. It has to: `findNextTask` resumes a blocked task FIRST,

@@ -40,7 +40,10 @@
  * Task lines are read with the patterns `findNextTask` reads them with,
  * `- [ ] ` and `- [BLOCKED] `, and with the `- [x] ` `updateTrackerLine`
  * ticks a line to. Lines are the same `split('\n')`, and a task's text
- * is its capture trimmed, as `findNextTask` trims it. So outside a
+ * is its capture trimmed, as `findNextTask` trims it, with a trailing
+ * `<!-- blocked: ... -->` comment taken off, as `findNextTask` takes it
+ * off through `splitBlockerComment` (`utils/tracker.ts`). The model does
+ * not carry the comment's text. So outside a
  * `rafa:*` block never closed, a line is an open task of the model
  * exactly when `findNextTask` can dispatch it, with the same text,
  * `lineNum` and status. `parse.test.ts` measures that rather than
@@ -134,6 +137,7 @@ import type { TaskDeclaration } from '../utils/declaration.js';
 
 import { parseTaskDeclaration } from '../utils/declaration.js';
 import { isStampableStub } from '../utils/plan-stamp.js';
+import { splitBlockerComment } from '../utils/tracker.js';
 
 import { readRafaBlocks } from './blocks.js';
 
@@ -188,8 +192,9 @@ export interface PlanStage {
 /** One task line. */
 export interface PlanTask {
   /**
-   * The line after its checkbox, trimmed, declaration included: what
-   * `findNextTask` answers as `TaskInfo.task` for an open line.
+   * The line after its checkbox, trimmed, declaration included and a
+   * trailing blocker comment taken off: what `findNextTask` answers as
+   * `TaskInfo.task` for an open line.
    */
   readonly task: string;
   /** The line, counting from zero, as `TaskInfo.lineNum` does. */
@@ -354,7 +359,7 @@ function emptyHeader(): PlanHeader {
 function readTaskLine(line: string): TaskLine | null {
   for (const [status, pattern] of TASK_LINES) {
     const capture = pattern.exec(line)?.[1];
-    if (capture !== undefined) return { status, task: capture.trim() };
+    if (capture !== undefined) return { status, task: splitBlockerComment(capture.trim()).text };
   }
   return null;
 }

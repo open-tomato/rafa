@@ -278,7 +278,11 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   holding no nested braces and at least one recognised key, and it is
   never the whole task text. Two spaces separate it from the text.
   Anything failing one of those rules stays task text — a task ending on
-  a code span carrying `{ "a": 1 }` is not a declaration.
+  a code span carrying `{ "a": 1 }` is not a declaration. The one thing
+  that may follow the block is the loop's own: on a blocked task's
+  tracker line it writes `<!-- blocked: <text> -->` after the block, and
+  takes that comment off before the block is read. The plan itself never
+  holds one.
 * Its tokens are space-separated `key=value` pairs. Recognised keys are
   `agent`, `model`, `effort` and `tools`; an unrecognised key is kept for
   telemetry and maps to no flag. The key `skills` reserves a comma-separated

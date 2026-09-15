@@ -23,7 +23,9 @@
  *
  * The task prompt's first line carries the `task` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
- * its drift guard reads that prefix from. Its last lines, ahead of the
+ * its drift guard reads that prefix from. Its third line, when the task's
+ * tracker line trails a blocker comment (`utils/tracker.ts`), hands the
+ * session the text the task was blocked on. Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
  * when there are any.
@@ -44,6 +46,7 @@ import { agentEffortLookup } from '../utils/agent-definition.js';
 import { runClaudeCaptured } from '../utils/claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
+import { escapeBlockerText } from '../utils/tracker.js';
 
 import { knownMissingNotice } from './preflight.js';
 import { withStamp } from './stamp.js';
@@ -163,6 +166,20 @@ export interface TaskDispatch {
 }
 
 /**
+ * What opens the prompt line handing a session the text its task was
+ * blocked on. The line opens with the loop's words, so the text a session
+ * wrote never opens a line of the prompt.
+ */
+export const BLOCKER_PROMPT_PREFIX = 'An earlier run of this task left it blocked on: ';
+
+/** The prompt line carrying `blocker`, or none for no blocker or a blank one. */
+function blockerLines(blocker: string | null): string[] {
+  return blocker === null || blocker.trim().length === 0
+    ? []
+    : [`${BLOCKER_PROMPT_PREFIX}${escapeBlockerText(blocker)}`];
+}
+
+/**
  * Assembles the prompt one task's session is given.
  *
  * `taskText` is the sentence a declaration has already been taken off,
@@ -188,16 +205,30 @@ export interface TaskDispatch {
  * after them, below the plan text and so above the stamp `withStamp`
  * appends to the whole (`start/preflight.ts`). With none, the default,
  * the prompt is the one built before the preflight existed.
+ *
+ * `blocker` is the text a blocked task's tracker line trails, as
+ * `findNextTask` answered it on `TaskInfo.blocker`. With one, a line
+ * opening {@link BLOCKER_PROMPT_PREFIX} follows the second, so a session
+ * dispatched on a blocked task reads what blocked it. The text goes in
+ * as the comment holds it (`escapeBlockerText` in `utils/tracker.ts`),
+ * which keeps it on that one line: a session wrote it, and raw it could
+ * open lines of its own, one of them the `<!-- ralph:plan=... -->` stamp.
+ * `planStubFromPrompt` reads the FIRST stamp in a prompt, so a stamp
+ * planted here, above the one `withStamp` appends, would attribute the
+ * session to another plan. With no blocker, or a blank one, the prompt
+ * is the one built before blockers were carried.
  */
 export function buildTaskPrompt(
   taskText: string,
   promptContent: string,
   planText: string,
   knownMissing: readonly string[] = [],
+  blocker: string | null = null,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
+    ...blockerLines(blocker),
     '',
     promptContent,
     planText,
@@ -242,7 +273,9 @@ export function buildTaskPrompt(
  *
  * A `rafa:*` block has no strip here, and needs none: `findNextTask`
  * never answers a task line inside a closed one, so the text this
- * announces and injects can carry no block's body.
+ * announces and injects can carry no block's body. Nor does a blocker
+ * comment: `findNextTask` takes it off the text and answers its text on
+ * `TaskInfo.blocker`, which the prompt carries as a line of its own.
  *
  * The plan the prompt carries is rendered here in the mode the caller
  * names. A `stage` or `task` rendering that cannot find the task at its
@@ -303,6 +336,7 @@ export async function dispatchTask(
     options.promptContent,
     injection.text,
     options.knownMissing,
+    taskInfo.blocker ?? null,
   ));
 
   const sessionId = (options.newSessionId ?? randomUUID)();
