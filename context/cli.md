@@ -24,6 +24,7 @@ module's note is the long form.
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
+| `src/commands/doctor.ts` | `rafa doctor`: the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
 ### The core roster
@@ -34,7 +35,7 @@ module's note is the long form.
   `src/commands/<name>.ts`, each module's default export its command.
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
   and `plan validate`; `loop start`, aliased `start`; `effort collect`,
-  `effort report`, `init`, `usage` and `describe`. The subjects are `plan`, `loop` and `effort`: a subject is declared with its
+  `effort report`, `init`, `doctor`, `usage` and `describe`. The subjects are `plan`, `loop` and `effort`: a subject is declared with its
   first action, never ahead of it.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
@@ -47,9 +48,9 @@ module's note is the long form.
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init` and the plan
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor` and the plan
   readers wrap none: `describe` reads the registry off its context, and
-  `init` and each plan reader their `args` and `flags`.
+  `init`, `doctor` and each plan reader their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/preflight.ts`, `preflight/run.ts`,
@@ -116,6 +117,25 @@ module's note is the long form.
   context's `PATH` (`src/project/bin-path.ts`). In json mode the result's
   `data` holds the root, its source, the working directory, whether the
   config existed, every path checked with its change, and that reading.
+- **`doctor` checks what `loop start` would, and starts no run**
+  (`src/commands/doctor.ts`). It resolves the config as `loop start`
+  does, then the plan `--plan=<file>` names against the project root, or
+  the default plan; a plan named that is no file is refused, and with no
+  default plan there the config's items are checked alone. `PLAN.md`
+  carries no stub, so a plan's `PREREQUISITES-<stub>.md` is merged in
+  through `--plan` only. Every item goes through `runPreflight` in the
+  project root with the context's environment, an optional failure warned
+  about as `loop start` warns. It generates no run id and writes no
+  `preflight` row, so `rafa effort report` lists the halts of `loop start`
+  runs alone. It exits 1 when a required item fails, the halt being the
+  refusal, and 0 otherwise. After the report, whatever the preflight did,
+  it warns when `.ralph/effort/` holds a store file and `.rafa/effort/`
+  none (`src/effort/store/legacy.ts`), and when `~/.rafa/bin` is not
+  ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text
+  mode says so in an `info` line when the order holds. In json mode a
+  preflight that did not halt gives the checks, the `known-missing:`
+  lines, the reminders and both readings as the result's `data`, and a
+  halt gives the `command_exit` error and no `data`.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
   flag declares, so `rafa plan show --tracker my-plan` hands `plan show`
@@ -126,8 +146,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `describe` declares no flag, and `init` the flags
-  `root` and `yes` and no argument, with `text` and `json`. Of the plan readers,
+  `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, and `doctor` the flag `plan` and no argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`.
@@ -157,6 +176,12 @@ module's note is the long form.
   is chosen, a path the scopes cannot be written at, a config
   `loadConfig` refuses and a `.gitignore` it cannot place its block in,
   each message ending with the line `Nothing was written.`
+  `doctor` throws 1 for a positional word, a `--plan` holding no file, a
+  plan named that is no file, a plan path that cannot be checked, a
+  config `loadConfig` refuses and a
+  PREREQUISITES file that cannot be read, each message ending with the
+  line `Nothing was checked.`, and for a failed required item, its message
+  the runner's halt.
 - **What changed for a phase 0 spelling**: `rafa effort` alone and
   `rafa effort help` refuse with exit code 1, where the phase 0 CLI
   printed its help and exited 0. An unknown first word writes

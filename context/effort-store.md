@@ -11,7 +11,9 @@ from `store` in `.rafa/config.yaml`, `sqlite` by default.
 `EFFORT_STORE_DIR` in `src/effort/store.ts` spells the directory once, and
 `effortStorePath` and `sqliteStorePath` (`store/sqlite.ts`) join it under
 the root. It moved there from `.ralph/effort/` (Q20), and no backend and no
-command reads a store left under `.ralph/effort/`. A test that plants or
+command reads a store left under `.ralph/effort/`: `rafa doctor` only
+looks for the store's file names there, and warns while `.rafa/effort/`
+holds none of them (`store/legacy.ts`). A test that plants or
 opens a store file by path spells `.rafa/effort`; the `.ralph/effort` the
 parity suites name is the sibling's own store, read through
 `readStoreRows` and never written.
@@ -60,7 +62,8 @@ per check keyed by `(run_id, position)`, since a run can check one item
 twice. No column says the run halted: a run halted when a required check
 did not pass, and `readPreflightHalts` reads that off the rows.
 `loop start` writes it through `start/preflight.ts` before any session,
-and writes nothing for a run with no item to check.
+and writes nothing for a run with no item to check. `rafa doctor` checks
+the same items and writes no row.
 
 ### Attribution
 
