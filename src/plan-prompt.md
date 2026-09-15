@@ -14,8 +14,8 @@ criteria — **do not execute the plan**.
   never move them into a tracked path).
 * If the plan assumes any prerequisite — a service running, a credential in an
   env var, an installed tool — create `{PREREQUISITES_FILE}` with those steps
-  as a human checklist (see the PREREQUISITES.md format in the dev-planner
-  specification below). Only genuinely non-automatable steps; do not duplicate
+  as a checklist in the PREREQUISITES.md format of the dev-planner
+  specification below. Only genuinely non-automatable steps; do not duplicate
   what `README.md`/`AGENTS.md` already require of every contributor. Link to
   it from the plan.
 * Do not create or touch any tracker file — the loop derives it from the plan.

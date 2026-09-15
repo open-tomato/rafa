@@ -369,23 +369,33 @@ The wrap-up session always receives `full` regardless of the configured mode.
 
 ## PREREQUISITES.md format
 
-`<plan.dir>/PREREQUISITES-<stub>.md` lists non-automatable setup steps. It is not parsed by the loop — it is a human checklist.
+`<plan.dir>/PREREQUISITES-<stub>.md` lists the setup a plan needs that no task can put in place. It is parsed: `src/preflight/prerequisites-md.ts` reads it and merges its items into the configured `prerequisites` for the plan beside it, `<plan.dir>/PLAN-<stub>.md`, and for no other plan.
 
 ```markdown
   # Prerequisites
 
-  ## Services
-  - [ ] {Service name} running on port {n}
+  ## Toolchain [auto]
+  - [ ] {Tool} installed: `{tool} --version`
+  - [ ] {Service name} answering on port {n}: `curl -sf http://localhost:{n}/health`
+  - [ ] {VAR_NAME} set, obtained from {where}: `test -n "${VAR_NAME}"`
 
-  ## Environment Variables
-  - `VAR_NAME` — description and where to obtain it
-
-  ## Credentials
+  ## Credentials [human]
   - [ ] {Credential description}
+
+  ## Operator steps after the plan merges [human]
+  - [ ] {Step the operator takes once the plan has merged}
 ```
+
+How the file is read:
+- An item is a line opening with `- [ ] `, continued by the indented lines directly below it that open no list item of their own. A ticked `- [x]` item and a `- [BLOCKED]` item are skipped, and nothing inside a fenced code block is read.
+- An item's tag is the `[auto]` or `[human]` written right after its box. Without one it takes its section's tag: a heading carrying `[auto]` tags its section `auto`, and one carrying `[human]` or naming `manual`, `human`, `sign-off` or `team` tags it `human`. A heading's tag reaches the deeper headings under it and ends at the next heading of its own level or shallower. An item under no tagged heading is `human`.
+- An `auto` item's first backticked span is its probe. The item merges as a required prerequisite, the tier whose failure halts a run.
+- A `human` item, and an `auto` item with no backticked span, is a reminder: named to the operator, never probed, and never halting a run.
 
 Rules:
 - Only include prerequisites that are genuinely non-automatable (installed services, external credentials, manual env var setup).
+- Tag an item `auto` only when a shell command proves it, and write that command as the item's first backticked span, with nothing quoted before it. The command asks for no input and changes nothing.
+- Tag every step for after the plan merges `human`, as the heading above does, so no run ever executes one as a probe.
 - Do not duplicate steps already documented in the repo's contributor docs (README, CONTRIBUTING, and the like).
 - For example: do not mark `bun install` as a prerequisite if it is already documented as a required step for all development work.
 - Link to the prerequisites file from the plan.
