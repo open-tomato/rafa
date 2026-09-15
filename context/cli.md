@@ -27,6 +27,7 @@ module's note is the long form.
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/doctor.ts` | `rafa doctor`: the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
+| `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
 ### The core roster
@@ -39,8 +40,8 @@ module's note is the long form.
   and `plan validate`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment` and `issue move`;
-  `effort collect`, `effort report`, `init`, `doctor`, `usage` and
-  `describe`. The subjects are `plan`, `loop`, `issue` and `effort`: a
+  `effort collect`, `effort report`, `init`, `doctor`, `self-update`,
+  `usage` and `describe`. The subjects are `plan`, `loop`, `issue` and `effort`: a
   subject is declared with its first action, never ahead of it.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
@@ -66,10 +67,11 @@ module's note is the long form.
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, the plan readers, the `loop`
-  session actions and the `issue` actions wrap none: `describe` reads the
-  registry off its context, and `init`, `doctor`, each plan reader, each
-  `loop` session action and each `issue` action their `args` and `flags`.
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
+  `loop` session actions and the `issue` actions wrap none: `describe`
+  reads the registry off its context, and `init`, `doctor`, `self-update`,
+  each plan reader, each `loop` session action and each `issue` action
+  their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -159,6 +161,24 @@ module's note is the long form.
   preflight that did not halt gives the checks, the `known-missing:`
   lines, the reminders and both readings as the result's `data`, and a
   halt gives the `command_exit` error and no `data`.
+- **`self-update` installs the checkout it runs in**
+  (`src/commands/self-update.ts`), as `bun run snapshot` does: both call
+  `installRuntime` (`src/runtime/install.ts`), the script from the
+  checkout and the command from the bundle. In the project root it reads
+  `package.json`, refusing one not named `@open-tomato/rafa`, then
+  `plan.dir` as `loop start` resolves the config, then each
+  `PLAN_TRACKER*.md` directly in `plan.dir`, refusing while one holds an
+  open or blocked task; the project root and subdirectories of `plan.dir`
+  are not looked in. Then it runs `bun run build`, copies `dist/` into
+  `~/.rafa/runtime/<version>/` file by file, each by a rename, and renames
+  a new link over `~/.rafa/bin/rafa`, making the directory when missing.
+  `~/.bun/bin/rafa` is not touched. The home is the project's. Each step
+  is an `info` line; the build's stdout is written at `info` and its
+  stderr at `warn` once it ends, so json mode's stdout stays NDJSON.
+  After an install it warns when `~/.rafa/bin` is not ahead of
+  `~/.bun/bin` on the context's `PATH` (`readBinPath`). In json mode the
+  result's `data` holds the root, the version, the runtime directory, the
+  link, where it resolves, the files copied and that reading.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and
@@ -211,7 +231,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, and `doctor` the flag `plan` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` neither a flag nor an argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. Of the `issue` actions, `list` declares the
@@ -261,6 +281,12 @@ module's note is the long form.
   config `loadConfig` refuses and a
   PREREQUISITES file that cannot be read, each message ending with the
   line `Nothing was checked.`, and for a failed required item, its message the runner's halt.
+  `self-update` throws 1 for a positional word and for a tracker in
+  `plan.dir` holding a task, naming each; and 2, the message naming the
+  step and what it leaves changed, for a `package.json` that cannot be
+  read or names another package or no usable version, a config
+  `loadConfig` refuses, a `plan.dir` that cannot be read, and a build,
+  copy or link that failed.
   The `issue` actions throw 1, before any config is read, for a line
   handing the wrong number of arguments, a flag typed with no value,
   holding nothing but whitespace where it takes text or a value outside

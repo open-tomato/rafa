@@ -14,7 +14,8 @@
  *
  *   - **A version**, shaped as semver (`0.1.0`, `1.2.3-rc.1`): the
  *     `cli.js` of `~/.rafa/runtime/<version>/`, where
- *     `scripts/snapshot-runtime.ts` copies a build. The home is `HOME`'s.
+ *     `scripts/snapshot-runtime.ts` and `rafa self-update` copy a build
+ *     (`runtime/install.ts`). The home is `HOME`'s.
  *   - **A path**, anything else: resolved against the working directory,
  *     as the shell it was typed in reads it. A directory names the
  *     `cli.js` it holds, and a file names itself.
@@ -108,8 +109,10 @@ export const RUNTIME_COMMAND: readonly string[] = ['start'];
 /**
  * A value read as a version: semver's shape, opening with a digit and
  * holding no separator, so it names one directory under the runtime root.
+ * `runtime/install.ts` holds a `package.json` version to it before it
+ * names a directory by one.
  */
-const VERSION_SHAPE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?$/;
+export const VERSION_SHAPE =/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?$/;
 
 /** How to spell the flag, as every refusal about its value says. */
 const SPELLING = '`--runtime=<version>` for a build under `~/.rafa/runtime/`, or `--runtime=<path>` for a `cli.js` or the directory holding it';

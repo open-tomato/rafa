@@ -24,7 +24,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, the three plan readers, `plan list`, `plan show` and
+ * `doctor`, `self-update`, the three plan readers, `plan list`, `plan show` and
  * `plan validate`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, and the five
  * `issue` actions are held to be the modules wrapping none. `describe` runs the roster builder
@@ -359,6 +359,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['./plan/plan-files.js', ['isFile', 'plural']],
   ]],
+  ['./commands/self-update.js', [
+    ['../cli/command.js', ['CommandExit']],
+    ['../project/bin-path.js', ['readBinPath']],
+    ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
+    ['./plan/plan-files.js', ['expectNoArgument']],
+  ]],
   ['./commands/usage.js', [['../usage.js', ['default']], ['./wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
 ];
@@ -531,6 +537,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/issue/move.js',
       './commands/init.js',
       './commands/doctor.js',
+      './commands/self-update.js',
       './commands/describe.js',
     ]);
     expect(defaultImports).toEqual(wrapping.map(() => 1));

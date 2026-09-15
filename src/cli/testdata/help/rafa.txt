@@ -12,6 +12,7 @@ Quick start:
   rafa effort collect
   rafa init
   rafa doctor
+  rafa self-update
   rafa usage
   rafa describe --output=json
 
@@ -22,7 +23,7 @@ Subjects:
   effort   collect session and commit rows; report per plan
 
 Commands:
-  init, doctor, usage, describe
+  init, doctor, self-update, usage, describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)

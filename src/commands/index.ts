@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-one registered so far wrap a
+ * of each is its command. Five of the twenty-two registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -24,7 +24,8 @@
  * `src/project/`, nor `doctor`, which checks the preflight through
  * `src/preflight/` and starts no run, nor the five `issue` actions, which
  * act on the tracker the chain resolves and share
- * `issue/issue-tracker.ts`.
+ * `issue/issue-tracker.ts`, nor `self-update`, which installs the
+ * checkout through `src/runtime/install.ts`.
  *
  * ## What is registered
  *
@@ -48,6 +49,9 @@
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
  *     checks, checked and printed with no run started, beside two
  *     warnings about the install.
+ *   - `self-update`, top-level: builds the rafa checkout and installs it
+ *     as `~/.rafa/bin/rafa`, refusing while a tracker in `plan.dir` holds a
+ *     task.
  *   - `usage`, top-level.
  *   - `describe`, top-level: the schema 2 roster of the registry the line
  *     was routed through.
@@ -57,8 +61,7 @@
  *
  * The subjects are the four with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `module` joins
- * with its first action, as `self-update` joins with the task that
- * brings it.
+ * with its first action.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
@@ -85,6 +88,7 @@ import planCreate from './plan/create.js';
 import planList from './plan/list.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
+import selfUpdate from './self-update.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -116,6 +120,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortReport,
   init,
   doctor,
+  selfUpdate,
   usage,
   describe,
 ]);

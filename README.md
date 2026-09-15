@@ -27,17 +27,23 @@ This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com)
 Run the global `rafa` from a copy of the build, never from this
 checkout's `dist/`: `bun run build` opens with `rm -rf dist`, so a loop
 running from `dist/` has its runner replaced by the first task that
-builds. `bun run snapshot` builds, copies `dist/` into
-`~/.rafa/runtime/<version>/` with the version from `package.json`,
-points `~/.bun/bin/rafa` (under `HOME`, whatever `BUN_INSTALL` names)
-at the copied `cli.js`, and prints the path the link resolves to,
-exiting 0. It exits 1 before building anything while a plan tracker in
-`.plans/` or the repo root still holds an open or blocked task, and
-names every such tracker. It exits 2 when it could not run: a tracker or
-`package.json` it could not read, or a build, copy or link that failed.
-A loop may be running from the runtime it replaces, so each file and
-then the link land by a rename, and nothing already in the runtime
-directory is deleted.
+builds. `bun run snapshot` in this checkout, or `rafa self-update` run
+inside it, builds, copies `dist/` into `~/.rafa/runtime/<version>/` with
+the version from `package.json`, points `~/.rafa/bin/rafa` at the copied
+`cli.js`, and prints the path the link resolves to, exiting 0. Both
+install the same way (`src/runtime/install.ts`). The bin is not in
+`~/.bun/bin`, where `bun link` in this checkout re-points `rafa` at the
+checkout's `dist/` with no message, so put `~/.rafa/bin` on `PATH` ahead
+of `~/.bun/bin`; both warn when it is not, and `rafa doctor` checks it.
+Both exit 1 before building anything while a plan tracker in `plan.dir`
+(`.rafa/plans` unless `.rafa/config.yaml` names another) still holds an
+open or blocked task, and name every such tracker. `rafa self-update`
+runs only inside a project, so `rafa init` the checkout first. They exit
+2 when they could not run: a `package.json` that is not rafa's or cannot
+be read, a config or tracker they could not read, or a build, copy or
+link that failed. A loop may be running from the runtime they replace,
+so each file and then the link land by a rename, and nothing already in
+the runtime directory is deleted.
 
 ## Runtime
 

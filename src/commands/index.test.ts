@@ -1,10 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the twenty-one commands it registers: what the registry
+ * declarations of the twenty-two commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `doctor`, `init`, `plan list`, `plan show`, `plan validate`,
+ * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`
  * and the five `issue` actions wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
@@ -98,6 +98,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'effort report': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
+  'self-update': ['text', 'json'],
   'usage': ['text', 'json'],
   'describe': ['text', 'json'],
 };
@@ -119,6 +120,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue move': [['id', 'state'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
+  'self-update': [[], []],
   'describe': [[], []],
 };
 
@@ -168,6 +170,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
+  ['self-update', 'self-update', [], ''],
   ['describe', 'describe', [], ''],
 ];
 
@@ -238,7 +241,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, init, doctor, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -259,6 +262,7 @@ describe('the core roster', () => {
       'effort report',
       'init',
       'doctor',
+      'self-update',
       'usage',
       'describe',
     ]);
