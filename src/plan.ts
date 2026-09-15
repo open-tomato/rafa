@@ -39,6 +39,10 @@
  * stderr, the bytes the command printed there before; json mode carries it
  * in the terminal result.
  *
+ * The project root is a parameter, the root the dispatcher resolved
+ * (`src/commands/wrap.ts`): `--spec` resolves against it, `.plans/` and
+ * `progress.txt` sit under it, and its config is the project scope's.
+ *
  * The registry is a parameter, {@link CORE_ADAPTER_REGISTRY} unless one
  * is handed over, so `plan.test.ts` resolves a fixture planner under the
  * same kind and spawns no session.
@@ -79,7 +83,6 @@ import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
 import { checkUsage } from './utils/claude.js';
-import { getRepoRoot } from './utils/git.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -252,9 +255,9 @@ async function generateOrExit(planner: Planner, request: PlanRequest): Promise<G
 
 export default async function plan(
   args: string[],
+  repoRoot: string,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
-  const repoRoot = getRepoRoot();
   const settingSources = resolvePlanSettingSources(repoRoot, homedir());
 
   const specArg = argValue(args, '--spec');

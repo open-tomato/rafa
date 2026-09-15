@@ -27,7 +27,7 @@ export default wrapPhaseZeroCommand({
   flags: [
     {
       name: 'spec',
-      description: 'The spec to plan from, relative to the repo root.',
+      description: 'The spec to plan from, relative to the project root.',
       type: 'string',
       required: true,
     },

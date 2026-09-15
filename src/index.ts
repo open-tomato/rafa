@@ -18,7 +18,8 @@
  *     (`rafa usage`), {@link effortCollectCommand} (`rafa effort collect`)
  *     and {@link effortReportCommand} (`rafa effort report`). These are
  *     the five functions the core commands in `src/commands/` wrap, each
- *     handed the words typed after its routing words. The entry
+ *     handed the words typed after its routing words and the root of the
+ *     project the dispatcher resolved. The entry
  *     re-exports them as they are, so a service calling one runs exactly
  *     what the terminal runs.
  *   - The whole `./plan` surface: the block reader, the plan parser, the
@@ -43,9 +44,10 @@
  * ## Why the commands carry a `Command` suffix
  *
  * A command is the terminal's contract, not a library call. Each takes
- * the argument list the command line would get, prints what the command
- * prints, and answers the working directory's git root as the repo it
- * acts on. Each writes through the active output
+ * the argument list the command line would get, then the root of the
+ * project it acts on, which behind the terminal is the nearest directory
+ * at or above the working directory holding `.rafa/config.yaml`, and
+ * prints what the command prints. Each writes through the active output
  * (`src/adapters/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls
  * `process.exit`: a refusal throws `CommandExit` (`src/cli/command.ts`)

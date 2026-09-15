@@ -17,9 +17,10 @@
  *
  * ## The command cases
  *
- * `start()` has no seam: it finds its root through git and spawns
- * `claude` off PATH. So it is run as a command, `bun src/rafa.ts start`,
- * in a scratch repository with a HOME of its own, under a PATH holding a
+ * `start()` has no seam: it takes its root from the project the
+ * dispatcher resolves and spawns `claude` off PATH. So it is run as a
+ * command, `bun src/rafa.ts start`, in a scratch repository holding
+ * `.rafa/config.yaml`, with a HOME of its own, under a PATH holding a
  * stand-in `claude` and git's own directory. Each run first asserts that
  * `claude` resolves to the stand-in on that PATH, so no case can reach a
  * real session. The stand-in keeps each call's arguments, prompt and the
@@ -136,6 +137,7 @@ import {
 } from '../start/dispatch.js';
 import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
 
+import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 
 /** What a run with no config spawns every session under, spelled out. */
@@ -398,10 +400,11 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
   git(repo, 'config', 'user.name', 'Rafa Loop');
   git(repo, 'config', 'commit.gpgsign', 'false');
   git(repo, 'config', 'core.hooksPath', hooks);
-  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.ralph/\n', 'utf8');
+  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.ralph/\n.rafa/\n', 'utf8');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '--no-verify', '-m', 'seed');
   git(repo, 'checkout', '-q', '-b', `feat/${STUB}`);
+  plantProjectConfig(repo);
 
   mkdirSync(join(repo, '.plans'));
   const plan = [`# Plan: ${STUB}`, '', ...tasks.map((task) => `- [ ] ${task}`), ''];

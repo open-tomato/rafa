@@ -6,7 +6,8 @@
  *
  * A top-level command, its action spelled as its subject, so it sits
  * directly under `src/commands/`. It wraps no phase 0 command, and it
- * needs no project: it is the command that makes one.
+ * needs no project: it is the command that makes one, so it declares
+ * `needsProject: false` and the dispatcher resolves none for it.
  *
  * ## Choosing the root
  *
@@ -406,6 +407,7 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       },
     ],
     outputs: ['text', 'json'],
+    needsProject: false,
     run: async (context) => runInit(context, seams),
   };
   return Object.freeze(command);

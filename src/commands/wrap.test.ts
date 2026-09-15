@@ -31,19 +31,49 @@
  * the module restored sha256-identical. Handing `argv` with the flag in
  * reddened the five cases dropping it, and keeping the value of
  * `--output json` the case typing it as two words.
+ *
+ * The root cases came with the wrapper handing on the root of the project
+ * the dispatcher resolved, and every case dispatches in a project planted
+ * in this file's temporary directory. Two mutations of `wrap.ts` were
+ * driven on 2026-09-15 over eleven suites, each restored
+ * sha256-identical. The working directory handed in place of the root
+ * reddened both root cases here and the four root cases of
+ * `src/tests/cli-surface.test.ts`; the check for a missing project dropped
+ * reddened the case running with none, alone.
  */
 import type { CommandDeclaration, PhaseZeroCommand } from './wrap.js';
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand } from '../cli/command.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
 
-import { describe, expect, it } from 'bun:test';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit, commandProblem } from '../cli/command.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { wrapPhaseZeroCommand } from './wrap.js';
+
+/** A temporary directory of this file's own. */
+const tempBase = mkdtempSync(join(tmpdir(), 'rafa-wrap-'));
+
+/** The project every case dispatches in, with a subdirectory `sub/`. */
+const PROJECT = join(tempBase, 'project');
+
+/** The home every case passes over. */
+const HOME = join(tempBase, 'home');
+
+plantProjectConfig(PROJECT);
+for (const dir of [join(PROJECT, 'sub'), HOME]) mkdirSync(dir, { recursive: true });
+
+afterAll(() => {
+  rmSync(tempBase, { recursive: true, force: true });
+});
 
 /** The declaration every case wraps: a flag with an alias and a default, and a command alias. */
 const DECLARATION: CommandDeclaration = {
@@ -59,21 +89,24 @@ const DECLARATION: CommandDeclaration = {
   outputs: ['text'],
 };
 
-/** A stand-in phase 0 command, and every argument list it was handed. */
+/** A stand-in phase 0 command, and every argument list and project root it was handed. */
 interface StandIn {
   readonly command: PhaseZeroCommand;
   readonly calls: string[][];
+  readonly roots: string[];
 }
 
-/** A stand-in that yields once, then records its words and runs `then`. */
+/** A stand-in that yields once, then records its words and its root and runs `then`. */
 function standIn(then: (args: string[]) => void = () => undefined): StandIn {
   const calls: string[][] = [];
-  const command: PhaseZeroCommand = async (args) => {
+  const roots: string[] = [];
+  const command: PhaseZeroCommand = async (args, root) => {
     await Promise.resolve();
     calls.push(args);
+    roots.push(root);
     then(args);
   };
-  return { command, calls };
+  return { command, calls, roots };
 }
 
 /** One invocation, and what it wrote. */
@@ -97,8 +130,8 @@ function memoryStream(): { stream: OutputStream; text: () => string } {
   };
 }
 
-/** Dispatches a line over a registry holding `command` alone. */
-async function dispatchOver(command: RafaCommand, argv: readonly string[]): Promise<Run> {
+/** Dispatches a line over a registry holding `command` alone, from `cwd` in the project of this file. */
+async function dispatchOver(command: RafaCommand, argv: readonly string[], cwd: string = PROJECT): Promise<Run> {
   const stdout = memoryStream();
   const stderr = memoryStream();
   const outcome = await dispatch(argv, {
@@ -107,6 +140,8 @@ async function dispatchOver(command: RafaCommand, argv: readonly string[]): Prom
     stdout: stdout.stream,
     stderr: stderr.stream,
     now: () => new Date('2026-09-14T12:00:00.000Z'),
+    cwd,
+    home: HOME,
   });
   return { outcome, stdout: stdout.text(), stderr: stderr.text() };
 }
@@ -213,6 +248,28 @@ describe('what a wrapped command is handed', () => {
     expect(wrapped.outcome.exitCode).toBe(0);
     expect(control.outcome.exitCode).toBe(1);
     expect(control.outcome.result).toMatchObject({ ok: false, error: { code: 'command_error' } });
+  });
+
+  it('hands the root of the project the dispatcher resolved after the words, from a subdirectory of it', async () => {
+    const { command, calls, roots } = standIn();
+
+    const run = await dispatchOver(wrapPhaseZeroCommand(DECLARATION, command), ['loop', 'start', '--plan=a.md'], join(PROJECT, 'sub'));
+
+    expect([calls, roots]).toEqual([[['--plan=a.md']], [realpathSync(PROJECT)]]);
+    expect(run.outcome.exitCode).toBe(0);
+  });
+
+  it('rejects before calling the command when its context carries no project', async () => {
+    const { command, calls } = standIn();
+    const outside = wrapPhaseZeroCommand({ ...DECLARATION, needsProject: false }, command);
+
+    const run = await dispatchOver(outside, ['loop', 'start']);
+
+    expect(calls).toEqual([]);
+    expect(run.outcome.result).toMatchObject({
+      ok: false,
+      error: { code: 'command_error', message: 'loop start: runs inside a rafa project, and its context carries none' },
+    });
   });
 });
 

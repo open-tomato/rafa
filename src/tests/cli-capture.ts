@@ -5,7 +5,11 @@
  *
  * In-process, the invocation gets streams, an environment and a clock of
  * its own, so a case reads exactly what that invocation wrote and no
- * `RAFA_OUTPUT` the suite runs under reaches it.
+ * `RAFA_OUTPUT` the suite runs under reaches it. It runs inside a project
+ * of its own: a temporary directory holding the `.rafa/config.yaml`
+ * `rafa init` writes, beside an empty home, both removed once it answers.
+ * So a command needing a project finds one, and no walk reaches the
+ * suite's working directory or the real home.
  *
  * Spawned, the child runs under a scratch repository whose HOME, `bin/`
  * directory and call log sit beside it in a temporary directory, never
@@ -14,6 +18,12 @@
  * names. So `claude` resolves to the stand-in {@link plantStandInClaude}
  * writes there, or to nothing: {@link runRafa} refuses to spawn when it
  * resolves anywhere else.
+ *
+ * {@link plantScratchRepo} makes the scratch repository a project with
+ * {@link plantProjectConfig}, as every spawn of a command needing a
+ * project must: outside one the dispatcher refuses it with the
+ * `rafa init` hint (`src/cli/dispatch.ts`). A case running `init`, the
+ * command that makes a project, asks for none.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand } from '../cli/command.js';
@@ -21,12 +31,15 @@ import type { SubjectSpec } from '../cli/registry.js';
 import type { CliEvent } from '../ports/index.js';
 
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { configFilePath } from '../config.js';
+import { projectConfigText } from '../project/scaffold.js';
 
 /** The CLI entry a spawned run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -57,8 +70,20 @@ function memoryStream(): { stream: OutputStream; text: () => string } {
 }
 
 /**
+ * Makes `root` a rafa project: writes `.rafa/config.yaml` under it, the
+ * file `rafa init` writes unless `text` says otherwise. Answers the file.
+ */
+export function plantProjectConfig(root: string, text: string = projectConfigText()): string {
+  const file = configFilePath(root);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text, 'utf8');
+  return file;
+}
+
+/**
  * Dispatches `words` in-process over a registry of `subjects` and
- * `commands`, with streams, a clock and the environment `env` of its own.
+ * `commands`, with streams, a clock and the environment `env` of its own,
+ * inside a temporary project of its own; see the module note.
  */
 export async function dispatchCaptured(
   words: readonly string[],
@@ -68,14 +93,25 @@ export async function dispatchCaptured(
 ): Promise<CapturedRun> {
   const stdout = memoryStream();
   const stderr = memoryStream();
-  const { exitCode } = await dispatch(words, {
-    registry: createCommandRegistry({ subjects, commands }),
-    env,
-    stdout: stdout.stream,
-    stderr: stderr.stream,
-    now: () => new Date('2026-09-15T12:00:00.000Z'),
-  });
-  return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
+  const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dispatch-captured-')));
+  try {
+    const cwd = join(scope, 'project');
+    const home = join(scope, 'home');
+    plantProjectConfig(cwd);
+    mkdirSync(home);
+    const { exitCode } = await dispatch(words, {
+      registry: createCommandRegistry({ subjects, commands }),
+      env,
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      now: () => new Date('2026-09-15T12:00:00.000Z'),
+      cwd,
+      home,
+    });
+    return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
+  } finally {
+    rmSync(scope, { recursive: true, force: true });
+  }
 }
 
 /** Every line of a json-mode stdout, parsed. Throws on a line that is no JSON. */
@@ -100,8 +136,18 @@ export interface ScratchRepo {
   readonly path: string;
 }
 
-/** Plants an empty git repository under a fresh directory in `base`, with its HOME and `bin/` beside it. */
-export function plantScratchRepo(base: string): ScratchRepo {
+/** What {@link plantScratchRepo} plants beyond the repository. */
+export interface ScratchOptions {
+  /** Whether the repository is a project, holding {@link plantProjectConfig}'s file. Defaults to true. */
+  readonly project?: boolean;
+}
+
+/**
+ * Plants a git repository with no commit under a fresh directory in
+ * `base`, with its HOME and `bin/` beside it, and makes it a project
+ * unless `options` says otherwise; see the module note.
+ */
+export function plantScratchRepo(base: string, options: ScratchOptions = {}): ScratchRepo {
   const root = realpathSync(mkdtempSync(join(base, 'scratch-')));
   const repo = join(root, 'repo');
   const home = join(root, 'home');
@@ -113,6 +159,7 @@ export function plantScratchRepo(base: string): ScratchRepo {
     stdio: 'pipe',
     env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
   });
+  if (options.project !== false) plantProjectConfig(repo);
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');

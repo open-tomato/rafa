@@ -17,13 +17,15 @@
  *   4. The start event is written, then each module warning at warn
  *      level.
  *   5. The route is settled. A help request writes the help text; a
- *      refusal writes nothing yet; a command prints its deprecation lines
- *      when it has any and runs with its context's output set as the
- *      active output (`src/adapters/output/active.ts`) in the
- *      invocation's output mode, the output and the mode active before
- *      being put back once it ends. Its context's
- *      `registry` is the one the line was routed through, with every
- *      module that loaded mounted on it.
+ *      refusal writes nothing yet. A command needing a project has it
+ *      resolved first, and outside one ends as the `no_project` refusal
+ *      without running (see "The project"). A command that runs prints
+ *      its deprecation lines when it has any and runs with its context's
+ *      output set as the active output (`src/adapters/output/active.ts`)
+ *      in the invocation's output mode, the output and the mode active
+ *      before being put back once it ends. Its context's `registry` is
+ *      the one the line was routed through, with every module that loaded
+ *      mounted on it, and its `project` the project resolved for it.
  *   6. The terminal result event is written, and the exit code answered.
  *
  * The dispatcher sets no `process.exitCode` and calls no
@@ -63,10 +65,29 @@
  *     with the thrown message, `rafa: <message>` on stderr in text mode,
  *     and the stack as a `debug` line.
  *
- * A refusal from routing or `invalid_spec` ends with exit code 1 and
- * `rafa: <message>` on stderr in text mode. A terminal event that cannot
- * be written, such as a payload `JSON.stringify` refuses, is replaced by
- * the `result_unwritable` failure with exit code 1.
+ * A refusal from routing, `invalid_spec` or `no_project` ends with exit
+ * code 1 and `rafa: <message>` on stderr in text mode. A terminal event
+ * that cannot be written, such as a payload `JSON.stringify` refuses, is
+ * replaced by the `result_unwritable` failure with exit code 1.
+ *
+ * ## The project
+ *
+ * A command runs inside a project unless it declares
+ * `needsProject: false` (`command.ts`), as `init` and `describe` do.
+ * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
+ * from the working directory, {@link DispatchOptions.cwd}, to the first
+ * directory holding `.rafa/config.yaml`, passing over the home,
+ * {@link DispatchOptions.home}. The project found is the context's
+ * `project`. With none, the invocation ends as the `no_project` refusal
+ * with exit code 1 and the `rafa init` hint the walk answers as its
+ * message, and the command never runs, so it prints no deprecation line.
+ * A working directory or a home the walk refuses, a relative path or a
+ * start that does not resolve, ends the same way with the walk's message.
+ *
+ * A help request, a routing refusal, `invalid_spec` and a command
+ * declaring `needsProject: false` read neither the working directory nor
+ * the home, so each answers outside a project as it does inside one, and
+ * such a command runs with `project` null.
  *
  * ## Deprecation lines
  *
@@ -88,15 +109,19 @@
  *
  *   rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"
  */
-import type { RafaContext, RafaFlagSpec } from './command.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from './command.js';
 import type { CliContext } from './core/types.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { CliEvent, CliEventResult, Output } from '../ports/index.js';
+import type { ProjectFound } from '../project/scope.js';
+
+import { homedir } from 'node:os';
 
 import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
+import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { CommandExit } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
@@ -110,6 +135,7 @@ const REFUSAL = 'dispatcher';
 export const DISPATCH_ERROR_CODES = [
   ...ROUTE_REFUSALS,
   'invalid_spec',
+  'no_project',
   'command_exit',
   'command_error',
   'result_unwritable',
@@ -141,6 +167,17 @@ export interface DispatchOptions {
   readonly now?: () => Date;
   /** Renders help. Defaults to {@link renderUsage}. */
   readonly renderHelp?: HelpRenderer;
+  /**
+   * The directory a command's project is resolved from, absolute.
+   * Defaults to `process.cwd()`, read only for a command running inside
+   * a project; see the module note.
+   */
+  readonly cwd?: string;
+  /**
+   * The home the walk passes over, absolute. Defaults to `homedir()`,
+   * read only for a command running inside a project.
+   */
+  readonly home?: string;
 }
 
 /** How an invocation ended: its exit code and its terminal event, written or not. */
@@ -157,6 +194,10 @@ interface Settings {
   readonly signal: AbortSignal | undefined;
   readonly now: () => Date;
   readonly renderHelp: HelpRenderer;
+  /** The working directory, read only when a command needs a project. */
+  readonly cwd: () => string;
+  /** The home, read only when a command needs a project. */
+  readonly home: () => string;
 }
 
 /** How a route settled, before its terminal event is built. */
@@ -322,6 +363,7 @@ async function runCommand(
   route: CommandRoute,
   base: CliContext,
   registry: CommandRegistry,
+  project: ProjectFound | null,
   settings: Settings,
 ): Promise<Ending> {
   const deprecation = deprecationLine(route);
@@ -334,6 +376,7 @@ async function runCommand(
     output: guarded.output,
     argv: Object.freeze([...route.argv]),
     registry,
+    project,
   });
   const previous = activeOutput();
   const previousMode = activeOutputMode();
@@ -368,6 +411,38 @@ async function runCommand(
   }
 }
 
+/** Where a command runs: in a project, outside any for one needing none, or refused with a message. */
+type Placement =
+  | { readonly kind: 'placed'; readonly project: ProjectFound | null }
+  | { readonly kind: 'refused'; readonly message: string };
+
+/** Resolves the project a command runs in; see the module note. */
+function placeCommand(command: RafaCommand, settings: Settings): Placement {
+  if (command.needsProject === false) return { kind: 'placed', project: null };
+  try {
+    const scope = resolveScope(settings.cwd(), { home: settings.home() });
+    return scope.found
+      ? { kind: 'placed', project: scope }
+      : { kind: 'refused', message: scope.hint };
+  } catch (error) {
+    if (!(error instanceof ScopeError)) throw error;
+    return { kind: 'refused', message: error.message };
+  }
+}
+
+/** Runs a command whose spec was read in the project it needs, or ends as `no_project`; see the module note. */
+async function settleCommand(
+  route: CommandRoute,
+  base: CliContext,
+  registry: CommandRegistry,
+  settings: Settings,
+): Promise<Ending> {
+  const placement = placeCommand(route.command, settings);
+  return placement.kind === 'refused'
+    ? failure('no_project', placement.message)
+    : runCommand(route, base, registry, placement.project, settings);
+}
+
 /** Settles a route into how the invocation ends; see the module note. */
 async function settle(
   route: Route,
@@ -384,7 +459,7 @@ async function settle(
       return failure(route.code satisfies RouteRefusalCode, route.message);
     case 'command':
       return problem === null
-        ? runCommand(route, base, registry, settings)
+        ? settleCommand(route, base, registry, settings)
         : failure('invalid_spec', problem);
   }
 }
@@ -435,6 +510,8 @@ export async function dispatch(argv: readonly string[], options: DispatchOptions
     signal: options.signal,
     now: options.now ?? (() => new Date()),
     renderHelp: options.renderHelp ?? renderUsage,
+    cwd: () => options.cwd ?? process.cwd(),
+    home: () => options.home ?? homedir(),
   };
   const loaded = await loadModuleCommands(options.registry, options.modules ?? [], options.importModule);
   const route = routeLine(loaded.registry, argv);

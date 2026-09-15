@@ -21,13 +21,13 @@ export default wrapPhaseZeroCommand({
     + ' is committed once it exits, and retries blocked tasks first. After the last task a wrap-up'
     + ' session promotes findings, syncs with main, pushes and opens or updates the PR, and the loop'
     + ' then waits on its checks, spending repair sessions on a red or conflicting PR. With no'
-    + ' `--plan` it runs `.plans/PLAN.md`, or `PLAN.md` at the repo root when that one does not exist.'
+    + ' `--plan` it runs `.plans/PLAN.md`, or `PLAN.md` at the project root when that one does not exist.'
     + ' It refuses to run on `main` or `master`.',
   args: [],
   flags: [
     {
       name: 'plan',
-      description: 'The plan to run, relative to the repo root. `PLAN-<stub>.md` is tracked in'
+      description: 'The plan to run, relative to the project root. `PLAN-<stub>.md` is tracked in'
         + ' `PLAN_TRACKER-<stub>.md` beside it.',
       type: 'string',
     },

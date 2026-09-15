@@ -522,7 +522,7 @@ describe('the PATH check', () => {
 
 describe('the registered command, spawned', () => {
   it('refuses without a terminal in a scratch repository, listing the git toplevel', () => {
-    const scratch = plantScratchRepo(tempBase);
+    const scratch = plantScratchRepo(tempBase, { project: false });
 
     const run = runRafa(scratch, scratch.repo, ['init']);
 
@@ -532,7 +532,7 @@ describe('the registered command, spawned', () => {
   }, SPAWN_TIMEOUT);
 
   it('sets up the scratch repository from a subdirectory under --yes, its user scope under the scratch HOME', () => {
-    const scratch = plantScratchRepo(tempBase);
+    const scratch = plantScratchRepo(tempBase, { project: false });
     const sub = join(scratch.repo, 'sub');
     mkdirSync(sub);
 

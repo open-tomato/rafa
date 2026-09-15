@@ -9,6 +9,9 @@
  * dispatches, every module the dispatcher mounted included, and never a
  * roster of its own.
  *
+ * It declares `needsProject: false`: the roster is the same inside a
+ * project as outside one, so the dispatcher resolves no project for it.
+ *
  * ## What it writes
  *
  * In json mode the document is the command's result: the invocation
@@ -53,6 +56,7 @@ const describeCommand: RafaCommand = {
     },
   ],
   outputs: ['text', 'json'],
+  needsProject: false,
   run: async (context) => {
     const document = describeRegistry(context.registry, version);
     if (context.outputMode === 'json') {

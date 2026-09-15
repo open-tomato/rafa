@@ -6,9 +6,11 @@
  *
  * ## Where plans sit
  *
- * `list` and `show` read {@link PLANS_DIR}, `.plans/` under the git root:
- * where `rafa plan create` writes `PLAN-<stub>.md`, and where
- * `rafa loop start` looks for its default plan. The loop keeps its copy
+ * `list` and `show` read {@link PLANS_DIR}, `.plans/` under the git root.
+ * `rafa plan create` writes `PLAN-<stub>.md`, and `rafa loop start` looks
+ * for its default plan, in `.plans/` under the project root the
+ * dispatcher resolves, so these two read where those write only while
+ * the project root is the git toplevel. The loop keeps its copy
  * of a plan beside it as `PLAN_TRACKER-<stub>.md` (`utils/tracker.ts`)
  * and ticks that copy as tasks finish. The config resolves `plan.dir`,
  * which no command reads yet, so these two read the directory the phase 0

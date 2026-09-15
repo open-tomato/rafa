@@ -11,7 +11,8 @@
  * The routing cases dispatch over a registry built from the roster's own
  * subjects and commands, each `run` swapped for one recording what ran
  * and the words it was handed. So each declaration routes as registered,
- * and no phase 0 command runs: no git, no home, no session. That a
+ * inside a project of this file's own beside a home of its own, and no
+ * phase 0 command runs: no git, no real home, no session. That a
  * wrapped `run` hands those words on is held in `wrap.test.ts`, and the
  * phase 0 commands run behind `src/rafa.ts` in the suites that spawn it.
  *
@@ -47,15 +48,17 @@ import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand } from '../cli/command.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
 
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { commandProblem, commandSpelling } from '../cli/command.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';
 
@@ -93,6 +96,20 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'init': [[], ['root', 'yes']],
   'describe': [[], []],
 };
+
+/** The commands running outside a project too: `init`, which makes one, and `describe`. */
+const OUTSIDE_A_PROJECT = ['init', 'describe'];
+
+/** A temporary directory of this file's own, holding the project and the home every routing case dispatches with. */
+const tempBase = mkdtempSync(join(tmpdir(), 'rafa-roster-'));
+const PROJECT = join(tempBase, 'project');
+const HOME = join(tempBase, 'home');
+plantProjectConfig(PROJECT);
+mkdirSync(HOME);
+
+afterAll(() => {
+  rmSync(tempBase, { recursive: true, force: true });
+});
 
 /** The deprecation line typing `typed` writes, as stderr holds it. */
 function deprecation(typed: string, spelling: string): string {
@@ -159,6 +176,8 @@ async function dispatchRecorded(line: string): Promise<Dispatched> {
     stdout: stdout.stream,
     stderr: stderr.stream,
     now: () => new Date('2026-09-14T12:00:00.000Z'),
+    cwd: PROJECT,
+    home: HOME,
   });
   return { ran, outcome, stdout: stdout.text(), stderr: stderr.text() };
 }
@@ -196,6 +215,12 @@ describe('the core roster', () => {
       'describe',
     ]);
     expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length);
+  });
+
+  it('runs every command inside a project but init and describe, which declare needsProject false', () => {
+    const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
+
+    expect(outside).toEqual(OUTSIDE_A_PROJECT);
   });
 
   it('aliases plan create as plan and loop start as start, and nothing else', () => {

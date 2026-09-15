@@ -23,6 +23,14 @@
  * `rafa effort report --output=json --kind=task` hands `report`
  * `['--kind=task']`. The words from a `--` on are handed over whole.
  *
+ * The function is also handed, after the words, the root of the project
+ * the dispatcher resolved for the command (`RafaContext.project`): the
+ * directory `start`, `plan`, `effort collect` and `effort report` act
+ * on, in place of the git root of the working directory each took before,
+ * and which `usage` ignores. A wrapped command runs inside a project, so
+ * its declaration leaves `needsProject` unset. Run with a context holding
+ * no project, it rejects before the function is called.
+ *
  * Nothing else in the context is handed on. The declaration's `flags`
  * spell what the phase 0 parser reads, for help and `describe`, and a
  * `default` declared there fills the context's `flags` and never reaches
@@ -36,13 +44,13 @@
  * `effort collect` and `effort report` each throw one on a refusal, and
  * `start` also when a task is interrupted.
  */
-import type { RafaCommand } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../cli/command.js';
 
 /** The global flag the dispatcher reads the output mode from, which no phase 0 command is handed. */
 const OUTPUT_FLAG = 'output';
 
-/** A phase 0 command: the words of its line in, its writes and its refusal out. */
-export type PhaseZeroCommand = (args: string[]) => Promise<void>;
+/** A phase 0 command: the words of its line and the project root in, its writes and its refusal out. */
+export type PhaseZeroCommand = (args: string[], root: string) => Promise<void>;
 
 /** Everything a `RafaCommand` declares but `run`. */
 export type CommandDeclaration = Omit<RafaCommand, 'run'>;
@@ -86,14 +94,23 @@ export function withoutOutputFlag(argv: readonly string[]): string[] {
   return kept;
 }
 
+/** The root of the project `context` carries, or an error naming the command `name` when it carries none. */
+function projectRootOf(context: RafaContext, name: string): string {
+  if (context.project === null) {
+    throw new Error(`${name}: runs inside a rafa project, and its context carries none`);
+  }
+  return context.project.root;
+}
+
 /**
  * The declaration as a frozen `RafaCommand` whose `run` hands `command`
- * the context's `argv` without `--output`; see the module note.
+ * the context's `argv` without `--output`, then the root of the project
+ * the context carries; see the module note.
  */
 export function wrapPhaseZeroCommand(declaration: CommandDeclaration, command: PhaseZeroCommand): RafaCommand {
   const wrapped: RafaCommand = {
     ...declaration,
-    run: (context) => command(withoutOutputFlag(context.argv)),
+    run: async (context) => command(withoutOutputFlag(context.argv), projectRootOf(context, declaration.name)),
   };
   return Object.freeze(wrapped);
 }

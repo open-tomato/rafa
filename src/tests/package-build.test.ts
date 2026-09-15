@@ -133,6 +133,8 @@ import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatCandidates } from '../plan.js';
 import * as portsSource from '../ports/index.js';
 
+import { plantProjectConfig } from './cli-capture.js';
+
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -314,6 +316,7 @@ function plantPlanScratch(name: string): PlanScratch {
   const init = Bun.spawnSync(['git', 'init', '-q', '.'], { cwd: repo });
   if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr.toString()}`);
   writeFileSync(join(repo, 'spec.md'), SPEC, 'utf8');
+  plantProjectConfig(repo);
 
   const git = Bun.which('git');
   if (git === null) throw new Error('git is not on the PATH this suite runs under');
@@ -520,7 +523,7 @@ describe('the prompt templates in the build', () => {
     const probe = join(scratch.root, 'probe.ts');
     writeFileSync(probe, [
       `const { planCommand } = await import(${JSON.stringify(join(DIST, 'index.js'))});`,
-      `await planCommand(${JSON.stringify(PLAN_ARGS)});`,
+      `await planCommand(${JSON.stringify(PLAN_ARGS)}, ${JSON.stringify(scratch.repo)});`,
       '',
     ].join('\n'), 'utf8');
     const plan = run([process.execPath, probe], scratch.repo, scratch.env);

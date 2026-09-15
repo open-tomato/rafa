@@ -44,7 +44,7 @@
  *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
- * --plan        plan file to execute (default: PLAN.md at the repo root). The
+ * --plan        plan file to execute (default: PLAN.md at the project root). The
  *               tracker is derived per plan (PLAN-foo.md → PLAN_TRACKER-foo.md)
  *               so several plans can coexist.
  * --start-at    defer the run until a local time of day (e.g. 23:00) — queue
@@ -112,7 +112,7 @@ import {
 import { setActivePlanStub } from './start/stamp.js';
 import { preserveProgress } from './start/wrap-up.js';
 import { checkUsage } from './utils/claude.js';
-import { getCurrentBranch, getRepoRoot } from './utils/git.js';
+import { getCurrentBranch } from './utils/git.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
@@ -180,8 +180,13 @@ export function guardRunBranch(
   }
 }
 
-export default async function start(args: string[]): Promise<void> {
-  const repoRoot = getRepoRoot();
+/**
+ * Runs the loop over the words of its line, on the project at `repoRoot`:
+ * the root the dispatcher resolved from the nearest `.rafa/config.yaml`
+ * at or above the working directory, handed over by
+ * `src/commands/wrap.ts`.
+ */
+export default async function start(args: string[], repoRoot: string): Promise<void> {
 
   // Before the deferral: a run queued for 23:00 that only meets a refused
   // config then has lost the night, where refusing now costs one command.

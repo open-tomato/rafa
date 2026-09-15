@@ -2,10 +2,11 @@
  * Tests for `rafa plan` (`src/plan.ts`) generating its plan through the
  * Planner it resolves from the adapter registry.
  *
- * Each case runs the command in a child process, because the command
- * reads the git root of its working directory and the user scope's config
- * under the home. The child runs in a scratch git repository under this
- * file's temporary directory, with HOME a directory beside it. It imports
+ * Each case runs the command in a child process, because the dispatcher
+ * resolves the project from its working directory and the command reads
+ * the user scope's config under the home. The child runs in a scratch git
+ * repository holding `.rafa/config.yaml` under this file's temporary
+ * directory, with HOME a directory beside it. It imports
  * `src/plan.ts` and hands the command a registry holding a fixture
  * `planner/claude` in place of core's, and dispatches `plan create` as
  * `src/rafa.ts` does: the declaration of `src/commands/plan/create.ts`
@@ -66,6 +67,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { buildPlanPrompt, readPlanFormat } from './plan.js';
+import { plantProjectConfig } from './tests/cli-capture.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */
 const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -120,7 +122,7 @@ const PROBE = [
   '    },',
   '  }),',
   '}]);',
-  'const command = wrapPhaseZeroCommand(declared, (words) => plan(words, registry));',
+  'const command = wrapPhaseZeroCommand(declared, (words, root) => plan(words, root, registry));',
   'const commands = createCommandRegistry({ subjects: [{ name: "plan", summary: "plans" }], commands: [command] });',
   'const { exitCode } = await dispatch(["plan", "create", ...args], { registry: commands });',
   'process.exitCode = exitCode;',
@@ -168,6 +170,7 @@ function plantScratch(): Scratch {
   if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr.toString()}`);
   writeFileSync(join(repo, 'spec.md'), SPEC, 'utf8');
   writeFileSync(join(repo, 'progress.txt'), PROGRESS, 'utf8');
+  plantProjectConfig(repo);
   const probe = join(root, 'probe.ts');
   writeFileSync(probe, PROBE, 'utf8');
 

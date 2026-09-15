@@ -12,6 +12,11 @@ To run the loop from a checkout (no arguments prints the help):
 bun src/rafa.ts loop start --plan=<file>
 ```
 
+Every command but `init`, the help and `describe` runs inside a rafa
+project: the nearest directory at or above the working directory holding
+`.rafa/config.yaml`. Outside one it prints the `rafa init` hint and exits
+1; `bun src/rafa.ts init --yes` sets up the git toplevel as one.
+
 `bun run build` writes `dist/`, which the `rafa` bin and the package's
 `exports` point at.
 

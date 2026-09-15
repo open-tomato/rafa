@@ -56,6 +56,21 @@
  * from the line as typed reddened four cases here, the flag's line never
  * written five, a flag typed twice written twice the case typing it
  * twice, and the words after a `--` read as flags the case typing one.
+ *
+ * The project cases came with the dispatcher resolving a command's
+ * project. Every invocation here runs with the working directory and the
+ * home of a project planted in this file's temporary directory, and a
+ * case outside a project hands a sibling directory or a relative path the
+ * walk refuses, so no case walks up from the suite's own working
+ * directory. Nine mutations of `dispatch.ts` were driven on 2026-09-15,
+ * one run each over eleven suites with 281 pass before, each restored
+ * sha256-identical, and each reddened at least one case among them. The
+ * fail counts over the eleven: no project resolved
+ * for any command 35, one resolved for every command 4, `no_project` told
+ * as `command_error` 3, a `ScopeError` rethrown 1, the hint replaced 3,
+ * the `cwd` option ignored 4, the `home` option ignored 1, the context's
+ * project dropped 32, and the deprecation line written before the project
+ * is resolved 12.
  */
 import type { RafaCommand, RafaContext } from './command.js';
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
@@ -63,7 +78,7 @@ import type { ModuleImporter } from './modules.js';
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +87,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 import { createJsonOutput } from '../adapters/output/json.js';
+import { initHint } from '../project/scope.js';
+import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { CommandExit } from './command.js';
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
@@ -87,6 +104,18 @@ const tempBase = mkdtempSync(join(tmpdir(), 'rafa-dispatch-'));
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
+
+/** A project of this file's own, its root holding `.rafa/config.yaml` and a subdirectory `sub/`. */
+const PROJECT = join(tempBase, 'project');
+
+/** The home every invocation passes over, beside the project. */
+const HOME = join(tempBase, 'home');
+
+/** A directory no project holds, beside the project. */
+const OUTSIDE = join(tempBase, 'outside');
+
+plantProjectConfig(PROJECT);
+for (const dir of [join(PROJECT, 'sub'), HOME, OUTSIDE]) mkdirSync(dir, { recursive: true });
 
 /** The clock every event is stamped from. */
 const NOW = new Date('2026-09-14T12:00:00.000Z');
@@ -247,6 +276,8 @@ async function run(argv: readonly string[], extra: Partial<DispatchOptions> = {}
     stdout: stdout.stream,
     stderr: stderr.stream,
     now: () => NOW,
+    cwd: PROJECT,
+    home: HOME,
     ...extra,
   });
   return { outcome, stdout: stdout.text(), stderr: stderr.text() };
@@ -772,6 +803,7 @@ describe('the active output and the exit code', () => {
 
   it('reads no process exit code a command sets, ending that command as a success, in a process of its own', () => {
     const cwd = mkdtempSync(join(tempBase, 'exit-code-'));
+    plantProjectConfig(cwd);
     writeFileSync(join(cwd, 'probe.ts'), [
       `const { dispatch } = await import(${JSON.stringify(join(CLI_DIR, 'dispatch.ts'))});`,
       `const { createCommandRegistry } = await import(${JSON.stringify(join(CLI_DIR, 'registry.ts'))});`,
@@ -784,7 +816,7 @@ describe('the active output and the exit code', () => {
       '  }],',
       '});',
       'const sink = { write: () => true };',
-      'const outcome = await dispatch(["loop", "exit-code"], { registry, env: {}, stdout: sink, stderr: sink });',
+      `const outcome = await dispatch(["loop", "exit-code"], { registry, env: {}, stdout: sink, stderr: sink, cwd: ${JSON.stringify(cwd)}, home: ${JSON.stringify(HOME)} });`,
       'console.log(JSON.stringify({ exitCode: outcome.exitCode, ok: outcome.result.ok, processExitCode: process.exitCode ?? null }));',
       '',
     ].join('\n'));
@@ -808,5 +840,69 @@ describe('the active output and the exit code', () => {
 
     expect(outcome.exitCode).toBe(3);
     expect(process.exitCode).toBe(before);
+  });
+});
+
+describe('the project a command runs in', () => {
+  it('hands the project resolved from a subdirectory of its root, the root a real path', async () => {
+    const { outcome } = await run(['loop', 'start'], { cwd: join(PROJECT, 'sub') });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(seen?.context.project).toMatchObject({ found: true, root: realpathSync(PROJECT), home: HOME });
+    expect(seen?.context.project?.project.configFile).toBe(join(realpathSync(PROJECT), '.rafa', 'config.yaml'));
+  });
+
+  it('refuses a command outside a project with the init hint and exit code 1, never running it or printing its deprecation line', async () => {
+    const { outcome, stdout, stderr } = await run(['start'], { cwd: OUTSIDE });
+
+    expect(seen).toBeNull();
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.result).toMatchObject({ ok: false, error: { code: 'no_project', message: initHint(OUTSIDE) } });
+    expect(stdout).toBe('');
+    expect(stderr).toBe(`rafa: ${initHint(OUTSIDE)}\n`);
+  });
+
+  it('carries the init hint in the one result event in json mode, writing nothing to stderr', async () => {
+    const { outcome, stdout, stderr } = await run(['--output=json', 'loop', 'status'], { cwd: OUTSIDE });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(stderr).toBe('');
+    expect(eventsOf(stdout)).toEqual([
+      { type: 'start', command: 'loop status', ts: NOW.toISOString() },
+      { type: 'result', ok: false, error: { code: 'no_project', message: initHint(OUTSIDE) }, ts: NOW.toISOString() },
+    ]);
+  });
+
+  it('runs a command declaring needsProject false with no project, reading neither the working directory nor the home', async () => {
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'loop', summary: 'the loop' }],
+      commands: [command('loop', 'anywhere', { needsProject: false }), command('loop', 'start')],
+    });
+    const unreadable = { registry, cwd: 'not/absolute', home: 'not/absolute/either' };
+
+    const anywhere = await run(['loop', 'anywhere'], unreadable);
+    const project = seen?.context.project;
+    const start = await run(['loop', 'start'], unreadable);
+
+    expect([anywhere.outcome.exitCode, project]).toEqual([0, null]);
+    expect(start.outcome.exitCode).toBe(1);
+    expect(start.outcome.result).toMatchObject({
+      ok: false,
+      error: { code: 'no_project', message: expect.stringContaining('not/absolute') },
+    });
+  });
+
+  it('answers a help request, a routing refusal and an unreadable spec without reading the working directory', async () => {
+    const unreadable = { cwd: 'not/absolute', home: 'not/absolute/either' };
+
+    const help = await run(['loop', '--help'], unreadable);
+    const refusal = await run(['nonesuch'], unreadable);
+    const spec = await run(['loop', 'spec'], unreadable);
+
+    expect(help.outcome.exitCode).toBe(0);
+    expect([refusal.outcome.result, spec.outcome.result]).toMatchObject([
+      { ok: false, error: { code: 'unknown_subject' } },
+      { ok: false, error: { code: 'invalid_spec' } },
+    ]);
   });
 });

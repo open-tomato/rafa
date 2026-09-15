@@ -15,8 +15,9 @@
  *
  * ## The command cases
  *
- * Each runs `bun src/rafa.ts` in a scratch git repository with a HOME of
- * its own, under a PATH holding git's directory alone, in an environment
+ * Each runs `bun src/rafa.ts` in a scratch git repository holding the
+ * `.rafa/config.yaml` `rafa init` writes, with a HOME of its own, under a
+ * PATH holding git's directory alone, in an environment
  * holding nothing else but what the case names, so no `RAFA_OUTPUT` the
  * suite runs under reaches a text case. A json run is held to NDJSON:
  * every line parses, the first is the start event and the one terminal
@@ -60,6 +61,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plantProjectConfig } from './cli-capture.js';
 import { consoleAndExitUses } from './source-uses.js';
 
 /** The `src/` directory. */
@@ -135,6 +137,7 @@ function plant(): Scratch {
   };
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '--no-verify', '-m', 'seed');
+  plantProjectConfig(repo);
   return { repo, home };
 }
 

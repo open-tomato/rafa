@@ -172,7 +172,6 @@ import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
-import { getRepoRoot } from '../utils/git.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
@@ -305,8 +304,8 @@ export interface CollectResult {
 
 /** How a run is bounded and where it reads from. */
 export interface CollectOptions {
-  /** Defaults to the git repo root. Governs the store and git's cwd. */
-  repoRoot?: string;
+  /** The project root, with no default. Governs the store and git's cwd. */
+  repoRoot: string;
   /** Defaults to the derived project log directory. */
   logDir?: string;
   /** Defaults to `<repoRoot>/.plans`. */
@@ -692,7 +691,7 @@ function resolveStore(
 export async function collectEffort(
   options: CollectOptions,
 ): Promise<CollectResult> {
-  const repoRoot = options.repoRoot ?? getRepoRoot();
+  const { repoRoot } = options;
   const verbose = options.verbose ?? false;
   const log = options.log ?? ((line: string) => activeOutput().info(line));
   const context: HalfContext = {
@@ -757,7 +756,8 @@ function refuse(problems: readonly string[]): never {
 }
 
 /**
- * `ralph effort collect` — the command entry.
+ * `ralph effort collect` — the command entry, over `repoRoot`, the project
+ * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
  * Writes the summary through the active output
  * (`adapters/output/active.ts`), one `info` line each, as the run's
@@ -775,13 +775,14 @@ function refuse(problems: readonly string[]): never {
  * class exists for. Anything else thrown is a fault rather than a
  * refusal, and is rethrown.
  */
-export default async function collect(args: string[]): Promise<void> {
+export default async function collect(args: string[], repoRoot: string): Promise<void> {
   const parsed = parseCollectArgs(args);
   if (parsed.errors.length > 0) refuse(parsed.errors);
 
   let result: CollectResult;
   try {
     result = await collectEffort({
+      repoRoot,
       home: homedir(),
       sinceEpochMs: parsed.sinceEpochMs,
       collectSessions: parsed.collectSessions,

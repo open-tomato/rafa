@@ -128,7 +128,6 @@ import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
-import { getRepoRoot } from '../utils/git.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
@@ -250,8 +249,8 @@ export interface ReportArgs {
 
 /** Where a report reads from and what it narrows to. */
 export interface ReportOptions {
-  /** Defaults to the git repo root. Governs the config and the store. */
-  repoRoot?: string;
+  /** The project root, with no default. Governs the config and the store. */
+  repoRoot: string;
   /**
    * The home the user scope's config is read under. No default: the
    * command passes `homedir()`, so a caller cannot reach the real home by
@@ -632,7 +631,7 @@ function resolveStore(
  * cannot run on.
  */
 export function buildReport(options: ReportOptions): EffortReport {
-  const repoRoot = options.repoRoot ?? getRepoRoot();
+  const { repoRoot } = options;
   const store = resolveStore(options.store, { root: repoRoot, home: options.home });
 
   return summariseSessions(
@@ -651,7 +650,8 @@ function refuse(problems: readonly string[]): never {
 }
 
 /**
- * `ralph effort report` — the command entry.
+ * `ralph effort report` — the command entry, over `repoRoot`, the project
+ * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
  * Writes through the active output (`adapters/output/active.ts`), in the
  * mode the dispatcher set beside it. In json mode the report is the
@@ -673,13 +673,14 @@ function refuse(problems: readonly string[]): never {
  * way a bad argument is and the way `rafa effort collect` refuses it.
  * Anything else thrown is a fault rather than a refusal, and is rethrown.
  */
-export default async function report(args: string[]): Promise<void> {
+export default async function report(args: string[], repoRoot: string): Promise<void> {
   const parsed = parseReportArgs(args);
   if (parsed.errors.length > 0) refuse(parsed.errors);
 
   let built: EffortReport;
   try {
     built = buildReport({
+      repoRoot,
       home: homedir(),
       kinds: parsed.kinds,
       entrypoints: parsed.entrypoints,

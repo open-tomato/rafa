@@ -29,6 +29,15 @@
  * reads it, so the roster it gives is the dispatcher's own and never a
  * second one.
  *
+ * And it carries `project`, the project the command runs in as
+ * `resolveScope` answers it (`src/project/scope.ts`): its root, the home,
+ * and both scopes' paths. A command runs inside a project unless it
+ * declares `needsProject: false`. The dispatcher resolves the project
+ * before any other command runs, and runs none outside a project, so
+ * such a command's `project` is never null. For a command declaring
+ * `needsProject: false`, as `init` and `describe` do, it resolves
+ * nothing, and `project` is null inside a project as outside one.
+ *
  * `run` takes a `RafaContext`, where `CliCommand.run` takes a
  * `CliContext`, so the interface extends `CliCommand` without its `run`.
  * A `RafaContext` is a `CliContext`, so a `run` written against
@@ -63,6 +72,7 @@
  */
 import type { CliCommand, CliContext, FlagSpec } from './core/types.js';
 import type { CommandRegistry } from './registry.js';
+import type { ProjectFound } from '../project/scope.js';
 
 import { describeValue } from '../config-sections.js';
 
@@ -109,6 +119,8 @@ export interface RafaContext extends CliContext {
   readonly argv: readonly string[];
   /** The registry the line was routed through, every module mounted for the invocation included. */
   readonly registry: CommandRegistry;
+  /** The project the command runs in, or null for a command declaring `needsProject: false`; see the module note. */
+  readonly project: ProjectFound | null;
 }
 
 /** A command the dispatcher routes to by its subject and action. */
@@ -141,6 +153,12 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
    * module's actions.
    */
   readonly exec?: true;
+  /**
+   * False for a command that runs outside a project too, which the
+   * dispatcher resolves no project for: `init` and `describe`. Absent,
+   * the command runs inside a project; see the module note.
+   */
+  readonly needsProject?: boolean;
   /** Runs the command. Throws {@link CommandExit} to refuse. */
   readonly run: (context: RafaContext) => Promise<void>;
 }
@@ -230,6 +248,11 @@ function fieldProblem(fields: CommandFields): string | null {
       'absent or a mapping of since and use',
     ],
     ['hidden', fields.hidden === undefined || typeof fields.hidden === 'boolean', 'absent or a boolean'],
+    [
+      'needsProject',
+      fields.needsProject === undefined || typeof fields.needsProject === 'boolean',
+      'absent or a boolean',
+    ],
     ['exec', fields.exec === undefined || fields.exec === true, 'absent or true'],
     ['run', typeof fields.run === 'function', 'a function'],
   ];

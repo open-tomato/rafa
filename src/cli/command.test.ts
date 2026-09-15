@@ -182,6 +182,11 @@ describe('the shape check', () => {
       'command "loop start": deprecated is a mapping, expected absent or a mapping of since and use',
     ],
     ['hidden as a string', { hidden: 'yes' }, 'command "loop start": hidden is "yes", expected absent or a boolean'],
+    [
+      'needsProject as a string',
+      { needsProject: 'no' },
+      'command "loop start": needsProject is "no", expected absent or a boolean',
+    ],
     ['exec as false', { exec: false }, 'command "loop start": exec is false, expected absent or true'],
     ['no run', { run: undefined }, 'command "loop start": run is undefined, expected a function'],
     ['two fields failing, naming the first', { name: 1, run: undefined }, 'command "loop start": name is 1, expected a string'],

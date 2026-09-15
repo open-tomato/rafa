@@ -39,8 +39,10 @@ module's note is the long form.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
-  without the global `--output` flag, and nothing else, so it keeps its
-  own parser. Each word `parseArgs` reads as `--output` ahead of a `--`
+  without the global `--output` flag, then the root of the project the
+  dispatcher resolved, and nothing else, so it keeps its own parser and
+  acts on that root where it took the git root before; `usage` ignores
+  it. Each word `parseArgs` reads as `--output` ahead of a `--`
   is dropped, a value typed as the next word included, so
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
@@ -75,14 +77,17 @@ module's note is the long form.
   `usage` write each line as a `log` event of its level and give no
   result.
 - **The plan readers start no session.** `plan list` and `plan show` read
-  `.plans/` under the git root, where `plan create` writes and
-  `loop start` finds its default plan: `plan.dir` resolves in the config,
-  and no command reads it yet (`src/commands/plan/plan-files.ts`).
+  `.plans/` under the git root. `plan create` writes and `loop start`
+  finds its default plan in `.plans/` under the project root, so the
+  readers read where those two write only while the project root is the
+  git toplevel. `plan.dir` resolves in the config, and no command reads
+  it yet (`src/commands/plan/plan-files.ts`).
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
   `plan validate <file>` resolves the file against the working directory
-  and needs no repository. It writes each `parsePlan` issue at `error` as
+  and reads no repository, though like every command but `init` and
+  `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
   `<file>:<line>: <reason>: <text>`, then throws exit code 1 when there is
   one. In json mode a list, a plan and a clean validation are the terminal
   result's `data`, and each issue is an `error` `log` event; text mode
@@ -90,7 +95,8 @@ module's note is the long form.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
   `plan create` calls it.
-- **`init` sets up a project and needs none** (`src/commands/init.ts`).
+- **`init` sets up a project and needs none** (`src/commands/init.ts`),
+  declaring `needsProject: false`.
   `--root=<path>` names the root, absolute or relative to the working
   directory, and `--yes` takes the first candidate `rootCandidates`
   answers. With neither, it lists the candidates on stderr and reads a
@@ -163,7 +169,14 @@ module's note is the long form.
   its own parser. `args` and `flags` are the rest of the line read
   against the command's `args` and `flags`, with flags typed ahead of
   the subject included. `registry` is the registry the line was routed
-  through, each module mounted for the invocation included.
+  through, each module mounted for the invocation included. `project` is
+  the project the dispatcher resolved for the command, as `resolveScope`
+  answers it (`src/project/scope.ts`), or null for a command declaring
+  `needsProject: false`.
+- **A command runs inside a project** unless it declares
+  `needsProject: false`, as `init` and `describe` do; the dispatcher
+  resolves none for such a command. `commandProblem` refuses a
+  `needsProject` that is no boolean.
 - **A command refuses by throwing `CommandExit(code, message)`.** It
   calls no `process.exit`. The dispatcher never reads `process.exitCode`,
   so a command that sets it and returns ends as a success.
@@ -221,7 +234,21 @@ start event. No caller passes an entry until phase 7 enables modules.
 
 `dispatch(argv, { registry })` answers `{ exitCode, result }` and sets
 no exit code: its caller ends the process. The streams, the environment,
-the clock, the importer and the help renderer are options.
+the clock, the importer, the help renderer, the working directory and the
+home are options.
+
+- **A command runs inside a project, or not at all.** Once the spec of a
+  command needing a project is read, `resolveScope` walks up from the
+  working directory, `process.cwd()` unless the `cwd` option names
+  another, to the nearest `.rafa/config.yaml`, passing over the home,
+  `homedir()` unless `home` names another. The project found is the
+  context's `project`. With none, the invocation ends as `no_project`
+  with exit code 1: `rafa: ` and the `rafa init` hint on stderr in text
+  mode, the hint as the result's message in json mode. The command never
+  runs, so it prints no deprecation line. A relative working directory or
+  home ends the same way with the walk's message. A help request, a
+  routing refusal, `invalid_spec` and a command declaring
+  `needsProject: false` read neither the working directory nor the home.
 
 - **json mode writes one `start` event first and one terminal `result`
   last**, every line NDJSON. Text mode writes neither event. A failure's
@@ -239,7 +266,7 @@ the clock, the importer and the help renderer are options.
 - **An alias, or a command declaring `deprecated`, writes one line to
   stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help
-  request writes none.
+  request writes none, nor does a command refused outside a project.
 - **A flag declaring `deprecated` is read as its `use`** when typed bare
   ahead of a `--`, as `--<name>` or `-<name>` or as one of its aliases:
   the words of `use` take its place in the line the context is assembled
@@ -251,8 +278,8 @@ the clock, the importer and the help renderer are options.
   on the copied `FlagSpec`, and `commandProblem` refuses one naming no
   `use`.
 - **The result error codes** are the four refusals, `invalid_spec` (a
-  spec `parseArgs` refuses), `command_exit`, `command_error` and
-  `result_unwritable`.
+  spec `parseArgs` refuses), `no_project` (a command run outside a
+  project), `command_exit`, `command_error` and `result_unwritable`.
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
 

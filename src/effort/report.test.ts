@@ -937,9 +937,10 @@ interface CommandRun {
 
 /**
  * A scratch git repository with a config and a planted NDJSON store,
- * answered as its real path. The command takes its root from git, which
- * resolves macOS's `/var` symlink to `/private/var`, and a refusal quotes
- * the config path under that root.
+ * answered as its real path. The command takes its root from the project
+ * the dispatcher resolves, a real path, which resolves macOS's `/var`
+ * symlink to `/private/var`, and a refusal quotes the config path under
+ * that root.
  */
 function makeRepo(config: string): string {
   const root = realpathSync(freshRoot());
@@ -1020,9 +1021,11 @@ describe('the report command', () => {
   it('prints the stored task reports when no session row is stored yet', () => {
     const root = realpathSync(freshRoot());
     Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
     plantTaskReport(root, 'aaaa-1111', 'done', 'blocked');
     const bare = realpathSync(freshRoot());
     Bun.spawnSync(['git', 'init', '-q'], { cwd: bare });
+    writeConfig(bare, '');
     const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
 
     const run = runReport(root, []);

@@ -15,8 +15,9 @@
  *
  * ## The command cases
  *
- * `start()` finds its root through git and spawns `claude` off PATH, so it
- * is run as `bun src/rafa.ts loop start` in a scratch repository with a
+ * `start()` takes its root from the project the dispatcher resolves and
+ * spawns `claude` off PATH, so it is run as `bun src/rafa.ts loop start`
+ * in a scratch repository holding `.rafa/config.yaml`, with a
  * HOME of its own, under a PATH holding a stand-in `claude` and git's own
  * directory, in an environment holding nothing else but `RAFA_OUTPUT` for
  * json mode. Each run first asserts that `claude` resolves to the
@@ -117,6 +118,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config.js';
 import { parsePlan } from '../plan/index.js';
 
+import { plantProjectConfig } from './cli-capture.js';
 import { consoleAndExitUses } from './source-uses.js';
 
 /** The `src/` directory. */
@@ -214,7 +216,7 @@ interface Planting {
   readonly branch: string;
   /** The plan at `.plans/PLAN-probe.md`, or null for none. */
   readonly plan: string | null;
-  /** `.rafa/config.yaml`, when one is planted. */
+  /** `.rafa/config.yaml`; the file `rafa init` writes when absent, so every run stands in a project. */
   readonly config?: string;
   /** The exit code the stand-in answers every call with. Defaults to 0. */
   readonly claudeExit?: number;
@@ -281,10 +283,7 @@ function plant(planting: Planting): Scratch {
     mkdirSync(join(repo, '.plans'));
     writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), planting.plan, 'utf8');
   }
-  if (planting.config !== undefined) {
-    mkdirSync(join(repo, '.rafa'));
-    writeFileSync(join(repo, '.rafa', 'config.yaml'), planting.config, 'utf8');
-  }
+  plantProjectConfig(repo, planting.config);
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
