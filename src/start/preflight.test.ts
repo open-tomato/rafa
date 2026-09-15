@@ -1,0 +1,555 @@
+/**
+ * Tests for the preflight `loop start` runs before any session
+ * (`start/preflight.ts`), and for the notice it adds to every task prompt.
+ *
+ * {@link runStartPreflight} is driven over a temporary repo root with the
+ * probe runner stubbed, so no case spawns a probe or waits on a timeout.
+ * Its stored rows are read back from the SQLite store under that root, by
+ * a query and through `readPreflightHalts`, and its lines through a sink
+ * output set for the case and unset after it. Each halt sits beside a
+ * control differing from it only in what the probe answered, the store
+ * refusal beside the same run over a root whose store can be written, and
+ * the unreadable PREREQUISITES file beside the same run with none there.
+ *
+ * The notice is read off `dispatchTask` with its session runner stubbed,
+ * so the prompt read is the bytes a session would take on stdin, stamp
+ * included.
+ *
+ * Twenty-nine mutations were driven against this file on 2026-09-15, 25
+ * of `start/preflight.ts` and 4 of the notice in `start/dispatch.ts`, each
+ * an exact string found once, the file run alone on a baseline of 14 pass
+ * taken twice, and both modules restored sha256-identical. All but one
+ * reddened a case at the first pass. The survivor, the store's clock seam
+ * dropped, reddened once the halt case read the halt's `collectedAt`.
+ *
+ * `start()` handing the preflight its settings and its plan, and handing
+ * the lines on to each dispatch, is reached by no case here, since
+ * `start()` spawns the CLI with no seam. It was read on the same day by
+ * spawning `loop start` in scratch repositories under a stand-in `claude`,
+ * with each of three strings of `src/start.ts` mutated in turn, and each
+ * mutation changed the reading it aimed at.
+ */
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { StartPreflight, StartPreflightOptions } from './preflight.js';
+import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
+import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
+import type { TaskInfo } from '../utils/tracker.js';
+
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { Database } from 'bun:sqlite';
+import { afterAll, describe, expect, it } from 'bun:test';
+
+import { setActiveOutput } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
+import { classifyPromptContent } from '../effort/classify.js';
+import { readPreflightHalts } from '../effort/store/preflight.js';
+import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { sinkOutput } from '../tests/output-sinks.js';
+import { planStubFromPrompt } from '../utils/plan-stamp.js';
+import { findNextTask } from '../utils/tracker.js';
+
+import { buildTaskPrompt, dispatchTask } from './dispatch.js';
+import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';
+import { setActivePlanStub } from './stamp.js';
+
+/** This file's scratch directory. */
+const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-start-preflight-'));
+
+afterAll(() => {
+  rmSync(tempRoot, { recursive: true, force: true });
+});
+
+/** The stub of the plan every planting runs. */
+const STUB = 'demo';
+
+/** The id every driven run is generated. */
+const RUN_ID = 'run-0001';
+
+/** The clock the stored rows are stamped from. */
+const CLOCK = new Date('2026-09-15T10:00:00.000Z');
+
+/** A required item with a probe. */
+const BUN: PrerequisiteItem = Object.freeze({ kind: 'tool', name: 'bun', probe: 'bun --version' });
+
+/** An optional item with a probe and a reason. */
+const MGREP: OptionalPrerequisiteItem = Object.freeze({
+  kind: 'tool',
+  name: 'mgrep',
+  probe: 'mgrep --version',
+  reason: 'faster search; grep is the fallback',
+});
+
+/** The line announcing a run that checks one item. */
+const CHECKING_ONE = `\n🛫 Preflight: checking 1 prerequisite item(s) under run ${RUN_ID}.`;
+
+let rooted = 0;
+
+/** A fresh repo root under this file's scratch directory, holding `.plans/`. */
+function freshRoot(): string {
+  rooted += 1;
+  const root = join(tempRoot, `root-${rooted}`);
+  mkdirSync(join(root, '.plans'), { recursive: true });
+  return root;
+}
+
+/** The plan file a run under `root` executes. It need not exist. */
+function planPathIn(root: string): string {
+  return join(root, '.plans', `PLAN-${STUB}.md`);
+}
+
+/** The PREREQUISITES file of that plan. */
+function prerequisitesPathIn(root: string): string {
+  return join(root, '.plans', `PREREQUISITES-${STUB}.md`);
+}
+
+/** The two tiers a run is configured with. */
+function settingsOf(
+  required: readonly PrerequisiteItem[],
+  optional: readonly OptionalPrerequisiteItem[],
+): PrerequisiteSettings {
+  return { prerequisitesRequired: required, prerequisitesOptional: optional };
+}
+
+/** A probe run that exited in time with `exitCode` and `stderr`. */
+function answered(exitCode: number, stderr = ''): ProbeRun {
+  return { exitCode, stderr, timedOut: false };
+}
+
+/** What one driven preflight did. */
+interface Driven {
+  /** What it answered, or null when it refused. */
+  readonly result: StartPreflight | null;
+  /** What it threw, or null when it answered. */
+  readonly refusal: CommandExit | null;
+  /** Each probe run, as `<probe> in <cwd>`. */
+  readonly probes: readonly string[];
+  readonly info: readonly string[];
+  readonly warn: readonly string[];
+}
+
+/**
+ * Drives one preflight under `root`, each probe answered from `answers`,
+ * with a sink output set and unset after it. `options` replaces any seam.
+ */
+async function drive(
+  root: string,
+  settings: PrerequisiteSettings,
+  answers: Readonly<Record<string, ProbeRun>>,
+  options: Partial<StartPreflightOptions> = {},
+): Promise<Driven> {
+  const probes: string[] = [];
+  const info: string[] = [];
+  const warn: string[] = [];
+  const runProbe: ProbeRunner = (probe, probeOptions) => {
+    probes.push(`${probe} in ${probeOptions.cwd}`);
+    const answer = answers[probe];
+    if (answer === undefined) throw new Error(`no answer planted for ${probe}`);
+    return Promise.resolve(answer);
+  };
+
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      info.push(message);
+    },
+    warn: (message) => {
+      warn.push(message);
+    },
+  }));
+  try {
+    const result = await runStartPreflight({
+      repoRoot: root,
+      planPath: planPathIn(root),
+      settings,
+      checks: { runProbe, env: {} },
+      newRunId: () => RUN_ID,
+      now: () => CLOCK,
+      ...options,
+    });
+    return { result, refusal: null, probes, info, warn };
+  } catch (error) {
+    if (!(error instanceof CommandExit)) throw error;
+    return { result: null, refusal: error, probes, info, warn };
+  } finally {
+    setActiveOutput(null);
+  }
+}
+
+/** A stored preflight row, as far as these cases read one. */
+interface StoredRow {
+  readonly run_id: string;
+  readonly position: number;
+  readonly tier: string;
+  readonly item: string;
+  readonly outcome: string;
+}
+
+/** Every preflight row under `root`, in append order. */
+function storedRows(root: string): StoredRow[] {
+  const db = new Database(sqliteStorePath(root), { readonly: true });
+  try {
+    return db.query<StoredRow, []>('SELECT run_id, position, tier, item, outcome FROM preflight ORDER BY seq').all();
+  } finally {
+    db.close();
+  }
+}
+
+describe('a preflight with nothing to check', () => {
+  it('runs no probe, stores nothing and prints nothing, answering the run id and no known-missing line', async () => {
+    const root = freshRoot();
+
+    const run = await drive(root, settingsOf([], []), {});
+
+    expect(run.refusal).toBeNull();
+    expect(run.result?.runId).toBe(RUN_ID);
+    expect(run.result?.report.checks).toEqual([]);
+    expect(run.result?.reminders).toEqual([]);
+    expect(run.result?.knownMissing).toEqual([]);
+    expect([run.probes, run.info, run.warn]).toEqual([[], [], []]);
+    // The passing run below writes this file, so its absence is a reading.
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+  });
+
+  it('opens no store, so one that cannot be opened refuses nothing, where it refuses a run with a check', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    for (const planted of [root, controlRoot]) {
+      mkdirSync(join(planted, '.rafa', 'effort'), { recursive: true });
+      writeFileSync(sqliteStorePath(planted), 'not a database\n', 'utf8');
+    }
+
+    const run = await drive(root, settingsOf([], []), {});
+    const control = await drive(controlRoot, settingsOf([BUN], []), { 'bun --version': answered(0) });
+
+    expect(run.refusal).toBeNull();
+    expect(run.result?.runId).toBe(RUN_ID);
+    expect(control.refusal?.exitCode).toBe(1);
+    expect(control.refusal?.message.startsWith(`❌ The preflight checks of run ${RUN_ID} could not be stored: `)).toBe(true);
+  });
+});
+
+describe('a preflight whose required item passes', () => {
+  it('runs the probe in the repo root, stores its row under the run id, halts nothing and says it passed', async () => {
+    const root = freshRoot();
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([`bun --version in ${root}`]);
+    expect(storedRows(root)).toEqual([
+      { run_id: RUN_ID, position: 0, tier: 'required', item: 'bun', outcome: 'pass' },
+    ]);
+    expect(readPreflightHalts(root)).toEqual([]);
+    expect(run.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
+    expect(run.warn).toEqual([]);
+  });
+});
+
+describe('a preflight whose required item fails', () => {
+  it('halts with exit code 1 naming the item, the probe, the exit code and the first stderr line, its rows stored and listed', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const settings = settingsOf([BUN], [MGREP]);
+
+    const run = await drive(root, settings, {
+      'bun --version': answered(127, '\nsh: bun: not found\nsecond line\n'),
+      'mgrep --version': answered(0),
+    });
+    const control = await drive(controlRoot, settings, {
+      'bun --version': answered(0),
+      'mgrep --version': answered(0),
+    });
+
+    expect(run.result).toBeNull();
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message).toBe([
+      '❌ preflight halted: 1 required item failed',
+      '  tool "bun": probe `bun --version` exited 127: sh: bun: not found',
+      `   Nothing was dispatched. The checks are stored under run ${RUN_ID},`,
+      '   and `rafa effort report` lists the halt.',
+    ].join('\n'));
+    // The optional item after the failed one was still checked and stored.
+    expect(run.probes).toEqual([`bun --version in ${root}`, `mgrep --version in ${root}`]);
+    expect(storedRows(root).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      'required bun fail',
+      'optional mgrep pass',
+    ]);
+    expect(readPreflightHalts(root)).toMatchObject([{
+      runId: RUN_ID,
+      collectedAt: CLOCK.toISOString(),
+      checks: 2,
+      failed: [{ kind: 'tool', item: 'bun', probe: 'bun --version', outcome: 'fail' }],
+    }]);
+    expect(run.info).toEqual([CHECKING_ONE.replace('1 prerequisite', '2 prerequisite')]);
+
+    expect(control.refusal).toBeNull();
+    expect(control.result?.runId).toBe(RUN_ID);
+    expect(readPreflightHalts(controlRoot)).toEqual([]);
+    expect(storedRows(controlRoot)).toHaveLength(2);
+  });
+});
+
+/** A PREREQUISITES file: a probed `auto` item, then an operator step for after the merge. */
+const PREREQUISITES = [
+  '# Prerequisites',
+  '',
+  '## Toolchain [auto]',
+  '- [ ] [auto] Bun is installed (`bun --version`)',
+  '',
+  '## Operator steps after the plan merges',
+  '- [ ] Publish with `npm publish` once the close-out is green',
+  '',
+].join('\n');
+
+/** The reminder lines {@link PREREQUISITES} is announced with. */
+const REMINDER_LINES: readonly string[] = [
+  `\n📌 PREREQUISITES-${STUB}.md names 1 step(s) the preflight does not check:`,
+  '   line 7: Publish with `npm publish` once the close-out is green',
+];
+
+describe('the PREREQUISITES file of the plan', () => {
+  it('halts on a failed probe of its auto item, never runs its human item, and prints that item as a reminder', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    writeFileSync(prerequisitesPathIn(root), PREREQUISITES, 'utf8');
+    writeFileSync(prerequisitesPathIn(controlRoot), PREREQUISITES, 'utf8');
+
+    const run = await drive(root, settingsOf([], []), { 'bun --version': answered(1, 'bun: broken') });
+    const control = await drive(controlRoot, settingsOf([], []), { 'bun --version': answered(0) });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message).toContain('\n  tool "Bun is installed (`bun --version`)": probe `bun --version` exited 1: bun: broken\n');
+    expect(run.probes).toEqual([`bun --version in ${root}`]);
+    expect(run.info).toEqual([...REMINDER_LINES, CHECKING_ONE]);
+
+    expect(control.refusal).toBeNull();
+    expect(control.probes).toEqual([`bun --version in ${controlRoot}`]);
+    expect(control.result?.reminders).toEqual([
+      { description: 'Publish with `npm publish` once the close-out is green', tag: 'human', line: 7 },
+    ]);
+    expect(control.info).toEqual([...REMINDER_LINES, CHECKING_ONE, '   Preflight passed.']);
+  });
+
+  it('merges the file for its own plan alone, running nothing for a plan beside it', async () => {
+    const root = freshRoot();
+    writeFileSync(prerequisitesPathIn(root), PREREQUISITES, 'utf8');
+
+    const run = await drive(root, settingsOf([], []), {}, { planPath: join(root, '.plans', 'PLAN-other.md') });
+
+    expect(run.refusal).toBeNull();
+    expect([run.probes, run.info, run.warn]).toEqual([[], [], []]);
+  });
+});
+
+describe('an optional item that fails', () => {
+  it('warns, answers its known-missing line and stores a failed row that halts nothing', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+
+    const run = await drive(root, settingsOf([], [MGREP]), { 'mgrep --version': answered(1, 'mgrep: login required') });
+    const control = await drive(controlRoot, settingsOf([], [MGREP]), { 'mgrep --version': answered(0) });
+
+    expect(run.refusal).toBeNull();
+    expect(run.result?.knownMissing).toEqual(['known-missing: mgrep (faster search; grep is the fallback)']);
+    expect(run.warn).toHaveLength(1);
+    expect(run.warn[0]).toContain('optional item tool "mgrep" failed: probe `mgrep --version` exited 1: mgrep: login required');
+    expect(run.info).toEqual([
+      CHECKING_ONE,
+      '   Preflight passed; 1 optional item(s) named known-missing in every task prompt.',
+    ]);
+    expect(storedRows(root)).toEqual([
+      { run_id: RUN_ID, position: 0, tier: 'optional', item: 'mgrep', outcome: 'fail' },
+    ]);
+    expect(readPreflightHalts(root)).toEqual([]);
+
+    expect(control.result?.knownMissing).toEqual([]);
+    expect(control.warn).toEqual([]);
+    expect(control.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
+  });
+});
+
+describe('the order a preflight works in', () => {
+  it('generates the run id before the first probe, and runs each probe in the repo root with the environment handed in', async () => {
+    const root = freshRoot();
+    const events: string[] = [];
+    const runProbe: ProbeRunner = (probe, options) => {
+      events.push(`${probe} in ${options.cwd} with MARK=${String(options.env.MARK)}`);
+      return Promise.resolve(answered(0));
+    };
+
+    const run = await drive(root, settingsOf([BUN], []), {}, {
+      checks: { runProbe, env: { MARK: 'seam' } },
+      newRunId: () => {
+        events.push('run id');
+        return 'run-ordered';
+      },
+    });
+
+    expect(run.refusal).toBeNull();
+    expect(events).toEqual(['run id', `bun --version in ${root} with MARK=seam`]);
+    expect(storedRows(root).map((row) => row.run_id)).toEqual(['run-ordered']);
+  });
+});
+
+/** Plants a file where the store's directory goes, so no row can be written under `root`. */
+function blockStore(root: string): string {
+  const blocker = join(root, '.rafa', 'effort');
+  mkdirSync(join(root, '.rafa'), { recursive: true });
+  writeFileSync(blocker, 'not a directory\n', 'utf8');
+  return blocker;
+}
+
+describe('a preflight whose rows the store refuses', () => {
+  it('refuses with exit code 1 for a run whose checks passed, naming the store refusal', async () => {
+    const root = freshRoot();
+    const blocker = blockStore(root);
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    const [first, second, ...rest] = run.refusal?.message.split('\n') ?? [];
+    expect(first?.startsWith(`❌ The preflight checks of run ${RUN_ID} could not be stored: `)).toBe(true);
+    expect(first).toContain(blocker);
+    expect(second).toBe('   Nothing was dispatched. Make the store writable, then run again.');
+    expect(rest).toEqual([]);
+    expect(run.info).toEqual([CHECKING_ONE]);
+    // The same run under a root whose store can be written is the passing case above.
+  });
+
+  it('keeps the halt first for a run that halted, the store refusal in place of where the rows went', async () => {
+    const root = freshRoot();
+    const blocker = blockStore(root);
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(127, 'sh: bun: not found') });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    const message = run.refusal?.message ?? '';
+    expect(message.startsWith([
+      '❌ preflight halted: 1 required item failed',
+      '  tool "bun": probe `bun --version` exited 127: sh: bun: not found',
+      `   Nothing was dispatched. The checks of run ${RUN_ID} were not stored: `,
+    ].join('\n'))).toBe(true);
+    expect(message).toContain(blocker);
+    expect(message).not.toContain('lists the halt');
+  });
+});
+
+describe('a PREREQUISITES file that cannot be read', () => {
+  it('refuses with exit code 1 naming its path, having run no probe and stored nothing', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    mkdirSync(prerequisitesPathIn(root));
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) });
+    const control = await drive(controlRoot, settingsOf([BUN], []), { 'bun --version': answered(0) });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    const [first, second, third, ...rest] = run.refusal?.message.split('\n') ?? [];
+    expect(first).toBe('❌ Refusing to start: the plan\'s prerequisites cannot be read.');
+    expect(second?.startsWith(`   ${prerequisitesPathIn(root)}: cannot be read (`)).toBe(true);
+    expect(third).toBe('   Nothing was checked and nothing was dispatched.');
+    expect(rest).toEqual([]);
+    expect([run.probes, run.info, run.warn]).toEqual([[], [], []]);
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+
+    expect(control.refusal).toBeNull();
+    expect(control.probes).toEqual([`bun --version in ${controlRoot}`]);
+  });
+});
+
+describe('the known-missing notice', () => {
+  it('answers nothing for no line, and the lines followed by the sentence otherwise', () => {
+    const lines = ['known-missing: mgrep', 'known-missing: LINEAR_API_KEY (the tracker falls back to local)'];
+
+    expect(knownMissingNotice([])).toEqual([]);
+    expect(knownMissingNotice(lines)).toEqual([...lines, KNOWN_MISSING_SENTENCE]);
+    expect(KNOWN_MISSING_SENTENCE).toContain('neither a bug to fix nor a credential to patch around');
+    expect(KNOWN_MISSING_SENTENCE).not.toContain('\n');
+  });
+});
+
+/** The task the notice cases dispatch. */
+const TASK = 'A task the notice rides on';
+
+/** The plan the notice cases dispatch from, ending in a newline as a plan file does. */
+const PLAN = `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`;
+
+/** The PROMPT.md the notice cases dispatch with. */
+const PROMPT = 'The prompt body.';
+
+/** The task {@link PLAN} hands the loop first. */
+function planTask(): TaskInfo {
+  const task = findNextTask(PLAN);
+  if (task === null) throw new Error('the notice plan holds no open task');
+  return task;
+}
+
+/** Dispatches {@link TASK} under the plan stamp, `knownMissing` handed in when not undefined, and answers its prompt. */
+async function promptFor(knownMissing: readonly string[] | undefined): Promise<string> {
+  const prompts: string[] = [];
+  setActivePlanStub(STUB);
+  setActiveOutput(sinkOutput({}));
+  try {
+    const dispatch = await dispatchTask({
+      taskInfo: planTask(),
+      promptContent: PROMPT,
+      planContent: PLAN,
+      inject: 'full',
+      repoRoot: tempRoot,
+      home: join(tempRoot, 'home'),
+      settingSources: ['project', 'local'],
+      run: (prompt) => {
+        prompts.push(prompt);
+        return Promise.resolve({ exitCode: 0, stdout: '' });
+      },
+      ...(knownMissing === undefined
+        ? {}
+        : { knownMissing }),
+    });
+    expect(prompts).toEqual([dispatch.prompt]);
+    return dispatch.prompt;
+  } finally {
+    setActivePlanStub(null);
+    setActiveOutput(null);
+  }
+}
+
+/** The stamp {@link promptFor} closes a prompt with. */
+const STAMP = `<!-- ralph:plan=${STUB} -->`;
+
+/** The prompt the loop built for {@link TASK} before the preflight existed, stamp aside. */
+const PROMPT_BEFORE = [
+  `Your scoped task is: ${TASK}`,
+  'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
+  '',
+  PROMPT,
+  PLAN,
+].join('\n');
+
+describe('a task prompt dispatched after a preflight', () => {
+  it('closes with the known-missing lines and the sentence after the plan text and before the stamp, its first line the task key', async () => {
+    const lines = ['known-missing: mgrep (faster search; grep is the fallback)', 'known-missing: LINEAR_API_KEY'];
+
+    const prompt = await promptFor(lines);
+
+    expect(prompt).toBe(`${PROMPT_BEFORE}\n${lines[0]}\n${lines[1]}\n${KNOWN_MISSING_SENTENCE}\n${STAMP}`);
+    expect(prompt.split('\n')[0]).toBe(`Your scoped task is: ${TASK}`);
+    expect(classifyPromptContent(prompt)).toBe('task');
+    expect(planStubFromPrompt(prompt)).toBe(STUB);
+  });
+
+  it('is the prompt built before the preflight existed when nothing is known-missing, left out or empty', async () => {
+    expect(await promptFor(undefined)).toBe(`${PROMPT_BEFORE}\n${STAMP}`);
+    expect(await promptFor([])).toBe(`${PROMPT_BEFORE}\n${STAMP}`);
+    expect(buildTaskPrompt(TASK, PROMPT, PLAN)).toBe(PROMPT_BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT, PLAN, [])).toBe(PROMPT_BEFORE);
+  });
+});

@@ -16,7 +16,7 @@
  * | `session_id`, `plan_stub`, `task_line` | the dispatch |
  * | `kind`, `trigger`, `what`, `cause`, `resolution`, `artifact`, `signal` | the report entry, as parsed |
  * | `outcome` | the loop: `done`, `blocked` or `failed` |
- * | `tracker_ref` | null on every row this phase writes; phase 1 fills it |
+ * | `tracker_ref` | null on every row this writer writes; `tracker-refs.ts` sets it |
  * | `collected_at` | the write's time, ISO 8601, one per write |
  *
  * `seq` comes first, the append order, as in every table of the store.
@@ -205,9 +205,10 @@ type FieldCheck = (value: unknown) => string | null;
 type Bound = string | null;
 
 /**
- * The insert. `tracker_ref` is the literal NULL: nothing this phase
- * writes has a tracker reference. Each conflict target repeats its
- * index's `WHERE`, which is what lets SQLite match it.
+ * The insert. `tracker_ref` is the literal NULL: a report entry carries
+ * no tracker reference, and `tracker-refs.ts` sets one on a row later.
+ * Each conflict target repeats its index's `WHERE`, which is what lets
+ * SQLite match it.
  */
 const INSERT_FINDING = `
   INSERT INTO findings (

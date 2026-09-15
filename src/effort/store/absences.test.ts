@@ -98,7 +98,7 @@ function freshRoot(name: string): string {
 
 /** The store file under a root. */
 function storeFile(root: string): string {
-  return join(root, '.ralph', 'effort', 'effort.sqlite');
+  return join(root, '.rafa', 'effort', 'effort.sqlite');
 }
 
 /** The store file's bytes, or null when nothing was ever written. */
@@ -228,7 +228,7 @@ describe('the report absences migration', () => {
     expect(rawQuery<{ name: string }>(root, columns, 'report_absences').map(({ name }) => name))
       .toEqual(COLUMNS);
     expect(rawQuery<{ name: string }>(root, tables, 'table').map(({ name }) => name))
-      .toEqual(['blockers', 'commits', 'findings', 'out_of_scope_bugs', 'report_absences', 'sessions']);
+      .toEqual(['blockers', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'preflight', 'report_absences', 'sessions', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
   });

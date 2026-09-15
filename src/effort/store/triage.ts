@@ -3,11 +3,11 @@
  * entry of a task report's blockers list, and one in its
  * `out_of_scope_bugs` table for each entry of its out-of-scope bugs.
  *
- * This phase stores both lists and acts on neither. Phase 1 triages them
- * once the Tracker port has an adapter: a blocker marks its task
- * blocked, and a bug is filed through the tracker, or commented on where
- * the tracker already holds one for its artifact. {@link writeTriage}
- * keeps both lists, entry for entry, until then.
+ * This writer stores both lists and acts on neither. `triage/triage.ts`
+ * acts on them: it writes a report's blocker text onto its task's
+ * tracker line, and files a bug through the tracker, or comments on the
+ * issue already filed for its artifact. {@link writeTriage} keeps both
+ * lists, entry for entry, whatever triage did with them.
  *
  * ## The rows
  *
@@ -35,12 +35,15 @@
  *     from one listed by a session it marked `blocked`. It has no CHECK,
  *     for the reason `findings.ts` gives: the spec widens the set with
  *     the CI verdict, and SQLite cannot widen a CHECK in place.
- *   - Neither table has a `tracker_ref`. Phase 1's spec writes the
- *     reference it files into the `findings` row, and a bug is matched
- *     against the tracker by `tracker.find` on its artifact, not against
- *     this table. Measured on SQLite 3.51.0, a nullable column added by
- *     `ALTER TABLE ... ADD COLUMN` keeps the rows and the unique index in
- *     force, so a later migration can add one if phase 1 wants it here.
+ *   - Neither table has a `tracker_ref`. The reference a filed bug gets
+ *     is kept in the `findings` row keyed by its artifact, which
+ *     `tracker-refs.ts` writes and answers back by artifact, and triage
+ *     (`triage/triage.ts`) matches a bug by that stored reference and
+ *     then by `tracker.find` on its artifact, never against this table.
+ *     Measured on SQLite 3.51.0, a nullable column
+ *     added by `ALTER TABLE ... ADD COLUMN` keeps the rows and the unique
+ *     index in force, so a later migration can add one if phase 1 wants
+ *     it here.
  *
  * ## Where the tables live
  *
@@ -61,9 +64,9 @@
  *     sighting, and sightings are deduplicated by artifact. A blocker or
  *     a bug is something phase 1 acts on, each entry once. Two bugs that
  *     share an artifact but are described apart are two rows, and it is
- *     phase 1's `tracker.find` on that artifact that turns the second
- *     into a comment on the first. Merged here, the second would never
- *     reach it.
+ *     triage's lookup on that artifact (`triage/triage.ts`) that turns
+ *     the second into a comment on the first. Merged here, the second
+ *     would never reach it.
  *   - `security` is part of the key so that a `security: true` bug is
  *     never dropped as the duplicate of a `false` or unflagged one.
  *   - The match is exact, as for findings: byte for byte, no trimming, no

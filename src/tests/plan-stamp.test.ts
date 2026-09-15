@@ -7,10 +7,17 @@
  * over the WHOLE prompt, so a marker written above the body would
  * re-bucket all four shapes as `other` while that module's own drift
  * guard stayed green. Nothing else here would catch that.
+ *
+ * The branch guard writes its warnings through the active output and
+ * throws its refusal as a `CommandExit`, so its cases read both: the
+ * warnings through a `sinkOutput` set for each case, and the refusal off
+ * what was thrown.
  */
 
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
 import { resolveSessionPlan } from '../effort/attribution.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { guardRunBranch } from '../start.js';
@@ -21,6 +28,8 @@ import {
   planStubFromPrompt,
   stampPrompt,
 } from '../utils/plan-stamp.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 const STUB = 'q16a-compose-n8n';
 
@@ -116,23 +125,96 @@ describe('resolveSessionPlan', () => {
 });
 
 describe('guardRunBranch', () => {
-  it('refuses the default branches', () => {
-    expect(guardRunBranch(STUB, 'main', [])).toBe(false);
-    expect(guardRunBranch(STUB, 'master', [])).toBe(false);
+  /** Lines the guard wrote through the active output at warn level. */
+  let warnings: string[] = [];
+
+  /** Lines it wrote at any other level. */
+  let others: string[] = [];
+
+  beforeEach(() => {
+    warnings = [];
+    others = [];
+    const other = (message: string): void => {
+      others.push(message);
+    };
+    setActiveOutput(sinkOutput({
+      warn: (message) => {
+        warnings.push(message);
+      },
+      info: other,
+      error: other,
+      debug: other,
+    }));
   });
 
-  it('allows a feature branch', () => {
-    expect(guardRunBranch(STUB, `feat/${STUB}`, [])).toBe(true);
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** The `CommandExit` the guard threw, or null when it let the run through. */
+  function refusalOf(planStub: string | null, branch: string, args: readonly string[]): CommandExit | null {
+    try {
+      guardRunBranch(planStub, branch, args);
+      return null;
+    } catch (error) {
+      if (error instanceof CommandExit) return error;
+      throw error;
+    }
+  }
+
+  /** The refusal the guard prints for a branch, one element per line it printed before. */
+  function refusalText(branch: string, name: string): string {
+    return [
+      `\n❌ Refusing to run a plan on \`${branch}\`.`,
+      '   A plan run needs its own branch: that is what gives it a PR to',
+      '   review, and what lets the wrap-up\'s CI stage have something to',
+      '   wait on. Run on main and both are silently skipped.',
+      `\n   git checkout -b feat/${name}`,
+      '\n   Pass --any-branch to run here anyway.',
+    ].join('\n');
+  }
+
+  it('refuses the default branches with exit code 1 and the whole refusal as its message', () => {
+    for (const branch of ['main', 'master']) {
+      const refusal = refusalOf(STUB, branch, []);
+
+      expect(refusal?.exitCode).toBe(1);
+      expect(refusal?.message).toBe(refusalText(branch, STUB));
+    }
+    expect(refusalOf(null, 'main', [])?.message).toBe(refusalText('main', 'this-plan'));
+
+    // The refusal is the dispatcher's to write, so the guard wrote none of it.
+    expect([...warnings, ...others]).toEqual([]);
+  });
+
+  it('allows a feature branch, writing nothing', () => {
+    expect(refusalOf(STUB, `feat/${STUB}`, [])).toBeNull();
+    expect([...warnings, ...others]).toEqual([]);
   });
 
   it('allows a branch that names the plan differently', () => {
     // Measured: five of eleven plan branches do. A refusal keyed on
     // the name would reject the project's own convention.
-    expect(guardRunBranch('q17-dynamic-form-provider-v1', 'feat/q17-dynamic-forms', []))
-      .toBe(true);
+    expect(refusalOf('q17-dynamic-form-provider-v1', 'feat/q17-dynamic-forms', []))
+      .toBeNull();
   });
 
-  it('lets --any-branch through on main', () => {
-    expect(guardRunBranch(STUB, 'main', ['--any-branch'])).toBe(true);
+  it('lets --any-branch through on main, warning once', () => {
+    expect(refusalOf(STUB, 'main', ['--any-branch'])).toBeNull();
+    expect(warnings).toEqual(['\n⚠️  --any-branch: running on `main` without the branch check.']);
+    expect(others).toEqual([]);
+  });
+
+  it('warns twice on a plan branch with no type prefix, and lets it through', () => {
+    expect(refusalOf(STUB, 'probe', [])).toBeNull();
+    expect(warnings).toEqual([
+      '\n⚠️  Branch `probe` carries no `<type>/` prefix.',
+      '   The run proceeds; the convention is `feat/<plan-stub>`.',
+    ]);
+
+    // The control: the same branch with no plan stub warns about nothing.
+    warnings = [];
+    expect(refusalOf(null, 'probe', [])).toBeNull();
+    expect(warnings).toEqual([]);
   });
 });

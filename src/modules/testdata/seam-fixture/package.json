@@ -1,0 +1,12 @@
+{
+  "name": "seam-fixture",
+  "version": "0.1.0",
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["commands"],
+    "provides": {
+      "commands": { "entry": "./commands.ts" }
+    },
+    "requires": { "rafa": ">=0.1 <1" }
+  }
+}

@@ -9,14 +9,26 @@
  * {@link PrLifecycleSeams}: `gh` through `utils/pr.ts`, the branch
  * through `utils/git.ts`, a repair session through `runClaude`, and the
  * poll's clock and wait through `waitForChecks`. So a test drives each
- * verdict with no network, no session and no 20-second wait.
+ * verdict with no network, no session and no 20-second wait. Every
+ * repair session loads settings from the sources `start()` hands over,
+ * the run's `loop.settingSources`.
+ *
+ * What the gate tells the operator goes through the active output
+ * (`adapters/output/active.ts`): the wait, each poll, a green verdict
+ * and a merged PR through `info`; a skipped check, a PR not found, a
+ * deadline passed, a PR with no checks and a red one through `warn`; and
+ * a failed repair session and the escalation through `error`. A repair
+ * session's own stdout reaches the operator through `utils/claude.ts`,
+ * as `log` events in json mode.
  *
  * The repair prompt's first line is the `ci-repair` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
  */
+import type { ClaudeSettingSource } from '../config.js';
 import type { CheckRow, WaitOptions, WaitResult } from '../utils/pr.js';
 
+import { activeOutput } from '../adapters/output/active.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 import {
@@ -59,8 +71,14 @@ export interface PrLifecycleSeams {
   readonly probeChecks: (prNumber: number) => string;
   /** The PR's merge state, or null when it cannot be read. */
   readonly readMergeState: (prNumber: number) => MergeState;
-  /** Spawns one repair session with the prompt on stdin; answers its exit code. */
-  readonly runClaude: (prompt: string) => Promise<number>;
+  /**
+   * Spawns one repair session with the prompt on stdin, loading settings
+   * from the sources named; answers its exit code.
+   */
+  readonly runClaude: (
+    prompt: string,
+    settingSources: readonly ClaudeSettingSource[],
+  ) => Promise<number>;
   /** The poll's clock. Absent, `waitForChecks` reads the real one. */
   readonly now?: WaitOptions['now'];
   /** The wait between polls. Absent, `waitForChecks` sets a real timer. */
@@ -76,6 +94,16 @@ export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
   readMergeState,
   runClaude,
 };
+
+/**
+ * The effects one attempt reaches through: {@link PrLifecycleSeams} with
+ * its repair session bound to the run's setting sources by
+ * {@link verifyPullRequest}.
+ */
+interface AttemptSeams extends Omit<PrLifecycleSeams, 'runClaude'> {
+  /** Spawns one repair session with the prompt on stdin; answers its exit code. */
+  readonly runRepair: (prompt: string) => Promise<number>;
+}
 
 /**
  * How one attempt at the PR ended. `stop` when there is nothing more to
@@ -97,7 +125,7 @@ async function repairPullRequest(
   branch: string,
   reason: string,
   detail: string,
-  run: PrLifecycleSeams['runClaude'],
+  run: AttemptSeams['runRepair'],
 ): Promise<number> {
   const prompt = [
     `The pull request for branch \`${branch}\` (#${prNumber}) is not mergeable: ${reason}`,
@@ -123,20 +151,28 @@ async function repairPullRequest(
  * a red or conflicting result before escalating to the operator. Skips
  * itself cleanly when `gh` is unusable, so the loop still works offline.
  *
+ * Every repair session loads settings from `settingSources`, bound once
+ * here so no attempt can spawn one under any other.
+ *
  * `seams` replaces any of the effects {@link PrLifecycleSeams} names; a
  * key left out runs the real helper.
  */
 export async function verifyPullRequest(
   timeoutMs: number,
   maxAttempts: number,
+  settingSources: readonly ClaudeSettingSource[],
   seams: Partial<PrLifecycleSeams> = {},
 ): Promise<void> {
-  const io: PrLifecycleSeams = { ...PR_LIFECYCLE_SEAMS, ...seams };
+  const given: PrLifecycleSeams = { ...PR_LIFECYCLE_SEAMS, ...seams };
+  const io: AttemptSeams = {
+    ...given,
+    runRepair: (prompt) => given.runClaude(prompt, settingSources),
+  };
   const branch = io.currentBranch();
 
   if (!io.isGhUsable()) {
-    console.warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
-    console.warn('   The PR has been pushed but nothing here confirms CI agreed with it.');
+    activeOutput().warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
+    activeOutput().warn('   The PR has been pushed but nothing here confirms CI agreed with it.');
     return;
   }
 
@@ -145,8 +181,8 @@ export async function verifyPullRequest(
     if (await verifyAttempt(io, branch, timeoutMs, isLastAttempt) === 'stop') return;
   }
 
-  console.error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
-  console.error('   Stopping rather than looping. Read the failing jobs and decide.');
+  activeOutput().error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
+  activeOutput().error('   Stopping rather than looping. Read the failing jobs and decide.');
 }
 
 /**
@@ -155,14 +191,14 @@ export async function verifyPullRequest(
  * unless this is the last attempt.
  */
 async function verifyAttempt(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   branch: string,
   timeoutMs: number,
   isLastAttempt: boolean,
 ): Promise<AttemptEnd> {
   const prNumber = io.findOpenPullRequest(branch);
   if (prNumber === null) {
-    console.warn(`\n⚠️  No open PR found for ${branch}. Nothing to verify.`);
+    activeOutput().warn(`\n⚠️  No open PR found for ${branch}. Nothing to verify.`);
     return 'stop';
   }
 
@@ -181,11 +217,11 @@ async function verifyAttempt(
 
 /** Polls one PR's checks until they settle or the deadline passes. */
 function pollChecks(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   prNumber: number,
   timeoutMs: number,
 ): Promise<WaitResult> {
-  console.log(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
+  activeOutput().info(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
 
   return waitForChecks({
     probe: () => Promise.resolve(io.probeChecks(prNumber)),
@@ -195,7 +231,7 @@ function pollChecks(
     sleep: io.sleep,
     onPoll: (rows, verdict, elapsedMs) => {
       const secs = Math.round(elapsedMs / 1000);
-      console.log(`   [${secs}s] ${verdict} — ${rows.length} check(s)`);
+      activeOutput().info(`   [${secs}s] ${verdict} — ${rows.length} check(s)`);
     },
   });
 }
@@ -206,15 +242,15 @@ function pollChecks(
  */
 function reportSettledVerdict(prNumber: number, result: WaitResult): boolean {
   if (result.verdict === 'green') {
-    console.log(`\n✅ CI green on PR #${prNumber}:`);
-    console.log(formatRows(result.rows));
+    activeOutput().info(`\n✅ CI green on PR #${prNumber}:`);
+    activeOutput().info(formatRows(result.rows));
     return true;
   }
 
   if (result.verdict === 'timeout') {
-    console.warn(`\n⚠️  CI still running after ${Math.round(result.elapsedMs / 1000)}s. Not waiting further.`);
-    console.warn(formatRows(result.rows));
-    console.warn(`   Check it yourself: gh pr checks ${prNumber}`);
+    activeOutput().warn(`\n⚠️  CI still running after ${Math.round(result.elapsedMs / 1000)}s. Not waiting further.`);
+    activeOutput().warn(formatRows(result.rows));
+    activeOutput().warn(`   Check it yourself: gh pr checks ${prNumber}`);
     return true;
   }
   return false;
@@ -226,31 +262,31 @@ function reportSettledVerdict(prNumber: number, result: WaitResult): boolean {
  * a conflict-repair session.
  */
 async function handleNoChecks(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   branch: string,
   prNumber: number,
   merge: MergeState,
 ): Promise<AttemptEnd> {
   if (merge?.state === 'MERGED') {
-    console.log(`\n✅ PR #${prNumber} is already merged.`);
+    activeOutput().info(`\n✅ PR #${prNumber} is already merged.`);
     return 'stop';
   }
   if (merge !== null && merge.mergeStateStatus !== 'DIRTY') {
-    console.warn(`\n⚠️  PR #${prNumber} reports no checks and is not conflicting`);
-    console.warn(`   (mergeable=${merge.mergeable} state=${merge.mergeStateStatus}).`);
-    console.warn('   Most likely no workflow matches the changed paths. Nothing to repair.');
+    activeOutput().warn(`\n⚠️  PR #${prNumber} reports no checks and is not conflicting`);
+    activeOutput().warn(`   (mergeable=${merge.mergeable} state=${merge.mergeStateStatus}).`);
+    activeOutput().warn('   Most likely no workflow matches the changed paths. Nothing to repair.');
     return 'stop';
   }
-  console.warn(`\n❌ PR #${prNumber} has no checks — it does not merge cleanly, so GitHub scheduled no run.`);
+  activeOutput().warn(`\n❌ PR #${prNumber} has no checks — it does not merge cleanly, so GitHub scheduled no run.`);
   const exitCode = await repairPullRequest(
     prNumber,
     branch,
     'it conflicts with the base branch, so GitHub scheduled no CI run at all.',
     'Merge `origin/main` into this branch and resolve the conflicts, then push. Mechanical conflicts (versions, lockfiles, complementary additions) are yours to resolve; a genuine semantic conflict is not.',
-    io.runClaude,
+    io.runRepair,
   );
   if (exitCode !== 0) {
-    console.error(`\n❌ Conflict-repair session failed (exit ${exitCode}).`);
+    activeOutput().error(`\n❌ Conflict-repair session failed (exit ${exitCode}).`);
     return 'stop';
   }
   return 'next';
@@ -258,23 +294,23 @@ async function handleNoChecks(
 
 /** A red PR gets a CI-repair session, handed its failing checks. */
 async function handleRedChecks(
-  io: PrLifecycleSeams,
+  io: AttemptSeams,
   branch: string,
   prNumber: number,
   rows: CheckRow[],
 ): Promise<AttemptEnd> {
-  console.warn(`\n❌ CI red on PR #${prNumber}:`);
-  console.warn(formatRows(rows));
+  activeOutput().warn(`\n❌ CI red on PR #${prNumber}:`);
+  activeOutput().warn(formatRows(rows));
   const failed = failingRows(rows);
   const exitCode = await repairPullRequest(
     prNumber,
     branch,
     'its CI checks failed.',
     ['The failing checks are:', formatRows(failed)].join('\n'),
-    io.runClaude,
+    io.runRepair,
   );
   if (exitCode !== 0) {
-    console.error(`\n❌ CI-repair session failed (exit ${exitCode}).`);
+    activeOutput().error(`\n❌ CI-repair session failed (exit ${exitCode}).`);
     return 'stop';
   }
   return 'next';

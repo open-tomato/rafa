@@ -13,12 +13,14 @@
  * nobody maintains: the six negative shapes (an unclosed brace, nested
  * braces, a trailing code span, an empty block, a block that is not
  * anchored at end of line, an unrecognised key on its own), and the
- * flag-mapping matrix (an `agent` suppressing the granular keys, and
+ * flag-mapping matrix (an `agent` suppressing its model and tools, its
+ * definition deciding whether the effort is passed or suppressed, and
  * the three mapping onto their flags in its absence). The negative
  * shapes now live in `tests/declaration-negatives.test.ts`, each with
  * its own positive control; the one line of overlap left here is the
  * block of unrecognised keys below, which that file widens into the
- * lone key, the case split and a near miss of all four. What IS asserted
+ * lone key, the case split and a near miss of each recognised key. What
+ * IS asserted
  * of {@link resolveDeclarationFlags} here is the one claim this task
  * owns: no declaration means no flags, which is today's behaviour
  * exactly.
@@ -52,17 +54,19 @@
  * re-driven against that file when it landed and redden 5 and 4 of its
  * 15 cases, which is how it knows its own fixtures reached the module.
  */
-import type { TaskDeclaration } from './declaration.js';
+import type { AgentEffortLookup, TaskDeclaration } from './declaration.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
+  AGENT_OWNED_KEYS,
   DECLARATION_KEYS,
   EFFORT_LEVELS,
   GRANULAR_KEYS,
   isEffortLevel,
   isModelValue,
   MODEL_ALIASES,
+  parseBudgetUsd,
   parseTaskDeclaration,
   parseToolList,
   resolveDeclarationFlags,
@@ -71,6 +75,9 @@ import {
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';
+
+/** No agent definition here declares an effort of its own. */
+const NO_OWN_EFFORT: AgentEffortLookup = () => false;
 
 /** The routing-table task of this plan, without its block. */
 const ROUTING_TASK = [
@@ -111,17 +118,22 @@ function declarationOf(taskText: string): TaskDeclaration {
 }
 
 describe('the recognised grammar', () => {
-  it('recognises exactly four keys', () => {
+  it('recognises exactly five keys, the budget ahead of the tools', () => {
     expect([...DECLARATION_KEYS]).toEqual([
       'agent',
       'model',
       'effort',
+      'budget',
       'tools',
     ]);
   });
 
   it('names the three keys an agent outranks', () => {
     expect([...GRANULAR_KEYS]).toEqual(['model', 'effort', 'tools']);
+  });
+
+  it('names the two of them an agent outranks whatever its definition says', () => {
+    expect([...AGENT_OWNED_KEYS]).toEqual(['model', 'tools']);
   });
 
   it('carries the five levels the CLI documents', () => {
@@ -175,16 +187,35 @@ describe('parseTaskDeclaration', () => {
     expect(parsed.text).toBe('Do the thing');
   });
 
-  it('reads all four keys off one block', () => {
+  it('reads all five keys off one block', () => {
     const declaration = declarationOf(
-      'Do it  {agent=tdd-guide model=opus effort=max tools=Read,Bash}',
+      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash}',
     );
 
     expect(declaration.agent).toBe('tdd-guide');
     expect(declaration.model).toBe('opus');
     expect(declaration.effort).toBe('max');
+    expect(declaration.budget).toBe(1.25);
     expect(declaration.tools).toEqual(['Read', 'Bash']);
     expect(declaration.issues).toEqual([]);
+  });
+
+  it('reads a lone budget as a declaration, and no budget as null', () => {
+    const parsed = parseTaskDeclaration('Do it  {budget=0.25}');
+
+    expect(parsed.text).toBe('Do it');
+    expect(parsed.declaration?.budget).toBe(0.25);
+    expect(declarationOf('Do it  {effort=low}').budget).toBeNull();
+  });
+
+  it('drops a budget it cannot use and records the token', () => {
+    const declaration = declarationOf('Do it  {budget=$2 effort=low}');
+
+    expect(declaration.budget).toBeNull();
+    expect(declaration.effort).toBe('low');
+    expect(declaration.issues).toEqual([
+      { reason: 'unusable-value', key: 'budget', text: 'budget=$2' },
+    ]);
   });
 
   it('reads the plan routing task as its plan wrote it', () => {
@@ -250,9 +281,11 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.extras).toEqual([
       { key: 'skills', value: 'zod-schemas' },
     ]);
-    expect(resolveDeclarationFlags(declaration).args).toEqual([
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT).args).toEqual([
       '--agent',
       'loop-implementer',
+      '--effort',
+      'high',
     ]);
     expect(parseTaskDeclaration(line).text).toBe(
       'Add the Zod schema for CreateJobRequest',
@@ -283,7 +316,7 @@ describe('parseTaskDeclaration', () => {
 
     expect(parsed.text).toBe('Do it');
     expect(parsed.declaration?.issues).toHaveLength(2);
-    expect(resolveDeclarationFlags(parsed.declaration).args).toEqual([]);
+    expect(resolveDeclarationFlags(parsed.declaration, NO_OWN_EFFORT).args).toEqual([]);
   });
 
   it('records a token inside the block carrying no equals', () => {
@@ -293,6 +326,46 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.issues).toEqual([
       { reason: 'stray-token', key: '', text: 'junk' },
     ]);
+  });
+});
+
+describe('parseBudgetUsd', () => {
+  it('reads a plain decimal as US dollars', () => {
+    expect(parseBudgetUsd('0.01')).toBe(0.01);
+    expect(parseBudgetUsd('2')).toBe(2);
+    expect(parseBudgetUsd('1.50')).toBe(1.5);
+    expect(parseBudgetUsd('0.000001')).toBe(0.000001);
+    expect(parseBudgetUsd('999999.999999')).toBe(999999.999999);
+  });
+
+  it('refuses zero, and every shape that is no plain decimal of six digits a side', () => {
+    const refused = [
+      '0',
+      '0.000000',
+      '-1',
+      '+1',
+      '$1',
+      '1e3',
+      '.5',
+      '5.',
+      '01',
+      '1,5',
+      '1000000',
+      '0.0000001',
+      'Infinity',
+      '0x10',
+      '',
+    ];
+    for (const value of refused) {
+      expect(parseBudgetUsd(value)).toBeNull();
+    }
+  });
+
+  it('reads back through String as the decimal it was written as, less trailing zeros', () => {
+    for (const value of ['0.01', '0.000001', '999999.999999', '12.5', '7']) {
+      expect(String(parseBudgetUsd(value))).toBe(value);
+    }
+    expect(String(parseBudgetUsd('1.50'))).toBe('1.5');
   });
 });
 
@@ -328,7 +401,7 @@ describe('stripTaskDeclaration', () => {
 
 describe('resolveDeclarationFlags', () => {
   it('answers no flags at all for no declaration', () => {
-    const resolved = resolveDeclarationFlags(null);
+    const resolved = resolveDeclarationFlags(null, NO_OWN_EFFORT);
 
     expect(resolved.args).toEqual([]);
     expect(resolved.suppressed).toEqual([]);

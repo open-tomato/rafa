@@ -18,11 +18,11 @@
  *
  * Every absence here is paired with a control proving the fixture
  * really carries the block, so a passing case is a strip and not an
- * empty plan agreeing with itself. And the commit body is empty unless
- * the subject was truncated (72 characters, the `type: ` prefix
- * included), so the fixture's task sentence is long enough to force
- * that truncation — otherwise an absence assertion on the body would
- * pass vacuously.
+ * empty plan agreeing with itself. And the commit body is the whole
+ * task sentence whatever the subject kept of it, so the body is
+ * asserted equal to that sentence before its absence is read —
+ * otherwise an absence assertion on an empty body would pass
+ * vacuously.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -44,14 +44,15 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '../utils/commit.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -60,9 +61,9 @@ const FENCE = '```';
 const BLOCK_MARKER = 'RAFA-BLOCK-MARKER: never quoted back to a task';
 
 /**
- * The task sentence, long enough that its subject is truncated: 165
- * characters normalised against a 72-character cap, so the body below
- * is not an empty-string vacuous pass.
+ * The task sentence, 165 characters normalised, with its first comma
+ * at index 108: the subject quotes a part of it and only the body
+ * carries the whole, which is what the body assertions below read.
  */
 const TASK_TEXT = [
   'Add the strip-proof test that plants a rafa block into a plan and',
@@ -122,22 +123,27 @@ function taskOrThrow(content: string): TaskInfo {
 let logs: string[] = [];
 
 /**
- * Captures what the loop printed, through a spy on `console`: bun:test
- * replaces the console object, so a `process.stdout.write` patch would
- * read nothing and every absence assertion below would pass against a
- * loop that announced the block in full.
+ * Captures what the loop told the operator. `start/dispatch.ts` and
+ * `start/commit.ts` write through the active output, whose `info` lines
+ * are read into this array through a `sinkOutput` set for each case, and
+ * the default is put back after it. Every other level is dropped. The
+ * sink holds each message as it was handed, so an absence assertion below
+ * reads the announced line itself, and a loop that announced the block in
+ * full would redden it. The line announcing a task put back on
+ * `console.log`, driven on 2026-09-15 and restored sha256-identical,
+ * reddened the prompt head and log line case.
  */
 beforeEach(() => {
   logs = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation(() => {});
-  spyOn(console, 'error').mockImplementation(() => {});
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
-  mock.restore();
+  setActiveOutput(null);
 });
 
 describe('a task dispatched from a plan carrying rafa:* blocks', () => {
@@ -161,6 +167,9 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
       promptContent: PROMPT_CONTENT,
       planContent: PLAN,
       inject: 'full',
+      repoRoot: tempRoot,
+      home: join(tempRoot, 'home'),
+      settingSources: ['project', 'local'],
       run,
     });
 
@@ -262,9 +271,9 @@ describe('what a finished task, dispatched from the same plan, commits', () => {
     expect(subject).toBe(expected.subject);
     expect(subject).not.toContain(BLOCK_MARKER);
 
-    // The vacuous-pass guard: the subject really was cut, so the body
-    // carries the whole sentence rather than staying empty.
-    expect(expected.truncated).toBe(true);
+    // The vacuous-pass guard: the body is the whole task sentence and
+    // never empty, so the absence below is read off a body that exists.
+    expect(body).toBe(TASK_TEXT);
     expect(body).toBe(expected.body);
     expect(body.length).toBeGreaterThan(0);
     expect(body).not.toContain(BLOCK_MARKER);

@@ -91,7 +91,7 @@ function freshRoot(name: string): string {
 
 /** The store file under a root. */
 function storeFile(root: string): string {
-  return join(root, '.ralph', 'effort', 'effort.sqlite');
+  return join(root, '.rafa', 'effort', 'effort.sqlite');
 }
 
 /** A backslash, for spelling an expected escape. */
@@ -372,7 +372,7 @@ describe('reading the store', () => {
     const root = freshRoot('no-store');
 
     expect(readProgressFindings(root, 'phase-0')).toEqual([]);
-    expect(existsSync(join(root, '.ralph'))).toBe(false);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
   });
 
   it('holds findings of this plan and global ones, never of another plan', () => {

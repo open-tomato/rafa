@@ -1,0 +1,32 @@
+rafa — run a plan through the ralph loop, one task per session
+
+Usage:
+  rafa <subject> <action> [args] [flags]
+  rafa <subject> --help            actions for a subject
+  rafa <subject> <action> --help   arguments, flags, examples
+
+Quick start:
+  rafa plan create --spec=.rafa/specs/my-feature.md
+  rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
+  rafa issue list
+  rafa effort collect
+  rafa module list
+  rafa init
+  rafa doctor
+  rafa self-update
+  rafa usage
+  rafa describe --output=json
+
+Subjects:
+  plan     create a plan from a spec; list, show and validate plans
+  loop     start a plan; stop, pause, resume, show and list its sessions
+  issue    the tracker: list, show, create, comment on and move issues
+  effort   collect session and commit rows; report per plan
+  module   list the configured modules; run an action a module provides
+
+Commands:
+  init, doctor, self-update, usage, describe
+
+Global flags:
+  --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)
+  -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)

@@ -30,6 +30,7 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
+import type { ConfigRoots } from '../config-load.js';
 import type { InjectMode } from '../config.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -55,14 +56,17 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
-import { announcePlanIssues, loadRunConfig } from '../start/run-config.js';
+import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
 import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -159,22 +163,27 @@ let logs: string[] = [];
 let warnings: string[] = [];
 
 /**
- * Captures what the loop printed, through a spy on `console`: bun:test
- * replaces the console object, so a `process.stdout.write` patch would
- * read nothing and every absence below would pass.
+ * Captures what the loop told the operator, by level. `start/run-config.ts`
+ * and `start/dispatch.ts` both write through the active output, read
+ * through a `sinkOutput` set for each case and put back to the default
+ * after it. The one case asking whether a line reached `console` spies on
+ * `console.warn` itself.
  */
 beforeEach(() => {
   logs = [];
   warnings = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    warnings.push(args.map(String).join(' '));
-  });
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    warn: (message) => {
+      warnings.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
+  setActiveOutput(null);
   mock.restore();
 });
 
@@ -195,6 +204,14 @@ function rootWith(text: string | null): string {
   return root;
 }
 
+/** A home of this file's own, holding no config, that a run reads under. */
+const HOME = join(tempRoot, 'home');
+
+/** The roots a run resolves under: `root`, with {@link HOME} as its home. */
+function scopesOf(root: string): ConfigRoots {
+  return { root, home: HOME };
+}
+
 describe('the injection mode a run resolves', () => {
   it('names three different modes, so each layer is a reading', () => {
     expect(new Set([FILE_MODE, FLAG_MODE]).size).toBe(2);
@@ -202,7 +219,7 @@ describe('the injection mode a run resolves', () => {
   });
 
   it('answers the default with no flag and no file', () => {
-    const resolved = loadRunConfig(rootWith(null), ['--plan=PLAN-x.md']);
+    const resolved = loadRunConfig(scopesOf(rootWith(null)), ['--plan=PLAN-x.md']);
 
     expect(resolved.config.inject).toBe(CONFIG_DEFAULTS.inject);
     expect(resolved.sources.inject).toBe('default');
@@ -210,7 +227,7 @@ describe('the injection mode a run resolves', () => {
   });
 
   it('takes the file over the default', () => {
-    const resolved = loadRunConfig(rootWith(FILE_CONFIG), ['--plan=PLAN-x.md']);
+    const resolved = loadRunConfig(scopesOf(rootWith(FILE_CONFIG)), ['--plan=PLAN-x.md']);
 
     expect(resolved.config.inject).toBe(FILE_MODE);
     expect(resolved.sources.inject).toBe('file');
@@ -218,8 +235,8 @@ describe('the injection mode a run resolves', () => {
 
   it('lets --inject= outrank the file', () => {
     const root = rootWith(FILE_CONFIG);
-    const flagged = loadRunConfig(root, ['--plan=PLAN-x.md', `--inject=${FLAG_MODE}`]);
-    const unflagged = loadRunConfig(root, ['--plan=PLAN-x.md']);
+    const flagged = loadRunConfig(scopesOf(root), ['--plan=PLAN-x.md', `--inject=${FLAG_MODE}`]);
+    const unflagged = loadRunConfig(scopesOf(root), ['--plan=PLAN-x.md']);
 
     expect(flagged.config.inject).toBe(FLAG_MODE);
     expect(flagged.sources.inject).toBe('cli');
@@ -231,38 +248,79 @@ describe('the injection mode a run resolves', () => {
 
   it('leaves the store to the file when the flag names the mode', () => {
     const root = rootWith(`store: ndjson\n${FILE_CONFIG}`);
-    const resolved = loadRunConfig(root, [`--inject=${FLAG_MODE}`]);
+    const resolved = loadRunConfig(scopesOf(root), [`--inject=${FLAG_MODE}`]);
 
     expect(resolved.config.store).toBe('ndjson');
     expect(resolved.sources.store).toBe('file');
     expect(resolved.sources.inject).toBe('cli');
   });
 
+  it('reads the user file under the home, and labels each layer the mode came from', () => {
+    const home = rootWith(FILE_CONFIG);
+    const projectRoot = rootWith(FILE_CONFIG);
+    const fromUser = loadRunConfig({ root: rootWith(null), home }, []);
+    const fromFile = loadRunConfig({ root: projectRoot, home }, []);
+    const fromFlag = loadRunConfig({ root: rootWith(null), home }, [`--inject=${FLAG_MODE}`]);
+    const fromDefault = loadRunConfig(scopesOf(rootWith(null)), []);
+
+    expect(fromUser.config.inject).toBe(FILE_MODE);
+    expect(fromUser.sources.inject).toBe('user');
+    expect(injectSourceLabel(fromUser)).toBe(join(home, '.rafa', 'config.yaml'));
+    expect(fromFile.sources.inject).toBe('file');
+    expect(injectSourceLabel(fromFile)).toBe(join(projectRoot, '.rafa', 'config.yaml'));
+    expect(injectSourceLabel(fromFlag)).toBe('--inject');
+    expect(injectSourceLabel(fromDefault)).toBe('the default');
+  });
+
   it('refuses a flag value no mode answers to', () => {
     const root = rootWith(FILE_CONFIG);
 
-    expect(() => loadRunConfig(root, ['--inject=stages'])).toThrow(ConfigError);
-    expect(() => loadRunConfig(root, ['--inject=stages'])).toThrow('command line: inject is "stages"');
+    expect(() => loadRunConfig(scopesOf(root), ['--inject=stages'])).toThrow(ConfigError);
+    expect(() => loadRunConfig(scopesOf(root), ['--inject=stages'])).toThrow('command line: inject is "stages"');
   });
 
   it('refuses a bare --inject rather than reading it as absent', () => {
     const root = rootWith(FILE_CONFIG);
 
-    expect(() => loadRunConfig(root, ['--inject'])).toThrow(ConfigError);
-    expect(loadRunConfig(root, []).config.inject).toBe(FILE_MODE);
+    expect(() => loadRunConfig(scopesOf(root), ['--inject'])).toThrow(ConfigError);
+    expect(loadRunConfig(scopesOf(root), []).config.inject).toBe(FILE_MODE);
   });
 
   it('hands a warning per unknown key to the sink it is given', () => {
     const seen: string[] = [];
-    const root = rootWith(`${FILE_CONFIG}tracker: linear\n`);
-    const resolved = loadRunConfig(root, [], (message) => {
+    const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
+    const resolved = loadRunConfig(scopesOf(root), [], (message) => {
       seen.push(message);
     });
 
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toContain('"tracker"');
+    expect(seen[0]).toContain('"nonesuch"');
     expect(resolved.config.inject).toBe(FILE_MODE);
     expect(warnings).toEqual([]);
+  });
+
+  it('writes a warning per unknown key through the active output when it is given no sink', () => {
+    const routed: string[] = [];
+    const consoleWarned: string[] = [];
+    const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
+    spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      consoleWarned.push(args.map(String).join(' '));
+    });
+    setActiveOutput(sinkOutput({
+      warn: (message) => {
+        routed.push(message);
+      },
+    }));
+
+    const resolved = loadRunConfig(scopesOf(root), []);
+
+    expect(routed).toHaveLength(1);
+    expect(routed[0]).toContain('"nonesuch"');
+    expect(resolved.config.inject).toBe(FILE_MODE);
+
+    // The console spy read nothing: the warning went through the active
+    // output alone, as `loadConfig` handed no sink writes it too.
+    expect(consoleWarned).toEqual([]);
   });
 });
 
@@ -285,6 +343,9 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
     promptContent: PROMPT_CONTENT,
     planContent: PLAN,
     inject: mode,
+    repoRoot: tempRoot,
+    home: join(tempRoot, 'home'),
+    settingSources: ['project', 'local'],
     run,
   });
   return { result, prompts };
@@ -420,7 +481,7 @@ describe('the wrap-up session', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
     const wrapUp = readFileSync(new URL('../start/wrap-up.ts', import.meta.url), 'utf8');
 
-    expect(start).toContain('await preserveProgress(planContent);');
+    expect(start).toContain('await preserveProgress(planContent, settingSources);');
     expect(wrapUp).toContain('buildWrapUpPrompt(branch, planContent, findOpenPullRequest(branch))');
     expect(start).toContain('inject: injectMode,');
     expect(start).not.toContain('await preserveProgress(injection');

@@ -18,8 +18,8 @@
  * its list through the same `claudeArgs`, with the session's
  * `--session-id` ahead of the declaration's flags. So every argument
  * list asserted here is the declaration's share of what is run: the base
- * arguments and the flags, the session id left out. The id, and where it
- * sits, are pinned by `tests/task-report.test.ts`.
+ * arguments, the setting sources and the flags, the session id left out.
+ * The id, and where it sits, are pinned by `tests/task-report.test.ts`.
  *
  * Two claims, and they fail in opposite directions. A block left on
  * the text is read by the session as part of the task, so the routing
@@ -55,8 +55,8 @@
  * ## The undeclared control
  *
  * One spec carries no block at all, and it is the compatibility
- * promise as an assertion: its argument list must be the two arguments
- * the loop always spawned and nothing else, and its prompt must equal
+ * promise as an assertion: its argument list must be the base arguments
+ * and the setting sources and nothing else, and its prompt must equal
  * the five-line join spelled out here from literals. The injected
  * second line is rebuilt from fragments rather than referenced, so an
  * edit to the preamble in `start/dispatch.ts` reddens this file rather
@@ -118,7 +118,34 @@
  * recognised-key rule together. Neither half reddens anything alone
  * (measured, 0 of 14 each): each shadows the other, so only the pair
  * can say which two layers that case rests on.
+ *
+ * ## The agent's own effort
+ *
+ * That grid counts 14 cases because it predates the first two under
+ * `a routed task whose agent declares its own effort`, which plant
+ * `doc-updater` definitions under roots of their own and read whether
+ * the dispatch passed `--effort`. Every other dispatch here is handed
+ * roots that hold nothing, so its effort always passes. Both cases were
+ * driven against legs over `start/dispatch.ts`,
+ * `utils/agent-definition.ts` and `utils/declaration.ts`, each run
+ * twice with identical red sets, and both redden. Handing the resolver
+ * a lookup that ignores the definitions reddens both; swapping
+ * `repoRoot` and `home` on their way to the lookup reddened the home
+ * case ALONE, because its shadowed dispatch was the only one here with a
+ * definition in each root, where only the search ORDER told the two
+ * roots apart. Under the setting sources the same swap reddens all three
+ * cases in that section, measured once and restored sha256-identical: a
+ * project definition handed over as the home is not searched under
+ * `project,local`.
+ *
+ * Every dispatch runs under `project,local`, the sources a run with no
+ * config resolves to, unless its case names others, and those sources
+ * leave the home unread. The two cases reading a home definition hand
+ * over sources naming `user`, and
+ * `reads no home definition unless the setting sources include user`
+ * pairs the default with such sources over the same roots.
  */
+import type { ClaudeSettingSource } from '../config.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
 import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
@@ -141,13 +168,14 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { runClaude } from '../utils/claude.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';
@@ -220,20 +248,24 @@ const DISPATCHES: readonly DispatchSpec[] = [
     text: 'Capture the three gates into per-run capture files',
     block: null,
     flags: [],
-    argv: ['-p', '--dangerously-skip-permissions'],
+    argv: ['-p', '--dangerously-skip-permissions', '--setting-sources', 'project,local'],
     suppressed: [],
   },
   {
     text: 'Update the skill cap sentence',
     block: '{agent=doc-updater model=haiku effort=low}',
-    flags: ['--agent', 'doc-updater'],
+    flags: ['--agent', 'doc-updater', '--effort', 'low'],
     argv: [
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--agent',
       'doc-updater',
+      '--effort',
+      'low',
     ],
-    suppressed: ['model', 'effort'],
+    suppressed: ['model'],
   },
   {
     text: ROUTING_TASK,
@@ -249,6 +281,8 @@ const DISPATCHES: readonly DispatchSpec[] = [
     argv: [
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
       '--model',
       'haiku',
       '--effort',
@@ -262,14 +296,21 @@ const DISPATCHES: readonly DispatchSpec[] = [
     text: `Refuse a settings payload of ${TICK}{"mode": "fast"}${TICK}`,
     block: null,
     flags: [],
-    argv: ['-p', '--dangerously-skip-permissions'],
+    argv: ['-p', '--dangerously-skip-permissions', '--setting-sources', 'project,local'],
     suppressed: [],
   },
   {
     text: 'Run the collector over every session log',
     block: '{effort=medum model=haiku}',
     flags: ['--model', 'haiku'],
-    argv: ['-p', '--dangerously-skip-permissions', '--model', 'haiku'],
+    argv: [
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+      '--model',
+      'haiku',
+    ],
     suppressed: [],
   },
 ];
@@ -338,6 +379,16 @@ interface DispatchOverrides {
   exitCode?: number;
   /** The tracker status the loop read. Defaults to unchecked. */
   status?: TaskInfo['status'];
+  /**
+   * The roots agent definitions resolve under. Defaults to two paths
+   * under this file's temporary directory that hold nothing.
+   */
+  roots?: { repoRoot: string; home: string };
+  /**
+   * The setting sources the run resolved to. Defaults to `project,local`,
+   * the sources a run with no config resolves to.
+   */
+  settingSources?: readonly ClaudeSettingSource[];
 }
 
 /**
@@ -366,8 +417,8 @@ async function dispatchSpec(
     return Promise.resolve(overrides.exitCode ?? 0);
   };
 
-  const run: TaskSessionRunner = async function run(prompt, flags) {
-    const exitCode = await runClaude(prompt, flags, spawn);
+  const run: TaskSessionRunner = async function run(prompt, flags, _sessionId, settingSources) {
+    const exitCode = await runClaude(prompt, settingSources, flags, spawn);
     return { exitCode, stdout: '' };
   };
 
@@ -376,6 +427,9 @@ async function dispatchSpec(
     promptContent: PROMPT_CONTENT,
     planContent: PLAN_CONTENT,
     inject: 'full',
+    repoRoot: overrides.roots?.repoRoot ?? join(tempRoot, 'no-definitions', 'repo'),
+    home: overrides.roots?.home ?? join(tempRoot, 'no-definitions', 'home'),
+    settingSources: overrides.settingSources ?? ['project', 'local'],
     run,
   });
 
@@ -407,12 +461,18 @@ let logs: string[] = [];
 let warnings: string[] = [];
 
 /**
- * Captures what the dispatch printed.
+ * Captures what the dispatch told the operator.
  *
- * Through a spy on `console` and not a `process.stdout.write` patch:
- * bun:test replaces the console object, so a stream capture reads zero
- * lines here and every absence assertion would pass against a loop
- * that announced the block in full.
+ * `start/dispatch.ts` and `start/commit.ts` both write through the
+ * active output, read into these arrays by level through a `sinkOutput`
+ * set for each case and put back after it. The sink holds each message
+ * as it was handed, so an absence assertion reads the announced line
+ * itself, and a loop that announced the block in full would redden it.
+ * Two mutations were driven on 2026-09-15, each restored
+ * sha256-identical. The line announcing a task put back on `console.log`
+ * reddened `keeps the block out of what it announces`. A dropped token's
+ * warning written at `info` reddened
+ * `drops a value it cannot use and says which`.
  *
  * {@link dispatchSpec} empties both arrays again before each dispatch,
  * so a case driving the whole table reads one dispatch at a time.
@@ -420,16 +480,18 @@ let warnings: string[] = [];
 beforeEach(() => {
   logs = [];
   warnings = [];
-  spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    logs.push(args.map(String).join(' '));
-  });
-  spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    warnings.push(args.map(String).join(' '));
-  });
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      logs.push(message);
+    },
+    warn: (message) => {
+      warnings.push(message);
+    },
+  }));
 });
 
 afterEach(() => {
-  mock.restore();
+  setActiveOutput(null);
 });
 
 /** The one announced line carrying `marker`, or the empty string. */
@@ -517,13 +579,15 @@ describe('a declaration-bearing task, dispatched', () => {
     await dispatchSpec(spec, AGENT_SPEC);
     const line = announced('Routed as: ');
 
-    expect(line).toContain('--agent doc-updater');
+    expect(line).toContain('--agent doc-updater --effort low');
     for (const key of spec.suppressed) expect(line).toContain(key);
 
-    // The granular keys are on the record and off the command line,
-    // so the only place a plan can see they were outranked is here.
+    // The model is on the record and off the command line, so the only
+    // place a plan can see it was outranked is here. The effort reached
+    // the command line, because no definition under this dispatch's
+    // roots declares one of its own.
+    expect(line).toContain('(model left to the agent)');
     expect(line).not.toContain('--model');
-    expect(line).not.toContain('--effort');
   });
 
   it('says nothing about routing for a plain task', async () => {
@@ -567,12 +631,12 @@ describe('a declaration-bearing task, dispatched', () => {
 });
 
 describe('a task with no block at all', () => {
-  it('spawns the two arguments the loop always did', async () => {
+  it('spawns the base arguments and the setting sources alone', async () => {
     const spec = DISPATCHES[PLAIN_SPEC]!;
     const { result, calls } = await dispatchSpec(spec, PLAIN_SPEC);
 
     expect(onlyCall(calls).args)
-      .toEqual(['-p', '--dangerously-skip-permissions']);
+      .toEqual(['-p', '--dangerously-skip-permissions', '--setting-sources', 'project,local']);
     expect(result.flags).toEqual([]);
     expect(result.declaration).toBeNull();
     expect(result.taskText).toBe(spec.text);
@@ -671,5 +735,110 @@ describe('what a finished declared task commits', () => {
 
     expect(seen[0]?.taskText).toBe(spec.text);
     expect(seen[0]?.taskText).toBe(taskInfoFor(spec, PLAIN_SPEC).task);
+  });
+});
+
+/** A `doc-updater` definition, declaring `effort` unless it is null. */
+function docUpdaterDefinition(effort: string | null): string {
+  const lines = [
+    '---',
+    'name: doc-updater',
+    'description: A stand-in for the vendored definition.',
+    'model: haiku',
+  ];
+  if (effort !== null) lines.push(`effort: ${effort}`);
+  return [...lines, '---', 'The agent body.', ''].join('\n');
+}
+
+/**
+ * Where each root's `doc-updater` definition declares its effort: a
+ * level, `null` for a definition silent on effort, and an absent key
+ * for no definition in that root at all.
+ */
+interface PlantedDefinitions {
+  project?: string | null;
+  user?: string | null;
+}
+
+let definitionSets = 0;
+
+/** Fresh roots under this file's temporary directory, planted as named. */
+function definitionRoots(definitions: PlantedDefinitions): { repoRoot: string; home: string } {
+  definitionSets += 1;
+  const base = join(tempRoot, `definitions-${definitionSets}`);
+  const roots = { repoRoot: join(base, 'repo'), home: join(base, 'home') };
+  const planted = [
+    { root: roots.repoRoot, effort: definitions.project },
+    { root: roots.home, effort: definitions.user },
+  ];
+
+  for (const { root, effort } of planted) {
+    if (effort === undefined) continue;
+    const dir = join(root, '.claude', 'agents');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'doc-updater.md'), docUpdaterDefinition(effort), 'utf8');
+  }
+
+  expect(roots.repoRoot.startsWith(tempRoot)).toBe(true);
+  expect(roots.home.startsWith(tempRoot)).toBe(true);
+  return roots;
+}
+
+describe('a routed task whose agent declares its own effort', () => {
+  it('leaves the effort to a project definition that declares one', async () => {
+    const spec = DISPATCHES[AGENT_SPEC]!;
+    const declaring = definitionRoots({ project: 'high' });
+    const { result, calls } = await dispatchSpec(spec, AGENT_SPEC, { roots: declaring });
+
+    expect(result.flags).toEqual(['--agent', 'doc-updater']);
+    expect(onlyCall(calls).args).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+      '--agent',
+      'doc-updater',
+    ]);
+    expect(announced('Routed as: ')).toContain('(model, effort left to the agent)');
+
+    // The control: the same dispatch over a project definition silent
+    // on effort passes the plan level on.
+    const silent = definitionRoots({ project: null });
+    const passed = await dispatchSpec(spec, AGENT_SPEC, { roots: silent });
+    expect(passed.result.flags).toEqual(['--agent', 'doc-updater', '--effort', 'low']);
+  });
+
+  it('reads the home definition only when the repo holds none', async () => {
+    const spec = DISPATCHES[AGENT_SPEC]!;
+    const userOnly = definitionRoots({ user: 'high' });
+    const shadowed = definitionRoots({ project: null, user: 'high' });
+    const settingSources = ['user', 'project', 'local'] as const;
+
+    const owned = await dispatchSpec(spec, AGENT_SPEC, { roots: userOnly, settingSources });
+    const passed = await dispatchSpec(spec, AGENT_SPEC, { roots: shadowed, settingSources });
+
+    expect(owned.result.flags).toEqual(['--agent', 'doc-updater']);
+    expect(passed.result.flags).toEqual(['--agent', 'doc-updater', '--effort', 'low']);
+  });
+
+  it('reads no home definition unless the setting sources include user', async () => {
+    const spec = DISPATCHES[AGENT_SPEC]!;
+    const userOnly = definitionRoots({ user: 'high' });
+
+    const byDefault = await dispatchSpec(spec, AGENT_SPEC, { roots: userOnly });
+    const withUser = await dispatchSpec(spec, AGENT_SPEC, {
+      roots: userOnly,
+      settingSources: ['local', 'user'],
+    });
+
+    // The default sources leave the user scope out, so the definition
+    // under the home is never read and the plan level passes on.
+    expect(byDefault.result.flags).toEqual(['--agent', 'doc-updater', '--effort', 'low']);
+    expect(onlyCall(byDefault.calls).args.slice(2, 4)).toEqual(['--setting-sources', 'project,local']);
+
+    // The control: the same roots, under sources naming the user scope,
+    // read it, and the sources reach the spawn in the order given.
+    expect(withUser.result.flags).toEqual(['--agent', 'doc-updater']);
+    expect(onlyCall(withUser.calls).args.slice(2, 4)).toEqual(['--setting-sources', 'local,user']);
   });
 });

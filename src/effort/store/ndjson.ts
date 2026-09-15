@@ -4,9 +4,10 @@
  *
  * Its behaviour is the sibling's by construction, not by copy. Every
  * read and every write goes through the functions of `effort/store.ts`,
- * the sibling's own module, which this repo holds byte-identical to the
- * sibling's `tools/ralph/effort/store.ts` (measured with `diff` when
- * this backend was added). All this module adds is routing: which file
+ * the sibling's own module, byte-identical to the sibling's
+ * `tools/ralph/effort/store.ts` when this backend was added (measured
+ * with `diff`); the phase 1 store move has since changed its directory
+ * and nothing else it runs. All this module adds is routing: which file
  * a kind lives in, and which key it is deduplicated by. The sibling's
  * rules hold here because they are the same code, and the suite beside
  * that module is a suite over the code this backend runs. Retiring
@@ -15,12 +16,14 @@
  *
  * ## Layout
  *
- * One file per kind under `.ralph/effort/`, named `sessions.ndjson` and
+ * One file per kind under `.rafa/effort/`, named `sessions.ndjson` and
  * `commits.ndjson` as the sibling's collector already names them. That
- * is what lets the sibling, at cutover, point this package at the store
- * it already holds, rather than at an empty one that would collect
- * everything again. The directory is the sibling's `EFFORT_STORE_DIR`,
- * spelled once over there, and the root `.gitignore` ignores it.
+ * is what let the sibling, at cutover, point this package at the store
+ * it already held, rather than at an empty one that would collect
+ * everything again; that store sits under `.ralph/effort/`, which the
+ * phase 1 move left behind, and no backend reads it. The directory is
+ * `EFFORT_STORE_DIR`, spelled once in `effort/store.ts`, and the
+ * project's `.gitignore` entry for `.rafa/` ignores it.
  *
  * The file names are the sibling's closed record too, so a kind added
  * to the port's row map compiles here only once that record names its

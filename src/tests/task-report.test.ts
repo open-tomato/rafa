@@ -17,12 +17,13 @@
  *
  * ## The command cases
  *
- * `start()` has no seam: it finds its root through git and spawns
- * `claude` off PATH. So it is run as a command, `bun src/rafa.ts start`,
- * in a scratch repository with a HOME of its own, under a PATH holding a
- * stand-in `claude` and git's own directory. Each run first asserts that
- * `claude` resolves to the stand-in on that PATH, so no case can reach a
- * real session. The stand-in keeps each call's arguments, prompt and the
+ * `start()` has no seam: it takes its root from the project the
+ * dispatcher resolves and spawns `claude` off PATH. So it is run as a
+ * command, `bun src/rafa.ts start`, in a scratch repository holding
+ * `.rafa/config.yaml`, with a HOME of its own, under a PATH holding a
+ * stand-in `claude`, a stand-in `gh` and git's own directory. Each run
+ * first asserts that `claude` and `gh` resolve to the stand-ins on that
+ * PATH, so no case can reach a real session or a real `gh`. The stand-in keeps each call's arguments, prompt and the
  * `progress.txt` it found, outside the repository, and answers by the
  * marker in the task sentence. A reporting call's finding names the call,
  * so one render can be told from the render before it.
@@ -34,6 +35,15 @@
  * same stand-in, dispatched. And a run that stops after one unstored
  * report stops for that reason only because its store rendered: that
  * store is readable, and refuses writes alone.
+ *
+ * ## The operator's lines
+ *
+ * Two cases read what `renderProgressForDispatch` and `storeTaskReport`
+ * tell the operator when the store refuses them, level by level through a
+ * `sinkOutput` set as the active output. The store is a file of bytes no
+ * SQLite reads, so neither case needs a permission to fail and both run
+ * as root. Each refusal written at `warn`, driven on 2026-09-15 and
+ * restored sha256-identical, reddened its own case alone.
  *
  * ## Mutations
  *
@@ -49,6 +59,52 @@
  * id seam ignored (1), the output dropped (5), the task line replaced
  * (3), the plan stub dropped (1), and a failed render that does not stop
  * the run (1).
+ *
+ * The routed-effort case came after those fifteen, and it is the only
+ * reading of `start.ts` handing the dispatch its repository root and
+ * `homedir()`, which reads the HOME each run is given. Two legs were
+ * driven against it, each twice: handing the repository root as the
+ * home, and the home as the repository root, each redden that case
+ * alone.
+ *
+ * Since every session names `--setting-sources`, that case runs `rafa
+ * start` twice over the same plantings, once with no config and once
+ * under a user-scope config naming `user`, and only the second reads the
+ * HOME definition. It is the one reading of `start.ts` handing the
+ * dispatch and the wrap-up the sources its config resolved to. Four legs
+ * were run once each against this file and the six other suites that
+ * reach the sources, each restored sha256-identical: `start.ts`
+ * dispatching under `project,local`, `start.ts` handing the repository
+ * root as the home, and `start/wrap-up.ts` spawning under
+ * `project,local` each reddened this case alone, and `start.ts` handing
+ * the wrap-up `project,local` reddened it and the source-text case in
+ * `tests/plan-injection.test.ts`.
+ *
+ * The blocker case came after both. The stand-in's `MARK-REPORT` report
+ * lists `blockers: []`, so its task ticks, and the `MARK-BLOCKER` call
+ * answers that same report with one blocker added: its task has to be
+ * committed, marked `[BLOCKED]` with that blocker's text trailing its line
+ * (`start/triage.ts`) and stored as `blocked`, and the run has to stop. Its
+ * control is the first case, whose reports differ only in listing
+ * none and whose run goes on through three tasks and the wrap-up. It is the
+ * only reading of `start.ts` handing the session's output to
+ * `finishCleanExit` and stopping on the outcome that answers. Three legs of
+ * `start.ts` were driven against this file, each restored sha256-identical:
+ * the run stopping on a refused commit alone, the report stored as `done`
+ * whatever became of the task, and the output not handed over. Each
+ * reddened the blocker case, and the second the refused commit's case too.
+ * The first, like `commit.ts` answering `done` for a held task, dispatches
+ * the task it has just blocked again and again. It held the suite until
+ * its run was killed by hand, which is why {@link runStart} kills a run
+ * past {@link START_KILL_AFTER_MS}; since then both legs fail the blocker
+ * case on their own, 52s into the file.
+ *
+ * Each stand-in report lists a public out-of-scope bug, so each run's
+ * triage resolves the tracker chain (`start/triage.ts`), `github` first
+ * under the config `rafa init` writes, whose preflight spawns `gh`. A
+ * stand-in `gh` refuses it, so the chain falls back to `local` on any
+ * machine, never reaching a real `gh` in git's directory. The blocker case
+ * reads its one `gh auth status` call.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -76,13 +132,24 @@ import {
   describe,
   expect,
   it,
-  mock,
-  spyOn,
 } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
-import { dispatchTask, runTaskSession, SESSION_ID_FLAG } from '../start/dispatch.js';
+import {
+  dispatchTask,
+  renderProgressForDispatch,
+  runTaskSession,
+  SESSION_ID_FLAG,
+  storeTaskReport,
+} from '../start/dispatch.js';
 import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
+
+import { plantProjectConfig } from './cli-capture.js';
+import { sinkOutput } from './output-sinks.js';
+
+/** What a run with no config spawns every session under, spelled out. */
+const DEFAULT_SOURCE_ARGS = ['--setting-sources', 'project,local'];
 
 /** A version-4 UUID, as `randomUUID` writes one. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -101,18 +168,20 @@ describe('the task session runner', () => {
       calls.push([...args]);
       return Promise.resolve({ exitCode: 3, stdout: 'the final message' });
     };
-    const session = await runTaskSession('do the task', flags, 'aaaa-1111', spawn);
+    const session = await runTaskSession('do the task', flags, 'aaaa-1111', ['local', 'user'], spawn);
 
     expect(session).toEqual({ exitCode: 3, stdout: 'the final message' });
     return calls;
   }
 
-  it('puts the session id between the base arguments and the flags', async () => {
+  it('puts the setting sources, then the session id, between the base arguments and the flags', async () => {
     const calls = await spawnedArgs(['--model', 'haiku', '--tools', 'Read,Write']);
 
     expect(calls).toEqual([[
       '-p',
       '--dangerously-skip-permissions',
+      '--setting-sources',
+      'local,user',
       '--session-id',
       'aaaa-1111',
       '--model',
@@ -122,10 +191,10 @@ describe('the task session runner', () => {
     ]]);
   });
 
-  it('spawns an undeclared task with its id and nothing else', async () => {
+  it('spawns an undeclared task with its setting sources and id and nothing else', async () => {
     const calls = await spawnedArgs([]);
 
-    expect(calls).toEqual([['-p', '--dangerously-skip-permissions', '--session-id', 'aaaa-1111']]);
+    expect(calls).toEqual([['-p', '--dangerously-skip-permissions', '--setting-sources', 'local,user', '--session-id', 'aaaa-1111']]);
     expect(SESSION_ID_FLAG).toBe('--session-id');
   });
 });
@@ -135,12 +204,11 @@ describe('a dispatched task session', () => {
   const taskInfo: TaskInfo = { task: 'Record the report', lineNum: 2, status: 'unchecked' };
 
   beforeEach(() => {
-    spyOn(console, 'log').mockImplementation(() => {});
-    spyOn(console, 'warn').mockImplementation(() => {});
+    setActiveOutput(sinkOutput({}));
   });
 
   afterEach(() => {
-    mock.restore();
+    setActiveOutput(null);
   });
 
   /** Dispatches the fixture task, the runner recording every id it is handed. */
@@ -154,6 +222,9 @@ describe('a dispatched task session', () => {
       promptContent: 'The loop stages and commits on your behalf.',
       planContent: plan,
       inject: 'full',
+      repoRoot: tempRoot,
+      home: join(tempRoot, 'home'),
+      settingSources: ['project', 'local'],
       run,
       newSessionId,
     });
@@ -194,6 +265,7 @@ const LATE_TASK = 'Add the third module MARK-REPORT';
 const FAILING_TASK = 'Add a module whose session fails MARK-FAIL';
 const BREAKING_TASK = 'Add a module whose session breaks the store MARK-BREAK';
 const INTERRUPTED_TASK = 'Add a module whose session is interrupted MARK-HANG';
+const BLOCKER_TASK = 'Add a module whose report lists a blocker MARK-BLOCKER';
 
 /** What the stand-in replaces with its call number. */
 const CALL_PLACEHOLDER = 'CALL-NUMBER';
@@ -215,14 +287,23 @@ const REPORT = [
   `    what: "${findingOf(CALL_PLACEHOLDER)}"`,
   '    artifact: "stand-in artifact"',
   '    signal: loud',
-  'blockers:',
-  '  - what: "a stand-in blocker"',
+  'blockers: []',
   'out_of_scope_bugs:',
   '  - what: "a stand-in bug"',
   '    security: false',
   FENCE,
   '',
 ].join('\n');
+
+/**
+ * The output a session ends with when it claims `done` beside a blocker,
+ * its call number still a placeholder: a report the loop holds its task
+ * on.
+ */
+const BLOCKER_REPORT = REPORT.replace('blockers: []', [
+  'blockers:',
+  `  - what: "a stand-in blocker of call ${CALL_PLACEHOLDER}"`,
+].join('\n'));
 
 /** Everything one scratch run lives in. */
 interface Scratch {
@@ -232,10 +313,12 @@ interface Scratch {
   readonly calls: string;
   /** The HOME the command runs under. */
   readonly home: string;
-  /** The PATH the command runs under: the stand-in, then git. */
+  /** The PATH the command runs under: the stand-ins, then git. */
   readonly path: string;
   /** The stand-in itself. */
   readonly claude: string;
+  /** The stand-in `gh` the tracker chain's `github` preflight meets. */
+  readonly gh: string;
 }
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-task-report-'));
@@ -250,8 +333,9 @@ afterAll(() => {
  * marker. An interrupted call prints its report, says it is waiting, and
  * exits 130 once the case releases it, at most 30s later.
  */
-function standInScript(calls: string, reportPath: string): string {
+function standInScript(calls: string, reportPath: string, blockerReportPath: string): string {
   const report = `/usr/bin/sed "s/${CALL_PLACEHOLDER}/$n/" '${reportPath}'`;
+  const blockerReport = `/usr/bin/sed "s/${CALL_PLACEHOLDER}/$n/" '${blockerReportPath}'`;
   const release = [
     ': > "$calls/$n.waiting"',
     'i=0',
@@ -271,8 +355,9 @@ function standInScript(calls: string, reportPath: string): string {
     'case "$head" in',
     `  *MARK-REPORT*) echo work > "work-$n.txt"; ${report} ;;`,
     '  *MARK-SILENT*) echo work > "work-$n.txt"; echo "Done, and nothing to report." ;;',
+    `  *MARK-BLOCKER*) echo work > "work-$n.txt"; ${blockerReport} ;;`,
     `  *MARK-FAIL*) ${report}; exit 3 ;;`,
-    `  *MARK-BREAK*) /bin/mkdir -p .ralph/effort/effort.sqlite; ${report} ;;`,
+    `  *MARK-BREAK*) /bin/mkdir -p .rafa/effort/effort.sqlite; ${report} ;;`,
     `  *MARK-HANG*) ${report}; ${release} ;;`,
     'esac',
     'exit 0',
@@ -280,9 +365,20 @@ function standInScript(calls: string, reportPath: string): string {
   ].join('\n');
 }
 
+/** The stand-in `gh`: one line of arguments per call in `gh.calls`, then a refusal. */
+function ghStandInScript(calls: string): string {
+  return `#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}/gh.calls'\necho "gh stand-in: not logged in" >&2\nexit 1\n`;
+}
+
 /** Runs git in a scratch repository, its output kept off the test's. */
 function git(dir: string, ...args: string[]): void {
   execFileSync('git', args, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/** Runs git in a scratch repository and answers its trimmed stdout. */
+function gitOutput(dir: string, ...args: string[]): string {
+  const stdout = execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return stdout.trim();
 }
 
 /** Writes an executable shell script. */
@@ -308,8 +404,12 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
 
   const reportPath = join(root, 'report.md');
   writeFileSync(reportPath, REPORT, 'utf8');
+  const blockerReportPath = join(root, 'blocker-report.md');
+  writeFileSync(blockerReportPath, BLOCKER_REPORT, 'utf8');
   const claude = join(bin, 'claude');
-  writeScript(claude, standInScript(calls, reportPath));
+  writeScript(claude, standInScript(calls, reportPath, blockerReportPath));
+  const gh = join(bin, 'gh');
+  writeScript(gh, ghStandInScript(calls));
   if (refuseCommits) writeScript(join(hooks, 'pre-commit'), '#!/bin/sh\nexit 1\n');
 
   git(repo, 'init', '-q', '.');
@@ -317,10 +417,11 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
   git(repo, 'config', 'user.name', 'Rafa Loop');
   git(repo, 'config', 'commit.gpgsign', 'false');
   git(repo, 'config', 'core.hooksPath', hooks);
-  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.ralph/\n', 'utf8');
+  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '--no-verify', '-m', 'seed');
   git(repo, 'checkout', '-q', '-b', `feat/${STUB}`);
+  plantProjectConfig(repo);
 
   mkdirSync(join(repo, '.plans'));
   const plan = [`# Plan: ${STUB}`, '', ...tasks.map((task) => `- [ ] ${task}`), ''];
@@ -328,7 +429,7 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, calls, home, claude, path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, calls, home, claude, gh, path: [bin, dirname(gitBinary)].join(delimiter) };
 }
 
 /** The command line of every run: the scratch plan, never waiting on CI. */
@@ -341,11 +442,14 @@ function startEnv(scratch: Scratch): Record<string, string> {
   return { PATH: scratch.path, HOME: scratch.home };
 }
 
-/** Throws unless `claude` resolves to the stand-in on the scratch PATH. */
+/** Throws unless `claude` and `gh` resolve to their stand-ins on the scratch PATH. */
 function assertStandIn(scratch: Scratch): void {
-  const resolved = Bun.which('claude', { PATH: scratch.path });
-  if (resolved !== scratch.claude) {
-    throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
+  const standIns: readonly (readonly [name: string, path: string])[] = [['claude', scratch.claude], ['gh', scratch.gh]];
+  for (const [name, standIn] of standIns) {
+    const resolved = Bun.which(name, { PATH: scratch.path });
+    if (resolved !== standIn) {
+      throw new Error(`${name} resolves to ${String(resolved)}, not the stand-in`);
+    }
   }
 }
 
@@ -356,10 +460,22 @@ interface StartRun {
   readonly output: string;
 }
 
-/** Runs `rafa start` to its end. */
+/**
+ * How long one `rafa start` may run before it is killed. It sits under a
+ * case's own timeout, which cannot interrupt a synchronous spawn, so a run
+ * that never stops, as one re-dispatching the task it has just blocked
+ * would, fails its case instead of holding the suite until someone kills it.
+ */
+const START_KILL_AFTER_MS = 45_000;
+
+/** Runs `rafa start` to its end, or kills it past {@link START_KILL_AFTER_MS}. */
 function runStart(scratch: Scratch): StartRun {
   assertStandIn(scratch);
-  const run = Bun.spawnSync(startCommand(), { cwd: scratch.repo, env: startEnv(scratch) });
+  const run = Bun.spawnSync(startCommand(), {
+    cwd: scratch.repo,
+    env: startEnv(scratch),
+    timeout: START_KILL_AFTER_MS,
+  });
   return {
     exitCode: run.exitCode,
     output: `${run.stdout.toString()}${run.stderr.toString()}`,
@@ -436,6 +552,67 @@ function trackerTasks(scratch: Scratch): string[] {
 /** A command run takes about a second, more under a loaded suite. */
 const RUN_TIMEOUT = { timeout: 60_000 };
 
+describe('what a store the loop cannot use tells the operator', () => {
+  /** Every line written, tagged by its level. */
+  let seen: string[] = [];
+
+  beforeEach(() => {
+    seen = [];
+    setActiveOutput(sinkOutput({
+      info: (message) => {
+        seen.push(`info:${message}`);
+      },
+      warn: (message) => {
+        seen.push(`warn:${message}`);
+      },
+      error: (message) => {
+        seen.push(`error:${message}`);
+      },
+    }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** A repo root whose store file holds bytes no SQLite reads. */
+  function brokenStoreRoot(name: string): string {
+    const root = join(tempRoot, name);
+    const store = sqliteStorePath(root);
+    mkdirSync(dirname(store), { recursive: true });
+    writeFileSync(store, 'not a database\n'.repeat(64), 'utf8');
+    return root;
+  }
+
+  it('writes the render refusal through error, and answers false', () => {
+    const root = brokenStoreRoot('broken-render');
+
+    expect(renderProgressForDispatch(root, 'probe')).toBe(false);
+
+    expect(seen).toEqual([
+      expect.stringMatching(/^error:\n❌ progress\.txt could not be rendered from the findings store: .+$/),
+      'error:   Nothing was dispatched. Make the store readable, then run again.',
+    ]);
+  });
+
+  it('writes a report the store refuses through error, and answers false', () => {
+    const root = brokenStoreRoot('broken-store');
+
+    const stored = storeTaskReport({
+      repoRoot: root,
+      planStub: 'probe',
+      dispatch: { sessionId: 'aaaa-1111', taskText: 'Record the report', output: '', declaration: null, flags: [] },
+      outcome: 'done',
+    });
+
+    expect(stored).toBe(false);
+    expect(seen).toEqual([
+      expect.stringMatching(/^error:\n❌ The report of session aaaa-1111 was not stored: .+$/),
+      'error:   The session printed it above as it ran.',
+    ]);
+  });
+});
+
 describe('rafa start, over a stand-in claude', () => {
   it('stores each report under the id its session ran with, rendering progress.txt first', () => {
     const scratch = plantScratch([REPORTING_TASK, SILENT_TASK, LATE_TASK]);
@@ -449,11 +626,11 @@ describe('rafa start, over a stand-in claude', () => {
     const [reporting, silent, late] = ids;
     for (const id of ids) expect(id).toMatch(UUID);
     expect(new Set(ids).size).toBe(3);
-    expect(argsOf(scratch, 1)).toEqual([...CLAUDE_BASE_ARGS, '--session-id', reporting]);
+    expect(argsOf(scratch, 1)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', reporting]);
     expect(promptHeadOf(scratch, 1)).toBe(`Your scoped task is: ${REPORTING_TASK}`);
 
     // The wrap-up is the fourth call: no id, and nothing stored for it.
-    expect(argsOf(scratch, 4)).toEqual([...CLAUDE_BASE_ARGS]);
+    expect(argsOf(scratch, 4)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS]);
     expect(promptHeadOf(scratch, 4)).toBe('* Read `@progress.txt` in full.');
 
     // Rendered before every dispatch: empty before the first task, the
@@ -470,7 +647,9 @@ describe('rafa start, over a stand-in claude', () => {
     const third = { session_id: late, plan_stub: STUB, task_line: LATE_TASK, outcome: 'done' };
     expect(rowsOf(scratch, 'findings', `${provenance}, what`))
       .toEqual([{ ...first, what: findingOf(1) }, { ...third, what: findingOf(3) }]);
-    expect(rowsOf(scratch, 'blockers', provenance)).toEqual([first, third]);
+    expect(rowsOf(scratch, 'blockers', provenance)).toEqual([]);
+    expect(rowsOf(scratch, 'task_reports', `${provenance}, status`))
+      .toEqual([{ ...first, status: 'done' }, { ...third, status: 'done' }]);
     expect(rowsOf(scratch, 'out_of_scope_bugs', `${provenance}, security`))
       .toEqual([{ ...first, security: 0 }, { ...third, security: 0 }]);
     expect(rowsOf(scratch, 'report_absences', `${provenance}, reason`)).toEqual([{
@@ -512,6 +691,37 @@ describe('rafa start, over a stand-in claude', () => {
     expect(rowsOf(scratch, 'findings', 'session_id, outcome'))
       .toEqual([{ session_id: requireSessionId(scratch, 1), outcome: 'blocked' }]);
     expect(trackerTasks(scratch)).toEqual([`- [BLOCKED] ${REPORTING_TASK}`]);
+  }, RUN_TIMEOUT);
+
+  it('commits the work of a session whose report lists a blocker, marks it blocked and stops', () => {
+    const scratch = plantScratch([BLOCKER_TASK, REPORTING_TASK]);
+    expect(gitOutput(scratch.repo, 'rev-list', '--count', 'HEAD')).toBe('1');
+
+    const run = runStart(scratch);
+
+    // Stopped as a failed session stops it: no second task, no wrap-up.
+    expect(callCount(scratch)).toBe(1);
+    expect(trackerTasks(scratch)).toEqual([
+      `- [BLOCKED] ${BLOCKER_TASK}  <!-- blocked: a stand-in blocker of call 1 -->`,
+      `- [ ] ${REPORTING_TASK}`,
+    ]);
+    expect(run.output).toContain(`Task blocked by its own report: ${BLOCKER_TASK}`);
+    expect(run.output).toContain('blocker: a stand-in blocker of call 1');
+
+    // Its triage tried `github` first, met the stand-in `gh` once, and fell back.
+    expect(readFileSync(join(scratch.calls, 'gh.calls'), 'utf8')).toBe('auth status\n');
+    expect(run.output).toContain('tracker chain: github unavailable: gh auth status: ');
+    expect(run.output).toContain('gh stand-in: not logged in');
+
+    // Its partial work was committed, and nothing else.
+    expect(gitOutput(scratch.repo, 'rev-list', '--count', 'HEAD')).toBe('2');
+    expect(gitOutput(scratch.repo, 'show', '--name-only', '--format=', 'HEAD')).toBe('work-1.txt');
+
+    const stored = { session_id: requireSessionId(scratch, 1), task_line: BLOCKER_TASK, outcome: 'blocked' };
+    expect(rowsOf(scratch, 'blockers', 'session_id, task_line, outcome, what'))
+      .toEqual([{ ...stored, what: 'a stand-in blocker of call 1' }]);
+    expect(rowsOf(scratch, 'task_reports', 'session_id, task_line, outcome, status'))
+      .toEqual([{ ...stored, status: 'done' }]);
   }, RUN_TIMEOUT);
 
   it('stores the report of an interrupted session as blocked, then exits', async () => {
@@ -577,4 +787,75 @@ describe('rafa start, over a stand-in claude', () => {
     expect(callCount(scratch)).toBe(1);
     expect(trackerTasks(scratch)).toEqual([`- [x] ${BREAKING_TASK}`, `- [ ] ${REPORTING_TASK}`]);
   }, RUN_TIMEOUT);
+
+  it('passes a routed effort unless a definition it reads declares one, reading the HOME only under a user source', () => {
+    const byDefault = plantRoutedScratch();
+    const withUser = plantRoutedScratch();
+    plantUserConfig(withUser.home, ['loop:', '  settingSources: user,project,local']);
+
+    const defaultRun = runStart(byDefault);
+    const userRun = runStart(withUser);
+
+    expect(defaultRun).toMatchObject({ exitCode: 0 });
+    expect(userRun).toMatchObject({ exitCode: 0 });
+    expect(callCount(byDefault)).toBe(4);
+    expect(callCount(withUser)).toBe(4);
+
+    // With no config every session, the wrap-up included, loads
+    // `project,local`, and the definition under the HOME is not read: its
+    // effort keeps nothing off the first task. The repository's is read.
+    const defaultArgs = (n: number) => [...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', requireSessionId(byDefault, n)];
+    expect(argsOf(byDefault, 1)).toEqual([...defaultArgs(1), '--agent', 'doc-updater', '--effort', 'low']);
+    expect(argsOf(byDefault, 2)).toEqual([...defaultArgs(2), '--agent', 'tdd-guide']);
+    expect(argsOf(byDefault, 3)).toEqual([...defaultArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+    expect(argsOf(byDefault, 4)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS]);
+
+    // The control: the same plantings under a user config naming `user`
+    // load those sources in every session and read the HOME definition, so
+    // the effort passed above is the sources and not a definition nothing
+    // could read. The third task, whose agent neither root defines, still
+    // passes its level under both.
+    const userSourceArgs = ['--setting-sources', 'user,project,local'];
+    const userArgs = (n: number) => [...CLAUDE_BASE_ARGS, ...userSourceArgs, '--session-id', requireSessionId(withUser, n)];
+    expect(argsOf(withUser, 1)).toEqual([...userArgs(1), '--agent', 'doc-updater']);
+    expect(argsOf(withUser, 2)).toEqual([...userArgs(2), '--agent', 'tdd-guide']);
+    expect(argsOf(withUser, 3)).toEqual([...userArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+    expect(argsOf(withUser, 4)).toEqual([...CLAUDE_BASE_ARGS, ...userSourceArgs]);
+  }, { timeout: 2 * RUN_TIMEOUT.timeout });
 });
+
+/** A task routed to an agent whose only definition sits under the HOME. */
+const ROUTED_HOME_TASK = 'Add the first routed module MARK-SILENT  {agent=doc-updater effort=low}';
+
+/** A task routed to an agent whose only definition sits in the repository. */
+const ROUTED_REPO_TASK = 'Add the second routed module MARK-SILENT  {agent=tdd-guide effort=low}';
+
+/** A task routed to an agent neither root defines. */
+const ROUTED_NOWHERE_TASK = 'Add the third routed module MARK-SILENT  {agent=code-reviewer effort=medium}';
+
+/** Writes a definition of `name` under `root`, declaring `effort`. */
+function plantDefinition(root: string, name: string, effort: string): void {
+  const dir = join(root, '.claude', 'agents');
+  mkdirSync(dir, { recursive: true });
+  const text = ['---', `name: ${name}`, 'description: A stand-in definition.', `effort: ${effort}`, '---', 'The body.', ''];
+  writeFileSync(join(dir, `${name}.md`), text.join('\n'), 'utf8');
+}
+
+/**
+ * A scratch run of the three routed tasks: `doc-updater` defined under its
+ * HOME and `tdd-guide` in its repository, each declaring an effort.
+ */
+function plantRoutedScratch(): Scratch {
+  const scratch = plantScratch([ROUTED_HOME_TASK, ROUTED_REPO_TASK, ROUTED_NOWHERE_TASK]);
+  plantDefinition(scratch.home, 'doc-updater', 'high');
+  plantDefinition(scratch.repo, 'tdd-guide', 'high');
+  git(scratch.repo, 'add', '-A');
+  git(scratch.repo, 'commit', '-q', '--no-verify', '-m', 'agents');
+  return scratch;
+}
+
+/** Writes the user scope's `.rafa/config.yaml` under `home`, one line per element. */
+function plantUserConfig(home: string, lines: readonly string[]): void {
+  mkdirSync(join(home, '.rafa'), { recursive: true });
+  writeFileSync(join(home, '.rafa', 'config.yaml'), [...lines, ''].join('\n'), 'utf8');
+}

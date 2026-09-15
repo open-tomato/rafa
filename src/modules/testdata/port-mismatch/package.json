@@ -1,0 +1,15 @@
+{
+  "name": "port-mismatch-fixture",
+  "version": "0.1.0",
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["tracker"],
+    "provides": {
+      "tracker": { "kind": "seam-demo", "entry": "./tracker.ts" }
+    },
+    "requires": {
+      "rafa": ">=0.1 <1",
+      "ports": { "tracker": 99 }
+    }
+  }
+}

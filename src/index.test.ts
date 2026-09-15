@@ -10,17 +10,33 @@
  * answering the same thing.
  *
  * The containment cases are computed instead: every runtime name the
- * `./plan` entry, the `./store` entry and the config module export is
- * held to be on the root as the same binding. Paired with the spelled
+ * `./plan` entry, the `./store` entry, the two config modules, the scope
+ * module, the adapter registry and the manifest module export is held to
+ * be on the root as the same binding. Paired with the spelled
  * list, a name added to a subpath and not to the root reds the
  * containment case, and one added to both reds the spelled list, so
  * neither grows the root unseen.
  *
- * The CLI case reads `src/rafa.ts`'s own imports off its source and
- * holds every binding it imports to be a root export's value, so a
- * sixth command dispatched there and not exported here goes red. The
- * parsed import list is also held to the spelled one, which is what
- * keeps a parser that matched nothing from passing vacuously.
+ * The CLI cases read imports off source. `src/rafa.ts` imports the
+ * dispatcher, the help renderer, the core registry and the module loader
+ * alone, and that
+ * registry is held to
+ * hold exactly the commands of the core command modules spelled here, so
+ * a command registered and not spelled goes red. Each of those modules
+ * wrapping a phase 0 command takes it as its one default import, and
+ * that binding is held to be a root export's value, so a command the
+ * terminal runs and a service cannot import goes red. `describe`, `init`,
+ * `doctor`, `self-update`, the three plan readers, `plan list`, `plan show` and
+ * `plan validate`, the five `loop` session actions, `loop stop`,
+ * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
+ * `issue` actions, and `module list` and `module exec` are held to be the
+ * modules wrapping none. `describe` runs the roster builder
+ * of `src/cli/describe.ts`, which is no root export, and each plan reader
+ * imports `parsePlan` from the `./plan` entry, which is one. A binding a module
+ * takes by name, as `loop start` takes the CI defaults its flags show,
+ * is a value and not a command, and is not held. Every parsed import list
+ * is also held to the spelled one, which is what keeps a parser that
+ * matched nothing from passing vacuously.
  *
  * The import cases run a probe in a fresh process, from an empty
  * directory outside any repository: import one module by absolute path,
@@ -28,8 +44,9 @@
  * exit code and the module's export count. Importing the entry prints
  * that line alone and leaves the directory holding only the probe. The
  * control imports `src/rafa.ts` the same way, which prints the CLI's
- * help above the probe's line: the check can see a module that does
- * something when imported.
+ * help above the probe's line and sets the exit code the dispatcher
+ * answers, 0: the check can see a module that does something when
+ * imported.
  *
  * Ten mutations were driven against this file, one run each, with the
  * unmodified modules green before them and restored byte-identical
@@ -39,16 +56,50 @@
  * exported as well, `loadConfig` and `resolveConfig` exported under each
  * other's names, and, red on the import probe alone, a `SIGINT`
  * listener, a printed line and an exit code added at import. Two
- * changed `src/rafa.ts`: one more binding imported, and a module
- * imported as a namespace, a form the import reader refuses rather than
- * skips. Each of those two reddened both CLI cases.
+ * changed the phase 0 `src/rafa.ts`, which imported the five commands
+ * itself: one more binding imported, and a module imported as a
+ * namespace. Each of those two reddened both CLI cases of that time.
+ *
+ * Five more were driven on 2026-09-14 once `src/rafa.ts` dispatched
+ * through the core registry, one run each over this file, with 50 pass
+ * before and after and every file restored byte-identical (sha256). A
+ * sixth command registered in `src/commands/index.ts` and not spelled
+ * here reddened the registry case. `usageCommand` exported as a wrapper
+ * reddened its re-export case and the reach case. One more binding
+ * imported by `src/rafa.ts` reddened its imports case. A wrapper importing
+ * its command as a namespace reddened four: its imports case, the
+ * registry case, the reach case, and the control, since the module no
+ * longer loads. `src/rafa.ts` setting no exit code reddened the control
+ * alone.
+ *
+ * Five more were driven on 2026-09-15 once the preflight, the scope
+ * module, the adapter registry and the manifest module joined the entry,
+ * one run each over this file, `src/plan/index.test.ts` and
+ * `src/tests/package-build.test.ts`, with 161 pass before and after and
+ * every file restored byte-identical (sha256). `resolveScope` dropped
+ * from the root reddened the name list, its re-export case, the scope
+ * module's containment case and the import probe, whose export count
+ * moved, with the root names case of `package-build.test.ts`.
+ * `CORE_ADAPTER_REGISTRY` dropped reddened the same five for the
+ * registry. `validateManifest` exported as a wrapper reddened its
+ * re-export case and the manifest module's containment case.
+ * `mergePlanPrerequisites` exported from `./plan` as a wrapper reddened
+ * its re-export case here and in `src/plan/index.test.ts`. `forkWorktree`
+ * exported from `./plan` and not from the root reddened the `./plan`
+ * entry's containment case.
  *
  * The type names are not checked here, and `check-types` skips this
  * file. Checked through a tsconfig outside the repo, a probe
- * re-exporting from the entry all fifty-seven type names the `./plan`
- * entry, the `./store` entry and the config module export compiled, and
- * one naming `TaskDeclaration`, which the entry leaves out, failed with
- * TS2305.
+ * re-exporting from the entry all sixty-seven type names the `./plan`
+ * entry, the `./store` entry and the two config modules export compiled,
+ * and one naming `TaskDeclaration`, which the entry leaves out, failed
+ * with TS2305. Checked again on 2026-09-15, a probe re-exporting all 107
+ * type names the entry now exports compiled, and one naming
+ * `RootCandidates` (`src/project/roots.ts`), which the entry leaves out,
+ * failed with TS2305. That tsconfig sets `module` to `ESNext`, as the
+ * repository's does: on `tsconfig.base.json` alone both probes also
+ * failed with TS1343, on the `import.meta` reads of `src/plan.ts` and
+ * `src/start.ts`.
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -57,15 +108,22 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
+import * as registryModule from './adapters/registry.js';
+import { loadConfig, readConfigFile } from './config-load.js';
+import * as configLoadModule from './config-load.js';
 import {
+  CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
   CONFIG_FILE,
+  CONFIG_VERSIONS,
   ConfigError,
   configFilePath,
   INJECT_MODES,
-  loadConfig,
+  MODULE_SOURCE_KINDS,
+  OUTPUT_MODES,
   parseConfigText,
-  readConfigFile,
+  PREREQUISITE_KINDS,
   resolveConfig,
   STORE_BACKENDS,
 } from './config.js';
@@ -79,6 +137,14 @@ import {
   selectEffortStore,
 } from './effort/store/index.js';
 import * as storeEntry from './effort/store/index.js';
+import {
+  FEATURE_TYPES,
+  MANIFEST_VERSION,
+  OUTPUT_CHANNELS,
+  RUNNING_MANIFEST_SEAMS,
+  validateManifest,
+} from './modules/manifest.js';
+import * as manifestModule from './modules/manifest.js';
 import {
   FINDING_KINDS,
   FINDING_SIGNALS,
@@ -94,6 +160,25 @@ import {
 } from './plan/index.js';
 import * as planEntry from './plan/index.js';
 import plan from './plan.js';
+import {
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
+  parsePrerequisites,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+} from './preflight/prerequisites-md.js';
+import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './preflight/run.js';
+import {
+  DISK_FILE_SYSTEM,
+  INIT_COMMAND,
+  initHint,
+  resolveScope,
+  SCOPE_DIR,
+  scopeAt,
+  ScopeError,
+  selfAndAncestors,
+} from './project/scope.js';
+import * as scopeModule from './project/scope.js';
 import start from './start.js';
 import usage from './usage.js';
 
@@ -101,70 +186,128 @@ import * as entry from './index.js';
 
 /** The runtime names the entry exposes, sorted as `sort` sorts them. */
 const RUNTIME_EXPORTS = [
+  'CLAUDE_SETTING_SOURCES',
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
+  'CONFIG_VERSIONS',
+  'CORE_ADAPTER_REGISTRY',
   'ConfigError',
+  'DISK_FILE_SYSTEM',
   'EFFORT_KEY_PROJECTIONS',
+  'FEATURE_TYPES',
   'FINDING_KINDS',
   'FINDING_SIGNALS',
+  'INIT_COMMAND',
   'INJECT_MODES',
+  'MANIFEST_VERSION',
+  'MODULE_SOURCE_KINDS',
+  'OUTPUT_CHANNELS',
+  'OUTPUT_MODES',
   'PLAN_BLOCK_KINDS',
   'PLAN_HEADER_FIELDS',
+  'PORT_VERSIONS',
+  'PREREQUISITE_KINDS',
+  'PROBE_TIMEOUT_MS',
   'RAFA_BLOCK_KINDS',
   'REPORT_STATUSES',
+  'RUNNING_MANIFEST_SEAMS',
+  'SCOPE_DIR',
   'STORE_BACKENDS',
+  'ScopeError',
   'configFilePath',
+  'createAdapterRegistry',
   'effortCollectCommand',
   'effortReportCommand',
+  'initHint',
   'isRafaBlockKind',
   'loadConfig',
+  'loadPlanPrerequisites',
+  'mergePlanPrerequisites',
   'openNdjsonStore',
   'openSqliteStore',
   'parseConfigText',
   'parsePlan',
+  'parsePrerequisites',
   'parseReport',
   'planCommand',
+  'planPrerequisites',
+  'prerequisitesPathForPlan',
   'readConfigFile',
   'readRafaBlocks',
   'renderInjection',
   'resolveConfig',
+  'resolveScope',
+  'runPreflight',
+  'runShellProbe',
+  'scopeAt',
   'selectEffortStore',
+  'selfAndAncestors',
   'startCommand',
   'usageCommand',
+  'validateManifest',
 ];
 
 /** Each runtime name, the entry's value for it, and its module's own. */
 const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
+  ['CLAUDE_SETTING_SOURCES', entry.CLAUDE_SETTING_SOURCES, CLAUDE_SETTING_SOURCES],
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],
+  ['CONFIG_VERSIONS', entry.CONFIG_VERSIONS, CONFIG_VERSIONS],
+  ['CORE_ADAPTER_REGISTRY', entry.CORE_ADAPTER_REGISTRY, CORE_ADAPTER_REGISTRY],
   ['ConfigError', entry.ConfigError, ConfigError],
+  ['DISK_FILE_SYSTEM', entry.DISK_FILE_SYSTEM, DISK_FILE_SYSTEM],
   ['EFFORT_KEY_PROJECTIONS', entry.EFFORT_KEY_PROJECTIONS, EFFORT_KEY_PROJECTIONS],
+  ['FEATURE_TYPES', entry.FEATURE_TYPES, FEATURE_TYPES],
   ['FINDING_KINDS', entry.FINDING_KINDS, FINDING_KINDS],
   ['FINDING_SIGNALS', entry.FINDING_SIGNALS, FINDING_SIGNALS],
+  ['INIT_COMMAND', entry.INIT_COMMAND, INIT_COMMAND],
   ['INJECT_MODES', entry.INJECT_MODES, INJECT_MODES],
+  ['MANIFEST_VERSION', entry.MANIFEST_VERSION, MANIFEST_VERSION],
+  ['MODULE_SOURCE_KINDS', entry.MODULE_SOURCE_KINDS, MODULE_SOURCE_KINDS],
+  ['OUTPUT_CHANNELS', entry.OUTPUT_CHANNELS, OUTPUT_CHANNELS],
+  ['OUTPUT_MODES', entry.OUTPUT_MODES, OUTPUT_MODES],
   ['PLAN_BLOCK_KINDS', entry.PLAN_BLOCK_KINDS, PLAN_BLOCK_KINDS],
   ['PLAN_HEADER_FIELDS', entry.PLAN_HEADER_FIELDS, PLAN_HEADER_FIELDS],
+  ['PORT_VERSIONS', entry.PORT_VERSIONS, PORT_VERSIONS],
+  ['PREREQUISITE_KINDS', entry.PREREQUISITE_KINDS, PREREQUISITE_KINDS],
+  ['PROBE_TIMEOUT_MS', entry.PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS],
   ['RAFA_BLOCK_KINDS', entry.RAFA_BLOCK_KINDS, RAFA_BLOCK_KINDS],
   ['REPORT_STATUSES', entry.REPORT_STATUSES, REPORT_STATUSES],
+  ['RUNNING_MANIFEST_SEAMS', entry.RUNNING_MANIFEST_SEAMS, RUNNING_MANIFEST_SEAMS],
+  ['SCOPE_DIR', entry.SCOPE_DIR, SCOPE_DIR],
   ['STORE_BACKENDS', entry.STORE_BACKENDS, STORE_BACKENDS],
+  ['ScopeError', entry.ScopeError, ScopeError],
   ['configFilePath', entry.configFilePath, configFilePath],
+  ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],
   ['effortCollectCommand', entry.effortCollectCommand, effortCollect],
   ['effortReportCommand', entry.effortReportCommand, effortReport],
+  ['initHint', entry.initHint, initHint],
   ['isRafaBlockKind', entry.isRafaBlockKind, isRafaBlockKind],
   ['loadConfig', entry.loadConfig, loadConfig],
+  ['loadPlanPrerequisites', entry.loadPlanPrerequisites, loadPlanPrerequisites],
+  ['mergePlanPrerequisites', entry.mergePlanPrerequisites, mergePlanPrerequisites],
   ['openNdjsonStore', entry.openNdjsonStore, openNdjsonStore],
   ['openSqliteStore', entry.openSqliteStore, openSqliteStore],
   ['parseConfigText', entry.parseConfigText, parseConfigText],
   ['parsePlan', entry.parsePlan, parsePlan],
+  ['parsePrerequisites', entry.parsePrerequisites, parsePrerequisites],
   ['parseReport', entry.parseReport, parseReport],
   ['planCommand', entry.planCommand, plan],
+  ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
+  ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
+  ['resolveScope', entry.resolveScope, resolveScope],
+  ['runPreflight', entry.runPreflight, runPreflight],
+  ['runShellProbe', entry.runShellProbe, runShellProbe],
+  ['scopeAt', entry.scopeAt, scopeAt],
   ['selectEffortStore', entry.selectEffortStore, selectEffortStore],
+  ['selfAndAncestors', entry.selfAndAncestors, selfAndAncestors],
   ['startCommand', entry.startCommand, start],
   ['usageCommand', entry.usageCommand, usage],
+  ['validateManifest', entry.validateManifest, validateManifest],
 ];
 
 /** The modules whose every runtime name the root also carries. */
@@ -172,32 +315,179 @@ const CONTAINED: readonly (readonly [string, Record<string, unknown>])[] = [
   ['the ./plan entry', planEntry],
   ['the ./store entry', storeEntry],
   ['the config module', configModule],
+  ['the config loader', configLoadModule],
+  ['the scope module', scopeModule],
+  ['the adapter registry', registryModule],
+  ['the manifest module', manifestModule],
 ];
 
 /** The `src/` directory, which the entry and the CLI both sit in. */
 const SRC_DIR = fileURLToPath(new URL('./', import.meta.url));
 
-/** The CLI's dispatcher, read as source and imported by the control. */
+/** The CLI entry, read as source and imported by the control. */
 const CLI_PATH = join(SRC_DIR, 'rafa.ts');
 
 /** The entry under test, as the probe imports it. */
 const ENTRY_PATH = join(SRC_DIR, 'index.ts');
 
 /**
- * What `src/rafa.ts` imports, spelled here: each module and the bindings
- * taken from it, `default` for a default import. The order is the
- * source's.
+ * What a module imports: each module and the bindings taken from it,
+ * `default` for a default import, in the source's order.
  */
-const CLI_IMPORTS: readonly (readonly [string, readonly string[]])[] = [
-  ['./effort/collect.js', ['default']],
-  ['./effort/report.js', ['default']],
-  ['./plan.js', ['default']],
-  ['./start.js', ['default']],
-  ['./usage.js', ['default']],
+type ImportList = readonly (readonly [string, readonly string[]])[];
+
+/** What `src/rafa.ts` imports, spelled here. */
+const CLI_IMPORTS: ImportList = [
+  ['./cli/dispatch.js', ['dispatch']],
+  ['./cli/help.js', ['renderHelp']],
+  ['./commands/index.js', ['CORE_REGISTRY']],
+  ['./modules/load.js', ['loadInvocationModules']],
 ];
 
-/** A static relative import, possibly spanning lines, type-only or not. */
-const IMPORT_PATTERN = /^import\s+(type\s+)?([\s\S]+?)\s+from\s+'(\.\.?\/[^']+)';$/gm;
+/**
+ * Each core command module, from `src/`, in the roster's order, and what
+ * it imports, spelled here as {@link CLI_IMPORTS} is.
+ */
+const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
+  ['./commands/plan/create.js', [['../../plan.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/plan/list.js', [
+    ['../../plan/index.js', ['parsePlan']],
+    ['../../utils/git.js', ['getRepoRoot']],
+    ['./plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts', 'isFile', 'planFileName', 'PLANS_DIR', 'plural', 'stubOfPlanFile']],
+  ]],
+  ['./commands/plan/show.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../plan/index.js', ['parsePlan']],
+    ['../../utils/git.js', ['getRepoRoot']],
+    ['../../utils/plan-stamp.js', ['isStampableStub']],
+    ['./plan-files.js', ['checkbox', 'countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'planFileName', 'PLANS_DIR']],
+  ]],
+  ['./commands/plan/validate.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../plan/index.js', ['parsePlan']],
+    ['./plan-files.js', ['countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'plural']],
+  ]],
+  ['./commands/loop/start.js', [
+    ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS', 'DEFAULT_CI_TIMEOUT_MIN']],
+    ['../../start/runtime.js', ['refuseMisplacedRuntime']],
+    ['../../start.js', ['default']],
+    ['../wrap.js', ['wrapPhaseZeroCommand']],
+  ]],
+  ['./commands/loop/stop.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['../../loop/sessions.js', ['errorCode', 'readSession', 'SessionRecordError']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./loop-sessions.js', ['checkboxAt', 'isLive', 'pickSession', 'planLabel', 'readSessionChecklist', 'refusal', 'resolveLoopSeams', 'sessionIdFlag']],
+  ]],
+  ['./commands/loop/pause.js', [
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./loop-sessions.js', ['isLive', 'pickSession', 'refusal', 'resolveLoopSeams', 'sessionIdFlag', 'writeSession']],
+  ]],
+  ['./commands/loop/resume.js', [
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./loop-sessions.js', ['isLive', 'pickSession', 'refusal', 'resolveLoopSeams', 'sessionIdFlag', 'writeSession']],
+  ]],
+  ['./commands/loop/status.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
+    ['./loop-sessions.js', [
+      'estimateEta',
+      'etaLine',
+      'isLive',
+      'pickSession',
+      'readSessionChecklist',
+      'readSessionFinishes',
+      'resolveLoopSeams',
+      'sessionIdFlag',
+      'sessionLine',
+    ]],
+  ]],
+  ['./commands/loop/list.js', [
+    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
+    ['./loop-sessions.js', ['isLive', 'projectRoot', 'readRecords', 'readSessionChecklist', 'resolveLoopSeams', 'sessionLine']],
+  ]],
+  ['./commands/issue/list.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'lineRefusal', 'onTracker', 'readChoiceFlag', 'readNonBlankFlag', 'readTextFlag', 'resolveIssueTracker']],
+  ]],
+  ['./commands/issue/show.js', [
+    ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueRef', 'onTracker', 'resolveIssueTracker', 'urlLines']],
+  ]],
+  ['./commands/issue/create.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../triage/triage.js', ['TRIAGE_MODULE']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./issue-tracker.js', [
+      'DEFAULT_ISSUE_SEAMS',
+      'issueName',
+      'onTracker',
+      'readChoiceFlag',
+      'readNonBlankFlag',
+      'readRequiredFlag',
+      'readTextFlag',
+      'resolveIssueTracker',
+      'urlLines',
+    ]],
+  ]],
+  ['./commands/issue/comment.js', [
+    ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'onTracker', 'readRequiredFlag', 'resolveIssueTracker']],
+  ]],
+  ['./commands/issue/move.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueRef', 'onTracker', 'readChoice', 'resolveIssueTracker']],
+  ]],
+  ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/module/list.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config.js', ['ConfigError']],
+    ['../../modules/load.js', ['loadModules', 'moduleSettings']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+  ]],
+  ['./commands/module/exec.js', [['../../cli/command.js', ['CommandExit']], ['../../cli/registry.js', ['mountKey']]]],
+  ['./commands/init.js', [
+    ['../cli/command.js', ['CommandExit']],
+    ['../config-load.js', ['loadConfig']],
+    ['../config-sections.js', ['messageOf']],
+    ['../config.js', ['ConfigError', 'configFilePath']],
+    ['../project/bin-path.js', ['readBinPath']],
+    ['../project/gitignore.js', ['applyTracking', 'GITIGNORE_FILE', 'GitignoreError', 'TRACKING_DIGEST_FILE', 'withTrackingBlock']],
+    ['../project/root-choice.js', ['candidateLines', 'createLinePrompter', 'firstCandidate', 'namedRoot', 'promptForRoot']],
+    ['../project/roots.js', ['DISK_ROOTS_FILE_SYSTEM', 'gitToplevel', 'rootCandidates']],
+    ['../project/scaffold.js', ['scaffoldConflicts', 'writeProjectScope', 'writeUserScope']],
+  ]],
+  ['./commands/doctor.js', [
+    ['../cli/command.js', ['CommandExit']],
+    ['../config-load.js', ['loadConfig']],
+    ['../config-sections.js', ['messageOf']],
+    ['../config.js', ['ConfigError']],
+    ['../effort/store/legacy.js', ['readLegacyStore']],
+    ['../preflight/prerequisites-md.js', ['loadPlanPrerequisites', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
+    ['../preflight/run.js', ['PROBE_TIMEOUT_MS', 'runPreflight']],
+    ['../project/bin-path.js', ['readBinPath']],
+    ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
+    ['./plan/plan-files.js', ['isFile', 'plural']],
+  ]],
+  ['./commands/self-update.js', [
+    ['../cli/command.js', ['CommandExit']],
+    ['../project/bin-path.js', ['readBinPath']],
+    ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
+    ['./plan/plan-files.js', ['expectNoArgument']],
+  ]],
+  ['./commands/usage.js', [['../usage.js', ['default']], ['./wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
+];
+
+/**
+ * A static relative import, possibly spanning lines, type-only or not.
+ * Its clause holds no `;`, so a match never runs on from an import of a
+ * bare module above it, such as `node:fs`, to the next relative one.
+ */
+const IMPORT_PATTERN = /^import\s+(type\s+)?([^;]+?)\s+from\s+'(\.\.?\/[^']+)';$/gm;
 
 /** One import's clause read as the bindings it takes. */
 function bindingsOf(clause: string): string[] {
@@ -213,15 +503,20 @@ function bindingsOf(clause: string): string[] {
       : ['default', ...names];
   }
   if (/^\w+$/.test(clause)) return ['default'];
-  throw new Error(`the CLI imports with a clause this test does not read: ${clause}`);
+  throw new Error(`a module imports with a clause this test does not read: ${clause}`);
 }
 
-/** The CLI's runtime imports, read off its source. */
-function readCliImports(): [string, string[]][] {
-  const source = readFileSync(CLI_PATH, 'utf8');
+/** A module's runtime imports, read off its source: the `.ts` file a `.js` specifier names. */
+function readImports(path: string): [string, string[]][] {
+  const source = readFileSync(path.replace(/\.js$/, '.ts'), 'utf8');
   return [...source.matchAll(IMPORT_PATTERN)]
     .filter((match) => match[1] === undefined)
     .map((match) => [match[3] ?? '', bindingsOf(match[2] ?? '')]);
+}
+
+/** An import list spelled here, in the shape {@link readImports} answers. */
+function spelled(imports: ImportList): [string, string[]][] {
+  return imports.map(([from, names]) => [from, [...names]]);
 }
 
 /** What the probe printed and left behind. */
@@ -301,20 +596,66 @@ describe('the package root entry', () => {
 
 describe('what the CLI reaches, through the entry', () => {
   it('reads the imports src/rafa.ts takes as the ones spelled here', () => {
-    expect(readCliImports()).toEqual(CLI_IMPORTS.map(([from, names]) => [from, [...names]]));
+    expect(readImports(CLI_PATH)).toEqual(spelled(CLI_IMPORTS));
   });
 
-  it('reaches every binding src/rafa.ts imports as a root export', async () => {
+  it.each(COMMAND_MODULES)('reads the imports %s takes as the ones spelled here', (path, imports) => {
+    expect(readImports(join(SRC_DIR, path))).toEqual(spelled(imports));
+  });
+
+  it('dispatches through a registry holding exactly the commands of the modules spelled here', async () => {
+    const { CORE_REGISTRY: registry } = await import(join(SRC_DIR, 'commands', 'index.js')) as {
+      CORE_REGISTRY: { commands: (options: { includeHidden: boolean }) => readonly unknown[] };
+    };
+    const spelledCommands: unknown[] = [];
+    for (const [path] of COMMAND_MODULES) {
+      const module = await import(join(SRC_DIR, path)) as { default: unknown };
+      spelledCommands.push(module.default);
+    }
+
+    expect(spelledCommands.filter((command) => command === undefined)).toEqual([]);
+    expect(registry.commands({ includeHidden: true }).map((command) => spelledCommands.indexOf(command)))
+      .toEqual(COMMAND_MODULES.map((_module, index) => index));
+  });
+
+  it('reaches the phase 0 command each wrapping core command module runs, its one default import, as a root export', async () => {
     const rootValues = new Set<unknown>(Object.values(entry));
+    const wrapping = COMMAND_MODULES.filter(([, imports]) => imports.some(([, names]) => names.includes('wrapPhaseZeroCommand')));
+    const defaultImports: number[] = [];
     const unreached: string[] = [];
 
-    for (const [from, names] of readCliImports()) {
-      const module = await import(join(SRC_DIR, from)) as Record<string, unknown>;
-      for (const name of names) {
-        if (!rootValues.has(module[name])) unreached.push(`${name} from ${from}`);
+    for (const [path] of wrapping) {
+      const modulePath = join(SRC_DIR, path);
+      const runs = readImports(modulePath).filter(([, names]) => names.includes('default'));
+      defaultImports.push(runs.length);
+      for (const [from] of runs) {
+        const module = await import(join(modulePath, '..', from)) as { default: unknown };
+        if (!rootValues.has(module.default)) unreached.push(`the default of ${from}, run by ${path}`);
       }
     }
 
+    expect(COMMAND_MODULES.filter((module) => !wrapping.includes(module)).map(([path]) => path)).toEqual([
+      './commands/plan/list.js',
+      './commands/plan/show.js',
+      './commands/plan/validate.js',
+      './commands/loop/stop.js',
+      './commands/loop/pause.js',
+      './commands/loop/resume.js',
+      './commands/loop/status.js',
+      './commands/loop/list.js',
+      './commands/issue/list.js',
+      './commands/issue/show.js',
+      './commands/issue/create.js',
+      './commands/issue/comment.js',
+      './commands/issue/move.js',
+      './commands/module/list.js',
+      './commands/module/exec.js',
+      './commands/init.js',
+      './commands/doctor.js',
+      './commands/self-update.js',
+      './commands/describe.js',
+    ]);
+    expect(defaultImports).toEqual(wrapping.map(() => 1));
     expect(unreached).toEqual([]);
   });
 });
@@ -335,12 +676,12 @@ describe('importing the entry', () => {
     expect(run.files).toEqual(['probe.ts']);
   });
 
-  it('is told apart from the CLI, which prints its help when imported', () => {
+  it('is told apart from the CLI, which prints its help and sets its exit code when imported', () => {
     const run = probeImport(CLI_PATH);
 
     expect(run.exitCode).toBe(0);
-    expect(run.stdout.startsWith('ralph — agent task loop\n')).toBe(true);
+    expect(run.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
     expect(run.stdout.trimEnd().split('\n').length).toBeGreaterThan(1);
-    expect(readingOf(run)).toMatchObject({ exports: 0 });
+    expect(readingOf(run)).toMatchObject({ exitCode: 0, exports: 0 });
   });
 });

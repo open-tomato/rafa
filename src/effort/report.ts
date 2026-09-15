@@ -3,15 +3,17 @@
  *
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
- * reads the config and the store the config selects, and nothing else
- * — no log, no clock — so a report is a pure projection of rows already
- * on disk and two runs over an unchanged store produce identical bytes.
+ * reads the config, the store the config selects, and the task reports,
+ * preflight checks and dispatches the loop stored, and nothing else — no
+ * log, no clock — so a report is
+ * a pure projection of rows already on disk and two runs over an
+ * unchanged store produce identical bytes.
  *
  * ## Which store it reads
  *
  * The one `rafa effort collect` writes. Both resolve it the same way,
- * `loadConfig` over the repo root and then `selectEffortStore` over the
- * resolved config, so under the `sqlite` default a report reads
+ * `loadConfig` over the repo root and the home, then `selectEffortStore`
+ * over the resolved config, so under the `sqlite` default a report reads
  * `effort.sqlite` and under `store: ndjson` the sessions file. A report
  * reading one backend's file directly reads nothing right after a
  * successful collect into the other, and says nothing was collected.
@@ -20,9 +22,45 @@
  *
  * A config the loop cannot run on is refused as the collect command
  * refuses it: {@link buildReport} throws the `ConfigError`, and the
- * command prints one line per problem and exits 1. A warning about an
- * unknown key goes to stderr through `loadConfig`'s default sink, so
- * the `--json` document on stdout stays parseable.
+ * command refuses with exit code 1, one line per problem. A warning about
+ * an unknown key goes through `loadConfig`'s default sink, the active
+ * output's `warn`, so in json mode it is a `log` event of its own and the
+ * report stays whole in the terminal result.
+ *
+ * ## Task reports beside the sessions
+ *
+ * {@link EffortReport.taskReports} is read from the `task_reports`
+ * table, tallied by plan, by the report's `status` and by the loop's
+ * outcome (`store/reports.ts`). The table sits in the SQLite file
+ * whichever backend `store` selects, so it is read under the repo root
+ * even when {@link ReportOptions.store} passes a store. A tally whose
+ * status and outcome differ counts sessions whose claim the loop did
+ * not take: a `done` beside a listed blocker, a commit git refused, a
+ * nonzero exit. The filters do not narrow the tallies, because a task
+ * report carries neither a kind nor an entrypoint to test them on, and
+ * the table printed under a filter says so.
+ *
+ * ## Preflight halts beside them
+ *
+ * {@link EffortReport.preflightHalts} lists the runs whose preflight
+ * halted, read from the `preflight` table (`store/preflight.ts`) under
+ * the repo root, as the tallies are, whichever backend `store` selects. A
+ * run halted when one of its required checks did not pass, and its halt
+ * names each such check. A store can hold a halt and no session row, so
+ * the command prints the halts under its no-rows line as it prints the
+ * tallies there. The filters do not narrow the halts either, since a
+ * preflight row carries no kind and no entrypoint.
+ *
+ * ## Budgets beside them
+ *
+ * {@link EffortReport.budgets} lists each task session the loop
+ * dispatched with a declared budget, read from the `dispatches` table
+ * (`store/dispatches.ts`) under the repo root, as the tallies are,
+ * whichever backend `store` selects, each beside the usage its session
+ * row measured (`report-budgets.ts`). The usage is tokens: a session row
+ * holds no dollar figure, and a text-mode session prints none. The
+ * command prints the budgets under its no-rows line as it prints the
+ * tallies there, and the filters do not narrow them.
  *
  * ## What a group is keyed on
  *
@@ -102,18 +140,34 @@
  */
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
+import type { BudgetedSession } from './report-budgets.js';
 import type { SessionUsageTotals } from './session-log.js';
+import type { ConfigRoots } from '../config-load.js';
+import type { SessionBudget } from './store/dispatches.js';
+import type { PreflightHalt } from './store/preflight.js';
+import type { TaskReportTally } from './store/reports.js';
 import type { EffortStore } from './store/types.js';
 
-import { ConfigError, loadConfig } from '../config.js';
-import { getRepoRoot } from '../utils/git.js';
+import { homedir } from 'node:os';
+
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
+import { loadConfig } from '../config-load.js';
+import { ConfigError } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
+import { budgetedSessions } from './report-budgets.js';
+import {
+  formatBudgets,
+  formatPreflightHalts,
+  formatReport,
+  formatTaskReports,
+} from './report-format.js';
+import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
-
-/** Decimal places a formatted minute figure carries in the table. */
-const TABLE_MINUTE_DECIMALS = 1;
+import { readPreflightHalts } from './store/preflight.js';
+import { readTaskReportTallies } from './store/reports.js';
 
 /** Decimal places a summed minute figure is re-rounded to. */
 const SUM_MINUTE_DECIMALS = 3;
@@ -211,6 +265,22 @@ export interface EffortReport {
   /** Rows a filter removed. `rowsRead - rowsExcluded` were folded. */
   rowsExcluded: number;
   filters: ReportFilters;
+  /**
+   * The stored task reports, one tally per plan, status and outcome.
+   * The filters do not narrow them; see the module note.
+   */
+  taskReports: readonly TaskReportTally[];
+  /**
+   * The runs whose preflight halted, in the order they were stored. The
+   * filters do not narrow them; see the module note.
+   */
+  preflightHalts: readonly PreflightHalt[];
+  /**
+   * The sessions dispatched with a budget, in the order they were stored,
+   * each beside its row's usage. The filters do not narrow them; see the
+   * module note.
+   */
+  budgets: readonly BudgetedSession[];
 }
 
 /** What the parsed argv asked for. */
@@ -224,12 +294,18 @@ export interface ReportArgs {
 
 /** Where a report reads from and what it narrows to. */
 export interface ReportOptions {
-  /** Defaults to the git repo root. Governs the config and the store. */
-  repoRoot?: string;
+  /** The project root, with no default. Governs the config and the store. */
+  repoRoot: string;
+  /**
+   * The home the user scope's config is read under. No default: the
+   * command passes `homedir()`, so a caller cannot reach the real home by
+   * leaving it out. Unread when a store is passed.
+   */
+  home: string;
   /**
    * The store the session rows are read from. Defaults to the backend
-   * `.rafa/config.yaml` under the repo root selects; a store passed here
-   * means that file is not read. See the module note.
+   * the config under the repo root and the home selects; a store passed
+   * here means neither file is read. See the module note.
    */
   store?: EffortStore;
   kinds?: readonly SessionKind[] | null;
@@ -456,11 +532,17 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  * Rolls rows up into the report.
  *
  * Pure over its inputs, which is the seam the whole suite drives: a
- * planted row needs no store, no log and no repository.
+ * planted row needs no store, no log and no repository. `taskReports`
+ * and `preflightHalts` are carried into the report as they are handed
+ * in, never filtered, and each of `budgets` is joined against every row
+ * handed in, filtered out or not (`report-budgets.ts`).
  */
 export function summariseSessions(
   rows: readonly ReportSessionRow[],
   filters: ReportFilters = { kinds: null, entrypoints: null },
+  taskReports: readonly TaskReportTally[] = [],
+  preflightHalts: readonly PreflightHalt[] = [],
+  budgets: readonly SessionBudget[] = [],
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -494,158 +576,10 @@ export function summariseSessions(
     rowsRead: rows.length,
     rowsExcluded,
     filters,
+    taskReports,
+    preflightHalts,
+    budgets: budgetedSessions(rows, budgets),
   };
-}
-
-/** A count with thousands separators, locale-independently. */
-export function formatCount(value: number): string {
-  return String(Math.trunc(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
-/** Minutes for the table, or a dash when there is no span. */
-export function formatMinutes(value: number | null): string {
-  return value === null
-    ? '-'
-    : value.toFixed(TABLE_MINUTE_DECIMALS);
-}
-
-/**
- * A histogram as `key=count` pairs, commonest first.
- *
- * Ties break on the key, so the string is stable across runs and can
- * be asserted verbatim. An empty histogram renders as a dash rather
- * than as nothing, which keeps a column from looking truncated.
- */
-export function formatHistogram(counts: Record<string, number>): string {
-  const entries = Object.entries(counts).sort((a, b) => {
-    if (a[1] !== b[1]) return b[1] - a[1];
-    return a[0] < b[0]
-      ? -1
-      : 1;
-  });
-  return entries.length === 0
-    ? '-'
-    : entries.map(([key, count]) => `${key}=${count}`).join(' ');
-}
-
-/** The table's columns, in order. */
-const TABLE_COLUMNS = [
-  'plan / branch',
-  'kind',
-  'sessions',
-  'turns',
-  'input',
-  'output',
-  'cache-r',
-  'cache-w',
-  'work-min',
-  'span-min',
-  'models',
-  'effort',
-] as const;
-
-/** Columns rendered right-aligned; the rest are left-aligned. */
-const RIGHT_ALIGNED: ReadonlySet<string> = new Set([
-  'sessions',
-  'turns',
-  'input',
-  'output',
-  'cache-r',
-  'cache-w',
-  'work-min',
-  'span-min',
-]);
-
-/** One group as its table cells, in {@link TABLE_COLUMNS} order. */
-function groupCells(group: EffortGroup): string[] {
-  return [
-    group.key,
-    group.kind,
-    formatCount(group.sessions),
-    formatCount(group.assistantTurns),
-    formatCount(group.inputTokens),
-    formatCount(group.outputTokens),
-    formatCount(group.cacheReadTokens),
-    formatCount(group.cacheWriteTokens),
-    formatMinutes(group.workMinutes),
-    formatMinutes(group.spanMinutes),
-    formatHistogram(group.models),
-    formatHistogram(group.efforts),
-  ];
-}
-
-/** Pads one cell to a column width, on the side its alignment wants. */
-function padCell(cell: string, width: number, right: boolean): string {
-  const pad = ' '.repeat(Math.max(0, width - cell.length));
-  return right
-    ? `${pad}${cell}`
-    : `${cell}${pad}`;
-}
-
-/**
- * Renders the report as an aligned table.
- *
- * Space-padded columns and no pipes at all, which is deliberate: a
- * bare `|` inside a cell splits a markdown table row silently, and a
- * histogram cell here is assembled from model names nobody in this
- * repo controls. A table that cannot be pasted into markdown is a
- * smaller problem than one that renders wrong when it is.
- *
- * Trailing whitespace is trimmed from every line, so a short last
- * column cannot leave a ragged right edge in a captured diff.
- */
-export function formatReportTable(report: EffortReport): string[] {
-  const rows = [
-    [...TABLE_COLUMNS],
-    ...report.groups.map(groupCells),
-    groupCells(report.totals),
-  ];
-  const widths = TABLE_COLUMNS.map((_column, index) => Math.max(
-    ...rows.map((row) => (row[index] ?? '').length),
-  ));
-
-  return rows.map((row) => TABLE_COLUMNS
-    .map((column, index) => padCell(
-      row[index] ?? '',
-      widths[index] ?? 0,
-      RIGHT_ALIGNED.has(column),
-    ))
-    .join('  ')
-    .trimEnd());
-}
-
-/** The lines describing what was read and what was filtered out. */
-export function formatReportHeader(report: EffortReport): string[] {
-  const kinds = report.filters.kinds;
-  const entrypoints = report.filters.entrypoints;
-  const included = report.rowsRead - report.rowsExcluded;
-  const lines = [
-    `effort report: ${included} of ${report.rowsRead} session rows`
-    + `, ${report.groups.length} groups`,
-  ];
-
-  if (kinds !== null) lines.push(`  kind        ${kinds.join(', ')}`);
-  if (entrypoints !== null) {
-    lines.push(`  entrypoint  ${entrypoints.join(', ')}`);
-  }
-  if (report.totals.sessionsWithoutSpan > 0) {
-    lines.push(
-      `  note        ${report.totals.sessionsWithoutSpan} sessions`
-      + ' contributed no span',
-    );
-  }
-  if (report.totals.sessionsWithoutEffort > 0) {
-    lines.push(
-      `  note        ${report.totals.sessionsWithoutEffort} rows predate`
-      + ' the effort field',
-    );
-  }
-  return lines;
-}
-
-/** Everything the command prints in table mode. */
-export function formatReport(report: EffortReport): string[] {
-  return [...formatReportHeader(report), '', ...formatReportTable(report)];
 }
 
 /** Splits a comma-separated flag value into its members. */
@@ -718,90 +652,113 @@ export function parseReportArgs(args: readonly string[]): ReportArgs {
 
 /**
  * The store a report reads: the one passed, else the one the config
- * under `repoRoot` selects, resolved as `rafa effort collect` resolves
- * its own.
+ * under `roots` selects, resolved as `rafa effort collect` resolves its
+ * own.
  *
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
 function resolveStore(
   store: EffortStore | undefined,
-  repoRoot: string,
+  roots: ConfigRoots,
 ): EffortStore {
   if (store !== undefined) return store;
 
-  const resolved = loadConfig(repoRoot);
-  return selectEffortStore(repoRoot, resolved.config);
+  const resolved = loadConfig(roots);
+  return selectEffortStore(roots.root, resolved.config);
 }
 
 /**
- * Reads the session rows of the selected store and rolls them up.
+ * Reads the session rows of the selected store, and the task report
+ * tallies and preflight halts under the repo root, and rolls the rows up.
  *
  * A missing store answers an EMPTY report rather than throwing — every
  * backend answers absence as the first-run case — so the command below
  * is what says "nothing collected yet" in words, which is the one thing
- * a table of zeroes cannot convey.
+ * a table of zeroes cannot convey. A missing SQLite file answers no
+ * tallies and no halts the same way.
  *
  * Throws a `ConfigError`, having read no row, when no store is passed
- * and the config under the repo root is one the loop cannot run on.
+ * and a config file under the repo root or the home is one the loop
+ * cannot run on.
  */
-export function buildReport(options: ReportOptions = {}): EffortReport {
-  const repoRoot = options.repoRoot ?? getRepoRoot();
-  const store = resolveStore(options.store, repoRoot);
+export function buildReport(options: ReportOptions): EffortReport {
+  const { repoRoot } = options;
+  const store = resolveStore(options.store, { root: repoRoot, home: options.home });
 
-  return summariseSessions(asReportRows(store.read('sessions')), {
-    kinds: options.kinds ?? null,
-    entrypoints: options.entrypoints ?? null,
-  });
+  return summariseSessions(
+    asReportRows(store.read('sessions')),
+    {
+      kinds: options.kinds ?? null,
+      entrypoints: options.entrypoints ?? null,
+    },
+    readTaskReportTallies(repoRoot),
+    readPreflightHalts(repoRoot),
+    readSessionBudgets(repoRoot),
+  );
 }
 
-/** Prints each refusal on its own line and marks the run failed. */
-function refuse(problems: readonly string[]): void {
-  for (const problem of problems) {
-    console.error(`ralph effort report: ${problem}`);
-  }
-  process.exitCode = 1;
+/** Refuses the run with exit code 1, its message one line per refusal. */
+function refuse(problems: readonly string[]): never {
+  throw new CommandExit(1, problems.map((problem) => `ralph effort report: ${problem}`).join('\n'));
 }
 
 /**
- * `ralph effort report` — the command entry.
+ * `ralph effort report` — the command entry, over `repoRoot`, the project
+ * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
- * Sets `process.exitCode` rather than calling `process.exit`, so the
- * function is drivable from a test and a caller's output is not
- * truncated mid-flush.
+ * Writes through the active output (`adapters/output/active.ts`), in the
+ * mode the dispatcher set beside it. In json mode the report is the
+ * command's result, the `data` of the invocation's terminal result event.
+ * In text mode each table line goes at `info`, and `--json` writes the
+ * report as JSON indented by two spaces through one `info` line, the
+ * bytes phase 0 printed. The dispatcher reads `--json` as `--output=json`
+ * (`src/commands/effort/report.ts`), so text mode meets `--json` only
+ * when this entry is called directly, as `effortReportCommand` is.
  *
- * A config the loop cannot run on is printed as a refusal, one line per
- * problem, the way a bad argument is and the way `rafa effort collect`
- * prints it. Anything else thrown is a fault rather than a refusal, and
- * is rethrown.
+ * Refuses by throwing `CommandExit` with exit code 1 and the refusal as
+ * its message, one line per problem, and neither sets `process.exitCode`
+ * nor calls `process.exit`: the dispatcher is the one place that sets
+ * the exit code. It writes the message to stderr in text mode, the bytes
+ * this command printed there before, and carries it in the terminal
+ * result in json mode.
+ *
+ * A config the loop cannot run on is refused, one line per problem, the
+ * way a bad argument is and the way `rafa effort collect` refuses it.
+ * Anything else thrown is a fault rather than a refusal, and is rethrown.
  */
-export default async function report(args: string[]): Promise<void> {
+export default async function report(args: string[], repoRoot: string): Promise<void> {
   const parsed = parseReportArgs(args);
-  if (parsed.errors.length > 0) {
-    refuse(parsed.errors);
-    return;
-  }
+  if (parsed.errors.length > 0) refuse(parsed.errors);
 
   let built: EffortReport;
   try {
     built = buildReport({
+      repoRoot,
+      home: homedir(),
       kinds: parsed.kinds,
       entrypoints: parsed.entrypoints,
     });
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);
+  }
+  const output = activeOutput();
+  if (activeOutputMode() === 'json') {
+    output.result(built);
     return;
   }
   if (parsed.json) {
-    console.log(JSON.stringify(built, null, 2));
+    output.info(JSON.stringify(built, null, 2));
     return;
   }
   if (built.rowsRead === 0) {
-    console.log('effort report: no session rows stored yet'
+    output.info('effort report: no session rows stored yet'
       + ' (run `ralph effort collect` first)');
+    const sections = [...formatTaskReports(built), ...formatPreflightHalts(built), ...formatBudgets(built)];
+    for (const line of sections) output.info(line);
     return;
   }
   for (const line of formatReport(built)) {
-    console.log(line);
+    output.info(line);
   }
 }

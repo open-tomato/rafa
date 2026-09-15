@@ -76,7 +76,10 @@
  * Dropping the whole-text rule on its own has no fixture here to
  * bite, that claim being the colocated suite's.
  */
-import type { TaskDeclaration } from '../utils/declaration.js';
+import type {
+  AgentEffortLookup,
+  TaskDeclaration,
+} from '../utils/declaration.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -89,6 +92,9 @@ import {
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';
 
+/** No agent definition here declares an effort of its own. */
+const NO_OWN_EFFORT: AgentEffortLookup = () => false;
+
 /** A code span's delimiter, kept out of the template literals. */
 const TICK = '`';
 
@@ -100,6 +106,7 @@ const KEY_PAIRS = [
   { good: 'agent=doc-updater', near: 'agents=doc-updater' },
   { good: 'model=haiku', near: 'modell=haiku' },
   { good: 'effort=low', near: 'efort=low' },
+  { good: 'budget=0.50', near: 'budgets=0.50' },
   { good: 'tools=Read', near: 'tool=Read' },
 ];
 
@@ -113,7 +120,7 @@ function expectTaskText(taskText: string): void {
   expect(parsed.declaration).toBeNull();
   expect(parsed.text).toBe(taskText);
   expect(stripTaskDeclaration(taskText)).toBe(taskText);
-  expect(resolveDeclarationFlags(parsed.declaration).args).toEqual([]);
+  expect(resolveDeclarationFlags(parsed.declaration, NO_OWN_EFFORT).args).toEqual([]);
 }
 
 /**
@@ -212,7 +219,7 @@ describe('an unrecognised key', () => {
       .toBe('doc-updater');
   });
 
-  it('reads a near miss of each of the four keys as text', () => {
+  it('reads a near miss of each of the five keys as text', () => {
     const text = 'Route the doc task';
 
     for (const pair of KEY_PAIRS) {
@@ -221,7 +228,7 @@ describe('an unrecognised key', () => {
         .toBe(text);
     }
 
-    expect(KEY_PAIRS).toHaveLength(4);
+    expect(KEY_PAIRS).toHaveLength(5);
   });
 });
 

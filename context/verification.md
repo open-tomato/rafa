@@ -41,7 +41,9 @@ code do not change. `env -u CLAUDECODE bun test` prints every case.
 `**/*.test.ts` (the `.specs/test-type-checking.md` its comment cites does
 not exist), and `bun test` strips types without checking them, so a type
 error in a test is green on every gate. To check one by hand, point a
-tsconfig outside the repo at it — `extends` this repo's, `files` holding
+tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`,
+never `tsconfig.base.json`, which leaves `module` unset and fails
+`src/plan.ts` and `src/start.ts` on `import.meta` (TS1343), `files` holding
 the test's absolute path, `include` empty, `typeRoots` naming
 `<repo>/node_modules/@types` absolutely — and run
 `./node_modules/.bin/tsc -p` on it. A type-level claim that must stay

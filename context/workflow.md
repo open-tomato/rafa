@@ -14,18 +14,21 @@ the shape discriminates where the verb does not.
 | Task shape | Agent | Where it lives |
 |---|---|---|
 | Prose — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `.claude/agents/doc-updater.md` |
-| Tests — a suite over code that already exists, or a red-first case | `tdd-guide` | user-level |
-| Repair — a red gate, a type error, a broken build | `build-error-resolver` | user-level |
+| Tests — a suite over code that already exists, or a red-first case | `tdd-guide` | `.claude/agents/tdd-guide.md` |
+| Repair — a red gate, a type error, a broken build | `build-error-resolver` | `.claude/agents/build-error-resolver.md` |
 | Cleanup — dead code, duplicates, a consolidation | `refactor-cleaner` | user-level |
 | Review of a TypeScript change | `typescript-reviewer` | user-level |
-| Review of a change as a whole | `code-reviewer` | user-level |
+| Review of a change as a whole | `code-reviewer` | `.claude/agents/code-reviewer.md` |
 | Implementation — a module plus its TSDoc plus its colocated tests | `loop-implementer` | `.claude/agents/loop-implementer.md` |
 
 **`user-level` in the third column is a portability warning and not a
-footnote.** Those five definitions live outside the repo, so a fresh
+footnote.** Those two definitions live outside the repo, so a fresh
 clone receives none of them and the name resolves against whatever that
-machine happens to hold — or against nothing. The two tracked rows
-travel. A project file also SHADOWS a user-level agent of the same name
+machine happens to hold — or against nothing. Under the default
+`loop.settingSources` of `project,local` it resolves against nothing on
+any machine: every loop session is spawned with `--setting-sources`,
+and the CLI lists no agent from `~/.claude/agents` until the sources
+include `user`. The five tracked rows travel. A project file also SHADOWS a user-level agent of the same name
 rather than merging with it, and the roster is blind to the difference:
 a shadowed name appears exactly ONCE in the CLI's own list of available
 agents, so only a behavioural probe separates a shadow from an
@@ -39,14 +42,26 @@ makes a wrong row something a test can find rather than a silent
 downgrade: an unresolvable agent exits 1 with NO JSON at all and the
 whole roster on stderr, before any model call.
 
-**`agent=` outranks the other three declaration keys because routing
-supplies the model.** A declaration carrying an agent passes only
-`--agent`; its `model`, `effort` and `tools` stay on the record so the
-collector can report what the planner expected against what ran, and
-none of the three reaches the CLI. The model comes from the agent
-file's own frontmatter — `doc-updater` and `loop-implementer` carry
-their own models, every user-level row defaults — and the collector
-uses this to report routed versus unrouted session models.
+**`agent=` outranks `model` and `tools` because routing supplies
+both.** A declaration carrying an agent never passes `--model` or
+`--tools`: the agent file's own frontmatter names its model and tool
+set, and every tracked file the table names carries a `model:`.
+`effort` is the exception, being the cost lever a plan most needs to
+reach the session: `--effort` joins `--agent` unless the definition
+declares an `effort` of its own. `src/utils/agent-definition.ts`
+answers that from `.claude/agents/<name>.md` under the repo root, then
+under the home directory when `loop.settingSources` includes `user`,
+and takes a file only when its frontmatter
+`name` is the name asked for, because the CLI resolves `--agent` by
+that `name` and not by the file name. A name found in neither still
+passes `--effort`, leaving the CLI to refuse the name. `budget` is
+outranked by nothing, since a definition supplies no budget:
+`--max-budget-usd` joins whatever the block resolved to, ahead of
+`--tools`, whose variadic value has to end the argument list. Every key
+stays on the dispatch record whatever reached the CLI, and on the
+session's `dispatches` row beside the flags that did
+(`src/effort/store/dispatches.ts`), and the `Routed as:` line names the
+ones left to the agent.
 
 **Routing also changes what a session can be read back from.** The
 prompt is untouched, byte-identical to what was piped in, but record 0

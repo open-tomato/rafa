@@ -263,6 +263,75 @@ function lowerFirstWord(text: string): string {
 }
 
 /**
+ * What ends a task text's first clause outside a code span: the comma,
+ * the colon and either parenthesis.
+ *
+ * The closing parenthesis is in the set for a text that reaches one
+ * with no opener before it (`case a) before case b`). Where an opener
+ * does come first, the opener has already ended the clause.
+ */
+const CLAUSE_ENDINGS: ReadonlySet<string> = new Set([',', ':', '(', ')']);
+
+/** Length of the backtick run starting at `start`, zero for none. */
+function backtickRunLength(text: string, start: number): number {
+  let end = start;
+  while (text.charAt(end) === '`') end += 1;
+  return end - start;
+}
+
+/**
+ * Index just past the run that closes a code span, or -1 when none does.
+ *
+ * CommonMark's rule: a span opened by a run of N backticks closes on
+ * the next run of EXACTLY N, so a double-backtick span can quote a
+ * single backtick, and a run of any other length inside it is content.
+ */
+function codeSpanEnd(text: string, from: number, length: number): number {
+  let index = text.indexOf('`', from);
+  while (index !== -1) {
+    const run = backtickRunLength(text, index);
+    if (run === length) return index + run;
+    index = text.indexOf('`', index + run);
+  }
+  return -1;
+}
+
+/**
+ * The task text up to its first comma, colon or parenthesis outside a
+ * code span, trailing whitespace dropped. The whole text when nothing
+ * ends it, and the empty string when the text opens on an ending.
+ *
+ * A subject quotes the first clause rather than the first 72
+ * characters because a width cut stops wherever the width falls: the
+ * 2026-09-14 cutover run committed a subject ending `(under 60 lines)
+ * stating that the loop`, mid-sentence, where the clause before the
+ * parenthesis was the whole of what it needed to say.
+ *
+ * The code-span exception is what makes the rule usable on a plan,
+ * which names identifiers in backticks: the comma in `run(a, b)` is
+ * part of a name, never the end of a clause. A backtick run that
+ * nothing closes opens no span, as CommonMark reads it, so it is
+ * literal text and the endings after it still count.
+ */
+export function firstClause(text: string): string {
+  let index = 0;
+  while (index < text.length) {
+    const character = text.charAt(index);
+    if (character === '`') {
+      const run = backtickRunLength(text, index);
+      const end = codeSpanEnd(text, index + run, run);
+      index = end === -1
+        ? index + run
+        : end;
+      continue;
+    }
+    if (CLAUSE_ENDINGS.has(character)) return text.slice(0, index).trimEnd();
+    index += 1;
+  }
+  return text.trimEnd();
+}
+
+/**
  * Cuts a description to fit, at a word boundary wherever there is one
  * inside the budget. Trailing punctuation left dangling by the cut
  * goes with it, so the subject does not end on a comma.
@@ -298,12 +367,41 @@ export interface DerivedSubject {
   subject: string;
   /** Type the rules selected. */
   type: CommitType;
-  /** True when the description was cut to fit the cap. */
+  /**
+   * True when the description was cut to fit the cap. Ending at the
+   * first clause is not a cut: a clause that fits answers false
+   * however much task text follows it.
+   */
   truncated: boolean;
 }
 
 /**
+ * The description a subject carries before the cap: the first clause,
+ * or the whole text when the clause is empty.
+ *
+ * An empty clause means the text opens on an ending, as `(Re)write the
+ * header` does, and a subject holding nothing past its type says
+ * nothing. The whole text stands in there, and the cap cuts it the way
+ * it cut every subject before the clause rule.
+ */
+function subjectDescription(normalised: string): string {
+  const clause = firstClause(normalised);
+  const description = clause.length === 0
+    ? normalised
+    : clause;
+
+  return lowerFirstWord(stripTrailingPeriod(description));
+}
+
+/**
  * Derives a conventional-commit subject from a task's text.
+ *
+ * The description is the text's {@link firstClause}, cut at a word
+ * boundary when that clause alone is longer than the cap leaves room
+ * for. The TYPE is still inferred from the whole text, since a clause
+ * can end before the path or the noun the rules read. Whatever the
+ * subject leaves out, the body {@link buildCommitMessage} writes
+ * carries.
  *
  * Deterministic over its input: the same task text answers the same
  * subject on every machine and every run, which is what lets the
@@ -321,13 +419,13 @@ export function deriveCommitSubject(
     : `${type}(${scope}): `;
 
   const normalised = normaliseTaskText(taskText);
-  const full = normalised.length === 0
+  const uncut = normalised.length === 0
     ? FALLBACK_DESCRIPTION
-    : lowerFirstWord(stripTrailingPeriod(normalised));
+    : subjectDescription(normalised);
 
   const maxLength = options.maxLength ?? MAX_SUBJECT_LENGTH;
-  const description = truncateDescription(full, maxLength - prefix.length);
-  const truncated = description !== full;
+  const description = truncateDescription(uncut, maxLength - prefix.length);
+  const truncated = description !== uncut;
 
   return {
     subject: `${prefix}${description}`,
@@ -336,12 +434,12 @@ export function deriveCommitSubject(
   };
 }
 
-/** A subject with the body that keeps the truncation lossless. */
+/** A subject with the body that carries the whole task line. */
 export interface CommitMessage extends DerivedSubject {
   /**
-   * The whole normalised task text, or the empty string when the
-   * subject already carries it. A message is never two spellings of
-   * the same sentence.
+   * The whole normalised task text, written whatever the subject kept
+   * of it. The empty string only for a task text with no words, which
+   * has no line to carry.
    */
   body: string;
 }
@@ -349,21 +447,20 @@ export interface CommitMessage extends DerivedSubject {
 /**
  * Builds the message a task's commit is made with.
  *
- * The body exists so that truncating the subject loses nothing: a
- * plan's task sentences run past two hundred characters here, and
- * the sentence is the only record of what the commit was asked to
- * do. It is omitted entirely when the subject was not cut, rather
- * than repeated.
+ * The body is the whole task line on every commit. The subject holds
+ * one clause at most, so it seldom carries the sentence, and a body
+ * written only when the subject lost words would leave a reader of
+ * `git log` checking, commit by commit, which of the two holds it. The
+ * sentence is the only record of what the commit was asked to do, so
+ * it sits in the same place every time, even where that repeats a
+ * subject that already says all of it.
  */
 export function buildCommitMessage(
   taskText: string,
   options: SubjectOptions = {},
 ): CommitMessage {
   const derived = deriveCommitSubject(taskText, options);
-  const normalised = normaliseTaskText(taskText);
-  const body = derived.truncated
-    ? normalised
-    : '';
+  const body = normaliseTaskText(taskText);
 
   return { ...derived, body };
 }

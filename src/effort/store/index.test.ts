@@ -3,7 +3,7 @@
  * the `./store` subpath exposes.
  *
  * Every store sits under a fresh temporary repo root, so the suite
- * touches no `.ralph/` anywhere, and the disk is real rather than
+ * touches no `.rafa/` anywhere, and the disk is real rather than
  * mocked.
  *
  * Which backend a selection opened is read off the disk, never off the
@@ -39,6 +39,20 @@
  * moved out after. The copies compiled unmutated, which is the control.
  * A third backend name added to the copied config with no opener then
  * failed in the copied entry's opener record (TS2741).
+ *
+ * The opener record and the name lookup then moved into the adapter
+ * registry, `src/adapters/registry.ts`. Four of the readings above were
+ * taken again there on 2026-09-14, one run each, with the suite at 27
+ * pass before and after and every module restored byte-identical. The
+ * openers swapped in the registry's record reddened nine cases. The
+ * registry's `find` indexing an object rather than its `Map` reddened the
+ * three `Object.prototype` names and the list. An unknown name falling
+ * back to SQLite reddened ten. A third name added to `STORE_BACKENDS` in
+ * place failed `check-types` with one TS2741, at the registry's opener
+ * record. A fifth mutation stayed green: the selector opening the backend
+ * itself once the registry finds the name. No case here tells a selector
+ * that resolves through the registry from one that does not, because
+ * both answer the same stores.
  */
 import type { SelectedEffortStore } from './index.js';
 import type { CommitEffortRow, SessionEffortRow } from './types.js';
@@ -57,7 +71,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig, resolveConfig, STORE_BACKENDS } from '../../config.js';
+import { loadConfig } from '../../config-load.js';
+import { resolveConfig, STORE_BACKENDS } from '../../config.js';
 
 import { openNdjsonStore } from './ndjson.js';
 import { openSqliteStore } from './sqlite.js';
@@ -81,7 +96,7 @@ const SESSION = sessionRow('aaaa-1111');
 const COMMIT = commitRow('deadbeef');
 
 /** The store directory each backend's files are expected in. */
-const STORE_DIR = ['.ralph', 'effort'] as const;
+const STORE_DIR = ['.rafa', 'effort'] as const;
 
 /** Where one backend is expected to put each kind, and what it leaves. */
 interface Layout {
@@ -175,12 +190,12 @@ function writeConfig(root: string, text: string): void {
   writeFileSync(join(root, '.rafa', 'config.yaml'), text);
 }
 
-/** Resolves the config under a root and selects from it. */
+/** Resolves the config under a root, beside an empty home, and selects from it. */
 function selectFromDisk(
   root: string,
   cli: { store?: string } = {},
 ): SelectedEffortStore {
-  const resolved = loadConfig(root, cli, () => undefined);
+  const resolved = loadConfig({ root, home: join(tempBase, 'home') }, cli, () => undefined);
   return selectEffortStore(root, resolved.config);
 }
 

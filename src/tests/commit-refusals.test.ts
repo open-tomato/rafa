@@ -52,11 +52,12 @@
  *
  * ## The mutation grid
  *
- * Twelve module mutations were driven against this file and ELEVEN
- * reddened at least one case, with the module restored
- * bytes-identical and all 11 cases green either side. Every case
- * below is in the reddened union, so none of them rests on nothing,
- * and two full passes named the identical red set for every leg.
+ * Twelve module mutations were driven against this file, before the
+ * first-clause rule, and ELEVEN reddened at least one case, with the
+ * module restored bytes-identical and all 11 cases then in the file
+ * green either side. Every one of those cases is in the reddened
+ * union, so none of them rests on nothing, and two full passes named
+ * the identical red set for every leg.
  *
  * The splits that ISOLATE are what the file is shaped for.
  * Committing under `--cleanup=strip`, and dropping the flag
@@ -64,14 +65,28 @@
  * cap to 120 reddens the truncation round-trip alone, which is why
  * 72 is spelled as a literal here rather than imported. Answering an
  * empty description for a first word past the budget reddens the
- * hard-cut case alone, and always writing a body reddens the
- * round-trip alone. Cutting with no word boundary reddens the two
+ * hard-cut case alone, and always writing a body reddened the
+ * round-trip alone while the body was written only for a cut subject;
+ * it is the rule now. Cutting with no word boundary reddens the two
  * boundary cases; refusing to cut at all reddens all four truncation
  * cases. Accepting a commit git refused, and answering an empty
  * failure message, redden the SAME four — the three hook cases plus
  * the discrimination one — which is the pair saying those two claims
  * are read together. Inverting the nothing-to-commit branch, and
  * inspecting without `--cached`, each redden 9 of 11.
+ *
+ * The first-clause rule (finding 5 of the 2026-09-13 prompt audit)
+ * added the clause case and twelve more legs, one pass each, and the
+ * clause case is in their reddened union. Writing the body only for a
+ * cut subject, the rule before it, reddens three here: the clause
+ * case, the round-trip and the hash-body case, whose first clause
+ * fits. Taking the subject from the whole text again, counting
+ * endings inside a code span, and dropping the opening parenthesis
+ * from the endings each redden the clause case alone. The other eight
+ * legs are `firstClause` branches no fixture here reaches, and the
+ * colocated suite reddens each of them; one of the eight, keeping the
+ * space before an ending, could not show here in any case, since
+ * `inRepo` trims what git prints.
  *
  * The one leg that reddened NOTHING is recorded rather than dropped,
  * because it is dead by construction rather than unguarded: swapping
@@ -119,6 +134,17 @@ const LONG_TASK = [
 
 /** The control for every truncation case. Fits with room to spare. */
 const SHORT_TASK = 'Add a refusal case';
+
+/**
+ * A task text whose first clause ends at a parenthesis well inside the
+ * cap. It opens the way the task did whose subject the 2026-09-14
+ * cutover run cut at width, mid-sentence; the words after `the loop`
+ * are this fixture's own.
+ */
+const CLAUSE_TASK = [
+  'Add `docs/rafa-cutover.md` (under 60 lines) stating that the loop',
+  'owns staging and committing',
+].join(' ');
 
 /**
  * A task text whose BODY opens on a hash.
@@ -433,6 +459,37 @@ describe('the rejected pre-commit hook', () => {
   });
 });
 
+describe('a task text whose first clause ends inside the cap', () => {
+  it('commits the clause as subject and the whole line as body', () => {
+    const dir = plantRepo();
+    write(dir, 'work.txt', 'done\n');
+    const result = attempt(dir, CLAUSE_TASK);
+
+    expect(result.outcome).toBe('committed');
+    expect(lastSubject(dir)).toBe('docs: add `docs/rafa-cutover.md`');
+    expect(lastBody(dir)).toBe(normaliseTaskText(CLAUSE_TASK));
+
+    // The control, along the one axis: the same words with the
+    // parenthesis moved inside the code span carry no ending outside
+    // one, so the subject runs on to the cap and stops mid-sentence,
+    // the shape the cutover run committed. That is what says the
+    // subject above is the clause rule and not a text that is short.
+    const hidden = CLAUSE_TASK
+      .replace('` (under 60 lines)', ' (under 60 lines)`');
+    write(dir, 'more.txt', 'done\n');
+    attempt(dir, hidden);
+
+    const capped = [
+      'docs: add `docs/rafa-cutover.md (under 60 lines)`',
+      'stating that the loop',
+    ].join(' ');
+
+    expect(hidden).not.toBe(CLAUSE_TASK);
+    expect(lastSubject(dir)).toBe(capped);
+    expect(lastBody(dir)).toBe(normaliseTaskText(hidden));
+  });
+});
+
 describe('a task text long enough to truncate', () => {
   it('cuts the subject and keeps the whole text', () => {
     // The fixture is asserted to REACH the branch. A task text that
@@ -451,13 +508,13 @@ describe('a task text long enough to truncate', () => {
     expect(lastBody(dir)).toContain('truncation in the subject');
 
     // The control, along the length axis: a short text in the same
-    // repository keeps its whole sentence in the subject and writes
-    // no body at all.
+    // repository keeps its whole sentence in the subject, and the body
+    // carries the task line all the same.
     write(dir, 'more.txt', 'done\n');
     attempt(dir, SHORT_TASK);
 
     expect(lastSubject(dir)).toBe('feat: add a refusal case');
-    expect(lastBody(dir)).toBe('');
+    expect(lastBody(dir)).toBe(SHORT_TASK);
   });
 
   it('cuts at a word the source really contains', () => {

@@ -20,8 +20,8 @@
  * spawn `effort report` in a scratch git repository, since the command
  * resolves its root through git and takes no seam. The refusal's
  * control is the same command over a config it can run on, which exits
- * 0 and prints a document `JSON.parse` reads. The refused config holds
- * a problem in each of its two settings, so a command printing the
+ * 0 and gives the report as its json terminal result. The refused config holds
+ * a problem in each of two settings, so a command printing the
  * error's message as one line cannot pass for one printing a line per
  * problem: measured, with only the `store` problem planted, it did.
  *
@@ -51,8 +51,8 @@
  * landing in `classify.ts` reaches the `--kind` validator without an
  * edit here, and a shape dropped from the derivation reds.
  *
- * Twenty-one module mutations were driven against this file and
- * TWENTY reddened at least one case, none of them missing its target,
+ * Nineteen module mutations were driven against this file and
+ * EIGHTEEN reddened at least one case, none of them missing its target,
  * with the restored module green either side and byte-identical:
  * grouping on the branch before the plan stub, dropping the branch
  * fallback so every unattributed row lands in one bucket, keying the
@@ -66,9 +66,10 @@
  * entrypoint instead of the dominant one, letting a row with no
  * entrypoint pass an entrypoint filter, breaking a dominance tie on
  * insertion order, sorting groups ascending, sorting on sessions
- * instead of tokens, rendering an empty histogram as an empty string,
- * dropping the TOTAL row from the table, accepting an unrecognised
- * argument, and keeping a duplicate on a repeated `--kind`.
+ * instead of tokens, accepting an unrecognised argument, and keeping a
+ * duplicate on a repeated `--kind`. The two aimed at the table, an
+ * empty histogram rendered as an empty string and the TOTAL row
+ * dropped, moved with its cases to `report-format.test.ts`.
  *
  * ONE stayed green and is named rather than dropped, because it is a
  * property of the FIXTURES rather than a hole in the suite: dropping
@@ -77,10 +78,33 @@
  * a figure already exact at three places. It exists for the float tail
  * a longer sum grows, and a fixture chosen to produce one would be
  * asserting JavaScript's arithmetic rather than this module's.
+ *
+ * The task report cases came later, with three legs of their own driven
+ * against this file and `tests/effort-pipeline.test.ts`, each restored
+ * sha256-identical: the tallies never read (3 red), the tallies emptied
+ * under a `--kind` filter (1), and the command's no-rows branch printing no
+ * tallies (1). None reddened the pipeline suite.
+ *
+ * The preflight halt cases came with the `preflight` table. Three legs of
+ * `report.ts` were driven on 2026-09-15 against this file and six other
+ * suites, each restored sha256-identical: the halts never read (2 red
+ * here), the no-rows branch printing no halts (1), and the halts emptied
+ * under a `--kind` filter (1).
+ *
+ * The json cases came when the command began writing through the active
+ * output, and each text case beside one reads the bytes phase 0 printed.
+ * Of the mutations driven on 2026-09-15 over this file and ten other
+ * suites, with 387 pass before and after and every module restored
+ * sha256-identical, these reddened cases here: `--output` handed to the
+ * parser (3), json mode's report written as an info line (2), the refusal
+ * thrown with no message (2), config warnings back on `console.warn` (2),
+ * and `--json` never read as `--output=json` or writing no deprecation
+ * line (1 each).
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { SessionEffortRow } from './store/types.js';
+import type { CliEvent } from '../ports/index.js';
 
 import {
   mkdirSync,
@@ -95,18 +119,14 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError, loadConfig } from '../config.js';
+import { loadConfig } from '../config-load.js';
+import { ConfigError } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import {
   buildReport,
   dominantEntrypoint,
   emptyGroup,
-  formatCount,
-  formatHistogram,
-  formatMinutes,
-  formatReport,
-  formatReportTable,
   groupKeyOf,
   matchesFilters,
   parseReportArgs,
@@ -116,12 +136,23 @@ import {
   summariseSessions,
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
+import { writeDispatch } from './store/dispatches.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
+import { writePreflightChecks } from './store/preflight.js';
+import { writeTaskReport } from './store/reports.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'ralph-report-'));
 let planted = 0;
+
+/**
+ * The home every case reads the user scope's config under, in-process
+ * and spawned: a directory of this file's own holding none, so no case
+ * reads the real home.
+ */
+const HOME = join(tempRoot, 'home');
+mkdirSync(HOME);
 
 afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
@@ -619,92 +650,6 @@ describe('sortGroups', () => {
   });
 });
 
-describe('formatting', () => {
-  it('groups a count in threes without a locale', () => {
-    expect(formatCount(0)).toBe('0');
-    expect(formatCount(999)).toBe('999');
-    expect(formatCount(1000)).toBe('1,000');
-    expect(formatCount(84053)).toBe('84,053');
-    expect(formatCount(1234567)).toBe('1,234,567');
-  });
-
-  it('renders a missing span as a dash', () => {
-    expect(formatMinutes(null)).toBe('-');
-    expect(formatMinutes(0)).toBe('0.0');
-    expect(formatMinutes(12.34)).toBe('12.3');
-  });
-
-  it('renders a histogram commonest first, ties by key', () => {
-    expect(formatHistogram({})).toBe('-');
-    expect(formatHistogram({ low: 2, xhigh: 9 })).toBe('xhigh=9 low=2');
-    expect(formatHistogram({ b: 1, a: 1 })).toBe('a=1 b=1');
-  });
-});
-
-describe('formatReportTable', () => {
-  it('renders a header, every group and a TOTAL row', () => {
-    const lines = formatReportTable(summariseSessions(ROWS));
-
-    expect(lines).toHaveLength(6);
-    expect(lines[0]?.startsWith('plan / branch')).toBe(true);
-    expect(lines[5]?.startsWith('TOTAL')).toBe(true);
-  });
-
-  it('carries no pipe, so no markdown row can split', () => {
-    for (const line of formatReportTable(summariseSessions(ROWS))) {
-      expect(line).not.toContain('|');
-    }
-  });
-
-  it('aligns every cell into one column per header', () => {
-    const lines = formatReportTable(summariseSessions(ROWS));
-    const header = lines[0] ?? '';
-    const offset = header.indexOf('sessions');
-
-    expect(offset).toBeGreaterThan(0);
-    for (const line of lines.slice(1)) {
-      // Right-aligned, so the column's last character is its end.
-      expect(line.slice(offset - 2, offset + 8)).toMatch(/^ +\d[\d,]*$/);
-    }
-  });
-
-  it('leaves no trailing whitespace on any line', () => {
-    for (const line of formatReportTable(summariseSessions(ROWS))) {
-      expect(line).toBe(line.trimEnd());
-    }
-  });
-
-  it('names both filters, and what they left', () => {
-    const lines = formatReport(summariseSessions(ROWS, {
-      kinds: ['task', 'other'],
-      entrypoints: ['sdk-cli'],
-    }));
-
-    expect(lines[0]).toContain('4 of 6 session rows');
-    expect(lines[1]).toContain('task, other');
-    expect(lines[2]).toContain('sdk-cli');
-  });
-
-  it('notes the spanless rows and the legacy ones', () => {
-    const text = formatReport(summariseSessions(ROWS)).join('\n');
-
-    expect(text).toContain('1 sessions contributed no span');
-    expect(text).toContain('1 rows predate the effort field');
-  });
-
-  it('omits both notes when neither applies', () => {
-    const clean = [plantRow({
-      branch: 'b',
-      firstTimestamp: '2026-09-08T10:00:00.000Z',
-      lastTimestamp: '2026-09-08T10:01:00.000Z',
-    })];
-    const lines = formatReport(summariseSessions(clean));
-
-    expect(lines[1]).toBe('');
-    expect(lines.join('\n')).not.toContain('note');
-  });
-});
-
 describe('SESSION_KINDS', () => {
   it('is every prompt shape plus the residue kind', () => {
     const shapes = PROMPT_SHAPES.map((shape) => shape.kind);
@@ -838,14 +783,14 @@ function thrownBy(call: () => unknown): unknown {
 
 describe('buildReport', () => {
   it('answers an empty report when no store exists', () => {
-    const report = buildReport({ repoRoot: join(tempRoot, 'nothing-here') });
+    const report = buildReport({ home: HOME, repoRoot: join(tempRoot, 'nothing-here') });
 
     expect(report.rowsRead).toBe(0);
     expect(report.groups).toEqual([]);
   });
 
   it('rolls up the rows a store holds', () => {
-    const report = buildReport({ repoRoot: plantStore(ROWS) });
+    const report = buildReport({ home: HOME, repoRoot: plantStore(ROWS) });
 
     expect(report.rowsRead).toBe(ROWS.length);
     expect(report.groups).toHaveLength(4);
@@ -854,7 +799,7 @@ describe('buildReport', () => {
 
   it('applies its filters to what the store held', () => {
     const root = plantStore(ROWS);
-    const report = buildReport({ repoRoot: root, kinds: ['task'] });
+    const report = buildReport({ home: HOME, repoRoot: root, kinds: ['task'] });
 
     expect(report.totals.sessions).toBe(4);
     expect(report.filters.kinds).toEqual(['task']);
@@ -865,7 +810,7 @@ describe('buildReport', () => {
       ...plantRow({ sessionId: 'legacy', branch: 'feat/x' }),
       effortCounts: undefined,
     }]);
-    const report = buildReport({ repoRoot: root });
+    const report = buildReport({ home: HOME, repoRoot: root });
 
     expect(report.totals.sessionsWithoutEffort).toBe(1);
   });
@@ -888,7 +833,7 @@ function plantBothBackends(config: string | null): string {
 
 describe('the store a report reads', () => {
   it('reads the SQLite store when no config names one', () => {
-    const report = buildReport({ repoRoot: plantBothBackends(null) });
+    const report = buildReport({ home: HOME, repoRoot: plantBothBackends(null) });
 
     expect(report.rowsRead).toBe(SQLITE_ROWS.length);
     expect(report.groups.map((group) => group.key))
@@ -901,7 +846,7 @@ describe('the store a report reads', () => {
   ])('reads the rows of the backend store: %s selects', (backend, rows) => {
     const root = plantBothBackends(`store: ${backend}\n`);
 
-    const report = buildReport({ repoRoot: root });
+    const report = buildReport({ home: HOME, repoRoot: root });
 
     expect(report.rowsRead).toBe(rows);
   });
@@ -911,8 +856,8 @@ describe('the store a report reads', () => {
     appendSqliteSessions(sqliteRoot, ROWS);
     const ndjsonRoot = plantStore(ROWS);
 
-    const fromSqlite = buildReport({ repoRoot: sqliteRoot });
-    const fromNdjson = buildReport({ repoRoot: ndjsonRoot });
+    const fromSqlite = buildReport({ home: HOME, repoRoot: sqliteRoot });
+    const fromNdjson = buildReport({ home: HOME, repoRoot: ndjsonRoot });
 
     expect(fromSqlite.rowsRead).toBe(ROWS.length);
     expect(fromSqlite.totals.sessionsWithoutEffort).toBe(1);
@@ -925,6 +870,7 @@ describe('the store a report reads', () => {
     const root = plantBothBackends('store: postgres\n');
 
     const report = buildReport({
+      home: HOME,
       repoRoot: root,
       store: openNdjsonStore(root),
     });
@@ -935,7 +881,7 @@ describe('the store a report reads', () => {
   it('refuses a config it cannot run on', () => {
     const root = plantBothBackends('store: postgres\n');
 
-    const refusal = thrownBy(() => buildReport({ repoRoot: root }));
+    const refusal = thrownBy(() => buildReport({ home: HOME, repoRoot: root }));
 
     expect(refusal).toBeInstanceOf(ConfigError);
     expect((refusal as ConfigError).problems).toEqual([
@@ -944,7 +890,157 @@ describe('the store a report reads', () => {
   });
 });
 
-/** A config holding a problem in each of its two settings. */
+/** Records one task report under a root, as the loop records one. */
+function plantTaskReport(
+  root: string,
+  sessionId: string,
+  status: 'done' | 'blocked' | null,
+  outcome: 'done' | 'blocked' | 'failed',
+): void {
+  writeTaskReport(root, {
+    dispatch: { sessionId, planStub: 'q19-loop-economics', taskLine: 'A task' },
+    outcome,
+    report: { status },
+  });
+}
+
+describe('the task reports a report carries', () => {
+  it('carries the tallies under the root beside the session rows the config selects', () => {
+    const root = plantStore(ROWS);
+    plantTaskReport(root, 'q19-a', 'done', 'blocked');
+    plantTaskReport(root, 'q19-b', 'done', 'done');
+
+    const report = buildReport({ home: HOME, repoRoot: root });
+
+    expect(report.rowsRead).toBe(ROWS.length);
+    expect(report.taskReports).toEqual([
+      { planStub: 'q19-loop-economics', status: 'done', outcome: 'blocked', reports: 1 },
+      { planStub: 'q19-loop-economics', status: 'done', outcome: 'done', reports: 1 },
+    ]);
+  });
+
+  it('carries them unfiltered, and none from a root that stores none', () => {
+    const root = plantStore(ROWS);
+    plantTaskReport(root, 'q19-a', 'blocked', 'blocked');
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.taskReports).toHaveLength(1);
+
+    // The control: the same session rows with no task report stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).taskReports).toEqual([]);
+  });
+});
+
+/**
+ * Records one run's preflight under a root, as the loop records one: a
+ * passing required check, then a failed presence check on `tier`, which
+ * halts the run only on the required tier.
+ */
+function plantPreflight(root: string, runId: string, tier: 'required' | 'optional'): void {
+  writePreflightChecks(root, {
+    runId,
+    checks: [
+      {
+        tier: 'required',
+        item: { kind: 'tool', name: 'bun', probe: 'bun --version' },
+        outcome: 'pass',
+        durationMs: 5,
+        failure: null,
+      },
+      {
+        tier,
+        item: { kind: 'env', name: 'GITHUB_TOKEN', probe: null },
+        outcome: 'fail',
+        durationMs: 0,
+        failure: 'presence check: GITHUB_TOKEN is not set',
+      },
+    ],
+  }, { now: () => new Date('2026-09-15T10:00:00.000Z') });
+}
+
+describe('the preflight halts a report carries', () => {
+  it('carries the halted runs under the root, unfiltered, and no run that only warned', () => {
+    const root = plantStore(ROWS);
+    plantPreflight(root, 'run-halted', 'required');
+    plantPreflight(root, 'run-warned', 'optional');
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.preflightHalts).toEqual([{
+      runId: 'run-halted',
+      collectedAt: '2026-09-15T10:00:00.000Z',
+      checks: 2,
+      failed: [{
+        kind: 'env',
+        item: 'GITHUB_TOKEN',
+        probe: null,
+        outcome: 'fail',
+        durationMs: 0,
+        failure: 'presence check: GITHUB_TOKEN is not set',
+      }],
+    }]);
+
+    // The control: the same session rows with no preflight stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).preflightHalts).toEqual([]);
+  });
+});
+
+/**
+ * Records one dispatch under a root, as the loop records one: a task
+ * declaring `budget`, or declaring nothing when it is null.
+ */
+function plantDispatch(root: string, sessionId: string, budget: number | null): void {
+  writeDispatch(root, {
+    sessionId,
+    planStub: 'q19-loop-economics',
+    taskLine: 'A task',
+    declaration: budget === null
+      ? null
+      : { raw: `{budget=${budget}}`, agent: null, model: null, effort: null, budget, tools: null },
+    flags: budget === null
+      ? []
+      : ['--max-budget-usd', String(budget)],
+  });
+}
+
+describe('the budgets a report carries', () => {
+  it('carries each budgeted session under the root beside its row, unfiltered', () => {
+    const root = plantStore(ROWS);
+    plantDispatch(root, 'q19-a', 0.5);
+    plantDispatch(root, 'q19-b', null);
+    plantDispatch(root, 'uncollected', 2);
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    // `q19-a` is a task session the filter leaves out of the table.
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.budgets).toEqual([
+      {
+        sessionId: 'q19-a',
+        planStub: 'q19-loop-economics',
+        taskLine: 'A task',
+        budgetUsd: 0.5,
+        usage: {
+          assistantTurns: 10,
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 5000,
+          cacheWriteTokens: 700,
+          totalTokens: 5820,
+        },
+      },
+      { sessionId: 'uncollected', planStub: 'q19-loop-economics', taskLine: 'A task', budgetUsd: 2, usage: null },
+    ]);
+
+    // The control: the same session rows with no dispatch stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).budgets).toEqual([]);
+  });
+});
+
+/** A config holding a problem in each of two settings, `store` and `plan.inject`. */
 const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
 
 /** What one run of the command printed, and how it exited. */
@@ -956,9 +1052,10 @@ interface CommandRun {
 
 /**
  * A scratch git repository with a config and a planted NDJSON store,
- * answered as its real path. The command takes its root from git, which
- * resolves macOS's `/var` symlink to `/private/var`, and a refusal quotes
- * the config path under that root.
+ * answered as its real path. The command takes its root from the project
+ * the dispatcher resolves, a real path, which resolves macOS's `/var`
+ * symlink to `/private/var`, and a refusal quotes the config path under
+ * that root.
  */
 function makeRepo(config: string): string {
   const root = realpathSync(freshRoot());
@@ -975,7 +1072,7 @@ function makeRepo(config: string): string {
 function runReport(root: string, args: readonly string[]): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'report', ...args],
-    { cwd: root },
+    { cwd: root, env: { ...process.env, HOME } },
   );
   return {
     exitCode: run.exitCode,
@@ -984,23 +1081,133 @@ function runReport(root: string, args: readonly string[]): CommandRun {
   };
 }
 
-describe('the report command', () => {
-  it('reads the store the config selects, warning on stderr alone', () => {
-    const root = makeRepo('store: ndjson\ntracker: linear\n');
+/** The events a json run wrote, one per line, each parsed. */
+function eventsOf(stdout: string): CliEvent[] {
+  return stdout
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line) as CliEvent);
+}
 
-    const run = runReport(root, ['--json']);
+/** An event without its stamp, which differs between two runs. */
+function withoutStamp(event: CliEvent): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'ts'));
+}
+
+describe('the report command', () => {
+  it('reads the store the config selects in json mode, its warning a warn event ahead of the result', () => {
+    const root = makeRepo('store: ndjson\nnonesuch: linear\n');
+
+    const run = runReport(root, ['--output=json']);
 
     expect(run.exitCode).toBe(0);
-    expect((JSON.parse(run.stdout) as { rowsRead: number }).rowsRead)
-      .toBe(ROWS.length);
-    expect(run.stderr).toContain('"tracker"');
+    expect(run.stderr).toBe('');
+    const events = eventsOf(run.stdout);
+    expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
+    expect(events[1]).toMatchObject({ level: 'warn', message: expect.stringContaining('"nonesuch"') });
+    expect(events[2]).toMatchObject({ ok: true, data: { rowsRead: ROWS.length } });
+  });
+
+  it('warns about the same key on stdout in text mode, ahead of the tables', () => {
+    const root = makeRepo('store: ndjson\nnonesuch: linear\n');
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.stdout).toStartWith('warn: ');
+    expect(run.stdout.split('\n')[0]).toContain('"nonesuch"');
+  });
+
+  it('reads --json as --output=json after one deprecation line, writing the same events but their stamps', () => {
+    const root = makeRepo('store: ndjson\n');
+
+    const deprecated = runReport(root, ['--json']);
+    const canonical = runReport(root, ['--output=json']);
+
+    expect(deprecated.exitCode).toBe(0);
+    expect(deprecated.stderr)
+      .toBe('rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"\n');
+    expect(canonical.stderr).toBe('');
+    expect(eventsOf(deprecated.stdout).map(withoutStamp)).toEqual(eventsOf(canonical.stdout).map(withoutStamp));
+    expect(eventsOf(canonical.stdout).at(-1)).toMatchObject({ ok: true, data: { rowsRead: ROWS.length } });
+  });
+
+  it('prints the stored task reports when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
+    plantTaskReport(root, 'aaaa-1111', 'done', 'blocked');
+    const bare = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: bare });
+    writeConfig(bare, '');
+    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'task reports: 1 stored, by plan, status and outcome',
+      'plan                status  outcome  reports',
+      'q19-loop-economics  done    blocked        1',
+      '',
+    ]);
+
+    // The control: a root storing neither prints the one line alone.
+    expect(runReport(bare, []).stdout).toBe(`${noRows}\n`);
+  });
+
+  it('prints the preflight halts when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
+    plantPreflight(root, 'run-halted', 'required');
+    plantPreflight(root, 'run-warned', 'optional');
+    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'preflight halts: 1 run, by run and failed required item',
+      'run         at                        item                outcome  ms  failure',
+      'run-halted  2026-09-15T10:00:00.000Z  env "GITHUB_TOKEN"  fail      0  presence check: GITHUB_TOKEN is not set',
+      '',
+    ]);
+  });
+
+  it('prints the budgets when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
+    plantDispatch(root, 'aaaa-1111', 0.5);
+    plantDispatch(root, 'bbbb-2222', null);
+    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'budgets: 1 session dispatched with a budget, beside the tokens each used',
+      '  note        usage is in tokens: no dollar cost is stored, and a text-mode session prints none',
+      '  note        - is a session no collect has read yet',
+      'session    plan                budget-usd  turns  input  output  cache-r  cache-w  total',
+      'aaaa-1111  q19-loop-economics         0.5      -      -       -        -        -      -',
+      '',
+    ]);
   });
 
   it('prints a config it cannot run on as one refusal per problem', () => {
     const root = makeRepo(TWO_PROBLEM_CONFIG);
-    const refusal = thrownBy(() => loadConfig(root)) as ConfigError;
+    const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
 
-    const run = runReport(root, ['--json']);
+    const run = runReport(root, []);
 
     expect(refusal.problems).toEqual([
       expect.stringContaining('store is "postgres"'),
@@ -1011,5 +1218,24 @@ describe('the report command', () => {
       refusal.problems.map((problem) => `ralph effort report: ${problem}`),
     );
     expect(run.stdout).toBe('');
+  });
+
+  it('carries the same refusal in the terminal result in json mode, writing nothing to stderr', () => {
+    const root = makeRepo(TWO_PROBLEM_CONFIG);
+    const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
+
+    const run = runReport(root, ['--output=json']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toBe('');
+    const events = eventsOf(run.stdout);
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    expect(events[1]).toMatchObject({
+      ok: false,
+      error: {
+        code: 'command_exit',
+        message: refusal.problems.map((problem) => `ralph effort report: ${problem}`).join('\n'),
+      },
+    });
   });
 });

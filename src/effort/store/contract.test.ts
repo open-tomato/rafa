@@ -36,7 +36,7 @@
  *     every byte of the file it targeted exactly as it was.
  *
  * Every store sits under a fresh temporary repo root, so the suite
- * touches no `.ralph/` anywhere, and the disk is real rather than
+ * touches no `.rafa/` anywhere, and the disk is real rather than
  * mocked, as the rest of the store suite's files reason.
  */
 import type { EffortRow, EffortRowKind, EffortStore } from './types.js';

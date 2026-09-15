@@ -4,30 +4,33 @@
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
  * output only the operator reads. It has three call sites: plan
- * generation in `plan.ts`, the wrap-up session in `start/wrap-up.ts`
- * and the CI-repair session in `start/pr-lifecycle.ts`, all of which
- * want today's behaviour exactly — one model, one effort, every tool.
- * So the flags are a parameter with an EMPTY default:
- * `runClaude(prompt)` spawns exactly the process the loop spawned
- * before declarations existed.
+ * generation in the `claude` planner, `adapters/planner/claude.ts`,
+ * which `plan.ts` makes, the wrap-up session in `start/wrap-up.ts`
+ * and the CI-repair session in `start/pr-lifecycle.ts`, none of which
+ * is routed — one model, one effort, every tool. So the flags are a
+ * parameter with an EMPTY default: `runClaude(prompt, settingSources)`
+ * spawns the base arguments and the setting sources, and nothing a
+ * declaration could add.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
  * LOOP reads as well, and the per-task dispatch is its caller, through
  * `runTaskSession` in `start/dispatch.ts`. A task session ends its
  * final message with a `rafa:report` block, and {@link spawnClaude}
- * inherits stdout, so a loop holding that session's exit code holds
- * nothing else. Its flags are the ones a task's routing declaration
- * resolved to, with the `--session-id` the loop picked for that session
- * ahead of them. The captured entry builds its argument list through
- * the same {@link claudeArgs} and hands the prompt over the same way;
- * only the spawner differs, {@link spawnClaudeCaptured} piping stdout,
- * writing each chunk on to the operator as it arrives and keeping the
+ * answers the exit code alone, so a loop holding that session's exit
+ * code holds nothing else. Its flags are the ones a task's routing
+ * declaration resolved to, with the `--session-id` the loop picked for
+ * that session ahead of them. The captured entry builds its argument
+ * list through the same {@link claudeArgs} and hands the prompt over the
+ * same way; only the spawner differs, {@link spawnClaudeCaptured} piping
+ * stdout, echoing it on to the operator as it arrives and keeping the
  * same bytes for the answer. It sits BESIDE `runClaude` rather than
- * replacing its spawner, so a session nothing parses keeps spawning
- * exactly what it spawned before.
+ * replacing its spawner, so in text mode a session nothing parses keeps
+ * spawning exactly what it spawned before. What json mode changes is in
+ * the section "What reaches the operator" below.
  *
- * The flags land AFTER {@link CLAUDE_BASE_ARGS} rather than before,
- * and the ordering is load-bearing rather than cosmetic. `--tools` is
+ * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
+ * rather than before, and the ordering is load-bearing rather than
+ * cosmetic. `--tools` is
  * VARIADIC in the CLI's own help (`--tools <tools...>`), so it keeps
  * consuming tokens until one that starts with a dash. `--tools` is the
  * LAST flag `resolveDeclarationFlags` emits, and the resolved flags are
@@ -37,6 +40,29 @@
  * the one arrangement that breaks. `-p` itself takes no value
  * (`-p, --print` is a boolean in the same help text), so nothing after
  * it is at risk either.
+ *
+ * ## Setting sources
+ *
+ * Every session, through either door, is spawned with
+ * {@link SETTING_SOURCES_FLAG} naming the run's `loop.settingSources`
+ * (`config.ts`), `project,local` unless a config names others. Finding
+ * 3 of `.specs/phase-1-installable.md` measured the user scope at about
+ * 14,900 tokens of a 58,989-token turn. The sources are a REQUIRED
+ * parameter of {@link claudeArgs} and of both doors. A default here
+ * would be a second one beside `CONFIG_DEFAULTS`, and a caller that
+ * forgot to hand on the value its config resolved to would spawn under
+ * that default with nothing to say so; with no default, that caller
+ * does not compile.
+ *
+ * They go between the base arguments and the flags. The CLI's help, on
+ * Claude Code 2.1.268, lists `--setting-sources <sources>` as one
+ * comma-separated value where `--tools <tools...>` is variadic, so the
+ * sources swallow nothing and `--tools` stays last. What they change is
+ * measurable without a model call: an `--agent` name no scope defines
+ * exits 1 and lists the agents it could have run. That list held this
+ * repo's `.claude/agents` and none of `~/.claude/agents` under
+ * `project,local`, both under `user,project,local`, and neither under
+ * `local`.
  *
  * The prompt goes on STDIN and never into the argument list. That is
  * not a style choice: a plan's task prompt here is the injected
@@ -56,7 +82,51 @@
  * unavailable. Override via CLAUDE_USAGE_PERCENT env var for testing or manual
  * control. A real data source (Anthropic billing API, CLI flag, or injected
  * env var) should be wired in once reliably identified.
+ *
+ * ## What reaches the operator
+ *
+ * A session's stdout reaches the operator in the mode of the active
+ * output (`adapters/output/active.ts`). In text mode it is the bytes the
+ * session wrote, in the order it wrote them: {@link spawnClaude} inherits
+ * the stream, and {@link spawnClaudeCaptured} writes each chunk to
+ * `process.stdout` as it arrives. In json mode those bytes would put
+ * lines no NDJSON reader parses among the events, so neither door lets
+ * them through. {@link spawnClaudeCaptured} hands each line, its newline
+ * off, to the active output's `info`, which the `json` adapter writes as
+ * one `log` event. {@link spawnClaude} spawns through
+ * {@link spawnClaudeCaptured} and answers its exit code alone. A last
+ * line with no newline goes once stdout closes, and a blank line is an
+ * event with an empty message, so the messages joined with newlines are
+ * the session's stdout. The argument list, the prompt, the environment
+ * and the inherited stderr are the same in both modes.
+ *
+ * ## Interrupting a running session
+ *
+ * Both doors hold the process they spawn among the live sessions until it
+ * has exited, and {@link interruptClaudeSessions} sends each of those
+ * SIGINT. `loop start` calls it from its own SIGINT handler (`src/start.ts`).
+ * A terminal's Ctrl-C reaches the loop and its session at once, as one
+ * process group, but `rafa loop stop` signals the loop's pid alone, and a
+ * signal to that pid never reaches the session. Measured on 2026-09-15 by
+ * spawning `loop start` over a stand-in `claude` sleeping 20 seconds: a
+ * SIGINT to the loop's pid ended the run after 20.06 s, once the session
+ * had run to its own end, and one to its process group after 0.03 s.
+ *
+ * A signalled session has ended once its process exits, but the captured
+ * door reads the session's stdout to its end first, and a process the
+ * session left behind holding that stdout keeps it open. Measured on
+ * 2026-09-15 with a stand-in that trapped SIGINT and exited 130 while a
+ * sleep it had put in the background held the pipe: `rafa loop stop` took
+ * 19.9 s, ending when the sleep did, against 0.28 s with the sleep's output
+ * sent to `/dev/null`. Both doors answered 130 for a stand-in the signal
+ * ended, under bun 1.3.14.
+ *
+ * {@link checkUsage} writes through the active output too: each warning
+ * through `warn`, and the usage it read through `info`.
  */
+import type { ClaudeSettingSource } from '../config.js';
+
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 
 export async function getClaudeUsagePercent(): Promise<number | null> {
   const envPct = process.env['CLAUDE_USAGE_PERCENT'];
@@ -83,21 +153,21 @@ export async function checkUsage(context: 'issue' | 'task'): Promise<boolean> {
   if (pct === null) return false;
 
   if (context === 'task' && pct >= 90) {
-    console.warn(
+    activeOutput().warn(
       `\nClaude usage at ${pct.toFixed(0)}% (>=90%). Pausing after current task to avoid hitting the limit.`,
     );
     return true;
   }
   if (pct >= 80) {
-    console.warn(
+    activeOutput().warn(
       `\nClaude usage at ${pct.toFixed(0)}% (>=80%). Monitor closely — tasks may be interrupted.`,
     );
   } else if (context === 'issue' && pct >= 70) {
-    console.warn(
+    activeOutput().warn(
       `\nClaude usage at ${pct.toFixed(0)}% (>=70%). Consider whether to start the next issue.`,
     );
   } else {
-    console.info(`\nClaude usage: ${pct.toFixed(0)}%`);
+    activeOutput().info(`\nClaude usage: ${pct.toFixed(0)}%`);
   }
   return false;
 }
@@ -124,7 +194,19 @@ export const CLAUDE_BASE_ARGS: readonly string[] = [
 ];
 
 /**
- * Builds the argument list for one session.
+ * The flag every session names its setting sources with. See the
+ * module note.
+ */
+export const SETTING_SOURCES_FLAG = '--setting-sources';
+
+/**
+ * Builds the argument list for one session: the base arguments, the
+ * setting sources, then the flags.
+ *
+ * `settingSources` is the run's resolved `loop.settingSources`, joined
+ * with commas in the order given. `config.ts` has already refused a
+ * source the CLI does not name, a repeat and an empty list, so nothing
+ * is checked again here.
  *
  * `flags` is whatever a task's declaration resolved to, already
  * validated and already ordered by its own resolver. Nothing is
@@ -132,8 +214,11 @@ export const CLAUDE_BASE_ARGS: readonly string[] = [
  * which flags are legal, and one that did would be a second authority
  * for a decision `utils/declaration.ts` already makes.
  */
-export function claudeArgs(flags: readonly string[] = []): string[] {
-  return [...CLAUDE_BASE_ARGS, ...flags];
+export function claudeArgs(
+  settingSources: readonly ClaudeSettingSource[],
+  flags: readonly string[] = [],
+): string[] {
+  return [...CLAUDE_BASE_ARGS, SETTING_SOURCES_FLAG, settingSources.join(','), ...flags];
 }
 
 /**
@@ -147,6 +232,26 @@ export type ClaudeSpawner = (
   args: readonly string[],
   prompt: string,
 ) => Promise<number>;
+
+/** A spawned session, as {@link interruptClaudeSessions} reaches it. */
+interface LiveSession {
+  kill(signal: 'SIGINT'): void;
+}
+
+/** The sessions either door spawned and has not yet seen exit. */
+const liveSessions = new Set<LiveSession>();
+
+/**
+ * Sends SIGINT to every session either door spawned and has not yet seen
+ * exit, and answers how many that is. A process that exited before its
+ * door saw it is signalled too, which does nothing: measured under bun
+ * 1.3.14, `kill` on a subprocess that has exited throws nothing. See the
+ * module note.
+ */
+export function interruptClaudeSessions(): number {
+  for (const session of liveSessions) session.kill('SIGINT');
+  return liveSessions.size;
+}
 
 /**
  * The environment every session is spawned with: the loop's own, plus
@@ -170,6 +275,11 @@ function claudeSessionEnv(): Record<string, string | undefined> {
  * The real spawner: `Bun.spawn`, streams inherited so the session's
  * output reaches the operator as it happens.
  *
+ * In json mode it spawns through {@link spawnClaudeCaptured} instead and
+ * answers that session's exit code, so the session's stdout reaches the
+ * operator as `log` events and never as bytes among them; see the module
+ * note.
+ *
  * An exit code of `undefined` — which is what a signalled process
  * answers — is reported as 1, because every caller here treats a
  * non-zero as a failed session and a killed one is not a success.
@@ -178,29 +288,40 @@ export async function spawnClaude(
   args: readonly string[],
   prompt: string,
 ): Promise<number> {
+  if (activeOutputMode() === 'json') {
+    const { exitCode } = await spawnClaudeCaptured(args, prompt);
+    return exitCode;
+  }
   const proc = Bun.spawn([CLAUDE_BIN, ...args], {
     stdin: new TextEncoder().encode(prompt),
     stdout: 'inherit',
     stderr: 'inherit',
     env: claudeSessionEnv(),
   });
-  return (await proc.exited) ?? 1;
+  liveSessions.add(proc);
+  try {
+    return (await proc.exited) ?? 1;
+  } finally {
+    liveSessions.delete(proc);
+  }
 }
 
 /**
- * Spawns one Claude session with `prompt` on stdin.
+ * Spawns one Claude session with `prompt` on stdin, loading settings
+ * from `settingSources`.
  *
- * `flags` defaults to empty, which is the whole of the compatibility
- * promise: `runClaude(prompt)` builds the identical argument list the
- * loop always spawned, so `plan.ts`, the wrap-up and the CI-repair
- * session need no change and cannot be routed by accident.
+ * `flags` defaults to empty, so plan generation, the wrap-up and the
+ * CI-repair session, which hand over none, cannot be routed by
+ * accident: each spawns the base arguments and its setting sources
+ * alone. `settingSources` has no default; see the module note.
  */
 export function runClaude(
   prompt: string,
+  settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
   spawn: ClaudeSpawner = spawnClaude,
 ): Promise<number> {
-  return spawn(claudeArgs(flags), prompt);
+  return spawn(claudeArgs(settingSources, flags), prompt);
 }
 
 /**
@@ -226,19 +347,51 @@ export type CapturingSpawner = (
 ) => Promise<CapturedSession>;
 
 /**
- * Writes each chunk of `stream` to the operator's stdout as it
- * arrives, and answers all of them decoded as one string.
+ * Hands each whole line of `text` to `write`, its newline off, and
+ * answers what follows the last newline, which is no line yet.
+ */
+function writeWholeLines(text: string, write: (line: string) => void): string {
+  const lines = text.split('\n');
+  const rest = lines.pop() ?? '';
+  for (const line of lines) write(line);
+  return rest;
+}
+
+/**
+ * Echoes each chunk of `stream` on to the operator as it arrives, and
+ * answers all of them decoded as one string.
+ *
+ * The mode is read once, before the first chunk, off the active output
+ * (`adapters/output/active.ts`). In text mode each chunk is written to
+ * `process.stdout` as its bytes. In json mode nothing is: each line the
+ * decoded text completes goes to that output's `info`, and what follows
+ * the last newline goes once the stream ends, unless it is empty. See
+ * the module note.
  */
 async function teeToOperator(
   stream: ReadableStream<Uint8Array>,
 ): Promise<string> {
   const decoder = new TextDecoder();
+  const jsonOutput = activeOutputMode() === 'json'
+    ? activeOutput()
+    : null;
+  const writeLine = (line: string): void => {
+    jsonOutput?.info(line);
+  };
   let text = '';
+  let pending = '';
   for await (const chunk of stream) {
-    process.stdout.write(chunk);
-    text += decoder.decode(chunk, { stream: true });
+    if (jsonOutput === null) process.stdout.write(chunk);
+    const decoded = decoder.decode(chunk, { stream: true });
+    text += decoded;
+    if (jsonOutput !== null) pending = writeWholeLines(pending + decoded, writeLine);
   }
-  return text + decoder.decode();
+  const tail = decoder.decode();
+  if (jsonOutput !== null) {
+    const rest = writeWholeLines(pending + tail, writeLine);
+    if (rest !== '') writeLine(rest);
+  }
+  return text + tail;
 }
 
 /**
@@ -287,11 +440,13 @@ export async function spawnClaudeCaptured(
     stderr: 'inherit',
     env: claudeSessionEnv(),
   });
+  liveSessions.add(proc);
   let stdout: string;
   try {
     stdout = await teeToOperator(proc.stdout);
   } finally {
     await proc.exited;
+    liveSessions.delete(proc);
   }
   return { exitCode: await proc.exited, stdout };
 }
@@ -301,15 +456,16 @@ export async function spawnClaudeCaptured(
  * exit code together with everything it wrote to stdout.
  *
  * The argument list is the one {@link runClaude} builds for the same
- * flags, both going through {@link claudeArgs}, so capturing a session
- * changes where its stdout goes and nothing about what is run. The
- * operator still sees that output as it is written, through the tee in
- * {@link spawnClaudeCaptured}.
+ * setting sources and flags, both going through {@link claudeArgs}, so
+ * capturing a session changes where its stdout goes and nothing about
+ * what is run. The operator still sees that output as it is written,
+ * through the tee in {@link spawnClaudeCaptured}.
  */
 export function runClaudeCaptured(
   prompt: string,
+  settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
   spawn: CapturingSpawner = spawnClaudeCaptured,
 ): Promise<CapturedSession> {
-  return spawn(claudeArgs(flags), prompt);
+  return spawn(claudeArgs(settingSources, flags), prompt);
 }

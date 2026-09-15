@@ -315,9 +315,9 @@ export function attributeBranch(
  * Reads plan stubs out of a directory listing.
  *
  * Takes names rather than a directory so the naming convention lives in
- * one place while the read stays with the caller — `.plans/` is
- * gitignored and can be absent entirely, which is the caller's problem
- * to report and not this module's to guess at.
+ * one place while the read stays with the caller — the plans directory,
+ * `plan.dir`, is untracked by default and can be absent entirely, which
+ * is the caller's problem to report and not this module's to guess at.
  *
  * Duplicates are collapsed: two listings concatenated would otherwise
  * make every queue-id match ambiguous against a stub and itself.
@@ -579,7 +579,7 @@ export function resolveIssueIdentifier(
  * Takes the two fields it reads rather than the whole
  * {@link SessionStats}, which keeps the coupling visible and lets a
  * caller holding only a histogram use it. The roster is required rather
- * than defaulted: an empty one is a legitimate answer — no `.plans/`
+ * than defaulted: an empty one is a legitimate answer — no plans
  * directory — and a caller that forgot to pass one would otherwise get
  * the identical all-`none` result with nothing saying which it was.
  *

@@ -21,12 +21,18 @@
  * working unchanged, which is what shapes the grammar. `findNextTask`
  * matches `^- \[ \] (.+)` and trims the capture, so the block arrives
  * inside `taskInfo.task` and would otherwise reach the injected prompt
- * verbatim; `updateTrackerLine` rewrites only the checkbox prefix, so
- * the block survives a tick byte-identical. Neither needs a change —
- * the stripping happens here, at the point the text is used. Both
- * halves are driven over real trackers in
- * `tests/tracker-declarations.test.ts`, which is where that claim is
- * measured rather than stated.
+ * verbatim; `updateTrackerLine` rewrites the checkbox prefix and
+ * nothing before a blocker comment, so the block survives a tick
+ * byte-identical. Neither needed a change for the block — the
+ * stripping happens here, at the point the text is used. Both halves
+ * are driven over real trackers in `tests/tracker-declarations.test.ts`,
+ * which is where that claim is measured rather than stated.
+ *
+ * A blocker comment is the one thing a line may trail after the block,
+ * and it comes off in `findNextTask` rather than here
+ * (`utils/tracker.ts`). It has to come off first: the block is anchored
+ * at end of text, so with the comment still on it would read as task
+ * text.
  *
  * The strip rule reaches every `rafa:*` block too, but not from here.
  * A declaration sits ON a task line, so the text alone says where it
@@ -57,12 +63,19 @@
  * Nothing is stripped and no flag is resolved.
  *
  * Priority inside a block is duplicated ON PURPOSE. With `agent`
- * present the loop passes only `--agent`, because an agent definition
- * carries its own model and tool set and a flag beside it would be two
- * authorities for one decision. The other keys are still PARSED and
- * still sit on the record, so the effort collector can report what a
- * planner asked for against what the agent's definition supplied —
- * {@link ResolvedFlags.suppressed} names exactly which ones that was.
+ * present the loop never passes `--model` or `--tools`, because an
+ * agent definition carries its own model and tool set and a flag beside
+ * it would be two authorities for one decision. `--effort` joins
+ * `--agent` unless the agent's definition declares an effort of its
+ * own, which the caller answers through an {@link AgentEffortLookup}
+ * (`utils/agent-definition.ts` reads it off the definition's
+ * frontmatter): effort is the cost lever a plan most needs to reach the
+ * session, and a definition silent on it leaves the plan's level the
+ * only one there is. `budget` is outranked by nothing: an agent
+ * definition supplies no budget, so `--max-budget-usd` joins whatever
+ * else the block resolved to, agent or none. Every key is still PARSED
+ * and still sits on the record whether or not it became a flag, and
+ * {@link ResolvedFlags.suppressed} names exactly the ones that did not.
  *
  * Nothing here throws. A recognised key whose value this module cannot
  * use lands in {@link TaskDeclaration.issues} and maps to no flag, so
@@ -72,22 +85,38 @@
  * which is what lets a grammar grow without every older plan going red.
  */
 
-/** Keys this module answers to, in the order flags are emitted. */
+/**
+ * Keys this module answers to, in the order flags are emitted. `budget`
+ * sits ahead of `tools` because `--tools` is variadic and has to end the
+ * argument list (`utils/claude.ts`).
+ */
 export const DECLARATION_KEYS = [
   'agent',
   'model',
   'effort',
+  'budget',
   'tools',
 ] as const;
 
-/** One of the four keys the grammar recognises. */
+/** One of the keys the grammar recognises. */
 export type DeclarationKey = (typeof DECLARATION_KEYS)[number];
 
-/** The granular keys, which an `agent` suppresses. */
+/**
+ * The granular keys, each mapping to a flag of its own with no agent, and
+ * each one an agent can outrank. `budget` maps to a flag of its own too,
+ * and is not one of them: nothing outranks it.
+ */
 export const GRANULAR_KEYS = ['model', 'effort', 'tools'] as const;
 
 /** A key that maps to a flag of its own when no agent is named. */
 export type GranularKey = (typeof GRANULAR_KEYS)[number];
+
+/**
+ * The granular keys an `agent` outranks whenever it is named, its
+ * definition supplying a model and a tool set. `effort` is outranked
+ * only by a definition declaring one ({@link resolveDeclarationFlags}).
+ */
+export const AGENT_OWNED_KEYS = ['model', 'tools'] as const;
 
 /**
  * Model aliases the CLI documents, which is what a plan should spell.
@@ -125,8 +154,42 @@ const FULL_MODEL_NAME = /^claude-[a-z0-9][a-z0-9.-]*$/;
 /** An agent name, as a file under `.claude/agents/` is named. */
 const AGENT_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
+/**
+ * True when `value` is an agent name this module passes on: a bare
+ * file stem, so no name can reach a path outside `.claude/agents/`.
+ */
+export function isAgentName(value: string): boolean {
+  return AGENT_NAME.test(value);
+}
+
 /** One tool name from the built-in set. */
 const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+/** The flag a declared budget is passed as, in the CLI's own spelling. */
+export const BUDGET_FLAG = '--max-budget-usd';
+
+/**
+ * A budget in US dollars as a plan writes one: a whole part of at most
+ * six digits, with no leading zero but a lone one, and at most six decimal
+ * places. No sign, no currency symbol, no exponent and no bare point, so
+ * the number reads back through `String` as a plain decimal: `String`
+ * writes an exponent only below a millionth or from twenty-two digits on,
+ * and this shape reaches neither.
+ */
+const BUDGET_VALUE = /^(?:0|[1-9]\d{0,5})(?:\.\d{1,6})?$/;
+
+/**
+ * Reads a `budget=` value as US dollars, or answers null when it is not
+ * one this module passes on: a shape {@link BUDGET_VALUE} refuses, or
+ * zero, which no session could run under.
+ */
+export function parseBudgetUsd(value: string): number | null {
+  if (!BUDGET_VALUE.test(value)) return null;
+  const usd = Number(value);
+  return usd > 0
+    ? usd
+    : null;
+}
 
 /** One `key=value` pair, exactly as it was written. */
 export interface DeclarationEntry {
@@ -170,6 +233,8 @@ export interface TaskDeclaration {
   model: string | null;
   /** Effort level, or null. */
   effort: EffortLevel | null;
+  /** Budget in US dollars, above zero, or null. */
+  budget: number | null;
   /** Tool names, deduped in first-seen order, or null. */
   tools: readonly string[] | null;
 }
@@ -240,7 +305,7 @@ function unusableValue(key: string, token: string): DeclarationIssue {
   return { reason: 'unusable-value', key, text: token };
 }
 
-/** True when `key` is one of the four the grammar recognises. */
+/** True when `key` is one of the keys the grammar recognises. */
 function isDeclarationKey(key: string): key is DeclarationKey {
   return (DECLARATION_KEYS as readonly string[]).includes(key);
 }
@@ -265,6 +330,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
   let agent: string | null = null;
   let model: string | null = null;
   let effort: EffortLevel | null = null;
+  let budget: number | null = null;
   let tools: readonly string[] | null = null;
 
   for (const token of tokenise(body)) {
@@ -304,6 +370,12 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
       else issues.push(unusableValue(key, token));
       continue;
     }
+    if (key === 'budget') {
+      const usd = parseBudgetUsd(value);
+      if (usd === null) issues.push(unusableValue(key, token));
+      else budget = usd;
+      continue;
+    }
 
     const parsed = parseToolList(value);
     if (parsed === null) issues.push(unusableValue(key, token));
@@ -312,7 +384,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
 
   if (seen.size === 0) return null;
 
-  return { raw, entries, extras, issues, agent, model, effort, tools };
+  return { raw, entries, extras, issues, agent, model, effort, budget, tools };
 }
 
 /**
@@ -346,15 +418,45 @@ export function stripTaskDeclaration(taskText: string): string {
   return parseTaskDeclaration(taskText).text;
 }
 
+/** The flag and value a declared budget passes, or none for no budget. */
+function budgetArgs(budget: number | null): string[] {
+  return budget === null
+    ? []
+    : [BUDGET_FLAG, String(budget)];
+}
+
+/**
+ * Answers whether the named agent's definition declares an effort of
+ * its own. The loop's answer comes from the definition's frontmatter
+ * (`utils/agent-definition.ts`); a test hands in whatever its case is
+ * about.
+ */
+export type AgentEffortLookup = (agent: string) => boolean;
+
 /**
  * Maps a declaration onto the flags the loop spawns Claude with.
  *
- * An `agent` outranks the granular keys entirely: the agent definition
- * already names a model and a tool set, and passing a flag beside it
- * would leave two authorities for one decision with no way to tell
- * which won. The suppressed keys are named rather than dropped, which
- * is what lets a report say a plan asked for something the agent did
- * not supply.
+ * An `agent` outranks `model` and `tools` whenever it is named: the
+ * agent definition already names a model and a tool set, and passing
+ * a flag beside it would leave two authorities for one decision with
+ * no way to tell which won. `effort` is the exception. It joins
+ * `--agent` as `--effort` unless `agentDeclaresEffort` answers that
+ * the named agent's definition declares an effort of its own, because
+ * a definition silent on effort leaves the plan's level the only one
+ * there is. The lookup is asked only about a block carrying both keys,
+ * so every other block resolves without reading a definition. A name
+ * no definition answers for is the lookup's `false` and still passes
+ * `--effort`, leaving the CLI to refuse the name before any model
+ * call.
+ *
+ * Keys that map to no flag are named in
+ * {@link ResolvedFlags.suppressed} rather than dropped, which is what
+ * lets the dispatch say what it left to the agent.
+ *
+ * `budget` passes {@link BUDGET_FLAG} whatever else the block holds, an
+ * agent included, since a definition supplies no budget, and is never
+ * named as suppressed. It goes after `--effort` and ahead of `--tools`,
+ * whose variadic value has to end the list.
  *
  * A key whose value did not parse is absent from the record and so
  * emits nothing here — the task runs at the loop's defaults, which is
@@ -362,18 +464,28 @@ export function stripTaskDeclaration(taskText: string): string {
  */
 export function resolveDeclarationFlags(
   declaration: TaskDeclaration | null,
+  agentDeclaresEffort: AgentEffortLookup,
 ): ResolvedFlags {
   if (declaration === null) return { args: [], suppressed: [] };
 
-  if (declaration.agent !== null) {
-    const isPresent = (key: GranularKey) => declaration[key] !== null;
-    const suppressed = GRANULAR_KEYS.filter(isPresent);
-    return { args: ['--agent', declaration.agent], suppressed };
+  const { agent, effort } = declaration;
+  const isPresent = (key: GranularKey) => declaration[key] !== null;
+  const budget = budgetArgs(declaration.budget);
+
+  if (agent !== null) {
+    if (effort === null || agentDeclaresEffort(agent)) {
+      return { args: ['--agent', agent, ...budget], suppressed: GRANULAR_KEYS.filter(isPresent) };
+    }
+    return {
+      args: ['--agent', agent, '--effort', effort, ...budget],
+      suppressed: AGENT_OWNED_KEYS.filter(isPresent),
+    };
   }
 
   const args: string[] = [];
   if (declaration.model !== null) args.push('--model', declaration.model);
   if (declaration.effort !== null) args.push('--effort', declaration.effort);
+  args.push(...budget);
   if (declaration.tools !== null) {
     args.push('--tools', declaration.tools.join(','));
   }

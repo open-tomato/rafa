@@ -5,9 +5,10 @@
  * ## Layout
  *
  * One file, `effort.sqlite`, in the directory the NDJSON backend's
- * files live in: `EFFORT_STORE_DIR`, spelled once in `effort/store.ts`
- * and ignored by the root `.gitignore`. The two backends can therefore
- * hold a store side by side, and neither is ever committed.
+ * files live in: `EFFORT_STORE_DIR`, `.rafa/effort/`, spelled once in
+ * `effort/store.ts` and ignored by the project's `.gitignore` entry for
+ * `.rafa/`. The two backends can therefore hold a store side by side, and
+ * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
  * NDJSON rows are deduplicated by. Each table has three columns:
@@ -36,17 +37,26 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds four tables that are not kinds, all filled from task
+ * The file holds six tables that are not kinds. Five are filled from task
  * reports: `findings`, `blockers` and `out_of_scope_bugs`, one per list
- * a report carries, and `report_absences`, one row per task session
- * whose output held no report to read. The port's row map names none
- * of them, and nothing in this module reads or writes them.
- * `findings.ts` writes the first, `triage.ts` the next two and
- * `absences.ts` the last. `findings.ts` and `triage.ts` write through
+ * a report carries, `report_absences`, one row per task session whose
+ * output held no report to read, and `task_reports`, one row per task
+ * session whose output carried one, holding its status. The sixth,
+ * `preflight`, holds one row per item a run's preflight checked. The
+ * port's row map names none of them, and nothing in this module reads or
+ * writes them. `findings.ts` writes the first, `triage.ts` the next two,
+ * `absences.ts` the fourth, `reports.ts` the fifth and `preflight.ts` the
+ * last. `tracker-refs.ts` writes the first as well, setting a filed
+ * issue's reference on a row and inserting the row when there is none.
+ * `findings.ts`, `triage.ts` and `preflight.ts` write through
  * {@link writeSqliteStore}, as an append does, so a write left with
- * nothing to insert still meets the schema check. `absences.ts` always
- * has its one row and opens {@link withSqliteStore} directly. Each table
- * is opened, migrated and closed as every kind's table is. Each writer
+ * nothing to insert still meets the schema check.
+ * `absences.ts` always has its one row and opens {@link withSqliteStore}
+ * directly, as `tracker-refs.ts` does with the one row it places.
+ * `reports.ts` always has its one row too, and passes
+ * {@link writeSqliteStore} a count of one, which opens the store as that
+ * direct call does. Each table is opened, migrated and closed as every
+ * kind's table is. Each writer
  * says why its tables have a column per field and their own
  * deduplication keys, where a kind has `row_json` and one key.
  *
@@ -291,6 +301,63 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     detail       TEXT NOT NULL CHECK (detail <> ''),
     block_body   TEXT,
     outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
+  // Version 5: one row per task session whose output carried a report,
+  // holding the report's status beside the loop's outcome, outside the
+  // port's row map. `reports.ts` writes it and says why `status` has a
+  // CHECK and `outcome` has none.
+  `
+  CREATE TABLE task_reports (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    status       TEXT CHECK (status IN ('done', 'blocked')),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
+  // Version 6: one row per item a run's preflight checked, outside the
+  // port's row map and filled from no task report. `preflight.ts` writes
+  // it and says why `(run_id, position)` is its key, why `kind` has no
+  // CHECK, and why no column says the run halted.
+  `
+  CREATE TABLE preflight (
+    seq          INTEGER PRIMARY KEY,
+    run_id       TEXT NOT NULL CHECK (run_id <> ''),
+    position     INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0),
+    tier         TEXT NOT NULL CHECK (tier IN ('required', 'optional')),
+    kind         TEXT NOT NULL CHECK (kind <> ''),
+    item         TEXT NOT NULL CHECK (item <> ''),
+    probe        TEXT CHECK (probe <> ''),
+    outcome      TEXT NOT NULL CHECK (outcome IN ('pass', 'fail', 'timeout')),
+    duration_ms  INTEGER NOT NULL CHECK (typeof(duration_ms) = 'integer' AND duration_ms >= 0),
+    failure      TEXT CHECK (failure <> ''),
+    collected_at TEXT NOT NULL,
+    UNIQUE (run_id, position),
+    CHECK ((outcome = 'pass') = (failure IS NULL))
+  );
+  `,
+  // Version 7: one row per task session the loop dispatched, holding what
+  // its declaration asked for and the flags it was spawned with, outside
+  // the port's row map. `dispatches.ts` writes it and says why the session
+  // id is its key and why no column holds an outcome.
+  `
+  CREATE TABLE dispatches (
+    seq          INTEGER PRIMARY KEY,
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    declaration  TEXT CHECK (declaration <> ''),
+    agent        TEXT CHECK (agent <> ''),
+    model        TEXT CHECK (model <> ''),
+    effort       TEXT CHECK (effort <> ''),
+    budget_usd   REAL CHECK (budget_usd IS NULL OR (typeof(budget_usd) IN ('integer', 'real') AND budget_usd > 0)),
+    tools        TEXT CHECK (tools <> ''),
+    flags        TEXT NOT NULL,
     collected_at TEXT NOT NULL
   );
   `,

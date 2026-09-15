@@ -2,7 +2,7 @@
  * Tests for the NDJSON backend of the effort store port.
  *
  * Every store sits under a fresh temporary repo root, so the suite
- * touches no `.ralph/` anywhere and runs on a machine that has never
+ * touches no `.rafa/` anywhere and runs on a machine that has never
  * run the loop. The disk is real rather than mocked, for the reason the
  * sibling's suite gives: the rules under test are properties of a file.
  *
@@ -111,7 +111,7 @@ function freshRoot(name: string): string {
 
 /** Where both kinds live under a root. */
 function storeDir(root: string): string {
-  return join(root, '.ralph', 'effort');
+  return join(root, '.rafa', 'effort');
 }
 
 /** One kind's file under a root. */
@@ -163,7 +163,7 @@ function refusalOf(call: () => unknown): string {
 }
 
 describe('openNdjsonStore layout', () => {
-  it('keeps each kind in its own file under .ralph/effort', () => {
+  it('keeps each kind in its own file under .rafa/effort', () => {
     const root = freshRoot('layout');
     const store = openNdjsonStore(root);
     store.append('sessions', [S_A, S_B]);

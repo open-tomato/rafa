@@ -40,6 +40,16 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .docs
 .local
 
-# loop-generated effort store and derived progress notes
+# the project scope, holding the loop-generated effort store under .rafa/effort/
+.rafa/
+
+# the effort store a rafa built before the move to .rafa/effort/ still writes,
+# as the runtime snapshot running this repository's phase 1 plan does
 .ralph/
+
+# derived progress notes
 progress.txt
+
+# >>> rafa tracking: rafa rewrites the lines up to the end marker
+.rafa/
+# <<< rafa tracking

@@ -1,91 +1,206 @@
 /**
- * Tests for the phase-0 config reader.
+ * Tests for the config reader: the phase 1 schema, its layers and its
+ * refusals.
  *
  * The rules are tested where they live. `parseConfigText` and
- * `resolveConfig` are pure, so every precedence and refusal case runs
- * without a disk; only the `readConfigFile` and `loadConfig` cases
- * touch one, each under a fresh temporary root, so the suite reads no
- * `.rafa/` anywhere and runs on a machine that has never held one.
+ * `resolveConfig` are pure, so every precedence and refusal case here
+ * runs without a disk. Reading the files, from a project root and a
+ * home, is `config-load.ts`, driven in `config-load.test.ts`. The value
+ * readers are driven one by one in `config-sections.test.ts`; here each
+ * section is reached through a file's text.
  *
  * Every precedence case plants values that DIFFER from the defaults in
  * each layer it names, which is what lets it fail: a resolver that
- * skipped the file would answer `sqlite` and `stage`, never the file's
- * `ndjson` and `full`. The one case where a layer spells the default
- * is there to pin the source record, which is the only thing that can
- * tell a file that was read from one that was skipped.
+ * skipped the file would answer the defaults, never the file's values.
+ * {@link FULL} names every setting at a value other than its default,
+ * and a case holds it to that. The one case where a layer spells the
+ * default is there to pin the source record, which is the only thing
+ * that can tell a file that was read from one that was skipped.
  *
- * Files are planted at the LITERAL `.rafa/config.yaml`, never at a
- * path the module computes, so a module reading the wrong path fails
- * here rather than agreeing with itself.
+ * The settings, the defaults and the known keys a warning lists are
+ * spelled here, never read off the module, so a module that drops a
+ * setting or moves a default fails rather than agreeing with itself.
+ * Files are planted at the LITERAL `.rafa/config.yaml` for the same
+ * reason.
  *
- * Two cases are CHARACTERIZATIONS of bun rather than guards of this
+ * Three cases are CHARACTERIZATIONS of bun rather than guards of this
  * module, and are named as such: a tab-indented child parsing as a
- * top-level key, and `Bun.file().exists()` answering false for a
- * directory. Each pins a measured claim the module note makes, so a
- * bun upgrade that changes either fails here and says which sentence
- * went stale.
+ * top-level key, `Bun.file().exists()` answering false for a directory,
+ * and `yes` parsing as a string where `TRUE` parses as the boolean.
+ * Each pins a measured claim the module note makes, so a bun upgrade
+ * that changes one fails here and says which sentence went stale.
  *
- * Twenty-eight module mutations were driven against this file and
- * every one reddened at least one case, with the restored module
- * byte-identical and green either side: the file over the command
- * line, each default moved, an unknown key dropped and an unknown key
- * refused, a null read as a value, any value accepted, an object
- * lookup in place of the `Map`, never descending into `plan`, only the
- * first problem reported, the file's source mislabelled, an unreadable
- * file read as absent, the file never read, warnings neither built nor
- * printed, an unusable command-line value downgraded to the file's,
- * the given-twice check dropped, an empty document refused, a list
- * taken for a mapping, the defaults unfrozen or shared by reference,
- * the wrong file name, an empty command-line value read as silence,
- * case-insensitive values, the parse error's cause dropped, a null
- * section refused, and `loadConfig` dropping the command line or
- * judging it before the file.
+ * Fifty module mutations were driven against this file and
+ * `config-sections.test.ts` together, each an exact string found once,
+ * with both modules restored sha256-identical after it and the two
+ * files green either side, and on the last pass every one reddened at
+ * least one case. Twenty-five were aimed at this module: the file over
+ * the command line; three defaults moved; a default list unfrozen and
+ * the defaults unfrozen; `outputMode` taken off the command line, and
+ * every override read; a section that is no mapping skipped; the known
+ * keys always the top level's; an item index not collapsed; item extras
+ * dropped, and put before the document's; reader problems dropped;
+ * tracker kinds closed; version 2 accepted; `loop.settingSources`
+ * misspelt; a null read as a value; no section descended into; the
+ * given-twice check dropped; warnings never printed; the command line
+ * judged before the file; its label spelling the file key; the known
+ * keys not deduplicated; and command-line problems ignored.
+ *
+ * Two of those, warnings never printed and the command line judged
+ * before the file, were mutations of `loadConfig`, which has since
+ * moved to `config-load.ts` with the cases that caught them.
  */
-import type { ConfigOverrides } from './config.js';
+import type {
+  ConfigLayer,
+  ConfigOverrides,
+  ConfigSetting,
+  ConfigSource,
+  RafaConfig,
+} from './config.js';
 
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 import {
   CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,
-  loadConfig,
   parseConfigText,
-  readConfigFile,
   resolveConfig,
 } from './config.js';
 
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
 
-/** The known-keys tail every unknown-key warning ends with. */
-const KNOWN = '(known keys: store, plan.inject)';
+/** The label a user scope file parses under. No file is read at it. */
+const USER_PATH = '/home/someone/.rafa/config.yaml';
 
-/** Chmod cannot deny a read to root; see the unreadable-file case. */
-const isRoot = process.getuid?.() === 0;
+/** The known-keys tail of a warning about a top-level unknown key. */
+const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
+  + 'output, prerequisites, tracking, modules, allowList, loop)';
 
-const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-'));
-let planted = 0;
+/** Every setting, in the order a layer holds them. */
+const SETTINGS: readonly ConfigSetting[] = [
+  'version',
+  'store',
+  'inject',
+  'planDir',
+  'specsDir',
+  'trackerDefault',
+  'trackerFallback',
+  'learningAdapter',
+  'outputMode',
+  'prerequisitesRequired',
+  'prerequisitesOptional',
+  'trackingSpecs',
+  'trackingPlans',
+  'trackingAll',
+  'modules',
+  'allowList',
+  'settingSources',
+];
 
-afterAll(() => {
-  rmSync(tempRoot, { recursive: true, force: true });
-});
+/** The block under "Config schema" in the phase 1 spec, as defaults. */
+const DEFAULTS: RafaConfig = {
+  version: 1,
+  store: 'sqlite',
+  inject: 'stage',
+  planDir: join('.rafa', 'plans'),
+  specsDir: join('.rafa', 'specs'),
+  trackerDefault: 'github',
+  trackerFallback: ['local'],
+  learningAdapter: 'local',
+  outputMode: 'text',
+  prerequisitesRequired: [],
+  prerequisitesOptional: [],
+  trackingSpecs: false,
+  trackingPlans: false,
+  trackingAll: false,
+  modules: [],
+  allowList: [],
+  settingSources: ['project', 'local'],
+};
 
-/** Parses `text` as a file labelled {@link PATH}. */
-function fileOf(text: string) {
-  return parseConfigText(text, PATH);
+/** A file naming every setting, each at a value other than its default. */
+const FULL = [
+  'version: 1',
+  'store: ndjson',
+  'plan:',
+  '  inject: full',
+  '  dir: .plans',
+  'specs:',
+  '  dir: .specs',
+  'tracker:',
+  '  default: linear',
+  '  fallback: [local, github]',
+  'learning:',
+  '  adapter: remote',
+  'output:',
+  '  mode: json',
+  'prerequisites:',
+  '  required:',
+  '    - tool: bun',
+  '      probe: bun --version',
+  '    - env: GITHUB_TOKEN',
+  '  optional:',
+  '    - tool: mgrep',
+  '      probe: mgrep --version',
+  '      reason: "faster search; grep is the fallback"',
+  '    - lsp: typescript',
+  'tracking:',
+  '  specs: true',
+  '  plans: true',
+  '  all: true',
+  'modules:',
+  '  - path: ../my-output',
+  '  - github: someone/rafa-obsidian',
+  '    ref: v0.3.0',
+  'allowList: [my-output]',
+  'loop:',
+  '  settingSources: user, project',
+  '',
+].join('\n');
+
+/** What {@link FULL} reads as. `version` is the one at its default. */
+const FULL_VALUES: RafaConfig = {
+  version: 1,
+  store: 'ndjson',
+  inject: 'full',
+  planDir: '.plans',
+  specsDir: '.specs',
+  trackerDefault: 'linear',
+  trackerFallback: ['local', 'github'],
+  learningAdapter: 'remote',
+  outputMode: 'json',
+  prerequisitesRequired: [
+    { kind: 'tool', name: 'bun', probe: 'bun --version' },
+    { kind: 'env', name: 'GITHUB_TOKEN', probe: null },
+  ],
+  prerequisitesOptional: [
+    {
+      kind: 'tool',
+      name: 'mgrep',
+      probe: 'mgrep --version',
+      reason: 'faster search; grep is the fallback',
+    },
+    { kind: 'lsp', name: 'typescript', probe: null, reason: null },
+  ],
+  trackingSpecs: true,
+  trackingPlans: true,
+  trackingAll: true,
+  modules: [
+    { kind: 'path', location: '../my-output', ref: null },
+    { kind: 'github', location: 'someone/rafa-obsidian', ref: 'v0.3.0' },
+  ],
+  allowList: ['my-output'],
+  settingSources: ['user', 'project'],
+};
+
+/** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
+function fileOf(text: string, path = PATH) {
+  return parseConfigText(text, path);
 }
 
 /** The {@link ConfigError} `run` throws. Fails when it throws none. */
@@ -99,25 +214,19 @@ function refusal(run: () => unknown): ConfigError {
   throw new Error('expected a ConfigError, and nothing was thrown');
 }
 
-/** A fresh repo root holding no config. */
-function emptyRoot(): string {
-  planted += 1;
-  const root = join(tempRoot, `root-${planted}`);
-  mkdirSync(root);
-  return root;
+/** Every setting answered by `rest`, except those `named` answers. */
+function sourcesWith(
+  named: Partial<Record<ConfigSetting, ConfigSource>>,
+  rest: ConfigSource = 'default',
+): Record<ConfigSetting, ConfigSource> {
+  const all = Object.fromEntries(SETTINGS.map((setting) => [setting, rest]));
+  return { ...all, ...named } as Record<ConfigSetting, ConfigSource>;
 }
 
-/** The literal config path under `root`, spelled without the module. */
-function literalPath(root: string): string {
-  return join(root, '.rafa', 'config.yaml');
-}
-
-/** A fresh repo root with `text` planted at `.rafa/config.yaml`. */
-function rootWith(text: string): string {
-  const root = emptyRoot();
-  mkdirSync(join(root, '.rafa'));
-  writeFileSync(literalPath(root), text);
-  return root;
+/** Holds a layer to saying nothing, with every setting still present. */
+function expectSilent(values: ConfigLayer): void {
+  expect(Object.keys(values)).toEqual([...SETTINGS]);
+  expect(Object.values(values).filter((value) => value !== undefined)).toEqual([]);
 }
 
 describe('CONFIG_FILE', () => {
@@ -128,27 +237,48 @@ describe('CONFIG_FILE', () => {
 });
 
 describe('CONFIG_DEFAULTS', () => {
-  it('are sqlite and stage', () => {
-    expect(CONFIG_DEFAULTS).toEqual({ store: 'sqlite', inject: 'stage' });
+  it('are the spec block defaults, with both prerequisite tiers empty', () => {
+    expect(Object.keys(CONFIG_DEFAULTS)).toEqual([...SETTINGS]);
+    expect(CONFIG_DEFAULTS).toEqual(DEFAULTS);
   });
 
-  it('are frozen, so no caller can move them for the next', () => {
+  it('are frozen, every list in them included, so no caller can move them for the next', () => {
+    const lists = SETTINGS.map((setting) => CONFIG_DEFAULTS[setting])
+      .filter((value) => Array.isArray(value));
+
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
+    expect(lists).toHaveLength(6);
+    expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
 
 describe('parseConfigText', () => {
-  it('reads both settings from the nested form', () => {
-    const file = fileOf('store: ndjson\nplan:\n  inject: full\n');
+  it('reads every setting from a file naming each', () => {
+    const file = fileOf(FULL);
 
-    expect(file.values).toEqual({ store: 'ndjson', inject: 'full' });
+    expect(file.values).toEqual(FULL_VALUES);
     expect(file.extras).toEqual([]);
     expect(file.path).toBe(PATH);
   });
 
-  it('reads plan.inject written flat as the same setting', () => {
-    expect(fileOf('plan.inject: task\n').values.inject).toBe('task');
+  it('names every setting but version at a value other than its default', () => {
+    const atDefault = SETTINGS.filter(
+      (setting) => Bun.deepEquals(FULL_VALUES[setting], CONFIG_DEFAULTS[setting]),
+    );
+
+    expect(atDefault).toEqual(['version']);
   });
+
+  it.each([
+    ['plan.inject', 'plan.inject: task\n', 'inject', 'task'],
+    ['tracker.default', 'tracker.default: linear\n', 'trackerDefault', 'linear'],
+    ['loop.settingSources', 'loop.settingSources: local\n', 'settingSources', ['local']],
+  ] as [string, string, ConfigSetting, unknown][])(
+    'reads %s written flat as the same setting',
+    (_label, text, setting, expected) => {
+      expect<unknown>(fileOf(text).values[setting]).toEqual(expected);
+    },
+  );
 
   it.each([
     ['an empty file', ''],
@@ -158,33 +288,54 @@ describe('parseConfigText', () => {
   ])('reads %s as a file that says nothing', (_label, text) => {
     const file = fileOf(text);
 
-    expect(file.values).toEqual({ store: undefined, inject: undefined });
+    expectSilent(file.values);
     expect(file.extras).toEqual([]);
   });
 
-  it('reads a null value as silence rather than as a problem', () => {
-    const file = fileOf('store:\nplan:\n  # inject: full\n');
-
-    expect(file.values).toEqual({ store: undefined, inject: undefined });
-    expect(file.extras).toEqual([]);
-  });
-
-  it('retains an unknown key, top-level or under plan, with its value', () => {
+  it('reads a null value or section as silence rather than as a problem', () => {
     const text = [
-      'store: sqlite',
-      'tracker:',
-      '  kind: linear',
+      'store:',
       'plan:',
-      '  inject: stage',
-      '  depth: 3',
+      '  # inject: full',
+      'tracker:',
+      '  fallback:',
+      'prerequisites:',
+      '  required:',
+      'loop:',
       '',
     ].join('\n');
     const file = fileOf(text);
 
-    expect(file.values).toEqual({ store: 'sqlite', inject: 'stage' });
+    expectSilent(file.values);
+    expect(file.extras).toEqual([]);
+  });
+
+  it('retains an unknown key at the top, under a section and in an item, with its value', () => {
+    const text = [
+      'store: sqlite',
+      'nonesuch:',
+      '  kind: linear',
+      'plan:',
+      '  inject: stage',
+      '  depth: 3',
+      'tracker:',
+      '  kind: linear',
+      'prerequisites:',
+      '  required:',
+      '    - tool: bun',
+      '      timeout: 30',
+      '',
+    ].join('\n');
+    const file = fileOf(text);
+
+    expect(file.values.store).toBe('sqlite');
+    expect(file.values.inject).toBe('stage');
+    expect(file.values.prerequisitesRequired).toEqual([{ kind: 'tool', name: 'bun', probe: null }]);
     expect(file.extras).toEqual([
-      { key: 'tracker', value: { kind: 'linear' } },
+      { key: 'nonesuch', value: { kind: 'linear' } },
       { key: 'plan.depth', value: 3 },
+      { key: 'tracker.kind', value: 'linear' },
+      { key: 'prerequisites.required[0].timeout', value: 30 },
     ]);
   });
 
@@ -195,16 +346,19 @@ describe('parseConfigText', () => {
       '__proto__: c',
       'plan:',
       '  hasOwnProperty: d',
+      'tracker:',
+      '  valueOf: e',
       '',
     ].join('\n');
     const file = fileOf(text);
 
-    expect(file.values).toEqual({ store: undefined, inject: undefined });
+    expectSilent(file.values);
     expect(file.extras.map((extra) => extra.key)).toEqual([
       'constructor',
       'toString',
       '__proto__',
       'plan.hasOwnProperty',
+      'tracker.valueOf',
     ]);
   });
 
@@ -213,6 +367,14 @@ describe('parseConfigText', () => {
 
     expect(file.values.inject).toBeUndefined();
     expect(file.extras).toEqual([{ key: 'inject', value: 'full' }]);
+  });
+
+  it('characterizes yes as a string and TRUE as the boolean, so yes is refused', () => {
+    expect(Bun.YAML.parse('a: yes')).toEqual({ a: 'yes' });
+    expect(fileOf('tracking:\n  specs: TRUE\n').values.trackingSpecs).toBe(true);
+    expect(refusal(() => fileOf('tracking:\n  specs: yes\n')).problems).toEqual([
+      `${PATH}: tracking.specs is "yes", expected true or false`,
+    ]);
   });
 
   it('refuses malformed YAML, naming the file and keeping the cause', () => {
@@ -235,12 +397,110 @@ describe('parseConfigText', () => {
   });
 
   it('refuses every value a setting does not accept, in one error', () => {
-    const text = 'store: postgres\nplan:\n  inject: everything\n';
+    const text = 'store: postgres\nplan:\n  inject: everything\ntracking:\n  all: 1\n';
 
     expect(refusal(() => fileOf(text)).problems).toEqual([
       `${PATH}: store is "postgres", expected one of: sqlite, ndjson`,
       `${PATH}: plan.inject is "everything", expected one of: full, stage, task`,
+      `${PATH}: tracking.all is 1, expected true or false`,
     ]);
+  });
+
+  describe('each section, refused by name beside an accepting control', () => {
+    const cases: readonly [string, string, string, string, ConfigSetting, unknown][] = [
+      ['version', 'version: 2', 'version is 2, expected one of: 1', 'version: 1', 'version', 1],
+      [
+        'store', 'store: postgres', 'store is "postgres", expected one of: sqlite, ndjson',
+        'store: ndjson', 'store', 'ndjson',
+      ],
+      [
+        'plan.inject', 'plan:\n  inject: all',
+        'plan.inject is "all", expected one of: full, stage, task',
+        'plan:\n  inject: task', 'inject', 'task',
+      ],
+      [
+        'plan.dir', 'plan:\n  dir: ""', 'plan.dir is "", expected a directory path',
+        'plan:\n  dir: .plans', 'planDir', '.plans',
+      ],
+      [
+        'specs.dir', 'specs:\n  dir: 3', 'specs.dir is 3, expected a directory path',
+        'specs:\n  dir: .specs', 'specsDir', '.specs',
+      ],
+      [
+        'tracker.default', 'tracker:\n  default: [linear]',
+        'tracker.default is a list, expected a tracker kind name',
+        'tracker:\n  default: linear', 'trackerDefault', 'linear',
+      ],
+      [
+        'tracker.fallback', 'tracker:\n  fallback: local',
+        'tracker.fallback is "local", expected a list of tracker kind names',
+        'tracker:\n  fallback: [github, obsidian]', 'trackerFallback', ['github', 'obsidian'],
+      ],
+      [
+        'learning.adapter', 'learning:\n  adapter: "  "',
+        'learning.adapter is "  ", expected a learning adapter name',
+        'learning:\n  adapter: remote', 'learningAdapter', 'remote',
+      ],
+      [
+        'output.mode', 'output:\n  mode: tui', 'output.mode is "tui", expected one of: text, json',
+        'output:\n  mode: json', 'outputMode', 'json',
+      ],
+      [
+        'prerequisites.required', 'prerequisites:\n  required:\n    - tool: bun\n      env: X',
+        'prerequisites.required[0] names tool and env, expected exactly one of: tool, env, service, lsp',
+        'prerequisites:\n  required:\n    - env: X', 'prerequisitesRequired',
+        [{ kind: 'env', name: 'X', probe: null }],
+      ],
+      [
+        'prerequisites.optional',
+        'prerequisites:\n  optional:\n    - lsp: typescript\n      reason: 4',
+        'prerequisites.optional[0].reason is 4, expected a non-empty string',
+        'prerequisites:\n  optional:\n    - lsp: typescript\n      reason: types',
+        'prerequisitesOptional', [{ kind: 'lsp', name: 'typescript', probe: null, reason: 'types' }],
+      ],
+      [
+        'tracking.specs', 'tracking:\n  specs: "true"',
+        'tracking.specs is "true", expected true or false',
+        'tracking:\n  specs: true', 'trackingSpecs', true,
+      ],
+      [
+        'tracking.plans', 'tracking:\n  plans: 1', 'tracking.plans is 1, expected true or false',
+        'tracking:\n  plans: true', 'trackingPlans', true,
+      ],
+      [
+        'tracking.all', 'tracking:\n  all: no', 'tracking.all is "no", expected true or false',
+        'tracking:\n  all: true', 'trackingAll', true,
+      ],
+      [
+        'modules', 'modules:\n  - {}', 'modules[0] names none of: npm, github, path',
+        'modules:\n  - path: ../mine', 'modules', [{ kind: 'path', location: '../mine', ref: null }],
+      ],
+      [
+        'allowList', 'allowList: mine', 'allowList is "mine", expected a list of module names',
+        'allowList: [mine]', 'allowList', ['mine'],
+      ],
+      [
+        'loop.settingSources', 'loop:\n  settingSources: project,project',
+        'loop.settingSources is "project,project", '
+          + 'expected a comma-separated subset of: user, project, local',
+        'loop:\n  settingSources: user', 'settingSources', ['user'],
+      ],
+    ];
+
+    it('covers every setting once', () => {
+      expect(cases.map((row) => row[4])).toEqual([...SETTINGS]);
+    });
+
+    it.each(cases)('refuses an unusable %s', (_key, unusable, problem) => {
+      expect(refusal(() => fileOf(`${unusable}\n`)).problems).toEqual([`${PATH}: ${problem}`]);
+    });
+
+    // The file layer holds undefined for a key it did not read, so the
+    // value alone tells a read key from a skipped one, version's 1
+    // (its default, and the one value it accepts) included.
+    it.each(cases)('accepts a usable %s into the file layer', (_k, _u, _p, usable, setting, expected) => {
+      expect<unknown>(fileOf(`${usable}\n`).values[setting]).toEqual(expected);
+    });
   });
 
   it.each([
@@ -255,17 +515,27 @@ describe('parseConfigText', () => {
     ]);
   });
 
-  it('refuses a plan that is not a mapping', () => {
-    expect(refusal(() => fileOf('plan: stage\n')).problems).toEqual([
-      `${PATH}: plan must be a mapping, found "stage"`,
+  it.each([
+    'plan',
+    'specs',
+    'tracker',
+    'learning',
+    'output',
+    'prerequisites',
+    'tracking',
+    'loop',
+  ])('refuses a %s section that is not a mapping', (section) => {
+    expect(refusal(() => fileOf(`${section}: linear\n`)).problems).toEqual([
+      `${PATH}: ${section} must be a mapping, found "linear"`,
     ]);
   });
 
-  it('refuses a setting given both flat and nested', () => {
-    const text = 'plan.inject: full\nplan:\n  inject: task\n';
-
+  it.each([
+    ['plan.inject', 'plan.inject: full\nplan:\n  inject: task\n'],
+    ['loop.settingSources', 'loop.settingSources: user\nloop:\n  settingSources: local\n'],
+  ])('refuses %s given both flat and nested', (key, text) => {
     expect(refusal(() => fileOf(text)).problems).toEqual([
-      `${PATH}: plan.inject is given more than once`,
+      `${PATH}: ${key} is given more than once`,
     ]);
   });
 });
@@ -273,47 +543,122 @@ describe('parseConfigText', () => {
 describe('resolveConfig', () => {
   it('answers the defaults when no layer names a setting', () => {
     expect(resolveConfig()).toEqual({
-      config: { store: 'sqlite', inject: 'stage' },
-      sources: { store: 'default', inject: 'default' },
+      config: DEFAULTS,
+      sources: sourcesWith({}),
       path: null,
+      userPath: null,
       extras: [],
+      userExtras: [],
       warnings: [],
     });
   });
 
-  it('lets the file outrank the default', () => {
-    const file = fileOf('store: ndjson\nplan:\n  inject: full\n');
-    const resolved = resolveConfig({ file });
+  it('lets the file outrank the default, for every setting', () => {
+    const resolved = resolveConfig({ file: fileOf(FULL) });
 
-    expect(resolved.config).toEqual({ store: 'ndjson', inject: 'full' });
-    expect(resolved.sources).toEqual({ store: 'file', inject: 'file' });
+    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
     expect(resolved.path).toBe(PATH);
   });
 
-  it('lets the command line outrank the file', () => {
-    const file = fileOf('store: ndjson\nplan:\n  inject: full\n');
-    const resolved = resolveConfig({
-      file,
-      cli: { store: 'sqlite', inject: 'task' },
-    });
+  it('lets the user file outrank the default, for every setting', () => {
+    const resolved = resolveConfig({ user: fileOf(FULL, USER_PATH) });
 
-    expect(resolved.config).toEqual({ store: 'sqlite', inject: 'task' });
-    expect(resolved.sources).toEqual({ store: 'cli', inject: 'cli' });
+    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.sources).toEqual(sourcesWith({}, 'user'));
+    expect([resolved.path, resolved.userPath]).toEqual([null, USER_PATH]);
+  });
+
+  it('lets the project file outrank the user file, setting by setting', () => {
+    const user = fileOf(FULL, USER_PATH);
+    const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
+    const resolved = resolveConfig({ file, user });
+
+    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'project-plans' });
+    expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'file' }, 'user'));
+    expect([resolved.path, resolved.userPath]).toEqual([PATH, USER_PATH]);
+  });
+
+  it('lets the command line outrank both files', () => {
+    const user = fileOf(FULL, USER_PATH);
+    const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
+    const resolved = resolveConfig({ file, user, cli: { planDir: 'cli-plans' } });
+
+    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'cli-plans' });
+    expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'cli' }, 'user'));
+  });
+
+  it('warns about the user file unknown keys first, each naming its own file', () => {
+    const user = fileOf('nonesuch: a\n', USER_PATH);
+    const file = fileOf('plan:\n  depth: 3\n');
+    const resolved = resolveConfig({ file, user });
+
+    expect(resolved.warnings).toEqual([
+      `rafa config: unknown key "nonesuch" in ${USER_PATH} has no effect in this version ${KNOWN}`,
+      `rafa config: unknown key "plan.depth" in ${PATH} has no effect in this version `
+        + '(known keys under plan: inject, dir)',
+    ]);
+    expect(resolved.userExtras).toEqual([{ key: 'nonesuch', value: 'a' }]);
+    expect(resolved.extras).toEqual([{ key: 'plan.depth', value: 3 }]);
+  });
+
+  it('lets the command line outrank the file, for every setting it can name', () => {
+    const cli: Required<ConfigOverrides> = {
+      store: 'sqlite',
+      inject: 'task',
+      planDir: 'cli-plans',
+      specsDir: 'cli-specs',
+      trackerDefault: 'obsidian',
+      learningAdapter: 'mirror',
+      outputMode: 'text',
+      settingSources: 'local',
+    };
+    const resolved = resolveConfig({ file: fileOf(FULL), cli });
+
+    expect(resolved.config).toEqual({
+      ...FULL_VALUES,
+      store: 'sqlite',
+      inject: 'task',
+      planDir: 'cli-plans',
+      specsDir: 'cli-specs',
+      trackerDefault: 'obsidian',
+      learningAdapter: 'mirror',
+      outputMode: 'text',
+      settingSources: ['local'],
+    });
+    expect(resolved.sources).toEqual(sourcesWith({
+      store: 'cli',
+      inject: 'cli',
+      planDir: 'cli',
+      specsDir: 'cli',
+      trackerDefault: 'cli',
+      learningAdapter: 'cli',
+      outputMode: 'cli',
+      settingSources: 'cli',
+    }, 'file'));
+  });
+
+  it('reads no command-line key naming a setting only the file spells', () => {
+    const cli = { version: '2', modules: 'x', trackingAll: 'true' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect(resolved.config).toEqual(DEFAULTS);
+    expect(resolved.sources).toEqual(sourcesWith({}));
   });
 
   it('ranks each setting on its own', () => {
     const file = fileOf('store: ndjson\nplan:\n  inject: full\n');
     const resolved = resolveConfig({ file, cli: { inject: 'task' } });
 
-    expect(resolved.config).toEqual({ store: 'ndjson', inject: 'task' });
-    expect(resolved.sources).toEqual({ store: 'file', inject: 'cli' });
+    expect(resolved.config).toEqual({ ...DEFAULTS, store: 'ndjson', inject: 'task' });
+    expect(resolved.sources).toEqual(sourcesWith({ store: 'file', inject: 'cli' }));
   });
 
   it('lets the command line outrank the default with no file', () => {
     const resolved = resolveConfig({ file: null, cli: { store: 'ndjson' } });
 
-    expect(resolved.config).toEqual({ store: 'ndjson', inject: 'stage' });
-    expect(resolved.sources).toEqual({ store: 'cli', inject: 'default' });
+    expect(resolved.config).toEqual({ ...DEFAULTS, store: 'ndjson' });
+    expect(resolved.sources).toEqual(sourcesWith({ store: 'cli' }));
   });
 
   it('records a file spelling the default as the layer that answered', () => {
@@ -334,22 +679,28 @@ describe('resolveConfig', () => {
   });
 
   it.each([
-    ['an empty value', { inject: '' }, 'inject is ""', 'full, stage, task'],
-    ['a misspelt mode', { inject: 'stag' }, 'inject is "stag"', 'full, stage, task'],
-    ['a misspelt backend', { store: 'sqllite' }, 'store is "sqllite"', 'sqlite, ndjson'],
+    ['an empty value', { inject: '' }, 'inject is ""', 'one of: full, stage, task'],
+    ['a misspelt mode', { inject: 'stag' }, 'inject is "stag"', 'one of: full, stage, task'],
+    ['a misspelt backend', { store: 'sqllite' }, 'store is "sqllite"', 'one of: sqlite, ndjson'],
+    ['an empty directory', { planDir: '' }, 'planDir is ""', 'a directory path'],
+    ['an output mode', { outputMode: 'tui' }, 'outputMode is "tui"', 'one of: text, json'],
+    [
+      'empty setting sources', { settingSources: '' }, 'settingSources is ""',
+      'a comma-separated subset of: user, project, local',
+    ],
   ] as [string, ConfigOverrides, string, string][])(
     'refuses %s on the command line',
     (_label, cli, said, expected) => {
       expect(refusal(() => resolveConfig({ cli })).problems).toEqual([
-        `command line: ${said}, expected one of: ${expected}`,
+        `command line: ${said}, expected ${expected}`,
       ]);
     },
   );
 
   it('names every unusable command-line value at once', () => {
-    const error = refusal(() => resolveConfig({ cli: { store: 'x', inject: 'y' } }));
+    const cli = { store: 'x', inject: 'y', settingSources: 'z' };
 
-    expect(error.problems).toHaveLength(2);
+    expect(refusal(() => resolveConfig({ cli })).problems).toHaveLength(3);
   });
 
   it('never downgrades an unusable command-line value to the file', () => {
@@ -359,21 +710,49 @@ describe('resolveConfig', () => {
       .toThrow(ConfigError);
   });
 
-  it('warns once per retained unknown key and resolves regardless', () => {
-    const file = fileOf('tracker: linear\nplan:\n  depth: 3\n');
+  it('warns once per retained unknown key, listing the keys known where it sits', () => {
+    const text = [
+      'nonesuch: linear',
+      'plan:',
+      '  depth: 3',
+      '  a.b: 4',
+      'tracker:',
+      '  kind: x',
+      'prerequisites:',
+      '  optional:',
+      '    - env: A',
+      '      timeout: 30',
+      'modules:',
+      '  - npm: pkg',
+      '    ref: v1',
+      '',
+    ].join('\n');
+    const file = fileOf(text);
     const resolved = resolveConfig({ file });
+    const warning = (key: string, known: string): string => `rafa config: unknown key "${key}" `
+      + `in ${PATH} has no effect in this version ${known}`;
 
     expect(resolved.warnings).toEqual([
-      `rafa config: unknown key "tracker" in ${PATH} has no effect in this version ${KNOWN}`,
-      `rafa config: unknown key "plan.depth" in ${PATH} has no effect in this version ${KNOWN}`,
+      warning('nonesuch', KNOWN),
+      warning('plan.depth', '(known keys under plan: inject, dir)'),
+      warning('plan.a.b', '(known keys under plan: inject, dir)'),
+      warning('tracker.kind', '(known keys under tracker: default, fallback)'),
+      warning(
+        'prerequisites.optional[0].timeout',
+        '(known keys under prerequisites.optional[0]: tool, env, service, lsp, probe, reason)',
+      ),
+      warning('modules[0].ref', '(known keys under modules[0]: npm, github, path, ref)'),
     ]);
     expect(resolved.extras).toEqual(file.extras);
-    expect(resolved.config).toEqual({ store: 'sqlite', inject: 'stage' });
+    expect(resolved.config).toEqual({
+      ...DEFAULTS,
+      prerequisitesOptional: [{ kind: 'env', name: 'A', probe: null, reason: null }],
+      modules: [{ kind: 'npm', location: 'pkg', ref: null }],
+    });
   });
 
   it('warns about nothing when the file holds only known keys', () => {
-    expect(resolveConfig({ file: fileOf('store: ndjson\n') }).warnings)
-      .toEqual([]);
+    expect(resolveConfig({ file: fileOf(FULL) }).warnings).toEqual([]);
   });
 
   it('answers fresh objects, so one result cannot leak into the next', () => {
@@ -382,112 +761,13 @@ describe('resolveConfig', () => {
 
     expect(resolveConfig().config.store).toBe('sqlite');
   });
-});
 
-describe('readConfigFile', () => {
-  it('answers null for a root with no config, and creates nothing', () => {
-    const root = emptyRoot();
+  it('answers frozen lists, from the defaults and from a file alike', () => {
+    const fromDefaults = resolveConfig().config.trackerFallback as string[];
+    const fromFile = resolveConfig({ file: fileOf(FULL) }).config.allowList as string[];
 
-    expect(readConfigFile(root)).toBeNull();
-    expect(existsSync(join(root, '.rafa'))).toBe(false);
-  });
-
-  it('reads the file planted at .rafa/config.yaml', () => {
-    const root = rootWith('store: ndjson\n');
-    const file = readConfigFile(root);
-
-    expect(file?.values.store).toBe('ndjson');
-    expect(file?.path).toBe(literalPath(root));
-  });
-
-  it('refuses a directory at the config path rather than reading it as absent', () => {
-    const root = emptyRoot();
-    mkdirSync(literalPath(root), { recursive: true });
-    const error = refusal(() => readConfigFile(root));
-
-    expect(error.problems).toHaveLength(1);
-    expect(error.problems[0]).toStartWith(`${literalPath(root)}: cannot be read (`);
-  });
-
-  it('characterizes Bun.file().exists() as false for a directory', async () => {
-    const root = emptyRoot();
-    mkdirSync(literalPath(root), { recursive: true });
-
-    expect(existsSync(literalPath(root))).toBe(true);
-    expect(await Bun.file(literalPath(root)).exists()).toBe(false);
-  });
-
-  it.skipIf(isRoot)('refuses a config file it cannot read', () => {
-    const root = rootWith('store: ndjson\n');
-    chmodSync(literalPath(root), 0o000);
-    const error = refusal(() => readConfigFile(root));
-
-    expect(error.problems[0]).toStartWith(`${literalPath(root)}: cannot be read (`);
-    expect(error.cause).toMatchObject({ code: 'EACCES' });
-  });
-
-  it('passes the parser refusals through', () => {
-    const root = rootWith('store: postgres\n');
-
-    expect(refusal(() => readConfigFile(root)).problems).toEqual([
-      `${literalPath(root)}: store is "postgres", expected one of: sqlite, ndjson`,
-    ]);
-  });
-});
-
-describe('loadConfig', () => {
-  it('resolves the defaults silently for a root with no config', () => {
-    const lines: string[] = [];
-    const resolved = loadConfig(emptyRoot(), {}, (line) => lines.push(line));
-
-    expect(resolved.config).toEqual({ store: 'sqlite', inject: 'stage' });
-    expect(resolved.sources).toEqual({ store: 'default', inject: 'default' });
-    expect(lines).toEqual([]);
-  });
-
-  it('reads the file and lets the command line outrank it', () => {
-    const root = rootWith('store: ndjson\nplan:\n  inject: full\n');
-    const resolved = loadConfig(root, { inject: 'task' }, () => {});
-
-    expect(resolved.config).toEqual({ store: 'ndjson', inject: 'task' });
-    expect(resolved.sources).toEqual({ store: 'file', inject: 'cli' });
-    expect(resolved.path).toBe(literalPath(root));
-  });
-
-  it('prints one warning per unknown key and still resolves', () => {
-    const root = rootWith('tracker: linear\nstore: ndjson\n');
-    const lines: string[] = [];
-    const resolved = loadConfig(root, {}, (line) => lines.push(line));
-
-    expect(lines).toEqual([
-      `rafa config: unknown key "tracker" in ${literalPath(root)} has no effect in this version ${KNOWN}`,
-    ]);
-    expect(resolved.config.store).toBe('ndjson');
-  });
-
-  it('prints through console.warn by default', () => {
-    const root = rootWith('tracker: linear\n');
-    const warned: unknown[][] = [];
-    spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-      warned.push(args);
-    });
-
-    try {
-      loadConfig(root);
-    } finally {
-      mock.restore();
-    }
-
-    expect(warned).toHaveLength(1);
-    expect(String(warned[0]?.[0])).toContain('unknown key "tracker"');
-  });
-
-  it('judges the file before it looks at the command line', () => {
-    const root = rootWith('store: postgres\n');
-    const error = refusal(() => loadConfig(root, { inject: 'bogus' }, () => {}));
-
-    expect(error.problems).toEqual([
-      `${literalPath(root)}: store is "postgres", expected one of: sqlite, ndjson`,
-    ]);
+    expect(() => fromDefaults.push('x')).toThrow(TypeError);
+    expect(() => fromFile.push('x')).toThrow(TypeError);
+    expect(CONFIG_DEFAULTS.trackerFallback).toEqual(['local']);
   });
 });

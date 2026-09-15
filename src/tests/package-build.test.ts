@@ -1,15 +1,17 @@
 /**
- * Tests for the package's published shape: the `bin`, `exports` and
- * `files` fields of `package.json`, and the `build` script that writes
- * what those fields name.
+ * Tests for the package's published shape: the `bin`, `exports`, `files`,
+ * `private`, `publishConfig`, `engines` and `module` fields of
+ * `package.json`, the dependency keys it does NOT carry, and the `build`
+ * script that writes what those fields name.
  *
- * The three fields are spelled HERE, as the phase 0 spec gives them, so a
- * target renamed in the manifest fails a case instead of agreeing with
+ * Each of those fields is spelled HERE, as the phase 0 spec gives the
+ * first three and phase 1's publishing stage the rest, so a target
+ * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest, both tsconfig files, the README and `src/`) into a
- * scratch directory and runs `bun run build` there, the script as the
- * manifest holds it, so nothing is written into the repository's own
- * `dist/`.
+ * (its manifest, both tsconfig files, the README, the dev-planner skill
+ * and `src/`) into a scratch directory and runs `bun run build` there,
+ * the script as the manifest holds it, so nothing is written into the
+ * repository's own `dist/`.
  *
  * ## What each clause of the build script is for
  *
@@ -34,22 +36,119 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
- *   - `src/PROMPT.md` and `src/plan-prompt.md` are copied into `dist/`.
+ *   - `src/PROMPT.md`, `src/plan-prompt.md` and
+ *     `.claude/skills/dev-planner/SKILL.md` are copied into `dist/`.
  *     `start.ts` and `plan.ts` find them beside themselves through
  *     `import.meta.url`, and a bundle inlining either module answers its
  *     OWN directory. The two built files reading `import.meta.url` are
- *     `cli.js` and `index.js`, both directly in `dist/`.
+ *     `cli.js` and `index.js`, both directly in `dist/`. The skill is the
+ *     plan format `buildPlanPrompt` inlines into the plan prompt, and a
+ *     project running an installed rafa carries no copy of its own.
  *
  * ## The template cases
  *
  * Copying the templates is held by behaviour as well as by bytes: `rafa
  * plan` runs from the build in a scratch repository, under a PATH holding
- * git and a stand-in `claude` that keeps the prompt it is handed, and that
- * prompt is held equal to what `buildPlanPrompt` makes of the source
- * template. It runs twice, through `dist/cli.js` and through the root
- * bundle's `planCommand`. The control runs the same command from a copy of
- * the build without `plan-prompt.md`, which refuses before any session
- * starts, so the check can see a template that is not there.
+ * git and a stand-in `claude` that keeps the prompt and the arguments it is
+ * handed, and that prompt is held equal to what `buildPlanPrompt` makes of the source
+ * template and the source skill. It runs three times: through
+ * `dist/cli.js` and through the root bundle's `planCommand`, both inside
+ * the scratch package, where the package's own skill also sits one
+ * directory above `dist/`, and through a copy of the build outside the
+ * package, where only the copy beside `cli.js` exists. Two controls run
+ * the same command from a copy of the build outside the package, one
+ * without `plan-prompt.md` and one without `SKILL.md`, and each refuses
+ * before any session starts, so the check can see a template that is not
+ * there.
+ *
+ * The `dist/cli.js` run also holds the session's argument list to the
+ * base arguments and `--setting-sources project,local`, the sources a run
+ * with no config resolves to. Its control runs under a user-scope config
+ * naming `local,user` and holds those instead, and a config whose sources
+ * the loop refuses stops the command before the stand-in is reached.
+ *
+ * ## The describe case
+ *
+ * `rafa describe` stamps its document with the `version` of
+ * `package.json`, which `src/commands/describe.ts` imports by name. The
+ * case runs it from a copy of the build outside the scratch package,
+ * where no `package.json` sits above the bundle, and holds its output to
+ * what `src/rafa.ts` prints and its version to the manifest's. So the
+ * version is the one `bun build` inlined, and nothing beside the bundle
+ * is read for it.
+ *
+ * Two mutations of `src/commands/describe.ts` were driven on 2026-09-14,
+ * one run of this file each, with the module restored byte-identical
+ * (sha256). A version other than the manifest's reddened this case alone.
+ * The version read at run time from the `package.json` beside the module
+ * reddened every case running the built CLI, 9 of 31 and this one among
+ * them: the bundle reads that file when it is imported, and the build has
+ * none there.
+ *
+ * ## The names phase 1 adds
+ *
+ * The preflight and the PREREQUISITES parser joined `./plan` in phase 1,
+ * and scope resolution, the adapter registry and the manifest validator
+ * joined the root beside the config resolver it already carried. Those
+ * names are spelled here too, so a bundle that lost one fails a case
+ * naming it, where the computed case above compares a bundle with a
+ * source that could have lost it as well. The root bundle's
+ * `PORT_VERSIONS` is held to the source's, its `RUNNING_MANIFEST_SEAMS`
+ * to the manifest's `version`, which `src/modules/manifest.ts` imports
+ * from `package.json` as `describe` does, and its built `resolveScope`
+ * and `validateManifest` are run once each.
+ *
+ * `README.md` says only `./plan` and `./ports` load under node. The
+ * preflight brought `Bun.spawn`, `Bun.which` and `Bun.file` calls into
+ * `./plan`, so one case imports `dist/plan/index.js` under node and holds
+ * its names to its source's. It imports `dist/index.js` the same way as
+ * its control, which node refuses at `bun:sqlite`. The case needs `node`
+ * on the suite's PATH, and fails naming it when there is none.
+ *
+ * Driven on 2026-09-15 with node 22.14.0, one run each over this file,
+ * `src/index.test.ts` and `src/plan/index.test.ts`, with 161 pass before
+ * and after and every file restored byte-identical (sha256).
+ * `resolveScope` dropped from the root reddened the root names case, and
+ * so did `CORE_ADAPTER_REGISTRY` dropped. A bare `import 'bun:sqlite';`
+ * added to `src/plan/index.ts` left every case green, the node case
+ * among them. It is no control: in a scratch build under that mutation,
+ * the import landed in `cli.js` and the chunk `index-qebmbvjb.js`, not
+ * in `dist/plan/index.js`, and node loaded that entry's twenty names.
+ * `Database` re-exported from `bun:sqlite` there instead reddened the
+ * node case, which is the control that it can fail.
+ *
+ * ## The publishing fields phase 1 sets
+ *
+ * `private: false` with `publishConfig.access: public` is what lets the
+ * scoped name reach the registry at all; npm defaults a scoped package to
+ * a restricted publish, so the access is spelled out rather than left to
+ * the default. `engines` names `bun` alone, against a build that targets
+ * bun: the phase 0 manifest declared `engines.node >= 22`, which no
+ * reading supported, since the root, `./cli` and `./store` never load
+ * under node. `module` moved off `index.ts`, a `console.log` placeholder
+ * `bun init` had left at the repository root and `files` never published,
+ * onto `./dist/index.js`, the root of the exports map; the case holds the
+ * two equal and finds the file in the build, so a `module` naming an
+ * entry the build does not write cannot pass.
+ *
+ * The dependency case reads absence, so it names every key an install
+ * would resolve from, not just the two the manifest once carried, and it
+ * asserts `devDependencies` is non-empty beside them: a manifest that
+ * failed to parse into an object would otherwise satisfy it. What the
+ * absence buys was measured on npm 11.1.0, outside this suite, on two
+ * probe tarballs differing in that one key: with
+ * `peerDependencies: {typescript: ^5}`, `npm install --offline` against
+ * an empty cache exited 1 with `npm error code ENOTCACHED` on
+ * `https://registry.npmjs.org/typescript` and left `node_modules` empty,
+ * and without it the same install exited 0. Against a warm cache the
+ * peer-carrying tarball installed 2 packages where the other installed
+ * 1, so npm resolves a peer dependency as a real install rather than a
+ * hint.
+ *
+ * The README case reads the install section that ships in the tarball —
+ * `files` publishes only `dist`, but npm packs `README.md` regardless,
+ * which the pack case above pins. It builds both commands from the
+ * manifest's own `name`, so renaming the package reddens it too.
  *
  * ## How the cases were shown to fail
  *
@@ -57,12 +156,21 @@
  * run each, with the unmutated manifest green before and after them and
  * restored byte-identical. Seven reddened at least one case: `--splitting`
  * dropped (the two binding cases), `rm -rf dist` dropped (the stale chunk
- * case), the template copy dropped (all five template cases, the control
- * among them since the file it removes was never written), `bin` renamed,
+ * case), the template copy dropped (re-measured below), `bin` renamed,
  * the ports entry dropped from the build, the CLI built from
  * `src/index.ts`, and `files` widened to `src`. The eighth, `--root=src`
  * dropped, is equivalent: bun's default root for these four entries is
  * their common directory, `src`, and every case stayed green.
+ *
+ * Once the skill joined the copy, two mutations of the copy clause were
+ * run the same way. Dropping the whole clause reddened all eight template
+ * cases that need a copied file: the three byte cases, the three `rafa
+ * plan` runs, and both controls, since the file each removes was never
+ * written. Dropping only the skill reddened three: its byte case, the
+ * run outside the package and the skill control. The two runs inside the
+ * scratch package stayed green, because `readPlanFormat` falls back to
+ * the package's own skill one directory above `dist/`; that blind spot is
+ * why the run outside the package exists.
  *
  * `check-types` skips this file. Checked through a tsconfig outside the
  * repo, it compiled clean, and a planted TS2322 in a second file of the
@@ -82,15 +190,17 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import * as storeSource from '../effort/store/index.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
-import { buildPlanPrompt } from '../plan.js';
+import { buildPlanPrompt, planFormatCandidates } from '../plan.js';
 import * as portsSource from '../ports/index.js';
+
+import { plantProjectConfig } from './cli-capture.js';
 
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -110,8 +220,37 @@ const EXPORTS = {
 /** What the manifest publishes. */
 const FILES = ['dist'];
 
+/** How the manifest publishes: a scoped name needs the access spelled out. */
+const PUBLISH_CONFIG = { access: 'public' };
+
+/** The engine the build targets, and the only one the manifest names. */
+const ENGINES = { bun: '>=1.3.14' };
+
+/** The manifest's `module`: the root of the exports map, which the build writes. */
+const MODULE = './dist/index.js';
+
+/**
+ * Every manifest key an install would resolve packages from. All are
+ * absent, which is what lets a packed tarball install with no registry
+ * access: measured on npm 11.1.0, a probe tarball carrying only
+ * `peerDependencies: {typescript: ^5}` failed `npm install --offline`
+ * against an empty cache with `ENOTCACHED` on
+ * `https://registry.npmjs.org/typescript` and installed nothing, where
+ * the same tarball without that key installed offline, exit 0.
+ */
+const DEPENDENCY_KEYS = [
+  'dependencies',
+  'peerDependencies',
+  'optionalDependencies',
+  'bundleDependencies',
+  'bundledDependencies',
+];
+
+/** The dev-planner skill, from the repository root: the plan format. */
+const SKILL = '.claude/skills/dev-planner/SKILL.md';
+
 /** The files the scratch copy of the package takes besides `src/`. */
-const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md'];
+const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md', SKILL];
 
 /** Each library entry: its path under `dist/`, and its source module. */
 const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
@@ -124,8 +263,56 @@ const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
 /** The subpath bundles whose every name the root bundle carries too. */
 const CONTAINED_SUBPATHS = ['plan/index.js', 'effort/store/index.js'];
 
-/** The templates the build copies beside its bundles. */
-const TEMPLATES = ['PROMPT.md', 'plan-prompt.md'];
+/**
+ * The names phase 1 adds to the `./plan` entry, the preflight and the
+ * PREREQUISITES parser, which the root bundle carries too.
+ */
+const PLAN_PREFLIGHT_NAMES = [
+  'PROBE_TIMEOUT_MS',
+  'loadPlanPrerequisites',
+  'mergePlanPrerequisites',
+  'parsePrerequisites',
+  'planPrerequisites',
+  'prerequisitesPathForPlan',
+  'runPreflight',
+  'runShellProbe',
+];
+
+/**
+ * The names phase 1 adds to the root alone, scope resolution, the adapter
+ * registry and the manifest validator, with the config resolver the root
+ * already carried.
+ */
+const ROOT_SEAM_NAMES = [
+  'CORE_ADAPTER_REGISTRY',
+  'DISK_FILE_SYSTEM',
+  'FEATURE_TYPES',
+  'INIT_COMMAND',
+  'MANIFEST_VERSION',
+  'OUTPUT_CHANNELS',
+  'PORT_VERSIONS',
+  'RUNNING_MANIFEST_SEAMS',
+  'SCOPE_DIR',
+  'ScopeError',
+  'createAdapterRegistry',
+  'initHint',
+  'loadConfig',
+  'resolveConfig',
+  'resolveScope',
+  'scopeAt',
+  'selfAndAncestors',
+  'validateManifest',
+];
+
+/**
+ * The templates the build copies beside its bundles: each one's source,
+ * from the repository root, and its name in `dist/`.
+ */
+const TEMPLATES: [string, string][] = [
+  ['src/PROMPT.md', 'PROMPT.md'],
+  ['src/plan-prompt.md', 'plan-prompt.md'],
+  [SKILL, 'SKILL.md'],
+];
 
 /** The spec the template cases plan from, and what `rafa plan` is told. */
 const SPEC = '# Spec: a build probe\n\nNothing to build.\n';
@@ -236,6 +423,8 @@ interface PlanScratch {
   readonly repo: string;
   /** Where the stand-in keeps the prompt it is handed, outside the repository. */
   readonly prompt: string;
+  /** Where the stand-in keeps the arguments it is handed, one per line. */
+  readonly args: string;
   /** The stand-in, then git, on PATH, and a HOME of its own. */
   readonly env: Record<string, string>;
 }
@@ -252,13 +441,16 @@ function plantPlanScratch(name: string): PlanScratch {
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
 
   const prompt = join(root, 'prompt.md');
+  const args = join(root, 'args.txt');
   const claude = join(bin, 'claude');
-  writeFileSync(claude, ['#!/bin/sh', `/bin/cat > '${prompt}'`, 'exit 0', ''].join('\n'), 'utf8');
+  const keepArgs = `for arg in "$@"; do printf '%s\\n' "$arg"; done > '${args}'`;
+  writeFileSync(claude, ['#!/bin/sh', keepArgs, `/bin/cat > '${prompt}'`, 'exit 0', ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
 
   const init = Bun.spawnSync(['git', 'init', '-q', '.'], { cwd: repo });
   if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr.toString()}`);
   writeFileSync(join(repo, 'spec.md'), SPEC, 'utf8');
+  plantProjectConfig(repo);
 
   const git = Bun.which('git');
   if (git === null) throw new Error('git is not on the PATH this suite runs under');
@@ -266,13 +458,43 @@ function plantPlanScratch(name: string): PlanScratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { root, repo, prompt, env: { PATH: path, HOME: home } };
+  return { root, repo, prompt, args, env: { PATH: path, HOME: home } };
 }
 
-/** The prompt `rafa plan` builds from the source template for {@link SPEC}. */
+/** The arguments the stand-in keeps for a plan session under `sources`, one per line. */
+function planSessionArgs(sources: string): string {
+  return ['-p', '--dangerously-skip-permissions', '--setting-sources', sources, ''].join('\n');
+}
+
+/** Writes `text` as the user scope's `.rafa/config.yaml` under the scratch HOME. */
+function plantUserConfig(scratch: PlanScratch, text: string): void {
+  const home = scratch.env['HOME'] ?? '';
+  expect(home.startsWith(tempRoot)).toBe(true);
+  mkdirSync(join(home, '.rafa'), { recursive: true });
+  writeFileSync(join(home, '.rafa', 'config.yaml'), text, 'utf8');
+}
+
+/**
+ * A copy of the build at `dist/` under a scratch root, outside the
+ * scratch package, with `removed` taken out of it.
+ */
+function copyBuildOutsidePackage(scratch: PlanScratch, removed: string | null): string {
+  const copy = join(scratch.root, 'dist');
+  cpSync(DIST, copy, { recursive: true });
+  if (removed !== null) rmSync(join(copy, removed));
+  return copy;
+}
+
+/** The candidates `readPlanFormat` would find from `moduleDir`. */
+function presentPlanFormats(moduleDir: string): string[] {
+  return planFormatCandidates(moduleDir).filter((candidate) => existsSync(candidate));
+}
+
+/** The prompt `rafa plan` builds from the source template and skill for {@link SPEC}. */
 function expectedPlanPrompt(): string {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
-  return buildPlanPrompt(template, SPEC, 'spec');
+  const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
+  return buildPlanPrompt(template, skill, SPEC, 'spec', '.rafa/plans');
 }
 
 describe('the package manifest', () => {
@@ -286,6 +508,41 @@ describe('the package manifest', () => {
 
   it('publishes the build directory and nothing else', () => {
     expect(readManifest()['files']).toEqual(FILES);
+  });
+
+  it('is publishable, and publishes the scoped name publicly', () => {
+    const manifest = readManifest();
+
+    expect(manifest['private']).toBe(false);
+    expect(manifest['publishConfig']).toEqual(PUBLISH_CONFIG);
+    expect(String(manifest['name']).startsWith('@')).toBe(true);
+  });
+
+  it('names bun as its engine, and no node version', () => {
+    expect(readManifest()['engines']).toEqual(ENGINES);
+  });
+
+  it('points module at the built root export, not at a source placeholder', () => {
+    expect(readManifest()['module']).toBe(MODULE);
+    expect(MODULE).toBe(EXPORTS['.']);
+    expect(existsSync(join(PACKAGE_DIR, MODULE))).toBe(true);
+  });
+
+  it('declares no runtime dependency, so an install resolves nothing but the package', () => {
+    const manifest = readManifest();
+
+    expect(DEPENDENCY_KEYS.filter((key) => key in manifest)).toEqual([]);
+    expect(Object.keys(manifest['devDependencies'] as Record<string, unknown>).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the README', () => {
+  it('gives both global install commands, each naming the package the manifest does', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+    const name = String(readManifest()['name']);
+    const commands = [`npm i -g ${name}`, `bun add -g ${name}`];
+
+    expect(commands.filter((command) => !readme.includes(command))).toEqual([]);
   });
 });
 
@@ -328,16 +585,32 @@ describe('the built CLI', () => {
 
     expect(readFileSync(cli, 'utf8').split('\n')[0]).toBe('#!/usr/bin/env bun');
     expect(fromSource.exitCode).toBe(0);
-    expect(fromSource.stdout).toContain('\nCommands:\n');
+    expect(fromSource.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
     expect(fromBuild).toEqual(fromSource);
   }, 30_000);
 
-  it('prints its help when imported, which the import probe can see', () => {
+  it('gives the roster from a copy of the build outside the package as src/rafa.ts does, stamped with the manifest version', () => {
+    const copy = join(tempRoot, 'describe-outside', 'dist');
+    cpSync(DIST, copy, { recursive: true });
+    const env = {
+      ...Object.fromEntries(Object.entries(withBunOnPath()).filter(([name]) => !name.startsWith('RAFA_'))),
+      HOME: tempRoot,
+    };
+    const fromSource = run([process.execPath, join(REPO_ROOT, 'src', 'rafa.ts'), 'describe'], tempRoot, env);
+    const fromBuild = run([process.execPath, join(copy, 'cli.js'), 'describe'], tempRoot, env);
+
+    expect(fromSource.exitCode).toBe(0);
+    expect(existsSync(join(copy, '..', 'package.json'))).toBe(false);
+    expect((JSON.parse(fromBuild.stdout) as { version?: unknown }).version).toBe(readManifest()['version']);
+    expect(fromBuild).toEqual(fromSource);
+  }, 30_000);
+
+  it('prints its help when imported and sets the exit code it answers, which the import probe can see', () => {
     const probe = probeImport(join(DIST, 'cli.js'));
 
     expect(probe.exitCode).toBe(0);
-    expect(probe.stdout).toContain('\nCommands:\n');
-    expect(probe.stdout.endsWith('\n[0,0,null]\n')).toBe(true);
+    expect(probe.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
+    expect(probe.stdout.endsWith('\n[0,0,0]\n')).toBe(true);
   }, 30_000);
 });
 
@@ -366,12 +639,59 @@ describe('the built library entries', () => {
   }, 30_000);
 });
 
+describe('the names phase 1 adds, in the built entries', () => {
+  it('carries the preflight and the PREREQUISITES parser in dist/plan/index.js, as the same bindings in dist/index.js', async () => {
+    const plan = await importBuilt('plan/index.js');
+    const root = await importBuilt('index.js');
+
+    expect(PLAN_PREFLIGHT_NAMES.filter((name) => !(name in plan))).toEqual([]);
+    expect(PLAN_PREFLIGHT_NAMES.filter((name) => root[name] !== plan[name])).toEqual([]);
+  });
+
+  it('carries the config resolver, scope resolution, the adapter registry and the manifest validator in dist/index.js', async () => {
+    const root = await importBuilt('index.js');
+    const start = mkdtempSync(join(tempRoot, 'scope-'));
+    const resolveScope = root['resolveScope'] as (start: string, seams: { home: string }) => unknown;
+    const validateManifest = root['validateManifest'] as (raw: unknown) => { ok: boolean };
+
+    expect(ROOT_SEAM_NAMES.filter((name) => !(name in root))).toEqual([]);
+    expect(root['PORT_VERSIONS']).toEqual(rootSource.PORT_VERSIONS);
+    expect(root['RUNNING_MANIFEST_SEAMS']).toEqual({
+      rafaVersion: readManifest()['version'],
+      portVersions: rootSource.PORT_VERSIONS,
+    });
+    expect(resolveScope(start, { home: tempRoot })).toMatchObject({ found: false, start, home: tempRoot });
+    expect(validateManifest({})).toMatchObject({ ok: false });
+  });
+
+  it('loads dist/plan/index.js under node with the names its source exports, where node refuses dist/index.js', () => {
+    const node = Bun.which('node');
+    if (node === null) throw new Error('node is not on the PATH this suite runs under');
+    const load = (path: string) => run([
+      node,
+      '--input-type=module',
+      '-e',
+      `console.log(JSON.stringify(Object.keys(await import(${JSON.stringify(pathToFileURL(path).href)})).sort()));`,
+    ], tempRoot, process.env);
+
+    expect(load(join(DIST, 'plan', 'index.js'))).toEqual({
+      exitCode: 0,
+      stdout: `${JSON.stringify(Object.keys(planSource).sort())}\n`,
+      stderr: '',
+    });
+    const root = load(join(DIST, 'index.js'));
+    expect(root.exitCode).not.toBe(0);
+    expect(root.stderr).toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
+    expect(root.stderr).toContain('bun:');
+  }, 30_000);
+});
+
 describe('the prompt templates in the build', () => {
-  it.each(TEMPLATES)('copies src/%s into dist unchanged', (name) => {
+  it.each(TEMPLATES)('copies %s into dist as %s, unchanged', (source, name) => {
     const built = join(DIST, name);
 
     expect(existsSync(built)).toBe(true);
-    expect(readFileSync(built, 'utf8')).toBe(readFileSync(join(REPO_ROOT, 'src', name), 'utf8'));
+    expect(readFileSync(built, 'utf8')).toBe(readFileSync(join(REPO_ROOT, source), 'utf8'));
   });
 
   it('writes every built file that reads import.meta.url directly into dist', () => {
@@ -388,7 +708,30 @@ describe('the prompt templates in the build', () => {
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
     expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
+  it('spawns rafa plan under the setting sources a user config names', () => {
+    const scratch = plantPlanScratch('sources');
+    plantUserConfig(scratch, 'loop:\n  settingSources: local,user\n');
+    const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
+  it('refuses rafa plan on a config it cannot run on, before any session starts', () => {
+    const scratch = plantPlanScratch('refused-config');
+    plantUserConfig(scratch, 'loop:\n  settingSources: everyone\n');
+    const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(plan.exitCode).toBe(1);
+    expect(plan.stderr).toContain('Refusing to generate a plan on this configuration');
+    expect(plan.stderr).toContain('loop.settingSources is "everyone"');
+    expect(existsSync(scratch.prompt)).toBe(false);
+    expect(existsSync(scratch.args)).toBe(false);
   }, 30_000);
 
   it('hands planCommand the template beside dist/index.js', () => {
@@ -396,7 +739,7 @@ describe('the prompt templates in the build', () => {
     const probe = join(scratch.root, 'probe.ts');
     writeFileSync(probe, [
       `const { planCommand } = await import(${JSON.stringify(join(DIST, 'index.js'))});`,
-      `await planCommand(${JSON.stringify(PLAN_ARGS)});`,
+      `await planCommand(${JSON.stringify(PLAN_ARGS)}, ${JSON.stringify(scratch.repo)});`,
       '',
     ].join('\n'), 'utf8');
     const plan = run([process.execPath, probe], scratch.repo, scratch.env);
@@ -405,16 +748,36 @@ describe('the prompt templates in the build', () => {
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
+  it('hands rafa plan the format from a copy of the build outside the package', () => {
+    const scratch = plantPlanScratch('outside');
+    const copy = copyBuildOutsidePackage(scratch, null);
+    const plan = run([process.execPath, join(copy, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(presentPlanFormats(copy)).toEqual([join(copy, 'SKILL.md')]);
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
   it('refuses before any session when the template is missing beside the bundle', () => {
     const scratch = plantPlanScratch('control');
-    const bare = join(scratch.root, 'dist');
-    cpSync(DIST, bare, { recursive: true });
-    rmSync(join(bare, 'plan-prompt.md'));
+    const bare = copyBuildOutsidePackage(scratch, 'plan-prompt.md');
     const plan = run([process.execPath, join(bare, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(plan.exitCode).not.toBe(0);
     expect(plan.stderr).toContain('ENOENT');
     expect(plan.stderr).toContain('plan-prompt.md');
+    expect(existsSync(scratch.prompt)).toBe(false);
+  }, 30_000);
+
+  it('refuses before any session when the skill is missing beside a bundle outside the package', () => {
+    const scratch = plantPlanScratch('control-skill');
+    const bare = copyBuildOutsidePackage(scratch, 'SKILL.md');
+    const plan = run([process.execPath, join(bare, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
+
+    expect(presentPlanFormats(bare)).toEqual([]);
+    expect(plan.exitCode).not.toBe(0);
+    expect(plan.stderr).toContain('The plan format is missing');
+    expect(plan.stderr).toContain(join(bare, 'SKILL.md'));
     expect(existsSync(scratch.prompt)).toBe(false);
   }, 30_000);
 });

@@ -22,17 +22,19 @@
  *     its schema check, so the same refusal is thrown before
  *     `writeTriage` ever runs.
  *
- * The command has no seam for its repo root or its session log
- * directory: both are resolved from git and from the home directory
- * respectively, so the case runs it as a subprocess under a HOME of its
- * own, holding an EMPTY session log directory for the scratch repo, the
- * way `collect.test.ts`'s two command cases already do. The scratch
- * repo root is resolved with `realpathSync` before that directory is
- * derived: `getRepoRoot` answers `git rev-parse --show-toplevel`, which
- * resolves `/var`'s symlink to `/private/var` on macOS, so a directory
- * keyed on the unresolved path would sit beside the one the command
- * actually looks under, and the session half would throw on a missing
- * directory instead of reading an empty one.
+ * The command has no seam for its root or its session log directory:
+ * the root is the project the dispatcher resolves from the working
+ * directory, and the log directory is derived from the root and the home.
+ * So the case runs it as a subprocess in a scratch repository holding
+ * `.rafa/config.yaml`, under a HOME of its own holding an EMPTY session
+ * log directory for the scratch repo, the way `collect.test.ts`'s two
+ * command cases already do. The scratch repo root is resolved with
+ * `realpathSync` before that directory is derived: the dispatcher answers
+ * the root as a real path (`src/project/scope.ts`), which resolves
+ * `/var`'s symlink to `/private/var` on macOS, so a directory keyed on
+ * the unresolved path would sit beside the one the command actually looks
+ * under, and the session half would throw on a missing directory instead
+ * of reading an empty one.
  *
  * With no session logs at all, the run's ONLY row comes from the one
  * commit `makeRepo` seeds, so "nothing new to collect" holds from the
@@ -63,6 +65,8 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { sessionLogDir } from '../effort/collect.js';
 import { sqliteStorePath, SQLITE_SCHEMA_VERSION } from '../effort/store/sqlite.js';
 import { recordTaskReport } from '../report/record.js';
+
+import { plantProjectConfig } from './cli-capture.js';
 
 /** The command every black-boxed run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -128,6 +132,7 @@ function makeRepo(): Repo {
   const home = makeScratch();
   git(root, 'init', '-q');
   git(root, 'commit', '-q', '--allow-empty', '--no-verify', '-m', 'init');
+  plantProjectConfig(root);
   mkdirSync(sessionLogDir(root, home), { recursive: true });
   return { root, home };
 }

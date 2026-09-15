@@ -1,7 +1,7 @@
 /**
  * End-to-end test for the effort pipeline: collect, then report.
  *
- * The effort stack's seven modules each have a colocated suite
+ * The effort stack's eight modules each have a colocated suite
  * driving their own seam, and between them every function here is
  * already covered.
  * What none of them drives is the JOIN — a row the COLLECTOR wrote,
@@ -69,7 +69,7 @@
  * The two command entries (`collect(args)` and `report(args)`) resolve
  * their repo root through git and their log directory from the home
  * directory, so driving them would read this machine's real session
- * logs and write into the real `.ralph/`. Their argv is covered
+ * logs and write into the real `.rafa/`. Their argv is covered
  * purely in the colocated suites; everything here goes through
  * {@link collectEffort} and {@link buildReport} with the root, the log
  * directory and the commit reader all injected, and the store selected
@@ -84,7 +84,7 @@
  * kinds the classifier declares rather than over the ones observed.
  *
  * Twenty-one module mutations were driven against this file, across
- * six of the stack's seven modules, and EIGHTEEN reddened at least
+ * six of the stack's eight modules, and EIGHTEEN reddened at least
  * one case, with the restored modules green either side and
  * byte-identical: making either store key projection a constant,
  * recursing the log walk into the subagent directory, attributing a
@@ -133,10 +133,10 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { PROMPT_SHAPES } from '../effort/classify.js';
 import { collectEffort } from '../effort/collect.js';
+import { formatReport } from '../effort/report-format.js';
 import {
   SESSION_KINDS,
   buildReport,
-  formatReport,
 } from '../effort/report.js';
 import { readStoreRows } from '../effort/store.js';
 
@@ -445,6 +445,8 @@ interface Fixture {
   root: string;
   logDir: string;
   plansDir: string;
+  /** The home the config is read under, holding none of its own. */
+  home: string;
 }
 
 /**
@@ -457,6 +459,8 @@ const FIXTURE_CONFIG = 'store: ndjson\n';
 function makeFixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), 'ralph-pipeline-'));
   scratch.push(root);
+  const home = mkdtempSync(join(tmpdir(), 'ralph-pipeline-home-'));
+  scratch.push(home);
 
   const logDir = join(root, 'logs');
   const plansDir = join(root, '.plans');
@@ -470,7 +474,7 @@ function makeFixture(): Fixture {
   }
   for (const spec of SESSIONS) writeSession(logDir, spec);
   writeSubagentTranscript(logDir);
-  return { root, logDir, plansDir };
+  return { root, logDir, plansDir, home };
 }
 
 /** Commit shas the planted reader answers. */
@@ -504,6 +508,7 @@ function plantedCommits(): () => CommitLogParseResult {
 /** Everything a collect run needs, with nothing resolved from git. */
 function optionsFor(fixture: Fixture): CollectOptions {
   return {
+    home: fixture.home,
     repoRoot: fixture.root,
     logDir: fixture.logDir,
     plansDir: fixture.plansDir,
@@ -568,7 +573,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     const result = await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ repoRoot: fixture.root });
+    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
     const commits = readStoreRows(result.commits?.storePath ?? '');
 
     expect(commits.rows).toHaveLength(COMMIT_SHAS.length);
@@ -580,7 +585,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ repoRoot: fixture.root });
+    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
     const q19 = groupFor(report, Q19_PLAN);
     const branch = groupFor(report, NO_PLAN_BRANCH);
 
@@ -596,7 +601,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ repoRoot: fixture.root });
+    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
     const q03 = groupFor(report, Q03_PLAN);
 
     expect(q03.kind).toBe('plan');
@@ -610,7 +615,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ repoRoot: fixture.root });
+    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
 
     expect(groupFor(report, MAIN_BRANCH).sessions).toBe(1);
     expect(groupFor(report, Q19_PLAN).assistantTurns)
@@ -621,7 +626,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ repoRoot: fixture.root });
+    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
     const turns = plantedTurns(() => true);
 
     expect(report.totals.assistantTurns).toBe(turns);
@@ -640,6 +645,7 @@ describe('collect then report over a planted log tree', () => {
     await collectEffort(optionsFor(fixture));
 
     const report = buildReport({
+      home: fixture.home,
       repoRoot: fixture.root,
       kinds: ['task'],
       entrypoints: [SDK],
@@ -655,8 +661,9 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const byKind = buildReport({ repoRoot: fixture.root, kinds: ['task'] });
+    const byKind = buildReport({ home: fixture.home, repoRoot: fixture.root, kinds: ['task'] });
     const byBoth = buildReport({
+      home: fixture.home,
       repoRoot: fixture.root,
       kinds: ['task'],
       entrypoints: [SDK],
@@ -678,6 +685,7 @@ describe('collect then report over a planted log tree', () => {
     await collectEffort(optionsFor(fixture));
 
     const report = buildReport({
+      home: fixture.home,
       repoRoot: fixture.root,
       kinds: ['task'],
       entrypoints: [SDK],
@@ -707,6 +715,7 @@ describe('collect then report over a planted log tree', () => {
     await collectEffort(optionsFor(fixture));
 
     const perKind = SESSION_KINDS.map((kind) => buildReport({
+      home: fixture.home,
       repoRoot: fixture.root,
       kinds: [kind],
     }).totals.sessions);
@@ -749,10 +758,10 @@ describe('a second collect run', () => {
     const fixture = makeFixture();
     const options = optionsFor(fixture);
     await collectEffort(options);
-    const before = formatReport(buildReport({ repoRoot: fixture.root }));
+    const before = formatReport(buildReport({ home: fixture.home, repoRoot: fixture.root }));
 
     await collectEffort(options);
-    const after = formatReport(buildReport({ repoRoot: fixture.root }));
+    const after = formatReport(buildReport({ home: fixture.home, repoRoot: fixture.root }));
 
     // A byte-identical pair of EMPTY renders would be vacuous, so the
     // line count is held against the fixture: one header line, a
@@ -769,11 +778,11 @@ describe('a second collect run', () => {
     const fixture = makeFixture();
     const options = optionsFor(fixture);
     await collectEffort(options);
-    const before = buildReport({ repoRoot: fixture.root });
+    const before = buildReport({ home: fixture.home, repoRoot: fixture.root });
     writeSession(fixture.logDir, LATE_SESSION);
 
     const third = await collectEffort(options);
-    const after = buildReport({ repoRoot: fixture.root });
+    const after = buildReport({ home: fixture.home, repoRoot: fixture.root });
     const added = LATE_SESSION.turns.length;
 
     expect(third.sessions?.read).toBe(1);

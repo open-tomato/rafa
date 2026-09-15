@@ -17,6 +17,11 @@
  *     finding is a row whose `plan_stub` is null, the only scope the
  *     findings table records. A dispatch with no stub therefore renders
  *     the global findings alone: SQL's `plan_stub = NULL` is never true.
+ *   - Every row of the table, whichever writer wrote it. Beside the
+ *     report's findings, `effort/store/tracker-refs.ts` inserts a row
+ *     holding an artifact and a filed issue's reference and no report
+ *     field, where the session reported no finding under that artifact,
+ *     and a render holds it as the bullet `- artifact: <artifact>`.
  *   - Most recent first, by `seq` descending, the store's append order.
  *     `collected_at` cannot order them: one write stamps every row it
  *     holds with the same time, and a clock stepped back would reorder

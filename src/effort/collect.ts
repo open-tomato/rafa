@@ -78,15 +78,18 @@
  * the reading that says the collector's key and the store's agree.
  *
  * The store is the one a caller passes as {@link CollectOptions.store},
- * else the one `.rafa/config.yaml` under the repo root selects, which
- * is `sqlite` when the file names none. That selection is made ONCE per
- * run, before either half reads a log or runs git, and both halves use
- * the one store it answered. So the two halves cannot land in two
- * backends, and a config the loop cannot run on refuses the run before
- * anything is read. This command has no store flag, so the file
- * outranks only the default. A store passed in means the file is not
- * read at all. An unknown key in the file is warned about through
- * {@link CollectOptions.log}, with everything else the run reports.
+ * else the one the config selects: `.rafa/config.yaml` under the repo
+ * root over the user scope's under {@link CollectOptions.home}, and
+ * `sqlite` when neither names one. That selection is made ONCE per run,
+ * before either half reads a log or runs git, and both halves use the
+ * one store it answered. So the two halves cannot land in two backends,
+ * and a config the loop cannot run on refuses the run before anything
+ * is read. The same read answers `plan.dir`, the roster's directory,
+ * unless {@link CollectOptions.plansDir} is passed. This command has no
+ * store flag, so the files outrank only the default. A store and a plans
+ * directory both passed in mean neither file is read at all. An unknown
+ * key in either file is warned about through {@link CollectOptions.log},
+ * with everything else the run reports.
  *
  * ## `--since` is one instant, resolved once
  *
@@ -146,8 +149,8 @@
  * to collect, and a zero-row run that looks successful is worse than
  * a message.
  *
- * An EMPTY plan roster is not refused — `.plans/` is gitignored and
- * legitimately absent on a fresh clone — but it makes every session's
+ * An EMPTY plan roster is not refused — `plan.dir` is untracked by
+ * default and absent on a fresh clone — but it makes every session's
  * `planStub` resolve to null, which reads as a collector that failed
  * to attribute anything. The roster size is reported for that reason.
  */
@@ -164,10 +167,12 @@ import type {
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
-import { ConfigError, loadConfig } from '../config.js';
-import { getRepoRoot } from '../utils/git.js';
+import { activeOutput } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
+import { loadConfig } from '../config-load.js';
+import { ConfigError } from '../config.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
@@ -192,9 +197,6 @@ const SESSION_LOG_NAME = /\.jsonl$/i;
 
 /** Where Claude Code files per-project logs, under the home directory. */
 const PROJECT_LOG_ROOT = ['.claude', 'projects'] as const;
-
-/** The plan directory, relative to the repo root. */
-const PLANS_DIR = '.plans';
 
 /**
  * The mode every session row this collector writes carries. A constant
@@ -300,26 +302,32 @@ export interface CollectResult {
 
 /** How a run is bounded and where it reads from. */
 export interface CollectOptions {
-  /** Defaults to the git repo root. Governs the store and git's cwd. */
-  repoRoot?: string;
+  /** The project root, with no default. Governs the store and git's cwd. */
+  repoRoot: string;
   /** Defaults to the derived project log directory. */
   logDir?: string;
-  /** Defaults to `<repoRoot>/.plans`. */
+  /** Defaults to `plan.dir` under the repo root, as the config resolves it. */
   plansDir?: string;
   /** The resolved `--since` instant, shared by both halves. */
   sinceEpochMs?: number | null;
   /**
+   * The home the user scope's config is read under. No default: the
+   * command passes `homedir()`, so a caller cannot reach the real home by
+   * leaving it out. Unread when a store and `plansDir` are both passed.
+   */
+  home: string;
+  /**
    * The store both halves read their keys from and append to. Defaults
-   * to the backend `.rafa/config.yaml` under the repo root selects; a
-   * store passed here means that file is not read. See the module note.
+   * to the backend the config under the repo root and the home selects;
+   * passed with `plansDir`, neither file is read. See the module note.
    */
   store?: EffortStore;
   collectSessions?: boolean;
   collectCommits?: boolean;
   verbose?: boolean;
   /**
-   * Sink for progress, errors and config warnings. Defaults to
-   * `console.log`.
+   * Sink for progress, errors and config warnings. Defaults to the
+   * active output's `info`, read at each line.
    */
   log?: (line: string) => void;
   /** Commit reader seam, so a test needs no repository. */
@@ -534,7 +542,7 @@ export function parseCollectArgs(args: readonly string[]): CollectArgs {
   };
 }
 
-/** Reads the plan roster, tolerating a `.plans/` that is not there. */
+/** Reads the plan roster, tolerating a plans directory that is not there. */
 export function readPlanStubs(plansDir: string): string[] {
   return existsSync(plansDir)
     ? planStubsFromFileNames(readdirSync(plansDir))
@@ -650,21 +658,22 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
 }
 
 /**
- * The store a run goes through: the one passed, else the one the config
- * under `repoRoot` selects, with the config's warnings sent to `log`.
+ * The store and the plans directory a run goes through: each one passed,
+ * else the one the config under the repo root and the home names, with
+ * the config's warnings sent to `log`. Passed both, it reads no file.
  *
- * Called once per run, so the file is read and warned about once.
+ * Called once per run, so each file is read and warned about once.
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
-function resolveStore(
-  store: EffortStore | undefined,
-  repoRoot: string,
+function resolveSources(
+  options: CollectOptions,
   log: (line: string) => void,
-): EffortStore {
-  if (store !== undefined) return store;
+): Pick<HalfContext, 'store' | 'plansDir'> {
+  const { repoRoot: root, store, plansDir } = options;
+  if (store !== undefined && plansDir !== undefined) return { store, plansDir };
 
-  const resolved = loadConfig(repoRoot, {}, log);
-  return selectEffortStore(repoRoot, resolved.config);
+  const { config } = loadConfig({ root, home: options.home }, {}, log);
+  return { store: store ?? selectEffortStore(root, config), plansDir: plansDir ?? resolve(root, config.planDir) };
 }
 
 /**
@@ -672,24 +681,24 @@ function resolveStore(
  *
  * The halves are independent and neither reads the other's rows, so
  * switching one off changes nothing about the other's result. They do
- * share one store, resolved before either runs; see the module note.
+ * share one store and one roster, resolved before either runs; see the
+ * module note.
  *
  * Rejects with a `ConfigError`, having read no log and run no git, when
- * no store is passed and the config under the repo root is one the
- * loop cannot run on.
+ * a store or a plans directory is not passed and a config file under the
+ * repo root or the home is one the loop cannot run on.
  */
 export async function collectEffort(
-  options: CollectOptions = {},
+  options: CollectOptions,
 ): Promise<CollectResult> {
-  const repoRoot = options.repoRoot ?? getRepoRoot();
+  const { repoRoot } = options;
   const verbose = options.verbose ?? false;
-  const log = options.log ?? ((line: string) => console.log(line));
+  const log = options.log ?? ((line: string) => activeOutput().info(line));
   const context: HalfContext = {
     repoRoot,
     logDir: options.logDir ?? sessionLogDir(repoRoot),
-    plansDir: options.plansDir ?? join(repoRoot, PLANS_DIR),
+    ...resolveSources(options, log),
     sinceEpochMs: options.sinceEpochMs ?? null,
-    store: resolveStore(options.store, repoRoot, log),
     log,
     note: (line: string) => {
       if (verbose) log(line);
@@ -740,36 +749,40 @@ export function formatCollectSummary(result: CollectResult): string[] {
   return lines;
 }
 
-/** Prints each refusal on its own line and marks the run failed. */
-function refuse(problems: readonly string[]): void {
-  for (const problem of problems) {
-    console.error(`ralph effort collect: ${problem}`);
-  }
-  process.exitCode = 1;
+/** Refuses the run with exit code 1, its message one line per refusal. */
+function refuse(problems: readonly string[]): never {
+  throw new CommandExit(1, problems.map((problem) => `ralph effort collect: ${problem}`).join('\n'));
 }
 
 /**
- * `ralph effort collect` — the command entry.
+ * `ralph effort collect` — the command entry, over `repoRoot`, the project
+ * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
- * Sets `process.exitCode` rather than calling `process.exit`, so the
- * function is drivable from a test and so a caller's own output is
- * not truncated mid-flush.
+ * Writes the summary through the active output
+ * (`adapters/output/active.ts`), one `info` line each, as the run's
+ * progress and config warnings are written ({@link collectEffort}).
  *
- * A config the loop cannot run on is printed as a refusal, one line
- * per problem, the way a bad argument is. That is the use the config
- * module's own error class exists for. Anything else thrown is a fault
- * rather than a refusal, and is rethrown.
+ * Refuses by throwing `CommandExit` with exit code 1 and the refusal as
+ * its message, one line per problem, and neither sets `process.exitCode`
+ * nor calls `process.exit`: the dispatcher is the one place that sets
+ * the exit code. It writes the message to stderr in text mode, the bytes
+ * this command printed there before, and carries it in the terminal
+ * result in json mode.
+ *
+ * A config the loop cannot run on is refused, one line per problem, the
+ * way a bad argument is. That is the use the config module's own error
+ * class exists for. Anything else thrown is a fault rather than a
+ * refusal, and is rethrown.
  */
-export default async function collect(args: string[]): Promise<void> {
+export default async function collect(args: string[], repoRoot: string): Promise<void> {
   const parsed = parseCollectArgs(args);
-  if (parsed.errors.length > 0) {
-    refuse(parsed.errors);
-    return;
-  }
+  if (parsed.errors.length > 0) refuse(parsed.errors);
 
   let result: CollectResult;
   try {
     result = await collectEffort({
+      repoRoot,
+      home: homedir(),
       sinceEpochMs: parsed.sinceEpochMs,
       collectSessions: parsed.collectSessions,
       collectCommits: parsed.collectCommits,
@@ -778,9 +791,8 @@ export default async function collect(args: string[]): Promise<void> {
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);
-    return;
   }
   for (const line of formatCollectSummary(result)) {
-    console.log(line);
+    activeOutput().info(line);
   }
 }
