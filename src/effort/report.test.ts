@@ -85,6 +85,12 @@
  * under a `--kind` filter (1), and the command's no-rows branch printing no
  * tallies (1). None reddened the pipeline suite.
  *
+ * The preflight halt cases came with the `preflight` table. Three legs of
+ * `report.ts` were driven on 2026-09-15 against this file and six other
+ * suites, each restored sha256-identical: the halts never read (2 red
+ * here), the no-rows branch printing no halts (1), and the halts emptied
+ * under a `--kind` filter (1).
+ *
  * The json cases came when the command began writing through the active
  * output, and each text case beside one reads the bytes phase 0 printed.
  * Of the mutations driven on 2026-09-15 over this file and ten other
@@ -131,6 +137,7 @@ import {
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
+import { writePreflightChecks } from './store/preflight.js';
 import { writeTaskReport } from './store/reports.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -925,6 +932,61 @@ describe('the task reports a report carries', () => {
   });
 });
 
+/**
+ * Records one run's preflight under a root, as the loop records one: a
+ * passing required check, then a failed presence check on `tier`, which
+ * halts the run only on the required tier.
+ */
+function plantPreflight(root: string, runId: string, tier: 'required' | 'optional'): void {
+  writePreflightChecks(root, {
+    runId,
+    checks: [
+      {
+        tier: 'required',
+        item: { kind: 'tool', name: 'bun', probe: 'bun --version' },
+        outcome: 'pass',
+        durationMs: 5,
+        failure: null,
+      },
+      {
+        tier,
+        item: { kind: 'env', name: 'GITHUB_TOKEN', probe: null },
+        outcome: 'fail',
+        durationMs: 0,
+        failure: 'presence check: GITHUB_TOKEN is not set',
+      },
+    ],
+  }, { now: () => new Date('2026-09-15T10:00:00.000Z') });
+}
+
+describe('the preflight halts a report carries', () => {
+  it('carries the halted runs under the root, unfiltered, and no run that only warned', () => {
+    const root = plantStore(ROWS);
+    plantPreflight(root, 'run-halted', 'required');
+    plantPreflight(root, 'run-warned', 'optional');
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.preflightHalts).toEqual([{
+      runId: 'run-halted',
+      collectedAt: '2026-09-15T10:00:00.000Z',
+      checks: 2,
+      failed: [{
+        kind: 'env',
+        item: 'GITHUB_TOKEN',
+        probe: null,
+        outcome: 'fail',
+        durationMs: 0,
+        failure: 'presence check: GITHUB_TOKEN is not set',
+      }],
+    }]);
+
+    // The control: the same session rows with no preflight stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).preflightHalts).toEqual([]);
+  });
+});
+
 /** A config holding a problem in each of two settings, `store` and `plan.inject`. */
 const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
 
@@ -1042,6 +1104,27 @@ describe('the report command', () => {
 
     // The control: a root storing neither prints the one line alone.
     expect(runReport(bare, []).stdout).toBe(`${noRows}\n`);
+  });
+
+  it('prints the preflight halts when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
+    plantPreflight(root, 'run-halted', 'required');
+    plantPreflight(root, 'run-warned', 'optional');
+    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'preflight halts: 1 run, by run and failed required item',
+      'run         at                        item                outcome  ms  failure',
+      'run-halted  2026-09-15T10:00:00.000Z  env "GITHUB_TOKEN"  fail      0  presence check: GITHUB_TOKEN is not set',
+      '',
+    ]);
   });
 
   it('prints a config it cannot run on as one refusal per problem', () => {

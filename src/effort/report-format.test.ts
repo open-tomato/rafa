@@ -32,8 +32,21 @@
  * them), and a NULL status written as `null` (1). The command case in
  * `report.test.ts` reddened too for the swap, the empty section and the
  * alignment.
+ *
+ * The preflight halt section came after that. Seven legs of
+ * `report-format.ts` were driven on 2026-09-15 against this file,
+ * `report.test.ts` and five store suites, each restored sha256-identical,
+ * and each reddened at least one case: the section left out of
+ * `formatReport` (1), a section printed for no halts (3: the task report
+ * and preflight halt cases here that expect nothing, and the command's
+ * task report case), the filter note dropped (1), a failure left on its
+ * lines (1), right alignment ignored (2), the outcome and duration cells
+ * swapped (2), and one run counted as `runs` (2). The command's preflight
+ * halt case in `report.test.ts` is one of the two for each of the last
+ * three.
  */
 import type { EffortGroup, EffortReport, GroupKind } from './report.js';
+import type { PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
 
 import { describe, expect, it } from 'bun:test';
@@ -42,6 +55,7 @@ import {
   formatCount,
   formatHistogram,
   formatMinutes,
+  formatPreflightHalts,
   formatReport,
   formatReportHeader,
   formatReportTable,
@@ -67,6 +81,7 @@ function plantReport(fields: Partial<EffortReport> = {}): EffortReport {
     rowsExcluded: 0,
     filters: { kinds: null, entrypoints: null },
     taskReports: [],
+    preflightHalts: [],
     ...fields,
   };
 }
@@ -273,6 +288,98 @@ describe('formatTaskReports', () => {
     expect(filtered[2]).toBe('  note        the filters narrow session rows, not task reports');
     expect(filtered).toHaveLength(8);
     expect(formatTaskReports(plantReport({ taskReports: TALLIES })).join('\n'))
+      .not.toContain('note');
+  });
+});
+
+/**
+ * Two halted runs: the first failed two required checks, one a presence
+ * check that took no measurable time and one a timeout past a thousand
+ * milliseconds whose probe spans two lines; the second failed one. The
+ * run id and item cells of the first are wider than their headers.
+ */
+const HALTS: readonly PreflightHalt[] = [
+  {
+    runId: '0f6c1a2e-run',
+    collectedAt: '2026-09-15T10:00:00.000Z',
+    checks: 4,
+    failed: [
+      {
+        kind: 'env',
+        item: 'GITHUB_TOKEN',
+        probe: null,
+        outcome: 'fail',
+        durationMs: 0,
+        failure: 'presence check: GITHUB_TOKEN is not set',
+      },
+      {
+        kind: 'tool',
+        item: 'mgrep',
+        probe: 'mgrep --version\n  --quiet',
+        outcome: 'timeout',
+        durationMs: 30012,
+        failure: 'probe `mgrep --version\n  --quiet` timed out after 30s and was killed (exit 137)',
+      },
+    ],
+  },
+  {
+    runId: 'r2',
+    collectedAt: '2026-09-15T11:30:00.000Z',
+    checks: 1,
+    failed: [{
+      kind: 'tool',
+      item: 'bun',
+      probe: 'bun --version',
+      outcome: 'fail',
+      durationMs: 41,
+      failure: 'probe `bun --version` exited 127: sh: bun: not found',
+    }],
+  },
+];
+
+describe('formatPreflightHalts', () => {
+  it('renders one aligned row per failed required check, its run on every row', () => {
+    expect(formatPreflightHalts(plantReport({ preflightHalts: HALTS }))).toEqual([
+      '',
+      'preflight halts: 2 runs, by run and failed required item',
+      'run           at                        item                outcome      ms  failure',
+      '0f6c1a2e-run  2026-09-15T10:00:00.000Z  env "GITHUB_TOKEN"  fail          0  presence check: GITHUB_TOKEN is not set',
+      '0f6c1a2e-run  2026-09-15T10:00:00.000Z  tool "mgrep"        timeout  30,012  probe `mgrep --version --quiet` timed out after 30s and was killed (exit 137)',
+      'r2            2026-09-15T11:30:00.000Z  tool "bun"          fail         41  probe `bun --version` exited 127: sh: bun: not found',
+    ]);
+  });
+
+  it('counts one run as one run', () => {
+    const [first] = HALTS;
+    expect(first).toBeDefined();
+
+    expect(formatPreflightHalts(plantReport({ preflightHalts: [first!] }))[1])
+      .toBe('preflight halts: 1 run, by run and failed required item');
+  });
+
+  it('adds nothing to a report where no run halted', () => {
+    const withTallies = { ...REPORT, taskReports: TALLIES };
+    const before = formatReport(withTallies);
+
+    expect(formatPreflightHalts(withTallies)).toEqual([]);
+    expect(before).toEqual([...formatReportHeader(REPORT), '', ...formatReportTable(REPORT), ...formatTaskReports(withTallies)]);
+
+    // The control: the same report holding halts ends with their section,
+    // after the task reports.
+    const withHalts = { ...withTallies, preflightHalts: HALTS };
+    expect(formatReport(withHalts)).toEqual([...before, ...formatPreflightHalts(withHalts)]);
+    expect(formatPreflightHalts(withHalts)).toHaveLength(6);
+  });
+
+  it('notes under a filter that the halts are not narrowed', () => {
+    const filtered = formatPreflightHalts(plantReport({
+      preflightHalts: HALTS,
+      filters: { kinds: null, entrypoints: ['sdk-cli'] },
+    }));
+
+    expect(filtered[2]).toBe('  note        the filters narrow session rows, not preflight halts');
+    expect(filtered).toHaveLength(7);
+    expect(formatPreflightHalts(plantReport({ preflightHalts: HALTS })).join('\n'))
       .not.toContain('note');
   });
 });

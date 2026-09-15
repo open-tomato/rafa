@@ -3,8 +3,9 @@
  *
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
- * reads the config, the store the config selects and the task reports
- * the loop stored, and nothing else — no log, no clock — so a report is
+ * reads the config, the store the config selects, and the task reports
+ * and preflight checks the loop stored, and nothing else — no log, no
+ * clock — so a report is
  * a pure projection of rows already on disk and two runs over an
  * unchanged store produce identical bytes.
  *
@@ -38,6 +39,17 @@
  * nonzero exit. The filters do not narrow the tallies, because a task
  * report carries neither a kind nor an entrypoint to test them on, and
  * the table printed under a filter says so.
+ *
+ * ## Preflight halts beside them
+ *
+ * {@link EffortReport.preflightHalts} lists the runs whose preflight
+ * halted, read from the `preflight` table (`store/preflight.ts`) under
+ * the repo root, as the tallies are, whichever backend `store` selects. A
+ * run halted when one of its required checks did not pass, and its halt
+ * names each such check. A store can hold a halt and no session row, so
+ * the command prints the halts under its no-rows line as it prints the
+ * tallies there. The filters do not narrow the halts either, since a
+ * preflight row carries no kind and no entrypoint.
  *
  * ## What a group is keyed on
  *
@@ -119,6 +131,7 @@ import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { ConfigRoots } from '../config-load.js';
+import type { PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
 import type { EffortStore } from './store/types.js';
 
@@ -131,8 +144,9 @@ import { ConfigError } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
-import { formatReport, formatTaskReports } from './report-format.js';
+import { formatPreflightHalts, formatReport, formatTaskReports } from './report-format.js';
 import { selectEffortStore } from './store/index.js';
+import { readPreflightHalts } from './store/preflight.js';
 import { readTaskReportTallies } from './store/reports.js';
 
 /** Decimal places a summed minute figure is re-rounded to. */
@@ -236,6 +250,11 @@ export interface EffortReport {
    * The filters do not narrow them; see the module note.
    */
   taskReports: readonly TaskReportTally[];
+  /**
+   * The runs whose preflight halted, in the order they were stored. The
+   * filters do not narrow them; see the module note.
+   */
+  preflightHalts: readonly PreflightHalt[];
 }
 
 /** What the parsed argv asked for. */
@@ -488,12 +507,14 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  *
  * Pure over its inputs, which is the seam the whole suite drives: a
  * planted row needs no store, no log and no repository. `taskReports`
- * is carried into the report as it is handed in, never filtered.
+ * and `preflightHalts` are carried into the report as they are handed
+ * in, never filtered.
  */
 export function summariseSessions(
   rows: readonly ReportSessionRow[],
   filters: ReportFilters = { kinds: null, entrypoints: null },
   taskReports: readonly TaskReportTally[] = [],
+  preflightHalts: readonly PreflightHalt[] = [],
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -528,6 +549,7 @@ export function summariseSessions(
     rowsExcluded,
     filters,
     taskReports,
+    preflightHalts,
   };
 }
 
@@ -617,14 +639,14 @@ function resolveStore(
 }
 
 /**
- * Reads the session rows of the selected store and the task report
- * tallies under the repo root, and rolls the rows up.
+ * Reads the session rows of the selected store, and the task report
+ * tallies and preflight halts under the repo root, and rolls the rows up.
  *
  * A missing store answers an EMPTY report rather than throwing — every
  * backend answers absence as the first-run case — so the command below
  * is what says "nothing collected yet" in words, which is the one thing
  * a table of zeroes cannot convey. A missing SQLite file answers no
- * tallies the same way.
+ * tallies and no halts the same way.
  *
  * Throws a `ConfigError`, having read no row, when no store is passed
  * and a config file under the repo root or the home is one the loop
@@ -641,6 +663,7 @@ export function buildReport(options: ReportOptions): EffortReport {
       entrypoints: options.entrypoints ?? null,
     },
     readTaskReportTallies(repoRoot),
+    readPreflightHalts(repoRoot),
   );
 }
 
@@ -701,7 +724,7 @@ export default async function report(args: string[], repoRoot: string): Promise<
   if (built.rowsRead === 0) {
     output.info('effort report: no session rows stored yet'
       + ' (run `ralph effort collect` first)');
-    for (const line of formatTaskReports(built)) output.info(line);
+    for (const line of [...formatTaskReports(built), ...formatPreflightHalts(built)]) output.info(line);
     return;
   }
   for (const line of formatReport(built)) {

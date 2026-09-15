@@ -273,7 +273,7 @@ describe('the triage migration', () => {
         .toEqual([...COLUMNS[table]]);
     }
     expect(rawQuery<{ name: string }>(root, tables, 'table').map(({ name }) => name))
-      .toEqual(['blockers', 'commits', 'findings', 'out_of_scope_bugs', 'report_absences', 'sessions', 'task_reports']);
+      .toEqual(['blockers', 'commits', 'findings', 'out_of_scope_bugs', 'preflight', 'report_absences', 'sessions', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
   });

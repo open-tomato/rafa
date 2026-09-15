@@ -16,9 +16,10 @@ export default wrapPhaseZeroCommand({
   name: 'effort report',
   subject: 'effort',
   action: 'report',
-  summary: 'roll the stored session rows up per plan, then tally the task reports',
+  summary: 'roll the stored session rows up per plan, then tally the task reports and list preflight halts',
   description: 'Rolls the session rows `rafa effort collect` stored up per plan, or per branch for a'
-    + ' session no plan claims, then tallies the stored task reports by plan, status and outcome. It'
+    + ' session no plan claims, then tallies the stored task reports by plan, status and outcome, and'
+    + ' lists the runs whose preflight halted, one row per required item that failed. It'
     + ' reads only what is stored, so two runs over an unchanged store print the same bytes. With'
     + ' `--output=json` the report is the data of the terminal result event. An unrecognised argument'
     + ' and a config the loop cannot run on are each refused, one line per problem.',
@@ -47,7 +48,7 @@ export default wrapPhaseZeroCommand({
   examples: [
     {
       cmd: 'rafa effort report',
-      note: 'Prints the per-plan tables, then the task report tallies.',
+      note: 'Prints the per-plan tables, the task report tallies, then the preflight halts.',
     },
     {
       cmd: 'rafa effort report --entrypoint=sdk-cli --kind=task --output=json',

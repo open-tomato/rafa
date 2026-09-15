@@ -36,21 +36,29 @@ is copied there as well.
 
 ### Tables outside the port
 
-`findings`, `blockers`, `out_of_scope_bugs`, `report_absences` and
-`task_reports` are SQLite-only and stay out of the port's row map. Each
-arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
-`sqliteStorePath` that `store/sqlite.ts` exports, and lands in
+`findings`, `blockers`, `out_of_scope_bugs`, `report_absences`,
+`task_reports` and `preflight` are SQLite-only and stay out of the port's
+row map. Each arrives as a new `SQLITE_MIGRATIONS` entry, is written
+under the `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
-nothing to insert goes through `writeSqliteStore`, as `writeFindings`
-and `writeTriage` do, so an empty write on a store that exists still
-meets the schema check. `writeReportAbsence` always has its one row and
-opens `withSqliteStore` directly. `writeTaskReport` always has its one
-row too, and passes `writeSqliteStore` a count of one, which opens the
-store as that direct call does. `readTaskReportTallies` reads that table
-back for `rafa effort report`, under the repo root whatever `store`
-selects, and opens nothing when the file is absent. A new table moves
-every full table-list expectation with it: two in `sqlite.test.ts`, one each in
-`triage.test.ts`, `absences.test.ts` and `reports.test.ts`.
+nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
+`writeTriage` and `writePreflightChecks` do, so an empty write on a store
+that exists still meets the schema check. `writeReportAbsence` always has
+its one row and opens `withSqliteStore` directly. `writeTaskReport`
+always has its one row too, and passes `writeSqliteStore` a count of
+one, which opens the store as that direct call does.
+`readTaskReportTallies` reads that table back for `rafa effort report`,
+under the repo root whatever `store` selects, and opens nothing when the
+file is absent; `readPreflightHalts` reads `preflight` back the same way.
+A new table moves every full table-list expectation with it: two in
+`sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
+`reports.test.ts` and `preflight.test.ts`.
+
+**`preflight` is the one such table no task report fills.**
+`store/preflight.ts` writes a run's checks in one transaction, one row
+per check keyed by `(run_id, position)`, since a run can check one item
+twice. No column says the run halted: a run halted when a required check
+did not pass, and `readPreflightHalts` reads that off the rows.
 
 ### Attribution
 

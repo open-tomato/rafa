@@ -1,7 +1,9 @@
 /**
  * Renders a rolled-up effort report as the lines `rafa effort report`
  * prints in table mode: the per-plan session table, then, when any task
- * report is stored, the reports tallied by plan, status and outcome.
+ * report is stored, the reports tallied by plan, status and outcome, and
+ * then, when any run's preflight halted, the required checks that halted
+ * it.
  *
  * Pure over an {@link EffortReport}: no store, no config and no clock
  * reach it, so `report.ts` decides every figure and this module decides
@@ -17,6 +19,7 @@
  * again rather than deriving one of its own.
  */
 import type { EffortGroup, EffortReport } from './report.js';
+import type { HaltedCheck, PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
 
 /** Decimal places a formatted minute figure carries in the table. */
@@ -92,6 +95,12 @@ const NO_PLAN_CELL = '(no plan)';
 
 /** Written for a tally of reports that gave no usable status. */
 const NO_STATUS_CELL = '-';
+
+/** The preflight halt table's columns, in order. */
+const PREFLIGHT_HALT_COLUMNS = ['run', 'at', 'item', 'outcome', 'ms', 'failure'] as const;
+
+/** The preflight halt columns rendered right-aligned. */
+const PREFLIGHT_HALT_RIGHT_ALIGNED: ReadonlySet<string> = new Set(['ms']);
 
 /** One group as its table cells, in {@link TABLE_COLUMNS} order. */
 function groupCells(group: EffortGroup): string[] {
@@ -224,6 +233,54 @@ export function formatTaskReports(report: EffortReport): string[] {
   return [...lines, ...alignRows(TASK_REPORT_COLUMNS, rows, TASK_REPORT_RIGHT_ALIGNED)];
 }
 
+/** `text` on one line, each run of whitespace one space. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * One required check that halted a run, as its table cells in
+ * {@link PREFLIGHT_HALT_COLUMNS} order: the item as the halt names it,
+ * kind and quoted name, and the failure on one line.
+ */
+function haltCells(halt: PreflightHalt, check: HaltedCheck): string[] {
+  return [
+    halt.runId,
+    halt.collectedAt,
+    `${check.kind} ${JSON.stringify(check.item)}`,
+    check.outcome,
+    formatCount(check.durationMs),
+    oneLine(check.failure),
+  ];
+}
+
+/**
+ * The preflight halt section: a blank line, a heading counting the runs
+ * whose preflight halted, and one row per required check that did not
+ * pass, its run's id and write time on every row so each reads alone.
+ *
+ * Nothing at all when no run halted, so a store holding none prints what
+ * it printed before the section existed. The failure is the last column,
+ * and is written on one line, each run of whitespace one space: a probe
+ * can span lines, and a line break inside a cell would split its row. A
+ * report narrowed by `--kind` or `--entrypoint` gets a note under the
+ * heading, as the task report section does.
+ */
+export function formatPreflightHalts(report: EffortReport): string[] {
+  const halts = report.preflightHalts;
+  if (halts.length === 0) return [];
+
+  const noun = halts.length === 1
+    ? 'run'
+    : 'runs';
+  const lines = ['', `preflight halts: ${formatCount(halts.length)} ${noun}, by run and failed required item`];
+  if (report.filters.kinds !== null || report.filters.entrypoints !== null) {
+    lines.push('  note        the filters narrow session rows, not preflight halts');
+  }
+  const rows = halts.flatMap((halt) => halt.failed.map((check) => haltCells(halt, check)));
+  return [...lines, ...alignRows(PREFLIGHT_HALT_COLUMNS, rows, PREFLIGHT_HALT_RIGHT_ALIGNED)];
+}
+
 /** Everything the command prints in table mode. */
 export function formatReport(report: EffortReport): string[] {
   return [
@@ -231,5 +288,6 @@ export function formatReport(report: EffortReport): string[] {
     '',
     ...formatReportTable(report),
     ...formatTaskReports(report),
+    ...formatPreflightHalts(report),
   ];
 }
