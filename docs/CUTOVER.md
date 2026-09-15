@@ -17,41 +17,43 @@ Before beginning, ensure:
 - Current working directory is the sibling:
   `/Users/marcos/projects/agentic-research`
 
-## Step 1: Link the rafa Package
+## Step 1: Install the Global rafa Snapshot
 
-Link the built `@open-tomato/rafa` package as a local dependency:
+Ensure the built `@open-tomato/rafa` snapshot is installed globally:
 
 ```bash
 cd /Users/marcos/projects/open-tomato/rafa
-bun link
+bun run snapshot
+```
+
+This copies the built runtime into `~/.rafa/runtime/<version>/` and links
+`~/.rafa/bin/rafa`. Verify that `~/.rafa/bin` is on your `PATH` ahead of
+`~/.bun/bin`:
+
+```bash
+echo $PATH | tr ':' '\n' | grep -E 'rafa|bun'
+```
+
+Should show `~/.rafa/bin` listed before `~/.bun/bin`. If not, update your
+shell profile to place `~/.rafa/bin` first.
+
+
+## Step 2: Update the ralph Script
+
+Repoint the `ralph` script in `package.json` to call the global `rafa`:
+
+```json
+{
+  "scripts": {
+    "ralph": "rafa"
+  }
+}
 ```
 
 In the sibling repository:
 
 ```bash
 cd /Users/marcos/projects/agentic-research
-bun link @open-tomato/rafa
-```
-
-Verify the link:
-
-```bash
-bun pm ls @open-tomato/rafa
-```
-
-Should show `@open-tomato/rafa@0.1.0 (local)` or similar.
-
-
-## Step 2: Update the ralph Script
-
-Repoint the `ralph` script in `package.json` to use rafa:
-
-```json
-{
-  "scripts": {
-    "ralph": "bun rafa"
-  }
-}
 ```
 
 Test the new entry point:
@@ -60,7 +62,10 @@ Test the new entry point:
 bun run ralph usage
 ```
 
-Should output the rafa usage help without error.
+Should output the rafa usage help without error. If the command fails, verify
+that `~/.rafa/bin` is on your `PATH` and that `rafa` resolves to the global
+snapshot (not a local `node_modules` entry). Do not use `bun link` or
+`bun pm ls` — the link carries no `bun` context.
 
 
 ## Step 3: Run Full Plan with `plan.inject=full`
@@ -229,15 +234,14 @@ restored:
 # Restore the previous state
 git revert <cutover-commit-SHA>
 
-# Unlink the rafa package
-bun unlink @open-tomato/rafa
-
 # Verify ralph is restored
 bun run ralph usage
 ```
 
 This rollback reverts the `tools/ralph` deletion and restores the
-previous script in `package.json`.
+previous script in `package.json`. The global `rafa` binary remains
+installed at `~/.rafa/bin/rafa` from the snapshot; it is unchanged by
+the revert.
 
 **Duration:** This rollback is documented for the length of one plan run.
 After the next major phase completes, it can be removed.
@@ -276,12 +280,8 @@ After the cutover commit is merged and the rollback is documented:
      "SELECT COUNT(*) FROM sessions;"
    ```
 
-4. **Verify the link can be unlinked and re-linked if needed:**
-
-   ```bash
-   bun unlink @open-tomato/rafa
-   bun link @open-tomato/rafa
-   ```
+   (After phase 1 upgrades, this path will change to `.rafa/effort/effort.sqlite`.
+   The migration is a one-time rename of the directory; see the notes above.)
 
 
 ## Success Criteria
@@ -299,22 +299,26 @@ Cutover is complete when:
 
 ## Troubleshooting
 
-### Link Resolution Issues
-
-If `bun link` shows the package but imports fail:
-
-```bash
-bun install  # Force re-resolution
-bun pm ls    # Verify link status
-```
-
-### Script Not Found
+### Command Not Found
 
 If `bun run ralph` fails with "not found":
 
 ```bash
+# Verify the ralph script exists in package.json
 cat package.json | grep -A2 "scripts"
-bun link --check  # Verify link integrity
+
+# Verify rafa is on PATH
+which rafa
+
+# Verify ~/.rafa/bin is ahead of ~/.bun/bin
+echo $PATH | tr ':' '\n' | grep -E 'rafa|bun'
+```
+
+If `which rafa` returns nothing, reinstall the snapshot:
+
+```bash
+cd /Users/marcos/projects/open-tomato/rafa
+bun run snapshot
 ```
 
 ### Store Backend Mismatch
@@ -331,19 +335,26 @@ To restore the old loop:
 
 ```bash
 git revert <cutover-commit-SHA>
-bun unlink @open-tomato/rafa
 ```
+
+The global snapshot at `~/.rafa/bin/rafa` is unchanged by the revert; only
+the sibling's `package.json` is restored. To roll back the snapshot itself,
+delete `~/.rafa/runtime/<version>/` and restore an earlier `rafa` if
+you have one linked at `~/.rafa/bin/rafa`.
 
 
 ## Notes
 
-- The sibling's `.ralph/` directory remained unchanged and went on
-  storing effort data under the new loop until phase 1 moved the store:
-  a rafa built from that move on writes and reads `.rafa/effort/` and
-  reads nothing under `.ralph/effort/`, so under such a build step 3
-  above reads `.rafa/effort/effort.sqlite`.
-- The `bun link` is temporary for development. Phase 1 will replace it
-  with an npm registry version.
+- The sibling's `.ralph/` directory stores effort data under this cutover
+  until phase 1 moves the store. When you upgrade to a phase 1 build,
+  rename `.ralph/` to `.rafa/` and the loop will migrate seamlessly:
+  a phase 1 rafa built from that move on writes and reads `.rafa/effort/`
+  and reads nothing under `.ralph/effort/`. The migration is a one-time
+  rename; no data is lost.
+- This cutover does not link the package — the global `~/.rafa/bin/rafa`
+  snapshot is already installed by `bun run snapshot`. Do not use
+  `bun link` or `bun pm ls`. Phase 1 will replace the development
+  snapshot with an npm registry version.
 - Both `full` and `stage` injection modes should produce functionally
   equivalent results; the difference is in prompt detail and developer
   experience.
