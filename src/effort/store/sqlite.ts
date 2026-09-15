@@ -5,9 +5,10 @@
  * ## Layout
  *
  * One file, `effort.sqlite`, in the directory the NDJSON backend's
- * files live in: `EFFORT_STORE_DIR`, spelled once in `effort/store.ts`
- * and ignored by the root `.gitignore`. The two backends can therefore
- * hold a store side by side, and neither is ever committed.
+ * files live in: `EFFORT_STORE_DIR`, `.rafa/effort/`, spelled once in
+ * `effort/store.ts` and ignored by the project's `.gitignore` entry for
+ * `.rafa/`. The two backends can therefore hold a store side by side, and
+ * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
  * NDJSON rows are deduplicated by. Each table has three columns:

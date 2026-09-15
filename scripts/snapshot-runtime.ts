@@ -29,8 +29,9 @@
  * when `findNextTask` answers one over its text, so a task line inside a
  * closed `rafa:*` block is skipped exactly as the loop skips it.
  * Trackers sit beside their plans (`trackerPathFor`) and are looked for
- * in `.plans/` and the repo root, where `rafa start` looks for a plan by
- * default. The refusal names every tracker with a task left.
+ * in `.plans/` and the repo root, where `rafa start` looked for a plan by
+ * default before it read `plan.dir`. The refusal names every tracker with
+ * a task left.
  *
  * ## Replacing a runtime in use
  *

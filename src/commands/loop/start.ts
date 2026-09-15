@@ -21,8 +21,9 @@ export default wrapPhaseZeroCommand({
     + ' is committed once it exits, and retries blocked tasks first. After the last task a wrap-up'
     + ' session promotes findings, syncs with main, pushes and opens or updates the PR, and the loop'
     + ' then waits on its checks, spending repair sessions on a red or conflicting PR. With no'
-    + ' `--plan` it runs `.plans/PLAN.md`, or `PLAN.md` at the project root when that one does not exist.'
-    + ' It refuses to run on `main` or `master`.',
+    + ' `--plan` it runs `PLAN.md` in `plan.dir`, `.rafa/plans` unless the config names another, or'
+    + ' `PLAN.md` at the project root when that one does not exist. It refuses to run on `main` or'
+    + ' `master`.',
   args: [],
   flags: [
     {
@@ -69,11 +70,11 @@ export default wrapPhaseZeroCommand({
   ],
   examples: [
     {
-      cmd: 'rafa loop start --plan=.plans/PLAN-my-feature.md',
+      cmd: 'rafa loop start --plan=.rafa/plans/PLAN-my-feature.md',
       note: 'Runs the plan from its first open task, then opens the PR and waits on its checks.',
     },
     {
-      cmd: 'rafa loop start --plan=.plans/PLAN-my-feature.md --start-at=23:00 --inject=task --no-ci-wait',
+      cmd: 'rafa loop start --plan=.rafa/plans/PLAN-my-feature.md --start-at=23:00 --inject=task --no-ci-wait',
       note: 'Starts at 23:00, hands each task session the plan context and its own task line,'
         + ' and finishes at the push.',
     },

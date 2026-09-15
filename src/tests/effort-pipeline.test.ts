@@ -69,7 +69,7 @@
  * The two command entries (`collect(args)` and `report(args)`) resolve
  * their repo root through git and their log directory from the home
  * directory, so driving them would read this machine's real session
- * logs and write into the real `.ralph/`. Their argv is covered
+ * logs and write into the real `.rafa/`. Their argv is covered
  * purely in the colocated suites; everything here goes through
  * {@link collectEffort} and {@link buildReport} with the root, the log
  * directory and the commit reader all injected, and the store selected

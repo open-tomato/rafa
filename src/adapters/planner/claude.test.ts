@@ -3,23 +3,26 @@
  *
  * No case spawns `claude`. Each planner is made with a recording spawner,
  * which keeps the argument list and the prompt it is handed, notes whether
- * `.plans/` was there when the session started, writes the files a case
- * names under the root as a session would, and answers the exit code the
- * case names. Every root is a directory of its own under one temporary
- * directory this file creates and removes, and a case reads what was left
- * behind off the disk under that root.
+ * the plans directory was there when the session started, writes the files
+ * a case names under the root as a session would, and answers the exit
+ * code the case names. Every root is a directory of its own under one
+ * temporary directory this file creates and removes, and a case reads what
+ * was left behind off the disk under that root. Every planner is made with
+ * {@link PLAN_DIR} as its plans directory unless a case names another.
  *
  * Each rejection sits beside a control, a case where the same planner with
  * the one thing changed answers a plan: the failed session beside the
  * session writing the same plan and exiting 0, the session writing no plan
  * beside the one writing the prerequisites and the plan, the plan already
- * there beside a fresh root, and the missing spec beside the spec read.
+ * there beside a fresh root, and the missing spec beside the spec read. A
+ * plan left in `.plans/`, the directory phase 0 wrote into, is neither
+ * refused as already there nor read as the session's.
  *
  * Thirteen mutations of `claude.ts` were driven on 2026-09-14 over this
  * file, `src/adapters/registry.test.ts` and `src/plan.test.ts`, one run
  * each, with 79 pass before and after, the module restored byte-identical
- * (sha256), and a PATH on which no `claude` resolves. Every one reddened
- * at least one case:
+ * (sha256), and a PATH on which no `claude` resolves. The plans directory
+ * was `.plans/` then. Every one reddened at least one case:
  *
  *   - The plan-already-there guard dropped reddened its rejection alone.
  *     The session's exit code unchecked, the failed session carrying exit
@@ -54,7 +57,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { ClaudePlannerError, createClaudePlanner } from './claude.js';
+import { ClaudePlannerError, createClaudePlanner, planFilePath } from './claude.js';
 
 /** The spec every root holds at `spec.md`. */
 const SPEC = '# Spec: a planner probe\n\nNothing to build.\n';
@@ -65,11 +68,14 @@ const STUB = 'probe';
 /** The request every case makes unless it names another. */
 const REQUEST = { specPath: 'spec.md', stub: STUB };
 
+/** The plans directory every planner is made with unless a case names another: `plan.dir` by default. */
+const PLAN_DIR = '.rafa/plans';
+
 /** The plan a session writes for {@link STUB}. */
-const PLAN = '.plans/PLAN-probe.md';
+const PLAN = '.rafa/plans/PLAN-probe.md';
 
 /** The prerequisites a session writes for {@link STUB}. */
-const PREREQUISITES = '.plans/PREREQUISITES-probe.md';
+const PREREQUISITES = '.rafa/plans/PREREQUISITES-probe.md';
 
 /** The arguments ahead of the setting sources, as `claudeArgs` builds them. */
 const BASE_ARGS = ['-p', '--dangerously-skip-permissions', '--setting-sources'];
@@ -98,7 +104,7 @@ function freshRoot(): string {
 interface SessionCall {
   readonly args: readonly string[];
   readonly prompt: string;
-  /** Whether `.plans/` was under the root when the session started. */
+  /** Whether {@link PLAN_DIR} was under the root when the session started. */
   readonly plansDirExisted: boolean;
 }
 
@@ -115,7 +121,7 @@ function recordingSession(
 ): { spawn: ClaudeSpawner; calls: SessionCall[] } {
   const calls: SessionCall[] = [];
   const spawn: ClaudeSpawner = async (args, prompt) => {
-    calls.push({ args: [...args], prompt, plansDirExisted: existsSync(join(root, '.plans')) });
+    calls.push({ args: [...args], prompt, plansDirExisted: existsSync(join(root, PLAN_DIR)) });
     for (const file of writes) writeFileSync(join(root, file), `written by the session: ${file}\n`, 'utf8');
     return exitCode;
   };
@@ -127,7 +133,7 @@ function buildPrompt(specContent: string, stub: string): string {
   return `prompt for ${stub}\n${specContent}`;
 }
 
-/** A planner over `root`, made with `spawn` and the default setting sources. */
+/** A planner over `root`, made with `spawn`, {@link PLAN_DIR} and the default setting sources. */
 function plannerOver(
   root: string,
   spawn: ClaudeSpawner,
@@ -135,6 +141,7 @@ function plannerOver(
 ): ReturnType<typeof createClaudePlanner> {
   return createClaudePlanner({
     repoRoot: root,
+    planDir: PLAN_DIR,
     settingSources: ['project', 'local'],
     buildPrompt,
     spawn,
@@ -147,12 +154,24 @@ async function rejectionOf(attempt: Promise<unknown>): Promise<unknown> {
   return attempt.then(() => null, (error: unknown) => error);
 }
 
+describe('planFilePath', () => {
+  it('joins a file onto the plans directory with a slash', () => {
+    expect(planFilePath('.rafa/plans', 'PLAN-x.md')).toBe('.rafa/plans/PLAN-x.md');
+    expect(planFilePath('.plans', 'PREREQUISITES-x.md')).toBe('.plans/PREREQUISITES-x.md');
+  });
+
+  it('normalises a leading dot segment and a trailing slash, and keeps an absolute directory absolute', () => {
+    expect(planFilePath('./.plans/', 'PLAN-x.md')).toBe('.plans/PLAN-x.md');
+    expect(planFilePath('/abs/plans', 'PLAN-x.md')).toBe('/abs/plans/PLAN-x.md');
+  });
+});
+
 describe('a claude planner generating a plan', () => {
-  it('makes .plans before the session and answers the plan with no prerequisites', async () => {
+  it('makes the plans directory before the session and answers the plan with no prerequisites', async () => {
     const root = freshRoot();
     const session = recordingSession(root, { writes: [PLAN] });
 
-    expect(existsSync(join(root, '.plans'))).toBe(false);
+    expect(existsSync(join(root, PLAN_DIR))).toBe(false);
     const generated = await plannerOver(root, session.spawn).create(REQUEST);
 
     expect(root.startsWith(tempDir)).toBe(true);
@@ -160,7 +179,8 @@ describe('a claude planner generating a plan', () => {
     expect(session.calls).toEqual([
       { args: [...BASE_ARGS, 'project,local'], prompt: `prompt for probe\n${SPEC}`, plansDirExisted: true },
     ]);
-    expect(readdirSync(join(root, '.plans'))).toEqual(['PLAN-probe.md']);
+    expect(readdirSync(join(root, PLAN_DIR))).toEqual(['PLAN-probe.md']);
+    expect(existsSync(join(root, '.plans'))).toBe(false);
   });
 
   it('answers the prerequisites when the session writes them beside the plan', async () => {
@@ -170,6 +190,32 @@ describe('a claude planner generating a plan', () => {
     const generated = await plannerOver(root, session.spawn).create(REQUEST);
 
     expect(generated).toEqual({ planPath: PLAN, prerequisitesPath: PREREQUISITES });
+  });
+
+  it('writes into the plans directory it is made with and answers the paths in it', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: ['plans-here/PLAN-probe.md'] });
+
+    const generated = await plannerOver(root, session.spawn, { planDir: 'plans-here' }).create(REQUEST);
+
+    expect(generated).toEqual({ planPath: 'plans-here/PLAN-probe.md', prerequisitesPath: null });
+    expect(existsSync(join(root, PLAN_DIR))).toBe(false);
+  });
+
+  it('makes an absolute plans directory outside the root and answers the absolute paths', async () => {
+    const root = freshRoot();
+    const outside = join(tempDir, `plans-outside-${made}`);
+    const plan = join(outside, 'PLAN-probe.md');
+    const spawn: ClaudeSpawner = async () => {
+      writeFileSync(plan, 'the plan\n', 'utf8');
+      return 0;
+    };
+
+    const generated = await plannerOver(root, spawn, { planDir: outside }).create(REQUEST);
+
+    expect(outside.startsWith(tempDir)).toBe(true);
+    expect(generated).toEqual({ planPath: plan, prerequisitesPath: null });
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
   });
 
   it('hands the session the setting sources it is made with, in their order', async () => {
@@ -226,33 +272,46 @@ describe('a claude planner rejecting', () => {
 
     expect(error).toBeInstanceOf(ClaudePlannerError);
     expect(error).toMatchObject({
-      message: 'The session finished but .plans/PLAN-probe.md was not created — inspect the output above.',
+      message: 'The session finished but .rafa/plans/PLAN-probe.md was not created — inspect the output above.',
       exitCode: 1,
     });
   });
 
   it('reads no plan of another stub as the one it was asked for', async () => {
     const root = freshRoot();
-    mkdirSync(join(root, '.plans'));
-    writeFileSync(join(root, '.plans', 'PLAN-other.md'), 'another plan\n', 'utf8');
+    mkdirSync(join(root, PLAN_DIR), { recursive: true });
+    writeFileSync(join(root, PLAN_DIR, 'PLAN-other.md'), 'another plan\n', 'utf8');
     const session = recordingSession(root);
 
     const error = await rejectionOf(plannerOver(root, session.spawn).create(REQUEST));
 
     expect(error).toMatchObject({ exitCode: 1 });
-    expect((error as Error).message).toContain('.plans/PLAN-probe.md was not created');
+    expect((error as Error).message).toContain('.rafa/plans/PLAN-probe.md was not created');
+  });
+
+  it('neither refuses nor reads a plan of the same stub left in .plans when made with another directory', async () => {
+    const root = freshRoot();
+    mkdirSync(join(root, '.plans'));
+    writeFileSync(join(root, '.plans', 'PLAN-probe.md'), 'a phase 0 plan\n', 'utf8');
+    const session = recordingSession(root);
+
+    const error = await rejectionOf(plannerOver(root, session.spawn).create(REQUEST));
+
+    expect(session.calls).toHaveLength(1);
+    expect(error).toMatchObject({ exitCode: 1 });
+    expect((error as Error).message).toContain('.rafa/plans/PLAN-probe.md was not created');
   });
 
   it('rejects before any session when the plan is already there, leaving it as it was', async () => {
     const root = freshRoot();
-    mkdirSync(join(root, '.plans'));
+    mkdirSync(join(root, PLAN_DIR), { recursive: true });
     writeFileSync(join(root, PLAN), 'an earlier plan\n', 'utf8');
     const session = recordingSession(root, { writes: [PLAN] });
 
     const error = await rejectionOf(plannerOver(root, session.spawn).create(REQUEST));
 
     expect(error).toBeInstanceOf(ClaudePlannerError);
-    expect(error).toMatchObject({ message: '.plans/PLAN-probe.md already exists', exitCode: 1 });
+    expect(error).toMatchObject({ message: '.rafa/plans/PLAN-probe.md already exists', exitCode: 1 });
     expect(session.calls).toEqual([]);
     expect(readFileSync(join(root, PLAN), 'utf8')).toBe('an earlier plan\n');
   });
@@ -268,6 +327,6 @@ describe('a claude planner rejecting', () => {
     expect(error).not.toBeInstanceOf(ClaudePlannerError);
     expect((error as Error).message).toContain('ENOENT');
     expect(session.calls).toEqual([]);
-    expect(existsSync(join(root, '.plans'))).toBe(false);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
   });
 });

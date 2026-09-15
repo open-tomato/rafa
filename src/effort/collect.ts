@@ -84,10 +84,12 @@
  * before either half reads a log or runs git, and both halves use the
  * one store it answered. So the two halves cannot land in two backends,
  * and a config the loop cannot run on refuses the run before anything
- * is read. This command has no store flag, so the files outrank only
- * the default. A store passed in means neither file is read at all. An
- * unknown key in either file is warned about through
- * {@link CollectOptions.log}, with everything else the run reports.
+ * is read. The same read answers `plan.dir`, the roster's directory,
+ * unless {@link CollectOptions.plansDir} is passed. This command has no
+ * store flag, so the files outrank only the default. A store and a plans
+ * directory both passed in mean neither file is read at all. An unknown
+ * key in either file is warned about through {@link CollectOptions.log},
+ * with everything else the run reports.
  *
  * ## `--since` is one instant, resolved once
  *
@@ -147,8 +149,8 @@
  * to collect, and a zero-row run that looks successful is worse than
  * a message.
  *
- * An EMPTY plan roster is not refused — `.plans/` is gitignored and
- * legitimately absent on a fresh clone — but it makes every session's
+ * An EMPTY plan roster is not refused — `plan.dir` is untracked by
+ * default and absent on a fresh clone — but it makes every session's
  * `planStub` resolve to null, which reads as a collector that failed
  * to attribute anything. The roster size is reported for that reason.
  */
@@ -157,7 +159,6 @@ import type {
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
-import type { ConfigRoots } from '../config-load.js';
 import type {
   EffortStore,
   SessionEffortRow,
@@ -166,7 +167,7 @@ import type {
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
@@ -196,9 +197,6 @@ const SESSION_LOG_NAME = /\.jsonl$/i;
 
 /** Where Claude Code files per-project logs, under the home directory. */
 const PROJECT_LOG_ROOT = ['.claude', 'projects'] as const;
-
-/** The plan directory, relative to the repo root. */
-const PLANS_DIR = '.plans';
 
 /**
  * The mode every session row this collector writes carries. A constant
@@ -308,20 +306,20 @@ export interface CollectOptions {
   repoRoot: string;
   /** Defaults to the derived project log directory. */
   logDir?: string;
-  /** Defaults to `<repoRoot>/.plans`. */
+  /** Defaults to `plan.dir` under the repo root, as the config resolves it. */
   plansDir?: string;
   /** The resolved `--since` instant, shared by both halves. */
   sinceEpochMs?: number | null;
   /**
    * The home the user scope's config is read under. No default: the
    * command passes `homedir()`, so a caller cannot reach the real home by
-   * leaving it out. Unread when a store is passed.
+   * leaving it out. Unread when a store and `plansDir` are both passed.
    */
   home: string;
   /**
    * The store both halves read their keys from and append to. Defaults
    * to the backend the config under the repo root and the home selects;
-   * a store passed here means neither file is read. See the module note.
+   * passed with `plansDir`, neither file is read. See the module note.
    */
   store?: EffortStore;
   collectSessions?: boolean;
@@ -544,7 +542,7 @@ export function parseCollectArgs(args: readonly string[]): CollectArgs {
   };
 }
 
-/** Reads the plan roster, tolerating a `.plans/` that is not there. */
+/** Reads the plan roster, tolerating a plans directory that is not there. */
 export function readPlanStubs(plansDir: string): string[] {
   return existsSync(plansDir)
     ? planStubsFromFileNames(readdirSync(plansDir))
@@ -660,21 +658,22 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
 }
 
 /**
- * The store a run goes through: the one passed, else the one the config
- * under `roots` selects, with the config's warnings sent to `log`.
+ * The store and the plans directory a run goes through: each one passed,
+ * else the one the config under the repo root and the home names, with
+ * the config's warnings sent to `log`. Passed both, it reads no file.
  *
  * Called once per run, so each file is read and warned about once.
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
-function resolveStore(
-  store: EffortStore | undefined,
-  roots: ConfigRoots,
+function resolveSources(
+  options: CollectOptions,
   log: (line: string) => void,
-): EffortStore {
-  if (store !== undefined) return store;
+): Pick<HalfContext, 'store' | 'plansDir'> {
+  const { repoRoot: root, store, plansDir } = options;
+  if (store !== undefined && plansDir !== undefined) return { store, plansDir };
 
-  const resolved = loadConfig(roots, {}, log);
-  return selectEffortStore(roots.root, resolved.config);
+  const { config } = loadConfig({ root, home: options.home }, {}, log);
+  return { store: store ?? selectEffortStore(root, config), plansDir: plansDir ?? resolve(root, config.planDir) };
 }
 
 /**
@@ -682,11 +681,12 @@ function resolveStore(
  *
  * The halves are independent and neither reads the other's rows, so
  * switching one off changes nothing about the other's result. They do
- * share one store, resolved before either runs; see the module note.
+ * share one store and one roster, resolved before either runs; see the
+ * module note.
  *
  * Rejects with a `ConfigError`, having read no log and run no git, when
- * no store is passed and a config file under the repo root or the home
- * is one the loop cannot run on.
+ * a store or a plans directory is not passed and a config file under the
+ * repo root or the home is one the loop cannot run on.
  */
 export async function collectEffort(
   options: CollectOptions,
@@ -697,9 +697,8 @@ export async function collectEffort(
   const context: HalfContext = {
     repoRoot,
     logDir: options.logDir ?? sessionLogDir(repoRoot),
-    plansDir: options.plansDir ?? join(repoRoot, PLANS_DIR),
+    ...resolveSources(options, log),
     sinceEpochMs: options.sinceEpochMs ?? null,
-    store: resolveStore(options.store, { root: repoRoot, home: options.home }, log),
     log,
     note: (line: string) => {
       if (verbose) log(line);

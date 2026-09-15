@@ -319,7 +319,7 @@ describe('the core adapter registry', () => {
 
     expect(existsSync(root)).toBe(false);
     store.append('sessions', [SESSION]);
-    expect(readdirSync(join(root, '.ralph', 'effort')).sort()).toEqual([...files]);
+    expect(readdirSync(join(root, '.rafa', 'effort')).sort()).toEqual([...files]);
     expect(store.read('sessions')).toEqual([SESSION]);
   });
 
@@ -448,14 +448,14 @@ describe('the core adapter registry', () => {
     expect(CORE_ADAPTER_REGISTRY.kinds('planner')).toEqual(['claude']);
   });
 
-  it('makes the claude planner over the sources, prompt and spawner its context names', async () => {
+  it('makes the claude planner over the sources, prompt, plans directory and spawner its context names', async () => {
     const root = freshRoot('planner');
     mkdirSync(root, { recursive: true });
     writeFileSync(join(root, 'spec.md'), 'the spec\n', 'utf8');
     const sessions: string[][] = [];
     const claude: ClaudeSpawner = async (args, prompt) => {
       sessions.push([...args, prompt]);
-      writeFileSync(join(root, '.plans', 'PLAN-probe.md'), 'the plan\n', 'utf8');
+      writeFileSync(join(root, 'plans-here', 'PLAN-probe.md'), 'the plan\n', 'utf8');
       return 0;
     };
 
@@ -463,20 +463,26 @@ describe('the core adapter registry', () => {
       repoRoot: root,
       settingSources: ['local'],
       planPrompt: (specContent, stub) => `${stub}: ${specContent}`,
+      planDir: 'plans-here',
       claude,
     });
     const generated = await planner.create({ specPath: 'spec.md', stub: 'probe' });
 
     expect(root.startsWith(tempDir)).toBe(true);
-    expect(generated).toEqual({ planPath: '.plans/PLAN-probe.md', prerequisitesPath: null });
+    expect(generated).toEqual({ planPath: 'plans-here/PLAN-probe.md', prerequisitesPath: null });
     expect(sessions).toEqual([
       ['-p', '--dangerously-skip-permissions', '--setting-sources', 'local', 'probe: the spec\n'],
     ]);
   });
 
   it.each([
-    ['settingSources', { planPrompt: () => 'prompt' }, 'settingSources undefined in its context, expected a list of setting sources'],
-    ['planPrompt', { settingSources: ['project', 'local'] }, 'planPrompt undefined in its context, expected a function'],
+    [
+      'settingSources',
+      { planPrompt: (): string => 'prompt', planDir: '.rafa/plans' },
+      'settingSources undefined in its context, expected a list of setting sources',
+    ],
+    ['planPrompt', { settingSources: ['project', 'local'], planDir: '.rafa/plans' }, 'planPrompt undefined in its context, expected a function'],
+    ['planDir', { settingSources: ['project', 'local'], planPrompt: (): string => 'prompt' }, 'planDir undefined in its context, expected a directory path'],
   ])('refuses to make the claude planner when its context names no %s', (_field, fields, named) => {
     const adapter = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude');
     const attempt = (): unknown => adapter.create({ repoRoot: '/nonexistent', ...fields } as AdapterContext);

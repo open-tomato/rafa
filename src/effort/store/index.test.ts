@@ -3,7 +3,7 @@
  * the `./store` subpath exposes.
  *
  * Every store sits under a fresh temporary repo root, so the suite
- * touches no `.ralph/` anywhere, and the disk is real rather than
+ * touches no `.rafa/` anywhere, and the disk is real rather than
  * mocked.
  *
  * Which backend a selection opened is read off the disk, never off the
@@ -96,7 +96,7 @@ const SESSION = sessionRow('aaaa-1111');
 const COMMIT = commitRow('deadbeef');
 
 /** The store directory each backend's files are expected in. */
-const STORE_DIR = ['.ralph', 'effort'] as const;
+const STORE_DIR = ['.rafa', 'effort'] as const;
 
 /** Where one backend is expected to put each kind, and what it leaves. */
 interface Layout {

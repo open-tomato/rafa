@@ -447,13 +447,16 @@ export interface PlanRequest {
   stub: string;
 }
 
-/** Where a planner left the plan it generated, repository-relative. */
+/**
+ * Where a planner left the plan it generated: repository-relative, or
+ * absolute when the directory it writes plans into is.
+ */
 export interface GeneratedPlan {
-  /** The plan: `.plans/PLAN-<stub>.md` under today's planner. */
+  /** The plan: `PLAN-<stub>.md` in `plan.dir` under today's planner. */
   planPath: string;
   /**
    * The setup steps the planner found no task could automate, or null
-   * when it wrote none: `.plans/PREREQUISITES-<stub>.md` today.
+   * when it wrote none: `PREREQUISITES-<stub>.md` in `plan.dir` today.
    */
   prerequisitesPath: string | null;
 }

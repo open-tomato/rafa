@@ -731,7 +731,7 @@ function optionsFor(tree: Tree, commits: PlantedCommits): CollectOptions {
 
 /** The store directory under a root, spelled here and not imported. */
 function storeDir(root: string): string {
-  return join(root, '.ralph', 'effort');
+  return join(root, '.rafa', 'effort');
 }
 
 /** Plants `.rafa/config.yaml` under a root. */
@@ -1072,7 +1072,7 @@ describe('the store a run goes through', () => {
     ]);
   });
 
-  it('never reads the config when a store is passed', async () => {
+  it('never reads the config when a store and a plans directory are passed', async () => {
     // The config names a store no backend opens, so a run that read it
     // at all would refuse; the run below writes NDJSON instead.
     const tree = makeTree(['s1']);
@@ -1089,6 +1089,73 @@ describe('the store a run goes through', () => {
       .toEqual(['commits.ndjson', 'sessions.ndjson']);
   });
 
+  it('reads the config for plan.dir when a store is passed without a plans directory', async () => {
+    // The control of the case above: the same unusable config, the same
+    // store passed, and only the plans directory left out.
+    const tree = makeTree(['s1']);
+    writeConfig(tree.root, 'store: postgres\n');
+    const commits = plantedCommits([commitRow('aaa')]);
+
+    const refusal = await collectEffort({
+      home: makeScratch(),
+      repoRoot: tree.root,
+      logDir: tree.logDir,
+      readCommits: commits.read,
+      log: () => undefined,
+      store: openNdjsonStore(tree.root),
+    }).then(() => null, (error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(ConfigError);
+    expect(commits.calls).toEqual([]);
+  });
+
+  it('attributes by the roster in plan.dir when no plans directory is passed', async () => {
+    // The tree's own roster names q19 alone. plan.dir names a directory
+    // holding q19 and a second stub, so a count of two can only come from
+    // the directory the config names.
+    const tree = makeTree(['s1']);
+    writeConfig(tree.root, 'store: ndjson\nplan:\n  dir: rosters\n');
+    mkdirSync(join(tree.root, 'rosters'));
+    for (const stub of ['q19-loop-economics', 'q21-alt-target']) {
+      writeFileSync(join(tree.root, 'rosters', `PLAN-${stub}.md`), '# x\n');
+    }
+
+    const result = await collectEffort({
+      home: makeScratch(),
+      repoRoot: tree.root,
+      logDir: tree.logDir,
+      readCommits: plantedCommits([]).read,
+      collectCommits: false,
+      log: () => undefined,
+    });
+
+    expect(result.sessions?.planStubCount).toBe(2);
+    expect(openNdjsonStore(tree.root).read('sessions')
+      .map((row) => row.planStub)).toEqual(['q19-loop-economics']);
+  });
+
+  it('reads the roster in .rafa/plans and not the one in .plans when plan.dir is left at its default', async () => {
+    const tree = makeTree(['s1']);
+    writeConfig(tree.root, 'store: ndjson\n');
+    mkdirSync(join(tree.root, '.plans'));
+    writeFileSync(join(tree.root, '.plans', 'PLAN-q19-loop-economics.md'), '# x\n');
+    mkdirSync(join(tree.root, '.rafa', 'plans'));
+    writeFileSync(join(tree.root, '.rafa', 'plans', 'PLAN-q21-alt-target.md'), '# x\n');
+
+    const result = await collectEffort({
+      home: makeScratch(),
+      repoRoot: tree.root,
+      logDir: tree.logDir,
+      readCommits: plantedCommits([]).read,
+      collectCommits: false,
+      log: () => undefined,
+    });
+
+    expect(result.sessions?.planStubCount).toBe(1);
+    expect(openNdjsonStore(tree.root).read('sessions')
+      .map((row) => row.planStub)).toEqual([null]);
+  });
+
   it('refuses a config it cannot run on before reading anything', async () => {
     // The log directory is missing too. A run that reached the session
     // half first would reject on that instead of on the config.
@@ -1103,7 +1170,7 @@ describe('the store a run goes through', () => {
 
     expect(refusal).toBeInstanceOf(ConfigError);
     expect(commits.calls).toEqual([]);
-    expect(existsSync(join(tree.root, '.ralph'))).toBe(false);
+    expect(existsSync(storeDir(tree.root))).toBe(false);
   });
 
   it('warns once, through the log sink, about an unknown key', async () => {
@@ -1225,6 +1292,6 @@ describe('the collect command', () => {
       expect.stringMatching(/^ralph effort collect: .*store is "postgres"/),
     ]);
     expect(run.stdout).toBe('');
-    expect(existsSync(join(root, '.ralph'))).toBe(false);
+    expect(existsSync(storeDir(root))).toBe(false);
   });
 });

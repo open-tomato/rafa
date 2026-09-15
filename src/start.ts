@@ -44,9 +44,10 @@
  *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
- * --plan        plan file to execute (default: PLAN.md at the project root). The
- *               tracker is derived per plan (PLAN-foo.md → PLAN_TRACKER-foo.md)
- *               so several plans can coexist.
+ * --plan        plan file to execute (default: PLAN.md in plan.dir, else at the
+ *               project root; `start/plan-path.ts`). The tracker is derived per
+ *               plan (PLAN-foo.md → PLAN_TRACKER-foo.md) so several plans can
+ *               coexist.
  * --start-at    defer the run until a local time of day (e.g. 23:00) — queue
  *               off-hours runs without cron.
  * --inject      how much of the plan each task session is handed: full, stage
@@ -98,6 +99,7 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './start/dispatch.js';
+import { resolvePlanPath } from './start/plan-path.js';
 import {
   DEFAULT_CI_ATTEMPTS,
   DEFAULT_CI_TIMEOUT_MIN,
@@ -207,15 +209,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const ciTimeoutMin = Number(argValue(args, '--ci-timeout') ?? DEFAULT_CI_TIMEOUT_MIN);
   const ciAttempts = Number(argValue(args, '--ci-attempts') ?? DEFAULT_CI_ATTEMPTS);
 
-  // Default plan: .plans/PLAN.md (the untracked plans directory `ralph plan`
-  // writes to), falling back to a root PLAN.md for hand-written plans.
-  const planArg = argValue(args, '--plan');
-  const defaultPlanPath = fs.existsSync(path.join(repoRoot, '.plans', 'PLAN.md'))
-    ? path.join(repoRoot, '.plans', 'PLAN.md')
-    : path.join(repoRoot, 'PLAN.md');
-  const planPath = planArg
-    ? path.resolve(repoRoot, planArg)
-    : defaultPlanPath;
+  // Default plan: PLAN.md in plan.dir, else at the root (`start/plan-path.ts`).
+  const planPath = resolvePlanPath(repoRoot, runConfig.config.planDir, argValue(args, '--plan'));
 
   const rootPromptPath = path.join(repoRoot, 'PROMPT.md');
   const promptPath = fs.existsSync(rootPromptPath)

@@ -337,9 +337,11 @@ bun unlink @open-tomato/rafa
 
 ## Notes
 
-- The sibling's `.ralph/` directory remains unchanged and continues to
-  store effort data under the new loop. Phase 1 will migrate this to
-  `.rafa/`.
+- The sibling's `.ralph/` directory remained unchanged and went on
+  storing effort data under the new loop until phase 1 moved the store:
+  a rafa built from that move on writes and reads `.rafa/effort/` and
+  reads nothing under `.ralph/effort/`, so under such a build step 3
+  above reads `.rafa/effort/effort.sqlite`.
 - The `bun link` is temporary for development. Phase 1 will replace it
   with an npm registry version.
 - Both `full` and `stage` injection modes should produce functionally

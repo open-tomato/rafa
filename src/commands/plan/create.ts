@@ -17,17 +17,19 @@ export default wrapPhaseZeroCommand({
   subject: 'plan',
   action: 'create',
   summary: 'generate a plan, and its prerequisites, from a spec',
-  description: 'Hands the spec to a Claude Code session that writes `.plans/PLAN-<stub>.md`, and'
-    + ' `.plans/PREREQUISITES-<stub>.md` when the spec needs setup no task can do. The stub is the'
-    + ' basename of the spec unless `--stub` names one, and the command refuses when that plan already'
-    + ' exists. The findings in `progress.txt` are handed to the session as advisory context unless'
-    + ' `--no-progress` is given. The session loads the setting sources `loop.settingSources` names,'
-    + ' and a config the loop cannot run on refuses the command before any session starts.',
+  description: 'Hands the spec to a Claude Code session that writes `PLAN-<stub>.md` in `plan.dir`,'
+    + ' `.rafa/plans` unless the config names another, and `PREREQUISITES-<stub>.md` beside it when the'
+    + ' spec needs setup no task can do. The stub is the basename of the spec unless `--stub` names one,'
+    + ' and the command refuses when that plan already exists. The findings in `progress.txt` are handed'
+    + ' to the session as advisory context unless `--no-progress` is given. The session loads the setting'
+    + ' sources `loop.settingSources` names, and a config the loop cannot run on refuses the command before'
+    + ' any session starts.',
   args: [],
   flags: [
     {
       name: 'spec',
-      description: 'The spec to plan from, relative to the project root.',
+      description: 'The spec to plan from, relative to the project root, or under `specs.dir`'
+        + ' (`.rafa/specs` unless the config names another) when the root holds no such file.',
       type: 'string',
       required: true,
     },
@@ -45,12 +47,13 @@ export default wrapPhaseZeroCommand({
   ],
   examples: [
     {
-      cmd: 'rafa plan create --spec=.specs/my-feature.md',
-      note: 'Writes .plans/PLAN-my-feature.md from the spec.',
+      cmd: 'rafa plan create --spec=.rafa/specs/my-feature.md',
+      note: 'Writes .rafa/plans/PLAN-my-feature.md from the spec.',
     },
     {
-      cmd: 'rafa plan create --spec=.specs/my-feature.md --stub=my-feature-v2 --no-progress',
-      note: 'Writes .plans/PLAN-my-feature-v2.md, without the findings in progress.txt.',
+      cmd: 'rafa plan create --spec=my-feature.md --stub=my-feature-v2 --no-progress',
+      note: 'Reads .rafa/specs/my-feature.md when the project root holds no my-feature.md, and writes'
+        + ' .rafa/plans/PLAN-my-feature-v2.md without the findings in progress.txt.',
     },
   ],
   aliases: ['plan'],

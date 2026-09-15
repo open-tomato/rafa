@@ -60,7 +60,7 @@ const FULL_REPORT = reportBlock(
   '    signal: silent',
   '  - trigger: "when looking for the store"',
   '    kind: location',
-  '    what: "the store lives under .ralph/effort"',
+  '    what: "the store lives under .rafa/effort"',
   '    signal: loud',
   'skills_used: []',
   'blockers:',
@@ -87,7 +87,7 @@ function freshRoot(name: string): string {
 
 /** Some columns of every row of one table, in append order. */
 function rowsOf(root: string, table: string, columns: string): Record<string, unknown>[] {
-  const db = new Database(join(root, '.ralph', 'effort', 'effort.sqlite'), { readonly: true });
+  const db = new Database(join(root, '.rafa', 'effort', 'effort.sqlite'), { readonly: true });
   try {
     return db.query<Record<string, unknown>, []>(`SELECT ${columns} FROM ${table} ORDER BY seq`).all();
   } finally {
@@ -126,7 +126,7 @@ describe('recordTaskReport', () => {
     expect(record.present).toBe(true);
     expect(rowsOf(root, 'findings', `${PROVENANCE}, what`)).toEqual([
       { ...stored, what: 'a second write adds nothing' },
-      { ...stored, what: 'the store lives under .ralph/effort' },
+      { ...stored, what: 'the store lives under .rafa/effort' },
     ]);
     expect(rowsOf(root, 'blockers', `${PROVENANCE}, what`))
       .toEqual([{ ...stored, what: 'LINEAR_API_KEY unset' }]);

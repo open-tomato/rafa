@@ -98,7 +98,7 @@ function freshRoot(name: string): string {
 
 /** The store file under a root. */
 function storeFile(root: string): string {
-  return join(root, '.ralph', 'effort', 'effort.sqlite');
+  return join(root, '.rafa', 'effort', 'effort.sqlite');
 }
 
 /** The store file's bytes, or null when nothing was ever written. */

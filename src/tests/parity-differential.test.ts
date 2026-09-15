@@ -73,11 +73,12 @@
  * and does carry an override.
  *
  * `repoRoot` is passed as the checkout for exactly this reason, and a
- * store is passed explicitly for every run, which is what keeps this
- * suite from ever writing into the sibling's own `.ralph/` — see the
- * module note on `effort/collect.ts`'s `CollectOptions.store` for why
- * passing one is what stops the config file, and its default store
- * location, from being consulted at all.
+ * store and the checkout's `.plans/` are passed explicitly for every run,
+ * which is what keeps this suite from ever writing a store under the
+ * sibling's root — see the module note on `effort/collect.ts`'s
+ * `CollectOptions.store` for why passing both is what stops the config
+ * file, its default store location and its `plan.dir`, from being
+ * consulted at all.
  */
 import type {
   CommitEffortRow,
@@ -191,6 +192,7 @@ async function collectOnce(store: EffortStore): Promise<Collected> {
   await collectEffort({
     repoRoot: SIBLING_CHECKOUT_ROOT,
     logDir: fixture.logDir,
+    plansDir: join(SIBLING_CHECKOUT_ROOT, '.plans'),
     store,
     verbose: false,
     log: () => undefined,

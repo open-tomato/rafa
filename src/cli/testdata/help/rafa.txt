@@ -6,8 +6,8 @@ Usage:
   rafa <subject> <action> --help   arguments, flags, examples
 
 Quick start:
-  rafa plan create --spec=.specs/my-feature.md
-  rafa loop start --plan=.plans/PLAN-my-feature.md
+  rafa plan create --spec=.rafa/specs/my-feature.md
+  rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
   rafa effort collect
   rafa init
   rafa usage

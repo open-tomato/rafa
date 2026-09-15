@@ -347,7 +347,7 @@ function standInScript(calls: string, reportPath: string, blockerReportPath: str
     '  *MARK-SILENT*) echo work > "work-$n.txt"; echo "Done, and nothing to report." ;;',
     `  *MARK-BLOCKER*) echo work > "work-$n.txt"; ${blockerReport} ;;`,
     `  *MARK-FAIL*) ${report}; exit 3 ;;`,
-    `  *MARK-BREAK*) /bin/mkdir -p .ralph/effort/effort.sqlite; ${report} ;;`,
+    `  *MARK-BREAK*) /bin/mkdir -p .rafa/effort/effort.sqlite; ${report} ;;`,
     `  *MARK-HANG*) ${report}; ${release} ;;`,
     'esac',
     'exit 0',
@@ -400,7 +400,7 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
   git(repo, 'config', 'user.name', 'Rafa Loop');
   git(repo, 'config', 'commit.gpgsign', 'false');
   git(repo, 'config', 'core.hooksPath', hooks);
-  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.ralph/\n.rafa/\n', 'utf8');
+  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '--no-verify', '-m', 'seed');
   git(repo, 'checkout', '-q', '-b', `feat/${STUB}`);

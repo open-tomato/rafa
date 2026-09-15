@@ -10,22 +10,41 @@
  * to the Planner port's `claude` adapter (`adapters/planner/claude.ts`),
  * resolved through the adapter registry, whose Claude Code session writes:
  *
- *   .plans/PLAN-<stub>.md            the flat checklist + technical context
- *   .plans/PREREQUISITES-<stub>.md   non-automatable setup steps (only if any)
+ *   .rafa/plans/PLAN-<stub>.md            the flat checklist + technical context
+ *   .rafa/plans/PREREQUISITES-<stub>.md   non-automatable setup steps (only if any)
  *
- * The stub defaults to the spec's basename. Execute the result with:
+ * both in `plan.dir`, `.rafa/plans` unless a config names another. The
+ * stub defaults to the spec's basename. Execute the result with:
  *
- *   bun src/rafa.ts start --plan=.plans/PLAN-<stub>.md
+ *   bun src/rafa.ts start --plan=.rafa/plans/PLAN-<stub>.md
  *
  * ## What the command keeps, and what the adapter does
  *
  * The command checks its command line (the config, `--spec`, `--stub`
  * and a plan already there), runs the usage check, reads `progress.txt`
  * unless `--no-progress` is given, and reads the template and the plan
- * format beside itself. It makes the adapter with the setting sources and
- * with {@link buildPlanPrompt} bound to what it read. The adapter reads
- * the spec, makes `.plans/`, runs the session, and answers the paths the
- * session wrote or rejects.
+ * format beside itself. It makes the adapter with the setting sources,
+ * `plan.dir` and {@link buildPlanPrompt} bound to what it read. The
+ * adapter reads the spec, makes `plan.dir`, runs the session, and answers
+ * the paths the session wrote or rejects.
+ *
+ * ## Where the spec and the plan are
+ *
+ * `--spec` names a file against the project root, and when nothing is
+ * there, the same name under `specs.dir`; a spec in neither is refused,
+ * naming both paths. So `--spec=my-feature.md` reads
+ * `.rafa/specs/my-feature.md` in a project whose root holds no
+ * `my-feature.md`, and a path written from the root, such as
+ * `.specs/my-feature.md`, reads as it did before `specs.dir` was read. An
+ * absolute `--spec` has the one candidate. The planner is handed the
+ * candidate found, as the port documents a spec path: repository-relative
+ * or absolute.
+ *
+ * The plan is `PLAN-<stub>.md` in `plan.dir`, and the refusal, the
+ * announcement, the plan prompt and the adapter all spell it through
+ * `planFilePath` (`adapters/planner/claude.ts`), so the plan the session
+ * is told to write is the plan the adapter looks for and the command
+ * names.
  *
  * The command writes every line the operator reads through the active
  * output (`adapters/output/active.ts`), at `info`, each message as
@@ -40,8 +59,9 @@
  * in the terminal result.
  *
  * The project root is a parameter, the root the dispatcher resolved
- * (`src/commands/wrap.ts`): `--spec` resolves against it, `.plans/` and
- * `progress.txt` sit under it, and its config is the project scope's.
+ * (`src/commands/wrap.ts`): `--spec` resolves against it, `plan.dir` and
+ * `specs.dir` resolve under it unless absolute, `progress.txt` sits under
+ * it, and its config is the project scope's.
  *
  * The registry is a parameter, {@link CORE_ADAPTER_REGISTRY} unless one
  * is handed over, so `plan.test.ts` resolves a fixture planner under the
@@ -67,7 +87,7 @@
  * the loop cannot run on refuses the command before any session starts.
  */
 import type { AdapterRegistry } from './adapters/registry.js';
-import type { ClaudeSettingSource } from './config.js';
+import type { RafaConfig } from './config.js';
 import type { GeneratedPlan, Planner, PlanRequest } from './ports/index.js';
 
 import fs from 'fs';
@@ -76,7 +96,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
-import { ClaudePlannerError } from './adapters/planner/claude.js';
+import { ClaudePlannerError, planFilePath } from './adapters/planner/claude.js';
 import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
@@ -183,7 +203,10 @@ const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
  * Builds the full plan-generation prompt. Exported for tests.
  *
  * `planFormat` is the dev-planner skill as read ({@link readPlanFormat});
- * its frontmatter is dropped here ({@link planFormatBody}).
+ * its frontmatter is dropped here ({@link planFormatBody}). `planDir` is
+ * the directory the plan is written into, the run's resolved `plan.dir`,
+ * and both files are named in it through `planFilePath`, as the adapter
+ * names the files it looks for.
  *
  * Every slot is filled in ONE pass over the template, through a replacer
  * function. Filled text is never scanned again, so a spec, a progress
@@ -198,11 +221,12 @@ export function buildPlanPrompt(
   planFormat: string,
   specContent: string,
   stub: string,
+  planDir: string,
   progressContent?: string,
 ): string {
   const values: Record<PlanPromptSlot, string> = {
-    PLAN_FILE: `.plans/PLAN-${stub}.md`,
-    PREREQUISITES_FILE: `.plans/PREREQUISITES-${stub}.md`,
+    PLAN_FILE: planFilePath(planDir, `PLAN-${stub}.md`),
+    PREREQUISITES_FILE: planFilePath(planDir, `PREREQUISITES-${stub}.md`),
     PROGRESS_SECTION: formatProgressSection(progressContent),
     PLAN_FORMAT: planFormatBody(planFormat),
     SPEC_CONTENT: specContent,
@@ -216,25 +240,50 @@ export function stubFromSpecPath(specPath: string): string {
 }
 
 /**
- * The setting sources the plan session loads: `loop.settingSources` from
- * the project's config under `repoRoot` and the user scope's under
- * `home`, over the default.
+ * Where `--spec` looks for its spec, in order, each as the planner is
+ * handed it: the value itself, read against the project root, then the
+ * same value under `specsDir`. An absolute value is its one candidate,
+ * and a second candidate spelled as the first is dropped. Exported for
+ * tests.
+ */
+export function specCandidates(specArg: string, specsDir: string): string[] {
+  if (path.isAbsolute(specArg)) return [specArg];
+  return [...new Set([specArg, path.join(specsDir, specArg)])];
+}
+
+/**
+ * The config the plan command runs on: the project's config under
+ * `repoRoot` over the user scope's under `home`, over the defaults. The
+ * session loads its `loop.settingSources`, `plan.dir` places the plan and
+ * `specs.dir` is where a spec the root does not hold is looked for.
  *
  * A config the loop cannot run on refuses the command with every problem
  * named, as `rafa start` refuses one, before any session starts: a
  * `CommandExit` with exit code 1 whose message is the whole refusal.
  */
-function resolvePlanSettingSources(
-  repoRoot: string,
-  home: string,
-): readonly ClaudeSettingSource[] {
+function resolvePlanConfig(repoRoot: string, home: string): RafaConfig {
   try {
-    return loadConfig({ root: repoRoot, home }).config.settingSources;
+    return loadConfig({ root: repoRoot, home }).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
     throw new CommandExit(1, ['❌ Refusing to generate a plan on this configuration:', ...problems].join('\n'));
   }
+}
+
+/**
+ * The spec `--spec` names, as the planner is handed it: the first of
+ * {@link specCandidates} that exists under `repoRoot`. When none does, a
+ * `CommandExit` with exit code 1 naming every path looked at.
+ */
+function findSpec(repoRoot: string, specArg: string, specsDir: string): string {
+  const candidates = specCandidates(specArg, specsDir);
+  const found = candidates.find((candidate) => fs.existsSync(path.resolve(repoRoot, candidate)));
+  if (found === undefined) {
+    const looked = [...new Set(candidates.map((candidate) => path.resolve(repoRoot, candidate)))];
+    throw new CommandExit(1, `❌ Spec file not found: ${looked.join(', or ')}`);
+  }
+  return found;
 }
 
 /**
@@ -258,25 +307,23 @@ export default async function plan(
   repoRoot: string,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
-  const settingSources = resolvePlanSettingSources(repoRoot, homedir());
+  const { settingSources, planDir, specsDir } = resolvePlanConfig(repoRoot, homedir());
 
   const specArg = argValue(args, '--spec');
   if (!specArg) {
     throw new CommandExit(1, [
       'Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]',
-      'Specs live in specs/ (trackable follow-ups) or .specs/ (untracked, sensitive).',
+      `A spec is read against the project root, or under specs.dir (${specsDir}) when the root holds none.`,
     ].join('\n'));
   }
 
-  const specPath = path.resolve(repoRoot, specArg);
-  if (!fs.existsSync(specPath)) {
-    throw new CommandExit(1, `❌ Spec file not found: ${specPath}`);
-  }
+  const specRequest = findSpec(repoRoot, specArg, specsDir);
+  const specPath = path.resolve(repoRoot, specRequest);
 
   const stub = argValue(args, '--stub') ?? stubFromSpecPath(specPath);
-  const planPath = path.join(repoRoot, '.plans', `PLAN-${stub}.md`);
-  if (fs.existsSync(planPath)) {
-    throw new CommandExit(1, `❌ .plans/${path.basename(planPath)} already exists — remove it or pass a different --stub.`);
+  const planFile = planFilePath(planDir, `PLAN-${stub}.md`);
+  if (fs.existsSync(path.resolve(repoRoot, planFile))) {
+    throw new CommandExit(1, `❌ ${planFile} already exists — remove it or pass a different --stub.`);
   }
 
   await checkUsage('issue');
@@ -296,18 +343,20 @@ export default async function plan(
   const planFormat = readPlanFormat(__dirname);
   const planner = registry.resolve('planner', 'claude').create({
     repoRoot,
+    planDir,
     settingSources,
     planPrompt: (specContent, planStub) => buildPlanPrompt(
       template,
       planFormat,
       specContent,
       planStub,
+      planDir,
       progressContent,
     ),
   });
 
-  activeOutput().info(`📝 Generating .plans/PLAN-${stub}.md from ${path.basename(specPath)}...`);
-  const generated = await generateOrExit(planner, { specPath: specArg, stub });
+  activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
+  const generated = await generateOrExit(planner, { specPath: specRequest, stub });
 
   activeOutput().info(`\n✅ Plan ready: ${generated.planPath}`);
   if (generated.prerequisitesPath !== null) {

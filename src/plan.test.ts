@@ -109,6 +109,7 @@ const PROBE = [
   '    create: async (request) => {',
   '      writeFileSync(record, JSON.stringify({',
   '        repoRoot: context.repoRoot,',
+  '        planDir: context.planDir,',
   '        settingSources: context.settingSources,',
   '        request,',
   `        prompt: context.planPrompt(${JSON.stringify(FIXTURE_SPEC)}, request.stub),`,
@@ -116,8 +117,8 @@ const PROBE = [
   '      if (outcome === "session-failed") throw new ClaudePlannerError("Plan generation failed (exit 3).", 3);',
   '      if (outcome === "other-rejection") throw new Error("the planner is unreachable");',
   '      return {',
-  '        planPath: ".plans/PLAN-" + request.stub + ".md",',
-  '        prerequisitesPath: outcome === "prerequisites" ? ".plans/PREREQUISITES-" + request.stub + ".md" : null,',
+  '        planPath: context.planDir + "/PLAN-" + request.stub + ".md",',
+  '        prerequisitesPath: outcome === "prerequisites" ? context.planDir + "/PREREQUISITES-" + request.stub + ".md" : null,',
   '      };',
   '    },',
   '  }),',
@@ -204,14 +205,17 @@ function readRecord(scratch: Scratch): Record<string, unknown> {
   return JSON.parse(readFileSync(scratch.record, 'utf8')) as Record<string, unknown>;
 }
 
+/** The plans directory the config resolves when no file names one. */
+const DEFAULT_PLAN_DIR = '.rafa/plans';
+
 /** The prompt `buildPlanPrompt` makes of the source template and skill for the fixture spec. */
-function expectedPrompt(progress: string | undefined): string {
+function expectedPrompt(progress: string | undefined, planDir: string = DEFAULT_PLAN_DIR): string {
   const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
-  return buildPlanPrompt(template, readPlanFormat(SRC_DIR), FIXTURE_SPEC, 'spec', progress);
+  return buildPlanPrompt(template, readPlanFormat(SRC_DIR), FIXTURE_SPEC, 'spec', planDir, progress);
 }
 
 describe('rafa plan through the adapter registry', () => {
-  it('resolves the claude planner with the run sources, the spec as --spec names it and the built prompt', () => {
+  it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
@@ -219,16 +223,70 @@ describe('rafa plan through the adapter registry', () => {
     expect(run.exitCode).toBe(0);
     expect(readRecord(scratch)).toEqual({
       repoRoot: realpathSync(scratch.repo),
+      planDir: DEFAULT_PLAN_DIR,
       settingSources: ['project', 'local'],
       request: { specPath: 'spec.md', stub: 'spec' },
       prompt: expectedPrompt(undefined),
     });
-    expect(run.stdout).toContain('📝 Generating .plans/PLAN-spec.md from spec.md...');
-    expect(run.stdout).toContain('\n✅ Plan ready: .plans/PLAN-spec.md\n');
-    expect(run.stdout).toContain('▶ Execute with: bun src/rafa.ts start --plan=.plans/PLAN-spec.md\n');
+    expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
+    expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
+    expect(run.stdout).toContain('▶ Execute with: bun src/rafa.ts start --plan=.rafa/plans/PLAN-spec.md\n');
     expect(run.stdout).not.toContain('Prerequisites detected');
     expect(run.stdout).not.toContain('Including findings');
+    expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
     expect(existsSync(join(scratch.repo, '.plans'))).toBe(false);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('hands the planner the plan.dir a config names, and names the plan in it', () => {
+    const scratch = plantScratch();
+    plantProjectConfig(scratch.repo, 'version: 1\nplan:\n  dir: .plans\n');
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
+
+    expect(expectedPrompt(undefined, '.plans')).not.toBe(expectedPrompt(undefined));
+    expect(run.exitCode).toBe(0);
+    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: expectedPrompt(undefined, '.plans') });
+    expect(run.stdout).toContain('📝 Generating .plans/PLAN-spec.md from spec.md...');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('reads a spec the project root does not hold from specs.dir, and hands the planner that path', () => {
+    const scratch = plantScratch();
+    mkdirSync(join(scratch.repo, '.rafa', 'specs'), { recursive: true });
+    writeFileSync(join(scratch.repo, '.rafa', 'specs', 'feature.md'), SPEC, 'utf8');
+
+    const run = runPlan(scratch, 'plan', ['--spec=feature.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    expect(readRecord(scratch)['request']).toEqual({ specPath: join('.rafa', 'specs', 'feature.md'), stub: 'feature' });
+    expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-feature.md from feature.md...');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('reads the spec at the project root ahead of one of the same name under specs.dir', () => {
+    const scratch = plantScratch();
+    mkdirSync(join(scratch.repo, '.rafa', 'specs'), { recursive: true });
+    writeFileSync(join(scratch.repo, '.rafa', 'specs', 'spec.md'), SPEC, 'utf8');
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    expect(readRecord(scratch)['request']).toEqual({ specPath: 'spec.md', stub: 'spec' });
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('refuses a spec found neither at the project root nor under specs.dir, naming both paths', () => {
+    const scratch = plantScratch();
+    const repo = realpathSync(scratch.repo);
+
+    const run = runPlan(scratch, 'plan', ['--spec=missing.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(
+      `❌ Spec file not found: ${join(repo, 'missing.md')}, or ${join(repo, '.rafa', 'specs', 'missing.md')}\n`,
+    );
+    expect(existsSync(scratch.record)).toBe(false);
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
@@ -251,7 +309,7 @@ describe('rafa plan through the adapter registry', () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain(
-      '⚠️  Prerequisites detected: complete .plans/PREREQUISITES-spec.md before starting the loop.\n',
+      '⚠️  Prerequisites detected: complete .rafa/plans/PREREQUISITES-spec.md before starting the loop.\n',
     );
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
@@ -278,16 +336,28 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('refuses a plan already there before asking the planner for one', () => {
+  it('refuses a plan already there in plan.dir before asking the planner for one', () => {
     const scratch = plantScratch();
-    mkdirSync(join(scratch.repo, '.plans'));
-    writeFileSync(join(scratch.repo, '.plans', 'PLAN-spec.md'), 'an earlier plan\n', 'utf8');
+    mkdirSync(join(scratch.repo, '.rafa', 'plans'), { recursive: true });
+    writeFileSync(join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md'), 'an earlier plan\n', 'utf8');
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
 
     expect(run.exitCode).toBe(1);
-    expect(run.stderr).toContain('❌ .plans/PLAN-spec.md already exists — remove it or pass a different --stub.');
+    expect(run.stderr).toContain('❌ .rafa/plans/PLAN-spec.md already exists — remove it or pass a different --stub.');
     expect(existsSync(scratch.record)).toBe(false);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('asks the planner for a plan when a plan of the stub sits in .plans and plan.dir is left at its default', () => {
+    const scratch = plantScratch();
+    mkdirSync(join(scratch.repo, '.plans'));
+    writeFileSync(join(scratch.repo, '.plans', 'PLAN-spec.md'), 'a phase 0 plan\n', 'utf8');
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    expect(existsSync(scratch.record)).toBe(true);
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 });
@@ -309,7 +379,7 @@ function labelOf(event: CliEvent): string {
 
 /** The refusal a line with no `--spec` gets. */
 const USAGE_REFUSAL = 'Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]\n'
-  + 'Specs live in specs/ (trackable follow-ups) or .specs/ (untracked, sensitive).';
+  + 'A spec is read against the project root, or under specs.dir (.rafa/specs) when the root holds none.';
 
 describe('rafa plan create in json mode', () => {
   it('writes each line as an info event between the start and the one result', () => {
@@ -321,10 +391,10 @@ describe('rafa plan create in json mode', () => {
     expect(run.stderr).toBe('');
     expect(eventsOf(run.stdout).map(labelOf)).toEqual([
       'start',
-      'info:📝 Generating .plans/PLAN-spec.md from spec.md...',
-      'info:\n✅ Plan ready: .plans/PLAN-spec.md',
-      'info:⚠️  Prerequisites detected: complete .plans/PREREQUISITES-spec.md before starting the loop.',
-      'info:▶ Execute with: bun src/rafa.ts start --plan=.plans/PLAN-spec.md',
+      'info:📝 Generating .rafa/plans/PLAN-spec.md from spec.md...',
+      'info:\n✅ Plan ready: .rafa/plans/PLAN-spec.md',
+      'info:⚠️  Prerequisites detected: complete .rafa/plans/PREREQUISITES-spec.md before starting the loop.',
+      'info:▶ Execute with: bun src/rafa.ts start --plan=.rafa/plans/PLAN-spec.md',
       'result',
     ]);
     expect(existsSync(scratch.spawned)).toBe(false);

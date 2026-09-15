@@ -274,7 +274,7 @@ function plant(planting: Planting): Scratch {
   git(repo, home, 'config', 'user.email', 'loop@example.test');
   git(repo, home, 'config', 'user.name', 'Rafa Loop');
   git(repo, home, 'config', 'commit.gpgsign', 'false');
-  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.ralph/\n.rafa/\n', 'utf8');
+  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
   git(repo, home, 'add', '-A');
   git(repo, home, 'commit', '-q', '--no-verify', '-m', 'seed');
   git(repo, home, 'checkout', '-q', '-B', planting.branch);
@@ -405,6 +405,32 @@ describe('loop start refusing', () => {
     ]);
 
     expect([existsSync(textScratch.callLog), existsSync(jsonScratch.callLog)]).toEqual([false, false]);
+  }, RUN_TIMEOUT);
+});
+
+describe('loop start with no --plan', () => {
+  it('runs PLAN.md in plan.dir, reaching the branch refusal rather than a missing plan', () => {
+    const scratch = plant({ branch: 'main', plan: null });
+    mkdirSync(join(scratch.repo, '.rafa', 'plans'), { recursive: true });
+    writeFileSync(join(scratch.repo, '.rafa', 'plans', 'PLAN.md'), PLAN_OPEN, 'utf8');
+
+    const run = runLoopStart(scratch, 'text', ['--no-ci-wait']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toBe('');
+    expect(run.stderr.startsWith('\n❌ Refusing to run a plan on `main`.\n')).toBe(true);
+    expect(existsSync(scratch.callLog)).toBe(false);
+  }, RUN_TIMEOUT);
+
+  it('reads no .plans/PLAN.md under the default plan.dir, refusing the PLAN.md at the root as missing', () => {
+    const scratch = plant({ branch: 'main', plan: null });
+    mkdirSync(join(scratch.repo, '.plans'));
+    writeFileSync(join(scratch.repo, '.plans', 'PLAN.md'), PLAN_OPEN, 'utf8');
+
+    const run = runLoopStart(scratch, 'text', ['--no-ci-wait']);
+
+    expect(run).toEqual({ exitCode: 1, stdout: '', stderr: `❌ Plan file not found: ${join(scratch.repo, 'PLAN.md')}\n` });
+    expect(existsSync(scratch.callLog)).toBe(false);
   }, RUN_TIMEOUT);
 });
 

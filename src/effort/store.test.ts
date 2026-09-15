@@ -2,7 +2,7 @@
  * Tests for the append-only effort store.
  *
  * Every fixture is PLANTED and every file is written under a fresh
- * temporary directory, so the suite touches no `.ralph/` anywhere and
+ * temporary directory, so the suite touches no `.rafa/` anywhere and
  * runs on a machine that has never run the loop.
  *
  * The disk is real rather than mocked, on purpose: the three
@@ -113,7 +113,7 @@ function readRaw(path: string): string | null {
 
 describe('effortStorePath', () => {
   it('puts both kinds under one ignored directory', () => {
-    const base = join('/repo', '.ralph', 'effort');
+    const base = join('/repo', '.rafa', 'effort');
 
     expect(effortStorePath('/repo', 'sessions'))
       .toBe(join(base, 'sessions.ndjson'));
@@ -122,7 +122,7 @@ describe('effortStorePath', () => {
   });
 
   it('spells the ignored directory once', () => {
-    expect(EFFORT_STORE_DIR).toBe(join('.ralph', 'effort'));
+    expect(EFFORT_STORE_DIR).toBe(join('.rafa', 'effort'));
     expect(effortStorePath('/repo', 'sessions')).toContain(EFFORT_STORE_DIR);
   });
 });

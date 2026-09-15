@@ -360,7 +360,7 @@ function presentPlanFormats(moduleDir: string): string[] {
 function expectedPlanPrompt(): string {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
   const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
-  return buildPlanPrompt(template, skill, SPEC, 'spec');
+  return buildPlanPrompt(template, skill, SPEC, 'spec', '.rafa/plans');
 }
 
 describe('the package manifest', () => {

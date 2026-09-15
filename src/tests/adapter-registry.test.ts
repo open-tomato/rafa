@@ -118,6 +118,7 @@ describe('every core port kind', () => {
       gh: createFakeGh().run,
       settingSources: ['project', 'local'],
       planPrompt: (specContent, stub) => `${stub}: ${specContent}`,
+      planDir: '.rafa/plans',
       claude,
     };
 

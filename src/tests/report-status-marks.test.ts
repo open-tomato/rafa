@@ -8,7 +8,7 @@
  * hands `commitFinishedTask` a fixed `taskInfo` rather than a dispatch.
  * `tests/task-report.test.ts` drives the whole `rafa start` command over
  * a stand-in `claude` on a child PATH. This file sits between the last
- * two: a real repository and a real `.ralph/effort/effort.sqlite`, but
+ * two: a real repository and a real `.rafa/effort/effort.sqlite`, but
  * the session itself is a stub `run` handed straight to `dispatchTask`,
  * so no process is spawned and no case needs a `claude` on `PATH`.
  *
@@ -123,7 +123,7 @@ function trackerPathOf(dir: string): string {
 }
 
 /**
- * A fresh repository ignoring `progress.txt`, `.plans/` and `.ralph/` —
+ * A fresh repository ignoring `progress.txt`, `.plans/` and `.rafa/` —
  * the store's own directory — with one seed commit and its tracker
  * planted inside the ignored `.plans/`. Real git, no stub, as
  * `tests/finished-task.test.ts` plants one.
@@ -136,7 +136,7 @@ function plantRepo(): string {
   inRepo(dir, 'config', 'user.email', 'loop@example.test');
   inRepo(dir, 'config', 'user.name', 'Rafa Loop');
   inRepo(dir, 'config', 'commit.gpgsign', 'false');
-  writeFileSync(join(dir, '.gitignore'), 'progress.txt\n.plans/\n.ralph/\n', 'utf8');
+  writeFileSync(join(dir, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
   writeFileSync(join(dir, 'seed.txt'), 'seed\n', 'utf8');
   inRepo(dir, 'add', '-A');
   inRepo(dir, 'commit', '-q', '-m', 'seed');

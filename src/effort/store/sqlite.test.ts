@@ -2,7 +2,7 @@
  * Tests for the SQLite backend of the effort store port.
  *
  * Every store sits under a fresh temporary repo root, so the suite
- * touches no `.ralph/` anywhere, and the disk is real rather than
+ * touches no `.rafa/` anywhere, and the disk is real rather than
  * mocked: the rules under test are properties of a file.
  *
  * The expectations are spelled HERE rather than read off the module:
@@ -176,7 +176,7 @@ function freshRoot(name: string): string {
 
 /** Where the store lives under a root. */
 function storeDir(root: string): string {
-  return join(root, '.ralph', 'effort');
+  return join(root, '.rafa', 'effort');
 }
 
 /** The one file every kind lives in under a root. */
@@ -270,7 +270,7 @@ function refusalOf(call: () => unknown): string {
 }
 
 describe('openSqliteStore layout', () => {
-  it('keeps every kind in one file under .ralph/effort, alone', () => {
+  it('keeps every kind in one file under .rafa/effort, alone', () => {
     const root = freshRoot('layout');
     const store = openSqliteStore(root);
     store.append('sessions', [S_A, S_B]);

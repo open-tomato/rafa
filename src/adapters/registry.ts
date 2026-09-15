@@ -82,10 +82,10 @@
  * that no other port's caller has to pass it: the outputs added `stream`
  * and `verbosity`, the `local` tracker added `fallbackReason`, the
  * `github` tracker added `gh`, and the `claude` planner added
- * `settingSources`, `planPrompt` and `claude`. The planner's first two are
- * optional to the type and not to the adapter: neither has a default it
- * could fall back on (`src/adapters/planner/claude.ts` says why), so its
- * `create` throws when either is left out. Each output `create` makes a new output,
+ * `settingSources`, `planPrompt`, `planDir` and `claude`. The planner's
+ * first three are optional to the type and not to the adapter: none has a
+ * default it could fall back on (`src/adapters/planner/claude.ts` says
+ * why), so its `create` throws when any is left out. Each output `create` makes a new output,
  * so a `json` output's one terminal result belongs to the command it was
  * made for. Each tracker `create` makes a new tracker, so the reason a
  * `local` tracker records is the one its own context named, and the
@@ -183,6 +183,11 @@ export interface AdapterContext {
    * stub. Read by it alone, which is refused without one.
    */
   readonly planPrompt?: PlanPromptBuilder;
+  /**
+   * The directory the `claude` planner writes plans into: the run's
+   * resolved `plan.dir`. Read by it alone, which is refused without one.
+   */
+  readonly planDir?: string;
   /**
    * The spawner the `claude` planner's session goes through. Read by it
    * alone; a spawner running `claude` when left out.
@@ -413,7 +418,7 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     port: 'planner',
     kind: 'claude',
     portVersion: PORT_VERSIONS.planner,
-    create: ({ repoRoot, settingSources, planPrompt, claude }) => {
+    create: ({ repoRoot, settingSources, planPrompt, planDir, claude }) => {
       if (!Array.isArray(settingSources)) {
         throw new TypeError(
           `${REFUSAL}: planner/claude has settingSources ${describeValue(settingSources)} in its context,`
@@ -426,7 +431,13 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
             + ' expected a function',
         );
       }
-      return createClaudePlanner({ repoRoot, settingSources, buildPrompt: planPrompt, spawn: claude });
+      if (typeof planDir !== 'string') {
+        throw new TypeError(
+          `${REFUSAL}: planner/claude has planDir ${describeValue(planDir)} in its context,`
+            + ' expected a directory path',
+        );
+      }
+      return createClaudePlanner({ repoRoot, planDir, settingSources, buildPrompt: planPrompt, spawn: claude });
     },
   },
 ];

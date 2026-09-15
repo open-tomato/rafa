@@ -333,6 +333,7 @@ describe.skipIf(!fixture.present)(title, () => {
     await collectEffort({
       repoRoot: SIBLING_CHECKOUT_ROOT,
       logDir: fixturePaths.logDir,
+      plansDir: join(SIBLING_CHECKOUT_ROOT, '.plans'),
       store,
       verbose: false,
       log: () => undefined,

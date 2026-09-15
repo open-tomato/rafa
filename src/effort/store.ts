@@ -1,7 +1,7 @@
 /**
  * Append-only newline-delimited JSON store for the effort collector.
  *
- * One file per row kind under `.ralph/effort/`, one JSON object per
+ * One file per row kind under `.rafa/effort/`, one JSON object per
  * line, and nothing is ever rewritten or removed. A collector run can
  * only ADD, so the store's whole incrementality is a set of the keys
  * it already holds — read back from the ROWS, never from a sidecar
@@ -52,9 +52,10 @@
  * than becoming a row, so a scalar or an array on a line cannot reach
  * a caller typed for objects.
  *
- * Nothing under {@link EFFORT_STORE_DIR} is ever committed. The root
- * `.gitignore` is what enforces that; this module's half of the
- * bargain is that the directory is spelled ONCE, so the ignore entry
+ * Nothing under {@link EFFORT_STORE_DIR} is committed unless a project
+ * sets `tracking.all`. The `.gitignore` entry for `.rafa/`
+ * (`project/gitignore.ts`) is what enforces that; this module's half of
+ * the bargain is that the directory is spelled ONCE, so the ignore entry
  * and the writer cannot drift to two different paths. The rows are a
  * measurement of one machine's runs, regenerable from the logs at any
  * time, and two checkouts would not produce the same ones.
@@ -74,7 +75,7 @@ import { dirname, join } from 'node:path';
  * literal so the separator is the platform's, which keeps a path built
  * here comparable to one a caller built with `join` of its own.
  */
-export const EFFORT_STORE_DIR = join('.ralph', 'effort');
+export const EFFORT_STORE_DIR = join('.rafa', 'effort');
 
 /** The row kinds the collector writes, one store file each. */
 export type EffortRowKind = 'sessions' | 'commits';

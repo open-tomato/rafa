@@ -5,6 +5,17 @@ pipeline write: the `EffortStore` port (`store/types.ts`), an NDJSON and a
 SQLite backend, and `selectEffortStore` (`store/index.ts`), which picks one
 from `store` in `.rafa/config.yaml`, `sqlite` by default.
 
+### Where it lives
+
+**Both backends write under `.rafa/effort/` in the project root.**
+`EFFORT_STORE_DIR` in `src/effort/store.ts` spells the directory once, and
+`effortStorePath` and `sqliteStorePath` (`store/sqlite.ts`) join it under
+the root. It moved there from `.ralph/effort/` (Q20), and no backend and no
+command reads a store left under `.ralph/effort/`. A test that plants or
+opens a store file by path spells `.rafa/effort`; the `.ralph/effort` the
+parity suites name is the sibling's own store, read through
+`readStoreRows` and never written.
+
 ### Imports
 
 **Import store code from `./store/index.js` and port types from
@@ -48,12 +59,19 @@ every full table-list expectation with it: two in `sqlite.test.ts`, one each in
 text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.
 
+**`effort collect` attributes by the plan stubs in `plan.dir`**, under
+the repo root and `.rafa/plans` unless a config names another, when its
+caller passes no `plansDir`.
+
 ### Tests over the store
 
-**`collectEffort` writes the store under its `repoRoot`.** A case pointing
-`repoRoot` at the live sibling appends to the sibling's own `.ralph/`
-unless it also passes a `store` opened under a temp root, or uses a temp
-`repoRoot` with `plansDir` and `readCommits` supplied.
+**`collectEffort` writes the store under its `repoRoot`, and reads the
+config there unless it is handed both `store` and `plansDir`.** A case
+pointing `repoRoot` at the live sibling appends to the sibling's own
+`.rafa/effort/` unless it also passes a `store` opened under a temp root,
+or uses a temp `repoRoot` with `plansDir` and `readCommits` supplied. The
+parity suites pass the sibling's `.plans/` as `plansDir` beside the store,
+so they attribute by the sibling's roster and read no config.
 
 **Compare the two backends' rows by `JSON.stringify(row)`, paired by key
 rather than by position.** `toEqual` ignores field order, and

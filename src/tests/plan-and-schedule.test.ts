@@ -98,10 +98,10 @@ describe('buildPlanPrompt', () => {
   const template = 'plan={PLAN_FILE} prereq={PREREQUISITES_FILE}\n{PROGRESS_SECTION}\n{PLAN_FORMAT}\n---\n{SPEC_CONTENT}';
   const format = '# Format\n\nOne task per line.\n';
 
-  it('substitutes plan, prerequisites, format and spec placeholders into .plans/', () => {
-    const out = buildPlanPrompt(template, format, '# My spec', 'my-feature');
-    expect(out).toContain('plan=.plans/PLAN-my-feature.md');
-    expect(out).toContain('prereq=.plans/PREREQUISITES-my-feature.md');
+  it('substitutes plan, prerequisites, format and spec placeholders into the plans directory', () => {
+    const out = buildPlanPrompt(template, format, '# My spec', 'my-feature', '.rafa/plans');
+    expect(out).toContain('plan=.rafa/plans/PLAN-my-feature.md');
+    expect(out).toContain('prereq=.rafa/plans/PREREQUISITES-my-feature.md');
     expect(out).toContain('\n# Format\n\nOne task per line.\n---\n');
     expect(out).toContain('# My spec');
     expect(out).not.toContain('{SPEC_CONTENT}');
@@ -109,8 +109,13 @@ describe('buildPlanPrompt', () => {
     expect(out).not.toContain('{PLAN_FORMAT}');
   });
 
+  it('names both files in whichever plans directory it is handed', () => {
+    const out = buildPlanPrompt(template, format, '# My spec', 'my-feature', '.plans');
+    expect(out).toContain('plan=.plans/PLAN-my-feature.md prereq=.plans/PREREQUISITES-my-feature.md\n');
+  });
+
   it('injects progress findings as advisory context when provided', () => {
-    const out = buildPlanPrompt(template, format, '# My spec', 'my-feature', 'auth logic lives in src/auth');
+    const out = buildPlanPrompt(template, format, '# My spec', 'my-feature', '.rafa/plans', 'auth logic lives in src/auth');
     expect(out).toContain('Findings from previous runs');
     expect(out).toContain('auth logic lives in src/auth');
     expect(out).toContain('ADVISORY');
@@ -118,14 +123,14 @@ describe('buildPlanPrompt', () => {
 
   it('omits the progress section entirely when there is nothing to inject', () => {
     for (const progress of [undefined, '', '  \n ']) {
-      const out = buildPlanPrompt(template, format, '# My spec', 'my-feature', progress);
+      const out = buildPlanPrompt(template, format, '# My spec', 'my-feature', '.rafa/plans', progress);
       expect(out).not.toContain('Findings from previous runs');
     }
   });
 
   it('inlines the skill without its frontmatter', () => {
     const skill = '---\nname: dev-planner\ndescription: a skill\n---\n\n# Format\n\nOne task per line.\n';
-    expect(buildPlanPrompt('[{PLAN_FORMAT}]', skill, '', 'x')).toBe('[# Format\n\nOne task per line.]');
+    expect(buildPlanPrompt('[{PLAN_FORMAT}]', skill, '', 'x', '.rafa/plans')).toBe('[# Format\n\nOne task per line.]');
   });
 
   it('never rescans filled text, so a slot name inside a spec, a progress note or the format stays as written', () => {
@@ -134,6 +139,7 @@ describe('buildPlanPrompt', () => {
       'format naming {SPEC_CONTENT} and {PLAN_FILE}',
       'spec naming {PLAN_FORMAT}',
       'x',
+      '.rafa/plans',
       'progress naming {SPEC_CONTENT}',
     );
     expect(out).toContain('\nprogress naming {SPEC_CONTENT}\n');
@@ -142,7 +148,7 @@ describe('buildPlanPrompt', () => {
   });
 
   it('reads no replacement pattern in filled text, so a dollar sequence stays as written', () => {
-    const out = buildPlanPrompt('[{PLAN_FORMAT}] [{SPEC_CONTENT}]', 'format $& $1 $$', 'spec $` $<name>', 'x');
+    const out = buildPlanPrompt('[{PLAN_FORMAT}] [{SPEC_CONTENT}]', 'format $& $1 $$', 'spec $` $<name>', 'x', '.rafa/plans');
     expect(out).toBe('[format $& $1 $$] [spec $` $<name>]');
   });
 });

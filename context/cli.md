@@ -78,10 +78,11 @@ module's note is the long form.
   result.
 - **The plan readers start no session.** `plan list` and `plan show` read
   `.plans/` under the git root. `plan create` writes and `loop start`
-  finds its default plan in `.plans/` under the project root, so the
-  readers read where those two write only while the project root is the
-  git toplevel. `plan.dir` resolves in the config, and no command reads
-  it yet (`src/commands/plan/plan-files.ts`).
+  finds its default plan in `plan.dir` under the project root,
+  `.rafa/plans` unless a config names another, and `effort collect`
+  attributes sessions by the plan stubs there, so the readers read where
+  those write only while `plan.dir` is `.plans` and the project root is
+  the git toplevel (`src/commands/plan/plan-files.ts`).
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
@@ -133,9 +134,10 @@ module's note is the long form.
   phase 0 command printed it and json mode carries it in the terminal
   result. `loop start` throws exit code 1 for an unusable config, a plan
   file that does not exist and a default branch. `plan create` throws 1
-  for an unusable config, a missing `--spec`, a spec that does not exist
-  and a plan already there, and for a planner's rejection the exit code a
-  `claude` planner's rejection carries, or 1. `effort collect` and
+  for an unusable config, a missing `--spec`, a spec found neither against
+  the project root nor under `specs.dir`, and a plan already there, and
+  for a planner's rejection the exit code a `claude` planner's rejection
+  carries, or 1. `effort collect` and
   `effort report` throw 1 for an unrecognised argument and an unusable
   config, one line per problem. An interrupted task throws
   `CommandExit(0)` once it is marked and its report stored; a failed,

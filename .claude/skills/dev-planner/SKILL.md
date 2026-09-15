@@ -15,12 +15,12 @@ This file is the single source of that format. `rafa plan` inlines it, without i
 
 | File | Purpose |
 | --- | --- |
-| `.plans/PLAN-<stub>.md` | Full task checklist with structured blocks and technical context |
-| `.plans/PREREQUISITES-<stub>.md` | Non-automatable setup steps required before the plan can run (only when any exist) |
+| `<plan.dir>/PLAN-<stub>.md` | Full task checklist with structured blocks and technical context |
+| `<plan.dir>/PREREQUISITES-<stub>.md` | Non-automatable setup steps required before the plan can run (only when any exist) |
 
-`rafa plan --spec=<spec>.md` generates them (optionally `--stub=<name>`; the stub defaults to the spec's basename) and writes both into `.plans/`, creating the directory when it is missing. It refuses to run when `.plans/PLAN-<stub>.md` already exists.
+`plan.dir` is `.rafa/plans` unless the project's `.rafa/config.yaml` names another directory. `rafa plan --spec=<spec>.md` generates both files (optionally `--stub=<name>`; the stub defaults to the spec's basename) and writes them into `plan.dir`, creating the directory when it is missing. It reads the spec from the project root, or from `specs.dir` (`.rafa/specs` by default) when the root holds no such file, and refuses to run when `<plan.dir>/PLAN-<stub>.md` already exists.
 
-Execute a plan with `rafa start --plan=.plans/PLAN-<stub>.md`. With no `--plan`, `rafa start` runs `.plans/PLAN.md`, and falls back to a hand-written `PLAN.md` at the repo root only when `.plans/PLAN.md` does not exist.
+Execute a plan with `rafa start --plan=.rafa/plans/PLAN-<stub>.md`. With no `--plan`, `rafa start` runs `PLAN.md` in `plan.dir`, and falls back to a hand-written `PLAN.md` at the project root only when `plan.dir` holds no `PLAN.md`.
 
 ---
 
@@ -369,7 +369,7 @@ The wrap-up session always receives `full` regardless of the configured mode.
 
 ## PREREQUISITES.md format
 
-`.plans/PREREQUISITES-<stub>.md` lists non-automatable setup steps. It is not parsed by the loop — it is a human checklist.
+`<plan.dir>/PREREQUISITES-<stub>.md` lists non-automatable setup steps. It is not parsed by the loop — it is a human checklist.
 
 ```markdown
   # Prerequisites

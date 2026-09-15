@@ -181,7 +181,7 @@ describe('buildPlanPrompt inlines the parser contract section unchanged', () => 
 
   it('carries the section byte for byte in the built prompt', () => {
     const section = extractSection(SKILL_BODY, PARSER_CONTRACT_HEADING);
-    const prompt = buildPlanPrompt(PROMPT_RAW, SKILL_RAW, 'a spec, for this pin only', 'a-stub');
+    const prompt = buildPlanPrompt(PROMPT_RAW, SKILL_RAW, 'a spec, for this pin only', 'a-stub', '.rafa/plans');
 
     expect(prompt).toContain(section);
   });
