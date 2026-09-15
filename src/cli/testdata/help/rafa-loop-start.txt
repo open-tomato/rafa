@@ -4,7 +4,7 @@ rafa loop start — run a plan task by task, then wrap up, open the PR and wait
 Usage:
   rafa loop start [--plan=<string>] [--start-at=<string>] [--inject=<string>]
     [--no-ci-wait] [--ci-timeout=<number>] [--ci-attempts=<number>]
-    [--any-branch]
+    [--any-branch] [-d|--detached]
 
 Description:
   Walks the tracker of a plan one task at a time, each in a Claude Code session
@@ -20,28 +20,33 @@ Description:
   Each run writes its session record to `.rafa/runs/<session-id>.json`: the
   plan, the branch, the pid, the start, the state and the running task. It
   refuses a plan whose record names another branch, and a plan a session is
-  still running.
+  still running. `rafa loop stop`, `pause`, `resume`, `status` and `list` reach
+  the run through that record. A run holds its terminal: until phase 6 it
+  refuses `--detached`.
 
 Flags:
-  --plan          string
+  --plan           string
       The plan to run, relative to the project root. `PLAN-<stub>.md` is tracked
       in `PLAN_TRACKER-<stub>.md` beside it.
-  --start-at      string
+  --start-at       string
       Waits until this local time of day, as `HH:MM`, before the first task.
-  --inject        string
+  --inject         string
       How much of the plan each task session is handed: `full`, `stage` or
       `task`. Outranks `plan.inject` in `.rafa/config.yaml`. The wrap-up is
       handed the whole plan.
-  --ci-wait       boolean, default true
+  --ci-wait        boolean, default true
       Waits on the checks of the PR once it is pushed; `--no-ci-wait` finishes
       at the push.
-  --ci-timeout    number, default 20
+  --ci-timeout     number, default 20
       Minutes to wait for the checks to settle.
-  --ci-attempts   number, default 2
+  --ci-attempts    number, default 2
       Repair sessions to spend on a red or conflicting PR before escalating; 0
       spends none and still reports the verdict.
-  --any-branch    boolean
+  --any-branch     boolean
       Runs on `main` or `master`, which the loop otherwise refuses.
+  -d, --detached   boolean
+      Runs the loop in the background. Refused until phase 6, before anything is
+      read: until then a run holds the terminal it starts in.
 
 Examples:
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
@@ -53,3 +58,7 @@ Examples:
 
 Outputs:
   text, json
+
+See also:
+  rafa loop stop, rafa loop pause, rafa loop resume, rafa loop status, rafa loop
+  list

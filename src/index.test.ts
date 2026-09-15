@@ -25,8 +25,9 @@
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
  * `doctor`, the three plan readers, `plan list`, `plan show` and
- * `plan validate`, and the five `issue` actions are held to be the
- * modules wrapping none. `describe` runs the roster builder
+ * `plan validate`, the five `loop` session actions, `loop stop`,
+ * `loop pause`, `loop resume`, `loop status` and `loop list`, and the five
+ * `issue` actions are held to be the modules wrapping none. `describe` runs the roster builder
  * of `src/cli/describe.ts`, which is no root export, and each plan reader
  * imports `parsePlan` from the `./plan` entry, which is one. A binding a module
  * takes by name, as `loop start` takes the CI defaults its flags show,
@@ -266,6 +267,39 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
+  ['./commands/loop/stop.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['../../loop/sessions.js', ['errorCode', 'readSession', 'SessionRecordError']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./loop-sessions.js', ['checkboxAt', 'isLive', 'pickSession', 'planLabel', 'readSessionChecklist', 'refusal', 'resolveLoopSeams', 'sessionIdFlag']],
+  ]],
+  ['./commands/loop/pause.js', [
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./loop-sessions.js', ['isLive', 'pickSession', 'refusal', 'resolveLoopSeams', 'sessionIdFlag', 'writeSession']],
+  ]],
+  ['./commands/loop/resume.js', [
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./loop-sessions.js', ['isLive', 'pickSession', 'refusal', 'resolveLoopSeams', 'sessionIdFlag', 'writeSession']],
+  ]],
+  ['./commands/loop/status.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
+    ['./loop-sessions.js', [
+      'estimateEta',
+      'etaLine',
+      'isLive',
+      'pickSession',
+      'readSessionChecklist',
+      'readSessionFinishes',
+      'resolveLoopSeams',
+      'sessionIdFlag',
+      'sessionLine',
+    ]],
+  ]],
+  ['./commands/loop/list.js', [
+    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
+    ['./loop-sessions.js', ['isLive', 'projectRoot', 'readRecords', 'readSessionChecklist', 'resolveLoopSeams', 'sessionLine']],
+  ]],
   ['./commands/issue/list.js', [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
     ['../plan/plan-files.js', ['expectNoArgument']],
@@ -484,6 +518,11 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/plan/list.js',
       './commands/plan/show.js',
       './commands/plan/validate.js',
+      './commands/loop/stop.js',
+      './commands/loop/pause.js',
+      './commands/loop/resume.js',
+      './commands/loop/status.js',
+      './commands/loop/list.js',
       './commands/issue/list.js',
       './commands/issue/show.js',
       './commands/issue/create.js',

@@ -159,6 +159,7 @@ import {
   CLAUDE_BASE_ARGS,
   checkUsage,
   claudeArgs,
+  interruptClaudeSessions,
   runClaude,
   runClaudeCaptured,
   SETTING_SOURCES_FLAG,
@@ -723,6 +724,79 @@ function recordingOutput(): ReturnType<typeof sinkOutput> {
     },
   });
 }
+
+/**
+ * The interrupt `loop start` passes a SIGINT on with (`src/start.ts`),
+ * against a stand-in that drains its prompt, marks that it has started,
+ * then becomes a 30-second sleep through `exec`, so a SIGINT reaches the
+ * sleep itself and not a shell waiting on it. Each door is interrupted
+ * once its session has started: the session ends well inside the sleep
+ * with a non-zero exit code, and nothing is left for a second call to
+ * signal. The call made before any session starts answers 0, the control
+ * that the count is of the sessions running.
+ */
+describe('interruptClaudeSessions against a stand-in claude on PATH', () => {
+  /** How soon an interrupted session must have ended. */
+  const ENDED_WITHIN_MS = 5_000;
+
+  /** How long a case may run: the sleep it interrupts runs 30 seconds. */
+  const CASE_TIMEOUT = 15_000;
+
+  beforeEach(() => {
+    binDir = mkdtempSync(join(tmpdir(), 'rafa-claude-stand-in-'));
+    savedEnv = {
+      PATH: process.env['PATH'],
+      CLAUDE_CODE_ENTRYPOINT: process.env['CLAUDE_CODE_ENTRYPOINT'],
+    };
+  });
+
+  afterEach(() => {
+    restoreEnv('PATH', savedEnv.PATH);
+    restoreEnv('CLAUDE_CODE_ENTRYPOINT', savedEnv.CLAUDE_CODE_ENTRYPOINT);
+    rmSync(binDir, { recursive: true, force: true });
+  });
+
+  /** What interrupting one running session came to. */
+  interface Interrupted {
+    /** What the call before the session answered. */
+    readonly before: number;
+    /** What the call while it ran answered. */
+    readonly signalled: number;
+    /** What the call after it ended answered. */
+    readonly after: number;
+    readonly exitCode: number;
+    readonly elapsedMs: number;
+  }
+
+  /** Runs `run` against the sleeping stand-in and interrupts it once it has started. */
+  async function interruptWhileRunning(run: () => Promise<number>): Promise<Interrupted> {
+    const started = join(binDir, 'started');
+    standInClaude(['/bin/cat > /dev/null', `: > '${started}'`, 'exec /bin/sleep 30']);
+    const before = interruptClaudeSessions();
+    const session = run();
+    for (let polls = 0; polls < 500 && !existsSync(started); polls++) await Bun.sleep(10);
+    const sentAt = Date.now();
+    const signalled = interruptClaudeSessions();
+    const exitCode = await session;
+    return { before, signalled, after: interruptClaudeSessions(), exitCode, elapsedMs: Date.now() - sentAt };
+  }
+
+  it('ends a session the captured door is running', async () => {
+    const run = await interruptWhileRunning(async () => (await runClaudeCaptured('interrupt me', DEFAULT_SOURCES)).exitCode);
+
+    expect([run.before, run.signalled, run.after]).toEqual([0, 1, 0]);
+    expect(run.exitCode).not.toBe(0);
+    expect(run.elapsedMs).toBeLessThan(ENDED_WITHIN_MS);
+  }, CASE_TIMEOUT);
+
+  it('ends a session the inherited door is running', async () => {
+    const run = await interruptWhileRunning(() => runClaude('interrupt me', DEFAULT_SOURCES));
+
+    expect([run.before, run.signalled, run.after]).toEqual([0, 1, 0]);
+    expect(run.exitCode).not.toBe(0);
+    expect(run.elapsedMs).toBeLessThan(ENDED_WITHIN_MS);
+  }, CASE_TIMEOUT);
+});
 
 describe('both doors in json mode, against a stand-in claude on PATH', () => {
   beforeEach(() => {

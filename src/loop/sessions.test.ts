@@ -38,6 +38,7 @@ import {
   isPidAlive,
   isSessionId,
   parseSessionRecord,
+  readSession,
   readSessions,
   readState,
   runsDir,
@@ -47,6 +48,7 @@ import {
   sessionConflicts,
   sessionFilePath,
   SessionRecordError,
+  SessionStateError,
   updateSession,
 } from './sessions.js';
 
@@ -478,5 +480,64 @@ describe('updateSession', () => {
     expect((error as SessionRecordError).message).toContain('not written: task.line is 0');
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(readdirSync(runsDir(root))).toEqual([`${ID}.json`]);
+  });
+});
+
+describe('updateSession guarded by onlyFrom', () => {
+  it('writes a change whose onlyFrom holds the stored state', () => {
+    const root = freshRoot();
+    plantRecord(root, record());
+
+    expect(updateSession(root, ID, { state: 'paused', onlyFrom: ['running'] })).toEqual(record({ state: 'paused' }));
+    expect(updateSession(root, ID, { state: 'running', onlyFrom: ['paused', 'stopped'] }).state).toBe('running');
+  });
+
+  it('refuses a change whose onlyFrom leaves the stored state out, leaving the file as it was', () => {
+    const root = freshRoot();
+    const file = plantRecord(root, record({ state: 'done' }));
+    const before = readFileSync(file, 'utf8');
+
+    const error = thrownBy(() => updateSession(root, ID, { state: 'paused', onlyFrom: ['running'] }));
+
+    expect(error).toBeInstanceOf(SessionStateError);
+    expect((error as SessionStateError).state).toBe('done');
+    expect((error as SessionStateError).message).toBe(`session record ${file}: stores done, and the change acts on running alone`);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    expect(readdirSync(runsDir(root))).toEqual([`${ID}.json`]);
+  });
+
+  it('refuses every change under an empty onlyFrom, naming no state', () => {
+    const root = freshRoot();
+    plantRecord(root, record());
+
+    const error = thrownBy(() => updateSession(root, ID, { task: null, onlyFrom: [] }));
+
+    expect((error as SessionStateError).message).toContain('stores running, and the change acts on no state alone');
+  });
+});
+
+describe('readSession', () => {
+  it('reads the record an id names, with the state it reads as', () => {
+    const root = freshRoot();
+    plantRecord(root, record({ task: { line: 3, text: 'A task' } }));
+    plantRecord(root, record({ sessionId: 'session-0002', state: 'done' }));
+
+    expect(readSession(root, ID, { isAlive: ALIVE })).toEqual(record({ task: { line: 3, text: 'A task' } }));
+    expect(readSession(root, ID, { isAlive: GONE }).state).toBe('stopped');
+    expect(readSession(root, 'session-0002', { isAlive: ALIVE }).state).toBe('done');
+  });
+
+  it('refuses an id whose file is not there as a record problem, and an id naming no file as none', () => {
+    const root = freshRoot();
+    plantRecord(root, record());
+
+    const missing = thrownBy(() => readSession(root, 'session-0404', { isAlive: ALIVE }));
+    const unusable = thrownBy(() => readSession(root, '../escape', { isAlive: ALIVE }));
+
+    expect(missing).toBeInstanceOf(SessionRecordError);
+    expect((missing as SessionRecordError).message).toContain('session-0404.json: cannot be read: ');
+    expect(unusable).toBeInstanceOf(Error);
+    expect(unusable).not.toBeInstanceOf(SessionRecordError);
+    expect((unusable as Error).message).toBe('session record: unusable session id "../escape"');
   });
 });

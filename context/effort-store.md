@@ -53,6 +53,9 @@ one, which opens the store as that direct call does.
 `readTaskReportTallies` reads that table back for `rafa effort report`,
 under the repo root whatever `store` selects, and opens nothing when the
 file is absent; `readPreflightHalts` reads `preflight` back the same way.
+`readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
+`task_reports` and `report_absences` back the same way, for the rough ETA
+of `rafa loop status`.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
 `reports.test.ts` and `preflight.test.ts`.

@@ -24,6 +24,7 @@ module's note is the long form.
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
 | `src/commands/issue/issue-tracker.ts` | what the five `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
+| `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/doctor.ts` | `rafa doctor`: the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -35,7 +36,8 @@ module's note is the long form.
   `src/commands/<subject>/<action>.ts` and a top-level command at
   `src/commands/<name>.ts`, each module's default export its command.
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
-  and `plan validate`; `loop start`, aliased `start`; `issue list`,
+  and `plan validate`; `loop start`, aliased `start`; `loop stop`,
+  `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment` and `issue move`;
   `effort collect`, `effort report`, `init`, `doctor`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue` and `effort`: a
@@ -51,14 +53,15 @@ module's note is the long form.
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, the plan readers and the `issue`
-  actions wrap none: `describe` reads the registry off its context, and
-  `init`, `doctor`, each plan reader and each `issue` action their `args`
-  and `flags`.
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, the plan readers, the `loop`
+  session actions and the `issue` actions wrap none: `describe` reads the
+  registry off its context, and `init`, `doctor`, each plan reader, each
+  `loop` session action and each `issue` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
-  `start/run-config.ts`, `start/session.ts`, `start/preflight.ts`,
-  `preflight/run.ts`, `start/commit.ts`, `start/wrap-up.ts`,
+  `start/run-config.ts`, `start/session.ts`, `start/pause.ts`,
+  `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
+  `start/wrap-up.ts`,
   `start/dispatch.ts`, `start/triage.ts`, `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
@@ -164,6 +167,26 @@ module's note is the long form.
   are seams of each command's factory. `src/commands/issue/create.test.ts`
   spawns `issue create` and `issues list` under a stand-in `gh` failing
   the `github` preflight.
+- **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
+  through its session record** (`src/commands/loop/`). `--session-id=<id>`,
+  aliased `-s`, names a record. Without it the session is the one reading
+  `running` or `paused` on the branch checked out at the project root, as
+  git reads it there, and `status` alone falls back on the newest record of
+  that branch (`loop/loop-sessions.ts`). `stop` sends SIGINT to the
+  record's pid; `loop start` passes it on to its running Claude session
+  (`utils/claude.ts`) and marks that task `[BLOCKED]`. `stop` then waits up
+  to 30 seconds for the record to read `stopped` or `done` and names what
+  the tracker holds at the task's line; a run still going then is warned
+  about, exit code 0. `pause` writes `paused` and nothing else, and the
+  loop holds between tasks while its record reads so (`start/pause.ts`);
+  `resume` writes `running`. Each moves a record only from the state it
+  read (`onlyFrom`, `loop/sessions.ts`), and leaves a record already where
+  it would put it unchanged, exit code 0. `status` counts the plan's tasks
+  from its tracker and gives a live session a rough ETA from the store's
+  `done` finishes since the session started
+  (`effort/store/task-finishes.ts`). `list` lists every live record and
+  reads no branch. In json mode each gives its reading as the result's
+  `data`; text mode writes lines.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
   flag declares, so `rafa plan show --tracker my-plan` hands `plan show`
@@ -174,7 +197,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, and `doctor` the flag `plan` and no argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, and `doctor` the flag `plan` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. Of the `issue` actions, `list` declares the
@@ -185,7 +208,9 @@ module's note is the long form.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
-  result. `loop start` throws exit code 1 for an unusable config, a plan
+  result. `loop start` throws exit code 1 for a line asking for
+  `-d|--detached`, before anything else is read (`start/run-config.ts`),
+  an unusable config, a plan
   file that does not exist, a default branch, a session record refusing
   the run, session records that cannot be read or written, and a
   preflight that halts before any session: a failed required
@@ -224,6 +249,14 @@ module's note is the long form.
   no `--title` and a `comment` with no `--body`; then for a config
   `loadConfig` refuses, a chain landing nowhere, and an adapter call
   that rejects, naming what was being done and the tracker's kind.
+  The `loop` session actions throw 1, before any record is read, for an
+  argument and for a `--session-id` with no value or naming no record
+  file; then for records that cannot be read, an id no record has, a
+  branch that cannot be read, no live session on the branch or two of
+  them, and a record whose state changed between the read and the write.
+  `stop`, `pause` and `resume` also throw 1 for a session reading
+  `stopped` or `done`, and `stop` for a signal refused for any reason but
+  the pid being gone.
 - **What changed for a phase 0 spelling**: `rafa effort` alone and
   `rafa effort help` refuse with exit code 1, where the phase 0 CLI
   printed its help and exited 0. An unknown first word writes
@@ -368,8 +401,9 @@ home are options.
   the argument and flag tables, the examples, the outputs and `See also`.
 - **Derived where the spec draws by hand.** The quick start is the first
   example of each subject's first visible action, then of each top-level
-  command, so it reads `rafa effort collect` where the spec draws the
-  unregistered `rafa loop status`. A subject's two examples are taken
+  command, so it reads `rafa effort collect` where the spec draws
+  `rafa loop status`, which is no subject's first action. A subject's two
+  examples are taken
   across its actions, the first of each before the second of any. The
   global flags are `--output=json` and `-v, --verbose`, the two
   `assembleContext` reads; the spec's `--runtime=<v>` joins when a command

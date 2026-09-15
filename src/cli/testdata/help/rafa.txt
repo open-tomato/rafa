@@ -17,7 +17,7 @@ Quick start:
 
 Subjects:
   plan     create a plan from a spec; list, show and validate plans
-  loop     start a plan through the loop, one task per session
+  loop     start a plan; stop, pause, resume, show and list its sessions
   issue    the tracker: list, show, create, comment on and move issues
   effort   collect session and commit rows; report per plan
 

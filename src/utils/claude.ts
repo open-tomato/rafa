@@ -100,6 +100,27 @@
  * the session's stdout. The argument list, the prompt, the environment
  * and the inherited stderr are the same in both modes.
  *
+ * ## Interrupting a running session
+ *
+ * Both doors hold the process they spawn among the live sessions until it
+ * has exited, and {@link interruptClaudeSessions} sends each of those
+ * SIGINT. `loop start` calls it from its own SIGINT handler (`src/start.ts`).
+ * A terminal's Ctrl-C reaches the loop and its session at once, as one
+ * process group, but `rafa loop stop` signals the loop's pid alone, and a
+ * signal to that pid never reaches the session. Measured on 2026-09-15 by
+ * spawning `loop start` over a stand-in `claude` sleeping 20 seconds: a
+ * SIGINT to the loop's pid ended the run after 20.06 s, once the session
+ * had run to its own end, and one to its process group after 0.03 s.
+ *
+ * A signalled session has ended once its process exits, but the captured
+ * door reads the session's stdout to its end first, and a process the
+ * session left behind holding that stdout keeps it open. Measured on
+ * 2026-09-15 with a stand-in that trapped SIGINT and exited 130 while a
+ * sleep it had put in the background held the pipe: `rafa loop stop` took
+ * 19.9 s, ending when the sleep did, against 0.28 s with the sleep's output
+ * sent to `/dev/null`. Both doors answered 130 for a stand-in the signal
+ * ended, under bun 1.3.14.
+ *
  * {@link checkUsage} writes through the active output too: each warning
  * through `warn`, and the usage it read through `info`.
  */
@@ -212,6 +233,26 @@ export type ClaudeSpawner = (
   prompt: string,
 ) => Promise<number>;
 
+/** A spawned session, as {@link interruptClaudeSessions} reaches it. */
+interface LiveSession {
+  kill(signal: 'SIGINT'): void;
+}
+
+/** The sessions either door spawned and has not yet seen exit. */
+const liveSessions = new Set<LiveSession>();
+
+/**
+ * Sends SIGINT to every session either door spawned and has not yet seen
+ * exit, and answers how many that is. A process that exited before its
+ * door saw it is signalled too, which does nothing: measured under bun
+ * 1.3.14, `kill` on a subprocess that has exited throws nothing. See the
+ * module note.
+ */
+export function interruptClaudeSessions(): number {
+  for (const session of liveSessions) session.kill('SIGINT');
+  return liveSessions.size;
+}
+
 /**
  * The environment every session is spawned with: the loop's own, plus
  * the one entry a session must see whichever spawner started it.
@@ -257,7 +298,12 @@ export async function spawnClaude(
     stderr: 'inherit',
     env: claudeSessionEnv(),
   });
-  return (await proc.exited) ?? 1;
+  liveSessions.add(proc);
+  try {
+    return (await proc.exited) ?? 1;
+  } finally {
+    liveSessions.delete(proc);
+  }
 }
 
 /**
@@ -394,11 +440,13 @@ export async function spawnClaudeCaptured(
     stderr: 'inherit',
     env: claudeSessionEnv(),
   });
+  liveSessions.add(proc);
   let stdout: string;
   try {
     stdout = await teeToOperator(proc.stdout);
   } finally {
     await proc.exited;
+    liveSessions.delete(proc);
   }
   return { exitCode: await proc.exited, stdout };
 }

@@ -1,10 +1,11 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the sixteen commands it registers: what the registry
+ * declarations of the twenty-one commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `doctor`, `init`, `plan list`, `plan show`, `plan validate`
+ * `describe`, `doctor`, `init`, `plan list`, `plan show`, `plan validate`,
+ * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`
  * and the five `issue` actions wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -29,9 +30,10 @@
  * one a quote or an `=` closes. Read when this landed, those literals are
  * exactly the flags each parser compares an argument against: no message,
  * usage line or comment in those modules quotes one that way. The control
- * reads a planted `--detached`, which the tree declares for `loop start`
- * and `src/start.ts` does not read, and skips the same flag inside a
- * message.
+ * reads a planted `--session-id`, which the tree declares for `loop stop`
+ * and no phase 0 module reads, and skips the same flag inside a message.
+ * `--detached`, which `loop start` now declares, is read by
+ * `start/run-config.ts`, which refuses it.
  *
  * Seven mutations were driven on 2026-09-14, one run each over this file,
  * with 28 pass before and after and every file restored byte-identical
@@ -82,6 +84,11 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'plan show': ['text', 'json'],
   'plan validate': ['text', 'json'],
   'loop start': ['text', 'json'],
+  'loop stop': ['text', 'json'],
+  'loop pause': ['text', 'json'],
+  'loop resume': ['text', 'json'],
+  'loop status': ['text', 'json'],
+  'loop list': ['text', 'json'],
   'issue list': ['text', 'json'],
   'issue show': ['text', 'json'],
   'issue create': ['text', 'json'],
@@ -100,6 +107,11 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'plan list': [[], []],
   'plan show': [['stub'], ['tracker']],
   'plan validate': [['file'], []],
+  'loop stop': [[], ['session-id']],
+  'loop pause': [[], ['session-id']],
+  'loop resume': [[], ['session-id']],
+  'loop status': [[], ['session-id']],
+  'loop list': [[], []],
   'issue list': [[], ['state', 'type', 'module', 'search', 'limit']],
   'issue show': [['id'], []],
   'issue create': [[], ['title', 'body', 'type', 'module', 'priority']],
@@ -140,6 +152,12 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['loop start --plan=.plans/PLAN-a.md --no-ci-wait', 'loop start', ['--plan=.plans/PLAN-a.md', '--no-ci-wait'], ''],
   ['start --plan=.plans/PLAN-a.md', 'loop start', ['--plan=.plans/PLAN-a.md'], deprecation('start', 'loop start')],
   ['loops start', 'loop start', [], ''],
+  ['loop start -d', 'loop start', ['-d'], ''],
+  ['loop stop -s session-0001', 'loop stop', ['-s', 'session-0001'], ''],
+  ['loop pause --session-id=session-0001', 'loop pause', ['--session-id=session-0001'], ''],
+  ['loops resume', 'loop resume', [], ''],
+  ['loop status', 'loop status', [], ''],
+  ['loop list', 'loop list', [], ''],
   ['issue list --type=bug', 'issue list', ['--type=bug'], ''],
   ['issues show 12', 'issue show', ['12'], ''],
   ['issue create --title=Timeouts', 'issue create', ['--title=Timeouts'], ''],
@@ -220,13 +238,18 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start, the five issue actions, the effort commands, init, doctor, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, init, doctor, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
       'plan show',
       'plan validate',
       'loop start',
+      'loop stop',
+      'loop pause',
+      'loop resume',
+      'loop status',
+      'loop list',
       'issue list',
       'issue show',
       'issue create',
@@ -288,7 +311,7 @@ describe('how the command tree routes', () => {
     expect(run.outcome.exitCode).toBe(0);
   });
 
-  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'issue --help', 'issue move --help', 'effort report --help'])('answers rafa %s with help, running nothing', async (line) => {
+  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'loop --help', 'loop stop --help', 'issue --help', 'issue move --help', 'effort report --help'])('answers rafa %s with help, running nothing', async (line) => {
     const run = await dispatchRecorded(line);
 
     expect(run.ran).toEqual([]);
@@ -332,8 +355,8 @@ describe('the flags each command declares', () => {
   });
 
   it('reads a planted quoted flag literal, and none inside a message', () => {
-    expect(literalFlags('if (args.includes(\'--detached\')) return;')).toEqual(['--detached']);
+    expect(literalFlags('if (args.includes(\'--session-id\')) return;')).toEqual(['--session-id']);
     expect(literalFlags('argValue(args, \'--plan\'); arg.startsWith(\'--since=\');')).toEqual(['--plan', '--since']);
-    expect(literalFlags('console.error(\'Usage: rafa loop start --detached\');')).toEqual([]);
+    expect(literalFlags('console.error(\'Usage: rafa loop stop --session-id\');')).toEqual([]);
   });
 });

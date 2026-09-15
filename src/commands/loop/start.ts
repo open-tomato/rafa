@@ -7,6 +7,10 @@
  * stderr. `src/start.ts` and `src/start/run-config.ts` read its flags,
  * and the ones declared here are those they read. The CI defaults are
  * the loop's own constants, so the help cannot drift from them.
+ *
+ * `-d|--detached` is declared so the help does not change when detached
+ * runs arrive in phase 6, and `start/run-config.ts` refuses it until
+ * then, before anything else is read.
  */
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 import start from '../../start.js';
@@ -27,7 +31,9 @@ export default wrapPhaseZeroCommand({
     + ' one fails and naming each failed optional one known-missing in every task prompt. It refuses to'
     + ' run on `main` or `master`. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
     + ' the plan, the branch, the pid, the start, the state and the running task. It refuses a plan whose'
-    + ' record names another branch, and a plan a session is still running.',
+    + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
+    + ' `resume`, `status` and `list` reach the run through that record. A run holds its terminal: until'
+    + ' phase 6 it refuses `--detached`.',
   args: [],
   flags: [
     {
@@ -70,6 +76,13 @@ export default wrapPhaseZeroCommand({
       name: 'any-branch',
       description: 'Runs on `main` or `master`, which the loop otherwise refuses.',
       type: 'boolean',
+    },
+    {
+      name: 'detached',
+      description: 'Runs the loop in the background. Refused until phase 6, before anything is read:'
+        + ' until then a run holds the terminal it starts in.',
+      type: 'boolean',
+      aliases: ['d'],
     },
   ],
   examples: [

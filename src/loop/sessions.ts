@@ -85,6 +85,13 @@
  * `loop pause` writes `paused`, survives the loop writing its running
  * task. A key this module does not know is dropped by that write.
  *
+ * A change handed `onlyFrom` is refused with {@link SessionStateError},
+ * writing nothing, when the state stored is none of those. `loop pause`
+ * moves only a `running` record and `loop resume` only a `paused` one, so
+ * a run that writes its end between such a command's read and its write
+ * keeps that end. The window left is the one between this module's own
+ * read and its rename, which holds no lock either.
+ *
  * ## What is refused on read
  *
  * {@link SessionRecordError}, naming the file: text that is no JSON
@@ -93,7 +100,8 @@
  * group), an unparsable `startedAt`, and a `sessionId` that is no plain
  * file name or differs from the file's name. {@link readSessions} reads
  * only names ending in `.json`, and answers no record when the directory
- * does not exist.
+ * does not exist. {@link readSession} reads the one record an id names,
+ * and refuses a file that is not there.
  */
 import {
   linkSync,
@@ -152,6 +160,11 @@ export type SessionDraft = Omit<SessionRecord, 'state' | 'task'>;
 export interface SessionChange {
   readonly state?: SessionState;
   readonly task?: SessionTask | null;
+  /**
+   * The stored states the change acts on. Any other refuses it with
+   * {@link SessionStateError}, writing nothing. Every state when left out.
+   */
+  readonly onlyFrom?: readonly SessionState[];
 }
 
 /** Answers whether a process with this pid exists. */
@@ -193,6 +206,24 @@ export class SessionConflictError extends Error {
     super(`the plan's sessions refuse the run: ${named.join(', ')}`);
     this.name = 'SessionConflictError';
     this.conflicts = conflicts;
+  }
+}
+
+/** A change {@link updateSession} refused: the record stores a state the change does not act on. */
+export class SessionStateError extends Error {
+  /** The record's path. */
+  readonly file: string;
+  /** The state the record stores. */
+  readonly state: SessionState;
+
+  constructor(file: string, state: SessionState, onlyFrom: readonly SessionState[]) {
+    const acted = onlyFrom.length === 0
+      ? 'no state'
+      : onlyFrom.join(' or ');
+    super(`session record ${file}: stores ${state}, and the change acts on ${acted} alone`);
+    this.name = 'SessionStateError';
+    this.file = file;
+    this.state = state;
   }
 }
 
@@ -408,6 +439,17 @@ export function readSessions(root: string, seams: SessionReadSeams = {}): readon
   return Object.freeze(records.sort(byStart));
 }
 
+/**
+ * The record of `sessionId` under `<root>/.rafa/runs/`, with the state it
+ * reads as ({@link readState}). Throws {@link SessionRecordError} when its
+ * file is not there or holds no record, and the error
+ * {@link sessionFilePath} throws for an id it refuses.
+ */
+export function readSession(root: string, sessionId: string, seams: SessionReadSeams = {}): SessionRecord {
+  const record = readRecordFile(sessionFilePath(root, sessionId));
+  return Object.freeze({ ...record, state: readState(record, seams.isAlive ?? isPidAlive) });
+}
+
 /** Whether two records name the same plan. See the module note. */
 export function samePlan(
   a: Pick<SessionRecord, 'planStub' | 'plan'>,
@@ -482,11 +524,16 @@ export function beginSession(
 /**
  * Changes the stored record of a session, reading it again first, and
  * answers the record written. Throws {@link SessionRecordError} when the
- * record cannot be read or the change would make it one that cannot be.
+ * record cannot be read or the change would make it one that cannot be,
+ * and {@link SessionStateError} when it stores a state the change's
+ * `onlyFrom` leaves out.
  */
 export function updateSession(root: string, sessionId: string, change: SessionChange): SessionRecord {
   const file = sessionFilePath(root, sessionId);
   const stored = readRecordFile(file);
+  if (change.onlyFrom !== undefined && !change.onlyFrom.includes(stored.state)) {
+    throw new SessionStateError(file, stored.state, change.onlyFrom);
+  }
   const record = freezeRecord({
     ...stored,
     state: change.state ?? stored.state,

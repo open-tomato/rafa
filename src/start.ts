@@ -41,6 +41,14 @@
  * task once the wrap-up starts, and the run's end writes `done` after the
  * wrap-up and the CI wait come back and `stopped` on every other way out.
  *
+ * At the top of each turn of the loop, before the tracker is read for the
+ * next task, the run reads its record and holds while it reads `paused`,
+ * as `rafa loop pause` writes it (`start/pause.ts`). So a pause takes
+ * effect once the running task is committed, marked, stored and triaged,
+ * and marks nothing. While it holds, the record names no task.
+ * `rafa loop resume` writes `running`, and the run goes on; a SIGINT ends
+ * the hold, and the run.
+ *
  * Before the tracker is created and before any session is spawned, the
  * wrap-up's included, the run's preflight checks the configured
  * prerequisites and those of the plan's `PREREQUISITES-<stub>.md`, and
@@ -106,7 +114,9 @@
  *
  * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
  * never by `process.exit`, so the dispatcher writes the terminal event.
- * An unusable config, a plan file that does not exist, a default branch,
+ * A line asking for `-d|--detached`, refused before anything else is
+ * read (`start/run-config.ts`), an unusable config, a plan file that does
+ * not exist, a default branch,
  * a session record refusing the run or session records that cannot be
  * read or written, and a preflight that halts (a failed required
  * prerequisite, a PREREQUISITES file that cannot be read, or checks the
@@ -117,6 +127,12 @@
  * A failed task, a blocked one and a report left unstored still stop the
  * run by returning, which the dispatcher ends as a success, with exit
  * code 0. A triage failure stops nothing.
+ *
+ * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
+ * loop's process group or `rafa loop stop` sends it to the loop's pid
+ * alone. The handler passes it on to the Claude session running at that
+ * moment (`utils/claude.ts`), so the task ends then rather than when its
+ * session would have, and the task is marked `[BLOCKED]`.
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -135,6 +151,7 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './start/dispatch.js';
+import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
 import {
   DEFAULT_CI_ATTEMPTS,
@@ -147,12 +164,13 @@ import {
   argValue,
   injectSourceLabel,
   loadRunConfig,
+  refuseDetachedRun,
 } from './start/run-config.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createStartTriage } from './start/triage.js';
 import { preserveProgress } from './start/wrap-up.js';
-import { checkUsage } from './utils/claude.js';
+import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
 import { getCurrentBranch } from './utils/git.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
@@ -228,6 +246,8 @@ export function guardRunBranch(
  * `src/commands/wrap.ts`.
  */
 export default async function start(args: string[], repoRoot: string): Promise<void> {
+  // Before anything is read: `-d|--detached` is declared, and refused until phase 6.
+  refuseDetachedRun(args);
 
   // Before the deferral: a run queued for 23:00 that only meets a refused
   // config then has lost the night, where refusing now costs one command.
@@ -297,12 +317,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       activeOutput().info(`📋 Resuming from existing ${path.basename(trackerPath)}...`);
     }
 
-    // SIGINT: flag and finish cleanup (mark blocked, throw exit 0) after the await returns.
+    // SIGINT: flag, pass it on to the running session so its task ends now,
+    // and finish cleanup (mark blocked, throw exit 0) after the await returns.
     process.on('SIGINT', () => {
       interrupted = true;
+      interruptClaudeSessions();
     });
 
     while (true) {
+      if (interrupted) break;
+      // Holds here while `rafa loop pause` has the record read `paused`.
+      await holdWhilePaused({ repoRoot, sessionId: session.id, isInterrupted: () => interrupted });
       if (interrupted) break;
 
       const trackerContent = fs.readFileSync(trackerPath, 'utf8');
