@@ -35,12 +35,14 @@
  *     from one listed by a session it marked `blocked`. It has no CHECK,
  *     for the reason `findings.ts` gives: the spec widens the set with
  *     the CI verdict, and SQLite cannot widen a CHECK in place.
- *   - Neither table has a `tracker_ref`. Phase 1's spec writes the
- *     reference it files into the `findings` row, and a bug is matched
- *     against the tracker by `tracker.find` on its artifact, not against
- *     this table. Measured on SQLite 3.51.0, a nullable column added by
- *     `ALTER TABLE ... ADD COLUMN` keeps the rows and the unique index in
- *     force, so a later migration can add one if phase 1 wants it here.
+ *   - Neither table has a `tracker_ref`. The reference a filed bug gets
+ *     is kept in the `findings` row keyed by its artifact, which
+ *     `tracker-refs.ts` writes and answers back by artifact, and a bug is
+ *     matched against the tracker by `tracker.find` on its artifact, not
+ *     against this table. Measured on SQLite 3.51.0, a nullable column
+ *     added by `ALTER TABLE ... ADD COLUMN` keeps the rows and the unique
+ *     index in force, so a later migration can add one if phase 1 wants
+ *     it here.
  *
  * ## Where the tables live
  *

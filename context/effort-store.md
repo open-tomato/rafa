@@ -46,7 +46,8 @@ under the `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
 `writeTriage` and `writePreflightChecks` do, so an empty write on a store
 that exists still meets the schema check. `writeReportAbsence` always has
-its one row and opens `withSqliteStore` directly. `writeTaskReport`
+its one row and opens `withSqliteStore` directly, as `writeTrackerRef`
+does. `writeTaskReport`
 always has its one row too, and passes `writeSqliteStore` a count of
 one, which opens the store as that direct call does.
 `readTaskReportTallies` reads that table back for `rafa effort report`,
@@ -64,6 +65,17 @@ did not pass, and `readPreflightHalts` reads that off the rows.
 `loop start` writes it through `start/preflight.ts` before any session,
 and writes nothing for a run with no item to check. `rafa doctor` checks
 the same items and writes no row.
+
+**`findings` has two writers.** `store/tracker-refs.ts` keeps a filed
+issue's reference in the row the dispatch's session holds under the
+bug's artifact: it sets `tracker_ref` on that session's finding, or
+inserts a row holding only the dispatch, the artifact and the reference,
+and keeps a reference already there. `readTrackerRef` answers the oldest
+reference stored under an artifact, in any session. Write a report's
+findings before its references: a finding written after a reference
+under the same session and artifact is skipped as that row's duplicate.
+An inserted row reaches `progress.txt` as the bullet
+`- artifact: <artifact>`.
 
 ### Attribution
 

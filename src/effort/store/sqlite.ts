@@ -46,11 +46,14 @@
  * port's row map names none of them, and nothing in this module reads or
  * writes them. `findings.ts` writes the first, `triage.ts` the next two,
  * `absences.ts` the fourth, `reports.ts` the fifth and `preflight.ts` the
- * last. `findings.ts`, `triage.ts` and `preflight.ts` write through
+ * last. `tracker-refs.ts` writes the first as well, setting a filed
+ * issue's reference on a row and inserting the row when there is none.
+ * `findings.ts`, `triage.ts` and `preflight.ts` write through
  * {@link writeSqliteStore}, as an append does, so a write left with
  * nothing to insert still meets the schema check.
  * `absences.ts` always has its one row and opens {@link withSqliteStore}
- * directly. `reports.ts` always has its one row too, and passes
+ * directly, as `tracker-refs.ts` does with the one row it places.
+ * `reports.ts` always has its one row too, and passes
  * {@link writeSqliteStore} a count of one, which opens the store as that
  * direct call does. Each table is opened, migrated and closed as every
  * kind's table is. Each writer
