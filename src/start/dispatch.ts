@@ -23,7 +23,10 @@
  *
  * The task prompt's first line carries the `task` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
- * its drift guard reads that prefix from.
+ * its drift guard reads that prefix from. Its last lines, ahead of the
+ * plan stamp, are the `known-missing:` lines the run's preflight answered
+ * and the sentence saying what such an item is (`start/preflight.ts`),
+ * when there are any.
  */
 import type { ClaudeSettingSource, InjectMode } from '../config.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
@@ -42,6 +45,7 @@ import { runClaudeCaptured } from '../utils/claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 
+import { knownMissingNotice } from './preflight.js';
 import { withStamp } from './stamp.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
@@ -123,6 +127,13 @@ export interface TaskDispatchOptions {
    * (`utils/agent-definition.ts`). Required for the reason `inject` is.
    */
   settingSources: readonly ClaudeSettingSource[];
+  /**
+   * The `known-missing:` lines the run's preflight answered, one per
+   * optional prerequisite that failed (`start/preflight.ts`). The prompt
+   * carries them after the plan text, with the sentence saying what such
+   * an item is. None when left out, which leaves the prompt as it was.
+   */
+  knownMissing?: readonly string[];
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -171,11 +182,18 @@ export interface TaskDispatch {
  * The `Your scoped task is: ` prefix is what `effort/classify.ts`
  * buckets a session log by. It is asserted against this file's source
  * by that module's own drift guard, so it must stay spelled here.
+ *
+ * `knownMissing` is the run's `known-missing:` lines. With any, the
+ * prompt closes with them and the sentence `knownMissingNotice` puts
+ * after them, below the plan text and so above the stamp `withStamp`
+ * appends to the whole (`start/preflight.ts`). With none, the default,
+ * the prompt is the one built before the preflight existed.
  */
 export function buildTaskPrompt(
   taskText: string,
   promptContent: string,
   planText: string,
+  knownMissing: readonly string[] = [],
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
@@ -183,6 +201,7 @@ export function buildTaskPrompt(
     '',
     promptContent,
     planText,
+    ...knownMissingNotice(knownMissing),
   ].join('\n');
 }
 
@@ -283,6 +302,7 @@ export async function dispatchTask(
     taskText,
     options.promptContent,
     injection.text,
+    options.knownMissing,
   ));
 
   const sessionId = (options.newSessionId ?? randomUUID)();

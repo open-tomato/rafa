@@ -59,6 +59,8 @@ A new table moves every full table-list expectation with it: two in
 per check keyed by `(run_id, position)`, since a run can check one item
 twice. No column says the run halted: a run halted when a required check
 did not pass, and `readPreflightHalts` reads that off the rows.
+`loop start` writes it through `start/preflight.ts` before any session,
+and writes nothing for a run with no item to check.
 
 ### Attribution
 

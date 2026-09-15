@@ -22,8 +22,10 @@ export default wrapPhaseZeroCommand({
     + ' session promotes findings, syncs with main, pushes and opens or updates the PR, and the loop'
     + ' then waits on its checks, spending repair sessions on a red or conflicting PR. With no'
     + ' `--plan` it runs `PLAN.md` in `plan.dir`, `.rafa/plans` unless the config names another, or'
-    + ' `PLAN.md` at the project root when that one does not exist. It refuses to run on `main` or'
-    + ' `master`.',
+    + ' `PLAN.md` at the project root when that one does not exist. Before any session it checks the'
+    + ' prerequisites the config and the plan\'s `PREREQUISITES-<stub>.md` name, halting when a required'
+    + ' one fails and naming each failed optional one known-missing in every task prompt. It refuses to'
+    + ' run on `main` or `master`.',
   args: [],
   flags: [
     {

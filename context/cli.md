@@ -52,9 +52,10 @@ module's note is the long form.
   `init` and each plan reader their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
-  `start/run-config.ts`, `start/commit.ts`, `start/wrap-up.ts`,
-  `start/dispatch.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts` and
-  `utils/schedule.ts`. For the others they are `src/plan.ts`,
+  `start/run-config.ts`, `start/preflight.ts`, `preflight/run.ts`,
+  `start/commit.ts`, `start/wrap-up.ts`, `start/dispatch.ts`,
+  `start/pr-lifecycle.ts`, `utils/claude.ts` and `utils/schedule.ts`.
+  For the others they are `src/plan.ts`,
   `src/usage.ts`, `effort/collect.ts` and `effort/report.ts`, and for
   every command `loadConfig`'s default warning sink in
   `src/config-load.ts`. `console.log`'s and `console.info`'s lines go at
@@ -134,7 +135,10 @@ module's note is the long form.
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
   result. `loop start` throws exit code 1 for an unusable config, a plan
-  file that does not exist and a default branch. `plan create` throws 1
+  file that does not exist, a default branch, and a preflight that halts
+  before any session: a failed required prerequisite, a PREREQUISITES
+  file that cannot be read, or checks the store refused
+  (`start/preflight.ts`). `plan create` throws 1
   for an unusable config, a missing `--spec`, a spec found neither against
   the project root nor under `specs.dir`, and a plan already there, and
   for a planner's rejection the exit code a `claude` planner's rejection

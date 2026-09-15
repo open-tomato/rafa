@@ -30,6 +30,15 @@
  * run spawns loads, task, wrap-up and CI repair alike: `loop.settingSources`,
  * `project,local` unless a config names others (`utils/claude.ts`).
  *
+ * Before the tracker is created and before any session is spawned, the
+ * wrap-up's included, the run's preflight checks the configured
+ * prerequisites and those of the plan's `PREREQUISITES-<stub>.md`, and
+ * stores a row per check under a run id generated first
+ * (`start/preflight.ts`). A failed required item refuses the run. Each
+ * failed optional one becomes a `known-missing:` line that every task
+ * prompt carries after its plan text, with one sentence saying such an
+ * item is neither a bug to fix nor a credential to patch around.
+ *
  * Each task session is spawned under an id the loop picks, with its stdout
  * captured (`start/dispatch.ts`). The exit code alone decides `failed`; a
  * clean exit is `blocked` when git refuses its commit or the `rafa:report`
@@ -65,8 +74,9 @@
  * conflicting PR gets no CI run at all, so without this last stage the
  * loop can report a finished plan whose code was never checked once.
  *
- * Every line this module, `start/run-config.ts`, `start/commit.ts` and
- * `start/wrap-up.ts` write goes through the active output
+ * Every line this module, `start/run-config.ts`, `start/preflight.ts`,
+ * `start/commit.ts` and `start/wrap-up.ts` write goes through the active
+ * output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
  * `error`, each message as it was. Under the dispatcher that is the
@@ -74,8 +84,10 @@
  *
  * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
  * never by `process.exit`, so the dispatcher writes the terminal event.
- * An unusable config, a plan file that does not exist and a default
- * branch each throw exit code 1 with the whole refusal as the message,
+ * An unusable config, a plan file that does not exist, a default branch
+ * and a preflight that halts (a failed required prerequisite, a
+ * PREREQUISITES file that cannot be read, or checks the store refused)
+ * each throw exit code 1 with the whole refusal as the message,
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored. A failed
@@ -105,6 +117,7 @@ import {
   DEFAULT_CI_TIMEOUT_MIN,
   verifyPullRequest,
 } from './start/pr-lifecycle.js';
+import { runStartPreflight } from './start/preflight.js';
 import {
   announcePlanIssues,
   argValue,
@@ -234,6 +247,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
   announcePlanIssues(planContent);
 
+  // Throws on a halt, before the tracker and before any session.
+  const { knownMissing } = await runStartPreflight({
+    repoRoot,
+    planPath,
+    settings: runConfig.config,
+  });
+
   // Initialize tracker only if it doesn't exist
   if (!fs.existsSync(trackerPath)) {
     activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -279,6 +299,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       repoRoot,
       home: homedir(),
       settingSources,
+      knownMissing,
     });
     const { exitCode } = dispatch;
 

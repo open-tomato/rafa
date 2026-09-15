@@ -4,7 +4,8 @@
  *
  * ## The source cases
  *
- * `src/start.ts`, `src/start/run-config.ts`, `src/start/commit.ts`,
+ * `src/start.ts`, `src/start/run-config.ts`, `src/start/preflight.ts`,
+ * `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
@@ -131,6 +132,8 @@ const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
 const ROUTED_MODULES: string[] = [
   'start.ts',
   'start/run-config.ts',
+  'start/preflight.ts',
+  'preflight/run.ts',
   'start/commit.ts',
   'start/wrap-up.ts',
   'start/dispatch.ts',
