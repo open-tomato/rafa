@@ -288,7 +288,7 @@ function secondsOf(timeoutMs: number): string {
 }
 
 /** The first line of `stderr` that is not blank, trimmed; or null. */
-function firstLineOf(stderr: string): string | null {
+export function firstLineOf(stderr: string): string | null {
   const line = stderr
     .split('\n')
     .map((part) => part.trim())
