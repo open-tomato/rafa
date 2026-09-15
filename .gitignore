@@ -49,3 +49,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # derived progress notes
 progress.txt
+
+# >>> rafa tracking: rafa rewrites the lines up to the end marker
+.rafa/
+# <<< rafa tracking
