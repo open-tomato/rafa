@@ -33,7 +33,8 @@
  *   - `plan list`, `plan show <stub> [--tracker]` and
  *     `plan validate <file>`, which start no session.
  *   - `loop start`, aliased `start`, declaring `-d|--detached` and
- *     refusing it until phase 6.
+ *     refusing it until phase 6, and `--runtime=<path|version>`, which
+ *     runs the loop from that installed rafa.
  *   - `loop stop`, `loop pause`, `loop resume` and `loop status`, each
  *     `[-s|--session-id=<id>]`, and `loop list`, over the session records
  *     under `.rafa/runs/`.

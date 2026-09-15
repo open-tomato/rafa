@@ -42,6 +42,19 @@ module's note is the long form.
   `effort collect`, `effort report`, `init`, `doctor`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue` and `effort`: a
   subject is declared with its first action, never ahead of it.
+- **`loop start --runtime=<path|version>` runs the loop from an installed
+  rafa** (`start/runtime.ts`): a version names
+  `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
+  directory, a `cli.js` or the directory holding it. When that file, links
+  resolved, is not `Bun.main`, the run bun runs it in the working directory
+  as `start` and the run's words without `--runtime`, with `RAFA_OUTPUT` set
+  to the invocation's mode, and waits, ignoring SIGINT meanwhile. `start`
+  because the `0.1.0` runtime routes that word alone. In text mode the child
+  writes to the same streams and a nonzero exit code is thrown with no
+  message; in json mode its `step` and `log` events are emitted as they come,
+  its `start` dropped and its failed `result` thrown with its code and
+  message. The child writes its own session record, so `loop stop` signals
+  the child.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
@@ -59,7 +72,7 @@ module's note is the long form.
   `loop` session action and each `issue` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
-  `start/run-config.ts`, `start/session.ts`, `start/pause.ts`,
+  `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
   `start/wrap-up.ts`,
   `start/dispatch.ts`, `start/triage.ts`, `adapters/tracker/resolve.ts`,
@@ -210,8 +223,13 @@ module's note is the long form.
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
   result. `loop start` throws exit code 1 for a line asking for
-  `-d|--detached`, before anything else is read (`start/run-config.ts`),
-  an unusable config, a plan
+  `-d|--detached`, before anything else is read (`start/run-config.ts`);
+  then, before anything else is read, for a `--runtime` with no value, a
+  version with no `cli.js` under `~/.rafa/runtime/`, a path that is neither
+  a file nor a directory holding `cli.js`, a runtime inside the `src/` of
+  the working directory or of the project root, as typed or with its links
+  resolved (`start/runtime.ts`), and, in the command before `start` runs, a
+  `--runtime` typed ahead of the subject; then for an unusable config, a plan
   file that does not exist, a default branch, a session record refusing
   the run, session records that cannot be read or written, and a
   preflight that halts before any session: a failed required
@@ -407,8 +425,10 @@ home are options.
   examples are taken
   across its actions, the first of each before the second of any. The
   global flags are `--output=json` and `-v, --verbose`, the two
-  `assembleContext` reads; the spec's `--runtime=<v>` joins when a command
-  reads it.
+  `assembleContext` reads. The spec's `--runtime=<v>` is no global flag:
+  `loop start` alone reads it and declares it, since a flag typed ahead of
+  the subject reaches the context's `flags` and never the `argv` a wrapped
+  command is handed.
 - **A hidden action** is in no roster, quick start, example list or
   `See also`, and its own help still renders.
 - **Prose wraps at 80 columns.** An example's command is never wrapped.

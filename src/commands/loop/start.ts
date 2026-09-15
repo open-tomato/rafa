@@ -11,12 +11,21 @@
  * `-d|--detached` is declared so the help does not change when detached
  * runs arrive in phase 6, and `start/run-config.ts` refuses it until
  * then, before anything else is read.
+ *
+ * `--runtime=<path|version>` is read by `start/runtime.ts`, right after
+ * that refusal. A `--runtime` typed ahead of the subject is read by the
+ * dispatcher into the context's `flags` and left out of its `argv`, the
+ * words `start` is handed, so the command refuses it before it runs
+ * `start` rather than let the run go on in this runtime.
  */
+import type { RafaCommand, RafaContext } from '../../cli/command.js';
+
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
+import { refuseMisplacedRuntime } from '../../start/runtime.js';
 import start from '../../start.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-export default wrapPhaseZeroCommand({
+const wrapped = wrapPhaseZeroCommand({
   name: 'loop start',
   subject: 'loop',
   action: 'start',
@@ -33,7 +42,8 @@ export default wrapPhaseZeroCommand({
     + ' the plan, the branch, the pid, the start, the state and the running task. It refuses a plan whose'
     + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
     + ' `resume`, `status` and `list` reach the run through that record. A run holds its terminal: until'
-    + ' phase 6 it refuses `--detached`.',
+    + ' phase 6 it refuses `--detached`. With `--runtime` the whole run goes on in that installed rafa,'
+    + ' never in a `src/` directory.',
   args: [],
   flags: [
     {
@@ -51,6 +61,13 @@ export default wrapPhaseZeroCommand({
       name: 'inject',
       description: 'How much of the plan each task session is handed: `full`, `stage` or `task`.'
         + ' Outranks `plan.inject` in `.rafa/config.yaml`. The wrap-up is handed the whole plan.',
+      type: 'string',
+    },
+    {
+      name: 'runtime',
+      description: 'The installed rafa the run goes on in: a version under `~/.rafa/runtime/`, or a path'
+        + ' against the working directory to a `cli.js` or the directory holding it. Refused inside the'
+        + ' `src/` of the working directory or the project root. Typed after `loop start`.',
       type: 'string',
     },
     {
@@ -99,3 +116,14 @@ export default wrapPhaseZeroCommand({
   aliases: ['start'],
   outputs: ['text', 'json'],
 }, start);
+
+/** The wrapped command, refusing a `--runtime` its words do not carry before `start` runs; see the module note. */
+const loopStart: RafaCommand = Object.freeze({
+  ...wrapped,
+  run: async (context: RafaContext) => {
+    refuseMisplacedRuntime(context.flags, context.argv);
+    return wrapped.run(context);
+  },
+});
+
+export default loopStart;

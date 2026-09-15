@@ -3,8 +3,8 @@ rafa loop start — run a plan task by task, then wrap up, open the PR and wait
 
 Usage:
   rafa loop start [--plan=<string>] [--start-at=<string>] [--inject=<string>]
-    [--no-ci-wait] [--ci-timeout=<number>] [--ci-attempts=<number>]
-    [--any-branch] [-d|--detached]
+    [--runtime=<string>] [--no-ci-wait] [--ci-timeout=<number>]
+    [--ci-attempts=<number>] [--any-branch] [-d|--detached]
 
 Description:
   Walks the tracker of a plan one task at a time, each in a Claude Code session
@@ -22,7 +22,8 @@ Description:
   refuses a plan whose record names another branch, and a plan a session is
   still running. `rafa loop stop`, `pause`, `resume`, `status` and `list` reach
   the run through that record. A run holds its terminal: until phase 6 it
-  refuses `--detached`.
+  refuses `--detached`. With `--runtime` the whole run goes on in that installed
+  rafa, never in a `src/` directory.
 
 Flags:
   --plan           string
@@ -34,6 +35,11 @@ Flags:
       How much of the plan each task session is handed: `full`, `stage` or
       `task`. Outranks `plan.inject` in `.rafa/config.yaml`. The wrap-up is
       handed the whole plan.
+  --runtime        string
+      The installed rafa the run goes on in: a version under `~/.rafa/runtime/`,
+      or a path against the working directory to a `cli.js` or the directory
+      holding it. Refused inside the `src/` of the working directory or the
+      project root. Typed after `loop start`.
   --ci-wait        boolean, default true
       Waits on the checks of the PR once it is pushed; `--no-ci-wait` finishes
       at the push.

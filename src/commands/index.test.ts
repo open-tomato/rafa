@@ -71,7 +71,7 @@ const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 /** The modules reading each command line, from `src/`. */
 const READERS: Readonly<Record<string, readonly string[]>> = {
   'plan create': ['plan.ts'],
-  'loop start': ['start.ts', 'start/run-config.ts'],
+  'loop start': ['start.ts', 'start/run-config.ts', 'start/runtime.ts'],
   'effort collect': ['effort/collect.ts'],
   'effort report': ['effort/report.ts'],
   'usage': ['usage.ts'],

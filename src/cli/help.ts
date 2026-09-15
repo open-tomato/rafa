@@ -38,8 +38,9 @@
  * taken.
  *
  * The global flags are {@link GLOBAL_FLAGS}: the two `assembleContext`
- * reads for every command. The spec's `--runtime=<v>` is left out until a
- * command reads it.
+ * reads for every command. The spec's `--runtime=<v>` is left out: `loop
+ * start` alone reads it, and declares it, since a flag typed ahead of the
+ * subject never reaches the words a wrapped command is handed.
  *
  * A hidden action is in no roster. It is left out of its subject's
  * actions and examples, the quick start, the top-level commands and every

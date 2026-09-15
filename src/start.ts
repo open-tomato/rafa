@@ -32,6 +32,14 @@
  * run spawns loads, task, wrap-up and CI repair alike: `loop.settingSources`,
  * `project,local` unless a config names others (`utils/claude.ts`).
  *
+ * A `--runtime=<path|version>` naming an installed rafa other than the one
+ * running sends the whole run there, before anything else is read
+ * (`start/runtime.ts`): a version under `~/.rafa/runtime/`, or a path to a
+ * `cli.js` or the directory holding it, refused inside the `src/` of the
+ * working directory or of the project root. That runtime is run as
+ * `start` with the run's other words and waited for, and its exit code is
+ * this run's.
+ *
  * Once the branch guard lets the run through, and before anything else is
  * printed or checked, the run opens its session (`start/session.ts`): it
  * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
@@ -93,6 +101,9 @@
  * --inject      how much of the plan each task session is handed: full, stage
  *               or task. Outranks `plan.inject` in `.rafa/config.yaml`. The
  *               wrap-up session is handed the whole plan whatever it says.
+ * --runtime     the installed rafa the run goes on in: a version under
+ *               `~/.rafa/runtime/`, or a path to a `cli.js` or its directory
+ *               (`start/runtime.ts`).
  * --no-ci-wait  finish at the push instead of waiting for CI.
  * --ci-timeout  minutes to wait for checks to settle (default 20).
  * --ci-attempts repair sessions to spend on a red or conflicting PR
@@ -105,7 +116,7 @@
  * conflicting PR gets no CI run at all, so without this last stage the
  * loop can report a finished plan whose code was never checked once.
  *
- * Every line this module, `start/run-config.ts`, `start/session.ts`,
+ * Every line this module, `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts` and `start/wrap-up.ts` write goes
  * through the active output
@@ -117,8 +128,8 @@
  * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
  * never by `process.exit`, so the dispatcher writes the terminal event.
  * A line asking for `-d|--detached`, refused before anything else is
- * read (`start/run-config.ts`), an unusable config, a plan file that does
- * not exist, a default branch,
+ * read (`start/run-config.ts`), a `--runtime` refused (`start/runtime.ts`),
+ * an unusable config, a plan file that does not exist, a default branch,
  * a session record refusing the run or session records that cannot be
  * read or written, and a preflight that halts (a failed required
  * prerequisite, a PREREQUISITES file that cannot be read, or checks the
@@ -169,6 +180,7 @@ import {
   loadRunConfig,
   refuseDetachedRun,
 } from './start/run-config.js';
+import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createStartTriage } from './start/triage.js';
@@ -251,6 +263,8 @@ export function guardRunBranch(
 export default async function start(args: string[], repoRoot: string): Promise<void> {
   // Before anything is read: `-d|--detached` is declared, and refused until phase 6.
   refuseDetachedRun(args);
+  // Then `--runtime`: an installed rafa other than this one runs the whole run instead.
+  if (await runFromSelectedRuntime({ args, root: repoRoot })) return;
 
   // Before the deferral: a run queued for 23:00 that only meets a refused
   // config then has lost the night, where refusing now costs one command.

@@ -264,6 +264,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/loop/start.js', [
     ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS', 'DEFAULT_CI_TIMEOUT_MIN']],
+    ['../../start/runtime.js', ['refuseMisplacedRuntime']],
     ['../../start.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
