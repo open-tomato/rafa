@@ -21,9 +21,9 @@
  * dispatcher resolves and spawns `claude` off PATH. So it is run as a
  * command, `bun src/rafa.ts start`, in a scratch repository holding
  * `.rafa/config.yaml`, with a HOME of its own, under a PATH holding a
- * stand-in `claude` and git's own directory. Each run first asserts that
- * `claude` resolves to the stand-in on that PATH, so no case can reach a
- * real session. The stand-in keeps each call's arguments, prompt and the
+ * stand-in `claude`, a stand-in `gh` and git's own directory. Each run
+ * first asserts that `claude` and `gh` resolve to the stand-ins on that
+ * PATH, so no case can reach a real session or a real `gh`. The stand-in keeps each call's arguments, prompt and the
  * `progress.txt` it found, outside the repository, and answers by the
  * marker in the task sentence. A reporting call's finding names the call,
  * so one render can be told from the render before it.
@@ -83,8 +83,9 @@
  * The blocker case came after both. The stand-in's `MARK-REPORT` report
  * lists `blockers: []`, so its task ticks, and the `MARK-BLOCKER` call
  * answers that same report with one blocker added: its task has to be
- * committed, marked `[BLOCKED]` and stored as `blocked`, and the run has to
- * stop. Its control is the first case, whose reports differ only in listing
+ * committed, marked `[BLOCKED]` with that blocker's text trailing its line
+ * (`start/triage.ts`) and stored as `blocked`, and the run has to stop. Its
+ * control is the first case, whose reports differ only in listing
  * none and whose run goes on through three tasks and the wrap-up. It is the
  * only reading of `start.ts` handing the session's output to
  * `finishCleanExit` and stopping on the outcome that answers. Three legs of
@@ -97,6 +98,13 @@
  * its run was killed by hand, which is why {@link runStart} kills a run
  * past {@link START_KILL_AFTER_MS}; since then both legs fail the blocker
  * case on their own, 52s into the file.
+ *
+ * Each stand-in report lists a public out-of-scope bug, so each run's
+ * triage resolves the tracker chain (`start/triage.ts`), `github` first
+ * under the config `rafa init` writes, whose preflight spawns `gh`. A
+ * stand-in `gh` refuses it, so the chain falls back to `local` on any
+ * machine, never reaching a real `gh` in git's directory. The blocker case
+ * reads its one `gh auth status` call.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -305,10 +313,12 @@ interface Scratch {
   readonly calls: string;
   /** The HOME the command runs under. */
   readonly home: string;
-  /** The PATH the command runs under: the stand-in, then git. */
+  /** The PATH the command runs under: the stand-ins, then git. */
   readonly path: string;
   /** The stand-in itself. */
   readonly claude: string;
+  /** The stand-in `gh` the tracker chain's `github` preflight meets. */
+  readonly gh: string;
 }
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-task-report-'));
@@ -355,6 +365,11 @@ function standInScript(calls: string, reportPath: string, blockerReportPath: str
   ].join('\n');
 }
 
+/** The stand-in `gh`: one line of arguments per call in `gh.calls`, then a refusal. */
+function ghStandInScript(calls: string): string {
+  return `#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}/gh.calls'\necho "gh stand-in: not logged in" >&2\nexit 1\n`;
+}
+
 /** Runs git in a scratch repository, its output kept off the test's. */
 function git(dir: string, ...args: string[]): void {
   execFileSync('git', args, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -393,6 +408,8 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
   writeFileSync(blockerReportPath, BLOCKER_REPORT, 'utf8');
   const claude = join(bin, 'claude');
   writeScript(claude, standInScript(calls, reportPath, blockerReportPath));
+  const gh = join(bin, 'gh');
+  writeScript(gh, ghStandInScript(calls));
   if (refuseCommits) writeScript(join(hooks, 'pre-commit'), '#!/bin/sh\nexit 1\n');
 
   git(repo, 'init', '-q', '.');
@@ -412,7 +429,7 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, calls, home, claude, path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, calls, home, claude, gh, path: [bin, dirname(gitBinary)].join(delimiter) };
 }
 
 /** The command line of every run: the scratch plan, never waiting on CI. */
@@ -425,11 +442,14 @@ function startEnv(scratch: Scratch): Record<string, string> {
   return { PATH: scratch.path, HOME: scratch.home };
 }
 
-/** Throws unless `claude` resolves to the stand-in on the scratch PATH. */
+/** Throws unless `claude` and `gh` resolve to their stand-ins on the scratch PATH. */
 function assertStandIn(scratch: Scratch): void {
-  const resolved = Bun.which('claude', { PATH: scratch.path });
-  if (resolved !== scratch.claude) {
-    throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
+  const standIns: readonly (readonly [name: string, path: string])[] = [['claude', scratch.claude], ['gh', scratch.gh]];
+  for (const [name, standIn] of standIns) {
+    const resolved = Bun.which(name, { PATH: scratch.path });
+    if (resolved !== standIn) {
+      throw new Error(`${name} resolves to ${String(resolved)}, not the stand-in`);
+    }
   }
 }
 
@@ -681,9 +701,17 @@ describe('rafa start, over a stand-in claude', () => {
 
     // Stopped as a failed session stops it: no second task, no wrap-up.
     expect(callCount(scratch)).toBe(1);
-    expect(trackerTasks(scratch)).toEqual([`- [BLOCKED] ${BLOCKER_TASK}`, `- [ ] ${REPORTING_TASK}`]);
+    expect(trackerTasks(scratch)).toEqual([
+      `- [BLOCKED] ${BLOCKER_TASK}  <!-- blocked: a stand-in blocker of call 1 -->`,
+      `- [ ] ${REPORTING_TASK}`,
+    ]);
     expect(run.output).toContain(`Task blocked by its own report: ${BLOCKER_TASK}`);
     expect(run.output).toContain('blocker: a stand-in blocker of call 1');
+
+    // Its triage tried `github` first, met the stand-in `gh` once, and fell back.
+    expect(readFileSync(join(scratch.calls, 'gh.calls'), 'utf8')).toBe('auth status\n');
+    expect(run.output).toContain('tracker chain: github unavailable: gh auth status: ');
+    expect(run.output).toContain('gh stand-in: not logged in');
 
     // Its partial work was committed, and nothing else.
     expect(gitOutput(scratch.repo, 'rev-list', '--count', 'HEAD')).toBe('2');

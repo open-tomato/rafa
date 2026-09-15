@@ -55,7 +55,9 @@ module's note is the long form.
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/preflight.ts`, `preflight/run.ts`,
   `start/commit.ts`, `start/wrap-up.ts`, `start/dispatch.ts`,
-  `start/pr-lifecycle.ts`, `utils/claude.ts` and `utils/schedule.ts`.
+  `start/triage.ts`, `adapters/tracker/resolve.ts`,
+  `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
+  and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
   `src/usage.ts`, `effort/collect.ts` and `effort/report.ts`, and for
   every command `loadConfig`'s default warning sink in

@@ -51,6 +51,16 @@
  * A store the loop cannot read or write stops the run: before a dispatch,
  * nothing is dispatched; after a task, its commit and its mark stand.
  *
+ * After each task's report is stored, and so after its commit and its
+ * mark, the run's triage acts on it (`start/triage.ts`): the report's
+ * blocker text goes onto the task's tracker line, for that task's next
+ * dispatch to read, and each out-of-scope bug is filed, or commented on
+ * where its artifact already has an issue. A security bug, or one with no
+ * flag, goes only to the private tracker under `.rafa/triage/private/`;
+ * every other bug goes through the tracker chain, resolved at most once
+ * per run, when a report first lists such a bug. A triage failure is a
+ * warning and stops nothing, and no bug is ever dispatched as a task.
+ *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
  * --plan        plan file to execute (default: PLAN.md in plan.dir, else at the
@@ -75,8 +85,8 @@
  * loop can report a finished plan whose code was never checked once.
  *
  * Every line this module, `start/run-config.ts`, `start/preflight.ts`,
- * `start/commit.ts` and `start/wrap-up.ts` write goes through the active
- * output
+ * `start/commit.ts`, `start/triage.ts` and `start/wrap-up.ts` write goes
+ * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
  * `error`, each message as it was. Under the dispatcher that is the
@@ -90,9 +100,10 @@
  * each throw exit code 1 with the whole refusal as the message,
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
- * throws exit code 0 once it is marked and its report stored. A failed
- * task, a blocked one and a report left unstored still stop the run by
- * returning, which the dispatcher ends as a success, with exit code 0.
+ * throws exit code 0 once it is marked and its report stored and triaged.
+ * A failed task, a blocked one and a report left unstored still stop the
+ * run by returning, which the dispatcher ends as a success, with exit
+ * code 0. A triage failure stops nothing.
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -125,6 +136,7 @@ import {
   loadRunConfig,
 } from './start/run-config.js';
 import { setActivePlanStub } from './start/stamp.js';
+import { createStartTriage } from './start/triage.js';
 import { preserveProgress } from './start/wrap-up.js';
 import { checkUsage } from './utils/claude.js';
 import { getCurrentBranch } from './utils/git.js';
@@ -254,6 +266,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     settings: runConfig.config,
   });
 
+  // Resolves no tracker here: the chain waits for the first public bug.
+  const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
+
   // Initialize tracker only if it doesn't exist
   if (!fs.existsSync(trackerPath)) {
     activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -304,25 +319,25 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     const { exitCode } = dispatch;
 
     // Stored once the task's fate is known, and never before: the
-    // outcome goes on every row the report is stored as.
-    const storeReport = (outcome: FindingOutcome): boolean => storeTaskReport({
-      repoRoot,
-      planStub,
-      dispatch,
-      outcome,
-    });
+    // outcome goes on every row the report is stored as. Triage follows
+    // the store and the mark, and stops nothing (`start/triage.ts`).
+    const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
+      const stored = storeTaskReport({ repoRoot, planStub, dispatch, outcome });
+      await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
+      return stored;
+    };
 
     if (interrupted) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
       activeOutput().info('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
-      storeReport('blocked');
+      await storeReport('blocked');
       throw new CommandExit(0);
     }
 
     if (exitCode !== 0) {
       updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
       activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
-      storeReport('failed');
+      await storeReport('failed');
       return;
     }
 
@@ -332,7 +347,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       repoRoot,
       output: dispatch.output,
     });
-    const stored = storeReport(finished.outcome);
+    const stored = await storeReport(finished.outcome);
     if (finished.outcome !== 'done') return;
     if (!stored) {
       activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');

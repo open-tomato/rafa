@@ -7,6 +7,8 @@
  * `src/start.ts`, `src/start/run-config.ts`, `src/start/preflight.ts`,
  * `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
+ * `src/start/triage.ts`, `src/adapters/tracker/resolve.ts`,
+ * `src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`. Each is parsed with
@@ -137,6 +139,9 @@ const ROUTED_MODULES: string[] = [
   'start/commit.ts',
   'start/wrap-up.ts',
   'start/dispatch.ts',
+  'start/triage.ts',
+  'adapters/tracker/resolve.ts',
+  'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
   'utils/claude.ts',
   'utils/schedule.ts',

@@ -270,10 +270,10 @@ export interface TransitionResult {
 }
 
 /**
- * An issue tracker: where the loop files what a task report's
- * out-of-scope bugs name, once phase 1 wires triage (`triage/triage.ts`)
- * through it. A report's blockers are written onto its task's tracker
- * line instead.
+ * An issue tracker: where `loop start` files what a task report's
+ * out-of-scope bugs name, through its triage (`start/triage.ts`, over
+ * `triage/triage.ts`). A report's blockers are written onto its task's
+ * tracker line instead.
  */
 export interface Tracker {
   readonly kind: TrackerKind;
