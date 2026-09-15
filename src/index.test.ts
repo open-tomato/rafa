@@ -267,6 +267,17 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/init.js', [
+    ['../cli/command.js', ['CommandExit']],
+    ['../config-load.js', ['loadConfig']],
+    ['../config-sections.js', ['messageOf']],
+    ['../config.js', ['ConfigError', 'configFilePath']],
+    ['../project/bin-path.js', ['readBinPath']],
+    ['../project/gitignore.js', ['applyTracking', 'GITIGNORE_FILE', 'GitignoreError', 'TRACKING_DIGEST_FILE', 'withTrackingBlock']],
+    ['../project/root-choice.js', ['candidateLines', 'createLinePrompter', 'firstCandidate', 'namedRoot', 'promptForRoot']],
+    ['../project/roots.js', ['DISK_ROOTS_FILE_SYSTEM', 'gitToplevel', 'rootCandidates']],
+    ['../project/scaffold.js', ['scaffoldConflicts', 'writeProjectScope', 'writeUserScope']],
+  ]],
   ['./commands/usage.js', [['../usage.js', ['default']], ['./wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
 ];
@@ -427,6 +438,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/plan/list.js',
       './commands/plan/show.js',
       './commands/plan/validate.js',
+      './commands/init.js',
       './commands/describe.js',
     ]);
     expect(defaultImports).toEqual(wrapping.map(() => 1));

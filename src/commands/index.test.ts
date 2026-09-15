@@ -1,10 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the nine commands it registers: what the registry
+ * declarations of the ten commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `plan list`, `plan show` and `plan validate` wrap none,
+ * `describe`, `init`, `plan list`, `plan show` and `plan validate` wrap none,
  * and each is held to the arguments and flags spelled for it here. Every
  * command is held to exactly one of the two lists.
  *
@@ -80,6 +80,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'loop start': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
+  'init': ['text', 'json'],
   'usage': ['text', 'json'],
   'describe': ['text', 'json'],
 };
@@ -89,6 +90,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'plan list': [[], []],
   'plan show': [['stub'], ['tracker']],
   'plan validate': [['file'], []],
+  'init': [[], ['root', 'yes']],
   'describe': [[], []],
 };
 
@@ -111,6 +113,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
+  ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['describe', 'describe', [], ''],
 ];
 
@@ -179,7 +182,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, the four other phase 0 commands, then describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, the phase 0 loop and effort commands, init, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -188,6 +191,7 @@ describe('the core roster', () => {
       'loop start',
       'effort collect',
       'effort report',
+      'init',
       'usage',
       'describe',
     ]);
