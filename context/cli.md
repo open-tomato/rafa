@@ -84,7 +84,8 @@ module's note is the long form.
   modes.
 - **What json mode gives for the others**: `effort report` gives the
   report as the terminal result's `data`, the document phase 0's `--json`
-  printed with the task report tallies and the preflight halts added, and
+  printed with the task report tallies, the preflight halts and the
+  budgeted sessions added, and
   writes no table line. `plan create`, `effort collect` and
   `usage` write each line as a `log` event of its level and give no
   result.

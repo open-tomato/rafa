@@ -1,9 +1,10 @@
 /**
  * Renders a rolled-up effort report as the lines `rafa effort report`
  * prints in table mode: the per-plan session table, then, when any task
- * report is stored, the reports tallied by plan, status and outcome, and
- * then, when any run's preflight halted, the required checks that halted
- * it.
+ * report is stored, the reports tallied by plan, status and outcome, then,
+ * when any run's preflight halted, the required checks that halted it,
+ * and then, when any session was dispatched with a budget, each such
+ * session's budget beside the tokens it used.
  *
  * Pure over an {@link EffortReport}: no store, no config and no clock
  * reach it, so `report.ts` decides every figure and this module decides
@@ -18,6 +19,7 @@
  * rollup already rounded to three, so the table rounds the JSON figure
  * again rather than deriving one of its own.
  */
+import type { BudgetedSession } from './report-budgets.js';
 import type { EffortGroup, EffortReport } from './report.js';
 import type { HaltedCheck, PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
@@ -281,6 +283,83 @@ export function formatPreflightHalts(report: EffortReport): string[] {
   return [...lines, ...alignRows(PREFLIGHT_HALT_COLUMNS, rows, PREFLIGHT_HALT_RIGHT_ALIGNED)];
 }
 
+/** The budget section's columns, in order. */
+const BUDGET_COLUMNS = [
+  'session',
+  'plan',
+  'budget-usd',
+  'turns',
+  'input',
+  'output',
+  'cache-r',
+  'cache-w',
+  'total',
+] as const;
+
+/** The budget columns rendered right-aligned. */
+const BUDGET_RIGHT_ALIGNED: ReadonlySet<string> = new Set(BUDGET_COLUMNS.slice(2));
+
+/** Written in each usage cell of a session no collect has read yet. */
+const NO_USAGE_CELL = '-';
+
+/** A usage count, or a dash for a session with no usage. */
+function usageCell(value: number | undefined): string {
+  return value === undefined
+    ? NO_USAGE_CELL
+    : formatCount(value);
+}
+
+/** One budgeted session as its table cells, in {@link BUDGET_COLUMNS} order. */
+function budgetCells(session: BudgetedSession): string[] {
+  const { usage } = session;
+  return [
+    session.sessionId,
+    session.planStub ?? NO_PLAN_CELL,
+    String(session.budgetUsd),
+    usageCell(usage?.assistantTurns),
+    usageCell(usage?.inputTokens),
+    usageCell(usage?.outputTokens),
+    usageCell(usage?.cacheReadTokens),
+    usageCell(usage?.cacheWriteTokens),
+    usageCell(usage?.totalTokens),
+  ];
+}
+
+/**
+ * The budget section: a blank line, a heading counting the sessions
+ * dispatched with a budget, a note that the usage beside each budget is in
+ * tokens, and one row per session, its budget in dollars as the
+ * declaration wrote it back and its usage counts beside it.
+ *
+ * Nothing at all when no session was dispatched with a budget, so a store
+ * holding none prints what it printed before the section existed. A
+ * session no collect has read yet writes a dash in every usage cell, and a
+ * note under the heading says what a dash is. A report narrowed by
+ * `--kind` or `--entrypoint` gets a note too, as the task report section
+ * does, since the budgets are not narrowed.
+ */
+export function formatBudgets(report: EffortReport): string[] {
+  const { budgets } = report;
+  if (budgets.length === 0) return [];
+
+  const noun = budgets.length === 1
+    ? 'session'
+    : 'sessions';
+  const lines = [
+    '',
+    `budgets: ${formatCount(budgets.length)} ${noun} dispatched with a budget, beside the tokens each used`,
+    '  note        usage is in tokens: no dollar cost is stored, and a text-mode session prints none',
+  ];
+  if (budgets.some((session) => session.usage === null)) {
+    lines.push(`  note        ${NO_USAGE_CELL} is a session no collect has read yet`);
+  }
+  if (report.filters.kinds !== null || report.filters.entrypoints !== null) {
+    lines.push('  note        the filters narrow session rows, not budgets');
+  }
+  const rows = budgets.map(budgetCells);
+  return [...lines, ...alignRows(BUDGET_COLUMNS, rows, BUDGET_RIGHT_ALIGNED)];
+}
+
 /** Everything the command prints in table mode. */
 export function formatReport(report: EffortReport): string[] {
   return [
@@ -289,5 +368,6 @@ export function formatReport(report: EffortReport): string[] {
     ...formatReportTable(report),
     ...formatTaskReports(report),
     ...formatPreflightHalts(report),
+    ...formatBudgets(report),
   ];
 }

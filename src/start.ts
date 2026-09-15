@@ -8,7 +8,9 @@
  * session left in the tree (`start/commit.ts`). `[x]` is marked once git has
  * answered; `[BLOCKED]` on a failed or interrupted session, on a commit git
  * refused, and on a task whose own report says `status: blocked` or lists a
- * blocker, its partial work committed first. Each of those stops the run.
+ * blocker, its partial work committed first. A session that ran out of the
+ * budget its task declared is marked `[BLOCKED]` with `budget exceeded` as
+ * its blocker text (`start/budget.ts`). Each of those stops the run.
  * Re-running resumes: blocked tasks are retried first.
  *
  * A task line may carry a trailing routing declaration (`utils/declaration.ts`).
@@ -104,8 +106,8 @@
  * loop can report a finished plan whose code was never checked once.
  *
  * Every line this module, `start/run-config.ts`, `start/session.ts`,
- * `start/preflight.ts`, `start/commit.ts`, `start/triage.ts` and
- * `start/wrap-up.ts` write goes
+ * `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
+ * `start/triage.ts` and `start/wrap-up.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -145,6 +147,7 @@ import { fileURLToPath } from 'url';
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
+import { isBudgetExit, markBudgetExit } from './start/budget.js';
 import { finishCleanExit } from './start/commit.js';
 import {
   dispatchTask,
@@ -380,6 +383,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         activeOutput().info('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
         await storeReport('blocked');
         throw new CommandExit(0);
+      }
+
+      // Ahead of any other failed session: marked with its blocker text.
+      if (isBudgetExit(dispatch)) {
+        markBudgetExit({ trackerPath, taskInfo, dispatch });
+        await storeReport('blocked');
+        return;
       }
 
       if (exitCode !== 0) {

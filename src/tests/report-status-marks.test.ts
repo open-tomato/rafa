@@ -211,6 +211,8 @@ async function runCase(dir: string, sessionId: string, output: string) {
       sessionId: dispatch.sessionId,
       taskText: dispatch.taskText,
       output: dispatch.output,
+      declaration: dispatch.declaration,
+      flags: dispatch.flags,
     },
     outcome: finished.outcome,
   });

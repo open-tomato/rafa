@@ -341,6 +341,26 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     CHECK ((outcome = 'pass') = (failure IS NULL))
   );
   `,
+  // Version 7: one row per task session the loop dispatched, holding what
+  // its declaration asked for and the flags it was spawned with, outside
+  // the port's row map. `dispatches.ts` writes it and says why the session
+  // id is its key and why no column holds an outcome.
+  `
+  CREATE TABLE dispatches (
+    seq          INTEGER PRIMARY KEY,
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    declaration  TEXT CHECK (declaration <> ''),
+    agent        TEXT CHECK (agent <> ''),
+    model        TEXT CHECK (model <> ''),
+    effort       TEXT CHECK (effort <> ''),
+    budget_usd   REAL CHECK (budget_usd IS NULL OR (typeof(budget_usd) IN ('integer', 'real') AND budget_usd > 0)),
+    tools        TEXT CHECK (tools <> ''),
+    flags        TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
 ];
 
 /**

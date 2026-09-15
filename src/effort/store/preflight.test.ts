@@ -101,6 +101,7 @@ const COLUMNS = [
 const TABLES = [
   'blockers',
   'commits',
+  'dispatches',
   'findings',
   'out_of_scope_bugs',
   'preflight',
@@ -319,7 +320,7 @@ describe('the preflight migration', () => {
     // The control: the first five entries make every earlier table and no
     // preflight table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'preflight'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'preflight' && table !== 'dispatches'));
 
     const result = writePreflightChecks(root, { runId: 'run-v5', checks: [PASS_CHECK] }, CLOCK);
 

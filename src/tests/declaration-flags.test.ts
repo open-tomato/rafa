@@ -34,8 +34,9 @@
  * and none of them can pass against a resolver that has stopped
  * emitting.
  *
- * Flag names are pinned to LITERALS. `--agent`, `--model`, `--effort`
- * and `--tools` are the CLI's spellings and not this module's, so a
+ * Flag names are pinned to LITERALS. `--agent`, `--model`, `--effort`,
+ * `--max-budget-usd` and `--tools` are the CLI's spellings and not this
+ * module's, so a
  * case built from the module's own constants would move with a typo
  * rather than reporting it; the same reason the colocated suite pins
  * the effort levels.
@@ -79,6 +80,16 @@
  * resolving to a flag reddens nothing here, because no fixture here
  * hands the resolver a null. It reddens the colocated suite (1 case)
  * and `tests/declaration-negatives.test.ts` (13).
+ *
+ * ## The budget half
+ *
+ * The three cases under `a budget passes whatever routes the task` came
+ * with the `budget` key, after that grid, so its counts are of the 14
+ * cases before them. Three legs of `utils/declaration.ts` were driven on
+ * 2026-09-15 against this file and the three other declaration suites,
+ * each restored sha256-identical, and each reddened a case here: the
+ * budget dropped beside an agent (1), the budget emitted after the tools
+ * (1), and a zero budget accepted (1 here, 1 in the colocated suite).
  */
 import type {
   AgentEffortLookup,
@@ -409,5 +420,46 @@ describe('an agent absent maps the granular keys onto flags', () => {
       'Read,Write,Edit,Grep,Glob',
     ]);
     expect(resolved.suppressed).toEqual([]);
+  });
+});
+
+describe('a budget passes whatever routes the task', () => {
+  it('passes the budget with no agent, after the effort and ahead of the tools', () => {
+    const resolved = flagsOf(granularLine('tools=Grep budget=0.5 effort=high model=sonnet'), NEVER_ASKED);
+
+    expect(resolved).toEqual({
+      args: ['--model', 'sonnet', '--effort', 'high', '--max-budget-usd', '0.5', '--tools', 'Grep'],
+      suppressed: [],
+    });
+  });
+
+  it('passes the budget beside an agent, whether or not its definition declares an effort', () => {
+    const silent = definitions();
+    const declaring = definitions(AGENT);
+    const line = routedLine('model=haiku effort=low budget=2 tools=Read');
+
+    expect(flagsOf(line, silent.lookup)).toEqual({
+      args: ['--agent', AGENT, '--effort', 'low', '--max-budget-usd', '2'],
+      suppressed: ['model', 'tools'],
+    });
+    expect(flagsOf(line, declaring.lookup)).toEqual({
+      args: ['--agent', AGENT, '--max-budget-usd', '2'],
+      suppressed: ['model', 'effort', 'tools'],
+    });
+    expect(flagsOf(routedLine('budget=0.75'), definitions().lookup)).toEqual({
+      args: ['--agent', AGENT, '--max-budget-usd', '0.75'],
+      suppressed: [],
+    });
+
+    // The control: the same blocks with the budget taken out pass no budget flag.
+    const unbudgeted = routedLine('model=haiku effort=low tools=Read');
+    expect(flagsOf(unbudgeted, silent.lookup).args).toEqual(['--agent', AGENT, '--effort', 'low']);
+    expect(flagsOf(unbudgeted, declaring.lookup).args).toEqual(['--agent', AGENT]);
+  });
+
+  it('passes no budget flag for a budget it could not use, keeping the rest of the block', () => {
+    expect(flagsOf(routedLine('budget=0'), definitions().lookup).args).toEqual(['--agent', AGENT]);
+    expect(flagsOf(granularLine('budget=$1 effort=low'), NEVER_ASKED).args).toEqual(['--effort', 'low']);
+    expect(declarationOf(granularLine('budget=$1 effort=low')).budget).toBeNull();
   });
 });

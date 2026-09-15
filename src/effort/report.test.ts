@@ -136,6 +136,7 @@ import {
   summariseSessions,
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
+import { writeDispatch } from './store/dispatches.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
 import { writePreflightChecks } from './store/preflight.js';
 import { writeTaskReport } from './store/reports.js';
@@ -987,6 +988,58 @@ describe('the preflight halts a report carries', () => {
   });
 });
 
+/**
+ * Records one dispatch under a root, as the loop records one: a task
+ * declaring `budget`, or declaring nothing when it is null.
+ */
+function plantDispatch(root: string, sessionId: string, budget: number | null): void {
+  writeDispatch(root, {
+    sessionId,
+    planStub: 'q19-loop-economics',
+    taskLine: 'A task',
+    declaration: budget === null
+      ? null
+      : { raw: `{budget=${budget}}`, agent: null, model: null, effort: null, budget, tools: null },
+    flags: budget === null
+      ? []
+      : ['--max-budget-usd', String(budget)],
+  });
+}
+
+describe('the budgets a report carries', () => {
+  it('carries each budgeted session under the root beside its row, unfiltered', () => {
+    const root = plantStore(ROWS);
+    plantDispatch(root, 'q19-a', 0.5);
+    plantDispatch(root, 'q19-b', null);
+    plantDispatch(root, 'uncollected', 2);
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    // `q19-a` is a task session the filter leaves out of the table.
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.budgets).toEqual([
+      {
+        sessionId: 'q19-a',
+        planStub: 'q19-loop-economics',
+        taskLine: 'A task',
+        budgetUsd: 0.5,
+        usage: {
+          assistantTurns: 10,
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 5000,
+          cacheWriteTokens: 700,
+          totalTokens: 5820,
+        },
+      },
+      { sessionId: 'uncollected', planStub: 'q19-loop-economics', taskLine: 'A task', budgetUsd: 2, usage: null },
+    ]);
+
+    // The control: the same session rows with no dispatch stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).budgets).toEqual([]);
+  });
+});
+
 /** A config holding a problem in each of two settings, `store` and `plan.inject`. */
 const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
 
@@ -1123,6 +1176,29 @@ describe('the report command', () => {
       'preflight halts: 1 run, by run and failed required item',
       'run         at                        item                outcome  ms  failure',
       'run-halted  2026-09-15T10:00:00.000Z  env "GITHUB_TOKEN"  fail      0  presence check: GITHUB_TOKEN is not set',
+      '',
+    ]);
+  });
+
+  it('prints the budgets when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
+    plantDispatch(root, 'aaaa-1111', 0.5);
+    plantDispatch(root, 'bbbb-2222', null);
+    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'budgets: 1 session dispatched with a budget, beside the tokens each used',
+      '  note        usage is in tokens: no dollar cost is stored, and a text-mode session prints none',
+      '  note        - is a session no collect has read yet',
+      'session    plan                budget-usd  turns  input  output  cache-r  cache-w  total',
+      'aaaa-1111  q19-loop-economics         0.5      -      -       -        -        -      -',
       '',
     ]);
   });

@@ -45,6 +45,7 @@
  * halt case in `report.test.ts` is one of the two for each of the last
  * three.
  */
+import type { BudgetedSession } from './report-budgets.js';
 import type { EffortGroup, EffortReport, GroupKind } from './report.js';
 import type { PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
@@ -52,6 +53,7 @@ import type { TaskReportTally } from './store/reports.js';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  formatBudgets,
   formatCount,
   formatHistogram,
   formatMinutes,
@@ -82,6 +84,7 @@ function plantReport(fields: Partial<EffortReport> = {}): EffortReport {
     filters: { kinds: null, entrypoints: null },
     taskReports: [],
     preflightHalts: [],
+    budgets: [],
     ...fields,
   };
 }
@@ -381,5 +384,91 @@ describe('formatPreflightHalts', () => {
     expect(filtered).toHaveLength(7);
     expect(formatPreflightHalts(plantReport({ preflightHalts: HALTS })).join('\n'))
       .not.toContain('note');
+  });
+});
+
+/**
+ * Two budgeted sessions: one collected, whose plan stub is wider than its
+ * header and whose counts run past a thousand, and one no collect has
+ * read, under no plan, whose usage cells are dashes.
+ */
+const BUDGETS: readonly BudgetedSession[] = [
+  {
+    sessionId: 'aaaa-1111',
+    planStub: 'phase-1-installable',
+    taskLine: 'Add the module',
+    budgetUsd: 0.5,
+    usage: {
+      assistantTurns: 12,
+      inputTokens: 1500,
+      outputTokens: 20,
+      cacheReadTokens: 1234567,
+      cacheWriteTokens: 0,
+      totalTokens: 1236087,
+    },
+  },
+  {
+    sessionId: 'bbbb-2222',
+    planStub: null,
+    taskLine: 'Add another module',
+    budgetUsd: 2,
+    usage: null,
+  },
+];
+
+describe('formatBudgets', () => {
+  it('renders each budget beside its usage, and a dash for a session not read yet', () => {
+    expect(formatBudgets(plantReport({ budgets: BUDGETS }))).toEqual([
+      '',
+      'budgets: 2 sessions dispatched with a budget, beside the tokens each used',
+      '  note        usage is in tokens: no dollar cost is stored, and a text-mode session prints none',
+      '  note        - is a session no collect has read yet',
+      'session    plan                 budget-usd  turns  input  output    cache-r  cache-w      total',
+      'aaaa-1111  phase-1-installable         0.5     12  1,500      20  1,234,567        0  1,236,087',
+      'bbbb-2222  (no plan)                     2      -      -       -          -        -          -',
+    ]);
+  });
+
+  it('counts one session as one, with no dash note when every session was read', () => {
+    const [collected] = BUDGETS;
+    const lines = formatBudgets(plantReport({ budgets: collected === undefined
+      ? []
+      : [collected] }));
+
+    expect(lines[1]).toBe('budgets: 1 session dispatched with a budget, beside the tokens each used');
+    expect(lines).toHaveLength(5);
+    expect(lines.join('\n')).not.toContain('read yet');
+  });
+
+  it('adds nothing to a report with no budgeted session', () => {
+    const withHalts = { ...REPORT, taskReports: TALLIES, preflightHalts: HALTS };
+    const before = formatReport(withHalts);
+
+    expect(formatBudgets(withHalts)).toEqual([]);
+    expect(before).toEqual([
+      ...formatReportHeader(REPORT),
+      '',
+      ...formatReportTable(REPORT),
+      ...formatTaskReports(withHalts),
+      ...formatPreflightHalts(withHalts),
+    ]);
+
+    // The control: the same report holding budgets ends with their
+    // section, after the preflight halts.
+    const withBudgets = { ...withHalts, budgets: BUDGETS };
+    expect(formatReport(withBudgets)).toEqual([...before, ...formatBudgets(withBudgets)]);
+    expect(formatBudgets(withBudgets)).toHaveLength(7);
+  });
+
+  it('notes under a filter that the budgets are not narrowed', () => {
+    const filtered = formatBudgets(plantReport({
+      budgets: BUDGETS,
+      filters: { kinds: ['task'], entrypoints: null },
+    }));
+
+    expect(filtered[4]).toBe('  note        the filters narrow session rows, not budgets');
+    expect(filtered).toHaveLength(8);
+    expect(formatBudgets(plantReport({ budgets: BUDGETS })).join('\n'))
+      .not.toContain('narrow');
   });
 });

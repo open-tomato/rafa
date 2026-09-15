@@ -54,9 +54,14 @@ under the home directory when `loop.settingSources` includes `user`,
 and takes a file only when its frontmatter
 `name` is the name asked for, because the CLI resolves `--agent` by
 that `name` and not by the file name. A name found in neither still
-passes `--effort`, leaving the CLI to refuse the name. All three keys
-stay on the dispatch record whatever reached the CLI, and the
-`Routed as:` line names the ones left to the agent.
+passes `--effort`, leaving the CLI to refuse the name. `budget` is
+outranked by nothing, since a definition supplies no budget:
+`--max-budget-usd` joins whatever the block resolved to, ahead of
+`--tools`, whose variadic value has to end the argument list. Every key
+stays on the dispatch record whatever reached the CLI, and on the
+session's `dispatches` row beside the flags that did
+(`src/effort/store/dispatches.ts`), and the `Routed as:` line names the
+ones left to the agent.
 
 **Routing also changes what a session can be read back from.** The
 prompt is untouched, byte-identical to what was piped in, but record 0

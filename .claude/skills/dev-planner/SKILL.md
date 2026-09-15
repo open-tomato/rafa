@@ -283,22 +283,31 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   tracker line it writes `<!-- blocked: <text> -->` after the block, and
   takes that comment off before the block is read. The plan itself never
   holds one.
-* Its tokens are space-separated `key=value` pairs. Recognised keys are
-  `agent`, `model`, `effort` and `tools`; an unrecognised key is kept for
-  telemetry and maps to no flag. The key `skills` reserves a comma-separated
-  list of skill names for phase 1 resolution and is stored for reporting.
-* `agent=<name>` outranks `model` and `tools` — the loop never passes
-  `--model` or `--tools` beside `--agent`, the agent definition
-  supplying its own model and tool set. `effort` still reaches the
-  session: `--effort` joins `--agent` unless the agent's definition
-  declares an `effort` of its own in its frontmatter. The outranked keys
-  are still recorded, and the loop's routing line names them.
-* `model` takes an alias (`opus`, `sonnet`, `haiku`, `fable`),
-  `effort` one of `low`, `medium`, `high`, `xhigh`, `max`, and `tools` a
-  comma-separated list of tool names with no spaces.
+* Its tokens are space-separated `key=value` pairs, of the recognised keys
+  in the table below; an unrecognised key is kept for telemetry and maps
+  to no flag. The key `skills` reserves a comma-separated list of skill
+  names for phase 1 resolution and is stored for reporting.
+
+| Key | Value | Passed as | Beside `agent=` |
+| --- | --- | --- | --- |
+| `agent` | an agent name, the file stem of a definition under `.claude/agents/` | `--agent` | — |
+| `model` | an alias (`opus`, `sonnet`, `haiku`, `fable`), or a full name such as `claude-opus-5` | `--model` | never passed: the definition names its model |
+| `effort` | `low`, `medium`, `high`, `xhigh` or `max` | `--effort` | passed, unless the definition declares an `effort` of its own in its frontmatter |
+| `budget` | US dollars above zero, as a plain decimal of at most six digits each side of the point, such as `0.50` | `--max-budget-usd` | always passed: a definition supplies no budget |
+| `tools` | tool names, comma-separated with no spaces | `--tools` | never passed: the definition names its tool set |
+
+* `agent=<name>` outranks `model` and `tools`, and `effort` only when its
+  definition declares one, as the last column says. The outranked keys
+  are still recorded, and the loop's routing line names them. Nothing
+  outranks `budget`.
+* A session that ends on its budget marks its task `[BLOCKED]` with
+  `budget exceeded` as the blocker text, and the run stops there, as it
+  does on every blocked task. A budget of `0.01` ended a session before it
+  answered `Say hello` (Claude Code 2.1.268), so size a budget for the
+  whole session.
 * A value the loop cannot use maps to no flag rather than failing the
   task, so a misspelled level costs the routing silently. Spell each one
-  from the lists above.
+  from the table above.
 * The loop strips the block before the task text reaches the agent's
   prompt, the operator log and the commit message: a declaration is a
   planning annotation, never an instruction.
@@ -311,7 +320,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES` and `EFFORT_LEVELS` hold the aliases and levels above; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES` and `EFFORT_LEVELS` hold the aliases and levels in the table and whose `parseBudgetUsd` reads a budget; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 

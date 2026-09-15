@@ -5,7 +5,8 @@
  * `start()` calls {@link renderProgressForDispatch} before every
  * session, the wrap-up's included, hands each task the tracker answers
  * to {@link dispatchTask}, and, once it knows what became of that task,
- * stores what the session reported through {@link storeTaskReport}. A
+ * stores the dispatch and what the session reported through
+ * {@link storeTaskReport}. A
  * dispatch spawns its session through {@link runTaskSession} unless its
  * `run` seam names another runner.
  *
@@ -40,6 +41,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { randomUUID } from 'crypto';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { writeDispatch } from '../effort/store/dispatches.js';
 import { renderInjection } from '../plan/index.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
@@ -397,16 +399,21 @@ export interface TaskReportStoreOptions {
   readonly repoRoot: string;
   /** The plan the run is executing, or null when its file name gives none. */
   readonly planStub: string | null;
-  /** The dispatch whose session wrote the report. */
-  readonly dispatch: Pick<TaskDispatch, 'sessionId' | 'taskText' | 'output'>;
+  /** The dispatch whose session wrote the report, with what it declared and was spawned with. */
+  readonly dispatch: Pick<TaskDispatch, 'sessionId' | 'taskText' | 'output' | 'declaration' | 'flags'>;
   /** What the loop made of the task. */
   readonly outcome: FindingOutcome;
 }
 
 /**
- * Stores what one task session reported under the loop's outcome for its
- * task, tells the operator what was stored, and answers whether the store
- * took it.
+ * Stores the dispatch and what its task session reported under the loop's
+ * outcome for its task, tells the operator what was stored, and answers
+ * whether the store took it.
+ *
+ * The dispatch goes first: one `dispatches` row holding what the task's
+ * declaration asked for, its budget among it, and the flags the session
+ * was spawned with (`effort/store/dispatches.ts`), whatever became of the
+ * task, so every session the loop stores has one. The report follows.
  *
  * Every row carries the sentence the dispatch quoted, declaration off, and
  * the id the session ran under, so it joins that session's log. An output
@@ -415,12 +422,19 @@ export interface TaskReportStoreOptions {
  *
  * A write the store refuses answers false, and the caller stops the run
  * rather than dispatching tasks whose reports would meet the same store.
- * The report is not gone with the row: the session wrote it to the
- * operator's terminal as it ran.
+ * A refused dispatch row stores no report either. The report is not gone
+ * with the row: the session wrote it to the operator's terminal as it ran.
  */
 export function storeTaskReport(options: TaskReportStoreOptions): boolean {
   const { dispatch } = options;
   try {
+    writeDispatch(options.repoRoot, {
+      sessionId: dispatch.sessionId,
+      planStub: options.planStub,
+      taskLine: dispatch.taskText,
+      declaration: dispatch.declaration,
+      flags: dispatch.flags,
+    });
     const record = recordTaskReport(options.repoRoot, {
       dispatch: {
         sessionId: dispatch.sessionId,

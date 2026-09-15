@@ -3,9 +3,9 @@
  *
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
- * reads the config, the store the config selects, and the task reports
- * and preflight checks the loop stored, and nothing else — no log, no
- * clock — so a report is
+ * reads the config, the store the config selects, and the task reports,
+ * preflight checks and dispatches the loop stored, and nothing else — no
+ * log, no clock — so a report is
  * a pure projection of rows already on disk and two runs over an
  * unchanged store produce identical bytes.
  *
@@ -50,6 +50,17 @@
  * the command prints the halts under its no-rows line as it prints the
  * tallies there. The filters do not narrow the halts either, since a
  * preflight row carries no kind and no entrypoint.
+ *
+ * ## Budgets beside them
+ *
+ * {@link EffortReport.budgets} lists each task session the loop
+ * dispatched with a declared budget, read from the `dispatches` table
+ * (`store/dispatches.ts`) under the repo root, as the tallies are,
+ * whichever backend `store` selects, each beside the usage its session
+ * row measured (`report-budgets.ts`). The usage is tokens: a session row
+ * holds no dollar figure, and a text-mode session prints none. The
+ * command prints the budgets under its no-rows line as it prints the
+ * tallies there, and the filters do not narrow them.
  *
  * ## What a group is keyed on
  *
@@ -129,8 +140,10 @@
  */
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
+import type { BudgetedSession } from './report-budgets.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { ConfigRoots } from '../config-load.js';
+import type { SessionBudget } from './store/dispatches.js';
 import type { PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
 import type { EffortStore } from './store/types.js';
@@ -144,7 +157,14 @@ import { ConfigError } from '../config.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
-import { formatPreflightHalts, formatReport, formatTaskReports } from './report-format.js';
+import { budgetedSessions } from './report-budgets.js';
+import {
+  formatBudgets,
+  formatPreflightHalts,
+  formatReport,
+  formatTaskReports,
+} from './report-format.js';
+import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
 import { readPreflightHalts } from './store/preflight.js';
 import { readTaskReportTallies } from './store/reports.js';
@@ -255,6 +275,12 @@ export interface EffortReport {
    * filters do not narrow them; see the module note.
    */
   preflightHalts: readonly PreflightHalt[];
+  /**
+   * The sessions dispatched with a budget, in the order they were stored,
+   * each beside its row's usage. The filters do not narrow them; see the
+   * module note.
+   */
+  budgets: readonly BudgetedSession[];
 }
 
 /** What the parsed argv asked for. */
@@ -508,13 +534,15 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  * Pure over its inputs, which is the seam the whole suite drives: a
  * planted row needs no store, no log and no repository. `taskReports`
  * and `preflightHalts` are carried into the report as they are handed
- * in, never filtered.
+ * in, never filtered, and each of `budgets` is joined against every row
+ * handed in, filtered out or not (`report-budgets.ts`).
  */
 export function summariseSessions(
   rows: readonly ReportSessionRow[],
   filters: ReportFilters = { kinds: null, entrypoints: null },
   taskReports: readonly TaskReportTally[] = [],
   preflightHalts: readonly PreflightHalt[] = [],
+  budgets: readonly SessionBudget[] = [],
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -550,6 +578,7 @@ export function summariseSessions(
     filters,
     taskReports,
     preflightHalts,
+    budgets: budgetedSessions(rows, budgets),
   };
 }
 
@@ -664,6 +693,7 @@ export function buildReport(options: ReportOptions): EffortReport {
     },
     readTaskReportTallies(repoRoot),
     readPreflightHalts(repoRoot),
+    readSessionBudgets(repoRoot),
   );
 }
 
@@ -724,7 +754,8 @@ export default async function report(args: string[], repoRoot: string): Promise<
   if (built.rowsRead === 0) {
     output.info('effort report: no session rows stored yet'
       + ' (run `ralph effort collect` first)');
-    for (const line of [...formatTaskReports(built), ...formatPreflightHalts(built)]) output.info(line);
+    const sections = [...formatTaskReports(built), ...formatPreflightHalts(built), ...formatBudgets(built)];
+    for (const line of sections) output.info(line);
     return;
   }
   for (const line of formatReport(built)) {

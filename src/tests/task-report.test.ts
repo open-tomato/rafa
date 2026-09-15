@@ -601,7 +601,7 @@ describe('what a store the loop cannot use tells the operator', () => {
     const stored = storeTaskReport({
       repoRoot: root,
       planStub: 'probe',
-      dispatch: { sessionId: 'aaaa-1111', taskText: 'Record the report', output: '' },
+      dispatch: { sessionId: 'aaaa-1111', taskText: 'Record the report', output: '', declaration: null, flags: [] },
       outcome: 'done',
     });
 

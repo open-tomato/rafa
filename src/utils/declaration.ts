@@ -71,8 +71,10 @@
  * (`utils/agent-definition.ts` reads it off the definition's
  * frontmatter): effort is the cost lever a plan most needs to reach the
  * session, and a definition silent on it leaves the plan's level the
- * only one there is. Every key is still PARSED and still sits on the
- * record whether or not it became a flag, and
+ * only one there is. `budget` is outranked by nothing: an agent
+ * definition supplies no budget, so `--max-budget-usd` joins whatever
+ * else the block resolved to, agent or none. Every key is still PARSED
+ * and still sits on the record whether or not it became a flag, and
  * {@link ResolvedFlags.suppressed} names exactly the ones that did not.
  *
  * Nothing here throws. A recognised key whose value this module cannot
@@ -83,18 +85,27 @@
  * which is what lets a grammar grow without every older plan going red.
  */
 
-/** Keys this module answers to, in the order flags are emitted. */
+/**
+ * Keys this module answers to, in the order flags are emitted. `budget`
+ * sits ahead of `tools` because `--tools` is variadic and has to end the
+ * argument list (`utils/claude.ts`).
+ */
 export const DECLARATION_KEYS = [
   'agent',
   'model',
   'effort',
+  'budget',
   'tools',
 ] as const;
 
-/** One of the four keys the grammar recognises. */
+/** One of the keys the grammar recognises. */
 export type DeclarationKey = (typeof DECLARATION_KEYS)[number];
 
-/** The granular keys, each mapping to a flag of its own with no agent. */
+/**
+ * The granular keys, each mapping to a flag of its own with no agent, and
+ * each one an agent can outrank. `budget` maps to a flag of its own too,
+ * and is not one of them: nothing outranks it.
+ */
 export const GRANULAR_KEYS = ['model', 'effort', 'tools'] as const;
 
 /** A key that maps to a flag of its own when no agent is named. */
@@ -154,6 +165,32 @@ export function isAgentName(value: string): boolean {
 /** One tool name from the built-in set. */
 const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
 
+/** The flag a declared budget is passed as, in the CLI's own spelling. */
+export const BUDGET_FLAG = '--max-budget-usd';
+
+/**
+ * A budget in US dollars as a plan writes one: a whole part of at most
+ * six digits, with no leading zero but a lone one, and at most six decimal
+ * places. No sign, no currency symbol, no exponent and no bare point, so
+ * the number reads back through `String` as a plain decimal: `String`
+ * writes an exponent only below a millionth or from twenty-two digits on,
+ * and this shape reaches neither.
+ */
+const BUDGET_VALUE = /^(?:0|[1-9]\d{0,5})(?:\.\d{1,6})?$/;
+
+/**
+ * Reads a `budget=` value as US dollars, or answers null when it is not
+ * one this module passes on: a shape {@link BUDGET_VALUE} refuses, or
+ * zero, which no session could run under.
+ */
+export function parseBudgetUsd(value: string): number | null {
+  if (!BUDGET_VALUE.test(value)) return null;
+  const usd = Number(value);
+  return usd > 0
+    ? usd
+    : null;
+}
+
 /** One `key=value` pair, exactly as it was written. */
 export interface DeclarationEntry {
   /** Key as written. Matched case-sensitively against the grammar. */
@@ -196,6 +233,8 @@ export interface TaskDeclaration {
   model: string | null;
   /** Effort level, or null. */
   effort: EffortLevel | null;
+  /** Budget in US dollars, above zero, or null. */
+  budget: number | null;
   /** Tool names, deduped in first-seen order, or null. */
   tools: readonly string[] | null;
 }
@@ -266,7 +305,7 @@ function unusableValue(key: string, token: string): DeclarationIssue {
   return { reason: 'unusable-value', key, text: token };
 }
 
-/** True when `key` is one of the four the grammar recognises. */
+/** True when `key` is one of the keys the grammar recognises. */
 function isDeclarationKey(key: string): key is DeclarationKey {
   return (DECLARATION_KEYS as readonly string[]).includes(key);
 }
@@ -291,6 +330,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
   let agent: string | null = null;
   let model: string | null = null;
   let effort: EffortLevel | null = null;
+  let budget: number | null = null;
   let tools: readonly string[] | null = null;
 
   for (const token of tokenise(body)) {
@@ -330,6 +370,12 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
       else issues.push(unusableValue(key, token));
       continue;
     }
+    if (key === 'budget') {
+      const usd = parseBudgetUsd(value);
+      if (usd === null) issues.push(unusableValue(key, token));
+      else budget = usd;
+      continue;
+    }
 
     const parsed = parseToolList(value);
     if (parsed === null) issues.push(unusableValue(key, token));
@@ -338,7 +384,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
 
   if (seen.size === 0) return null;
 
-  return { raw, entries, extras, issues, agent, model, effort, tools };
+  return { raw, entries, extras, issues, agent, model, effort, budget, tools };
 }
 
 /**
@@ -372,6 +418,13 @@ export function stripTaskDeclaration(taskText: string): string {
   return parseTaskDeclaration(taskText).text;
 }
 
+/** The flag and value a declared budget passes, or none for no budget. */
+function budgetArgs(budget: number | null): string[] {
+  return budget === null
+    ? []
+    : [BUDGET_FLAG, String(budget)];
+}
+
 /**
  * Answers whether the named agent's definition declares an effort of
  * its own. The loop's answer comes from the definition's frontmatter
@@ -400,6 +453,11 @@ export type AgentEffortLookup = (agent: string) => boolean;
  * {@link ResolvedFlags.suppressed} rather than dropped, which is what
  * lets the dispatch say what it left to the agent.
  *
+ * `budget` passes {@link BUDGET_FLAG} whatever else the block holds, an
+ * agent included, since a definition supplies no budget, and is never
+ * named as suppressed. It goes after `--effort` and ahead of `--tools`,
+ * whose variadic value has to end the list.
+ *
  * A key whose value did not parse is absent from the record and so
  * emits nothing here — the task runs at the loop's defaults, which is
  * the failure worth having.
@@ -412,13 +470,14 @@ export function resolveDeclarationFlags(
 
   const { agent, effort } = declaration;
   const isPresent = (key: GranularKey) => declaration[key] !== null;
+  const budget = budgetArgs(declaration.budget);
 
   if (agent !== null) {
     if (effort === null || agentDeclaresEffort(agent)) {
-      return { args: ['--agent', agent], suppressed: GRANULAR_KEYS.filter(isPresent) };
+      return { args: ['--agent', agent, ...budget], suppressed: GRANULAR_KEYS.filter(isPresent) };
     }
     return {
-      args: ['--agent', agent, '--effort', effort],
+      args: ['--agent', agent, '--effort', effort, ...budget],
       suppressed: AGENT_OWNED_KEYS.filter(isPresent),
     };
   }
@@ -426,6 +485,7 @@ export function resolveDeclarationFlags(
   const args: string[] = [];
   if (declaration.model !== null) args.push('--model', declaration.model);
   if (declaration.effort !== null) args.push('--effort', declaration.effort);
+  args.push(...budget);
   if (declaration.tools !== null) {
     args.push('--tools', declaration.tools.join(','));
   }
