@@ -12,10 +12,10 @@
  *
  * ## What one preflight does, in order
  *
- *   1. **Generates the run's id**, `randomUUID` unless `newRunId`
- *      replaces it, before anything is checked. The id keys the store's
- *      rows, and is answered so a later stage can reuse it as the loop
- *      session's id.
+ *   1. **Takes the run's id** from `newRunId`, `randomUUID` when it is
+ *      left out, before anything is checked. The id keys the store's
+ *      rows. `start()` hands in its session's id (`start/session.ts`),
+ *      so the run id a halt names is the session's.
  *   2. **Reads the items** through `loadPlanPrerequisites`: the config's
  *      two tiers, with the plan's `PREREQUISITES-<stub>.md` merged in for
  *      this plan alone (`preflight/prerequisites-md.ts`). A file there

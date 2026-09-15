@@ -17,6 +17,10 @@ Description:
   the prerequisites the config and the plan's `PREREQUISITES-<stub>.md` name,
   halting when a required one fails and naming each failed optional one
   known-missing in every task prompt. It refuses to run on `main` or `master`.
+  Each run writes its session record to `.rafa/runs/<session-id>.json`: the
+  plan, the branch, the pid, the start, the state and the running task. It
+  refuses a plan whose record names another branch, and a plan a session is
+  still running.
 
 Flags:
   --plan          string

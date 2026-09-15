@@ -57,9 +57,9 @@ module's note is the long form.
   and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
-  `start/run-config.ts`, `start/preflight.ts`, `preflight/run.ts`,
-  `start/commit.ts`, `start/wrap-up.ts`, `start/dispatch.ts`,
-  `start/triage.ts`, `adapters/tracker/resolve.ts`,
+  `start/run-config.ts`, `start/session.ts`, `start/preflight.ts`,
+  `preflight/run.ts`, `start/commit.ts`, `start/wrap-up.ts`,
+  `start/dispatch.ts`, `start/triage.ts`, `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
@@ -186,10 +186,14 @@ module's note is the long form.
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
   result. `loop start` throws exit code 1 for an unusable config, a plan
-  file that does not exist, a default branch, and a preflight that halts
-  before any session: a failed required prerequisite, a PREREQUISITES
-  file that cannot be read, or checks the store refused
-  (`start/preflight.ts`). `plan create` throws 1
+  file that does not exist, a default branch, a session record refusing
+  the run, session records that cannot be read or written, and a
+  preflight that halts before any session: a failed required
+  prerequisite, a PREREQUISITES file that cannot be read, or checks the
+  store refused (`start/preflight.ts`). A record of the plan refuses the
+  run when it names another branch, whatever its state, or names this
+  branch and reads `running` or `paused`, a pid that is gone reading
+  `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1
   for an unusable config, a missing `--spec`, a spec found neither against
   the project root nor under `specs.dir`, and a plan already there, and
   for a planner's rejection the exit code a `claude` planner's rejection

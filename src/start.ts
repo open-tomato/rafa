@@ -30,10 +30,21 @@
  * run spawns loads, task, wrap-up and CI repair alike: `loop.settingSources`,
  * `project,local` unless a config names others (`utils/claude.ts`).
  *
+ * Once the branch guard lets the run through, and before anything else is
+ * printed or checked, the run opens its session (`start/session.ts`): it
+ * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
+ * stub and path, the branch, this process's pid, the start time, the state
+ * `running` and no task (`loop/sessions.ts`). A record of the plan refuses
+ * the run when it names another branch, whatever its state, or names this
+ * branch and still reads `running` or `paused`; a record whose pid is gone
+ * reads `stopped`. The record names each task before its dispatch and no
+ * task once the wrap-up starts, and the run's end writes `done` after the
+ * wrap-up and the CI wait come back and `stopped` on every other way out.
+ *
  * Before the tracker is created and before any session is spawned, the
  * wrap-up's included, the run's preflight checks the configured
  * prerequisites and those of the plan's `PREREQUISITES-<stub>.md`, and
- * stores a row per check under a run id generated first
+ * stores a row per check under the session's id as its run id
  * (`start/preflight.ts`). A failed required item refuses the run. Each
  * failed optional one becomes a `known-missing:` line that every task
  * prompt carries after its plan text, with one sentence saying such an
@@ -84,8 +95,9 @@
  * conflicting PR gets no CI run at all, so without this last stage the
  * loop can report a finished plan whose code was never checked once.
  *
- * Every line this module, `start/run-config.ts`, `start/preflight.ts`,
- * `start/commit.ts`, `start/triage.ts` and `start/wrap-up.ts` write goes
+ * Every line this module, `start/run-config.ts`, `start/session.ts`,
+ * `start/preflight.ts`, `start/commit.ts`, `start/triage.ts` and
+ * `start/wrap-up.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -94,10 +106,11 @@
  *
  * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
  * never by `process.exit`, so the dispatcher writes the terminal event.
- * An unusable config, a plan file that does not exist, a default branch
- * and a preflight that halts (a failed required prerequisite, a
- * PREREQUISITES file that cannot be read, or checks the store refused)
- * each throw exit code 1 with the whole refusal as the message,
+ * An unusable config, a plan file that does not exist, a default branch,
+ * a session record refusing the run or session records that cannot be
+ * read or written, and a preflight that halts (a failed required
+ * prerequisite, a PREREQUISITES file that cannot be read, or checks the
+ * store refused) each throw exit code 1 with the whole refusal as the message,
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
@@ -135,6 +148,7 @@ import {
   injectSourceLabel,
   loadRunConfig,
 } from './start/run-config.js';
+import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createStartTriage } from './start/triage.js';
 import { preserveProgress } from './start/wrap-up.js';
@@ -249,115 +263,127 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   }
 
   const planStub = planStubFromPath(planPath);
-  guardRunBranch(planStub, getCurrentBranch(), args);
+  const branch = getCurrentBranch();
+  guardRunBranch(planStub, branch, args);
   setActivePlanStub(planStub);
 
-  const planContent = fs.readFileSync(planPath, 'utf8');
-  const promptContent = fs.readFileSync(promptPath, 'utf8');
+  // Refuses a second run of the plan before anything else is printed or
+  // checked; every way out of the `try` writes the run's end.
+  const session = openRunSession({ repoRoot, planPath, planStub, branch });
+  try {
+    const planContent = fs.readFileSync(planPath, 'utf8');
+    const promptContent = fs.readFileSync(promptPath, 'utf8');
 
-  const injectSource = injectSourceLabel(runConfig);
-  activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
-  announcePlanIssues(planContent);
+    const injectSource = injectSourceLabel(runConfig);
+    activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
+    announcePlanIssues(planContent);
 
-  // Throws on a halt, before the tracker and before any session.
-  const { knownMissing } = await runStartPreflight({
-    repoRoot,
-    planPath,
-    settings: runConfig.config,
-  });
+    // Throws on a halt, before the tracker and before any session.
+    const { knownMissing } = await runStartPreflight({
+      repoRoot,
+      planPath,
+      settings: runConfig.config,
+      newRunId: () => session.id,
+    });
 
-  // Resolves no tracker here: the chain waits for the first public bug.
-  const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
+    // Resolves no tracker here: the chain waits for the first public bug.
+    const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
-  // Initialize tracker only if it doesn't exist
-  if (!fs.existsSync(trackerPath)) {
-    activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
-    fs.copyFileSync(planPath, trackerPath);
-  } else {
-    activeOutput().info(`📋 Resuming from existing ${path.basename(trackerPath)}...`);
-  }
+    // Initialize tracker only if it doesn't exist
+    if (!fs.existsSync(trackerPath)) {
+      activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
+      fs.copyFileSync(planPath, trackerPath);
+    } else {
+      activeOutput().info(`📋 Resuming from existing ${path.basename(trackerPath)}...`);
+    }
 
-  // SIGINT: flag and finish cleanup (mark blocked, throw exit 0) after the await returns.
-  process.on('SIGINT', () => {
-    interrupted = true;
-  });
+    // SIGINT: flag and finish cleanup (mark blocked, throw exit 0) after the await returns.
+    process.on('SIGINT', () => {
+      interrupted = true;
+    });
 
-  while (true) {
-    if (interrupted) break;
+    while (true) {
+      if (interrupted) break;
 
-    const trackerContent = fs.readFileSync(trackerPath, 'utf8');
-    const taskInfo = findNextTask(trackerContent);
+      const trackerContent = fs.readFileSync(trackerPath, 'utf8');
+      const taskInfo = findNextTask(trackerContent);
 
-    // Before the session it is for, whichever it is: a task or the wrap-up.
-    if (!renderProgressForDispatch(repoRoot, planStub)) return;
+      // Before the session it is for, whichever it is: a task or the wrap-up.
+      if (!renderProgressForDispatch(repoRoot, planStub)) return;
 
-    if (!taskInfo) {
-      activeOutput().info('\n✅ All tasks completed!');
-      activeOutput().info('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
-      activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
-      await preserveProgress(planContent, settingSources);
-      if (ciWait) {
-        await verifyPullRequest(
-          Math.max(1, ciTimeoutMin) * 60_000,
-          Math.max(0, ciAttempts),
-          settingSources,
-        );
+      if (!taskInfo) {
+        session.wrapUpStarted();
+        activeOutput().info('\n✅ All tasks completed!');
+        activeOutput().info('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
+        activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
+        await preserveProgress(planContent, settingSources);
+        if (ciWait) {
+          await verifyPullRequest(
+            Math.max(1, ciTimeoutMin) * 60_000,
+            Math.max(0, ciAttempts),
+            settingSources,
+          );
+        }
+        session.finished();
+        break;
       }
-      break;
+
+      session.taskStarted(taskInfo);
+      const dispatch = await dispatchTask({
+        taskInfo,
+        promptContent,
+        planContent,
+        inject: injectMode,
+        repoRoot,
+        home: homedir(),
+        settingSources,
+        knownMissing,
+      });
+      const { exitCode } = dispatch;
+
+      // Stored once the task's fate is known, and never before: the
+      // outcome goes on every row the report is stored as. Triage follows
+      // the store and the mark, and stops nothing (`start/triage.ts`).
+      const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
+        const stored = storeTaskReport({ repoRoot, planStub, dispatch, outcome });
+        await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
+        return stored;
+      };
+
+      if (interrupted) {
+        updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
+        activeOutput().info('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
+        await storeReport('blocked');
+        throw new CommandExit(0);
+      }
+
+      if (exitCode !== 0) {
+        updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
+        activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
+        await storeReport('failed');
+        return;
+      }
+
+      const finished = finishCleanExit({
+        trackerPath,
+        taskInfo,
+        repoRoot,
+        output: dispatch.output,
+      });
+      const stored = await storeReport(finished.outcome);
+      if (finished.outcome !== 'done') return;
+      if (!stored) {
+        activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');
+        return;
+      }
+
+      const shouldPause = await checkUsage('task');
+      if (shouldPause) {
+        activeOutput().info('\n⚠️  Pausing task loop due to high Claude usage. Run again when usage is lower.');
+        break;
+      }
     }
-
-    const dispatch = await dispatchTask({
-      taskInfo,
-      promptContent,
-      planContent,
-      inject: injectMode,
-      repoRoot,
-      home: homedir(),
-      settingSources,
-      knownMissing,
-    });
-    const { exitCode } = dispatch;
-
-    // Stored once the task's fate is known, and never before: the
-    // outcome goes on every row the report is stored as. Triage follows
-    // the store and the mark, and stops nothing (`start/triage.ts`).
-    const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
-      const stored = storeTaskReport({ repoRoot, planStub, dispatch, outcome });
-      await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
-      return stored;
-    };
-
-    if (interrupted) {
-      updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
-      activeOutput().info('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
-      await storeReport('blocked');
-      throw new CommandExit(0);
-    }
-
-    if (exitCode !== 0) {
-      updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
-      activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
-      await storeReport('failed');
-      return;
-    }
-
-    const finished = finishCleanExit({
-      trackerPath,
-      taskInfo,
-      repoRoot,
-      output: dispatch.output,
-    });
-    const stored = await storeReport(finished.outcome);
-    if (finished.outcome !== 'done') return;
-    if (!stored) {
-      activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');
-      return;
-    }
-
-    const shouldPause = await checkUsage('task');
-    if (shouldPause) {
-      activeOutput().info('\n⚠️  Pausing task loop due to high Claude usage. Run again when usage is lower.');
-      break;
-    }
+  } finally {
+    session.end();
   }
 }

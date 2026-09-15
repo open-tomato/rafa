@@ -4,8 +4,8 @@
  *
  * ## The source cases
  *
- * `src/start.ts`, `src/start/run-config.ts`, `src/start/preflight.ts`,
- * `src/preflight/run.ts`, `src/start/commit.ts`,
+ * `src/start.ts`, `src/start/run-config.ts`, `src/start/session.ts`,
+ * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
  * `src/start/triage.ts`, `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
@@ -134,6 +134,7 @@ const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
 const ROUTED_MODULES: string[] = [
   'start.ts',
   'start/run-config.ts',
+  'start/session.ts',
   'start/preflight.ts',
   'preflight/run.ts',
   'start/commit.ts',
