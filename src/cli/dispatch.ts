@@ -14,8 +14,8 @@
  *      deprecated for, against the routed command's `args` and `flags`.
  *      A spec `parseArgs` refuses is the `invalid_spec` refusal, and the
  *      context is assembled again without it so the refusal can be told.
- *   4. The start event is written, then each module warning at warn
- *      level.
+ *   4. The start event is written, then each warning the caller handed
+ *      in and each module command warning, at warn level.
  *   5. The route is settled. A help request writes the help text; a
  *      refusal writes nothing yet. A command needing a project has it
  *      resolved first, and outside one ends as the `no_project` refusal
@@ -73,7 +73,8 @@
  * ## The project
  *
  * A command runs inside a project unless it declares
- * `needsProject: false` (`command.ts`), as `init` and `describe` do.
+ * `needsProject: false` (`command.ts`), as `module exec`, `init` and
+ * `describe` do.
  * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
  * from the working directory, {@link DispatchOptions.cwd}, to the first
  * directory holding `.rafa/config.yaml`, passing over the home,
@@ -155,6 +156,12 @@ export interface DispatchOptions {
   readonly modules?: readonly ModuleCommandEntry[];
   /** Imports one module entry. Defaults to a dynamic import of the file. */
   readonly importModule?: ModuleImporter;
+  /**
+   * Warnings read before the invocation, such as those of loading the
+   * modules (`src/modules/load.ts`), written at warn level after the start
+   * event and ahead of the module command warnings. Defaults to none.
+   */
+  readonly warnings?: readonly string[];
   /** The environment the context reads. Defaults to `process.env`. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Where the output, help and results are written. Defaults to `process.stdout`. */
@@ -520,7 +527,7 @@ export async function dispatch(argv: readonly string[], options: DispatchOptions
   if (base.outputMode === 'json') {
     base.output.emit({ type: 'start', command: route.label, ts: settings.now().toISOString() });
   }
-  for (const warning of loaded.warnings) base.output.warn(warning);
+  for (const warning of [...(options.warnings ?? []), ...loaded.warnings]) base.output.warn(warning);
 
   let ending: Ending;
   try {

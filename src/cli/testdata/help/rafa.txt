@@ -10,6 +10,7 @@ Quick start:
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
   rafa issue list
   rafa effort collect
+  rafa module list
   rafa init
   rafa doctor
   rafa self-update
@@ -21,6 +22,7 @@ Subjects:
   loop     start a plan; stop, pause, resume, show and list its sessions
   issue    the tracker: list, show, create, comment on and move issues
   effort   collect session and commit rows; report per plan
+  module   list the configured modules; run an action a module provides
 
 Commands:
   init, doctor, self-update, usage, describe

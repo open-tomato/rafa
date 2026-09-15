@@ -755,6 +755,24 @@ describe('what a command runs with', () => {
       message: 'module "broken": skipped "/modules/broken/commands.ts": import failed: Unexpected token at 3:1',
     });
   });
+
+  it('writes each warning it is handed after the start event and ahead of the module warnings', async () => {
+    const warnings = ['module "demo": refused for this case'];
+    const json = await run(['--output=json', 'loop', 'start'], { modules: MODULES, importModule, warnings });
+    const text = await run(['loop', 'start'], { warnings });
+
+    const opening = eventsOf(json.stdout).slice(0, 3);
+    const told = opening.map((event) => [event.type, 'message' in event
+      ? event.message
+      : null]);
+
+    expect(told).toEqual([
+      ['start', null],
+      ['log', 'module "demo": refused for this case'],
+      ['log', 'module "broken": skipped "/modules/broken/commands.ts": import failed: Unexpected token at 3:1'],
+    ]);
+    expect(text.stdout.split('\n')[0]).toBe('warn: module "demo": refused for this case');
+  });
 });
 
 describe('the active output and the exit code', () => {

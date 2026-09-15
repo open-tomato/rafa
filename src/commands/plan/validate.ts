@@ -8,7 +8,7 @@
  * The one file the line names, resolved against the working directory as
  * a shell completes it, wherever it sits: the command reads no config and
  * no repository, though the dispatcher runs it only inside a project, as
- * it runs every command but `init` and `describe`. It reads that file and
+ * it runs every command but `module exec`, `init` and `describe`. It reads that file and
  * nothing else, and starts no
  * Claude Code session: `validate.test.ts` runs it with a stand-in `claude`
  * first on the PATH and finds the stand-in never called, where

@@ -8,8 +8,9 @@
  * what the invocation wrote. The version is read from `package.json`
  * here, apart from the import the command takes.
  *
- * The module case dispatches over the core roster with a `module exec`
- * action added, naming two module entries a stand-in importer answers:
+ * The module case dispatches over the core roster, whose `module exec`
+ * action reaches a mounted module, naming two module entries a stand-in
+ * importer answers:
  * one loads and one fails to import. Its control dispatches the same
  * registry with no module, and lists no module action, so what the first
  * lists came from the mount.
@@ -41,11 +42,10 @@ import { describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 
 import describeCommand from './describe.js';
 
-import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';
+import { CORE_REGISTRY } from './index.js';
 
 /** The `version` of the repository's `package.json`, read as a file. */
 const PACKAGE_VERSION = (JSON.parse(readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8')) as {
@@ -134,12 +134,6 @@ function command(subject: string, action: string, overrides: Partial<RafaCommand
 /** The command the loading module entry exports. */
 const LINEAR_NEXT = command('linear', 'next');
 
-/** The core roster with a `module exec` action, which reaches a mounted module. */
-const WITH_EXEC = createCommandRegistry({
-  subjects: [...CORE_SUBJECTS, { name: 'module', summary: 'modules' }],
-  commands: [...CORE_COMMANDS, command('module', 'exec', { exec: true })],
-});
-
 /** Two module entries: one that loads, one whose import fails. */
 const MODULES = [
   { name: 'linear', entry: '/modules/linear/commands.ts' },
@@ -192,9 +186,9 @@ describe('what rafa describe writes', () => {
   });
 
   it('lists the actions of a module the dispatcher mounted and warns for the one it skipped, and lists none with no module', async () => {
-    const mounted = await dispatched(['describe', '--output=json'], { registry: WITH_EXEC, modules: MODULES, importModule });
-    const bare = await dispatched(['describe', '--output=json'], { registry: WITH_EXEC });
-    const loaded = WITH_EXEC.mount({ name: 'linear', entry: '/modules/linear/commands.ts', commands: [LINEAR_NEXT] });
+    const mounted = await dispatched(['describe', '--output=json'], { registry: CORE_REGISTRY, modules: MODULES, importModule });
+    const bare = await dispatched(['describe', '--output=json'], { registry: CORE_REGISTRY });
+    const loaded = CORE_REGISTRY.mount({ name: 'linear', entry: '/modules/linear/commands.ts', commands: [LINEAR_NEXT] });
 
     expect(mounted.outcome.exitCode).toBe(0);
     expect(eventsOf(mounted.stdout).map((event) => event.type)).toEqual(['start', 'log', 'result']);

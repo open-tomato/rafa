@@ -8,7 +8,9 @@
  * selecting by kind. This module is that registry and core's part of
  * populating it. Enabling a module is phase 7's work; until then an
  * add-on reaches the registry through {@link AdapterRegistry.register},
- * and core never imports one.
+ * which `src/modules/load.ts` calls for each module `allowList:` names
+ * from a `path` source. No reader resolves through that registry yet:
+ * every caller below resolves through {@link CORE_ADAPTER_REGISTRY}.
  *
  * ## Keys
  *

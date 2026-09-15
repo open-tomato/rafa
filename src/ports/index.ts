@@ -6,7 +6,8 @@
  * The spec's `exports` map names this module's build as the `./ports`
  * subpath, declared in phase 0 and filled in phase 1. Phase 1 puts one
  * adapter per port under `src/adapters/` and lets an add-on register
- * more by name; core never imports an add-on. What those adapters
+ * more by name; core imports an add-on only from a `path` source the
+ * config's `allowList:` names (`src/modules/load.ts`). What those adapters
  * implement is declared here first, so a service (the orchestrator's
  * worker pool, a Drizzle-backed store) can type an implementation
  * against the subpath without importing the CLI.

@@ -1,12 +1,12 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the twenty-two commands it registers: what the registry
+ * declarations of the twenty-four commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
- * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`
- * and the five `issue` actions wrap none, and each is held to the
+ * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
+ * the five `issue` actions, `module list` and `module exec` wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
  *
@@ -96,6 +96,8 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'issue move': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
+  'module list': ['text', 'json'],
+  'module exec': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
   'self-update': ['text', 'json'],
@@ -118,14 +120,16 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue create': [[], ['title', 'body', 'type', 'module', 'priority']],
   'issue comment': [['id'], ['body']],
   'issue move': [['id', 'state'], []],
+  'module list': [[], []],
+  'module exec': [['module', 'action'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
   'self-update': [[], []],
   'describe': [[], []],
 };
 
-/** The commands running outside a project too: `init`, which makes one, and `describe`. */
-const OUTSIDE_A_PROJECT = ['init', 'describe'];
+/** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `init`, which makes one, and `describe`. */
+const OUTSIDE_A_PROJECT = ['module exec', 'init', 'describe'];
 
 /** A temporary directory of this file's own, holding the project and the home every routing case dispatches with. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-roster-'));
@@ -168,6 +172,8 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
+  ['module list', 'module list', [], ''],
+  ['modules exec', 'module exec', [], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['self-update', 'self-update', [], ''],
@@ -236,12 +242,12 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the four subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort']);
+  it('registers the five subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -260,6 +266,8 @@ describe('the core roster', () => {
       'issue move',
       'effort collect',
       'effort report',
+      'module list',
+      'module exec',
       'init',
       'doctor',
       'self-update',
@@ -269,7 +277,7 @@ describe('the core roster', () => {
     expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length);
   });
 
-  it('runs every command inside a project but init and describe, which declare needsProject false', () => {
+  it('runs every command inside a project but module exec, init and describe, which declare needsProject false', () => {
     const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);

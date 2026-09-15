@@ -17,7 +17,8 @@
  * neither grows the root unseen.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
- * dispatcher, the help renderer and the core registry alone, and that
+ * dispatcher, the help renderer, the core registry and the module loader
+ * alone, and that
  * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
  * a command registered and not spelled goes red. Each of those modules
@@ -26,8 +27,9 @@
  * terminal runs and a service cannot import goes red. `describe`, `init`,
  * `doctor`, `self-update`, the three plan readers, `plan list`, `plan show` and
  * `plan validate`, the five `loop` session actions, `loop stop`,
- * `loop pause`, `loop resume`, `loop status` and `loop list`, and the five
- * `issue` actions are held to be the modules wrapping none. `describe` runs the roster builder
+ * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
+ * `issue` actions, and `module list` and `module exec` are held to be the
+ * modules wrapping none. `describe` runs the roster builder
  * of `src/cli/describe.ts`, which is no root export, and each plan reader
  * imports `parsePlan` from the `./plan` entry, which is one. A binding a module
  * takes by name, as `loop start` takes the CI defaults its flags show,
@@ -237,6 +239,7 @@ const CLI_IMPORTS: ImportList = [
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
+  ['./modules/load.js', ['loadInvocationModules']],
 ];
 
 /**
@@ -336,6 +339,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/module/list.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config.js', ['ConfigError']],
+    ['../../modules/load.js', ['loadModules', 'moduleSettings']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+  ]],
+  ['./commands/module/exec.js', [['../../cli/command.js', ['CommandExit']], ['../../cli/registry.js', ['mountKey']]]],
   ['./commands/init.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../config-load.js', ['loadConfig']],
@@ -535,6 +546,8 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/issue/create.js',
       './commands/issue/comment.js',
       './commands/issue/move.js',
+      './commands/module/list.js',
+      './commands/module/exec.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/self-update.js',

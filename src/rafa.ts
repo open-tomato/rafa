@@ -12,12 +12,17 @@
  *   rafa usage
  *   rafa describe [--output=json]
  *   rafa effort collect|report [flags]
+ *   rafa module list | exec <module> <action>
  *
  * From a checkout, `bun src/rafa.ts <words>`. `rafa start` and
  * `rafa plan --spec=` still run, each after one deprecation line on
  * stderr.
  *
- * The module holds nothing but the dispatch. `src/commands/index.ts`
+ * The module holds nothing but the dispatch and the modules loaded for
+ * it. It first loads the modules of the project the working directory is
+ * in (`src/modules/load.ts`), so a module's actions route, render help
+ * and are described, and hands the dispatcher their command entries and
+ * the loader's warnings. `src/commands/index.ts`
  * holds the roster, `src/cli/help.ts` renders `rafa --help` and the help
  * of each subject and action from it, and `src/cli/dispatch.ts` routes
  * the line, runs the command, writes its events and answers the exit
@@ -28,9 +33,18 @@
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
  */
+import { homedir } from 'node:os';
+
 import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { CORE_REGISTRY } from './commands/index.js';
+import { loadInvocationModules } from './modules/load.js';
 
-const { exitCode } = await dispatch(process.argv.slice(2), { registry: CORE_REGISTRY, renderHelp });
+const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
+const { exitCode } = await dispatch(process.argv.slice(2), {
+  registry: CORE_REGISTRY,
+  renderHelp,
+  modules: modules.commands,
+  warnings: modules.warnings,
+});
 process.exitCode = exitCode;

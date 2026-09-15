@@ -20,6 +20,8 @@ module's note is the long form.
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help` and `rafa loop start --help` |
+| `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
+| `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
@@ -40,8 +42,9 @@ module's note is the long form.
   and `plan validate`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment` and `issue move`;
-  `effort collect`, `effort report`, `init`, `doctor`, `self-update`,
-  `usage` and `describe`. The subjects are `plan`, `loop`, `issue` and `effort`: a
+  `effort collect`, `effort report`, `module list`, `module exec`, `init`,
+  `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
+  `loop`, `issue`, `effort` and `module`: a
   subject is declared with its first action, never ahead of it.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
@@ -115,8 +118,8 @@ module's note is the long form.
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
   `plan validate <file>` resolves the file against the working directory
-  and reads no repository, though like every command but `init` and
-  `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
+  and reads no repository, though like every command but `module exec`,
+  `init` and `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
   `<file>:<line>: <reason>: <text>`, then throws exit code 1 when there is
   one. In json mode a list, a plan and a clean validation are the terminal
   result's `data`, and each issue is an `error` `log` event; text mode
@@ -231,7 +234,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` neither a flag nor an argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` neither a flag nor an argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. Of the `issue` actions, `list` declares the
@@ -326,7 +329,7 @@ module's note is the long form.
   answers it (`src/project/scope.ts`), or null for a command declaring
   `needsProject: false`.
 - **A command runs inside a project** unless it declares
-  `needsProject: false`, as `init` and `describe` do; the dispatcher
+  `needsProject: false`, as `module exec`, `init` and `describe` do; the dispatcher
   resolves none for such a command. `commandProblem` refuses a
   `needsProject` that is no boolean.
 - **A command refuses by throwing `CommandExit(code, message)`.** It
@@ -380,14 +383,62 @@ it throws (a syntax error included), when its default export is no list,
 or when the registry refuses the mount. A skipped file gets one warning,
 `module "<name>": skipped "<file>": <reason>`, and the entries after it
 still load. The dispatcher writes each warning at warn level after the
-start event. No caller passes an entry until phase 7 enables modules.
+start event. `src/rafa.ts` passes the entries `src/modules/load.ts`
+answers, described under "Loading modules".
+
+### Loading modules
+
+`src/rafa.ts` calls `loadInvocationModules` before it dispatches, with
+`process.cwd()` and the home. It resolves the project as the dispatcher
+does, reads its config with the unknown-key warnings dropped, since a
+command reading the config warns once, and hands `loadModules` the
+config's `modules:` and `allowList:`. Outside a project nothing is loaded
+or warned, and a config `loadConfig` refuses or a walk the scope refuses
+loads nothing and warns nothing: the command reading the config, or the
+dispatcher placing a command in a project, says why once. So
+`rafa describe` and help under a refused config list no module action and
+say nothing of why.
+
+- **A source's name** is its `package.json` `name` for `path`, the package
+  for `npm`, and `owner/repo` for `github`; `allowList:` matches it. A
+  relative `path` resolves against the project root, or the home when the
+  user scope's config gave `modules:`.
+- **`npm` and `github` are refused** by name,
+  `npm source "<name>" is refused: phase 1 loads path sources alone, ...`.
+- **Every `path` source is validated**, enabled or not, with
+  `validateManifest` (`src/modules/manifest.ts`). An enabled one with no
+  problem has each `tracker`, `store`, `planner` and `output` entry
+  imported, its default export the adapter's `create`, registered under
+  the manifest's `kind` and `requires.ports` version on
+  `CORE_ADAPTER_REGISTRY`, and its `commands` entry handed to
+  `loadModuleCommands`. An entry outside the module directory, an import
+  that throws, a default export that is no function and a registry refusal
+  (a kind already held, a port version core does not serve) refuse the
+  module whole: none of its adapters and no command entry.
+- **States**: `loaded`, `refused`, or `disabled` off `allowList:`. Each
+  problem of an enabled module is one warning,
+  `module "<name>": <problem>`, written after the start event ahead of the
+  command-entry warnings (`DispatchOptions.warnings`); a disabled module
+  warns nothing. A second source giving a name is refused, and an
+  `allowList:` name no source gives is warned about.
+- **The adapter registry reaches no reader.** `resolveTracker`,
+  `selectEffortStore` and `rafa plan` still resolve through
+  `CORE_ADAPTER_REGISTRY`, so a module's adapter is registered and listed
+  by `module list` and selected by nothing.
+- **`module list`** loads the modules again from the config and lists
+  each source's name, version, types, whether it is enabled, its state,
+  adapters, command entry and problems, with `mounted` read off the
+  context's registry. Exit code 1 for an argument and a refused config.
+- **`module exec`** declares `exec` and `needsProject: false`. Typed with
+  no module word it refuses with exit code 1, naming each mount and its
+  actions, or that none is mounted.
 
 ### One invocation
 
 `dispatch(argv, { registry })` answers `{ exitCode, result }` and sets
 no exit code: its caller ends the process. The streams, the environment,
-the clock, the importer, the help renderer, the working directory and the
-home are options.
+the clock, the importer, the help renderer, the working directory, the
+home and the warnings read before the invocation are options.
 
 - **A command runs inside a project, or not at all.** Once the spec of a
   command needing a project is read, `resolveScope` walks up from the
@@ -489,9 +540,9 @@ home are options.
   commands for a top-level `exec`. It is named by the words after the
   subject (`exec linear next` under `module`), with `module` its mount's
   name and `aliases` empty. A mount no visible `exec` action reaches is in
-  no entry. The core roster declares no `exec` action yet and
-  `src/rafa.ts` passes no module, so `rafa describe` lists no module
-  action today.
+  no entry. The core roster's `exec` action is `module exec`, so
+  `rafa describe` lists the actions of every module `src/rafa.ts`
+  loaded after `module list` and `module exec`.
 - **A hidden command is in no entry**, nor is an action typed through a
   hidden `exec` action.
 - **The completeness case** in `src/cli/describe.test.ts` is red when a

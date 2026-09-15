@@ -33,9 +33,9 @@
  * data, and the dispatcher writes them through the invocation's output
  * after its start event, so a json stream stays one event per line.
  *
- * Which modules to load is the caller's to say. Enabling a module and
- * reading its manifest are phase 7's, so until then the dispatcher's
- * caller passes no entry and nothing is imported.
+ * Which modules to load is the caller's to say. `src/rafa.ts` passes the
+ * command entries of the modules `src/modules/load.ts` loaded: those
+ * `allowList:` names from a `path` source whose manifest checked out.
  */
 import type { RafaCommand } from './command.js';
 import type { CommandRegistry } from './registry.js';

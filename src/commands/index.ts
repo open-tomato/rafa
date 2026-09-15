@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-two registered so far wrap a
+ * of each is its command. Five of the twenty-four registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -25,7 +25,9 @@
  * `src/preflight/` and starts no run, nor the five `issue` actions, which
  * act on the tracker the chain resolves and share
  * `issue/issue-tracker.ts`, nor `self-update`, which installs the
- * checkout through `src/runtime/install.ts`.
+ * checkout through `src/runtime/install.ts`, nor `module list` and
+ * `module exec`, which read the modules `src/modules/load.ts` loads and
+ * the mounts the dispatcher made.
  *
  * ## What is registered
  *
@@ -44,6 +46,9 @@
  *     over the Tracker port, on the tracker `tracker.default` and
  *     `tracker.fallback` resolve to through the chain.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's.
+ *   - `module list`, every module the config gives a source for and what
+ *     it came to, and `module exec <module> <action>`, the `exec` action a
+ *     module's mounted commands are reached through.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -59,9 +64,8 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the four with an action registered: a subject with
- * none would show in every roster and dispatch nothing. `module` joins
- * with its first action.
+ * The subjects are the five with an action registered: a subject with
+ * none would show in every roster and dispatch nothing.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
@@ -84,6 +88,8 @@ import loopResume from './loop/resume.js';
 import loopStart from './loop/start.js';
 import loopStatus from './loop/status.js';
 import loopStop from './loop/stop.js';
+import moduleExec from './module/exec.js';
+import moduleList from './module/list.js';
 import planCreate from './plan/create.js';
 import planList from './plan/list.js';
 import planShow from './plan/show.js';
@@ -97,6 +103,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
+  { name: 'module', summary: 'list the configured modules; run an action a module provides' },
 ]);
 
 /** The core commands, in roster order. */
@@ -118,6 +125,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   issueMove,
   effortCollect,
   effortReport,
+  moduleList,
+  moduleExec,
   init,
   doctor,
   selfUpdate,

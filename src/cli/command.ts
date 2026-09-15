@@ -35,7 +35,7 @@
  * declares `needsProject: false`. The dispatcher resolves the project
  * before any other command runs, and runs none outside a project, so
  * such a command's `project` is never null. For a command declaring
- * `needsProject: false`, as `init` and `describe` do, it resolves
+ * `needsProject: false`, as `module exec`, `init` and `describe` do, it resolves
  * nothing, and `project` is null inside a project as outside one.
  *
  * `run` takes a `RafaContext`, where `CliCommand.run` takes a
@@ -155,7 +155,8 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
   readonly exec?: true;
   /**
    * False for a command that runs outside a project too, which the
-   * dispatcher resolves no project for: `init` and `describe`. Absent,
+   * dispatcher resolves no project for: `module exec`, `init` and
+   * `describe`. Absent,
    * the command runs inside a project; see the module note.
    */
   readonly needsProject?: boolean;
