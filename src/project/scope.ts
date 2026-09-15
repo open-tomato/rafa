@@ -211,8 +211,12 @@ function realHomeOf(home: string, fs: ScopeFileSystem): string | null {
   }
 }
 
-/** `path` and every directory above it, nearest first, ending at the filesystem root. */
-function selfAndAncestors(path: string): readonly string[] {
+/**
+ * `path` and every directory above it, nearest first, ending at the
+ * filesystem root. Lexical: it reads nothing, so a caller hands in a
+ * real path to climb real directories. `roots.ts` climbs with it too.
+ */
+export function selfAndAncestors(path: string): readonly string[] {
   const parent = dirname(path);
   return parent === path
     ? [path]
