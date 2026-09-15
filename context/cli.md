@@ -100,6 +100,12 @@ module's note is the long form.
   before. Both read the mode the dispatcher sets beside the active
   output. `src/tests/loop-output.test.ts` spawns `loop start` in both
   modes.
+- **A wrap-up that could not open its PR still ends `ok`.**
+  `preserveProgress` (`start/wrap-up.ts`) reads only the wrap-up
+  session's exit code, and a `gh pr create` failing inside that session,
+  as it does with no GitHub remote, is the session's own tool use: it
+  ends 0, so the terminal `result` reads `ok: true`. Only the wrap-up's
+  `log` lines say the PR was not opened.
 - **What json mode gives for the others**: `effort report` gives the
   report as the terminal result's `data`, the document phase 0's `--json`
   printed with the task report tallies, the preflight halts and the
@@ -417,7 +423,9 @@ say nothing of why.
   module whole: none of its adapters and no command entry.
 - **States**: `loaded`, `refused`, or `disabled` off `allowList:`. Each
   problem of an enabled module is one warning,
-  `module "<name>": <problem>`, written after the start event ahead of the
+  `module "<name>": <problem>`, where a problem read off the manifest
+  opens with the absolute `<directory>/package.json` path (`readPathSource`
+  in `src/modules/load.ts`), written after the start event ahead of the
   command-entry warnings (`DispatchOptions.warnings`); a disabled module
   warns nothing. A second source giving a name is refused, and an
   `allowList:` name no source gives is warned about.
