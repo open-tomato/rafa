@@ -13,14 +13,16 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the eleven registered so far wrap a
+ * of each is its command. Five of the sixteen registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
  * `plan validate`, which read plan files with `parsePlan` and share
  * `plan/plan-files.ts`, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
- * `src/preflight/` and starts no run.
+ * `src/preflight/` and starts no run, nor the five `issue` actions, which
+ * act on the tracker the chain resolves and share
+ * `issue/issue-tracker.ts`.
  *
  * ## What is registered
  *
@@ -29,6 +31,10 @@
  *   - `plan list`, `plan show <stub> [--tracker]` and
  *     `plan validate <file>`, which start no session.
  *   - `loop start`, aliased `start`.
+ *   - `issue list`, `issue show <id>`, `issue create --title=<text>`,
+ *     `issue comment <id> --body=<text>` and `issue move <id> <state>`,
+ *     over the Tracker port, on the tracker `tracker.default` and
+ *     `tracker.fallback` resolve to through the chain.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
@@ -42,10 +48,10 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the three with an action registered: a subject with
- * none would show in every roster and dispatch nothing. `issue` and
- * `module` join with their first action, as `self-update` joins with
- * the task that brings it.
+ * The subjects are the four with an action registered: a subject with
+ * none would show in every roster and dispatch nothing. `module` joins
+ * with its first action, as `self-update` joins with the task that
+ * brings it.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
@@ -57,6 +63,11 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import init from './init.js';
+import issueComment from './issue/comment.js';
+import issueCreate from './issue/create.js';
+import issueList from './issue/list.js';
+import issueMove from './issue/move.js';
+import issueShow from './issue/show.js';
 import loopStart from './loop/start.js';
 import planCreate from './plan/create.js';
 import planList from './plan/list.js';
@@ -68,6 +79,7 @@ import usage from './usage.js';
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create a plan from a spec; list, show and validate plans' },
   { name: 'loop', summary: 'start a plan through the loop, one task per session' },
+  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
 ]);
 
@@ -78,6 +90,11 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   planShow,
   planValidate,
   loopStart,
+  issueList,
+  issueShow,
+  issueCreate,
+  issueComment,
+  issueMove,
   effortCollect,
   effortReport,
   init,

@@ -24,8 +24,9 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor` and the three plan readers, `plan list`, `plan show` and
- * `plan validate`, are held to be the modules wrapping none. `describe` runs the roster builder
+ * `doctor`, the three plan readers, `plan list`, `plan show` and
+ * `plan validate`, and the five `issue` actions are held to be the
+ * modules wrapping none. `describe` runs the roster builder
  * of `src/cli/describe.ts`, which is no root export, and each plan reader
  * imports `parsePlan` from the `./plan` entry, which is one. A binding a module
  * takes by name, as `loop start` takes the CI defaults its flags show,
@@ -265,6 +266,39 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
+  ['./commands/issue/list.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'lineRefusal', 'onTracker', 'readChoiceFlag', 'readNonBlankFlag', 'readTextFlag', 'resolveIssueTracker']],
+  ]],
+  ['./commands/issue/show.js', [
+    ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueRef', 'onTracker', 'resolveIssueTracker', 'urlLines']],
+  ]],
+  ['./commands/issue/create.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../triage/triage.js', ['TRIAGE_MODULE']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./issue-tracker.js', [
+      'DEFAULT_ISSUE_SEAMS',
+      'issueName',
+      'onTracker',
+      'readChoiceFlag',
+      'readNonBlankFlag',
+      'readRequiredFlag',
+      'readTextFlag',
+      'resolveIssueTracker',
+      'urlLines',
+    ]],
+  ]],
+  ['./commands/issue/comment.js', [
+    ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'onTracker', 'readRequiredFlag', 'resolveIssueTracker']],
+  ]],
+  ['./commands/issue/move.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueRef', 'onTracker', 'readChoice', 'resolveIssueTracker']],
+  ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/init.js', [
@@ -450,6 +484,11 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/plan/list.js',
       './commands/plan/show.js',
       './commands/plan/validate.js',
+      './commands/issue/list.js',
+      './commands/issue/show.js',
+      './commands/issue/create.js',
+      './commands/issue/comment.js',
+      './commands/issue/move.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/describe.js',

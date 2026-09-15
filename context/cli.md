@@ -23,6 +23,7 @@ module's note is the long form.
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
+| `src/commands/issue/issue-tracker.ts` | what the five `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/doctor.ts` | `rafa doctor`: the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -34,9 +35,11 @@ module's note is the long form.
   `src/commands/<subject>/<action>.ts` and a top-level command at
   `src/commands/<name>.ts`, each module's default export its command.
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
-  and `plan validate`; `loop start`, aliased `start`; `effort collect`,
-  `effort report`, `init`, `doctor`, `usage` and `describe`. The subjects are `plan`, `loop` and `effort`: a subject is declared with its
-  first action, never ahead of it.
+  and `plan validate`; `loop start`, aliased `start`; `issue list`,
+  `issue show`, `issue create`, `issue comment` and `issue move`;
+  `effort collect`, `effort report`, `init`, `doctor`, `usage` and
+  `describe`. The subjects are `plan`, `loop`, `issue` and `effort`: a
+  subject is declared with its first action, never ahead of it.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
@@ -48,9 +51,10 @@ module's note is the long form.
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init`, `doctor` and the plan
-  readers wrap none: `describe` reads the registry off its context, and
-  `init`, `doctor` and each plan reader their `args` and `flags`.
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, the plan readers and the `issue`
+  actions wrap none: `describe` reads the registry off its context, and
+  `init`, `doctor`, each plan reader and each `issue` action their `args`
+  and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/preflight.ts`, `preflight/run.ts`,
@@ -138,6 +142,28 @@ module's note is the long form.
   preflight that did not halt gives the checks, the `known-missing:`
   lines, the reminders and both readings as the result's `data`, and a
   halt gives the `command_exit` error and no `data`.
+- **`issue` acts on the tracker the chain lands on**
+  (`src/commands/issue/`). Each action reads its line first, then the
+  config as `loop start` resolves it, then hands `tracker.default` and
+  `tracker.fallback` to `resolveTracker` with the project root as the
+  repository (`issue/issue-tracker.ts`), so a line refused for its words
+  reads no config and runs no preflight. Each kind passed over is
+  written at `warn` as `tracker chain: <kind> unavailable: <reason>`
+  before the action acts. An id is the issue's `externalId` on the
+  tracker landed on, so a degraded chain reads the id on the tracker it
+  fell back to, which numbers its issues on its own. `list` hands `find`
+  the query its flags make and reads each ref it answers with `get`, and
+  `github`'s `find` refuses every `--state`. `show` reads one issue;
+  `create` files a draft of type `code`, module `unassigned` and no
+  priority unless a flag names one; `comment` posts `--body`; and `move`
+  moves an issue to a state, writing a `warning` the tracker answers at
+  `warn` and still exiting 0. In json mode the result's `data` holds the
+  tracker (its kind, whether the chain degraded, and why) beside the
+  query and the issues, the issue, the ref, or the ref with the state and
+  the warning; text mode writes lines. The registry and the `gh` runner
+  are seams of each command's factory. `src/commands/issue/create.test.ts`
+  spawns `issue create` and `issues list` under a stand-in `gh` failing
+  the `github` preflight.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
   flag declares, so `rafa plan show --tracker my-plan` hands `plan show`
@@ -151,7 +177,11 @@ module's note is the long form.
   `describe` does. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, and `doctor` the flag `plan` and no argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
-  declares `text` and `json`.
+  declares `text` and `json`. Of the `issue` actions, `list` declares the
+  flags `state`, `type`, `module`, `search` and `limit`, `show` the
+  argument `id`, `create` the flags `title`, `body`, `type`, `module` and
+  `priority`, `comment` the argument `id` and the flag `body`, and `move`
+  the arguments `id` and `state`; each declares `text` and `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
@@ -182,8 +212,14 @@ module's note is the long form.
   plan named that is no file, a plan path that cannot be checked, a
   config `loadConfig` refuses and a
   PREREQUISITES file that cannot be read, each message ending with the
-  line `Nothing was checked.`, and for a failed required item, its message
-  the runner's halt.
+  line `Nothing was checked.`, and for a failed required item, its message the runner's halt.
+  The `issue` actions throw 1, before any config is read, for a line
+  handing the wrong number of arguments, a flag typed with no value,
+  holding nothing but whitespace where it takes text or a value outside
+  its set, a `--limit` that is no positive whole number, a `create` with
+  no `--title` and a `comment` with no `--body`; then for a config
+  `loadConfig` refuses, a chain landing nowhere, and an adapter call
+  that rejects, naming what was being done and the tracker's kind.
 - **What changed for a phase 0 spelling**: `rafa effort` alone and
   `rafa effort help` refuse with exit code 1, where the phase 0 CLI
   printed its help and exited 0. An unknown first word writes

@@ -8,6 +8,7 @@ Usage:
 Quick start:
   rafa plan create --spec=.rafa/specs/my-feature.md
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
+  rafa issue list
   rafa effort collect
   rafa init
   rafa doctor
@@ -17,6 +18,7 @@ Quick start:
 Subjects:
   plan     create a plan from a spec; list, show and validate plans
   loop     start a plan through the loop, one task per session
+  issue    the tracker: list, show, create, comment on and move issues
   effort   collect session and commit rows; report per plan
 
 Commands:

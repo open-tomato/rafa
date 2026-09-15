@@ -1,12 +1,13 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the eleven commands it registers: what the registry
+ * declarations of the sixteen commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `doctor`, `init`, `plan list`, `plan show` and `plan validate` wrap none,
- * and each is held to the arguments and flags spelled for it here. Every
- * command is held to exactly one of the two lists.
+ * `describe`, `doctor`, `init`, `plan list`, `plan show`, `plan validate`
+ * and the five `issue` actions wrap none, and each is held to the
+ * arguments and flags spelled for it here. Every command is held to
+ * exactly one of the two lists.
  *
  * The routing cases dispatch over a registry built from the roster's own
  * subjects and commands, each `run` swapped for one recording what ran
@@ -81,6 +82,11 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'plan show': ['text', 'json'],
   'plan validate': ['text', 'json'],
   'loop start': ['text', 'json'],
+  'issue list': ['text', 'json'],
+  'issue show': ['text', 'json'],
+  'issue create': ['text', 'json'],
+  'issue comment': ['text', 'json'],
+  'issue move': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
   'init': ['text', 'json'],
@@ -94,6 +100,11 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'plan list': [[], []],
   'plan show': [['stub'], ['tracker']],
   'plan validate': [['file'], []],
+  'issue list': [[], ['state', 'type', 'module', 'search', 'limit']],
+  'issue show': [['id'], []],
+  'issue create': [[], ['title', 'body', 'type', 'module', 'priority']],
+  'issue comment': [['id'], ['body']],
+  'issue move': [['id', 'state'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
   'describe': [[], []],
@@ -129,6 +140,11 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['loop start --plan=.plans/PLAN-a.md --no-ci-wait', 'loop start', ['--plan=.plans/PLAN-a.md', '--no-ci-wait'], ''],
   ['start --plan=.plans/PLAN-a.md', 'loop start', ['--plan=.plans/PLAN-a.md'], deprecation('start', 'loop start')],
   ['loops start', 'loop start', [], ''],
+  ['issue list --type=bug', 'issue list', ['--type=bug'], ''],
+  ['issues show 12', 'issue show', ['12'], ''],
+  ['issue create --title=Timeouts', 'issue create', ['--title=Timeouts'], ''],
+  ['issue comment 12 --body=Reproduced', 'issue comment', ['12', '--body=Reproduced'], ''],
+  ['issue move 12 done', 'issue move', ['12', 'done'], ''],
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
@@ -199,18 +215,23 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the three subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'effort']);
+  it('registers the four subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, the phase 0 loop and effort commands, init, doctor, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start, the five issue actions, the effort commands, init, doctor, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
       'plan show',
       'plan validate',
       'loop start',
+      'issue list',
+      'issue show',
+      'issue create',
+      'issue comment',
+      'issue move',
       'effort collect',
       'effort report',
       'init',
@@ -267,7 +288,7 @@ describe('how the command tree routes', () => {
     expect(run.outcome.exitCode).toBe(0);
   });
 
-  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'effort report --help'])('answers rafa %s with help, running nothing', async (line) => {
+  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'issue --help', 'issue move --help', 'effort report --help'])('answers rafa %s with help, running nothing', async (line) => {
     const run = await dispatchRecorded(line);
 
     expect(run.ran).toEqual([]);
@@ -278,12 +299,14 @@ describe('how the command tree routes', () => {
 
   it('refuses a subject with no action, and a word naming nothing, running nothing', async () => {
     const bare = await dispatchRecorded('effort');
+    const issue = await dispatchRecorded('issue');
     const unknown = await dispatchRecorded('stop');
 
     expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report\n');
+    expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move\n');
     expect(unknown.stderr).toBe('rafa: unknown subject or command "stop"\n');
-    expect([bare.outcome.exitCode, unknown.outcome.exitCode]).toEqual([1, 1]);
-    expect([...bare.ran, ...unknown.ran]).toEqual([]);
+    expect([bare.outcome.exitCode, issue.outcome.exitCode, unknown.outcome.exitCode]).toEqual([1, 1, 1]);
+    expect([...bare.ran, ...issue.ran, ...unknown.ran]).toEqual([]);
   });
 });
 

@@ -29,7 +29,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { dispatchCaptured, plantScratchRepo } from './cli-capture.js';
+import { dispatchCaptured, dispatchInProject, plantProject, plantScratchRepo } from './cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cli-capture-')));
@@ -67,6 +67,20 @@ describe('dispatchCaptured', () => {
     expect(run.exitCode).toBe(0);
     expect([project?.root.startsWith(temporary), project?.home.startsWith(temporary)]).toEqual([true, true]);
     expect(existsSync(project?.root ?? tempBase)).toBe(false);
+  });
+});
+
+describe('plantProject and dispatchInProject', () => {
+  it('dispatch from the root of a project the case planted, leaving the project and its config in place', async () => {
+    const seen: (ProjectFound | null)[] = [];
+    const planted = plantProject(mkdtempSync(join(tempBase, 'planted-')), 'store: ndjson\n');
+
+    const run = await dispatchInProject(['loop', 'start'], [{ name: 'loop', summary: 'the loop' }], [recorder(seen)], planted);
+
+    expect(run.exitCode).toBe(0);
+    expect([seen[0]?.root, seen[0]?.home]).toEqual([planted.root, planted.home]);
+    expect(planted.root.startsWith(`${tempBase}/`)).toBe(true);
+    expect([readFileSync(configFilePath(planted.root), 'utf8'), existsSync(planted.home)]).toEqual(['store: ndjson\n', true]);
   });
 });
 

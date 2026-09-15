@@ -9,7 +9,10 @@
  * of its own: a temporary directory holding the `.rafa/config.yaml`
  * `rafa init` writes, beside an empty home, both removed once it answers.
  * So a command needing a project finds one, and no walk reaches the
- * suite's working directory or the real home.
+ * suite's working directory or the real home. A case reading what a
+ * command left in its project plants one with {@link plantProject} under
+ * a directory the case owns, and dispatches from its root with
+ * {@link dispatchInProject}, which removes nothing.
  *
  * Spawned, the child runs under a scratch repository whose HOME, `bin/`
  * directory and call log sit beside it in a temporary directory, never
@@ -80,10 +83,59 @@ export function plantProjectConfig(root: string, text: string = projectConfigTex
   return file;
 }
 
+/** A project a case planted: its root, holding `.rafa/config.yaml`, beside an empty home. */
+export interface PlantedProject {
+  /** The project root, holding `.rafa/config.yaml`. */
+  readonly root: string;
+  /** The home the dispatcher's walk passes over, empty. */
+  readonly home: string;
+}
+
+/**
+ * Plants a project under `scope`, a directory that exists: `project/`
+ * holding {@link plantProjectConfig}'s file, written with `text` unless
+ * it is left out, and an empty `home/` beside it. Answers both paths.
+ */
+export function plantProject(scope: string, text: string = projectConfigText()): PlantedProject {
+  const root = join(scope, 'project');
+  const home = join(scope, 'home');
+  plantProjectConfig(root, text);
+  mkdirSync(home);
+  return { root, home };
+}
+
+/**
+ * Dispatches `words` in-process over a registry of `subjects` and
+ * `commands` from the root of `project`, with streams, a clock and the
+ * environment `env` of its own. Nothing is removed afterwards; see the
+ * module note.
+ */
+export async function dispatchInProject(
+  words: readonly string[],
+  subjects: readonly SubjectSpec[],
+  commands: readonly RafaCommand[],
+  project: PlantedProject,
+  env: Readonly<Record<string, string>> = {},
+): Promise<CapturedRun> {
+  const stdout = memoryStream();
+  const stderr = memoryStream();
+  const { exitCode } = await dispatch(words, {
+    registry: createCommandRegistry({ subjects, commands }),
+    env,
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+    now: () => new Date('2026-09-15T12:00:00.000Z'),
+    cwd: project.root,
+    home: project.home,
+  });
+  return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
+}
+
 /**
  * Dispatches `words` in-process over a registry of `subjects` and
  * `commands`, with streams, a clock and the environment `env` of its own,
- * inside a temporary project of its own; see the module note.
+ * inside a temporary project of its own, removed once it answers; see the
+ * module note.
  */
 export async function dispatchCaptured(
   words: readonly string[],
@@ -91,24 +143,9 @@ export async function dispatchCaptured(
   commands: readonly RafaCommand[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<CapturedRun> {
-  const stdout = memoryStream();
-  const stderr = memoryStream();
   const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dispatch-captured-')));
   try {
-    const cwd = join(scope, 'project');
-    const home = join(scope, 'home');
-    plantProjectConfig(cwd);
-    mkdirSync(home);
-    const { exitCode } = await dispatch(words, {
-      registry: createCommandRegistry({ subjects, commands }),
-      env,
-      stdout: stdout.stream,
-      stderr: stderr.stream,
-      now: () => new Date('2026-09-15T12:00:00.000Z'),
-      cwd,
-      home,
-    });
-    return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
+    return await dispatchInProject(words, subjects, commands, plantProject(scope), env);
   } finally {
     rmSync(scope, { recursive: true, force: true });
   }
