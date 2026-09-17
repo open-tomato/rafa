@@ -42,6 +42,14 @@ import {
  * cases is a reading that could have failed. Where a case asserts a
  * tracker is not looked at, a control beside it plants the same tracker
  * where it is looked at and reads a refusal.
+ *
+ * The forced cases read the replacement through a planted runtime
+ * directory ({@link plantRuntime}) whose files the new build does not
+ * write: gone afterwards is the whole replacement, and each case that
+ * forces has the same world refusing unforced beside it as its control.
+ * Where a case asserts nothing was left beside the version's directory,
+ * it reads the runtime root, which the staging and outgoing directories
+ * would be in.
  */
 
 const FENCE = '```';
@@ -76,6 +84,8 @@ interface World {
   bunLinkPath: string;
   /** Where the bun link points: an earlier runtime's `cli.js`. */
   earlierTarget: string;
+  /** `~/.rafa/runtime`, holding one directory per version installed. */
+  runtimeRoot: string;
   /** Where this run's version lands. */
   runtimeDir: string;
 }
@@ -100,6 +110,7 @@ function plantWorld(manifest: Record<string, unknown> = { name: RAFA_PACKAGE_NAM
     linkPath: join(binDir, 'rafa'),
     bunLinkPath,
     earlierTarget,
+    runtimeRoot: join(home, '.rafa', 'runtime'),
     runtimeDir: join(home, '.rafa', 'runtime', VERSION),
   };
 }
@@ -187,9 +198,17 @@ function expectDone(outcome: InstallOutcome): Extract<InstallOutcome, { kind: 'd
 
 /** The tracker names of a refused outcome, or none. */
 function refusedPaths(outcome: InstallOutcome): string[] {
-  return outcome.kind === 'refused'
+  return outcome.kind === 'refused' && outcome.reason === 'trackers'
     ? outcome.trackers.map((tracker) => tracker.path)
     : [];
+}
+
+/** A runtime directory for {@link VERSION} holding a `cli.js` and a marker of its own. */
+function plantRuntime(world: World): void {
+  mkdirSync(join(world.runtimeDir, 'plan'), { recursive: true });
+  writeFileSync(join(world.runtimeDir, 'cli.js'), 'the runtime in use\n');
+  writeFileSync(join(world.runtimeDir, 'index-stale9999.js'), 'export const stale = 1;\n');
+  writeFileSync(join(world.runtimeDir, 'plan', 'marker.txt'), 'planted\n');
 }
 
 describe('installRuntime refuses while a tracker in plan.dir has a task left', () => {
@@ -205,6 +224,7 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
 
     expect(outcome).toEqual({
       kind: 'refused',
+      reason: 'trackers',
       planDir: join(world.repoRoot, '.rafa', 'plans'),
       trackers: [{
         path: join('.rafa', 'plans', 'PLAN_TRACKER-running.md'),
@@ -234,6 +254,7 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
 
     expect(outcome).toMatchObject({
       kind: 'refused',
+      reason: 'trackers',
       trackers: [{ task: { task: 'a blocked task', lineNum: 1, status: 'blocked' } }],
     });
     expect(exitCodeFor(outcome)).toBe(EXIT_REFUSED);
@@ -278,6 +299,117 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
 
     expect(outcome.kind).toBe('done');
     expect(inside.builds).toEqual([world.repoRoot]);
+  });
+});
+
+describe('installRuntime refuses a version already installed', () => {
+  it('refuses when the version directory is there, naming it and the version, building nothing', () => {
+    const world = plantWorld();
+    plantRuntime(world);
+    // A dist an earlier build left, which a run that did not refuse could copy.
+    writeDist(world.repoRoot);
+    const run = harness(world, cleanBuild);
+    const before = fingerprint(base);
+
+    const outcome = installRuntime(run.seams);
+
+    expect(outcome).toEqual({ kind: 'refused', reason: 'runtime-exists', version: VERSION, runtimeDir: world.runtimeDir });
+    expect(exitCodeFor(outcome)).toBe(EXIT_REFUSED);
+    expect(run.builds).toEqual([]);
+    expect(fingerprint(base)).toEqual(before);
+    expect(existsSync(world.linkPath)).toBe(false);
+    expect(outcomeProblem(outcome, world.repoRoot)).toEqual([
+      `REFUSED — ${world.runtimeDir} already holds version ${VERSION}, the version in package.json, and a loop may be running from it.`,
+      'nothing was built, copied or linked. Raise the version in package.json,'
+        + ' or run it again with --force to replace that directory whole.',
+    ]);
+  });
+
+  it('refuses an empty version directory too, and installs when only another version is there', () => {
+    const world = plantWorld();
+    // The control: the runtime root holds 0.0.1 alone, and this version installs.
+    expect(installRuntime(harness(world, cleanBuild).seams).kind).toBe('done');
+
+    rmSync(world.runtimeDir, { recursive: true, force: true });
+    mkdirSync(world.runtimeDir, { recursive: true });
+    const run = harness(world, cleanBuild);
+
+    expect(installRuntime(run.seams)).toMatchObject({ kind: 'refused', reason: 'runtime-exists' });
+    expect(run.builds).toEqual([]);
+  });
+
+  it('names the trackers first when a tracker also has a task left', () => {
+    const world = plantWorld();
+    plantRuntime(world);
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-running.md', ['- [ ] a task left']);
+    const run = harness(world, cleanBuild);
+
+    expect(installRuntime(run.seams)).toMatchObject({ kind: 'refused', reason: 'trackers' });
+
+    // The control: with the tracker finished, the same world refuses for the runtime.
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-running.md', ['- [x] a task done']);
+    expect(installRuntime(harness(world, cleanBuild).seams)).toMatchObject({ kind: 'refused', reason: 'runtime-exists' });
+  });
+});
+
+describe('installRuntime forced replaces the version directory whole', () => {
+  it('drops every file the old build left, leaves no staging directory, and links at the new cli.js', () => {
+    const world = plantWorld();
+    plantRuntime(world);
+    const run = harness(world, cleanBuild);
+
+    // The control: the same world, unforced, refuses and builds nothing.
+    expect(installRuntime(run.seams)).toMatchObject({ kind: 'refused', reason: 'runtime-exists' });
+    expect(run.builds).toEqual([]);
+
+    const outcome = expectDone(installRuntime(run.seams, { force: true }));
+
+    expect(outcome.copied).toBe(Object.keys(BUILT).length);
+    expect(run.builds).toEqual([world.repoRoot]);
+    for (const [rel, text] of Object.entries(BUILT)) {
+      expect(readFileSync(join(world.runtimeDir, rel), 'utf8'), rel).toBe(text);
+    }
+    expect(existsSync(join(world.runtimeDir, 'index-stale9999.js'))).toBe(false);
+    expect(existsSync(join(world.runtimeDir, 'plan', 'marker.txt'))).toBe(false);
+    expect(readdirSync(world.runtimeRoot).sort()).toEqual(['0.0.1', VERSION]);
+    expect(statSync(join(world.runtimeDir, 'cli.js')).mode & 0o111).toBe(0o111);
+    expect(realpathSync(world.linkPath)).toBe(join(world.runtimeDir, 'cli.js'));
+    expect(readFileSync(world.earlierTarget, 'utf8')).toBe('the earlier runtime\n');
+    expect(run.out).toContain(`copying ${join(world.repoRoot, 'dist')} over ${world.runtimeDir}, replacing it whole`);
+  });
+
+  it('installs into a version directory that is not there, saying it copied into it', () => {
+    const world = plantWorld();
+    const run = harness(world, cleanBuild);
+
+    const outcome = expectDone(installRuntime(run.seams, { force: true }));
+
+    expect(outcome.copied).toBe(Object.keys(BUILT).length);
+    expect(readdirSync(world.runtimeRoot).sort()).toEqual(['0.0.1', VERSION]);
+    expect(run.out).toContain(`copying ${join(world.repoRoot, 'dist')} into ${world.runtimeDir}`);
+  });
+
+  it('leaves the runtime it was replacing in place when the copy fails, with no staging directory left', () => {
+    const world = plantWorld();
+    plantRuntime(world);
+    const run = harness(world, (root) => {
+      writeDist(root);
+      // An entry that is neither a file nor a directory, which the copy throws on.
+      symlinkSync(join(root, 'dist', 'cli.js'), join(root, 'dist', 'linked.js'));
+      return 0;
+    });
+
+    const outcome = installRuntime(run.seams, { force: true });
+
+    expect(outcome).toMatchObject({ kind: 'failed', stage: 'copy' });
+    expect(outcomeProblem(outcome, world.repoRoot)?.[0]).toContain('is neither a file nor a directory');
+    expect(exitCodeFor(outcome)).toBe(EXIT_COULD_NOT_RUN);
+    expect(readFileSync(join(world.runtimeDir, 'cli.js'), 'utf8')).toBe('the runtime in use\n');
+    expect(readFileSync(join(world.runtimeDir, 'plan', 'marker.txt'), 'utf8')).toBe('planted\n');
+    expect(readdirSync(world.runtimeRoot).sort()).toEqual(['0.0.1', VERSION]);
+    expect(existsSync(world.linkPath)).toBe(false);
+    expect(outcomeProblem(outcome, world.repoRoot)?.[1])
+      .toBe('the runtime directory holds the build it held or this one, never a mix, and the link was not changed.');
   });
 });
 
@@ -434,10 +566,6 @@ describe('a clean run', () => {
   it('lands cli.js under the runtime directory with ~/.rafa/bin/rafa resolving to it, leaving ~/.bun/bin/rafa alone', () => {
     const world = plantWorld();
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-finished.md', ['- [x] a finished task', '- [x] another']);
-    // The version's directory usually exists already.
-    mkdirSync(world.runtimeDir, { recursive: true });
-    writeFileSync(join(world.runtimeDir, 'cli.js'), 'the runtime being replaced\n');
-    writeFileSync(join(world.runtimeDir, 'index-stale9999.js'), 'export const stale = 1;\n');
     const run = harness(world, cleanBuild);
     const before = fingerprint(base);
 
@@ -461,7 +589,6 @@ describe('a clean run', () => {
       expect(readFileSync(join(world.runtimeDir, rel), 'utf8'), rel).toBe(text);
     }
     expect(statSync(cli).mode & 0o111).toBe(0o111);
-    expect(readFileSync(join(world.runtimeDir, 'index-stale9999.js'), 'utf8')).toBe('export const stale = 1;\n');
 
     expect(lstatSync(world.linkPath).isSymbolicLink()).toBe(true);
     expect(readlinkSync(world.linkPath)).toBe(cli);
@@ -471,6 +598,7 @@ describe('a clean run', () => {
 
     expect(readdirSync(world.binDir)).toEqual(['rafa']);
     expect(readdirSync(world.runtimeDir).filter((name) => name.includes('.snapshot-'))).toEqual([]);
+    expect(readdirSync(world.runtimeRoot).sort()).toEqual(['0.0.1', VERSION]);
     expect(run.out.at(-1)).toBe(`${world.linkPath} resolves to ${cli}`);
     expect(run.warnings).toEqual([]);
 

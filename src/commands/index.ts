@@ -54,9 +54,10 @@
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
  *     checks, checked and printed with no run started, beside two
  *     warnings about the install.
- *   - `self-update`, top-level: builds the rafa checkout and installs it
- *     as `~/.rafa/bin/rafa`, refusing while a tracker in `plan.dir` holds a
- *     task.
+ *   - `self-update [--force]`, top-level: builds the rafa checkout and
+ *     installs it as `~/.rafa/bin/rafa`, refusing while a tracker in
+ *     `plan.dir` holds a task and while this version's runtime directory
+ *     is already there, which `--force` replaces whole.
  *   - `usage`, top-level.
  *   - `describe`, top-level: the schema 2 roster of the registry the line
  *     was routed through.

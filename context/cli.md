@@ -178,10 +178,15 @@ module's note is the long form.
   `plan.dir` as `loop start` resolves the config, then each
   `PLAN_TRACKER*.md` directly in `plan.dir`, refusing while one holds an
   open or blocked task; the project root and subdirectories of `plan.dir`
-  are not looked in. Then it runs `bun run build`, copies `dist/` into
-  `~/.rafa/runtime/<version>/` file by file, each by a rename, and renames
-  a new link over `~/.rafa/bin/rafa`, making the directory when missing.
-  `~/.bun/bin/rafa` is not touched. The home is the project's. Each step
+  are not looked in. Then, still before building, it refuses while
+  `~/.rafa/runtime/<version>/` is already there, naming that directory and
+  the version, unless `--force` is on the line: a version is installed
+  once, and a loop may be running from that directory. Then it runs
+  `bun run build`, copies `dist/` into a staging directory in
+  `~/.rafa/runtime/` file by file, each by a rename, renames that
+  directory into the version's place, removing what it held whole, and
+  renames a new link over `~/.rafa/bin/rafa`, making the directory when
+  missing. `~/.bun/bin/rafa` is not touched. The home is the project's. Each step
   is an `info` line; the build's stdout is written at `info` and its
   stderr at `warn` once it ends, so json mode's stdout stays NDJSON.
   After an install it warns when `~/.rafa/bin` is not ahead of
@@ -240,7 +245,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` neither a flag nor an argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. Of the `issue` actions, `list` declares the
@@ -290,8 +295,10 @@ module's note is the long form.
   config `loadConfig` refuses and a
   PREREQUISITES file that cannot be read, each message ending with the
   line `Nothing was checked.`, and for a failed required item, its message the runner's halt.
-  `self-update` throws 1 for a positional word and for a tracker in
-  `plan.dir` holding a task, naming each; and 2, the message naming the
+  `self-update` throws 1 for a positional word, for a `--force` value
+  other than `true` or `false`, for a tracker in `plan.dir` holding a
+  task, naming each, and for a `~/.rafa/runtime/<version>/` already there
+  without `--force`, naming it and the version; and 2, the message naming the
   step and what it leaves changed, for a `package.json` that cannot be
   read or names another package or no usable version, a config
   `loadConfig` refuses, a `plan.dir` that cannot be read, and a build,

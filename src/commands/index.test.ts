@@ -124,7 +124,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'module exec': [['module', 'action'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
-  'self-update': [[], []],
+  'self-update': [[], ['force']],
   'describe': [[], []],
 };
 

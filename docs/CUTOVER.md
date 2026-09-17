@@ -27,7 +27,10 @@ bun run snapshot
 ```
 
 This copies the built runtime into `~/.rafa/runtime/<version>/` and links
-`~/.rafa/bin/rafa`. Verify that `~/.rafa/bin` is on your `PATH` ahead of
+`~/.rafa/bin/rafa`. A version is installed once: it refuses, before
+building, while that directory is already there, since a loop may be
+running from it. Add `--force` to build and replace that directory whole.
+Verify that `~/.rafa/bin` is on your `PATH` ahead of
 `~/.bun/bin`:
 
 ```bash
@@ -314,11 +317,13 @@ which rafa
 echo $PATH | tr ':' '\n' | grep -E 'rafa|bun'
 ```
 
-If `which rafa` returns nothing, reinstall the snapshot:
+If `which rafa` returns nothing, reinstall the snapshot. A plain
+`bun run snapshot` refuses while `~/.rafa/runtime/<version>/` is already
+there, so force it over that directory:
 
 ```bash
 cd /Users/marcos/projects/open-tomato/rafa
-bun run snapshot
+bun run snapshot --force
 ```
 
 ### Store Backend Mismatch

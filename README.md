@@ -64,9 +64,19 @@ open or blocked task, and name every such tracker. `rafa self-update`
 runs only inside a project, so `rafa init` the checkout first. They exit
 2 when they could not run: a `package.json` that is not rafa's or cannot
 be read, a config or tracker they could not read, or a build, copy or
-link that failed. A loop may be running from the runtime they replace,
-so each file and then the link land by a rename, and nothing already in
-the runtime directory is deleted.
+link that failed.
+
+A version is installed once. Both also exit 1, before building, when
+`~/.rafa/runtime/<version>/` is already there, naming that directory and
+the version `package.json` gave: a loop may be running from it, and a
+second build under the same version would swap its runner. Raise the
+version to install beside it. `bun run snapshot --force` and
+`rafa self-update --force` install over it anyway, replacing the
+directory whole, so nothing the old build left is kept: the replacement
+is copied beside the directory and renamed into its place, and only then
+is the old one removed, so no reader meets a half-replaced runtime. The
+link lands by a rename too, so a shell meets the old link or the new one
+and never none.
 
 ## Runtime
 
