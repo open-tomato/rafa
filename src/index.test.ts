@@ -452,6 +452,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/module/exec.js', [['../../cli/command.js', ['CommandExit']], ['../../cli/registry.js', ['mountKey']]]],
+  ['./commands/agent/vendor.js', [
+    ['../../agents/roster.js', ['readAgentDefinitions']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../utils/agent-definition.js', ['AGENT_DEFINITION_DIR', 'readFrontmatter']],
+  ]],
+  ['./commands/agent/list.js', [
+    ['../../agents/roster.js', ['resolveAgentRoster', 'VENDOR_COMMAND']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config.js', ['ConfigError']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+  ]],
   ['./commands/init.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../config-load.js', ['loadConfig']],
@@ -654,6 +666,8 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/issue/move.js',
       './commands/module/list.js',
       './commands/module/exec.js',
+      './commands/agent/vendor.js',
+      './commands/agent/list.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/self-update.js',

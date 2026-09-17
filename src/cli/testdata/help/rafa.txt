@@ -11,6 +11,7 @@ Quick start:
   rafa issue list
   rafa effort collect
   rafa module list
+  rafa agent vendor tdd-guide
   rafa init
   rafa doctor
   rafa self-update
@@ -23,6 +24,7 @@ Subjects:
   issue    the tracker: list, show, create, comment on and move issues
   effort   collect session and commit rows; report per plan
   module   list the configured modules; run an action a module provides
+  agent    copy an agent definition into the project; list what a session sees
 
 Commands:
   init, doctor, self-update, usage, describe

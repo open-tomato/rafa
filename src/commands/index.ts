@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-four registered so far wrap a
+ * of each is its command. Five of the twenty-six registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -27,7 +27,8 @@
  * `issue/issue-tracker.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
- * the mounts the dispatcher made.
+ * the mounts the dispatcher made, nor `agent vendor` and `agent list`,
+ * which copy and read agent definitions through `src/agents/roster.ts`.
  *
  * ## What is registered
  *
@@ -49,6 +50,9 @@
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
+ *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
+ *     definition copied into the project with a source header, and
+ *     `agent list`, the names a session this project spawns resolves.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -65,7 +69,7 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the five with an action registered: a subject with
+ * The subjects are the six with an action registered: a subject with
  * none would show in every roster and dispatch nothing.
  */
 import type { RafaCommand } from '../cli/command.js';
@@ -73,6 +77,8 @@ import type { SubjectSpec } from '../cli/registry.js';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
+import agentList from './agent/list.js';
+import agentVendor from './agent/vendor.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
@@ -105,6 +111,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
+  { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
 ]);
 
 /** The core commands, in roster order. */
@@ -128,6 +135,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortReport,
   moduleList,
   moduleExec,
+  agentVendor,
+  agentList,
   init,
   doctor,
   selfUpdate,

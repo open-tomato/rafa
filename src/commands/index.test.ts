@@ -1,12 +1,12 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the twenty-four commands it registers: what the registry
+ * declarations of the twenty-six commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
- * the five `issue` actions, `module list` and `module exec` wrap none, and each is held to the
+ * the five `issue` actions, `module list`, `module exec`, `agent vendor` and `agent list` wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
  *
@@ -98,6 +98,8 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'effort report': ['text', 'json'],
   'module list': ['text', 'json'],
   'module exec': ['text', 'json'],
+  'agent vendor': ['text', 'json'],
+  'agent list': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
   'self-update': ['text', 'json'],
@@ -122,6 +124,8 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue move': [['id', 'state'], []],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
+  'agent vendor': [['name'], ['force']],
+  'agent list': [[], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
@@ -174,6 +178,8 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
   ['module list', 'module list', [], ''],
   ['modules exec', 'module exec', [], ''],
+  ['agent vendor tdd-guide', 'agent vendor', ['tdd-guide'], ''],
+  ['agents list', 'agent list', [], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['self-update', 'self-update', [], ''],
@@ -242,12 +248,12 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the five subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module']);
+  it('registers the six subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module', 'agent']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -268,6 +274,8 @@ describe('the core roster', () => {
       'effort report',
       'module list',
       'module exec',
+      'agent vendor',
+      'agent list',
       'init',
       'doctor',
       'self-update',

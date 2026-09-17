@@ -23,6 +23,7 @@ module's note is the long form.
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help` and `rafa loop start --help` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
+| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
@@ -43,9 +44,10 @@ module's note is the long form.
   and `plan validate`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment` and `issue move`;
-  `effort collect`, `effort report`, `module list`, `module exec`, `init`,
+  `effort collect`, `effort report`, `module list`, `module exec`,
+  `agent vendor`, `agent list`, `init`,
   `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
-  `loop`, `issue`, `effort` and `module`: a
+  `loop`, `issue`, `effort`, `module` and `agent`: a
   subject is declared with its first action, never ahead of it.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
@@ -208,6 +210,45 @@ module's note is the long form.
   `~/.bun/bin` on the context's `PATH` (`readBinPath`). In json mode the
   result's `data` holds the root, the version, the runtime directory, the
   link, where it resolves, the files copied and that reading.
+- **`agent vendor <name>... [--force]` copies a home definition into the
+  project** (`src/commands/agent/vendor.ts`), which is the fix
+  `loop start`'s preflight and `plan validate` name for an `agent=` no
+  loaded scope defines. A name is a definition's frontmatter `name`, what
+  `--agent` resolves by, so the source is the `~/.claude/agents/*.md`
+  carrying it, whatever its stem, and the copy keeps that file's own name
+  under `<root>/.claude/agents/`. The copy carries one line the original
+  does not, an HTML comment naming the source file and the day, written
+  directly after the frontmatter's closing `---` — never ahead of the
+  opening one, which would leave the file carrying no frontmatter at all
+  — and as the first line of a file that opens with none. The home is the
+  project's and no config is read. Every name is checked before the first
+  byte is copied, so a line naming one bad name copies none of the rest.
+  It throws exit code 1 for a `--force` value that is neither `true` nor
+  `false`, read ahead of the names so `--force` typed first, which
+  `parseArgs` hands the next word as its value, meets that refusal; for a
+  line naming no name; for a name no `~/.claude/agents` definition
+  carries; and for a destination already there, which `--force` replaces
+  whole. Each refusal ends with the line `Nothing was written.` In json
+  mode the result's `data` holds the root, `<root>/.claude/agents` and
+  one row per copy: the name, the file it came from, the file written and
+  whether one was replaced. A declaration has no variadic spelling, so
+  `rafa agent vendor --help` renders the argument as `<name>` where the
+  refusals' usage line says `<name>...`.
+- **`agent list` prints the roster a session resolves**
+  (`src/commands/agent/list.ts`), from `src/agents/roster.ts` over the
+  project the dispatcher found and the `loop.settingSources` of the
+  config that resolves there — the reading `loop start` halts on. One row
+  per name, each once and in the order the CLI resolves them: the
+  project's definitions, then `~/.claude/agents` when the sources name
+  `user`, then the measured built-ins, each row naming the scope, the
+  file, and the user-level file a project definition shadows. It spawns
+  nothing. When the home carries a name no row resolves, a trailing line
+  counts those names and points at `rafa agent vendor`; a home name the
+  project also carries is not one of them, since the name resolves. It
+  throws exit code 1 for a positional word and for a config `loadConfig`
+  refuses. In json mode the sources, the rows and those names are the
+  result's `data`, and `AgentRoster.userDefinitions`, a map, is not
+  given.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and
@@ -260,7 +301,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` neither, each with `text` and `json`. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. Of the `issue` actions, `list` declares the
