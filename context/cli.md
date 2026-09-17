@@ -14,10 +14,11 @@ module's note is the long form.
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
 | `src/cli/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
-| `src/cli/route.ts` | a line read into a command, a help request or a refusal, with no side effect |
+| `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
 | `src/cli/dispatch.ts` | one invocation: the context, the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
+| `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help` and `rafa loop start --help` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
@@ -28,7 +29,7 @@ module's note is the long form.
 | `src/commands/issue/issue-tracker.ts` | what the five `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
-| `src/commands/doctor.ts` | `rafa doctor`: the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
+| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
@@ -152,7 +153,10 @@ module's note is the long form.
   `data` holds the root, its source, the working directory, whether the
   config existed, every path checked with its change, and that reading.
 - **`doctor` checks what `loop start` would, and starts no run**
-  (`src/commands/doctor.ts`). It resolves the config as `loop start`
+  (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
+  first, before anything is checked, so the build that answered is read
+  whatever the preflight then does; json mode prints no such line. It
+  resolves the config as `loop start`
   does, then the plan `--plan=<file>` names against the project root, or
   the default plan; a plan named that is no file is refused, and with no
   default plan there the config's items are checked alone. `PLAN.md`
@@ -368,12 +372,16 @@ module's note is the long form.
 - **Help**: no routing word, a first word `help`, or `--help` or `-h`
   before a `--`. A subject alone asks for its roster before an alias
   spelled as that subject is tried.
+- **The version**: `--version` before a `--`, read ahead of every other
+  rule. It is typed alone: beside a routing word, `rafa loop --version`
+  included, it is the `unexpected_version` refusal. There is no short
+  form, since `-v` is the verbosity and `-V` is not read.
 - **An action declaring `exec` reads on**: `<module> <action>` routes to
   the command mounted under `module/<module>`. With no module word, the
   `exec` action runs itself. A mounted command's own subject and aliases
   route nothing.
 - **The refusal codes** are `unknown_subject`, `missing_action`,
-  `unknown_action` and `unknown_module`.
+  `unknown_action`, `unknown_module` and `unexpected_version`.
 
 ### The registry
 
@@ -495,11 +503,15 @@ home and the warnings read before the invocation are options.
   mode. `deprecated` sits on `RafaFlagSpec` (`src/cli/command.ts`), not
   on the copied `FlagSpec`, and `commandProblem` refuses one naming no
   `use`.
-- **The result error codes** are the four refusals, `invalid_spec` (a
+- **The result error codes** are the five routing refusals, `invalid_spec` (a
   spec `parseArgs` refuses), `no_project` (a command run outside a
   project), `command_exit`, `command_error` and `result_unwritable`.
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
+- **So is the version.** A version route writes `rafa <version>`
+  (`src/cli/version.ts`) to stdout and ends 0; json mode writes its two
+  events and no text, where `rafa describe` gives the same version as
+  data.
 
 ### Help
 
@@ -517,7 +529,8 @@ home and the warnings read before the invocation are options.
   examples are taken
   across its actions, the first of each before the second of any. The
   global flags are `--output=json` and `-v, --verbose`, the two
-  `assembleContext` reads. The spec's `--runtime=<v>` is no global flag:
+  `assembleContext` reads, and `--version`, which routing reads and which
+  takes no subject beside it. The spec's `--runtime=<v>` is no global flag:
   `loop start` alone reads it and declares it, since a flag typed ahead of
   the subject reaches the context's `flags` and never the `argv` a wrapped
   command is handed.

@@ -2,8 +2,8 @@
  * Tests for `rafa doctor` (`doctor.ts`): the preflight it checks and
  * prints for the config and a plan, the exit code a failed required item
  * gives, that it starts no run and stores no row, its refusals, the two
- * warnings beside the report, json mode, and the registered command
- * spawned.
+ * warnings beside the report, the `rafa <version>` line text mode opens
+ * with, json mode, and the registered command spawned.
  *
  * ## The world
  *
@@ -40,8 +40,10 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { version } from '../../package.json';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { versionLine } from '../cli/version.js';
 import { configFilePath } from '../config.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
@@ -69,6 +71,9 @@ const LOGIN_PROBE = 'echo "mgrep: login required" >&2; exit 3';
 
 /** The seams of every in-process case not recording its probes: the real runner, with a clock that stands still. */
 const STILL_CLOCK: DoctorSeams = { checks: { now: () => 0 } };
+
+/** The line text mode opens with, before anything is checked. */
+const VERSION_LINE = versionLine();
 
 /** The head line of a world with no plan, for `checked`. */
 function noPlanHead(checked: string): string {
@@ -187,6 +192,7 @@ describe('the preflight it prints', () => {
     expect(run.stderr).toBe('');
     expect(run.exitCode).toBe(0);
     expect(lines(run.stdout)).toEqual([
+      VERSION_LINE,
       `warn: preflight: optional item tool "mgrep" failed: probe \`${LOGIN_PROBE}\` exited 3: mgrep: login required;`
         + ' the run goes on, and each task prompt names it known-missing',
       noPlanHead('2 items from the config checked'),
@@ -213,6 +219,7 @@ describe('the preflight it prints', () => {
       '',
     ].join('\n'));
     expect(lines(failed.stdout)).toEqual([
+      VERSION_LINE,
       noPlanHead('1 item from the config checked'),
       `  fail    required tool "needed", probe \`${MISSING_TOOL_PROBE}\`, 0 ms`,
       aheadLine(failing),
@@ -220,6 +227,7 @@ describe('the preflight it prints', () => {
     expect(passed.exitCode).toBe(0);
     expect(passed.stderr).toBe('');
     expect(lines(passed.stdout)).toEqual([
+      VERSION_LINE,
       noPlanHead('1 item from the config checked'),
       '  pass    required tool "needed", probe `exit 0`, 0 ms',
       'Preflight passed: rafa loop start would go on to its first session.',
@@ -301,6 +309,7 @@ describe('the preflight it prints', () => {
     expect(named.stderr).toBe('');
     expect(named.exitCode).toBe(0);
     expect(lines(named.stdout)).toEqual([
+      VERSION_LINE,
       'Preflight for .plans/PLAN-probe.md, with PREREQUISITES-probe.md merged in: 1 item checked, no run started.',
       '  pass    required tool "The probe answers: `exit 0`", probe `exit 0`, 0 ms',
       'PREREQUISITES-probe.md names 1 step the preflight does not check:',
@@ -309,6 +318,7 @@ describe('the preflight it prints', () => {
       aheadLine(world),
     ]);
     expect(lines(unnamed.stdout)).toEqual([
+      VERSION_LINE,
       noPlanHead('nothing to check'),
       'Preflight passed: rafa loop start would go on to its first session.',
       aheadLine(world),
@@ -323,10 +333,23 @@ describe('the preflight it prints', () => {
     const run = await doctor(world);
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(0, 2)).toEqual([
+    expect(lines(run.stdout).slice(0, 3)).toEqual([
+      VERSION_LINE,
       'Preflight for .rafa/plans/PLAN.md: 1 item checked, no run started.',
       '  pass    required tool "needed", probe `exit 0`, 0 ms',
     ]);
+  });
+
+  it('opens with the running build\'s version, which json mode writes as no line at all', async () => {
+    const world = plantWorld(requiredTool('exit 0'));
+
+    const text = await doctor(world);
+    const json = await doctor(world, ['--output=json']);
+
+    expect(VERSION_LINE).toBe(`rafa ${version}`);
+    expect(lines(text.stdout)[0]).toBe(VERSION_LINE);
+    expect(json.stdout).not.toContain(VERSION_LINE);
+    expect(json.exitCode).toBe(0);
   });
 });
 
@@ -355,7 +378,7 @@ describe('its refusals', () => {
     );
     expect(empty.stderr).toBe('rafa doctor: --plan needs a file: --plan=<file>\nNothing was checked.\n');
     expect(absent.stderr).toBe(`rafa doctor: no plan file at ${join(world.root, '.plans', 'PLAN-absent.md')}\nNothing was checked.\n`);
-    expect(lines(control.stdout)[0]).toBe('Preflight for .plans/PLAN-there.md: 1 item checked, no run started.');
+    expect(lines(control.stdout)[1]).toBe('Preflight for .plans/PLAN-there.md: 1 item checked, no run started.');
   });
 
   it('refuses a plan path it cannot check, one under a file, checking nothing, beside that file', async () => {
@@ -394,9 +417,9 @@ describe('its refusals', () => {
       'Nothing was checked.',
       '',
     ].join('\n'));
-    expect(lines(run.stdout)).toEqual([`warn: ${readBinPath(refused.bunBin, refused.home).warning}`]);
+    expect(lines(run.stdout)).toEqual([VERSION_LINE, `warn: ${readBinPath(refused.bunBin, refused.home).warning}`]);
     expect(read.exitCode).toBe(0);
-    expect(lines(read.stdout)[0]).toBe(noPlanHead('nothing to check'));
+    expect(lines(read.stdout)[1]).toBe(noPlanHead('nothing to check'));
   });
 
   it('refuses a PREREQUISITES file that cannot be read, naming it, beside one it reads', async () => {
@@ -433,6 +456,7 @@ describe('the warnings beside the report', () => {
     expect(warning).not.toBeNull();
     expect(warned.exitCode).toBe(0);
     expect(lines(warned.stdout)).toEqual([
+      VERSION_LINE,
       noPlanHead('nothing to check'),
       'Preflight passed: rafa loop start would go on to its first session.',
       `warn: ${warning}`,

@@ -30,3 +30,4 @@ Commands:
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)
   -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)
+  --version       print "rafa <version>" and exit; typed alone, no short form

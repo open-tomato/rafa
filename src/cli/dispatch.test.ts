@@ -85,6 +85,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { version } from '../../package.json';
 import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { initHint } from '../project/scope.js';
@@ -94,6 +95,7 @@ import { CommandExit } from './command.js';
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
+import { versionLine } from './version.js';
 
 /** The directory the dispatcher sits in, which the child probe imports from. */
 const CLI_DIR = fileURLToPath(new URL('./', import.meta.url));
@@ -548,6 +550,27 @@ describe('text mode', () => {
     const { stdout } = await run(['--output=json', 'loop', '--help']);
 
     expect(eventsOf(stdout).map((event) => event.type)).toEqual(['start', 'result']);
+  });
+
+  it('writes the one version line for --version and exits 0, and no line in json mode', async () => {
+    const text = await run(['--version']);
+    const json = await run(['--output=json', '--version']);
+
+    expect(text.stdout).toBe(`${versionLine()}\n`);
+    expect(text.stdout).toBe(`rafa ${version}\n`);
+    expect(text.stderr).toBe('');
+    expect(text.outcome.exitCode).toBe(0);
+    expect(text.outcome.result).toEqual({ type: 'result', ok: true, ts: NOW.toISOString() });
+    expect(eventsOf(json.stdout).map((event) => event.type)).toEqual(['start', 'result']);
+    expect(json.stdout).not.toContain(versionLine());
+  });
+
+  it('refuses --version beside a routing word, writing no version line', async () => {
+    const { outcome, stdout, stderr } = await run(['loop', '--version']);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(stderr).toBe('rafa: "--version" is typed alone and takes no other word; got "loop"\n');
+    expect(stdout).toBe('');
   });
 
   it('writes a usage line for each help level by default', () => {

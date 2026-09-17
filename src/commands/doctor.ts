@@ -69,15 +69,19 @@
  *
  * ## What it prints
  *
- * In text mode, {@link renderDoctor}'s lines: a head naming the plan, or
- * where none was found, and the PREREQUISITES file merged in; one line per
- * check; the steps that file names and nothing checks; and the verdict with
- * any `known-missing:` lines. A halt has no verdict line: it is the
- * refusal, on stderr. In json mode the terminal result's `data` is a
- * {@link DoctorResult}, every path absolute, for a preflight that did not
- * halt. A halt gives no `data`: the terminal event is the `command_exit`
- * error, whose message is the halt naming every failed required item. In
- * either mode each warning is a `warn` line, a `log` event in json mode.
+ * In text mode, `rafa <version>` (`src/cli/version.ts`) first, printed
+ * before anything is checked so a person reads which build answered
+ * whatever the preflight then does; then {@link renderDoctor}'s lines: a
+ * head naming the plan, or where none was found, and the PREREQUISITES
+ * file merged in; one line per check; the steps that file names and
+ * nothing checks; and the verdict with any `known-missing:` lines. A halt
+ * has no verdict line: it is the refusal, on stderr. json mode prints no
+ * version line, where `rafa describe` gives the same version as data, and
+ * the terminal result's `data` is a {@link DoctorResult}, every path
+ * absolute, for a preflight that did not halt. A halt gives no `data`:
+ * the terminal event is the `command_exit` error, whose message is the
+ * halt naming every failed required item. In either mode each warning is
+ * a `warn` line, a `log` event in json mode.
  *
  * ## Seams
  *
@@ -97,6 +101,7 @@ import type { ProjectFound } from '../project/scope.js';
 import { basename, relative, resolve, sep } from 'node:path';
 
 import { CommandExit } from '../cli/command.js';
+import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError } from '../config.js';
@@ -378,6 +383,7 @@ function projectOf(context: RafaContext): ProjectFound {
 /** Runs `doctor` with `seams`; see the module note. */
 async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void> {
   const project = projectOf(context);
+  if (context.outputMode !== 'json') context.output.info(versionLine());
   const install = readInstall(context, project);
   try {
     const preflight = await checkPreflight(context, project, seams);

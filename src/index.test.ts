@@ -462,6 +462,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/doctor.js', [
     ['../cli/command.js', ['CommandExit']],
+    ['../cli/version.js', ['versionLine']],
     ['../config-load.js', ['loadConfig']],
     ['../config-sections.js', ['messageOf']],
     ['../config.js', ['ConfigError']],
