@@ -124,13 +124,24 @@ module's note is the long form.
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
-  `plan validate <file>` resolves the file against the working directory
-  and reads no repository, though like every command but `module exec`,
-  `init` and `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
-  `<file>:<line>: <reason>: <text>`, then throws exit code 1 when there is
-  one. In json mode a list, a plan and a clean validation are the terminal
-  result's `data`, and each issue is an `error` `log` event; text mode
-  writes lines and no `result: ` line.
+  `plan validate <file>` resolves the file against the working directory,
+  and like every command but `module exec`, `init` and `describe` it runs
+  only inside a project. It writes each `parsePlan` issue at `error` as
+  `<file>:<line>: <reason>: <text>`, then the `agent=` of each
+  still-to-run task that no scope the project's `loop.settingSources`
+  loads defines, as `<file>: <the line `missingAgentLine` words>` naming
+  the agent, the lines that asked for it and its `rafa agent vendor`
+  fix or that no user definition carries it
+  (`src/agents/roster.ts`). It throws exit code 1 when there is either,
+  with a message counting both. That is the check `loop start`'s
+  preflight halts on, so a plan the loop would refuse is refused here
+  too. The roster is the project the dispatcher found and the config that
+  resolves there, which is the only thing this command reads beyond the
+  file; handed no project it says so and checks no agent. In json mode a
+  list, a plan and a clean validation are the terminal result's `data`,
+  the validation carrying an empty `issues` and an empty `missingAgents`,
+  and each issue and each missing agent is an `error` `log` event; text
+  mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
   `plan create` calls it.
@@ -270,9 +281,11 @@ module's note is the long form.
   `--runtime` typed ahead of the subject; then for an unusable config, a plan
   file that does not exist, a default branch, a session record refusing
   the run, session records that cannot be read or written, and a
-  preflight that halts before any session: a failed required
-  prerequisite, a PREREQUISITES file that cannot be read, or checks the
-  store refused (`start/preflight.ts`). A record of the plan refuses the
+  preflight that halts before any session: an `agent=` of a still-to-run
+  task that no scope `loop.settingSources` loads defines, checked ahead
+  of every probe, a failed required prerequisite, a PREREQUISITES file
+  that cannot be read, or checks the store refused
+  (`start/preflight.ts`). A record of the plan refuses the
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
   `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1
@@ -287,8 +300,9 @@ module's note is the long form.
   The plan readers throw 1 for a line handing them the wrong number of
   arguments, `plan show` also for a stub no plan stamp can carry, a stub
   naming no plan or no tracker and a `--tracker` value other than `true`
-  or `false`, and `plan validate` also for a path that is no file and for
-  a plan with an issue. `init` throws 1 for a positional word, a `--yes`
+  or `false`, and `plan validate` also for a path that is no file, for
+  a plan with an issue, for a plan naming an agent no loaded scope
+  defines, and for a config `loadConfig` refuses. `init` throws 1 for a positional word, a `--yes`
   value other than `true` or `false`, a `--root` with no path, a refused
   root, no terminal with neither flag given, input ending before a root
   is chosen, a path the scopes cannot be written at, a config

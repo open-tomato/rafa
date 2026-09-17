@@ -363,7 +363,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan-files.js', ['checkbox', 'countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'planFileName', 'PLANS_DIR']],
   ]],
   ['./commands/plan/validate.js', [
+    ['../../agents/roster.js', ['missingAgentLine', 'missingPlanAgents', 'resolveAgentRoster']],
     ['../../cli/command.js', ['CommandExit']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config.js', ['ConfigError']],
     ['../../plan/index.js', ['parsePlan']],
     ['./plan-files.js', ['countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'plural']],
   ]],

@@ -15,6 +15,15 @@
  * so the prompt read is the bytes a session would take on stdin, stamp
  * included.
  *
+ * The roster cases plant their own home as well as their own root, and
+ * hand both to the run, so a case that lost one would read this
+ * machine's `~/.claude/agents`; the first of them asserts both resolve
+ * under this file's scratch directory. Each reading that halts on a
+ * missing agent sits beside a control differing in one thing only — the
+ * sources loaded, the project's definitions, the checkbox of the line,
+ * or which of the plan and the tracker exists — so a check applied to
+ * everything reddens the control.
+ *
  * Twenty-nine mutations were driven against this file on 2026-09-15, 25
  * of `start/preflight.ts` and 4 of the notice in `start/dispatch.ts`, each
  * an exact string found once, the file run alone on a baseline of 14 pass
@@ -50,12 +59,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { CONFIG_DEFAULTS } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { planStubFromPrompt } from '../utils/plan-stamp.js';
-import { findNextTask } from '../utils/tracker.js';
+import { findNextTask, trackerPathFor } from '../utils/tracker.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';
@@ -92,6 +102,7 @@ const MGREP: OptionalPrerequisiteItem = Object.freeze({
 const CHECKING_ONE = `\n🛫 Preflight: checking 1 prerequisite item(s) under run ${RUN_ID}.`;
 
 let rooted = 0;
+let homed = 0;
 
 /** A fresh repo root under this file's scratch directory, holding `.plans/`. */
 function freshRoot(): string {
@@ -110,6 +121,35 @@ function planPathIn(root: string): string {
 function prerequisitesPathIn(root: string): string {
   return join(root, '.plans', `PREREQUISITES-${STUB}.md`);
 }
+
+/** A fresh home under this file's scratch directory, for the roster check. */
+function freshHome(): string {
+  homed += 1;
+  const home = join(tempRoot, `home-${homed}`);
+  mkdirSync(home, { recursive: true });
+  return home;
+}
+
+/** Writes `<root>/.claude/agents/<name>.md` carrying that name as its frontmatter. */
+function plantAgent(root: string, name: string): void {
+  const dir = join(root, '.claude', 'agents');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${name}.md`), `---\nname: ${name}\n---\nThe agent body.\n`, 'utf8');
+}
+
+/**
+ * A checklist routing two open tasks and one blocked one to agents, one
+ * of them defined in the home alone and one nowhere at all.
+ */
+const TASKS_NAMING_AGENTS = [
+  '# Stage: one',
+  '',
+  '- [ ] Write the tests  {agent=tdd-guide}',
+  '- [ ] Ask the void  {agent=no-such-agent}',
+  '- [x] Already ran  {agent=also-nowhere}',
+  '- [BLOCKED] Ask again  {agent=no-such-agent}',
+  '',
+].join('\n');
 
 /** The two tiers a run is configured with. */
 function settingsOf(
@@ -462,6 +502,137 @@ describe('a PREREQUISITES file that cannot be read', () => {
 
     expect(control.refusal).toBeNull();
     expect(control.probes).toEqual([`bun --version in ${controlRoot}`]);
+  });
+});
+
+describe('the agent roster check', () => {
+  it('halts with exit code 1 naming each missing agent and its fix, having run no probe and stored nothing', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    plantAgent(home, 'tdd-guide');
+    writeFileSync(planPathIn(root), TASKS_NAMING_AGENTS, 'utf8');
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+    // The control differs only in the sources, which bring the home into reach.
+    const control = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents: { settingSources: ['user', 'project', 'local'], home },
+    });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message.split('\n')).toEqual([
+      `❌ Refusing to start: PLAN-${STUB}.md names 2 agent(s) no loaded scope defines`
+        + ' (loop.settingSources: project, local).',
+      '   agent "tdd-guide" (line 3) resolves under no loaded scope: run `rafa agent vendor tdd-guide`',
+      '   agent "no-such-agent" (lines 4, 6) resolves under no loaded scope:'
+        + ' no definition under ~/.claude/agents to vendor',
+      '   Nothing was checked and nothing was dispatched.',
+    ]);
+    expect([run.probes, run.info, run.warn]).toEqual([[], [], []]);
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+
+    // Under `user` only `no-such-agent` is left, so the halt is the roster's and not the sources'.
+    expect(control.refusal?.message).toContain('names 1 agent(s) no loaded scope defines');
+    expect(control.refusal?.message).not.toContain('"tdd-guide"');
+    expect([root, home].every((planted) => planted.startsWith(tempRoot))).toBe(true);
+  });
+
+  it('lets a run through once the project defines every agent its open tasks name', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    writeFileSync(planPathIn(root), TASKS_NAMING_AGENTS, 'utf8');
+    for (const name of ['tdd-guide', 'no-such-agent']) plantAgent(root, name);
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([`bun --version in ${root}`]);
+  });
+
+  it('reads the tracker when one sits beside the plan, and the plan when none does', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    plantAgent(root, 'in-the-project');
+    writeFileSync(planPathIn(root), '- [ ] Write it  {agent=in-the-project}\n', 'utf8');
+
+    const withoutTracker = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+
+    writeFileSync(trackerPathFor(planPathIn(root)), '- [ ] Write it  {agent=only-in-the-tracker}\n', 'utf8');
+    const withTracker = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+
+    expect(withoutTracker.refusal).toBeNull();
+    expect(withTracker.refusal?.exitCode).toBe(1);
+    expect(withTracker.refusal?.message).toContain(`PLAN_TRACKER-${STUB}.md names 1 agent(s)`);
+    expect(withTracker.refusal?.message).toContain('"only-in-the-tracker"');
+  });
+
+  it('passes over a ticked task, and a checklist that cannot be read', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    const unreadable = freshRoot();
+    writeFileSync(planPathIn(root), '- [x] Write it  {agent=already-ran}\n', 'utf8');
+
+    const ticked = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+    // No plan file at all: the absence is `start()`'s refusal, not this one's.
+    const absent = await drive(unreadable, settingsOf([], []), {}, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+
+    expect([ticked.refusal, absent.refusal]).toEqual([null, null]);
+
+    // The control: the same line still to run does halt, so the two readings above are not vacuous.
+    writeFileSync(planPathIn(root), '- [ ] Write it  {agent=already-ran}\n', 'utf8');
+    const open = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+
+    expect(open.refusal?.message).toContain('"already-ran"');
+  });
+
+  it('resolves the sources and the home the run was configured with, defaulting the sources to the config default', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    plantAgent(home, 'tdd-guide');
+    writeFileSync(planPathIn(root), '- [ ] Write the tests  {agent=tdd-guide}\n', 'utf8');
+
+    const defaulted = await drive(root, settingsOf([], []), {}, { agents: { home } });
+    const loadingUser = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: ['user'], home },
+    });
+
+    expect(CONFIG_DEFAULTS.settingSources).toEqual(['project', 'local']);
+    expect(defaulted.refusal?.message).toContain('(loop.settingSources: project, local).');
+    expect(defaulted.refusal?.message).toContain('run `rafa agent vendor tdd-guide`');
+    expect(loadingUser.refusal).toBeNull();
+  });
+
+  it('halts on the roster before any probe runs, where the probe would halt the run too', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    writeFileSync(planPathIn(root), '- [ ] Write it  {agent=no-such-agent}\n', 'utf8');
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(127, 'sh: bun: not found') }, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+    // The control, with the plan naming no agent: the same probe halts the run.
+    writeFileSync(planPathIn(root), '- [ ] Write it\n', 'utf8');
+    const control = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(127, 'sh: bun: not found') }, {
+      agents: { settingSources: ['project', 'local'], home },
+    });
+
+    expect(run.refusal?.message).toContain('names 1 agent(s) no loaded scope defines');
+    expect(run.probes).toEqual([]);
+    expect(control.refusal?.message).toContain('preflight halted');
+    expect(control.probes).toEqual([`bun --version in ${root}`]);
   });
 });
 

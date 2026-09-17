@@ -40,7 +40,12 @@ answer both questions from one column.
 **A name that resolves to nothing STOPS the dispatch**, which is what
 makes a wrong row something a test can find rather than a silent
 downgrade: an unresolvable agent exits 1 with NO JSON at all and the
-whole roster on stderr, before any model call.
+whole roster on stderr, before any model call. `loop start` no longer
+waits for that: its preflight resolves the roster from the same two
+`.claude/agents` directories and refuses the run, ahead of every
+prerequisite probe, when a still-to-run task of the plan or the tracker
+names an agent no loaded scope defines (`src/start/preflight.ts`).
+`rafa plan validate` runs the same check and exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies
 both.** A declaration carrying an agent never passes `--model` or
