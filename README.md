@@ -79,6 +79,45 @@ the root of `exports` names. The package ships no type declarations:
 `exports` names no `types`, and a TypeScript consumer gets TS7016 under
 `strict`.
 
+## Roadmap
+
+What rafa does today and what is planned, in the order it is being
+built. A box is ticked by the change that finishes the feature.
+
+- [x] Run a plan task by task: one Claude Code session per task, one
+  commit per task, then a pull request and a wait for CI
+- [x] Plans that carry their own background, so each task reads only the
+  part of the plan it needs
+- [x] Every task reports back what it did, what it found and what
+  blocked it, and rafa keeps the record
+- [x] See what each plan cost: sessions, tokens and commits per plan
+- [x] Install once, set up any project with `rafa init`
+- [x] Checks before a run: a missing tool or key stops the run with its
+  name, before any session is paid for
+- [x] A spending cap per task
+- [x] One consistent command line, with help at every level that people
+  and agents can both read
+- [x] Stop, pause, resume and check on a running plan
+- [x] Blockers and unrelated bugs found along the way are filed as
+  issues, once each
+- [x] rafa can safely work on its own code and update itself
+- [x] Usable as a library inside other services, not only as a command
+- [ ] A health check for skills: one format, and a checker that refuses
+  a broken skill before an agent can follow it
+- [ ] The agents a plan needs are checked before the run, and copied
+  into the project with one command
+- [ ] A version bump and a changelog entry with every pull request
+- [ ] The right skills reach the right task, chosen when the plan is
+  written
+- [ ] Know which skills earn their place and which are ignored
+- [ ] rafa learns from its own runs: what one task works out is handed
+  to the tasks that need it later
+- [ ] Skills and lessons shared across projects and machines
+- [ ] Work on several issues or specs at the same time
+- [ ] Add-ons: install a tracker, an output or a set of skills (Linear,
+  Obsidian and others) without changing rafa
+- [ ] A live terminal dashboard
+
 ## Attribution
 
 The agent task loop at the core of this project draws on several key sources:
