@@ -2,7 +2,12 @@
  * Tests for `rafa init` (`init.ts`): how the root is chosen under
  * `--root`, `--yes`, a terminal and no terminal, what is written under
  * the root and the home, a rerun, the refusals, the `PATH` check, json
- * mode, and the registered command spawned.
+ * mode, the agent warning, and the registered command spawned.
+ *
+ * The agent cases plant a `~/.claude/agents` and a `plan.dir` plan under
+ * the world, never the real home, and each narrowing carries its
+ * control: the same plan with the definition vendored into the project,
+ * and a plan naming an agent no home file carries, both warn nothing.
  *
  * ## The world
  *
@@ -517,6 +522,68 @@ describe('the PATH check', () => {
     expect([result.binPath.state, result.binPath.rafaIndex, result.binPath.bunIndex]).toEqual(['behind', 1, 0]);
     expect([result.root, result.start, result.configExisted, result.changed]).toEqual([world.repo, world.sub, false, true]);
     expect(result.writes.filter((write) => !write.path.startsWith(`${tempBase}/`))).toEqual([]);
+  });
+});
+
+describe('the agent warning', () => {
+  /** Writes `<root>/.claude/agents/<name>.md` carrying that frontmatter `name`. */
+  const plantAgent = (root: string, name: string): void => {
+    const dir = join(root, '.claude', 'agents');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${name}.md`), ['---', `name: ${name}`, '---', 'Body.', ''].join('\n'), 'utf8');
+  };
+
+  /** Writes a one-task plan routed to `agent` under the world's default `plan.dir`. */
+  const plantPlan = (world: World, agent: string): string => {
+    const dir = join(world.repo, '.rafa', 'plans');
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'PLAN.md');
+    writeFileSync(path, `- [ ] Write the module  {agent=${agent}}\n`, 'utf8');
+    return path;
+  };
+
+  it('warns about an agent a plan routes to that only the home defines, naming the vendor command', async () => {
+    const world = plantWorld();
+    plantAgent(world.home, 'tdd-guide');
+    plantPlan(world, 'tdd-guide');
+
+    const run = await init(world, [`--root=${world.repo}`]);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('warn: 1 agent use(s) under plan.dir resolve only in ~/.claude/agents');
+    expect(run.stdout).toContain('warn:   .rafa/plans/PLAN.md (line 1) routes to agent "tdd-guide",'
+      + ' which resolves only in ~/.claude/agents: run `rafa agent vendor tdd-guide`');
+  });
+
+  it('says nothing when the project defines the agent itself, and nothing when no home file carries it', async () => {
+    const vendored = plantWorld();
+    plantAgent(vendored.home, 'tdd-guide');
+    plantAgent(vendored.repo, 'tdd-guide');
+    plantPlan(vendored, 'tdd-guide');
+    const unknown = plantWorld();
+    plantPlan(unknown, 'ghost-agent');
+
+    const quiet = await init(vendored, [`--root=${vendored.repo}`]);
+    const silent = await init(unknown, [`--root=${unknown.repo}`]);
+
+    expect([quiet.exitCode, silent.exitCode]).toEqual([0, 0]);
+    expect(quiet.stdout).not.toContain('warn: ');
+    expect(silent.stdout).not.toContain('warn: ');
+  });
+
+  it('warns about nothing on a project whose plan.dir holds no plan, and gives the uses in json mode', async () => {
+    const world = plantWorld();
+    plantAgent(world.home, 'tdd-guide');
+
+    const empty = await init(world, [`--root=${world.repo}`, '--output=json']);
+    const plan = plantPlan(world, 'tdd-guide');
+    const warned = await init(world, [`--root=${world.repo}`, '--output=json']);
+
+    expect(resultOf(empty.stdout).vendorableAgents).toEqual([]);
+    expect(resultOf(warned.stdout).vendorableAgents).toEqual([
+      { plan, name: 'tdd-guide', lines: [1], fix: 'rafa agent vendor tdd-guide' },
+    ]);
+    expect(eventsOf(warned.stdout).map((event) => event.type)).toEqual(['start', 'log', 'log', 'result']);
   });
 });
 

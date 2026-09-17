@@ -465,6 +465,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/init.js', [
+    ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
     ['../cli/command.js', ['CommandExit']],
     ['../config-load.js', ['loadConfig']],
     ['../config-sections.js', ['messageOf']],

@@ -162,9 +162,15 @@ module's note is the long form.
   its `config.yaml` and `instincts/`. Each is written only when missing,
   so a rerun changes no byte and ends with the line `Nothing changed.`
   It warns when `~/.rafa/bin` is not ahead of `~/.bun/bin` on its
-  context's `PATH` (`src/project/bin-path.ts`). In json mode the result's
-  `data` holds the root, its source, the working directory, whether the
-  config existed, every path checked with its change, and that reading.
+  context's `PATH` (`src/project/bin-path.ts`). It also warns, and never
+  copies, when a plan under `plan.dir` routes to an agent that resolves
+  only in `~/.claude/agents` under the resolved `loop.settingSources`,
+  naming each plan, its lines and `rafa agent vendor <name>`
+  (`src/agents/vendorable.ts`); a missing agent no user definition
+  carries is left to the preflight, which refuses on it. In json mode the
+  result's `data` holds the root, its source, the working directory,
+  whether the config existed, every path checked with its change, that
+  reading, and those vendorable uses.
 - **`doctor` checks what `loop start` would, and starts no run**
   (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
   first, before anything is checked, so the build that answered is read
