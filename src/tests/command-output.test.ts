@@ -227,7 +227,7 @@ describe('rafa effort collect', () => {
 
   it('refuses a --since that is no date on stderr in text mode, and in the terminal result in json mode', () => {
     const scratch = plant();
-    const refusal = 'ralph effort collect: --since value is not a date this can read: nope';
+    const refusal = 'rafa effort collect: --since value is not a date this can read: nope';
 
     const text = rafa(scratch, ['effort', 'collect', '--since=nope']);
     const json = rafa(scratch, ['effort', 'collect', '--since=nope', '--output=json']);
@@ -263,7 +263,7 @@ describe('rafa effort report', () => {
     const json = rafa(scratch, ['effort', 'report', '--kind=nope', '--output=json']);
 
     expect([text.exitCode, text.stdout]).toEqual([1, '']);
-    expect(text.stderr).toStartWith('ralph effort report: --kind value is not a session kind: nope (one of ');
+    expect(text.stderr).toStartWith('rafa effort report: --kind value is not a session kind: nope (one of ');
     expect([json.exitCode, json.stderr]).toEqual([1, '']);
     const events = eventsOf(json);
     expect(events.map((event) => event.type)).toEqual(['start', 'result']);

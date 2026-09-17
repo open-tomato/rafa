@@ -1,5 +1,5 @@
 /**
- * Tests for the ralph start loop (scripts/ralph/start.ts).
+ * Tests for the rafa start loop (scripts/ralph/start.ts).
  *
  * Mocks:
  *  - 'fs'                     — no real disk I/O

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * ralph start — the task loop.
+ * rafa start — the task loop.
  *
  * Walks the plan's tracker checklist one task at a time, delegating each task
  * to a Claude Code session and then staging and committing whatever that

@@ -1289,7 +1289,7 @@ describe('the collect command', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr.trimEnd().split('\n')).toEqual([
-      expect.stringMatching(/^ralph effort collect: .*store is "postgres"/),
+      expect.stringMatching(/^rafa effort collect: .*store is "postgres"/),
     ]);
     expect(run.stdout).toBe('');
     expect(existsSync(storeDir(root))).toBe(false);
