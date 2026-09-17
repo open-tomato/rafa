@@ -16,7 +16,9 @@
  * — does it declare an effort. This module reads WHOLE directories,
  * because the question here is the roster rather than one file, and a
  * definition answers under the name its frontmatter carries whatever
- * its file is called.
+ * its file is called. Both ask `schema/frontmatter.ts` for the block
+ * itself, so a file either module passes over is one the other passes
+ * over too.
  *
  * ## What a session sees, measured
  *
@@ -96,7 +98,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { parsePlan } from '../plan/parse.js';
-import { AGENT_DEFINITION_DIR, readFrontmatter } from '../utils/agent-definition.js';
+import { readFrontmatter } from '../schema/frontmatter.js';
+import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 
 /**
  * The agents Claude Code answers for with no definition of its own
