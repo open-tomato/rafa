@@ -1,5 +1,5 @@
 /**
- * Tests for the wrap-up stage's CI gate (src/utils/pr.ts).
+ * Tests for the pull request's check-row readers (`src/pr/checks.ts`).
  *
  * Everything here is driven through injected probes and an injected
  * clock, so no `gh`, no network and no real timers are involved. The
@@ -17,7 +17,7 @@ import {
   parseChecks,
   verdictOf,
   waitForChecks,
-} from '../utils/pr.js';
+} from './checks.js';
 
 const JOB = 'https://github.com/o/r/actions/runs/1/job/2';
 

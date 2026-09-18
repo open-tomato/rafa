@@ -6,7 +6,7 @@
  * reached. The stub answers from a script, and a poll, merge read or
  * repair session the script did not plan throws, failing the case
  * rather than reaching for the real helper. The check rows are the
- * `gh pr checks --json name,state,link` shape `src/tests/pr-checks.test.ts`
+ * `gh pr checks --json name,state,link` shape `src/pr/checks.test.ts`
  * parses.
  *
  * There is one case per verdict branch, and each pins the whole sequence
