@@ -7,7 +7,9 @@
  * adapter over the GitHub CLI, `./checks.js` holds the check-row
  * readers, which are pure and belong to no provider,
  * `./merge.js` holds what `pr merge` refuses on and the clean-up steps
- * it runs afterwards, both as data, and
+ * it runs afterwards, both as data, `./git.js` is the runner those steps
+ * are spawned through, git being the merge command's own half and no
+ * provider's, and
  * `./provider.js` answers which provider a repository gets and holds
  * the one exit-2 refusal every `pr` action shares,
  * `./preflight-items.js` builds the two required preflight items a `gh`
@@ -52,6 +54,7 @@ export type {
   PullRequestSummary,
 } from './types.js';
 export type { GhPullRequestsOptions } from './gh.js';
+export type { GitResult, GitRunner } from './git.js';
 export type {
   CleanUpPlan,
   MergeRefusal,
@@ -90,6 +93,7 @@ export {
   worktreesHolding,
 } from './merge.js';
 export { compareUrl, pushBranch } from './none.js';
+export { createGitRunner, gitSaid } from './git.js';
 export { createGhPullRequests, ghAuthOk, ghAuthOkIn, ghPullRequestsIn } from './gh.js';
 export {
   DEFAULT_GH_HOST,

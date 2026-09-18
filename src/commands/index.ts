@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the thirty-seven registered so far wrap a
+ * of each is its command. Five of the thirty-eight registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -37,8 +37,8 @@
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
- * the four `pr` reading actions, which read one repository's pull requests
- * through the PullRequests port and share `pr/pr-context.ts`.
+ * the five `pr` actions, which read and merge one repository's pull
+ * requests through the PullRequests port and share `pr/pr-context.ts`.
  *
  * ## What is registered
  *
@@ -59,7 +59,9 @@
  *   - `pr current`, the open pull request of the branch checked out at the
  *     project root on one line; `pr show [<n>]`, that pull request in full
  *     with its checks and its last triage; `pr view [<n>]`, it opened in
- *     the browser; and `pr list`, the open pull requests as rows. Each
+ *     the browser; `pr list`, the open pull requests as rows; and
+ *     `pr merge [<n>] [--yes] [--method=squash|merge|rebase]`, one
+ *     merged and both branches cleaned up after it. Each
  *     refuses with exit code 2 where `pr.provider` is not `gh`.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's.
  *   - `module list`, every module the config gives a source for and what
@@ -139,6 +141,7 @@ import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
 import prCurrent from './pr/current.js';
 import prList from './pr/list.js';
+import prMerge from './pr/merge.js';
 import prShow from './pr/show.js';
 import prView from './pr/view.js';
 import selfUpdate from './self-update.js';
@@ -153,7 +156,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create a plan from a spec; list, show and validate plans' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues' },
-  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list the open ones' },
+  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list them, merge one' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
@@ -182,6 +185,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   prShow,
   prView,
   prList,
+  prMerge,
   effortCollect,
   effortReport,
   moduleList,

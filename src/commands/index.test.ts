@@ -1,6 +1,6 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the thirty-seven commands it registers: what the registry
+ * declarations of the thirty-eight commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
@@ -8,7 +8,7 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
  * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list`, `instinct show`
- * and the four `pr` readers
+ * and the four `pr` readers beside `pr merge`
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -101,6 +101,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'pr show': ['text', 'json'],
   'pr view': ['text', 'json'],
   'pr list': ['text', 'json'],
+  'pr merge': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
   'module list': ['text', 'json'],
@@ -140,6 +141,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr show': [['n'], []],
   'pr view': [['n'], []],
   'pr list': [[], []],
+  'pr merge': [['n'], ['yes', 'method']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
@@ -202,6 +204,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['prs show 41', 'pr show', ['41'], ''],
   ['pr view', 'pr view', [], ''],
   ['pr list', 'pr list', [], ''],
+  ['pr merge 41 --yes --method=squash', 'pr merge', ['41', '--yes', '--method=squash'], ''],
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
@@ -291,7 +294,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the four pr readers, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the four pr readers and pr merge, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -312,6 +315,7 @@ describe('the core roster', () => {
       'pr show',
       'pr view',
       'pr list',
+      'pr merge',
       'effort collect',
       'effort report',
       'module list',
