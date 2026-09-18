@@ -33,6 +33,12 @@
  * `console` prompt rule (2), treating a `&&`-terminated line as a
  * continuation (2), and dropping the skill directory from the path
  * classification so a script resolved as a project path (4).
+ *
+ * Two more were driven for the stack demotion on 2026-09-18, the
+ * module restored sha256-identical after each: making
+ * `missing-tool-off-stack` a failure reddened 3 cases across this file
+ * and `run.test.ts`, and dropping the `agnostic` exception from
+ * {@link isOffStack} — so every non-empty list demoted — reddened 5.
  */
 import type { BodyReference, ReferenceIssue, ReferenceIssueCode } from './references.js';
 
@@ -48,6 +54,7 @@ import {
   checkReferences,
   collectReferences,
   hasReferenceFailure,
+  isOffStack,
   isProjectPath,
   pathDirectories,
 } from './references.js';
@@ -436,6 +443,88 @@ describe('resolution', () => {
   });
 });
 
+describe('the stack seam', () => {
+  /**
+   * The one body all three readings share: a fenced command naming a
+   * tool the empty `PATH` seam cannot hold. Only the `stack` handed
+   * beside it differs.
+   */
+  const text = body(...fence('bash', 'cpanm --installdeps .'));
+
+  /** The seams of a run with no project, no skill and no PATH. */
+  const bare = { projectRoot: null, skillDir: null, pathDirs: [] } as const;
+
+  it('warns instead of failing for a stack other than agnostic', () => {
+    const found = checkReferences(text, { ...bare, stack: ['perl'] });
+
+    expect(codesOf(found.issues)).toEqual(['missing-tool-off-stack']);
+    expect(hasReferenceFailure(found.issues)).toBe(false);
+    expect(found.issues[0]?.message).toContain('cpanm');
+    expect(found.issues[0]?.message).toContain('need not carry');
+  });
+
+  it('fails the same body for the agnostic list', () => {
+    const found = checkReferences(text, { ...bare, stack: ['agnostic'] });
+
+    expect(codesOf(found.issues)).toEqual(['missing-tool']);
+    expect(hasReferenceFailure(found.issues)).toBe(true);
+  });
+
+  it('fails the same body for a null stack and for a seam that names none', () => {
+    const nulled = checkReferences(text, { ...bare, stack: null });
+    const absent = checkReferences(text, bare);
+
+    expect(codesOf(nulled.issues)).toEqual(['missing-tool']);
+    expect(codesOf(absent.issues)).toEqual(['missing-tool']);
+    expect(hasReferenceFailure(absent.issues)).toBe(true);
+  });
+
+  it('resolves the same tool clean off stack once the PATH holds it', () => {
+    const root = plant({ '+bin/cpanm': '#!/bin/sh\n' });
+
+    const found = checkReferences(text, {
+      ...bare,
+      pathDirs: [join(root, 'bin')],
+      stack: ['perl'],
+    });
+
+    expect(found.issues).toEqual([]);
+  });
+
+  it('leaves every other verdict where it was, whatever the stack says', () => {
+    const root = plant({ 'skill/scripts/there.sh': 'x', 'project/': '' });
+    const seams = {
+      projectRoot: join(root, 'project'),
+      skillDir: join(root, 'skill'),
+      pathDirs: [],
+    };
+    const paths = body(
+      span('src/gone.ts'),
+      span('scripts/gone.sh'),
+      span('/Users/someone/notes.md'),
+    );
+
+    const offStack = checkReferences(paths, { ...seams, stack: ['perl'] });
+    const agnostic = checkReferences(paths, { ...seams, stack: ['agnostic'] });
+
+    expect(codesOf(offStack.issues)).toEqual([
+      'unresolved-path', 'missing-script', 'home-path',
+    ]);
+    expect(codesOf(agnostic.issues)).toEqual(codesOf(offStack.issues));
+  });
+
+  it('reads an empty list and a contradictory one as no demotion', () => {
+    const empty = checkReferences(text, { ...bare, stack: [] });
+    const mixed = checkReferences(text, { ...bare, stack: ['agnostic', 'perl'] });
+
+    expect(isOffStack([])).toBe(false);
+    expect(isOffStack(['agnostic', 'perl'])).toBe(false);
+    expect(isOffStack(['perl', 'kotlin'])).toBe(true);
+    expect(codesOf(empty.issues)).toEqual(['missing-tool']);
+    expect(codesOf(mixed.issues)).toEqual(['missing-tool']);
+  });
+});
+
 describe('a run with no project root', () => {
   it('warns on a project path instead of failing the file', () => {
     const root = plant({ 'skill/SKILL.md': 'x' });
@@ -539,7 +628,11 @@ describe('the issue codes', () => {
       body(span('src/gone.ts')),
       { projectRoot: null, skillDir: null, pathDirs: [] },
     );
-    return [...withProject.issues, ...withoutProject.issues];
+    const offStack = checkReferences(
+      body(...fence('bash', 'nosuchtool --flag')),
+      { projectRoot: null, skillDir: null, pathDirs: [], stack: ['perl'] },
+    );
+    return [...withProject.issues, ...withoutProject.issues, ...offStack.issues];
   }
 
   it('provokes every code the module declares, and no code it does not', () => {
@@ -557,7 +650,7 @@ describe('the issue codes', () => {
     expect(Object.keys(REFERENCE_SEVERITY).sort()).toEqual([...REFERENCE_ISSUE_CODES].sort());
     expect(severities.every((severity) => severity === 'failure' || severity === 'warning'))
       .toBe(true);
-    expect(warnings).toEqual(['unchecked-path']);
+    expect(warnings).toEqual(['missing-tool-off-stack', 'unchecked-path']);
   });
 
   it('opens every message with the line the reference sits on', () => {

@@ -22,7 +22,10 @@
  * The four check modules own their own rules and their own tests. What
  * this file measures is what only the checker can be wrong about: that
  * all five stages run over a file that already failed an earlier one,
- * that the issues come back in {@link CHECK_STAGES} order, that a file
+ * that the issues come back in {@link CHECK_STAGES} order, that the
+ * `stack` the frontmatter declares reaches the reference checker's
+ * seam (dropping that one wiring reddens the off-stack case, driven on
+ * 2026-09-18), that a file
  * with four faults counts ONCE, that a warning never counts, that the
  * count is capped, and that `--fix` writes exactly two fields and not
  * one byte of a body.
@@ -275,6 +278,64 @@ describe('the project, skill and PATH seams', () => {
 
     expect(marks(report)).toEqual(['resolution/unchecked-path']);
     expect(report.failed).toBe(false);
+  });
+});
+
+describe('a missing tool off the machine stack', () => {
+  /**
+   * The one body all three readings share: a fenced command naming a
+   * tool no planted `PATH` directory holds, and nothing else any check
+   * can refuse. Only the `stack` line above it differs between the
+   * three files.
+   */
+  const body = '\n# Perl gates\n\nRun the gate:\n\n```bash\ncpanm --installdeps .\n```\n';
+
+  /** `CLEAN_SKILL_FIELDS` with its `stack` line replaced or dropped. */
+  function fields(stack: string | null): readonly string[] {
+    const rest = CLEAN_SKILL_FIELDS.filter((line) => !line.startsWith('stack:'));
+    return stack === null
+      ? rest
+      : [...rest, `stack: ${stack}`];
+  }
+
+  const root = plant({
+    'off/verification-loop/SKILL.md': skillText(fields('[perl]'), body),
+    'agnostic/verification-loop/SKILL.md': skillText(fields('[agnostic]'), body),
+    'none/verification-loop/SKILL.md': skillText(fields(null), body),
+  });
+
+  /** The report on one of the three planted tiers, with an empty PATH. */
+  function read(tier: string): CheckReport {
+    return checkFile(join(root, tier, 'verification-loop/SKILL.md'), 'skill', BARE);
+  }
+
+  it('warns instead of failing when the frontmatter declares a stack of its own', () => {
+    const report = read('off');
+    const directory = checkDirectory(join(root, 'off'), 'skill', BARE);
+
+    expect(marks(report)).toEqual(['resolution/missing-tool-off-stack']);
+    expect(report.issues[0]?.severity).toBe('warning');
+    expect(report.issues[0]?.message).toContain('cpanm');
+    expect(report.failed).toBe(false);
+    expect(directory.failingFiles).toBe(0);
+    expect(directory.exitCode).toBe(0);
+  });
+
+  it('fails the same body when the stack is agnostic', () => {
+    const report = read('agnostic');
+    const directory = checkDirectory(join(root, 'agnostic'), 'skill', BARE);
+
+    expect(marks(report)).toEqual(['resolution/missing-tool']);
+    expect(report.issues[0]?.severity).toBe('failure');
+    expect(report.failed).toBe(true);
+    expect(directory.exitCode).toBe(1);
+  });
+
+  it('fails the same body when the frontmatter declares no stack at all', () => {
+    const report = read('none');
+
+    expect(marks(report)).toEqual(['schema/missing-field', 'resolution/missing-tool']);
+    expect(report.failed).toBe(true);
   });
 });
 

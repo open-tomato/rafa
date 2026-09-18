@@ -107,9 +107,31 @@
  * WARNING that never reaches the checker's exit code. Scripts and
  * tools are still resolved in that run: both are answerable without a
  * project.
+ *
+ * ## Off a machine's stack, a missing tool is a warning
+ *
+ * A tool lookup answers about the machine the check RAN on, not about
+ * the body. A kotlin skill naming `gradle` and a perl skill naming
+ * `cpanm` are correct files; the checkout that has neither binary is
+ * the thing that differs. So when the frontmatter declares a `stack`
+ * that is anything other than `agnostic`
+ * ({@link ReferenceSeams.stack}), a command no `PATH` directory holds
+ * is {@link ReferenceIssueCode} `missing-tool-off-stack`, a WARNING
+ * that never reaches the exit code, rather than `missing-tool`.
+ *
+ * The failure is KEPT for `stack: [agnostic]` and for a file whose
+ * frontmatter declares no `stack` at all. An agnostic skill is one
+ * every session on every machine is meant to follow, so a tool it
+ * names and this machine does not hold is a claim the reader cannot
+ * act on; and an absent `stack` is not a statement about a stack, so
+ * it buys no demotion. The demotion is about the reader's toolchain
+ * alone: paths, scripts and locality are judged the same whatever the
+ * `stack` says.
  */
 import { existsSync, statSync } from 'node:fs';
 import { delimiter, isAbsolute, relative, resolve } from 'node:path';
+
+import { AGNOSTIC_STACK } from '../schema/stack.js';
 
 /** The fence info strings whose blocks hold shell command lines. */
 export const SHELL_FENCE_LANGUAGES: readonly string[] = ['bash', 'sh', 'shell', 'zsh', 'console'];
@@ -205,6 +227,8 @@ export type ReferenceIssueCode =
   | 'missing-script'
   /** A command name no `PATH` directory holds. */
   | 'missing-tool'
+  /** The same, in a skill whose `stack` is not `agnostic`. */
+  | 'missing-tool-off-stack'
   /** An absolute path under a home root, outside project and skill. */
   | 'home-path'
   /** Another absolute path outside project, skill and system roots. */
@@ -217,21 +241,25 @@ export const REFERENCE_ISSUE_CODES: readonly ReferenceIssueCode[] = [
   'unresolved-path',
   'missing-script',
   'missing-tool',
+  'missing-tool-off-stack',
   'home-path',
   'foreign-path',
   'unchecked-path',
 ];
 
 /**
- * What each code costs. Only `unchecked-path` is a warning: a user
- * tier is checked without a project root on purpose, and the paths it
- * could not answer for must not redden it.
+ * What each code costs. Two are warnings: `unchecked-path`, because a
+ * user tier is checked without a project root on purpose and the paths
+ * it could not answer for must not redden it, and
+ * `missing-tool-off-stack`, because a stack-gated skill naming a tool
+ * this machine does not install is a reading about the machine.
  */
 export const REFERENCE_SEVERITY: Readonly<Record<ReferenceIssueCode, ReferenceSeverity>>
   = Object.freeze({
     'unresolved-path': 'failure',
     'missing-script': 'failure',
     'missing-tool': 'failure',
+    'missing-tool-off-stack': 'warning',
     'home-path': 'failure',
     'foreign-path': 'failure',
     'unchecked-path': 'warning',
@@ -281,6 +309,17 @@ export interface ReferenceSeams {
   readonly skillDir: string | null;
   /** The directories a command name is looked up in, in order. */
   readonly pathDirs: readonly string[];
+  /**
+   * The `stack` list the file's frontmatter declares, or null for a
+   * file that declares none — an instinct record, a skill missing the
+   * field, and a skill whose `stack` is not a list of strings all read
+   * as null. A list that is anything other than `[agnostic]` demotes a
+   * missing tool to a warning; null and `[agnostic]` keep the failure.
+   *
+   * Absent reads as null, so a caller that has no frontmatter to hand
+   * gets the strict reading rather than the lenient one.
+   */
+  readonly stack?: readonly string[] | null;
 }
 
 /** What {@link checkReferences} answers. */
@@ -700,14 +739,42 @@ function absoluteIssue(ref: BodyReference, seams: ReferenceSeams): ReferenceIssu
   );
 }
 
-/** The verdict on a tool name. `functions` are names the body defines for itself. */
+/**
+ * Whether `stack` gates the file to a stack this machine need not
+ * carry the toolchain of: a non-empty list holding no
+ * {@link AGNOSTIC_STACK} entry. An absent list, a null one, an empty
+ * one and `[agnostic]` are all false, and so keep the failure.
+ *
+ * `[agnostic, kotlin]` is not a valid list at all — the skill schema
+ * fails it as `unknown-stack` — and is read here as agnostic, so a
+ * contradictory list never buys the demotion.
+ */
+export function isOffStack(stack: readonly string[] | null | undefined): boolean {
+  if (stack === null || stack === undefined || stack.length === 0) return false;
+  return !stack.includes(AGNOSTIC_STACK);
+}
+
+/**
+ * The verdict on a tool name. `functions` are names the body defines
+ * for itself, and `offStack` is {@link isOffStack} over the file's
+ * declared `stack`, which is what parts the failure from the warning.
+ */
 function toolIssue(
   ref: BodyReference,
   pathDirs: readonly string[],
   functions: ReadonlySet<string>,
+  offStack: boolean,
 ): ReferenceIssue | null {
   if (functions.has(ref.text)) return null;
   if (pathDirs.some((dir) => isExecutableFile(resolve(dir, ref.text)))) return null;
+  if (offStack) {
+    return issueOf(
+      'missing-tool-off-stack',
+      ref,
+      `the command ${ref.text} is in no directory of the PATH this run was given,`
+      + ' and this file declares a stack this machine need not carry',
+    );
+  }
   return issueOf(
     'missing-tool',
     ref,
@@ -721,7 +788,9 @@ function referenceIssue(
   seams: ReferenceSeams,
   functions: ReadonlySet<string>,
 ): ReferenceIssue | null {
-  if (ref.kind === 'tool') return toolIssue(ref, seams.pathDirs, functions);
+  if (ref.kind === 'tool') {
+    return toolIssue(ref, seams.pathDirs, functions, isOffStack(seams.stack));
+  }
   if (isAbsolute(ref.text)) return absoluteIssue(ref, seams);
   return relativeIssue(ref, seams);
 }

@@ -280,7 +280,13 @@ module's note is the long form.
   `instinct check` declares no flag at all, so its runs always read that
   way. `PATH`, which the fenced-tool lookup resolves against, is the
   context's `env`; `<dir>` and `--project` resolve against the working
-  directory, which is the one seam of each command's factory.
+  directory, which is the one seam of each command's factory. A command
+  no `PATH` directory holds is `missing-tool`, a failure, only for a
+  file whose frontmatter declares `stack: [agnostic]` or declares no
+  `stack` at all; a file declaring any other `stack` gets
+  `missing-tool-off-stack`, a warning, because the machine the run
+  happened on need not install a stack-gated skill's toolchain. Nothing
+  else the resolution and locality stages judge moves with the `stack`.
   `--fix` fills `tags` and `stack` on a file whose only failures are
   those two missing fields, through `src/schema/frontmatter.ts`, so the
   body survives byte for byte, and the report is the re-check of what

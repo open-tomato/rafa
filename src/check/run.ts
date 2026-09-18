@@ -379,6 +379,21 @@ function skillDirectoryOf(entry: LayoutEntry): string | null {
     : null;
 }
 
+/**
+ * The `stack` list `data` declares, or null when it declares none or
+ * declares it as something other than a list. Null is what the
+ * reference checker reads as "no stack", which keeps a missing tool a
+ * failure; entries are stringified rather than filtered, so a list
+ * holding a non-string is still a list and is still judged by whether
+ * `agnostic` is in it.
+ */
+function declaredStack(data: Readonly<Record<string, unknown>>): string[] | null {
+  const value = data['stack'];
+  return Array.isArray(value)
+    ? value.map((entry) => String(entry))
+    : null;
+}
+
 /** The string at `key`, or null when it is absent or another type. */
 function stringAt(data: Readonly<Record<string, unknown>>, key: string): string | null {
   const value = data[key];
@@ -573,6 +588,9 @@ export function checkFile(
     projectRoot: options.projectRoot,
     skillDir: skillDirectoryOf(entry),
     pathDirs: options.pathDirs,
+    stack: document === null
+      ? null
+      : declaredStack(document.data),
   };
 
   const issues = inStageOrder([
