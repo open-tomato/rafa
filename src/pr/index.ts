@@ -7,7 +7,9 @@
  * adapter over the GitHub CLI, `./checks.js` holds the check-row
  * readers, which are pure and belong to no provider, and
  * `./provider.js` answers which provider a repository gets and holds
- * the one exit-2 refusal every `pr` action shares.
+ * the one exit-2 refusal every `pr` action shares, and
+ * `./preflight-items.js` builds the two required preflight items a `gh`
+ * provider contributes.
  *
  * It is a barrel, so it is imported as `../pr/index.js` and never as
  * `../pr.js` (`context/source.md`). It re-exports and defines nothing:
@@ -64,6 +66,15 @@ export {
 } from './checks.js';
 export { isMergeMethod, MERGE_METHODS } from './types.js';
 export { createGhPullRequests, ghAuthOk, ghAuthOkIn, ghPullRequestsIn } from './gh.js';
+export {
+  DEFAULT_GH_HOST,
+  GH_INSTALL_LINE,
+  ghAuthItem,
+  ghAuthLine,
+  ghHostOf,
+  ghOnPathItem,
+  ghPreflightItems,
+} from './preflight-items.js';
 export {
   isGitHubRemote,
   PR_NEEDS_GH,

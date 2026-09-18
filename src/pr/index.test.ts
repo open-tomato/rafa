@@ -20,6 +20,7 @@ import { describe, expect, it } from 'bun:test';
 
 import * as checks from './checks.js';
 import * as gh from './gh.js';
+import * as preflightItems from './preflight-items.js';
 import * as provider from './provider.js';
 import * as types from './types.js';
 
@@ -54,6 +55,16 @@ describe('the pull request barrel', () => {
     expect(barrel.remoteHost).toBe(provider.remoteHost);
     expect(barrel.requireGhProvider).toBe(provider.requireGhProvider);
     expect(barrel.resolvePrProvider).toBe(provider.resolvePrProvider);
+  });
+
+  it('answers the preflight item builders of ./preflight-items.js themselves', () => {
+    expect(barrel.DEFAULT_GH_HOST).toBe(preflightItems.DEFAULT_GH_HOST);
+    expect(barrel.GH_INSTALL_LINE).toBe(preflightItems.GH_INSTALL_LINE);
+    expect(barrel.ghAuthItem).toBe(preflightItems.ghAuthItem);
+    expect(barrel.ghAuthLine).toBe(preflightItems.ghAuthLine);
+    expect(barrel.ghHostOf).toBe(preflightItems.ghHostOf);
+    expect(barrel.ghOnPathItem).toBe(preflightItems.ghOnPathItem);
+    expect(barrel.ghPreflightItems).toBe(preflightItems.ghPreflightItems);
   });
 
   it('keeps the recorded fake out of the import graph of the loop', () => {
