@@ -1,8 +1,8 @@
 /**
- * Four readings of the preflight stage, each beside the passing control
+ * Five readings of the preflight stage, each beside the passing control
  * that proves the fixture could have failed it.
  *
- * The first two run the real CLI: `loop start` is spawned in a scratch
+ * The first three run the real CLI: `loop start` is spawned in a scratch
  * repository under a stand-in `claude`, exactly as `task-report.test.ts`
  * and `loop-output.test.ts` do, with `.rafa/config.yaml` naming the
  * prerequisite the case is about. Every path a spawned run reads sits
@@ -12,10 +12,15 @@
  * what is new here is the join those files leave to a comment: that a
  * failed required item really stops `loop start` before the stand-in is
  * ever called, that `rafa effort report` really reads the rows a halted
- * run left behind, and that a failed optional item's `known-missing:`
- * line really reaches the bytes a session receives on stdin.
+ * run left behind, that a failed optional item's `known-missing:` line
+ * really reaches the bytes a session receives on stdin, and that
+ * `pr.provider: gh`'s two automatic items really halt the same run when
+ * `gh` is absent from the child's own PATH — every scratch PATH in this
+ * file already carries no `gh`, so naming the provider is the whole of
+ * the fixture — beside the same run under `pr.provider: none`, which
+ * contributes neither item and so is never touched by the absence.
  *
- * The third cannot run through the CLI at all: `loop start` exposes no
+ * The fourth cannot run through the CLI at all: `loop start` exposes no
  * flag for the probe timeout, and the default is 30 seconds, which no
  * case here spends. So it drives `runStartPreflight` directly, the
  * module `loop start` calls, with the timeout shortened through its own
@@ -24,7 +29,7 @@
  * `/dev/tty`, then a sleep, so the case reads a real failure and not a
  * `cat` answering the closed stdin's end-of-file at once.
  *
- * The fourth drives `forkWorktree` (`preflight/fork.ts`) directly, since
+ * The fifth drives `forkWorktree` (`preflight/fork.ts`) directly, since
  * phase 1 forks no worktree and so no case can reach it through the CLI.
  * A required item's probe stands in for the fork's first task: its own
  * `bun.lock` is committed, a stand-in `bun` logs every call, and the
@@ -54,6 +59,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';
 
@@ -239,6 +245,53 @@ describe('a required prerequisite probe that fails', () => {
       // The control's preflight passed, so its rows are stored but list no halt.
       expect(passedReport.exitCode).toBe(0);
       expect(passedReport.stdout).not.toContain('preflight halts:');
+    },
+    RUN_TIMEOUT,
+  );
+});
+
+describe('a pr.provider: gh run with no gh on the child\'s PATH', () => {
+  const TASK = 'A task nothing should run for it';
+
+  /** Config lines naming `provider`, the whole of the `pr` section a case needs. */
+  function config(provider: string): string[] {
+    return ['pr:', `  provider: ${provider}`];
+  }
+
+  it(
+    'halts loop start on the automatic gh item before any session, beside a control under'
+      + ' pr.provider: none that skips it and runs one',
+    () => {
+      // Neither scratch PATH carries a `gh`: `plantScratchRepo` and this
+      // file's own `plantCliScratch` build it from the stand-in `bin/`
+      // and git's own directory alone, so `pr.provider: gh` here meets
+      // exactly the absence the task names, with no extra PATH surgery.
+      const failing = plantCliScratch(config('gh'), TASK, 'feat/pr-provider-gh-missing');
+      const passing = plantCliScratch(config('none'), TASK, 'feat/pr-provider-none');
+
+      const failedStart = runLoopStart(failing, [PLAN_FLAG, '--no-ci-wait']);
+      const passedStart = runLoopStart(passing, [PLAN_FLAG, '--no-ci-wait']);
+
+      expect(failedStart.exitCode).toBe(1);
+      // The preflight prints before it halts, so stdout is not empty; what
+      // it never carries is any sign a task session ran.
+      expect(failedStart.stdout).not.toContain('Executing task');
+      // With gh absent, both automatic items fail: `gh` never resolves on
+      // PATH, and `gh auth status` cannot run either, so the halt names
+      // both, not just the one the task asks about.
+      expect(failedStart.stderr).toContain('❌ preflight halted: 2 required items failed');
+      expect(failedStart.stderr).toContain('tool "gh": probe');
+      expect(failedStart.stderr).toContain(ghMissingMessage(DEFAULT_GH_HOST));
+      expect(failedStart.stderr).toContain(`service "https://${DEFAULT_GH_HOST}": probe`);
+      expect(failedStart.stderr).toContain(ghUnauthenticatedMessage(DEFAULT_GH_HOST));
+      // No session was spawned: the stand-in never ran, so it never wrote a call count.
+      expect(existsSync(callsFile(failing, 'count'))).toBe(false);
+
+      // The control: the same absent gh, but `pr.provider: none` contributes
+      // no automatic item, so the preflight passes and a session runs.
+      expect(passedStart.exitCode).toBe(0);
+      expect(passedStart.stderr).not.toContain('preflight halted');
+      expect(existsSync(callsFile(passing, 'count'))).toBe(true);
     },
     RUN_TIMEOUT,
   );
