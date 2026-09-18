@@ -3,11 +3,14 @@
  *
  * Every case drives {@link verifyPullRequest} through a complete stub of
  * its seams, so no `gh`, no git, no Claude session and no timer is
- * reached. The stub answers from a script, and a poll, merge read or
- * repair session the script did not plan throws, failing the case
- * rather than reaching for the real helper. The check rows are the
- * `gh pr checks --json name,state,link` shape `src/pr/checks.test.ts`
- * parses.
+ * reached. The stub's provider is a whole {@link PullRequests}: the four
+ * members the gate reads answer from a script, and the seven it must
+ * never reach throw, so a gate that started listing or merging fails the
+ * case rather than passing on an unread call. A poll, merge read or
+ * repair session the script did not plan throws the same way. The check
+ * rows go in as the `gh pr checks --json name,state,link` stdout
+ * `src/pr/checks.test.ts` parses, read through `parseChecks` as the `gh`
+ * adapter reads them.
  *
  * There is one case per verdict branch, and each pins the whole sequence
  * of effects rather than one printed line. A branch that falls through
@@ -16,18 +19,27 @@
  * session failed; the sequence does not.
  *
  * Fifteen mutations of `pr-lifecycle.ts` were driven against this file
- * alone, and every one reddened at least one case, with the module
- * restored byte-identical and green either side: the `gh` check never
- * refusing, a merged PR not recognised, the conflict test inverted, an
- * unreadable merge state read as clean, a failed CI-repair or
- * conflict-repair session ignored, the last-attempt check dropped, a
- * timeout not read as settled, the attempt loop one short, a default
- * seam replaced by a stub, the repair prompt left unstamped, the repair
- * handed every row, a 10 s poll, the merge state read before the
- * last-attempt check, and the wait seam not passed on. That last one
- * reddens only through the runner's 5 s case timeout, the real 20 s
- * wait outlasting it, and not through any assertion. Leg counts are not
- * recorded; they drift with every case added here.
+ * alone BEFORE the gate was moved onto the port, and every one reddened
+ * at least one case, with the module restored byte-identical and green
+ * either side: the `gh` check never refusing, a merged PR not
+ * recognised, the conflict test inverted, an unreadable merge state read
+ * as clean, a failed CI-repair or conflict-repair session ignored, the
+ * last-attempt check dropped, a timeout not read as settled, the attempt
+ * loop one short, a default seam replaced by a stub, the repair prompt
+ * left unstamped, the repair handed every row, a 10 s poll, the merge
+ * state read before the last-attempt check, and the wait seam not passed
+ * on. That last one reddens only through the runner's 5 s case timeout,
+ * the real 20 s wait outlasting it, and not through any assertion. Leg
+ * counts are not recorded; they drift with every case added here.
+ *
+ * Four more were driven on 2026-09-18, over the rewritten module, one
+ * run each with 20 pass either side and the module restored
+ * sha256-identical after every one. The PR number taken from a constant
+ * instead of from the PR `findOpen` answered: 12 cases. A merged PR read
+ * with GitHub's own `MERGED` rather than the port's `merged`: the merged
+ * case alone. The provider's throw rethrown instead of reported: the
+ * unreachable-provider case alone. The poll answering no rows while
+ * still asking the provider: 10 cases.
  *
  * Once the gate wrote through the active output, three level mutations
  * were driven on 2026-09-15, each restored sha256-identical. The deadline
@@ -44,6 +56,12 @@
  */
 import type { PrLifecycleSeams } from './pr-lifecycle.js';
 import type { ClaudeSettingSource } from '../config.js';
+import type {
+  ChecksReading,
+  PullRequestDetail,
+  PullRequestSummary,
+  PullRequests,
+} from '../pr/index.js';
 
 import { readFileSync } from 'node:fs';
 
@@ -51,16 +69,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { classifyPromptContent } from '../effort/classify.js';
+import { parseChecks, verdictOf } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 import { planStubFromPrompt } from '../utils/plan-stamp.js';
-import {
-  findOpenPullRequest,
-  isGhUsable,
-  probeChecks,
-  readMergeState,
-} from '../utils/pr.js';
 
 import {
   CI_POLL_INTERVAL_MS,
@@ -97,23 +110,41 @@ const PENDING = checks({ lint: 'SUCCESS', test: 'IN_PROGRESS' });
 /** What `gh pr checks` writes for a PR with no checks: not JSON at all. */
 const NONE = 'no checks reported on the feat/ci-gate branch';
 
-type MergeState = ReturnType<PrLifecycleSeams['readMergeState']>;
+/** The PR the cases plant, as `PullRequests.findOpen` answers it. */
+const SUMMARY: PullRequestSummary = {
+  number: PR,
+  title: 'rafa-20: pull request commands',
+  url: `https://github.com/o/r/pull/${PR}`,
+  state: 'open',
+  headRefName: BRANCH,
+  baseRefName: 'main',
+  author: { login: 'octo', isBot: false },
+  isCrossRepository: false,
+  updatedAt: '2026-09-18T12:00:00Z',
+};
 
-const MERGED: MergeState = {
-  mergeable: 'UNKNOWN',
-  mergeStateStatus: 'UNKNOWN',
-  state: 'MERGED',
-};
-const CLEAN: MergeState = {
-  mergeable: 'MERGEABLE',
-  mergeStateStatus: 'CLEAN',
-  state: 'OPEN',
-};
-const DIRTY: MergeState = {
-  mergeable: 'CONFLICTING',
-  mergeStateStatus: 'DIRTY',
-  state: 'OPEN',
-};
+/** One full read of that PR, in the state the case is about. */
+function detail(
+  state: PullRequestDetail['state'],
+  mergeable: PullRequestDetail['mergeable'],
+  mergeStateStatus: string,
+): PullRequestDetail {
+  return {
+    ...SUMMARY,
+    state,
+    body: 'Closes #20',
+    headRefOid: 'deadbeef',
+    mergeable,
+    mergeStateStatus,
+    labels: [],
+  };
+}
+
+type MergeState = PullRequestDetail | null;
+
+const MERGED: MergeState = detail('merged', 'unknown', 'UNKNOWN');
+const CLEAN: MergeState = detail('open', 'mergeable', 'CLEAN');
+const DIRTY: MergeState = detail('open', 'conflicting', 'DIRTY');
 
 /** What a case plans for the stubbed effects to answer, in order. */
 interface Script {
@@ -133,6 +164,14 @@ interface Stubbed {
   readonly prompts: string[];
   /** The setting sources each repair session was handed, in order. */
   readonly sources: (readonly ClaudeSettingSource[])[];
+}
+
+/**
+ * A port member the gate must never reach: a gate that started listing
+ * or merging throws here and fails the case that let it.
+ */
+function unreached(member: string): never {
+  throw new Error(`unplanned ${member}`);
 }
 
 /** Answers a planned queue one entry per call, and throws past its end. */
@@ -155,26 +194,42 @@ function stub(script: Script): Stubbed {
   const nextExit = answer(script.exits ?? [], 'repair session');
   let clock = 0;
 
+  const pulls: PullRequests = {
+    kind: 'gh',
+    findOpen: (branch: string): Promise<PullRequestSummary | null> => {
+      calls.push(`pr list ${branch}`);
+      const number = script.prNumber === undefined
+        ? PR
+        : script.prNumber;
+      return Promise.resolve(number === null
+        ? null
+        : { ...SUMMARY, number, headRefName: branch });
+    },
+    get: (prNumber: number): Promise<PullRequestDetail | null> => {
+      calls.push(`pr view ${prNumber}`);
+      return Promise.resolve(nextMerge());
+    },
+    checks: (prNumber: number): Promise<ChecksReading> => {
+      calls.push(`pr checks ${prNumber}`);
+      const rows = parseChecks(nextProbe());
+      return Promise.resolve({ rows, verdict: verdictOf(rows) });
+    },
+    list: () => unreached('list'),
+    browse: () => unreached('browse'),
+    merge: () => unreached('merge'),
+    comments: () => unreached('comments'),
+    comment: () => unreached('comment'),
+    editComment: () => unreached('editComment'),
+    failedLog: () => unreached('failedLog'),
+  };
+
   const seams: PrLifecycleSeams = {
     currentBranch: () => BRANCH,
     isGhUsable: () => {
       calls.push('gh auth status');
-      return script.ghUsable ?? true;
+      return Promise.resolve(script.ghUsable ?? true);
     },
-    findOpenPullRequest: (branch) => {
-      calls.push(`pr list ${branch}`);
-      return script.prNumber === undefined
-        ? PR
-        : script.prNumber;
-    },
-    probeChecks: (prNumber) => {
-      calls.push(`pr checks ${prNumber}`);
-      return nextProbe();
-    },
-    readMergeState: (prNumber) => {
-      calls.push(`pr view ${prNumber}`);
-      return nextMerge();
-    },
+    pulls,
     runClaude: (prompt, settingSources) => {
       calls.push('repair');
       prompts.push(prompt);
@@ -246,6 +301,29 @@ describe('verifyPullRequest, before any poll', () => {
     expect(warnings.join('\n')).toContain(`No open PR found for ${BRANCH}. Nothing to verify.`);
     expect(errors).toEqual([]);
   });
+
+  it('reports a provider that could not be asked rather than throwing', async () => {
+    // The port throws where the helpers it replaced answered nothing, and
+    // this is the run's last gate: a throw reaching `start()` would end
+    // the run on a PR that was pushed. The escalation line is NOT here,
+    // which is what separates reporting from falling through the loop.
+    const run = stub({});
+    const failing: PrLifecycleSeams = {
+      ...run.seams,
+      pulls: {
+        ...run.seams.pulls,
+        findOpen: () => Promise.reject(new Error('gh pr list exited non-zero: could not resolve host')),
+      },
+    };
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, failing);
+
+    expect(errors).toEqual([
+      `\n❌ Could not read the PR for ${BRANCH}: gh pr list exited non-zero: could not resolve host`,
+      '   The PR has been pushed but nothing here confirms CI agreed with it.',
+    ]);
+    expect(run.prompts).toEqual([]);
+  });
 });
 
 describe('verifyPullRequest, on a settled poll', () => {
@@ -300,7 +378,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
     expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`]);
     const warned = warnings.join('\n');
     expect(warned).toContain(`PR #${PR} reports no checks and is not conflicting`);
-    expect(warned).toContain('(mergeable=MERGEABLE state=CLEAN).');
+    expect(warned).toContain('(GitHub says it is mergeable, merge state CLEAN).');
     expect(errors).toEqual([]);
   });
 
@@ -441,10 +519,10 @@ describe('verifyPullRequest, with zero attempts', () => {
 describe('PR_LIFECYCLE_SEAMS', () => {
   it('holds the real helpers and leaves the clock to waitForChecks', () => {
     expect(PR_LIFECYCLE_SEAMS.currentBranch).toBe(getCurrentBranch);
-    expect(PR_LIFECYCLE_SEAMS.isGhUsable).toBe(isGhUsable);
-    expect(PR_LIFECYCLE_SEAMS.findOpenPullRequest).toBe(findOpenPullRequest);
-    expect(PR_LIFECYCLE_SEAMS.probeChecks).toBe(probeChecks);
-    expect(PR_LIFECYCLE_SEAMS.readMergeState).toBe(readMergeState);
+    // The provider is the real `gh` adapter, and nothing here calls a
+    // member of it: every one would spawn `gh` in this checkout.
+    expect(PR_LIFECYCLE_SEAMS.pulls.kind).toBe('gh');
+    expect(typeof PR_LIFECYCLE_SEAMS.isGhUsable).toBe('function');
     expect(PR_LIFECYCLE_SEAMS.runClaude).toBe(runClaude);
     expect(PR_LIFECYCLE_SEAMS.now).toBeUndefined();
     expect(PR_LIFECYCLE_SEAMS.sleep).toBeUndefined();

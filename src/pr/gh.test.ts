@@ -19,6 +19,9 @@
  *     construction, and the adapter checks each field because `gh`
  *     writing an unexpected shape is a reading about `gh`. A stub
  *     answering a hand-built payload is the only way to hold those.
+ *   - `ghAuthOk`. `gh auth status` is not one of the commands the fake
+ *     models, it being no part of the port, so its two cases record the
+ *     args through a stub runner of their own.
  *
  * Twelve mutations of `src/pr/gh.ts` were driven on 2026-09-18, one run
  * each over this file, with 48 pass before and after and the module
@@ -57,7 +60,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { createFakePrGh, logFailedText } from './gh-fake.js';
-import { createGhPullRequests } from './gh.js';
+import { createGhPullRequests, ghAuthOk, ghPullRequestsIn } from './gh.js';
 
 /** The fields a summary read asks for, as the adapter spells them. */
 const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url';
@@ -502,5 +505,46 @@ describe('what the adapter refuses in a payload', () => {
     await expect(pr.comments(7)).rejects.toThrow(
       'answered comment 0.id is "IC_kwDOfake", expected a positive whole number',
     );
+  });
+});
+
+describe('ghAuthOk', () => {
+  /** A runner answering `ok` to every command, recording what it was sent. */
+  function recording(ok: boolean): { gh: GhRunner; sent: string[][] } {
+    const sent: string[][] = [];
+    const gh: GhRunner = async (args) => {
+      sent.push([...args]);
+      return { ok, stdout: '', stderr: '' };
+    };
+    return { gh, sent };
+  }
+
+  it('answers true when gh auth status exits 0, asking exactly that', async () => {
+    const runner = recording(true);
+
+    expect(await ghAuthOk(runner.gh)).toBe(true);
+    expect(runner.sent).toEqual([['auth', 'status']]);
+  });
+
+  it('answers false when the runner reports a failure', async () => {
+    // The control on the case above: a runner that answers `ok` false is
+    // both an unauthenticated `gh` and a `gh` that is not installed,
+    // which `createGhRunner` reports the same way.
+    const runner = recording(false);
+
+    expect(await ghAuthOk(runner.gh)).toBe(false);
+    expect(runner.sent).toEqual([['auth', 'status']]);
+  });
+});
+
+describe('ghPullRequestsIn', () => {
+  it('answers a gh provider without running anything', () => {
+    // Nothing is called on it: every member here would spawn the real
+    // `gh` in the directory given. What the wiring itself does is held
+    // by the cases above, which drive the same adapter over the fake.
+    const pr = ghPullRequestsIn('/tmp/nowhere');
+
+    expect(pr.kind).toBe('gh');
+    expect(typeof pr.findOpen).toBe('function');
   });
 });

@@ -17,9 +17,9 @@
 import type { ClaudeSettingSource } from '../config.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { ghPullRequestsIn } from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
-import { findOpenPullRequest } from '../utils/pr.js';
 
 import { withStamp } from './stamp.js';
 
@@ -88,6 +88,25 @@ function pullRequestStep(branch: string, openPullRequest: number | null): string
 }
 
 /**
+ * The branch's open PR number as the loop reads it before the session,
+ * or null when it has none.
+ *
+ * A provider that could not be ASKED — `gh` absent, unauthenticated or
+ * offline — throws, and that is read as null here rather than stopping
+ * the wrap-up: the session still has to promote the findings, commit and
+ * push, and the create bullet already carries the reading of a refusal
+ * that must not turn into a second PR.
+ */
+async function openPullRequestNumber(branch: string): Promise<number | null> {
+  try {
+    const found = await ghPullRequestsIn(process.cwd()).findOpen(branch);
+    return found?.number ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Runs the wrap-up session over the plan the run was started on, loading
  * settings from `settingSources`, the run's `loop.settingSources`.
  */
@@ -96,7 +115,7 @@ export async function preserveProgress(
   settingSources: readonly ClaudeSettingSource[],
 ): Promise<void> {
   const branch = getCurrentBranch();
-  const prompt = buildWrapUpPrompt(branch, planContent, findOpenPullRequest(branch));
+  const prompt = buildWrapUpPrompt(branch, planContent, await openPullRequestNumber(branch));
   const exitCode = await runClaude(withStamp(prompt), settingSources);
   if (exitCode !== 0) {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);

@@ -21,6 +21,11 @@
  * so the polling logic is testable without a network or a timer. The
  * `gh` invocations that feed it live with the rest of the port, not
  * here, which is what keeps `checks.test.ts` free of a process spawn.
+ *
+ * {@link waitForChecks} polls ROWS rather than stdout, so the poll runs
+ * over `PullRequests.checks` (`./types.ts`) without either side naming
+ * the CLI. {@link parseChecks} is what turns one provider's stdout into
+ * those rows, and the `gh` adapter is its only caller.
  */
 
 /** Whether a single check has passed, failed, or is still in flight. */
@@ -115,7 +120,7 @@ export function parseChecks(stdout: string): CheckRow[] {
  * Reduces rows to one verdict. Pending outranks failure so a run that is
  * still going is never reported as red on a partial reading.
  */
-export function verdictOf(rows: CheckRow[]): ChecksVerdict {
+export function verdictOf(rows: readonly CheckRow[]): ChecksVerdict {
   if (rows.length === 0) return 'none';
   if (rows.some((r) => r.outcome === 'pending')) return 'pending';
   if (rows.some((r) => r.outcome === 'fail')) return 'red';
@@ -123,12 +128,12 @@ export function verdictOf(rows: CheckRow[]): ChecksVerdict {
 }
 
 /** Rows the caller should act on: the failing ones, for a repair prompt. */
-export function failingRows(rows: CheckRow[]): CheckRow[] {
+export function failingRows(rows: readonly CheckRow[]): CheckRow[] {
   return rows.filter((r) => r.outcome === 'fail');
 }
 
 /** One line per check, for the console and for a repair prompt. */
-export function formatRows(rows: CheckRow[]): string {
+export function formatRows(rows: readonly CheckRow[]): string {
   if (rows.length === 0) return '   (no checks reported)';
   const lines = rows.map((r) => {
     const suffix = r.link === ''
@@ -140,8 +145,12 @@ export function formatRows(rows: CheckRow[]): string {
 }
 
 export interface WaitOptions {
-  /** Returns raw `gh pr checks --json ...` stdout for one poll. */
-  probe: () => Promise<string>;
+  /**
+   * The rows of one poll. A caller on the port hands
+   * `PullRequests.checks` here, and a caller holding raw
+   * `gh pr checks --json ...` stdout hands {@link parseChecks} of it.
+   */
+  probe: () => Promise<readonly CheckRow[]>;
   timeoutMs: number;
   intervalMs: number;
   /** Injected for tests; defaults to the real clock. */
@@ -149,13 +158,13 @@ export interface WaitOptions {
   /** Injected for tests; defaults to a real timer. */
   sleep?: (ms: number) => Promise<void>;
   /** Called after every poll, for progress output. */
-  onPoll?: (rows: CheckRow[], verdict: ChecksVerdict, elapsedMs: number) => void;
+  onPoll?: (rows: readonly CheckRow[], verdict: ChecksVerdict, elapsedMs: number) => void;
 }
 
 export interface WaitResult {
   /** `timeout` means the deadline passed while checks were still running. */
   verdict: ChecksVerdict | 'timeout';
-  rows: CheckRow[];
+  rows: readonly CheckRow[];
   elapsedMs: number;
   polls: number;
 }
@@ -183,7 +192,7 @@ export async function waitForChecks(options: WaitOptions): Promise<WaitResult> {
   let polls = 0;
 
   while (true) {
-    const rows = parseChecks(await options.probe());
+    const rows = await options.probe();
     polls += 1;
     const verdict = verdictOf(rows);
     const elapsedMs = now() - started;

@@ -2,11 +2,12 @@
  * The pull request port: what every pull request provider answers, and
  * the record shapes it answers with.
  *
- * `src/utils/pr.ts` reached `gh` directly from the wrap-up stage, so the
- * only way to hold a caller to a behaviour was to run `gh`. This port is
- * the seam that replaces it: an adapter over the GitHub CLI implements
- * it, a second provider later is another adapter, and a caller typed
- * against {@link PullRequests} names neither.
+ * Until this port, the wrap-up stage reached `gh` directly through
+ * `src/utils/pr.ts` — deleted now — so the only way to hold a caller to
+ * a behaviour was to run `gh`. This port is the seam that replaced it:
+ * an adapter over the GitHub CLI implements it, a second provider later
+ * is another adapter, and a caller typed against {@link PullRequests}
+ * names neither.
  *
  * ## What the port owes, and what it leaves out
  *

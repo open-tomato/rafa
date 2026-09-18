@@ -8,7 +8,12 @@
  * cases in `./gh.test.ts` drive it through the recorded fake in
  * `./gh-fake.ts` and none of them reaches GitHub, spawns a process, or
  * reads the configuration `gh` keeps under the home. Authentication is
- * the one `gh` holds: nothing here reads a token.
+ * the one `gh` holds: nothing here reads a token, and
+ * {@link ghAuthOk} only asks whether it has one.
+ *
+ * {@link ghPullRequestsIn} is the single place a runner that DOES spawn
+ * the real CLI is made, so a caller that wants the real provider names
+ * one function and every other caller hands over its own.
  *
  * ## Which repository
  *
@@ -97,6 +102,7 @@ import type {
 } from './types.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
 import { parseChecks, verdictOf } from './checks.js';
@@ -451,4 +457,37 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
     },
   };
   return Object.freeze(pulls);
+}
+
+/**
+ * Whether `gh` can be asked at all: on `PATH`, and authenticated for the
+ * host of the directory its runner runs in.
+ *
+ * `gh auth status` exits 0 when it is and non-zero when it is not, and
+ * the runner answers a `gh` that is not installed as a failure too
+ * (`createGhRunner` turns the spawn's throw into `ok` false), so one
+ * reading covers both. Nothing here reads what it wrote: the run's CI
+ * gate only decides whether to skip itself, and the preflight items that
+ * report WHY are a separate reading.
+ */
+export async function ghAuthOk(gh: GhRunner): Promise<boolean> {
+  const result = await gh(['auth', 'status']);
+  return result.ok;
+}
+
+/**
+ * The `gh` provider for the repository of `cwd`, over a runner that
+ * spawns the real CLI there.
+ *
+ * This is the one place the loop's own callers get a provider from until
+ * `pr.provider` is read from the config; every test hands over a
+ * provider of its own instead.
+ */
+export function ghPullRequestsIn(cwd: string): PullRequests {
+  return createGhPullRequests({ gh: createGhRunner({ cwd }) });
+}
+
+/** {@link ghAuthOk} over a runner spawning the real `gh` in `cwd`. */
+export function ghAuthOkIn(cwd: string): Promise<boolean> {
+  return ghAuthOk(createGhRunner({ cwd }));
 }
