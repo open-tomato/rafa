@@ -7,6 +7,16 @@ commit list. Versions follow semver; a phase is a minor, a fix between
 phases is a patch. Each released version is tagged `v<version>`
 (`v0.1.0` was never tagged; `f9954e2..da0a76c` is its range).
 
+## 0.3.0 — 2026-09-18, phase 2: schema, checker, demotion
+
+- Stack vocabulary, skill frontmatter v2 schema with `prevents`, `signal`, `when_to_use`, `paths`, `tags`, `stack`, and instinct record schema.
+- Skill checker: layout, schema, resolution, locality, and instinct verification; rafa skill check|list commands.
+- Skill demotion pass: classify auto-extracted skills as observations or procedures, convert observations to instinct records.
+- Instinct commands: rafa instinct check|list|show to verify and browse instinct records in project and user scopes.
+- Backfill pass: proposal and derivation to fill missing `prevents`, `signal`, `when_to_use`, and `stack` fields across skill tiers.
+- Agent roster validation in preflight and rafa plan validate; declared agents checked before run.
+- Runtime refusal on installed version without --force; git-workflow and cli docs updated for phase 2 and 1 fixes.
+
 ## 0.2.0 — 2026-09-15, phase 1: installable
 
 - `rafa init`, project and user scope under `.rafa/` and `~/.rafa/`, config schema with declared prerequisites.
