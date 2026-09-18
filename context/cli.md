@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; and `skill demote`, the demotion pass of `src/demote/` over one directory |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
@@ -50,7 +50,8 @@ module's note is the long form.
   `issue show`, `issue create`, `issue comment` and `issue move`;
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `skill check`, `skill list`,
-  `skill demote`, `instinct check`, `instinct list`, `instinct show`, `init`,
+  `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
+  `instinct show`, `init`,
   `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
   `loop`, `issue`, `effort`, `module`, `agent`, `skill` and `instinct`: a
   subject is declared with its first action, never ahead of it.
@@ -83,12 +84,12 @@ module's note is the long form.
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
-  three listings (`skill list`, `instinct list` and `instinct show`) and
-  `skill demote`
+  three listings (`skill list`, `instinct list` and `instinct show`),
+  `skill demote` and `skill backfill`
   wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing and `skill demote`
-  their `args` and `flags`.
+  each `issue` action, each checker, each listing, `skill demote` and
+  `skill backfill` their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -356,6 +357,43 @@ module's note is the long form.
   an `--apply` that read the directory as its value. In json mode the
   counts, or the per-row actions, are the result's `data` on a run that
   refused no row.
+- **`skill backfill <dir> [--propose|--apply] [--project=<root>]` fills
+  in the fields a skills directory lacks** (`src/commands/skill/backfill.ts`,
+  over `src/backfill/`). `<dir>` is read as `skill demote` reads it —
+  a `<base>/.claude/skills`, the home making it `user` and any other
+  base a `project` one — and everything the run writes outside the
+  skills directory goes under that `<base>/.rafa/backfill/`. So this
+  command too runs INSIDE a project, and `<dir>` and `--project`
+  resolve against the working directory, the command's one path seam;
+  the spawner each session runs through is its other.
+  With no flag the run PLANS: `planDerivation` (`src/backfill/derive.ts`)
+  answers what `stack`, `paths` and `when_to_use` would be written,
+  `selectProposals` (`src/backfill/proposal-batch.ts`) counts the files
+  a session would be asked about, and NOTHING is written.
+  With `--propose` it runs `runProposalPass` (`src/backfill/propose.ts`):
+  one `claude -p` session per batch of twenty through the capturing
+  spawner of `src/utils/claude.ts`, the setting sources
+  `loop.settingSources` resolves to, and one
+  `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each
+  `status: draft` and each row of a session that answered nothing
+  readable marked `unanswered`. No skill is touched.
+  With `--apply` it reads those files back — refusing the whole run
+  when one does not parse — copies every file a reviewed row could
+  rewrite under `<base>/.rafa/backfill/backup/` (`src/backfill/backup.ts`),
+  writes the rows (`applyProposals`), then plans the derivation with
+  the trigger sentences those rows carried, copies what it will rewrite
+  and derives (`applyDerivation`). A file under the checkout the
+  command runs in is copied nowhere: git holds it. A draft file, a
+  file naming another skills directory, a skill that changed since its
+  proposal and any write that fails a check the file passed before are
+  each refused ALONE, and no body is ever written.
+  The exit code is the number of rows and files refused, capped at 255,
+  and 1 is kept for no directory, a second word, `--propose` and
+  `--apply` together, a switch that read the directory as its value, a
+  bare `--project`, a `<dir>` that is no `.claude/skills` or is not
+  there, and a proposal file that does not parse. In json mode the
+  actions and their counts are the result's `data` on a run that
+  refused nothing.
 - **`instinct list` and `instinct show <id>` read the two instinct
   scopes** (`src/commands/instinct/list.ts`,
   `src/commands/instinct/show.ts`, sharing
