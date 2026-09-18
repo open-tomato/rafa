@@ -1,12 +1,13 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the twenty-six commands it registers: what the registry
+ * declarations of the twenty-eight commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
- * the five `issue` actions, `module list`, `module exec`, `agent vendor` and `agent list` wrap none, and each is held to the
+ * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
+ * `skill check` and `instinct check` wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
  *
@@ -100,6 +101,8 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'module exec': ['text', 'json'],
   'agent vendor': ['text', 'json'],
   'agent list': ['text', 'json'],
+  'skill check': ['text', 'json'],
+  'instinct check': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
   'self-update': ['text', 'json'],
@@ -126,14 +129,16 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
   'agent list': [[], []],
+  'skill check': [['dir'], ['fix', 'project']],
+  'instinct check': [['dir'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
 
-/** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `init`, which makes one, and `describe`. */
-const OUTSIDE_A_PROJECT = ['module exec', 'init', 'describe'];
+/** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `skill check` and `instinct check`, whose only project seam is `--project`, `init`, which makes one, and `describe`. */
+const OUTSIDE_A_PROJECT = ['module exec', 'skill check', 'instinct check', 'init', 'describe'];
 
 /** A temporary directory of this file's own, holding the project and the home every routing case dispatches with. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-roster-'));
@@ -180,6 +185,10 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['modules exec', 'module exec', [], ''],
   ['agent vendor tdd-guide', 'agent vendor', ['tdd-guide'], ''],
   ['agents list', 'agent list', [], ''],
+  ['skill check .claude/skills --fix', 'skill check', ['.claude/skills', '--fix'], ''],
+  ['skills check .claude/skills --project=.', 'skill check', ['.claude/skills', '--project=.'], ''],
+  ['instinct check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
+  ['instincts check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['self-update', 'self-update', [], ''],
@@ -248,12 +257,12 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the six subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module', 'agent']);
+  it('registers the eight subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module', 'agent', 'skill', 'instinct']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, the two checkers, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -276,6 +285,8 @@ describe('the core roster', () => {
       'module exec',
       'agent vendor',
       'agent list',
+      'skill check',
+      'instinct check',
       'init',
       'doctor',
       'self-update',
@@ -285,7 +296,7 @@ describe('the core roster', () => {
     expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length);
   });
 
-  it('runs every command inside a project but module exec, init and describe, which declare needsProject false', () => {
+  it('runs every command inside a project but module exec, the two checkers, init and describe, which declare needsProject false', () => {
     const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);

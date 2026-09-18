@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-six registered so far wrap a
+ * of each is its command. Five of the twenty-eight registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -28,7 +28,9 @@
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor` and `agent list`,
- * which copy and read agent definitions through `src/agents/roster.ts`.
+ * which copy and read agent definitions through `src/agents/roster.ts`,
+ * nor `skill check` and `instinct check`, which run the five checks
+ * through `src/check/run.ts` and share `commands/check-report.ts`.
  *
  * ## What is registered
  *
@@ -53,6 +55,10 @@
  *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
  *     definition copied into the project with a source header, and
  *     `agent list`, the names a session this project spawns resolves.
+ *   - `skill check <dir> [--fix] [--project=<root>]` and
+ *     `instinct check <dir>`, the checker over one tier, each exiting
+ *     with the number of its failing files and running outside a
+ *     project, since `--project` is its only project seam.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -69,8 +75,10 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the six with an action registered: a subject with
- * none would show in every roster and dispatch nothing.
+ * The subjects are the eight with an action registered: a subject with
+ * none would show in every roster and dispatch nothing. `skill index`,
+ * `instinct flag` and `instinct promote` are in the command tree and
+ * are not registered, because nothing dispatches them yet.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
@@ -84,6 +92,7 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import init from './init.js';
+import instinctCheck from './instinct/check.js';
 import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
 import issueList from './issue/list.js';
@@ -102,6 +111,7 @@ import planList from './plan/list.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
 import selfUpdate from './self-update.js';
+import skillCheck from './skill/check.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -112,6 +122,8 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
+  { name: 'skill', summary: 'check a skills directory: layout, schema, references and locality' },
+  { name: 'instinct', summary: 'check an instincts directory against the instinct schema' },
 ]);
 
 /** The core commands, in roster order. */
@@ -137,6 +149,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   moduleExec,
   agentVendor,
   agentList,
+  skillCheck,
+  instinctCheck,
   init,
   doctor,
   selfUpdate,

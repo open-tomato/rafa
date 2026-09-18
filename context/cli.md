@@ -24,6 +24,9 @@ module's note is the long form.
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project` |
+| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory |
+| `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
@@ -45,10 +48,13 @@ module's note is the long form.
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment` and `issue move`;
   `effort collect`, `effort report`, `module list`, `module exec`,
-  `agent vendor`, `agent list`, `init`,
+  `agent vendor`, `agent list`, `skill check`, `instinct check`, `init`,
   `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
-  `loop`, `issue`, `effort`, `module` and `agent`: a
+  `loop`, `issue`, `effort`, `module`, `agent`, `skill` and `instinct`: a
   subject is declared with its first action, never ahead of it.
+  `skill index`, `skill list`, `instinct list`, `instinct show`,
+  `instinct flag` and `instinct promote` are in the command tree and are
+  registered by none of it yet, so no roster names them.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
@@ -74,10 +80,10 @@ module's note is the long form.
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
-  `loop` session actions and the `issue` actions wrap none: `describe`
-  reads the registry off its context, and `init`, `doctor`, `self-update`,
-  each plan reader, each `loop` session action and each `issue` action
-  their `args` and `flags`.
+  `loop` session actions, the `issue` actions and the two checkers wrap
+  none: `describe` reads the registry off its context, and `init`,
+  `doctor`, `self-update`, each plan reader, each `loop` session action,
+  each `issue` action and each checker their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -127,8 +133,8 @@ module's note is the long form.
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
   `plan validate <file>` resolves the file against the working directory,
-  and like every command but `module exec`, `init` and `describe` it runs
-  only inside a project. It writes each `parsePlan` issue at `error` as
+  and like every command but `module exec`, the two checkers, `init` and
+  `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
   `<file>:<line>: <reason>: <text>`, then the `agent=` of each
   still-to-run task that no scope the project's `loop.settingSources`
   loads defines, as `<file>: <the line `missingAgentLine` words>` naming
@@ -255,6 +261,41 @@ module's note is the long form.
   refuses. In json mode the sources, the rows and those names are the
   result's `data`, and `AgentRoster.userDefinitions`, a map, is not
   given.
+- **`skill check <dir> [--fix] [--project=<root>]` and
+  `instinct check <dir>` run the checker over one tier**
+  (`src/commands/skill/check.ts`, `src/commands/instinct/check.ts`,
+  sharing `src/commands/check-report.ts`). The five checks of
+  `src/check/run.ts` run in order and all of them on every file, so one
+  run names every rule a file breaks and the file counts once.
+  Both declare `needsProject: false`: the checker's project seam is
+  `--project` and nothing else, since a tier is often
+  `~/.claude/skills`, which sits in no project, and without the flag a
+  project-looking path in a body is counted `unchecked-path`, a warning.
+  `instinct check` declares no flag at all, so its runs always read that
+  way. `PATH`, which the fenced-tool lookup resolves against, is the
+  context's `env`; `<dir>` and `--project` resolve against the working
+  directory, which is the one seam of each command's factory.
+  `--fix` fills `tags` and `stack` on a file whose only failures are
+  those two missing fields, through `src/schema/frontmatter.ts`, so the
+  body survives byte for byte, and the report is the re-check of what
+  was written. Both flags are read AHEAD of the directory, as
+  `agent vendor` reads `--force` ahead of its names, so
+  `rafa skill check --fix <dir>` — which `parseArgs` hands the directory
+  as the value of `--fix` — meets the refusal naming the order that
+  works rather than the one saying it named no directory.
+  A clean entry prints nothing; an entry with issues prints its path and
+  one line per issue in `CHECK_STAGES` order, and the run closes with a
+  count. The exit code is the number of failing entries, capped at 255,
+  and exit code 1 is kept for the refusals: no directory, a second word,
+  a `--fix` or `--project` value the flag cannot take, and a path that
+  is no directory. On a failing run those lines are the `CommandExit`
+  message, as `doctor`'s halt is, because the dispatcher drops a nonzero
+  exit's `result` payload; so json mode gives
+  `CheckCommandResult` as the result's `data` on a CLEAN run alone.
+  Help renders a string flag's placeholder from its type, so
+  `rafa skill check --help` draws `[--project=<string>]` where the
+  refusals' usage line says `[--project=<root>]`, as `agent vendor`
+  draws `<name>` where its own says `<name>...`.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and
@@ -407,7 +448,8 @@ module's note is the long form.
   answers it (`src/project/scope.ts`), or null for a command declaring
   `needsProject: false`.
 - **A command runs inside a project** unless it declares
-  `needsProject: false`, as `module exec`, `init` and `describe` do; the dispatcher
+  `needsProject: false`, as `module exec`, `skill check`, `instinct check`,
+  `init` and `describe` do; the dispatcher
   resolves none for such a command. `commandProblem` refuses a
   `needsProject` that is no boolean.
 - **A command refuses by throwing `CommandExit(code, message)`.** It

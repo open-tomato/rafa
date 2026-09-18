@@ -464,6 +464,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config.js', ['ConfigError']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
+  ['./commands/skill/check.js', [
+    ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'SKILL_CHECK_USAGE']],
+  ]],
+  ['./commands/instinct/check.js', [
+    ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'INSTINCT_CHECK_USAGE']],
+  ]],
   ['./commands/init.js', [
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
     ['../cli/command.js', ['CommandExit']],
@@ -669,6 +675,8 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/module/exec.js',
       './commands/agent/vendor.js',
       './commands/agent/list.js',
+      './commands/skill/check.js',
+      './commands/instinct/check.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/self-update.js',
