@@ -75,7 +75,18 @@
  * definition supplies no budget, so `--max-budget-usd` joins whatever
  * else the block resolved to, agent or none. Every key is still PARSED
  * and still sits on the record whether or not it became a flag, and
- * {@link ResolvedFlags.suppressed} names exactly the ones that did not.
+ * {@link ResolvedFlags.suppressed} names exactly the granular ones an
+ * agent took.
+ *
+ * `skills` is the one recognised key that maps to no flag under any
+ * block: there is no CLI flag for a skill, and what a plan names there
+ * is a hint for whoever reads the dispatch record rather than something
+ * the spawn can pass on. It is recognised all the same, because that is
+ * what makes `{skills=bun-testing}` a declaration on its own and what
+ * gets a misspelled value into {@link TaskDeclaration.issues} instead of
+ * through to the agent's prompt as task text. It is never named in
+ * {@link ResolvedFlags.suppressed}, which says what an AGENT outranked,
+ * and nothing outranks a key that was never a flag.
  *
  * Nothing here throws. A recognised key whose value this module cannot
  * use lands in {@link TaskDeclaration.issues} and maps to no flag, so
@@ -88,7 +99,10 @@
 /**
  * Keys this module answers to, in the order flags are emitted. `budget`
  * sits ahead of `tools` because `--tools` is variadic and has to end the
- * argument list (`utils/claude.ts`).
+ * argument list (`utils/claude.ts`). `skills` comes last because it emits
+ * no flag at all: it is recognised so that its value is PARSED and lands
+ * on the record, and a value the parser cannot use lands in
+ * {@link TaskDeclaration.issues} rather than passing silently.
  */
 export const DECLARATION_KEYS = [
   'agent',
@@ -96,6 +110,7 @@ export const DECLARATION_KEYS = [
   'effort',
   'budget',
   'tools',
+  'skills',
 ] as const;
 
 /** One of the keys the grammar recognises. */
@@ -164,6 +179,9 @@ export function isAgentName(value: string): boolean {
 
 /** One tool name from the built-in set. */
 const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+/** A skill name, as a directory under `.claude/skills/` is named. */
+const SKILL_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 /** The flag a declared budget is passed as, in the CLI's own spelling. */
 export const BUDGET_FLAG = '--max-budget-usd';
@@ -237,6 +255,12 @@ export interface TaskDeclaration {
   budget: number | null;
   /** Tool names, deduped in first-seen order, or null. */
   tools: readonly string[] | null;
+  /**
+   * Skill names, deduped in first-seen order, or null. Maps to no flag:
+   * the key is recognised so a plan's skill hint is parsed and kept,
+   * and a reader takes it off the record rather than off the CLI.
+   */
+  skills: readonly string[] | null;
 }
 
 /** A task text split from the declaration it carried. */
@@ -300,6 +324,30 @@ export function parseToolList(value: string): readonly string[] | null {
   return tools;
 }
 
+/**
+ * Splits a `skills=` value into names, or answers null when it is not
+ * usable.
+ *
+ * Membership is NOT checked against the skills installed here, for the
+ * reason {@link parseToolList} gives: the set moves with the machine,
+ * and a plan naming a skill this checkout has yet to install is a plan
+ * that still routes. The SHAPE is checked instead — a bare directory
+ * stem, so no name reaches a path outside `.claude/skills/` — which
+ * catches an empty value, a doubled comma and a stray quote.
+ */
+export function parseSkillList(value: string): readonly string[] | null {
+  const parts = value.split(',');
+  if (parts.length === 0) return null;
+
+  const skills: string[] = [];
+  for (const part of parts) {
+    if (!SKILL_NAME.test(part)) return null;
+    if (!skills.includes(part)) skills.push(part);
+  }
+
+  return skills;
+}
+
 /** The issue a recognised key with an unusable value produces. */
 function unusableValue(key: string, token: string): DeclarationIssue {
   return { reason: 'unusable-value', key, text: token };
@@ -332,6 +380,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
   let effort: EffortLevel | null = null;
   let budget: number | null = null;
   let tools: readonly string[] | null = null;
+  let skills: readonly string[] | null = null;
 
   for (const token of tokenise(body)) {
     const match = token.match(ENTRY_TOKEN);
@@ -377,14 +426,32 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
       continue;
     }
 
-    const parsed = parseToolList(value);
-    if (parsed === null) issues.push(unusableValue(key, token));
-    else tools = parsed;
+    if (key === 'tools') {
+      const parsed = parseToolList(value);
+      if (parsed === null) issues.push(unusableValue(key, token));
+      else tools = parsed;
+      continue;
+    }
+
+    const named = parseSkillList(value);
+    if (named === null) issues.push(unusableValue(key, token));
+    else skills = named;
   }
 
   if (seen.size === 0) return null;
 
-  return { raw, entries, extras, issues, agent, model, effort, budget, tools };
+  return {
+    raw,
+    entries,
+    extras,
+    issues,
+    agent,
+    model,
+    effort,
+    budget,
+    tools,
+    skills,
+  };
 }
 
 /**
@@ -449,9 +516,11 @@ export type AgentEffortLookup = (agent: string) => boolean;
  * `--effort`, leaving the CLI to refuse the name before any model
  * call.
  *
- * Keys that map to no flag are named in
+ * Granular keys an agent outranked are named in
  * {@link ResolvedFlags.suppressed} rather than dropped, which is what
- * lets the dispatch say what it left to the agent.
+ * lets the dispatch say what it left to the agent. `skills` is not
+ * among them: it maps to no flag under any block, so no agent ever
+ * took it.
  *
  * `budget` passes {@link BUDGET_FLAG} whatever else the block holds, an
  * agent included, since a definition supplies no budget, and is never

@@ -285,8 +285,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   holds one.
 * Its tokens are space-separated `key=value` pairs, of the recognised keys
   in the table below; an unrecognised key is kept for telemetry and maps
-  to no flag. The key `skills` reserves a comma-separated list of skill
-  names for phase 1 resolution and is stored for reporting.
+  to no flag.
 
 | Key | Value | Passed as | Beside `agent=` |
 | --- | --- | --- | --- |
@@ -295,6 +294,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 | `effort` | `low`, `medium`, `high`, `xhigh` or `max` | `--effort` | passed, unless the definition declares an `effort` of its own in its frontmatter |
 | `budget` | US dollars above zero, as a plain decimal of at most six digits each side of the point, such as `0.50` | `--max-budget-usd` | always passed: a definition supplies no budget |
 | `tools` | tool names, comma-separated with no spaces | `--tools` | never passed: the definition names its tool set |
+| `skills` | skill names, comma-separated with no spaces | nothing: no flag carries a skill | kept on the record beside the agent |
 
 * `agent=<name>` outranks `model` and `tools`, and `effort` only when its
   definition declares one, as the last column says. The outranked keys
@@ -320,11 +320,11 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES` and `EFFORT_LEVELS` hold the aliases and levels in the table and whose `parseBudgetUsd` reads a budget; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES` and `EFFORT_LEVELS` hold the aliases and levels in the table, whose `parseBudgetUsd` reads a budget and whose `parseSkillList` reads a skill list; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 
-`skills` is an extras key rather than a recognised one, so give the task a recognised key beside it: `{skills=bun-testing}` alone is not a declaration and stays in the task text.
+`skills` is a recognised key that maps to no flag: there is no CLI flag for a skill, so the names are parsed, kept on the dispatch record and stripped from the task text with the rest of the block. It stands on its own — `{skills=bun-testing}` is a declaration with no other key beside it — and a value that is not a comma-separated list of skill names is recorded as an issue rather than passed on.
 
 ```markdown
   - [ ] Port vitest tests to bun:test  {agent=build-error-resolver skills=bun-testing,vitest-migration}

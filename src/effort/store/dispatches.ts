@@ -24,11 +24,12 @@
  * | `collected_at` | the write's time, ISO 8601 |
  *
  * `seq` comes first, the append order, as in every table of the store. The
- * five value columns follow `DECLARATION_KEYS`. A value is stored only when
- * the parser could use it: one it dropped as unusable is NULL here, and
- * still reads in `declaration`, as it does on the parser's record. So does
- * every key the grammar does not recognise, `skills` among them, which has
- * no column of its own.
+ * five value columns follow `DECLARATION_KEYS`, whose sixth key, `skills`,
+ * has none: it maps to no flag and nothing here reads it back by itself. A
+ * value is stored only when the parser could use it: one it dropped as
+ * unusable is NULL here, and still reads in `declaration`, as it does on
+ * the parser's record. So does a declared `skills=`, and so does every key
+ * the grammar does not recognise.
  *
  * `flags` is what reached the CLI, and it can differ from the values: an
  * `agent` outranks a declared `model` and `tools`, and `effort` too when

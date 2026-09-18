@@ -87,7 +87,7 @@ const CLOCK = { now: () => new Date(WRITTEN_AT) };
 /** The plan every write here is dispatched under. */
 const STUB = 'phase-1-installable';
 
-/** A task line declaring every recognised key, and a key the grammar keeps as an extra. */
+/** A task line declaring every recognised key, `skills` among them, which has no column. */
 const FULL_LINE = 'Add the module  {agent=loop-implementer model=opus effort=high budget=0.5 tools=Read,Bash skills=bun-testing}';
 
 /** A lone high surrogate, built from its code unit. */

@@ -44,6 +44,22 @@
  * flags for a null declaration, and letting a stray token pass
  * unrecorded.
  *
+ * The mutation grid above was driven BEFORE `skills` joined the
+ * recognised keys, so it measures nothing about the four cases that key
+ * added (the six-key roster, the block carrying all six, `skills=`
+ * beside an agent and on its own, its unusable value, and
+ * {@link parseSkillList} itself). What those cases do pin is the
+ * difference from the extras behaviour they replaced: a value on the
+ * record rather than in `extras`, an issue rather than a silent pass,
+ * a declaration where a lone `skills=` used to be task text — and no
+ * flag either way, which is the one thing that did not change.
+ *
+ * One control was driven for those cases: taking `skills` back out of
+ * `DECLARATION_KEYS` reddens SEVEN cases — the four here plus the
+ * six-key roster, `plan/parse.test.ts`'s declaration case and the
+ * near-miss table of `tests/declaration-negatives.test.ts` — with the
+ * module restored byte-identical (sha256 checked) and green after.
+ *
  * The two that stayed GREEN are named rather than dropped, and they
  * are not no-ops — both are real holes, and both belong to
  * `tests/declaration-negatives.test.ts` rather than to this file.
@@ -67,6 +83,7 @@ import {
   isModelValue,
   MODEL_ALIASES,
   parseBudgetUsd,
+  parseSkillList,
   parseTaskDeclaration,
   parseToolList,
   resolveDeclarationFlags,
@@ -118,13 +135,14 @@ function declarationOf(taskText: string): TaskDeclaration {
 }
 
 describe('the recognised grammar', () => {
-  it('recognises exactly five keys, the budget ahead of the tools', () => {
+  it('recognises exactly six keys, the budget ahead of the tools and skills last', () => {
     expect([...DECLARATION_KEYS]).toEqual([
       'agent',
       'model',
       'effort',
       'budget',
       'tools',
+      'skills',
     ]);
   });
 
@@ -187,9 +205,9 @@ describe('parseTaskDeclaration', () => {
     expect(parsed.text).toBe('Do the thing');
   });
 
-  it('reads all five keys off one block', () => {
+  it('reads all six keys off one block', () => {
     const declaration = declarationOf(
-      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash}',
+      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash skills=bun-testing}',
     );
 
     expect(declaration.agent).toBe('tdd-guide');
@@ -197,6 +215,7 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.effort).toBe('max');
     expect(declaration.budget).toBe(1.25);
     expect(declaration.tools).toEqual(['Read', 'Bash']);
+    expect(declaration.skills).toEqual(['bun-testing']);
     expect(declaration.issues).toEqual([]);
   });
 
@@ -273,23 +292,45 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.issues).toEqual([]);
   });
 
-  it('pins `skills=` to extras: no flag of its own, and the text it trails comes clean', () => {
+  it('reads `skills=` as a recognised key mapping to no flag, the text it trails coming clean', () => {
     const line =
       'Add the Zod schema for CreateJobRequest  {agent=loop-implementer effort=high skills=zod-schemas}';
     const declaration = declarationOf(line);
 
-    expect(declaration.extras).toEqual([
-      { key: 'skills', value: 'zod-schemas' },
-    ]);
+    expect(declaration.skills).toEqual(['zod-schemas']);
+    expect(declaration.extras).toEqual([]);
+    expect(declaration.issues).toEqual([]);
     expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT).args).toEqual([
       '--agent',
       'loop-implementer',
       '--effort',
       'high',
     ]);
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT).suppressed)
+      .toEqual([]);
     expect(parseTaskDeclaration(line).text).toBe(
       'Add the Zod schema for CreateJobRequest',
     );
+  });
+
+  it('declares on `skills=` alone, with no other recognised key beside it', () => {
+    const line = 'Port vitest tests to bun:test  {skills=bun-testing,vitest-migration}';
+    const declaration = declarationOf(line);
+
+    expect(declaration.skills).toEqual(['bun-testing', 'vitest-migration']);
+    expect(declaration.agent).toBeNull();
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT).args).toEqual([]);
+    expect(parseTaskDeclaration(line).text).toBe('Port vitest tests to bun:test');
+  });
+
+  it('records an unusable `skills=` value as an issue and keeps no names', () => {
+    const declaration = declarationOf('Do it  {effort=low skills=bun-testing,}');
+
+    expect(declaration.skills).toBeNull();
+    expect(declaration.effort).toBe('low');
+    expect(declaration.issues).toEqual([
+      { reason: 'unusable-value', key: 'skills', text: 'skills=bun-testing,' },
+    ]);
   });
 
   it('takes the first of a duplicated key and says so', () => {
@@ -386,6 +427,31 @@ describe('parseToolList', () => {
     expect(parseToolList('')).toBeNull();
     expect(parseToolList('Read,,Write')).toBeNull();
     expect(parseToolList('Read, Write')).toBeNull();
+  });
+});
+
+describe('parseSkillList', () => {
+  it('splits a comma-separated list in written order', () => {
+    expect(parseSkillList('bun-testing,dev_planner,zod3')).toEqual([
+      'bun-testing',
+      'dev_planner',
+      'zod3',
+    ]);
+  });
+
+  it('keeps the first of a repeated skill name', () => {
+    expect(parseSkillList('bun-testing,api,bun-testing')).toEqual([
+      'bun-testing',
+      'api',
+    ]);
+  });
+
+  it('refuses an empty value, a doubled comma, a space and a path', () => {
+    expect(parseSkillList('')).toBeNull();
+    expect(parseSkillList('bun-testing,,api')).toBeNull();
+    expect(parseSkillList('bun-testing, api')).toBeNull();
+    expect(parseSkillList('../elsewhere/api')).toBeNull();
+    expect(parseSkillList('bun-testing\'')).toBeNull();
   });
 });
 
