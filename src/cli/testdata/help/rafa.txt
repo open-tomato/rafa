@@ -26,7 +26,7 @@ Subjects:
   loop       start a plan; stop, pause, resume, show and list its sessions
   issue      the tracker: list, show, create, comment on and move issues
   pr         the pull request of a branch: one line, in full or in the browser;
-             list them, merge one
+             list, merge and triage them
   effort     collect session and commit rows; report per plan
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
