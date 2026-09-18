@@ -7,9 +7,10 @@
  * adapter over the GitHub CLI, `./checks.js` holds the check-row
  * readers, which are pure and belong to no provider, and
  * `./provider.js` answers which provider a repository gets and holds
- * the one exit-2 refusal every `pr` action shares, and
+ * the one exit-2 refusal every `pr` action shares,
  * `./preflight-items.js` builds the two required preflight items a `gh`
- * provider contributes.
+ * provider contributes, and `./none.js` is what a `none` provider gets
+ * in place of a pull request: the branch pushed and a compare URL.
  *
  * It is a barrel, so it is imported as `../pr/index.js` and never as
  * `../pr.js` (`context/source.md`). It re-exports and defines nothing:
@@ -49,6 +50,7 @@ export type {
   PullRequestSummary,
 } from './types.js';
 export type { GhPullRequestsOptions } from './gh.js';
+export type { PushOutcome } from './none.js';
 export type {
   GhProviderReading,
   PrProviderReading,
@@ -65,6 +67,7 @@ export {
   waitForChecks,
 } from './checks.js';
 export { isMergeMethod, MERGE_METHODS } from './types.js';
+export { compareUrl, pushBranch } from './none.js';
 export { createGhPullRequests, ghAuthOk, ghAuthOkIn, ghPullRequestsIn } from './gh.js';
 export {
   DEFAULT_GH_HOST,

@@ -47,6 +47,20 @@
  * at `warn` reddened the case stopping after one. The poll line at `warn`
  * reddened the green case and both zero-attempt cases.
  *
+ * The `none`-provider cases are the gate's other path, and each pins
+ * the whole call sequence for the same reason: `['read provider',
+ * 'git push <branch>']` and nothing more says that no `gh auth status`,
+ * no PR lookup, no poll and no repair session happened, where a check
+ * for the printed compare URL alone would pass a gate that pushed and
+ * then fell through to the `gh` path. Four mutations of the module were
+ * driven against this file on 2026-09-18, one run each, the module
+ * restored sha256-identical after every one and 26 pass either side:
+ * the provider read AFTER `isGhUsable` rather than before, 19 cases;
+ * the `none` branch falling through with no `return`, 4; the
+ * `source === 'config'` reading inverted so the wording swaps, 2; and
+ * the failed-push `return` dropped so a compare URL is printed for a
+ * branch that never left the machine, 1.
+ *
  * Every repair session records the setting sources it was handed beside
  * its prompt. The sources the cases hand over are not the default, so a
  * gate that bound the default in their place reddens.
@@ -58,9 +72,11 @@ import type { PrLifecycleSeams } from './pr-lifecycle.js';
 import type { ClaudeSettingSource } from '../config.js';
 import type {
   ChecksReading,
+  PrProviderReading,
   PullRequestDetail,
   PullRequestSummary,
   PullRequests,
+  PushOutcome,
 } from '../pr/index.js';
 
 import { readFileSync } from 'node:fs';
@@ -96,6 +112,41 @@ const SOURCES: readonly ClaudeSettingSource[] = ['local', 'user'];
 
 /** A timeout the first poll cannot reach, so only a verdict ends it. */
 const LONG_TIMEOUT_MS = 20 * 60_000;
+
+/** The remote the readings below carry, and the URL it compares at. */
+const REMOTE = 'git@github.com:o/r.git';
+const COMPARE = `https://github.com/o/r/compare/${BRANCH}?expand=1`;
+
+/** The reading every `gh`-provider case runs under. */
+const GH_READING: PrProviderReading = {
+  provider: 'gh',
+  source: 'config',
+  remote: REMOTE,
+  host: 'github.com',
+};
+
+/** `pr.provider: none` in the config, over a GitHub origin. */
+const NONE_BY_CONFIG: PrProviderReading = { ...GH_READING, provider: 'none' };
+
+/** No config, and an origin that is not GitHub, so the remote decided. */
+const NONE_BY_REMOTE: PrProviderReading = {
+  provider: 'none',
+  source: 'remote',
+  remote: 'git@gitlab.com:o/r.git',
+  host: 'gitlab.com',
+};
+
+/** A repository with no origin at all: nothing to build a URL from. */
+const NONE_NO_REMOTE: PrProviderReading = {
+  provider: 'none',
+  source: 'remote',
+  remote: null,
+  host: null,
+};
+
+/** A push that worked, and one git refused. */
+const PUSHED: PushOutcome = { ok: true, output: `branch '${BRANCH}' set up to track 'origin/${BRANCH}'.` };
+const REFUSED: PushOutcome = { ok: false, output: 'error: failed to push some refs' };
 
 /** `gh pr checks --json name,state,link` stdout for the given states. */
 function checks(states: Record<string, string>): string {
@@ -148,6 +199,10 @@ const DIRTY: MergeState = detail('open', 'conflicting', 'DIRTY');
 
 /** What a case plans for the stubbed effects to answer, in order. */
 interface Script {
+  /** The provider reading, or the default `gh`-from-config one. */
+  readonly provider?: PrProviderReading;
+  /** How the push a `none` provider makes ends. Absent, it succeeds. */
+  readonly push?: PushOutcome;
   readonly ghUsable?: boolean;
   readonly prNumber?: number | null;
   readonly probes?: readonly string[];
@@ -225,6 +280,14 @@ function stub(script: Script): Stubbed {
 
   const seams: PrLifecycleSeams = {
     currentBranch: () => BRANCH,
+    readProvider: () => {
+      calls.push('read provider');
+      return script.provider ?? GH_READING;
+    },
+    pushBranch: (branch) => {
+      calls.push(`git push ${branch}`);
+      return Promise.resolve(script.push ?? PUSHED);
+    },
     isGhUsable: () => {
       calls.push('gh auth status');
       return Promise.resolve(script.ghUsable ?? true);
@@ -248,6 +311,9 @@ function stub(script: Script): Stubbed {
 
 /** The effects every attempt that finds the PR starts with. */
 const POLL = [`pr list ${BRANCH}`, `pr checks ${PR}`];
+
+/** The effects every `gh`-provider case opens with, before its first poll. */
+const OPENING = ['read provider', 'gh auth status'];
 
 let logs: string[] = [];
 let warnings: string[] = [];
@@ -287,7 +353,7 @@ describe('verifyPullRequest, before any poll', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status']);
+    expect(run.calls).toEqual([...OPENING]);
     expect(warnings.join('\n')).toContain('`gh` is not available or not authenticated');
     expect(errors).toEqual([]);
   });
@@ -297,7 +363,7 @@ describe('verifyPullRequest, before any poll', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', `pr list ${BRANCH}`]);
+    expect(run.calls).toEqual([...OPENING, `pr list ${BRANCH}`]);
     expect(warnings.join('\n')).toContain(`No open PR found for ${BRANCH}. Nothing to verify.`);
     expect(errors).toEqual([]);
   });
@@ -332,7 +398,7 @@ describe('verifyPullRequest, on a settled poll', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL]);
+    expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain(`CI green on PR #${PR}:`);
     expect(warnings).toEqual([]);
     expect(errors).toEqual([]);
@@ -344,7 +410,7 @@ describe('verifyPullRequest, on a settled poll', () => {
     await verifyPullRequest(60_000, 2, SOURCES, run.seams);
 
     expect(run.calls).toEqual([
-      'gh auth status',
+      ...OPENING,
       ...POLL,
       'sleep 20000',
       `pr checks ${PR}`,
@@ -365,7 +431,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`]);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`]);
     expect(logs.join('\n')).toContain(`PR #${PR} is already merged.`);
     expect(errors).toEqual([]);
   });
@@ -375,7 +441,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`]);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`]);
     const warned = warnings.join('\n');
     expect(warned).toContain(`PR #${PR} reports no checks and is not conflicting`);
     expect(warned).toContain('(GitHub says it is mergeable, merge state CLEAN).');
@@ -387,7 +453,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
     expect(run.prompts).toHaveLength(1);
     expect(run.sources).toEqual([SOURCES]);
     const prompt = run.prompts[0] ?? '';
@@ -404,7 +470,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
     expect(run.prompts[0]).toContain('it conflicts with the base branch');
     expect(errors).toEqual([]);
   });
@@ -414,7 +480,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`, 'repair']);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair']);
     expect(errors).toEqual(['\n❌ Conflict-repair session failed (exit 4).']);
   });
 });
@@ -425,7 +491,7 @@ describe('verifyPullRequest, on a red PR', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
     const prompt = run.prompts[0] ?? '';
     expect(prompt.split('\n')[0]).toBe(`The pull request for branch \`${BRANCH}\` (#${PR}) is not mergeable: its CI checks failed.`);
     expect(prompt).toContain(`The failing checks are:\n   fail    test — FAILURE (${JOB})`);
@@ -440,7 +506,7 @@ describe('verifyPullRequest, on a red PR', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL, `pr view ${PR}`, 'repair']);
+    expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair']);
     expect(errors).toEqual(['\n❌ CI-repair session failed (exit 3).']);
   });
 
@@ -454,7 +520,7 @@ describe('verifyPullRequest, on a red PR', () => {
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
     expect(run.calls).toEqual([
-      'gh auth status',
+      ...OPENING,
       ...POLL,
       `pr view ${PR}`,
       'repair',
@@ -499,7 +565,7 @@ describe('verifyPullRequest, with zero attempts', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 0, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL]);
+    expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain('[0s] red — 2 check(s)');
     expect(warnings).toEqual([]);
     expect(errors[0]).toBe(`\n❌ CI still not green after 0 repair attempt(s) on ${BRANCH}.`);
@@ -510,9 +576,89 @@ describe('verifyPullRequest, with zero attempts', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 0, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['gh auth status', ...POLL]);
+    expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain('[0s] none — 0 check(s)');
     expect(errors[0]).toBe(`\n❌ CI still not green after 0 repair attempt(s) on ${BRANCH}.`);
+  });
+});
+
+describe('verifyPullRequest, under a none provider', () => {
+  it('pushes the branch, prints the compare URL and asks gh nothing', async () => {
+    const run = stub({ provider: NONE_BY_CONFIG });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    // The whole of the gate: the reading, the push, and nothing else.
+    // No `gh auth status`, no PR looked for, no check polled and no
+    // repair session, so a gate that fell through to the `gh` path
+    // after pushing fails here rather than on a printed line.
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    expect(run.prompts).toEqual([]);
+    expect(logs.join('\n')).toContain('pr.provider is none');
+    expect(logs.join('\n')).toContain(`Pushed ${BRANCH} to origin.`);
+    expect(logs.join('\n')).toContain(`Open the pull request: ${COMPARE}`);
+    expect(errors).toEqual([]);
+  });
+
+  it('says the CI wait was skipped, and why, at warn', async () => {
+    const run = stub({ provider: NONE_BY_CONFIG });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    // The skip is a warning and the push is not: the first is something
+    // the operator has to act on and the second is the loop working.
+    expect(warnings.join('\n')).toContain('CI check skipped');
+    expect(warnings.join('\n')).toContain('nothing here confirms CI agreed');
+    expect(warnings.join('\n')).not.toContain('`gh` is not available');
+  });
+
+  it('names the origin rather than the config when the remote decided', async () => {
+    const run = stub({ provider: NONE_BY_REMOTE });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    expect(logs.join('\n')).toContain('origin is not a GitHub remote');
+    expect(logs.join('\n')).toContain(`https://gitlab.com/o/r/compare/${BRANCH}?expand=1`);
+  });
+
+  it('pushes and says there is no compare URL when origin names no host', async () => {
+    const run = stub({ provider: NONE_NO_REMOTE });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    expect(logs.join('\n')).toContain(`Pushed ${BRANCH} to origin.`);
+    expect(logs.join('\n')).not.toContain('Open the pull request:');
+    expect(warnings.join('\n')).toContain('no web host');
+  });
+
+  it('reports a refused push with git\'s words and prints no URL', async () => {
+    const run = stub({ provider: NONE_BY_CONFIG, push: REFUSED });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    expect(errors).toEqual([
+      `\n❌ Could not push ${BRANCH}.`,
+      REFUSED.output,
+      '   The work is committed locally. Push it yourself and open the PR by hand.',
+    ]);
+    // Nothing to compare against: the branch never left the machine.
+    expect(logs.join('\n')).not.toContain(COMPARE);
+    expect(warnings).toEqual([]);
+  });
+
+  it('reads the provider before asking gh anything, under a gh provider too', async () => {
+    const run = stub({ ghUsable: false });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    // The control on the order: an unusable `gh` still gets the `gh`
+    // wording, and the reading came first.
+    expect(run.calls).toEqual(['read provider', 'gh auth status']);
+    expect(warnings.join('\n')).toContain('`gh` is not available');
+    expect(warnings.join('\n')).not.toContain('CI check skipped');
   });
 });
 
@@ -523,6 +669,11 @@ describe('PR_LIFECYCLE_SEAMS', () => {
     // member of it: every one would spawn `gh` in this checkout.
     expect(PR_LIFECYCLE_SEAMS.pulls.kind).toBe('gh');
     expect(typeof PR_LIFECYCLE_SEAMS.isGhUsable).toBe('function');
+    // Neither is called here: `readProvider` would spawn
+    // `git remote get-url origin` in this checkout and `pushBranch`
+    // would push it.
+    expect(typeof PR_LIFECYCLE_SEAMS.readProvider).toBe('function');
+    expect(typeof PR_LIFECYCLE_SEAMS.pushBranch).toBe('function');
     expect(PR_LIFECYCLE_SEAMS.runClaude).toBe(runClaude);
     expect(PR_LIFECYCLE_SEAMS.now).toBeUndefined();
     expect(PR_LIFECYCLE_SEAMS.sleep).toBeUndefined();

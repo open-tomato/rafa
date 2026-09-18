@@ -20,6 +20,7 @@ import { describe, expect, it } from 'bun:test';
 
 import * as checks from './checks.js';
 import * as gh from './gh.js';
+import * as none from './none.js';
 import * as preflightItems from './preflight-items.js';
 import * as provider from './provider.js';
 import * as types from './types.js';
@@ -46,6 +47,11 @@ describe('the pull request barrel', () => {
     expect(barrel.ghAuthOk).toBe(gh.ghAuthOk);
     expect(barrel.ghAuthOkIn).toBe(gh.ghAuthOkIn);
     expect(barrel.ghPullRequestsIn).toBe(gh.ghPullRequestsIn);
+  });
+
+  it('answers the none-provider helpers of ./none.js themselves', () => {
+    expect(barrel.compareUrl).toBe(none.compareUrl);
+    expect(barrel.pushBranch).toBe(none.pushBranch);
   });
 
   it('answers the provider readers of ./provider.js themselves', () => {

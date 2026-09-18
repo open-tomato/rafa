@@ -21,6 +21,29 @@
  * the reading that decides whether to skip the gate at all, and the
  * repair prompt, which tells a session which commands to read logs with.
  *
+ * ## The `none` provider
+ *
+ * Before anything is asked of `gh`, the gate reads which provider the
+ * repository gets ({@link PrLifecycleSeams.readProvider}, over
+ * `pr/provider.ts`). A reading of `none` has no CLI to open a pull
+ * request with and so nothing to poll, and it takes the whole of the
+ * gate's other path: the branch is PUSHED, the compare URL printed, and
+ * the CI wait skipped and said to be skipped (`pr/none.ts`). No PR is
+ * looked for, no check is polled and no repair session is spent, so
+ * `pr.provider: none` costs a `git push` and nothing else.
+ *
+ * That reading comes before {@link PrLifecycleSeams.isGhUsable} on
+ * purpose. The two skips are different facts and say different things:
+ * `none` is a configured answer and the push is the loop doing its job,
+ * while an unusable `gh` under a `gh` provider is a machine that cannot
+ * answer and leaves the operator with a PR nothing confirmed. Asking
+ * `gh auth status` first would print the second for a repository that
+ * means the first.
+ *
+ * A push that fails is reported and not rethrown, for the reason a
+ * provider that cannot be asked is: this is the run's last gate, and
+ * the commits are made either way.
+ *
  * What the gate tells the operator goes through the active output
  * (`adapters/output/active.ts`): the wait, each poll, a green verdict
  * and a merged PR through `info`; a skipped check, a PR not found, a
@@ -36,15 +59,26 @@
 import type { ClaudeSettingSource } from '../config.js';
 import type {
   CheckRow,
+  PrProviderReading,
   PullRequestDetail,
   PullRequests,
+  PushOutcome,
   WaitOptions,
   WaitResult,
 } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../config-sections.js';
-import { failingRows, formatRows, ghAuthOkIn, ghPullRequestsIn, waitForChecks } from '../pr/index.js';
+import {
+  compareUrl,
+  failingRows,
+  formatRows,
+  ghAuthOkIn,
+  ghPullRequestsIn,
+  pushBranch,
+  resolvePrProvider,
+  waitForChecks,
+} from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 
@@ -70,6 +104,13 @@ type MergeState = PullRequestDetail | null;
 export interface PrLifecycleSeams {
   /** The branch whose PR is verified. */
   readonly currentBranch: () => string;
+  /**
+   * Which provider the repository gets. A reading of `none` takes the
+   * gate's other path; see the module note.
+   */
+  readonly readProvider: () => PrProviderReading;
+  /** Pushes the branch to `origin` with upstream set, for a `none` provider. */
+  readonly pushBranch: (branch: string) => Promise<PushOutcome>;
   /** Whether `gh` is on PATH and authenticated. */
   readonly isGhUsable: () => Promise<boolean>;
   /** The provider every read of the pull request goes through. */
@@ -91,6 +132,11 @@ export interface PrLifecycleSeams {
 /** The real helpers, which {@link verifyPullRequest} runs on by default. */
 export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
   currentBranch: getCurrentBranch,
+  // `configured: null` leaves the answer to `origin`. `start()` passes a
+  // reader carrying the run's own `pr.provider`; this default is what a
+  // caller that names no seam gets.
+  readProvider: () => resolvePrProvider({ configured: null, dir: process.cwd() }),
+  pushBranch: (branch) => Promise.resolve(pushBranch(process.cwd(), branch)),
   isGhUsable: () => ghAuthOkIn(process.cwd()),
   pulls: ghPullRequestsIn(process.cwd()),
   runClaude,
@@ -154,6 +200,9 @@ async function repairPullRequest(
  * and reports rather than rethrows a provider that could not be asked
  * once the gate has started, for the same reason.
  *
+ * Under a `none` provider it pushes the branch, prints the compare URL
+ * and skips the wait instead, polling nothing; see the module note.
+ *
  * Every repair session loads settings from `settingSources`, bound once
  * here so no attempt can spawn one under any other.
  *
@@ -172,6 +221,12 @@ export async function verifyPullRequest(
     runRepair: (prompt) => given.runClaude(prompt, settingSources),
   };
   const branch = io.currentBranch();
+
+  const reading = io.readProvider();
+  if (reading.provider === 'none') {
+    await pushWithoutProvider(io, branch, reading);
+    return;
+  }
 
   if (!await io.isGhUsable()) {
     activeOutput().warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
@@ -196,6 +251,42 @@ export async function verifyPullRequest(
 
   activeOutput().error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
   activeOutput().error('   Stopping rather than looping. Read the failing jobs and decide.');
+}
+
+/**
+ * The whole of the gate for a `none` provider: pushes `branch`, names
+ * where a pull request would be opened from, and says the CI wait was
+ * skipped. Reports a failed push and returns; see the module note.
+ */
+async function pushWithoutProvider(
+  io: AttemptSeams,
+  branch: string,
+  reading: PrProviderReading,
+): Promise<void> {
+  const output = activeOutput();
+  const said = reading.source === 'config'
+    ? 'pr.provider is none'
+    : 'origin is not a GitHub remote, so pr.provider resolves to none';
+  output.info(`\n⬆️  ${said} — pushing ${branch} and opening no pull request.`);
+
+  const push = await io.pushBranch(branch);
+  if (!push.ok) {
+    output.error(`\n❌ Could not push ${branch}.`);
+    if (push.output !== '') output.error(push.output);
+    output.error('   The work is committed locally. Push it yourself and open the PR by hand.');
+    return;
+  }
+  output.info(`\n✅ Pushed ${branch} to origin.`);
+
+  const url = compareUrl(reading.remote, branch);
+  if (url === null) {
+    output.warn('   origin names no web host, so there is no compare URL to open. Open the PR by hand.');
+  } else {
+    output.info(`   Open the pull request: ${url}`);
+  }
+
+  output.warn('\n⚠️  CI check skipped: with no pull request provider there is nothing to poll.');
+  output.warn('   The branch is pushed but nothing here confirms CI agreed with it.');
 }
 
 /**
