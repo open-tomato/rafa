@@ -77,9 +77,11 @@
  * names, because the corpus names a stack skill `<stack>-<concern>`
  * (`kotlin-testing`, `django-tdd`, `springboot-verification`) and the
  * concern half is open-ended. A directory whose leading tokens match
- * nothing yields an empty list, which the backfill reads as agnostic:
- * `verification-loop` and `code-tour` are ECC skills about no stack at
- * all, and inventing one for them would gate them out of everything.
+ * nothing yields an empty list, which `src/backfill/derive.ts` reads
+ * as NO derivation: `verification-loop` and `code-tour` are ECC skills
+ * about no stack at all, and the `stack` a `--fix` already inferred
+ * from their bodies is a better answer than either an invented name or
+ * an `[agnostic]` written over it.
  *
  * Nothing here throws, nothing reads a file and nothing reads the
  * home. Every table is a literal, and the corpus it was measured
@@ -448,7 +450,7 @@ const MAX_PREFIX_TOKENS = 2;
 /**
  * The stacks an ECC skill directory name declares, longest leading
  * token run first. Empty for a name about no stack, which the backfill
- * reads as `[agnostic]`.
+ * reads as a `stack` it must leave alone.
  */
 export function stacksFromEccSkillName(directory: string): readonly StackName[] {
   const tokens = directory
