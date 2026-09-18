@@ -9,6 +9,7 @@ Quick start:
   rafa plan create --spec=.rafa/specs/my-feature.md
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
   rafa issue list
+  rafa pr current
   rafa effort collect
   rafa module list
   rafa agent vendor tdd-guide
@@ -24,6 +25,8 @@ Subjects:
   plan       create a plan from a spec; list, show and validate plans
   loop       start a plan; stop, pause, resume, show and list its sessions
   issue      the tracker: list, show, create, comment on and move issues
+  pr         the pull request of a branch: one line, in full or in the browser;
+             list the open ones
   effort     collect session and commit rows; report per plan
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees

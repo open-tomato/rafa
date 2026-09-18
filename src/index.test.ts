@@ -445,6 +445,26 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueRef', 'onTracker', 'readChoice', 'resolveIssueTracker']],
   ]],
+  ['./commands/pr/current.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
+  ]],
+  ['./commands/pr/show.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['../../pr/index.js', ['formatRows']],
+    ['./current.js', ['SEPARATOR']],
+    ['./last-triage.js', ['readLastTriage']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readPullArgument']],
+  ]],
+  ['./commands/pr/view.js', [
+    ['./current.js', ['SEPARATOR']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readPullArgument']],
+  ]],
+  ['./commands/pr/list.js', [
+    ['../../config-sections.js', ['messageOf']],
+    ['./current.js', ['SEPARATOR']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'onProvider', 'openPrContext', 'PR_USAGE']],
+  ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/module/list.js', [
@@ -714,6 +734,10 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/issue/create.js',
       './commands/issue/comment.js',
       './commands/issue/move.js',
+      './commands/pr/current.js',
+      './commands/pr/show.js',
+      './commands/pr/view.js',
+      './commands/pr/list.js',
       './commands/module/list.js',
       './commands/module/exec.js',
       './commands/agent/vendor.js',
