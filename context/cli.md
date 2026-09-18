@@ -524,9 +524,11 @@ module's note is the long form.
   the run, session records that cannot be read or written, and a
   preflight that halts before any session: an `agent=` of a still-to-run
   task that no scope `loop.settingSources` loads defines, checked ahead
-  of every probe, a failed required prerequisite, a PREREQUISITES file
-  that cannot be read, or checks the store refused
-  (`start/preflight.ts`). A record of the plan refuses the
+  of every probe, a failed required prerequisite — the two automatic
+  items a `gh` pull request provider contributes, `gh` on `PATH` and
+  `gh auth status` for `origin`'s host, checked ahead of the configured
+  tiers, included — a PREREQUISITES file that cannot be read, or checks
+  the store refused (`start/preflight.ts`). A record of the plan refuses the
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
   `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1

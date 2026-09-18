@@ -31,6 +31,19 @@
  * reddened a case at the first pass. The survivor, the store's clock seam
  * dropped, reddened once the halt case read the halt's `collectedAt`.
  *
+ * The automatic items of the pull request provider are driven with the
+ * `origin` probe stubbed, so no case here spawns git or reads this
+ * checkout's remote: `drive` answers that probe with null unless a case
+ * plants one, which is why every other case resolves `pr.provider:
+ * none` and checks nothing extra. Each of those cases sits beside a
+ * control differing in one thing only — the remote, the configured
+ * provider, or what the `gh` probe answered. Three mutations of
+ * `start/preflight.ts` were driven against them on 2026-09-18, the file
+ * run alone on a baseline of 25 pass and restored sha256-identical: the
+ * items appended to the required tier instead of prepended reddened 1
+ * case, the `pr.provider: none` shortcut dropped reddened 1, and the
+ * `readRemote` seam dropped reddened 5.
+ *
  * `start()` handing the preflight its settings and its plan, and handing
  * the lines on to each dispatch, is reached by no case here, since
  * `start()` spawns the CLI with no seam. It was read on the same day by
@@ -39,7 +52,7 @@
  * mutation changed the reading it aimed at.
  */
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
-import type { StartPreflight, StartPreflightOptions } from './preflight.js';
+import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -63,6 +76,13 @@ import { CONFIG_DEFAULTS } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
+import {
+  DEFAULT_GH_HOST,
+  ghAuthItem,
+  ghMissingMessage,
+  ghOnPathItem,
+  ghUnauthenticatedMessage,
+} from '../pr/preflight-items.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { planStubFromPrompt } from '../utils/plan-stamp.js';
 import { findNextTask, trackerPathFor } from '../utils/tracker.js';
@@ -182,7 +202,7 @@ interface Driven {
  */
 async function drive(
   root: string,
-  settings: PrerequisiteSettings,
+  settings: StartPreflightSettings,
   answers: Readonly<Record<string, ProbeRun>>,
   options: Partial<StartPreflightOptions> = {},
 ): Promise<Driven> {
@@ -212,6 +232,9 @@ async function drive(
       checks: { runProbe, env: {} },
       newRunId: () => RUN_ID,
       now: () => CLOCK,
+      // No case here reads this machine's `origin`: a case that wants one
+      // plants it, and every other run resolves `pr.provider: none`.
+      readRemote: () => null,
       ...options,
     });
     return { result, refusal: null, probes, info, warn };
@@ -436,6 +459,139 @@ describe('the order a preflight works in', () => {
     expect(run.refusal).toBeNull();
     expect(events).toEqual(['run id', `bun --version in ${root} with MARK=seam`]);
     expect(storedRows(root).map((row) => row.run_id)).toEqual(['run-ordered']);
+  });
+});
+
+/** The probe of `item`, which every automatic item carries. */
+function probeOf(item: PrerequisiteItem): string {
+  const { probe } = item;
+  if (probe === undefined) throw new Error(`${item.name} carries no probe`);
+  return probe;
+}
+
+/** A GitHub `origin`, as git writes one for an ssh clone. */
+const GITHUB_ORIGIN = 'git@github.com:open-tomato/rafa.git';
+
+/** An answer for each probe of the two automatic items of `host`, all passing. */
+function ghAnswers(host: string): Record<string, ProbeRun> {
+  return {
+    [probeOf(ghOnPathItem(host))]: answered(0),
+    [probeOf(ghAuthItem(host))]: answered(0),
+  };
+}
+
+describe('the automatic items of the pull request provider', () => {
+  it('checks gh on PATH and gh auth status ahead of the configured tier, where a repository with no GitHub origin checks neither', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const settings = settingsOf([BUN], []);
+    const answers = { ...ghAnswers(DEFAULT_GH_HOST), 'bun --version': answered(0) };
+
+    const run = await drive(root, settings, answers, { readRemote: () => GITHUB_ORIGIN });
+    const control = await drive(controlRoot, settings, answers, { readRemote: () => null });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([
+      `${probeOf(ghOnPathItem(DEFAULT_GH_HOST))} in ${root}`,
+      `${probeOf(ghAuthItem(DEFAULT_GH_HOST))} in ${root}`,
+      `bun --version in ${root}`,
+    ]);
+    expect(storedRows(root).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      'required gh pass',
+      `required https://${DEFAULT_GH_HOST} pass`,
+      'required bun pass',
+    ]);
+    expect(run.info[0]).toBe(`\n🛫 Preflight: checking 3 prerequisite item(s) under run ${RUN_ID}.`);
+    expect(control.refusal).toBeNull();
+    expect(control.probes).toEqual([`bun --version in ${controlRoot}`]);
+  });
+
+  it('asks about the host origin names, where a configured provider with no origin asks about github.com', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const host = 'github.example.com';
+    const settings: StartPreflightSettings = { ...settingsOf([], []), prProvider: 'gh' };
+
+    const run = await drive(root, settings, ghAnswers(host), {
+      readRemote: () => `https://${host}/open-tomato/rafa.git`,
+    });
+    const control = await drive(controlRoot, settings, ghAnswers(DEFAULT_GH_HOST), { readRemote: () => null });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([
+      `${probeOf(ghOnPathItem(host))} in ${root}`,
+      `${probeOf(ghAuthItem(host))} in ${root}`,
+    ]);
+    expect(storedRows(root).map((row) => row.item)).toEqual(['gh', `https://${host}`]);
+    expect(control.refusal).toBeNull();
+    expect(storedRows(controlRoot).map((row) => row.item)).toEqual(['gh', `https://${DEFAULT_GH_HOST}`]);
+  });
+
+  it('halts the run when gh is absent, its remedy the failure, where the same run with gh present dispatches', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const settings = settingsOf([BUN], []);
+    const missing = probeOf(ghOnPathItem(DEFAULT_GH_HOST));
+    const answers = {
+      ...ghAnswers(DEFAULT_GH_HOST),
+      'bun --version': answered(0),
+    };
+
+    const run = await drive(root, settings, {
+      ...answers,
+      [missing]: answered(1, `${ghMissingMessage(DEFAULT_GH_HOST)}\n`),
+    }, { readRemote: () => GITHUB_ORIGIN });
+    const control = await drive(controlRoot, settings, answers, { readRemote: () => GITHUB_ORIGIN });
+
+    expect(run.result).toBeNull();
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message).toBe([
+      '❌ preflight halted: 1 required item failed',
+      `  tool "gh": probe \`${missing}\` exited 1: ${ghMissingMessage(DEFAULT_GH_HOST)}`,
+      `   Nothing was dispatched. The checks are stored under run ${RUN_ID},`,
+      '   and `rafa effort report` lists the halt.',
+    ].join('\n'));
+    expect(run.refusal?.message.includes('gh auth login --hostname github.com')).toBe(true);
+    expect(control.refusal).toBeNull();
+  });
+
+  it('halts the run when gh is not authenticated for the remote host, naming that host in the remedy', async () => {
+    const root = freshRoot();
+    const host = 'github.com';
+    const auth = probeOf(ghAuthItem(host));
+
+    const run = await drive(root, settingsOf([], []), {
+      ...ghAnswers(host),
+      [auth]: answered(1, `${ghUnauthenticatedMessage(host)}\n`),
+    }, { readRemote: () => GITHUB_ORIGIN });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message.split('\n')[1]).toBe(
+      `  service "https://${host}": probe \`${auth}\` exited 1: ${ghUnauthenticatedMessage(host)}`,
+    );
+    expect(readPreflightHalts(root)).toMatchObject([{
+      runId: RUN_ID,
+      failed: [{ kind: 'service', item: `https://${host}`, outcome: 'fail' }],
+    }]);
+  });
+
+  it('reads no origin at all under a configured pr.provider: none, where every other provider reads it once', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const reads: string[] = [];
+    const readRemote = (dir: string): string => {
+      reads.push(dir);
+      return GITHUB_ORIGIN;
+    };
+
+    const run = await drive(root, { ...settingsOf([], []), prProvider: 'none' }, {}, { readRemote });
+    const control = await drive(controlRoot, { ...settingsOf([], []), prProvider: 'gh' }, ghAnswers(DEFAULT_GH_HOST), { readRemote });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([]);
+    expect(control.refusal).toBeNull();
+    expect(control.probes.length).toBe(2);
+    expect(reads).toEqual([controlRoot]);
   });
 });
 
