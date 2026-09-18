@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-nine registered so far wrap a
+ * of each is its command. Five of the thirty-two registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -32,9 +32,10 @@
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which runs those checks over the tiers
- * `src/schema/tiers.ts` resolves, nor `instinct list` and
- * `instinct show`, which read the records the two instinct scopes hold
- * through `commands/instinct/instinct-records.ts`.
+ * `src/schema/tiers.ts` resolves, nor `skill demote`, which runs the
+ * demotion pass of `src/demote/` over one skills directory, nor
+ * `instinct list` and `instinct show`, which read the records the two
+ * instinct scopes hold through `commands/instinct/instinct-records.ts`.
  *
  * ## What is registered
  *
@@ -67,6 +68,9 @@
  *     register with its stack and its verdict, and `instinct list` and
  *     `instinct show <id>`, the records the project and user instinct
  *     scopes hold, each listing exiting 0 whatever its rows say.
+ *   - `skill demote <dir> [--apply]`, the demotion pass over one skills
+ *     directory: the report written with nothing moved, and a report the
+ *     review marked `reviewed` applied, exiting with the rows it refused.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -122,6 +126,7 @@ import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
 import selfUpdate from './self-update.js';
 import skillCheck from './skill/check.js';
+import skillDemote from './skill/demote.js';
 import skillList from './skill/list.js';
 import usage from './usage.js';
 
@@ -133,7 +138,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
-  { name: 'skill', summary: 'check a skills directory; list the skills each tier registers' },
+  { name: 'skill', summary: 'check a skills directory; list each tier; run the demotion pass' },
   { name: 'instinct', summary: 'check an instincts directory; list and show its records' },
 ]);
 
@@ -162,6 +167,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   agentList,
   skillCheck,
   skillList,
+  skillDemote,
   instinctCheck,
   instinctList,
   instinctShow,

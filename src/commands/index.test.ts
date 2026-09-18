@@ -1,13 +1,13 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the twenty-nine commands it registers: what the registry
+ * declarations of the thirty-two commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
- * `skill check`, `skill list`, `instinct check`, `instinct list` and `instinct show`
+ * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list` and `instinct show`
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -104,6 +104,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'agent list': ['text', 'json'],
   'skill check': ['text', 'json'],
   'skill list': ['text', 'json'],
+  'skill demote': ['text', 'json'],
   'instinct check': ['text', 'json'],
   'instinct list': ['text', 'json'],
   'instinct show': ['text', 'json'],
@@ -135,6 +136,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'agent list': [[], []],
   'skill check': [['dir'], ['fix', 'project']],
   'skill list': [[], ['tier']],
+  'skill demote': [['dir'], ['apply']],
   'instinct check': [['dir'], []],
   'instinct list': [[], []],
   'instinct show': [['id'], []],
@@ -195,6 +197,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['skill check .claude/skills --fix', 'skill check', ['.claude/skills', '--fix'], ''],
   ['skills check .claude/skills --project=.', 'skill check', ['.claude/skills', '--project=.'], ''],
   ['skill list --tier=user', 'skill list', ['--tier=user'], ''],
+  ['skill demote --apply .claude/skills', 'skill demote', ['--apply', '.claude/skills'], ''],
   ['instinct check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
   ['instincts check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
   ['instinct list', 'instinct list', [], ''],
@@ -272,7 +275,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, skill check and skill list, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, skill check, skill list and skill demote, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -297,6 +300,7 @@ describe('the core roster', () => {
       'agent list',
       'skill check',
       'skill list',
+      'skill demote',
       'instinct check',
       'instinct list',
       'instinct show',

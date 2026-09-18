@@ -27,7 +27,7 @@ Subjects:
   effort     collect session and commit rows; report per plan
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
-  skill      check a skills directory; list the skills each tier registers
+  skill      check a skills directory; list each tier; run the demotion pass
   instinct   check an instincts directory; list and show its records
 
 Commands:

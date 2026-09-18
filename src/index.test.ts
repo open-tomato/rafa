@@ -475,6 +475,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../schema/tiers.js', ['isSkillTier', 'resolveSkillTiers', 'SKILL_TIERS', 'tierExists']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
+  ['./commands/skill/demote.js', [
+    ['../../check/references.js', ['pathDirectories']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../demote/apply.js', ['applyDemotion', 'DEMOTION_ACTION_KINDS', 'planDemotion']],
+    ['../../demote/classify.js', ['DEMOTION_VERDICTS']],
+    ['../../demote/draft.js', ['buildDemotionReport']],
+    ['../../demote/report.js', ['countVerdicts', 'parseDemotionReport', 'REVIEWED_STATUS', 'writeDemotionReport']],
+    ['../../demote/select.js', ['resolveDemotionScope', 'selectSources']],
+  ]],
   ['./commands/instinct/check.js', [
     ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'INSTINCT_CHECK_USAGE']],
   ]],
@@ -695,6 +704,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/agent/list.js',
       './commands/skill/check.js',
       './commands/skill/list.js',
+      './commands/skill/demote.js',
       './commands/instinct/check.js',
       './commands/instinct/list.js',
       './commands/instinct/show.js',

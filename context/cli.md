@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`, and `skill list`, the skills each tier of `src/schema/tiers.ts` registers |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; and `skill demote`, the demotion pass of `src/demote/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
@@ -50,7 +50,7 @@ module's note is the long form.
   `issue show`, `issue create`, `issue comment` and `issue move`;
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `skill check`, `skill list`,
-  `instinct check`, `instinct list`, `instinct show`, `init`,
+  `skill demote`, `instinct check`, `instinct list`, `instinct show`, `init`,
   `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
   `loop`, `issue`, `effort`, `module`, `agent`, `skill` and `instinct`: a
   subject is declared with its first action, never ahead of it.
@@ -82,12 +82,13 @@ module's note is the long form.
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
-  `loop` session actions, the `issue` actions, the two checkers and the
-  three listings (`skill list`, `instinct list` and `instinct show`)
+  `loop` session actions, the `issue` actions, the two checkers, the
+  three listings (`skill list`, `instinct list` and `instinct show`) and
+  `skill demote`
   wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker and each listing their `args` and
-  `flags`.
+  each `issue` action, each checker, each listing and `skill demote`
+  their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -317,6 +318,44 @@ module's note is the long form.
   listing reports and `skill check` gates — and exit code 1 is kept for
   a positional word and a `--tier` that is no tier. In json mode the
   tiers, their rows and the two counts are the result's `data`.
+- **`skill demote <dir> [--apply]` runs the demotion pass over one
+  skills directory** (`src/commands/skill/demote.ts`, over
+  `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and
+  `<base>` decides the scope: the home makes it `user`, writing to
+  `~/.rafa/`, and any other base a `project` one, writing under that
+  base's `.rafa/`. Anything else is refused, which is why this command
+  runs INSIDE a project where the two checkers do not — the home is
+  what tells the scopes apart, and it is read off the project the
+  dispatcher resolved, as `skill list` reads its own. `<dir>` resolves
+  against the working directory, the command's one seam.
+  Without `--apply` it selects every `<name>/SKILL.md` and, by
+  `origin`, the `learned/*.md` files (`src/demote/select.ts`),
+  classifies each (`src/demote/classify.ts`) and writes
+  `<base>/.rafa/demoted/report.md` (`src/demote/draft.ts`,
+  `src/demote/report.ts`), MOVING NOTHING. A report already there has
+  each override carried onto the row for the same path whose hash is
+  unchanged, and keeps `status: reviewed` only when the row set is
+  identical; a report that does not parse is warned about and carried
+  from not at all.
+  With `--apply` it reads that report back and refuses the whole run
+  when it is missing, does not parse, or is still `draft`. Then, one
+  row at a time (`src/demote/apply.ts`): an observation becomes a
+  record under `<base>/.rafa/instincts/`, run through `checkFile` with
+  NO project root — which is how `instinct check` runs — before it is
+  written, with the original moved under `<base>/.rafa/demoted/` at its
+  relative path; a procedure `SKILL.md` is left where it is and a
+  procedure `learned/<name>.md` moves to `<dir>/<name>/SKILL.md`; an
+  unclassified row the review did not decide is left alone. A row whose
+  file changed since the report, whose file is gone with nothing
+  matching at its destination, whose record the conversion refuses and
+  whose record the checker fails are each refused ALONE, so one stale
+  row does not throw away a review of 124. A second `--apply` reads the
+  moved rows as `done` and changes nothing.
+  The exit code is the number of rows refused, capped at 255, and 1 is
+  kept for the refusals above and for no directory, a second word and
+  an `--apply` that read the directory as its value. In json mode the
+  counts, or the per-row actions, are the result's `data` on a run that
+  refused no row.
 - **`instinct list` and `instinct show <id>` read the two instinct
   scopes** (`src/commands/instinct/list.ts`,
   `src/commands/instinct/show.ts`, sharing
