@@ -32,7 +32,9 @@
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which runs those checks over the tiers
- * `src/schema/tiers.ts` resolves.
+ * `src/schema/tiers.ts` resolves, nor `instinct list` and
+ * `instinct show`, which read the records the two instinct scopes hold
+ * through `commands/instinct/instinct-records.ts`.
  *
  * ## What is registered
  *
@@ -61,6 +63,10 @@
  *     `instinct check <dir>`, the checker over one tier, each exiting
  *     with the number of its failing files and running outside a
  *     project, since `--project` is its only project seam.
+ *   - `skill list [--tier=<tier>]`, every skill the three tiers
+ *     register with its stack and its verdict, and `instinct list` and
+ *     `instinct show <id>`, the records the project and user instinct
+ *     scopes hold, each listing exiting 0 whatever its rows say.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -95,6 +101,8 @@ import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
+import instinctList from './instinct/list.js';
+import instinctShow from './instinct/show.js';
 import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
 import issueList from './issue/list.js';
@@ -126,7 +134,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list the skills each tier registers' },
-  { name: 'instinct', summary: 'check an instincts directory against the instinct schema' },
+  { name: 'instinct', summary: 'check an instincts directory; list and show its records' },
 ]);
 
 /** The core commands, in roster order. */
@@ -155,6 +163,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   skillCheck,
   skillList,
   instinctCheck,
+  instinctList,
+  instinctShow,
   init,
   doctor,
   selfUpdate,

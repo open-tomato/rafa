@@ -7,7 +7,8 @@
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
- * `skill check`, `skill list` and `instinct check` wrap none, and each is held to the
+ * `skill check`, `skill list`, `instinct check`, `instinct list` and `instinct show`
+ * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
  *
@@ -104,6 +105,8 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'skill check': ['text', 'json'],
   'skill list': ['text', 'json'],
   'instinct check': ['text', 'json'],
+  'instinct list': ['text', 'json'],
+  'instinct show': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
   'self-update': ['text', 'json'],
@@ -133,6 +136,8 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'skill check': [['dir'], ['fix', 'project']],
   'skill list': [[], ['tier']],
   'instinct check': [['dir'], []],
+  'instinct list': [[], []],
+  'instinct show': [['id'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
@@ -192,6 +197,8 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['skill list --tier=user', 'skill list', ['--tier=user'], ''],
   ['instinct check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
   ['instincts check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
+  ['instinct list', 'instinct list', [], ''],
+  ['instinct show gate-order', 'instinct show', ['gate-order'], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['self-update', 'self-update', [], ''],
@@ -265,7 +272,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, skill check and skill list, instinct check, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, skill check and skill list, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -291,6 +298,8 @@ describe('the core roster', () => {
       'skill check',
       'skill list',
       'instinct check',
+      'instinct list',
+      'instinct show',
       'init',
       'doctor',
       'self-update',

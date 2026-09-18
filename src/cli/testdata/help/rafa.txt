@@ -28,7 +28,7 @@ Subjects:
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
   skill      check a skills directory; list the skills each tier registers
-  instinct   check an instincts directory against the instinct schema
+  instinct   check an instincts directory; list and show its records
 
 Commands:
   init, doctor, self-update, usage, describe

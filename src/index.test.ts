@@ -478,6 +478,16 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/instinct/check.js', [
     ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'INSTINCT_CHECK_USAGE']],
   ]],
+  ['./commands/instinct/list.js', [
+    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./instinct-records.js', ['allRecords', 'instinctProject', 'readScopes']],
+  ]],
+  ['./commands/instinct/show.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../schema/instinct.js', ['ACTION_HEADING', 'CAUSE_HEADING']],
+    ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./instinct-records.js', ['findRecords', 'instinctProject', 'readScopes']],
+  ]],
   ['./commands/init.js', [
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
     ['../cli/command.js', ['CommandExit']],
@@ -686,6 +696,8 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/skill/check.js',
       './commands/skill/list.js',
       './commands/instinct/check.js',
+      './commands/instinct/list.js',
+      './commands/instinct/show.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/self-update.js',

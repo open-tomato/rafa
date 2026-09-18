@@ -25,7 +25,8 @@ module's note is the long form.
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`, and `skill list`, the skills each tier of `src/schema/tiers.ts` registers |
-| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory |
+| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
+| `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -49,13 +50,13 @@ module's note is the long form.
   `issue show`, `issue create`, `issue comment` and `issue move`;
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `skill check`, `skill list`,
-  `instinct check`, `init`,
+  `instinct check`, `instinct list`, `instinct show`, `init`,
   `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
   `loop`, `issue`, `effort`, `module`, `agent`, `skill` and `instinct`: a
   subject is declared with its first action, never ahead of it.
-  `skill index`, `instinct list`, `instinct show`, `instinct flag` and
-  `instinct promote` are in the command tree and are registered by none
-  of it yet, so no roster names them.
+  `skill index`, `instinct flag` and `instinct promote` are in the
+  command tree and are registered by none of it yet, so no roster names
+  them.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
@@ -81,10 +82,12 @@ module's note is the long form.
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
-  `loop` session actions, the `issue` actions and the two checkers wrap
-  none: `describe` reads the registry off its context, and `init`,
+  `loop` session actions, the `issue` actions, the two checkers and the
+  three listings (`skill list`, `instinct list` and `instinct show`)
+  wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action and each checker their `args` and `flags`.
+  each `issue` action, each checker and each listing their `args` and
+  `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -314,6 +317,32 @@ module's note is the long form.
   listing reports and `skill check` gates — and exit code 1 is kept for
   a positional word and a `--tier` that is no tier. In json mode the
   tiers, their rows and the two counts are the result's `data`.
+- **`instinct list` and `instinct show <id>` read the two instinct
+  scopes** (`src/commands/instinct/list.ts`,
+  `src/commands/instinct/show.ts`, sharing
+  `src/commands/instinct/instinct-records.ts`). The scopes are
+  `src/schema/tiers.ts`'s — `<root>/.rafa/instincts` and
+  `~/.rafa/instincts`, nearest the work first — and both commands run
+  INSIDE a project, reading the home and the root off the project the
+  dispatcher resolved; neither declares a flag or a seam of its own. A
+  record is a top-level `<scope>/<id>.md`, so the local Learning
+  adapter's `instincts.ndjson` and `flags.ndjson`, a dotfile and a
+  subdirectory are all passed over without a word, and the id a lookup
+  works on is the FILE NAME, never the frontmatter `id`, so a record the
+  checker reddens for `name-mismatch` stays reachable.
+  `list` prints one row per record — its id, its `kind/domain`, its
+  `signal`, its `confidence` and its `trigger` — and for a record that
+  broke a rule the number of rules instead; a scope whose directory is
+  absent prints its path and `(no such directory)`. Its exit code is 0
+  whatever the rows say, with exit code 1 kept for a positional word.
+  `show` prints the fields, the two sections, the evidence and the
+  `action_hash` computed from the action, which no file stores, and a
+  line naming the other scope when it holds that id too; the project
+  scope answers first. It refuses with exit code 1 an id no scope holds,
+  naming both scopes, and a record that broke a rule, naming its issues,
+  each as the `CommandExit` message. In json mode `list` gives the
+  scopes, their records and the two counts as the result's `data`, and
+  `show` the record.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and
