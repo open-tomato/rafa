@@ -112,9 +112,9 @@ built. A box is ticked by the change that finishes the feature.
   issues, once each
 - [x] rafa can safely work on its own code and update itself
 - [x] Usable as a library inside other services, not only as a command
-- [ ] A health check for skills: one format, and a checker that refuses
+- [x] A health check for skills: one format, and a checker that refuses
   a broken skill before an agent can follow it
-- [ ] The agents a plan needs are checked before the run, and copied
+- [x] The agents a plan needs are checked before the run, and copied
   into the project with one command
 - [ ] A version bump and a changelog entry with every pull request
 - [ ] The right skills reach the right task, chosen when the plan is
