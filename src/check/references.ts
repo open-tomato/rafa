@@ -159,6 +159,41 @@ export const SHELL_BUILTINS: readonly string[] = [
   'while',
 ];
 
+/**
+ * A POSIX shell function definition: a name, a REQUIRED empty `()`,
+ * and an opening `{` — on its own line (the body follows) or a full
+ * one-liner (`_phase() { ( set -e; "$1" ); }`), which is why the `{`
+ * only has to be PRESENT, not the last thing on the line.
+ */
+const POSIX_FUNCTION_DEFINITION = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)\s*\{/;
+
+/**
+ * Bash's own function syntax: the `function` keyword, a name, and an
+ * optional empty `()`, then the same `{` rule as the POSIX form. The
+ * keyword is what makes this shape unambiguous without requiring the
+ * parens POSIX does.
+ */
+const BASH_FUNCTION_DEFINITION = /^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\s*\))?\s*\{/;
+
+/**
+ * The names `body` defines as a shell function anywhere in it. A name
+ * a body defines for itself is exactly as resolvable as a builtin is —
+ * the reader never leaves the shell to reach it — so a HELPER a fenced
+ * example defines and then calls (`_ok`, `_bad`, a project's own
+ * `usage`) is not a claim about `PATH` at all. Measured against the
+ * corpus of `~/.claude/skills` on 2026-09-18: without this, a `_ok`/
+ * `_bad` assertion pair alone cost eleven files a false `missing-tool`,
+ * every one a bash example that already defines what it calls.
+ */
+function definedFunctionNames(body: string): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const line of body.split('\n')) {
+    const name = POSIX_FUNCTION_DEFINITION.exec(line)?.[1] ?? BASH_FUNCTION_DEFINITION.exec(line)?.[1];
+    if (name !== undefined) names.add(name);
+  }
+  return names;
+}
+
 /** Whether an issue counts towards the checker's exit code. */
 export type ReferenceSeverity = 'failure' | 'warning';
 
@@ -259,7 +294,7 @@ export interface ReferenceCheck {
 /** A fenced block's opening line: its marker run and its info string. */
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})[ \t]*(\S*)/;
 
-/** A line closing a fence: the marker run and nothing else. */
+/** A line that is only a marker run, a candidate close for SOME fence. */
 const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 
 /** An inline code span, with its contents captured. */
@@ -434,10 +469,32 @@ function commandOf(line: string, info: string): string | null {
 interface FenceReader {
   /** The fence's language, lowercased. */
   readonly info: string;
+  /** The character the opening marker ran on, `` ` `` or `~`. */
+  readonly delimiter: string;
+  /** How many marker characters the opening line ran, 3 or more. */
+  readonly length: number;
   /** The heredoc terminator being skipped to, or null. */
   terminator: string | null;
   /** Whether the previous command line continues into this one. */
   continued: boolean;
+}
+
+/**
+ * Whether `line` closes the fence `reader` opened. CommonMark's own rule:
+ * the closing run has to be the SAME character as the opening one, and at
+ * least as long. Without this, a bare closing ` ``` ` line inside a
+ * FOUR-backtick fence — the standard way a doc shows a fenced example
+ * literally, `dev-planner`'s own `SKILL.md` included — reads as closing
+ * the OUTER fence early, and the outer fence's real closing line then
+ * reads as OPENING a fresh unlabelled fence that swallows every line
+ * after it as fenced content, prose included, until the next stray
+ * marker run closes it. `references.test.ts` pins the shape that broke.
+ */
+function closesFence(line: string, reader: FenceReader): boolean {
+  const match = FENCE_CLOSE.exec(line);
+  if (match === null) return false;
+  const run = match[1] ?? '';
+  return run[0] === reader.delimiter && run.length >= reader.length;
 }
 
 /** A reference, ready to push. */
@@ -515,7 +572,8 @@ export function collectReferences(body: string): readonly BodyReference[] {
       const open = FENCE_OPEN.exec(line);
       if (open) {
         const info = fenceInfo(open[2] ?? '');
-        reader = { info, terminator: null, continued: false };
+        const run = open[1] ?? '';
+        reader = { info, delimiter: run[0] ?? '`', length: run.length, terminator: null, continued: false };
         return;
       }
       for (const span of codeSpans(line)) {
@@ -526,7 +584,7 @@ export function collectReferences(body: string): readonly BodyReference[] {
       return;
     }
 
-    if (FENCE_CLOSE.test(line)) {
+    if (closesFence(line, reader)) {
       reader = null;
       return;
     }
@@ -642,8 +700,13 @@ function absoluteIssue(ref: BodyReference, seams: ReferenceSeams): ReferenceIssu
   );
 }
 
-/** The verdict on a tool name. */
-function toolIssue(ref: BodyReference, pathDirs: readonly string[]): ReferenceIssue | null {
+/** The verdict on a tool name. `functions` are names the body defines for itself. */
+function toolIssue(
+  ref: BodyReference,
+  pathDirs: readonly string[],
+  functions: ReadonlySet<string>,
+): ReferenceIssue | null {
+  if (functions.has(ref.text)) return null;
   if (pathDirs.some((dir) => isExecutableFile(resolve(dir, ref.text)))) return null;
   return issueOf(
     'missing-tool',
@@ -653,8 +716,12 @@ function toolIssue(ref: BodyReference, pathDirs: readonly string[]): ReferenceIs
 }
 
 /** The verdict on one reference. */
-function referenceIssue(ref: BodyReference, seams: ReferenceSeams): ReferenceIssue | null {
-  if (ref.kind === 'tool') return toolIssue(ref, seams.pathDirs);
+function referenceIssue(
+  ref: BodyReference,
+  seams: ReferenceSeams,
+  functions: ReadonlySet<string>,
+): ReferenceIssue | null {
+  if (ref.kind === 'tool') return toolIssue(ref, seams.pathDirs, functions);
   if (isAbsolute(ref.text)) return absoluteIssue(ref, seams);
   return relativeIssue(ref, seams);
 }
@@ -669,6 +736,7 @@ function referenceIssue(ref: BodyReference, seams: ReferenceSeams): ReferenceIss
  */
 export function checkReferences(body: string, seams: ReferenceSeams): ReferenceCheck {
   const references = collectReferences(body);
+  const functions = definedFunctionNames(body);
   const issues: ReferenceIssue[] = [];
   const seen = new Set<string>();
 
@@ -680,7 +748,7 @@ export function checkReferences(body: string, seams: ReferenceSeams): ReferenceC
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const issue = referenceIssue(ref, seams);
+    const issue = referenceIssue(ref, seams, functions);
     if (issue !== null) issues.push(issue);
   }
 

@@ -221,6 +221,20 @@ describe('what a body names', () => {
     expect(isProjectPath('src/')).toBe(false);
     expect(isProjectPath('/etc/hosts')).toBe(false);
   });
+
+  it('holds a four-backtick fence closed through a bare three-backtick line inside it, and reads plain prose as prose again after the real close', () => {
+    const references = collectReferences(body(
+      '````markdown',
+      '```example',
+      'stub: my-feature',
+      'spec: .specs/my-feature.md',
+      '```',
+      '````',
+      'Prose after the fence naming src/kept.ts with no code span at all.',
+    ));
+
+    expect(textsOf(references, 'path')).toEqual([]);
+  });
 });
 
 describe('a shell fence', () => {
@@ -404,6 +418,21 @@ describe('resolution', () => {
 
     expect(codesOf(before.issues)).toEqual(['missing-tool']);
     expect(after.issues).toEqual([]);
+  });
+
+  it('passes a call to a function the body defines for itself, beside one it never defines', () => {
+    const posix = checkReferences(
+      body(...fence('bash', '_ok() {', '  echo "$1"', '}', '_ok "done"', 'nosuchtool')),
+      { projectRoot: null, skillDir: null, pathDirs: [] },
+    );
+    const bashStyle = checkReferences(
+      body(...fence('bash', 'function _bad {', '  echo "$1" 1>&2', '}', '_bad "no"')),
+      { projectRoot: null, skillDir: null, pathDirs: [] },
+    );
+
+    expect(codesOf(posix.issues)).toEqual(['missing-tool']);
+    expect(posix.issues[0]?.message).toContain('nosuchtool');
+    expect(bashStyle.issues).toEqual([]);
   });
 });
 

@@ -4,6 +4,21 @@ description: "Use when turning a design source (bundle spec, design page, or pro
 prevents: a component shipped that silently diverges from the design source it claims to implement
 signal: silent
 when_to_use: "Three source situations, one skill. Prevents: a component shipped that silently diverges from the design source it claims to implement"
+tags:
+  - component
+  - from
+  - design
+  - css
+  - html
+  - javascript
+  - shell
+  - typescript
+stack:
+  - css
+  - html
+  - javascript
+  - shell
+  - typescript
 ---
 
 > Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
@@ -12,11 +27,11 @@ when_to_use: "Three source situations, one skill. Prevents: a component shipped 
 
 ## Overview
 
-Design references live under [design/](../../../design/) — the design side of the rosetta comparator (see `design/README.md` for the per-mode file contract). The bundle catalog at `design/bundle/` is a frozen design handoff: real CVA-shaped specs for every primitive, each rendered live on the page. Every component we ship traces back to one of these sources or a spec doc.
+Design references live under [design/](../../../design/) — the design side of the rosetta comparator (see `README.md` for the per-mode file contract). The bundle catalog at `design/bundle/` is a frozen design handoff: real CVA-shaped specs for every primitive, each rendered live on the page. Every component we ship traces back to one of these sources or a spec doc.
 
 The job is **never** to invent — it's to translate a spec that already exists into a typed React component, and to **prove the translation is 1:1** with screenshots before locking it in as a visual baseline. Two verification layers exist:
 
-- **Compare** (`scripts/compare-design.mjs`) — our story next to the design source's live demo. Correctness of the *translation*.
+- **Compare** (`compare-design.mjs`) — our story next to the design source's live demo. Correctness of the *translation*.
 - **Visual regression** (`bun run test:visual`) — every story × light/dark against this machine's baselines. Protection against *future drift*. Baselines are untracked and per-environment; CI keeps its own set.
 
 ## When to use
@@ -26,7 +41,7 @@ decides the READ step and the fidelity check; everything from PLACE onward is
 identical.
 
 1. **Bundle spec** (the original rosetta loop below) — the component has a
-   spec object in the bundle catalog (`design/bundle/index.html` plus the
+   spec object in the bundle catalog (`index.html` plus the
    chapter sources staged next to it).
 2. **Design-page JSX** — the component exists only as an unmigrated screen or
    widget in a page under `design/pages/` (auth screens, the topbar showcase,
@@ -44,7 +59,7 @@ need a brainstorming/design pass first.
 
 ## Reading a bundle spec
 
-The bundle's chapter sources (the JSX files staged next to `design/bundle/index.html`) define spec objects with:
+The bundle's chapter sources (the JSX files staged next to `index.html`) define spec objects with:
 
 | Field | What it is | How to treat it |
 |-------|-----------|-----------------|
@@ -77,7 +92,7 @@ The bundle's chapter sources (the JSX files staged next to `design/bundle/index.
 │ 6. WRITE     index.ts barrel: re-export component, props type, cva, and    │
 │              variants type. Add to parent src/<level>/index.ts.            │
 │ 7. COMPARE   bun run build:storybook                                       │
-│              node scripts/compare-design.mjs <story-id> <SpecName>         │
+│              node compare-design.mjs <story-id> <SpecName>         │
 │              [--theme dark] [--set variant=<value>]                        │
 │              Open both PNGs in visual/__compare__/ and eyeball: fill,      │
 │              border, radius, type, spacing, icon treatment. Fix via        │
@@ -105,7 +120,7 @@ src/atoms/Button/
 
 No `__snapshots__/` — DOM snapshots are banned. Visual baselines live in the untracked `/visual/__image_snapshots__/` (this machine's set) and are never committed.
 
-Molecules and above may colocate smaller atoms that are only used inside the parent (e.g. `Table/TableRow.tsx`) — keep variants and stories on the parent only, do not re-story the internals.
+Molecules and above may colocate smaller atoms that are only used inside the parent (e.g. `TableRow.tsx`) — keep variants and stories on the parent only, do not re-story the internals.
 
 ## CVA conventions
 
@@ -113,7 +128,7 @@ Mirror the design source's `source` field as closely as possible. Three rules:
 
 1. **Variant names match the source.** If the spec says `variant`, don't rename it `kind`. The spec is the contract.
 2. **Defaults match the source.** `defaultVariants` carries semantic meaning — keep them.
-3. **Class strings stay Tailwind-only.** No inline style props from the variants object. If a variant needs a custom value, extend the `@theme` contract in `src/styles/theme.css` so the utility exists.
+3. **Class strings stay Tailwind-only.** No inline style props from the variants object. If a variant needs a custom value, extend the `@theme` contract in `theme.css` so the utility exists.
 
 When `source` and `demo()` disagree, encode the demo's rendered truth and leave a comment naming the delta (see the header of `Button.variants.ts` for the pattern).
 
@@ -177,16 +192,16 @@ If `bun run test:visual` fails on a screenshot:
 
 ## Side-by-side review
 
-`scripts/compare-design.mjs` automates the old manual eyeballing:
+`compare-design.mjs` automates the old manual eyeballing:
 
 ```bash
 bun run build:storybook
-node scripts/compare-design.mjs atoms-button--primary Button
-node scripts/compare-design.mjs atoms-button--secondary Button --set variant=secondary
-node scripts/compare-design.mjs atoms-button--primary Button --theme dark
+node compare-design.mjs atoms-button--primary Button
+node compare-design.mjs atoms-button--secondary Button --set variant=secondary
+node compare-design.mjs atoms-button--primary Button --theme dark
 ```
 
-Output: `visual/__compare__/<story-id>--{ours,design}.png`. The design side captures only the spec's live demo box (`#prim-<SpecName>`), so the bundle page's role-overlay decorations never appear. The ours capture applies the bundle's hatched backdrop so transparent surfaces and edges read identically on both sides — the hatch is comparator-only doc chrome and must never appear in stories or baselines. For interactive states (hover/focus) or specs without a `#prim-` anchor, fall back to `bun run storybook` next to opening `design/bundle/index.html` manually (serve the directory, e.g. `bunx serve design/bundle`).
+Output: `visual/__compare__/<story-id>--{ours,design}.png`. The design side captures only the spec's live demo box (`#prim-<SpecName>`), so the bundle page's role-overlay decorations never appear. The ours capture applies the bundle's hatched backdrop so transparent surfaces and edges read identically on both sides — the hatch is comparator-only doc chrome and must never appear in stories or baselines. For interactive states (hover/focus) or specs without a `#prim-` anchor, fall back to `bun run storybook` next to opening `index.html` manually (serve the directory, e.g. `bunx serve design/bundle`).
 
 ## Design-page JSX sources (topbar + dashboard) — adapted loop
 
@@ -222,12 +237,12 @@ The loop's READ and COMPARE steps adapt; PLACE→VERIFY are unchanged:
    # topbar widgets: captures one showcase card's demo box by its title —
    # the exact card title string in design/pages/topbar.html (mind the
    # middots, e.g. "Search · suggest", "Workspace switcher", "Notifications")
-   node scripts/compare-design.mjs organisms-searchsuggest--default "Search · suggest" --source topbar
+   node compare-design.mjs organisms-searchsuggest--default "Search · suggest" --source topbar
 
    # whole-app screens: SpecName is the page file under design/pages/;
    # full-page capture by default, --selector to crop a region
-   node scripts/compare-design.mjs pages-usage--default usage.html --source dashboard
-   node scripts/compare-design.mjs molecules-usagechart--default usage.html --source dashboard --selector "main section:nth-of-type(2)"
+   node compare-design.mjs pages-usage--default usage.html --source dashboard
+   node compare-design.mjs molecules-usagechart--default usage.html --source dashboard --selector "main section:nth-of-type(2)"
    ```
 
    Both need network access (the pages load React UMD + Babel from a CDN)
@@ -284,16 +299,16 @@ unchanged. The verification path:
 - **Committing anything under `visual/`.** Baselines are per-environment; the folder is gitignored for a reason.
 - **Slot anchors that swallow Radix's injected props.** Anything passed to an `asChild` trigger (Tooltip/Menu triggers, Touchable asChild) gets cloned with a ref + event handlers injected — the child must `forwardRef` AND spread `...props` onto its DOM node, or positioning and hover silently break (no error, not even in `check:stories`). Library components already comply; watch for story fixtures and app-side wrappers.
 - **Trusting a spec's `/* global … */` name over the rendered DOM.** Bundle sources resolve shared components from `window` at render time, and a name can be defined more than once across the bundle's source files — the demo may render a different chrome than the spec you were reading. When a demo passes props the spec'd component lacks (e.g. `<Tag dot>` where `Tag` has no `dot`), probe the served bundle's DOM; the spec's `usage` code block usually names the real component.
-- **Importing tokens.css separately in stories.** Stories load tokens through `.storybook/preview.ts` already.
-- **Forgetting to add the component to its level's barrel.** `src/atoms/Button/index.ts` re-exports — but `src/atoms/index.ts` also needs `export * from './Button'`.
-- **Reintroducing unlayered element rules.** `src/styles/tokens.css` keeps its element defaults (`h1`–`h6`, `a`, `p`) inside `@layer base` precisely so Tailwind utilities beat them without the `!` modifier. Unlayered author CSS outranks `@layer utilities` — one unlayered `h2` rule and every bare `text-[26px]`/`no-underline`/`m-0` on a raw heading or link in your markup silently loses again. Keep element rules inside `@layer base`, or scope them by class (the scoped-prose pattern) so specificity, not layering, decides.
+- **Importing tokens.css separately in stories.** Stories load tokens through `preview.ts` already.
+- **Forgetting to add the component to its level's barrel.** the leaf atom's `index.ts` re-exports — but the level's own `index.ts` also needs `export * from 'Button'`.
+- **Reintroducing unlayered element rules.** `tokens.css` keeps its element defaults (`h1`–`h6`, `a`, `p`) inside `@layer base` precisely so Tailwind utilities beat them without the `!` modifier. Unlayered author CSS outranks `@layer utilities` — one unlayered `h2` rule and every bare `text-[26px]`/`no-underline`/`m-0` on a raw heading or link in your markup silently loses again. Keep element rules inside `@layer base`, or scope them by class (the scoped-prose pattern) so specificity, not layering, decides.
 
 ## Known hazards
 
 Traps that cost real debugging time across the build sessions. The component agents (`component-builder`, `fidelity-verifier`, `component-porter`, `component-reviewer`) all reference this section — keep it the single canonical list.
 
-- **Built-storybook barrel-init chunking.** A cross-tree import through a *multi-file* barrel (`import { X } from '../../molecules/Progress'` where the barrel re-exports X from a separate file) can be dropped by the **production** storybook build's lazy-init chunking — the component resolves to `undefined` and throws React error #130 / "u is not a function" in the built preview **only**; `bun run test` (vitest) and `bun run dev` stay green, so it passes the smoke layer and surfaces in `test:visual`/`check:stories` against the built storybook. Fix: **deep member import** from the component's own module (`'../../molecules/Progress/Progress'`), with a one-line comment. This recurred four separate times across build sessions before the deep-import rule stuck.
-- **Icon dynamic loading.** Resolve lucide by name via `dynamicIconImports` from `lucide-react/dynamic` + a per-name `React.lazy` cache — **never** the static `icons` namespace (that ships the full ~1996-icon set to every consumer and mis-resolves ~245 alias kebab names like `help-circle`). The lazy chunk means the visual runner must wait for `data-glyph-pending` to detach before capturing, or icon stories flake; that wait is in `.storybook/test-runner.ts` and is guarded so glyph-less stories keep their original capture timing.
+- **Built-storybook barrel-init chunking.** A cross-tree import through a *multi-file* barrel (importing `X` from the `Progress` molecule's barrel, where the barrel re-exports `X` from a separate file) can be dropped by the **production** storybook build's lazy-init chunking — the component resolves to `undefined` and throws React error #130 / "u is not a function" in the built preview **only**; `bun run test` (vitest) and `bun run dev` stay green, so it passes the smoke layer and surfaces in `test:visual`/`check:stories` against the built storybook. Fix: **deep member import** from the component's own module (`Progress`'s own file, not the barrel), with a one-line comment. This recurred four separate times across build sessions before the deep-import rule stuck.
+- **Icon dynamic loading.** Resolve lucide by name via `dynamicIconImports` from `lucide-react/dynamic` + a per-name `React.lazy` cache — **never** the static `icons` namespace (that ships the full ~1996-icon set to every consumer and mis-resolves ~245 alias kebab names like `help-circle`). The lazy chunk means the visual runner must wait for `data-glyph-pending` to detach before capturing, or icon stories flake; that wait is in `test-runner.ts` and is guarded so glyph-less stories keep their original capture timing.
 - **Orphaned storybook servers.** Interrupted `check:stories` / `test:visual` runs leave static servers on ports **6006 / 6007 / 6016**; the next run fails with `EADDRINUSE` (a false failure that looks like a real one). Kill them before re-running: `pkill -f "test-storybook|test-visual|serve-static|check-stories"` then free the three ports. Run long suites in the background and read the log rather than racing them (concurrent runs re-collide). Grep logs with `-a` — they contain binary/ANSI bytes that make plain `grep` silently miss matches.
 - **Baseline-safe verification order.** Always `bun run test:visual` against **existing** baselines FIRST — pre-existing snapshots passing unchanged is the behaviour-preservation proof. Only then `test:visual:update` the new/legitimately-changed baselines, each called out. Watch for a **sub-threshold markup change** hiding under the ~0.01% diff threshold: if you changed a story's markup on purpose but its baseline passed unchanged, delete + reseed it deliberately so the accepted truth reflects the change.
 - **Date & input discipline.** Date-only ISO strings (`"2026-05-04"`) parse as **UTC** midnight, so local getters read the previous day in negative-UTC zones — parse date-only strings as local calendar dates (`toDate`). Freeze the clock in fixtures (no `Date.now()`/`new Date()`). Guard `Enter` handlers with `e.nativeEvent.isComposing` so committing an IME candidate doesn't navigate/submit.
@@ -304,7 +319,7 @@ Traps that cost real debugging time across the build sessions. The component age
 
 The shipped catalog under `src/` (browse the layer barrels) is the reuse
 inventory — compose it, never fork it; formatting goes through
-`src/lib/format.ts`. New components come from the three source situations
+`format.ts`. New components come from the three source situations
 above: a bundle spec, a design page, or a prose spec doc. A component with
 none of the three needs a brainstorming/design pass first — this skill
 translates designs, it does not originate them.

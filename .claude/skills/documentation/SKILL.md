@@ -12,6 +12,8 @@ tags:
 prevents: undocumented code and a docs command that wipes the tracked docs tree while exiting clean
 signal: silent
 when_to_use: "You are writing TSDoc, wiring documentation tooling, or deciding where a new document belongs. Prevents: undocumented code and a docs command that wipes the tracked docs tree while exiting clean"
+stack:
+  - typescript
 ---
 
 > Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, `.plans/`, `.specs/`, and `tools/`, which live at the umbrella repo root.
@@ -24,7 +26,7 @@ Two kinds of documentation are maintained:
 | Kind | Tool | Output | When to generate |
 | --- | --- | --- | --- |
 | **Code (TypeDoc)** | `typedoc` | typedoc's default `out`, which resolves to the TRACKED `docs/` tree | `bun run docs:generate` |
-| **API (Swagger)** | `@asteasolutions/zod-to-openapi` + `swagger-ui-express` | `.docs/swagger/openapi.json` + served behind `ctx.requireAuth` at `GET /docs/` | `bun run docs:openapi` |
+| **API (Swagger)** | `@asteasolutions/zod-to-openapi` + `swagger-ui-express` | `openapi.json` + served behind `ctx.requireAuth` at `GET /docs/` | `bun run docs:openapi` |
 
 > Both rows are INSTALLED in `@ar/service` — the OpenAPI half is no longer a
 > convention to adopt on some later day, and [`rules/openapi.md`](rules/openapi.md)
@@ -70,8 +72,8 @@ Before marking a documentation task done:
 - [ ] Every file has a `@packageDocumentation` comment (or is covered by a module-level JSDoc).
 - [ ] Every Express router factory is documented with `@remarks` listing its HTTP endpoints.
 - [ ] `typedoc.json`, `tsconfig.docs.json`, and a `docs:generate` script exist (see [`rules/typedoc-setup.md`](rules/typedoc-setup.md)).
-- [ ] `src/openapi.ts` exists and every route is registered in it — `tests/invariants/openapi-coverage.test.ts` is the gate that says so, and a route added without a binding-table entry reddens it.
-- [ ] `.docs/` is already gitignored twice over and needs no new entry: once at the repo root (`.gitignore`) and again at the package (`packages/service/.gitignore`), both files tracked. `git check-ignore -v packages/service/.docs/swagger/openapi.json` names the PACKAGE rule, the nearer file winning — take the source off that output rather than predicting it.
+- [ ] `openapi.ts` exists and every route is registered in it — `openapi-coverage.test.ts` is the gate that says so, and a route added without a binding-table entry reddens it.
+- [ ] `.docs/` is already gitignored twice over and needs no new entry: once at the repo root (`.gitignore`) and again at the package (`packages/service/.gitignore`), both files tracked. Running `git check-ignore -v` on the generated `openapi.json` names the PACKAGE rule, the nearer file winning — take the source off that output rather than predicting it.
 - [ ] `docs/` (manual ADRs) is **not** gitignored.
 - [ ] `bun run docs:openapi` passes with 0 errors. Do NOT reach for `bun run docs:generate` as a verification: it exits 0 while WIPING the tracked `docs/` tree (see the note under the table above).
 
@@ -83,7 +85,7 @@ Before marking a documentation task done:
 typedoc                          → HTML docs from TSDoc comments → the TRACKED docs/ tree
 @asteasolutions/zod-to-openapi   → OpenAPI document from the Zod schemas the routes parse with
 swagger-ui-express               → serves that document behind ctx.requireAuth at GET /docs/
-scripts/export-openapi.ts        → writes .docs/swagger/openapi.json, via bun run docs:openapi
+export-openapi.ts        → writes openapi.json, via bun run docs:openapi
 ```
 
 Dependencies go in `devDependencies` where the toolchain is only ever a test's or a generator's — `@seriousme/openapi-schema-validator`, `@types/swagger-ui-express` and `typedoc` are all there.

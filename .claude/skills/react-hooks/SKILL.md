@@ -4,6 +4,12 @@ description: "Use when an effect calls setState — reset-on-open, derived state
 prevents: stale per-session state and cascading re-renders from setState called inside an effect
 signal: loud
 when_to_use: "Recognize these shapes:. Prevents: stale per-session state and cascading re-renders from setState called inside an effect"
+tags:
+  - react
+  - hooks
+  - typescript
+stack:
+  - typescript
 ---
 
 > Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.

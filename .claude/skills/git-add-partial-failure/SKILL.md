@@ -4,6 +4,14 @@ description: "Use when a batched `git add A B C` stages nothing and the commit r
 prevents: "a whole staging batch lost to one missing pathspec, with the error suppressed"
 signal: loud
 when_to_use: "A git commit in a scripted loop reports \"no changes added to commit\" for files that clearly show as modified in git status. Prevents: a whole staging batch lost to one missing pathspec, with the error suppressed"
+tags:
+  - git
+  - add
+  - partial
+  - failure
+  - shell
+stack:
+  - shell
 ---
 
 # `git add` Aborts Entirely On Any Missing Pathspec

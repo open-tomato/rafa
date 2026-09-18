@@ -4,6 +4,12 @@ description: "Use when writing or parsing a PLAN-<stub>.md for the rafa loop —
 prevents: "plan tasks the loop's parser silently skips because they are shaped wrong"
 signal: silent
 when_to_use: "You are generating a plan document for the rafa loop, or reading one the loop will parse. Prevents: plan tasks the loop's parser silently skips because they are shaped wrong"
+tags:
+  - dev
+  - planner
+  - typescript
+stack:
+  - typescript
 ---
 
 # dev-planner — Structured Plan Format Specification

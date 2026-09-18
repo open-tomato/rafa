@@ -12,6 +12,8 @@ tags:
 prevents: unvalidated request input and inconsistent response shapes reaching callers
 signal: silent
 when_to_use: "You are adding or changing an HTTP endpoint in this service, or writing the client code that consumes one. Prevents: unvalidated request input and inconsistent response shapes reaching callers"
+stack:
+  - agnostic
 ---
 
 > Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, `.plans/`, `.specs/`, and `tools/`, which live at the umbrella repo root.
