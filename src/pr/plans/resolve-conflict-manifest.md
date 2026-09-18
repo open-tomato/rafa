@@ -8,7 +8,9 @@ spec: .specs/rafa-20-pr-commands.md
 ```
 
 ```rafa:context
-Mechanical conflicts are resolved without stopping — dependency version bumps take the base's version unless the branch deliberately pinned it, lockfiles and generated artifacts likewise, and complementary additions keep BOTH. Stop only for a genuine semantic conflict — two sides changing the same behaviour incompatibly. For manifest conflicts specifically: merge the base, keep both sides' entries and take the higher version where both bumped one, then reinstall to verify consistency and confirm all gates pass before pushing.
+{CONFLICT_SENTENCE}
+
+For manifest conflicts specifically: merge the base, keep both sides' entries and take the higher version where both bumped one, then reinstall to verify consistency and confirm all gates pass before pushing. This triage read the conflict from {CONFLICT_FILES}.
 ```
 
 ## Description

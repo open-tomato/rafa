@@ -8,7 +8,9 @@ spec: .specs/rafa-20-pr-commands.md
 ```
 
 ```rafa:context
-Mechanical conflicts are resolved without stopping — dependency version bumps take the base's version unless the branch deliberately pinned it, lockfiles and generated artifacts likewise, and complementary additions keep BOTH. Stop only for a genuine semantic conflict — two sides changing the same behaviour incompatibly. For lockfile conflicts specifically: merge the base, take the base's lockfile, then reinstall to re-anchor the branch's dependencies to the base's versions.
+{CONFLICT_SENTENCE}
+
+For lockfile conflicts specifically: merge the base, take the base's lockfile, then reinstall to re-anchor the branch's dependencies to the base's versions. This triage read the conflict from {CONFLICT_FILES}.
 ```
 
 ## Description
