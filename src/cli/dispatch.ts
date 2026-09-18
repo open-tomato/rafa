@@ -7,8 +7,8 @@
  *
  *   1. Every module command entry the caller names is imported and
  *      mounted (`modules.ts`), each failure kept as a warning.
- *   2. The line is routed (`route.ts`): a command, a help request or a
- *      refusal.
+ *   2. The line is routed (`route.ts`): a command, a help request, a
+ *      version request or a refusal.
  *   3. The context is assembled from the line without its routing
  *      words, each deprecated flag typed read as the spelling it is
  *      deprecated for, against the routed command's `args` and `flags`.
@@ -16,7 +16,8 @@
  *      context is assembled again without it so the refusal can be told.
  *   4. The start event is written, then each warning the caller handed
  *      in and each module command warning, at warn level.
- *   5. The route is settled. A help request writes the help text; a
+ *   5. The route is settled. A help request writes the help text and a
+ *      version request the one `rafa <version>` line; a
  *      refusal writes nothing yet. A command needing a project has it
  *      resolved first, and outside one ends as the `no_project` refusal
  *      without running (see "The project"). A command that runs prints
@@ -38,8 +39,8 @@
  * the context's output. In text mode neither is written, so a person
  * reads only what the command prints: a failure's message goes to stderr
  * as one line, and a result a command gave is written as the `text`
- * adapter writes one. Help is text only: in json mode a help request
- * writes its two events and no text. Either way the terminal event is
+ * adapter writes one. Help and the version are text only: in json mode
+ * each writes its two events and no text. Either way the terminal event is
  * answered with the exit code, in {@link DispatchOutcome}.
  *
  * ## What a command writes through
@@ -85,9 +86,9 @@
  * A working directory or a home the walk refuses, a relative path or a
  * start that does not resolve, ends the same way with the walk's message.
  *
- * A help request, a routing refusal, `invalid_spec` and a command
- * declaring `needsProject: false` read neither the working directory nor
- * the home, so each answers outside a project as it does inside one, and
+ * A help request, a version request, a routing refusal, `invalid_spec`
+ * and a command declaring `needsProject: false` read neither the working
+ * directory nor the home, so each answers outside a project as it does inside one, and
  * such a command runs with `project` null.
  *
  * ## Deprecation lines
@@ -128,6 +129,7 @@ import { CommandExit } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
+import { versionLine } from './version.js';
 
 /** What every refusal the dispatcher throws opens with. */
 const REFUSAL = 'dispatcher';
@@ -461,6 +463,9 @@ async function settle(
   switch (route.kind) {
     case 'help':
       if (base.outputMode === 'text') settings.stdout.write(settings.renderHelp(route.request, registry));
+      return success(null);
+    case 'version':
+      if (base.outputMode === 'text') settings.stdout.write(`${versionLine()}\n`);
       return success(null);
     case 'refusal':
       return failure(route.code satisfies RouteRefusalCode, route.message);

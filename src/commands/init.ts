@@ -70,6 +70,19 @@
  * `~/.rafa/bin` is not on it ahead of `~/.bun/bin`. It warns and never
  * refuses: the project is set up whichever `rafa` a shell finds.
  *
+ * ## The agent warning
+ *
+ * `vendorableAgents` (`src/agents/vendorable.ts`) then reads the plans
+ * under the config's `plan.dir`, and a warning is written for every
+ * `agent=` of a still-to-run task that resolves only in
+ * `~/.claude/agents` under the resolved `loop.settingSources`, naming
+ * the plan, its lines and `rafa agent vendor <name>`. It warns, copies
+ * nothing and refuses nothing: `loop start`'s preflight and `rafa plan
+ * validate` are where such a name stops a run, and a missing name no
+ * user definition carries is left to them, having no vendor fix to
+ * name. On a fresh project `plan.dir` holds no plan and nothing is
+ * warned.
+ *
  * ## What it prints
  *
  * In text mode, the head line naming the root and where it came from,
@@ -89,6 +102,7 @@
  * `homedir()` and `process.stdin`, and prompts on stderr. The writes go
  * to the disk, under the root and the home the seams name.
  */
+import type { VendorableAgent } from '../agents/vendorable.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
 import type { BinPathReading } from '../project/bin-path.js';
@@ -101,6 +115,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
+import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
@@ -167,6 +182,8 @@ export interface InitResult {
   readonly trackingNotice: boolean;
   /** Where `~/.rafa/bin` sits on the `PATH` handed in. */
   readonly binPath: BinPathReading;
+  /** Each agent a plan under `plan.dir` routes to that resolves only in `~/.claude/agents`. */
+  readonly vendorableAgents: readonly VendorableAgent[];
 }
 
 /** The line every refusal ends with. */
@@ -321,6 +338,12 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
     writes,
     trackingNotice: tracking.notice.printed,
     binPath: readBinPath(context.env['PATH'], home),
+    vendorableAgents: vendorableAgents({
+      repoRoot: root.path,
+      home,
+      planDir: config.planDir,
+      settingSources: config.settingSources,
+    }),
   };
 }
 
@@ -359,6 +382,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   if (context.outputMode === 'json') context.output.result(result);
   else for (const line of renderInit(result)) context.output.info(line);
   if (result.binPath.warning !== null) context.output.warn(result.binPath.warning);
+  for (const line of vendorableAgentWarnings(result.vendorableAgents, result.root)) context.output.warn(line);
 }
 
 /** The command, reading `seams`; see the module note. */
@@ -377,7 +401,9 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' `runs/`, `effort/` and `instincts/` under `.rafa/`, and the rafa block in `.gitignore` from the'
       + ' `tracking` settings; under the home it writes `~/.rafa/config.yaml` and `~/.rafa/instincts/` when'
       + ' they are missing. Only what is missing or stale is written, so a rerun changes no byte and says'
-      + ' so. It warns when `~/.rafa/bin` is not on PATH ahead of `~/.bun/bin`. With `--output=json` the'
+      + ' so. It warns when `~/.rafa/bin` is not on PATH ahead of `~/.bun/bin`, and when a plan under'
+      + ' `plan.dir` routes to an agent that resolves only in `~/.claude/agents`, naming'
+      + ' `rafa agent vendor <name>`. With `--output=json` the'
       + ' root and every path checked are the data of the terminal result event.',
     args: [],
     flags: [

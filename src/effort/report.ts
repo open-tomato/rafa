@@ -699,11 +699,11 @@ export function buildReport(options: ReportOptions): EffortReport {
 
 /** Refuses the run with exit code 1, its message one line per refusal. */
 function refuse(problems: readonly string[]): never {
-  throw new CommandExit(1, problems.map((problem) => `ralph effort report: ${problem}`).join('\n'));
+  throw new CommandExit(1, problems.map((problem) => `rafa effort report: ${problem}`).join('\n'));
 }
 
 /**
- * `ralph effort report` — the command entry, over `repoRoot`, the project
+ * `rafa effort report` — the command entry, over `repoRoot`, the project
  * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
  * Writes through the active output (`adapters/output/active.ts`), in the
@@ -753,7 +753,7 @@ export default async function report(args: string[], repoRoot: string): Promise<
   }
   if (built.rowsRead === 0) {
     output.info('effort report: no session rows stored yet'
-      + ' (run `ralph effort collect` first)');
+      + ' (run `rafa effort collect` first)');
     const sections = [...formatTaskReports(built), ...formatPreflightHalts(built), ...formatBudgets(built)];
     for (const line of sections) output.info(line);
     return;

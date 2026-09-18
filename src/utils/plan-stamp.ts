@@ -60,7 +60,7 @@ export function isStampableStub(stub: string): boolean {
  */
 export function planStampLine(stub: string): string {
   if (!isStampableStub(stub)) {
-    throw new Error(`ralph plan stamp: unusable stub ${JSON.stringify(stub)}`);
+    throw new Error(`rafa plan stamp: unusable stub ${JSON.stringify(stub)}`);
   }
   return `<!-- ralph:plan=${stub} -->`;
 }

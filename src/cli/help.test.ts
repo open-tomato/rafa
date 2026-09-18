@@ -299,6 +299,7 @@ describe('the root help', () => {
     expect(blockOf(text, 'Global flags')).toEqual([
       '  --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)',
       '  -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)',
+      '  --version       print "rafa <version>" and exit; typed alone, no short form',
     ]);
   });
 
@@ -314,7 +315,7 @@ describe('the global flags the root help lists', () => {
   const read = (argv: string[], env: Record<string, string> = {}) => assembleContext({ argv, env, stream: memoryStream().stream });
 
   it('are the output mode and the verbosity, each read by assembleContext as its note says', () => {
-    expect(GLOBAL_FLAGS.map((flag) => flag.spelling)).toEqual(['--output=json', '-v, --verbose']);
+    expect(GLOBAL_FLAGS.map((flag) => flag.spelling)).toEqual(['--output=json', '-v, --verbose', '--version']);
     expect(read([]).outputMode).toBe('text');
     expect(read(['--output=json']).outputMode).toBe('json');
     expect(read([], { RAFA_OUTPUT: 'json' }).outputMode).toBe('json');
@@ -323,6 +324,12 @@ describe('the global flags the root help lists', () => {
     expect(read(['-v', '-v', '-v', '-v']).verbosity).toBe(3);
     expect(read(['--verbose=2']).verbosity).toBe(2);
     expect(read([], { RAFA_VERBOSITY: '1' }).verbosity).toBe(1);
+  });
+
+  it('list --version, which routing reads rather than assembleContext, with no short form', () => {
+    expect(routeLine(PLANTED, ['--version']).kind).toBe('version');
+    expect(routeLine(PLANTED, ['-v']).kind).toBe('help');
+    expect(read(['--version']).verbosity).toBe(0);
   });
 });
 

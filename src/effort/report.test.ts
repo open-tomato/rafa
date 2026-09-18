@@ -1141,7 +1141,7 @@ describe('the report command', () => {
     const bare = realpathSync(freshRoot());
     Bun.spawnSync(['git', 'init', '-q'], { cwd: bare });
     writeConfig(bare, '');
-    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+    const noRows = 'effort report: no session rows stored yet (run `rafa effort collect` first)';
 
     const run = runReport(root, []);
 
@@ -1165,7 +1165,7 @@ describe('the report command', () => {
     writeConfig(root, '');
     plantPreflight(root, 'run-halted', 'required');
     plantPreflight(root, 'run-warned', 'optional');
-    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+    const noRows = 'effort report: no session rows stored yet (run `rafa effort collect` first)';
 
     const run = runReport(root, []);
 
@@ -1186,7 +1186,7 @@ describe('the report command', () => {
     writeConfig(root, '');
     plantDispatch(root, 'aaaa-1111', 0.5);
     plantDispatch(root, 'bbbb-2222', null);
-    const noRows = 'effort report: no session rows stored yet (run `ralph effort collect` first)';
+    const noRows = 'effort report: no session rows stored yet (run `rafa effort collect` first)';
 
     const run = runReport(root, []);
 
@@ -1215,7 +1215,7 @@ describe('the report command', () => {
     ]);
     expect(run.exitCode).toBe(1);
     expect(run.stderr.trimEnd().split('\n')).toEqual(
-      refusal.problems.map((problem) => `ralph effort report: ${problem}`),
+      refusal.problems.map((problem) => `rafa effort report: ${problem}`),
     );
     expect(run.stdout).toBe('');
   });
@@ -1234,7 +1234,7 @@ describe('the report command', () => {
       ok: false,
       error: {
         code: 'command_exit',
-        message: refusal.problems.map((problem) => `ralph effort report: ${problem}`).join('\n'),
+        message: refusal.problems.map((problem) => `rafa effort report: ${problem}`).join('\n'),
       },
     });
   });

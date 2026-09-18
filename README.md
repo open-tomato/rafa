@@ -64,9 +64,19 @@ open or blocked task, and name every such tracker. `rafa self-update`
 runs only inside a project, so `rafa init` the checkout first. They exit
 2 when they could not run: a `package.json` that is not rafa's or cannot
 be read, a config or tracker they could not read, or a build, copy or
-link that failed. A loop may be running from the runtime they replace,
-so each file and then the link land by a rename, and nothing already in
-the runtime directory is deleted.
+link that failed.
+
+A version is installed once. Both also exit 1, before building, when
+`~/.rafa/runtime/<version>/` is already there, naming that directory and
+the version `package.json` gave: a loop may be running from it, and a
+second build under the same version would swap its runner. Raise the
+version to install beside it. `bun run snapshot --force` and
+`rafa self-update --force` install over it anyway, replacing the
+directory whole, so nothing the old build left is kept: the replacement
+is copied beside the directory and renamed into its place, and only then
+is the old one removed, so no reader meets a half-replaced runtime. The
+link lands by a rename too, so a shell meets the old link or the new one
+and never none.
 
 ## Runtime
 
@@ -78,6 +88,45 @@ under node at all. `module` points at `./dist/index.js`, the same build
 the root of `exports` names. The package ships no type declarations:
 `exports` names no `types`, and a TypeScript consumer gets TS7016 under
 `strict`.
+
+## Roadmap
+
+What rafa does today and what is planned, in the order it is being
+built. A box is ticked by the change that finishes the feature.
+
+- [x] Run a plan task by task: one Claude Code session per task, one
+  commit per task, then a pull request and a wait for CI
+- [x] Plans that carry their own background, so each task reads only the
+  part of the plan it needs
+- [x] Every task reports back what it did, what it found and what
+  blocked it, and rafa keeps the record
+- [x] See what each plan cost: sessions, tokens and commits per plan
+- [x] Install once, set up any project with `rafa init`
+- [x] Checks before a run: a missing tool or key stops the run with its
+  name, before any session is paid for
+- [x] A spending cap per task
+- [x] One consistent command line, with help at every level that people
+  and agents can both read
+- [x] Stop, pause, resume and check on a running plan
+- [x] Blockers and unrelated bugs found along the way are filed as
+  issues, once each
+- [x] rafa can safely work on its own code and update itself
+- [x] Usable as a library inside other services, not only as a command
+- [x] A health check for skills: one format, and a checker that refuses
+  a broken skill before an agent can follow it
+- [x] The agents a plan needs are checked before the run, and copied
+  into the project with one command
+- [ ] A version bump and a changelog entry with every pull request
+- [ ] The right skills reach the right task, chosen when the plan is
+  written
+- [ ] Know which skills earn their place and which are ignored
+- [ ] rafa learns from its own runs: what one task works out is handed
+  to the tasks that need it later
+- [ ] Skills and lessons shared across projects and machines
+- [ ] Work on several issues or specs at the same time
+- [ ] Add-ons: install a tracker, an output or a set of skills (Linear,
+  Obsidian and others) without changing rafa
+- [ ] A live terminal dashboard
 
 ## Attribution
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * ralph start — the task loop.
+ * rafa start — the task loop.
  *
  * Walks the plan's tracker checklist one task at a time, delegating each task
  * to a Claude Code session and then staging and committing whatever that
@@ -66,7 +66,11 @@
  * (`start/preflight.ts`). A failed required item refuses the run. Each
  * failed optional one becomes a `known-missing:` line that every task
  * prompt carries after its plan text, with one sentence saying such an
- * item is neither a bug to fix nor a credential to patch around.
+ * item is neither a bug to fix nor a credential to patch around. Ahead
+ * of every probe, the same preflight refuses a run whose checklist
+ * routes a still-to-run task to an `agent=` no scope
+ * `loop.settingSources` loads defines, since that dispatch would exit 1
+ * before any model call.
  *
  * Each task session is spawned under an id the loop picks, with its stdout
  * captured (`start/dispatch.ts`). The exit code alone decides `failed`; a
@@ -315,12 +319,14 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
     announcePlanIssues(planContent);
 
-    // Throws on a halt, before the tracker and before any session.
+    // Throws on an unresolvable agent or a halt, before the tracker and
+    // before any session.
     const { knownMissing } = await runStartPreflight({
       repoRoot,
       planPath,
       settings: runConfig.config,
       newRunId: () => session.id,
+      agents: { settingSources, home: homedir() },
     });
 
     // Resolves no tracker here: the chain waits for the first public bug.

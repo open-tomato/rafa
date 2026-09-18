@@ -1,6 +1,17 @@
 ---
 name: git-add-partial-failure
-description: Use when a shell script batches multiple files into a single `git add A B C` and the following `git commit` unexpectedly reports "no changes added to commit" despite the files clearly being modified — `git add` aborts entirely if any pathspec in the list does not match a working-tree file, so nothing at all gets staged. The failure is silent when stderr is suppressed with `2>/dev/null`.
+description: "Use when a batched `git add A B C` stages nothing and the commit reports 'no changes added to commit'."
+prevents: "a whole staging batch lost to one missing pathspec, with the error suppressed"
+signal: loud
+when_to_use: "A git commit in a scripted loop reports \"no changes added to commit\" for files that clearly show as modified in git status. Prevents: a whole staging batch lost to one missing pathspec, with the error suppressed"
+tags:
+  - git
+  - add
+  - partial
+  - failure
+  - shell
+stack:
+  - shell
 ---
 
 # `git add` Aborts Entirely On Any Missing Pathspec

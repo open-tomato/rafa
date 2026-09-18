@@ -751,11 +751,11 @@ export function formatCollectSummary(result: CollectResult): string[] {
 
 /** Refuses the run with exit code 1, its message one line per refusal. */
 function refuse(problems: readonly string[]): never {
-  throw new CommandExit(1, problems.map((problem) => `ralph effort collect: ${problem}`).join('\n'));
+  throw new CommandExit(1, problems.map((problem) => `rafa effort collect: ${problem}`).join('\n'));
 }
 
 /**
- * `ralph effort collect` — the command entry, over `repoRoot`, the project
+ * `rafa effort collect` — the command entry, over `repoRoot`, the project
  * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
  * Writes the summary through the active output

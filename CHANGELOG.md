@@ -1,5 +1,22 @@
 # Changelog
 
+One section per released version, newest first, headed
+`## <version> — <date>, <what the release is>`. One line per area a
+user would notice, written from the pull request rather than from the
+commit list. Versions follow semver; a phase is a minor, a fix between
+phases is a patch. Each released version is tagged `v<version>`
+(`v0.1.0` was never tagged; `f9954e2..da0a76c` is its range).
+
+## 0.3.0 — 2026-09-18, phase 2: schema, checker, demotion
+
+- Stack vocabulary, skill frontmatter v2 schema with `prevents`, `signal`, `when_to_use`, `paths`, `tags`, `stack`, and instinct record schema.
+- Skill checker: layout, schema, resolution, locality, and instinct verification; rafa skill check|list commands.
+- Skill demotion pass: classify auto-extracted skills as observations or procedures, convert observations to instinct records.
+- Instinct commands: rafa instinct check|list|show to verify and browse instinct records in project and user scopes.
+- Backfill pass: proposal and derivation to fill missing `prevents`, `signal`, `when_to_use`, and `stack` fields across skill tiers.
+- Agent roster validation in preflight and rafa plan validate; declared agents checked before run.
+- Runtime refusal on installed version without --force; git-workflow and cli docs updated for phase 2 and 1 fixes.
+
 ## 0.2.0 — 2026-09-15, phase 1: installable
 
 - `rafa init`, project and user scope under `.rafa/` and `~/.rafa/`, config schema with declared prerequisites.
@@ -12,4 +29,22 @@
 
 ## 0.1.0 — 2026-09-13, phase 0 and 0b
 
-- Sibling loop imported, `bun test`, Store port with SQLite and NDJSON, parity tests, structured plan and report, `plan.inject`, cutover runbook, review fixes, runtime snapshot.
+Released as one version; the three pull requests are listed apart
+because no tag separates them.
+
+Phase 0 (#1):
+
+- The loop imported from `marcostomatti/template-agentic-research` as the package `@open-tomato/rafa`, binary `rafa`, suite under `bun test`.
+- Store port with SQLite and NDJSON backends; differential and lineage parity tests over the sibling's session logs.
+- Structured plan blocks (`rafa:plan`, `rafa:context`, `rafa:stage-context`) and `plan.inject: full | stage | task`, default `stage`.
+- Structured task report (`rafa:report`), the `findings` table, and `progress.txt` rendered from it.
+- Cutover runbook in `docs/CUTOVER.md`.
+
+Phase 0b (#2):
+
+- Review fixes: store schema-version guard on empty writes, `effort report` reading through the selected backend, repo hygiene tests, control-byte gate ported to `bun:test`.
+- Runtime snapshot under `~/.rafa/runtime/<version>/`, so a loop never runs from the source it edits.
+
+Fix (#3, 2026-09-14, merged without a version bump):
+
+- Prompt audit findings 1 to 5: wrap-up prompt targets and the `@` marker note, `PROMPT.md` finish-or-blocked wording, `eslint --fix` in the agents, `gate:control-bytes` script.

@@ -805,9 +805,9 @@ describe('rafa start, over a stand-in claude', () => {
     // `project,local`, and the definition under the HOME is not read: its
     // effort keeps nothing off the first task. The repository's is read.
     const defaultArgs = (n: number) => [...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', requireSessionId(byDefault, n)];
-    expect(argsOf(byDefault, 1)).toEqual([...defaultArgs(1), '--agent', 'doc-updater', '--effort', 'low']);
+    expect(argsOf(byDefault, 1)).toEqual([...defaultArgs(1), '--agent', 'Explore', '--effort', 'low']);
     expect(argsOf(byDefault, 2)).toEqual([...defaultArgs(2), '--agent', 'tdd-guide']);
-    expect(argsOf(byDefault, 3)).toEqual([...defaultArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+    expect(argsOf(byDefault, 3)).toEqual([...defaultArgs(3), '--agent', 'statusline-setup', '--effort', 'medium']);
     expect(argsOf(byDefault, 4)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS]);
 
     // The control: the same plantings under a user config naming `user`
@@ -817,21 +817,21 @@ describe('rafa start, over a stand-in claude', () => {
     // passes its level under both.
     const userSourceArgs = ['--setting-sources', 'user,project,local'];
     const userArgs = (n: number) => [...CLAUDE_BASE_ARGS, ...userSourceArgs, '--session-id', requireSessionId(withUser, n)];
-    expect(argsOf(withUser, 1)).toEqual([...userArgs(1), '--agent', 'doc-updater']);
+    expect(argsOf(withUser, 1)).toEqual([...userArgs(1), '--agent', 'Explore']);
     expect(argsOf(withUser, 2)).toEqual([...userArgs(2), '--agent', 'tdd-guide']);
-    expect(argsOf(withUser, 3)).toEqual([...userArgs(3), '--agent', 'code-reviewer', '--effort', 'medium']);
+    expect(argsOf(withUser, 3)).toEqual([...userArgs(3), '--agent', 'statusline-setup', '--effort', 'medium']);
     expect(argsOf(withUser, 4)).toEqual([...CLAUDE_BASE_ARGS, ...userSourceArgs]);
   }, { timeout: 2 * RUN_TIMEOUT.timeout });
 });
 
 /** A task routed to an agent whose only definition sits under the HOME. */
-const ROUTED_HOME_TASK = 'Add the first routed module MARK-SILENT  {agent=doc-updater effort=low}';
+const ROUTED_HOME_TASK = 'Add the first routed module MARK-SILENT  {agent=Explore effort=low}';
 
 /** A task routed to an agent whose only definition sits in the repository. */
 const ROUTED_REPO_TASK = 'Add the second routed module MARK-SILENT  {agent=tdd-guide effort=low}';
 
 /** A task routed to an agent neither root defines. */
-const ROUTED_NOWHERE_TASK = 'Add the third routed module MARK-SILENT  {agent=code-reviewer effort=medium}';
+const ROUTED_NOWHERE_TASK = 'Add the third routed module MARK-SILENT  {agent=statusline-setup effort=medium}';
 
 /** Writes a definition of `name` under `root`, declaring `effort`. */
 function plantDefinition(root: string, name: string, effort: string): void {
@@ -842,12 +842,21 @@ function plantDefinition(root: string, name: string, effort: string): void {
 }
 
 /**
- * A scratch run of the three routed tasks: `doc-updater` defined under its
- * HOME and `tdd-guide` in its repository, each declaring an effort.
+ * A scratch run of the three routed tasks: `Explore` defined under its
+ * HOME and `tdd-guide` in its repository, each declaring an effort, and
+ * `statusline-setup` defined nowhere.
+ *
+ * Two of the three names are Claude Code built-ins, which is what keeps
+ * the run past the preflight's roster check (`start/preflight.ts`): that
+ * check refuses a run naming an agent no loaded scope resolves, and a
+ * home definition is in no loaded scope under the default sources. A
+ * built-in name resolves for the roster whatever the sources, while
+ * `utils/agent-definition.ts` still reads a definition of that name only
+ * where the sources let it, which is what these cases measure.
  */
 function plantRoutedScratch(): Scratch {
   const scratch = plantScratch([ROUTED_HOME_TASK, ROUTED_REPO_TASK, ROUTED_NOWHERE_TASK]);
-  plantDefinition(scratch.home, 'doc-updater', 'high');
+  plantDefinition(scratch.home, 'Explore', 'high');
   plantDefinition(scratch.repo, 'tdd-guide', 'high');
   git(scratch.repo, 'add', '-A');
   git(scratch.repo, 'commit', '-q', '--no-verify', '-m', 'agents');

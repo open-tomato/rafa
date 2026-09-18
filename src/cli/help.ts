@@ -38,9 +38,11 @@
  * taken.
  *
  * The global flags are {@link GLOBAL_FLAGS}: the two `assembleContext`
- * reads for every command. The spec's `--runtime=<v>` is left out: `loop
- * start` alone reads it, and declares it, since a flag typed ahead of the
- * subject never reaches the words a wrapped command is handed.
+ * reads for every command, and `--version`, which routing reads and which
+ * takes no subject beside it (`route.ts`). The spec's `--runtime=<v>` is
+ * left out: `loop start` alone reads it, and declares it, since a flag
+ * typed ahead of the subject never reaches the words a wrapped command is
+ * handed.
  *
  * A hidden action is in no roster. It is left out of its subject's
  * actions and examples, the quick start, the top-level commands and every
@@ -102,12 +104,14 @@ export interface GlobalFlag {
 }
 
 /**
- * The flags `assembleContext` reads for every command, typed ahead of the
- * subject or after the action.
+ * The flags the root help lists: the two `assembleContext` reads for
+ * every command, typed ahead of the subject or after the action, then
+ * `--version`, which `routeLine` reads and which is typed alone.
  */
 export const GLOBAL_FLAGS: readonly GlobalFlag[] = Object.freeze([
   { spelling: '--output=json', note: 'NDJSON events instead of text (also RAFA_OUTPUT=json)' },
   { spelling: '-v, --verbose', note: 'repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)' },
+  { spelling: '--version', note: 'print "rafa <version>" and exit; typed alone, no short form' },
 ]);
 
 /** The indent of a block's lines under its heading. */

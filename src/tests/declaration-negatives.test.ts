@@ -108,6 +108,7 @@ const KEY_PAIRS = [
   { good: 'effort=low', near: 'efort=low' },
   { good: 'budget=0.50', near: 'budgets=0.50' },
   { good: 'tools=Read', near: 'tool=Read' },
+  { good: 'skills=bun-testing', near: 'skill=bun-testing' },
 ];
 
 /**
@@ -219,7 +220,7 @@ describe('an unrecognised key', () => {
       .toBe('doc-updater');
   });
 
-  it('reads a near miss of each of the five keys as text', () => {
+  it('reads a near miss of each of the six keys as text', () => {
     const text = 'Route the doc task';
 
     for (const pair of KEY_PAIRS) {
@@ -228,7 +229,7 @@ describe('an unrecognised key', () => {
         .toBe(text);
     }
 
-    expect(KEY_PAIRS).toHaveLength(5);
+    expect(KEY_PAIRS).toHaveLength(6);
   });
 });
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * ralph plan — generate a plan (and prerequisites) from a spec.
+ * rafa plan — generate a plan (and prerequisites) from a spec.
  *
  *   bun src/rafa.ts plan --spec=specs/my-feature.md [--stub=my-feature]
  *
@@ -312,7 +312,7 @@ export default async function plan(
   const specArg = argValue(args, '--spec');
   if (!specArg) {
     throw new CommandExit(1, [
-      'Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]',
+      'Usage: rafa plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]',
       `A spec is read against the project root, or under specs.dir (${specsDir}) when the root holds none.`,
     ].join('\n'));
   }

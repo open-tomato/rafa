@@ -47,13 +47,16 @@
  *
  * ## Reading the frontmatter
  *
- * The block opens with a `---` first line and closes at the next `---`
- * line, and its body is parsed with `Bun.YAML`, as `config.ts` parses
- * the loop's config. A body that parser refuses, or one that is not a
- * mapping, reads as no frontmatter at all, and its file is passed over
- * like one naming another agent. That is stricter than the CLI:
- * `description: Probe: answers one literal` throws in `Bun.YAML`, and
- * the CLI dispatched a definition carrying exactly that line.
+ * `schema/frontmatter.ts` reads it, and this module re-exports {@link
+ * readFrontmatter} for the callers that reached for it here before the
+ * schema existed. The block opens with a `---` first line and closes
+ * at the next `---` line, and its body is parsed with `Bun.YAML`, as
+ * `config.ts` parses the loop's config. A body that parser refuses, or
+ * one that is not a mapping, reads as no frontmatter at all, and its
+ * file is passed over like one naming another agent. That is stricter
+ * than the CLI: `description: Probe: answers one literal` throws in
+ * `Bun.YAML`, and the CLI dispatched a definition carrying exactly
+ * that line.
  *
  * ## What counts as declaring an effort
  *
@@ -77,7 +80,11 @@ import type { ClaudeSettingSource } from '../config.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { readFrontmatter } from '../schema/frontmatter.js';
+
 import { isAgentName } from './declaration.js';
+
+export { readFrontmatter };
 
 /** Where definitions live under either root. */
 export const AGENT_DEFINITION_DIR = join('.claude', 'agents');
@@ -112,42 +119,6 @@ export interface AgentDefinition {
   readonly path: string;
   /** Its frontmatter, as `Bun.YAML` parsed the block. */
   readonly frontmatter: Readonly<Record<string, unknown>>;
-}
-
-/** True for a line that opens or closes the frontmatter block. */
-function isFence(line: string): boolean {
-  return line === '---';
-}
-
-/** True for a parsed YAML value that is a mapping. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * The frontmatter a definition's text opens with, or null when it opens
- * with none, never closes it, or holds a body that is not a YAML
- * mapping.
- */
-export function readFrontmatter(
-  text: string,
-): Readonly<Record<string, unknown>> | null {
-  const lines = text.split(/\r?\n/);
-  if (!isFence(lines[0] ?? '')) return null;
-
-  const close = lines.findIndex((line, index) => index > 0 && isFence(line));
-  if (close === -1) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = Bun.YAML.parse(lines.slice(1, close).join('\n'));
-  } catch {
-    return null;
-  }
-
-  return isRecord(parsed)
-    ? parsed
-    : null;
 }
 
 /**

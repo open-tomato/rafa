@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-four registered so far wrap a
+ * of each is its command. Five of the thirty-three registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -27,7 +27,16 @@
  * `issue/issue-tracker.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
- * the mounts the dispatcher made.
+ * the mounts the dispatcher made, nor `agent vendor` and `agent list`,
+ * which copy and read agent definitions through `src/agents/roster.ts`,
+ * nor `skill check` and `instinct check`, which run the five checks
+ * through `src/check/run.ts` and share `commands/check-report.ts`, nor
+ * `skill list`, which runs those checks over the tiers
+ * `src/schema/tiers.ts` resolves, nor `skill demote` and
+ * `skill backfill`, which run the demotion pass of `src/demote/` and the
+ * backfill of `src/backfill/` over one skills directory, nor
+ * `instinct list` and `instinct show`, which read the records the two
+ * instinct scopes hold through `commands/instinct/instinct-records.ts`.
  *
  * ## What is registered
  *
@@ -49,14 +58,34 @@
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
+ *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
+ *     definition copied into the project with a source header, and
+ *     `agent list`, the names a session this project spawns resolves.
+ *   - `skill check <dir> [--fix] [--project=<root>]` and
+ *     `instinct check <dir>`, the checker over one tier, each exiting
+ *     with the number of its failing files and running outside a
+ *     project, since `--project` is its only project seam.
+ *   - `skill list [--tier=<tier>]`, every skill the three tiers
+ *     register with its stack and its verdict, and `instinct list` and
+ *     `instinct show <id>`, the records the project and user instinct
+ *     scopes hold, each listing exiting 0 whatever its rows say.
+ *   - `skill demote <dir> [--apply]`, the demotion pass over one skills
+ *     directory: the report written with nothing moved, and a report the
+ *     review marked `reviewed` applied, exiting with the rows it refused.
+ *   - `skill backfill <dir> [--propose|--apply] [--project=<root>]`, the
+ *     backfill over one skills directory: what the derivation would
+ *     write, the draft proposals one session per twenty files answers,
+ *     and the reviewed rows written and derived over, exiting with the
+ *     rows and files it refused.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
  *     checks, checked and printed with no run started, beside two
  *     warnings about the install.
- *   - `self-update`, top-level: builds the rafa checkout and installs it
- *     as `~/.rafa/bin/rafa`, refusing while a tracker in `plan.dir` holds a
- *     task.
+ *   - `self-update [--force]`, top-level: builds the rafa checkout and
+ *     installs it as `~/.rafa/bin/rafa`, refusing while a tracker in
+ *     `plan.dir` holds a task and while this version's runtime directory
+ *     is already there, which `--force` replaces whole.
  *   - `usage`, top-level.
  *   - `describe`, top-level: the schema 2 roster of the registry the line
  *     was routed through.
@@ -64,19 +93,26 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the five with an action registered: a subject with
- * none would show in every roster and dispatch nothing.
+ * The subjects are the eight with an action registered: a subject with
+ * none would show in every roster and dispatch nothing. `skill index`,
+ * `instinct flag` and `instinct promote` are in the command tree and
+ * are not registered, because nothing dispatches them yet.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
+import agentList from './agent/list.js';
+import agentVendor from './agent/vendor.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import init from './init.js';
+import instinctCheck from './instinct/check.js';
+import instinctList from './instinct/list.js';
+import instinctShow from './instinct/show.js';
 import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
 import issueList from './issue/list.js';
@@ -95,6 +131,10 @@ import planList from './plan/list.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
 import selfUpdate from './self-update.js';
+import skillBackfill from './skill/backfill.js';
+import skillCheck from './skill/check.js';
+import skillDemote from './skill/demote.js';
+import skillList from './skill/list.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -104,6 +144,9 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
+  { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
+  { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
+  { name: 'instinct', summary: 'check an instincts directory; list and show its records' },
 ]);
 
 /** The core commands, in roster order. */
@@ -127,6 +170,15 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortReport,
   moduleList,
   moduleExec,
+  agentVendor,
+  agentList,
+  skillCheck,
+  skillList,
+  skillDemote,
+  skillBackfill,
+  instinctCheck,
+  instinctList,
+  instinctShow,
   init,
   doctor,
   selfUpdate,

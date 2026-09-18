@@ -1,12 +1,25 @@
 /**
  * Tests for `rafa plan validate` (`validate.ts`): a clean plan and a plan
- * with issues in both modes, the path resolved against the working
- * directory, the refusals, and that the command starts no session.
+ * with issues in both modes, the agents of its still-to-run tasks, the
+ * path resolved against the working directory, the refusals, and that
+ * the command starts no session.
  *
  * The broken plan carries three issues of three reasons, a header field
  * YAML reads as a comment, a block never closed and an open task line
  * inside it, so a command writing fewer than every issue, or writing them
  * out of line order, differs from what is held.
+ *
+ * ## The agent roster
+ *
+ * Each roster case plants its definitions under the project and the home
+ * of the temporary project it dispatches in, never under this machine's,
+ * and the first asserts both paths resolve under this file's own
+ * directory. Every reading that reports a missing agent sits beside a
+ * control differing in one thing only: the project's definitions, the
+ * `loop.settingSources` of the project's config, or the checkbox of the
+ * line that named it. The one case with no project at all is run by
+ * calling the command directly, since the dispatcher refuses a command
+ * needing a project outside one and would never hand it null.
  *
  * ## No session
  *
@@ -27,8 +40,18 @@ import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
+import { createCommandRegistry } from '../../cli/registry.js';
 import { parsePlan } from '../../plan/index.js';
-import { dispatchCaptured, eventsOf, plantScratchRepo, plantStandInClaude, runRafa } from '../../tests/cli-capture.js';
+import {
+  dispatchCaptured,
+  dispatchInProject,
+  eventsOf,
+  plantProject,
+  plantScratchRepo,
+  plantStandInClaude,
+  runRafa,
+} from '../../tests/cli-capture.js';
+import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { issueLine } from './plan-files.js';
 import { createPlanValidateCommand, validatePlan } from './validate.js';
@@ -70,6 +93,70 @@ const BROKEN_LINES = parsePlan(BROKEN_PLAN).issues.map((issue) => issueLine('pla
 
 /** The refusal the broken plan ends with, typed as `plans/broken.md`. */
 const BROKEN_REFUSAL = '❌ plans/broken.md: 3 issues; the plan does not read as written';
+
+/** A plan whose open and blocked tasks name agents, and whose ticked one names another. */
+const PLAN_NAMING_AGENTS = [
+  '# Plan: routed',
+  '',
+  '# Stage: one',
+  '',
+  '- [ ] Write the tests  {agent=tdd-guide}',
+  '- [x] Already ran  {agent=ticked-only}',
+  '- [BLOCKED] Ask the void  {agent=no-such-agent}',
+  '',
+].join('\n');
+
+/** Writes `<root>/.claude/agents/<name>.md` carrying that name as its frontmatter, and answers its path. */
+function plantAgent(root: string, name: string): string {
+  const dir = join(root, '.claude', 'agents');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, `${name}.md`);
+  writeFileSync(file, `---\nname: ${name}\n---\nThe agent body.\n`, 'utf8');
+  return file;
+}
+
+/** A fresh temporary project of this file's own, its plan written at `plan.md`. */
+function plantRoutedProject(plan: string = PLAN_NAMING_AGENTS, config?: string): { root: string; home: string } {
+  const scope = mkdtempSync(join(tempBase, 'scope-'));
+  const project = config === undefined
+    ? plantProject(scope)
+    : plantProject(scope, config);
+  writeFileSync(join(project.root, 'plan.md'), plan, 'utf8');
+  return project;
+}
+
+/**
+ * Runs the command over `plan.md` in `root` with a context carrying no
+ * project, which the dispatcher never builds for a command needing one,
+ * each `info` line handed to `onInfo`.
+ */
+async function runWithoutProject(root: string, onInfo: (message: string) => void): Promise<void> {
+  return createPlanValidateCommand(() => root).run({
+    args: ['plan.md'],
+    argv: ['plan.md'],
+    flags: {},
+    outputMode: 'text',
+    verbosity: 1,
+    output: sinkOutput({ info: onInfo }),
+    signal: new AbortController().signal,
+    env: {},
+    registry: createCommandRegistry({ subjects: SUBJECTS, commands: [] }),
+    project: null,
+  });
+}
+
+/** Dispatches `plan validate plan.md` in `project`, with `words` added to the line. */
+async function validateIn(
+  project: { root: string; home: string },
+  words: readonly string[] = [],
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  return dispatchInProject(
+    ['plan', 'validate', 'plan.md', ...words],
+    SUBJECTS,
+    [createPlanValidateCommand(() => project.root)],
+    project,
+  );
+}
 
 /** A fresh root holding the clean plan and the broken one under `plans/`. */
 function plantPlans(): string {
@@ -199,6 +286,117 @@ describe('rafa plan validate, dispatched', () => {
 
     expect(await dispatchCaptured(words, SUBJECTS, [createPlanValidateCommand(() => root)]))
       .toEqual({ exitCode: 1, stdout: '', stderr });
+  });
+});
+
+describe('the agents rafa plan validate checks', () => {
+  it('writes one error line per agent no loaded scope defines, with its fix, and exits 1', async () => {
+    const project = plantRoutedProject();
+    const vendorable = plantAgent(project.home, 'tdd-guide');
+
+    const run = await validateIn(project);
+    // The control differs only in the project's own definitions.
+    for (const name of ['tdd-guide', 'no-such-agent']) plantAgent(project.root, name);
+    const control = await validateIn(project);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout.split('\n')).toEqual([
+      'error: plan.md: agent "tdd-guide" (line 5) resolves under no loaded scope:'
+        + ' run `rafa agent vendor tdd-guide`',
+      'error: plan.md: agent "no-such-agent" (line 7) resolves under no loaded scope:'
+        + ' no definition under ~/.claude/agents to vendor',
+      '',
+    ]);
+    expect(run.stderr).toBe('❌ plan.md: 2 unresolvable agents; no session would be dispatched\n');
+    // The ticked line names `ticked-only`, whose dispatch is behind any run.
+    expect(run.stdout).not.toContain('ticked-only');
+    expect([vendorable, project.root].every((path) => path.startsWith(tempBase))).toBe(true);
+
+    expect(control).toEqual({
+      exitCode: 0,
+      stdout: '✅ plan.md: no issues; 1 stage, tasks 1/3 done, 1 blocked, 1 open\n',
+      stderr: '',
+    });
+  });
+
+  it('reads the loop.settingSources of the project config, which can bring the home into reach', async () => {
+    const withoutUser = plantRoutedProject('- [ ] Write the tests  {agent=tdd-guide}\n');
+    const withUser = plantRoutedProject(
+      '- [ ] Write the tests  {agent=tdd-guide}\n',
+      'version: 1\nloop:\n  settingSources: user,project,local\n',
+    );
+    for (const project of [withoutUser, withUser]) plantAgent(project.home, 'tdd-guide');
+
+    const refused = await validateIn(withoutUser);
+    const passed = await validateIn(withUser);
+
+    expect([refused.exitCode, refused.stdout.includes('"tdd-guide"')]).toEqual([1, true]);
+    expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
+  });
+
+  it('counts the issues and the agents together in the refusal of a plan carrying both', async () => {
+    const routed = BROKEN_PLAN.replace('- [ ] a task', '- [ ] a task  {agent=no-such-agent}');
+    const project = plantRoutedProject(routed);
+
+    expect(parsePlan(routed).issues).toHaveLength(3);
+
+    const run = await validateIn(project);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toContain('error: plan.md:3: unusable-field:');
+    expect(run.stdout).toContain('error: plan.md: agent "no-such-agent"');
+    expect(run.stderr).toBe('❌ plan.md: 3 issues, 1 unresolvable agent; the plan does not read as written\n');
+  });
+
+  it('gives each missing agent as an error log event in json mode, and an empty list for a plan with none', async () => {
+    const project = plantRoutedProject('- [ ] Write the tests  {agent=tdd-guide}\n');
+    const clean = plantRoutedProject('- [ ] Write the tests  {agent=Explore}\n');
+
+    const refused = await validateIn(project, ['--output=json']);
+    const passed = await validateIn(clean, ['--output=json']);
+
+    expect([refused.exitCode, refused.stderr]).toEqual([1, '']);
+    expect(eventsOf(refused.stdout).map(labelOf)).toEqual([
+      'start',
+      'error:plan.md: agent "tdd-guide" (line 1) resolves under no loaded scope:'
+        + ' no definition under ~/.claude/agents to vendor',
+      'result',
+    ]);
+    expect(eventsOf(passed.stdout).at(-1)).toMatchObject({
+      type: 'result',
+      ok: true,
+      data: { missingAgents: [] },
+    });
+  });
+
+  it('refuses a config the loader refuses with exit code 1, where the same plan passes under a usable one', async () => {
+    const refusedConfig = plantRoutedProject(CLEAN_PLAN, 'version: 1\nloop:\n  settingSources: nowhere\n');
+    const usable = plantRoutedProject(CLEAN_PLAN);
+
+    const refused = await validateIn(refusedConfig);
+    const passed = await validateIn(usable);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr.split('\n')[0]).toBe('❌ rafa plan validate: the config cannot be used:');
+    expect(refused.stderr).toContain('settingSources');
+    expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
+  });
+
+  it('checks no agent and says so when it is handed no project, where the same plan is refused in one', async () => {
+    const project = plantRoutedProject('- [ ] Write the tests  {agent=tdd-guide}\n');
+    const info: string[] = [];
+
+    const ran = await runWithoutProject(project.root, (message) => {
+      info.push(message);
+    });
+    const inProject = await validateIn(project);
+
+    expect(ran).toBeUndefined();
+    expect(info).toEqual([
+      'ℹ️  No project was found from the working directory, so no `agent=` was checked.',
+      '✅ plan.md: no issues; 0 stages, tasks 0/1 done, 0 blocked, 1 open',
+    ]);
+    expect([inProject.exitCode, inProject.stdout.includes('"tdd-guide"')]).toEqual([1, true]);
   });
 });
 

@@ -1,8 +1,8 @@
 /**
  * Tests for `rafa self-update` (`self-update.ts`): the install it runs in
  * the project root, the build lines it forwards, the `PATH` warning, json
- * mode, and its refusals with their exit codes. The install itself is
- * held in `src/runtime/install.test.ts`.
+ * mode, `--force` reaching the install, and its refusals with their exit
+ * codes. The install itself is held in `src/runtime/install.test.ts`.
  *
  * Each case dispatches a command made over a build seam of its own, in a
  * project planted under this file's temporary directory beside a home of
@@ -129,7 +129,55 @@ describe('rafa self-update installs the checkout', () => {
   });
 });
 
+describe('rafa self-update --force', () => {
+  it('replaces a runtime directory already there whole, dropping what the old build left', async () => {
+    const project = plantCheckout();
+    const runtimeDir = join(project.home, '.rafa', 'runtime', VERSION);
+    writeFile(join(runtimeDir, 'marker.txt'), 'planted\n');
+    const builds: string[] = [];
+
+    // The control: the same project without the flag refuses and builds nothing.
+    const refused = await selfUpdate(project, recordingBuild(builds));
+    expect(refused.exitCode).toBe(1);
+    expect(builds).toEqual([]);
+
+    const run = await selfUpdate(project, recordingBuild(builds), ['--force']);
+
+    expect(run.exitCode).toBe(0);
+    expect(builds).toEqual([project.root]);
+    expect(existsSync(join(runtimeDir, 'marker.txt'))).toBe(false);
+    expect(readlinkSync(join(rafaBinOf(project), 'rafa'))).toBe(join(runtimeDir, 'cli.js'));
+  });
+
+  it('exits 1 for a value on the flag, before anything is read', async () => {
+    const project = plantCheckout();
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, recordingBuild(builds), ['--force=nonsense']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('--force takes no value, and read "nonsense" as one');
+    expect(run.stderr).toContain('Usage: rafa self-update [--force]');
+    expect(builds).toEqual([]);
+  });
+});
+
 describe('rafa self-update refuses', () => {
+  it('exits 1 when this version is already installed, naming the directory and building nothing', async () => {
+    const project = plantCheckout();
+    const runtimeDir = join(project.home, '.rafa', 'runtime', VERSION);
+    writeFile(join(runtimeDir, 'cli.js'), 'the runtime in use\n');
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, recordingBuild(builds));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`REFUSED — ${runtimeDir} already holds version ${VERSION}`);
+    expect(run.stderr).toContain('run it again with --force');
+    expect(builds).toEqual([]);
+    expect(existsSync(join(rafaBinOf(project), 'rafa'))).toBe(false);
+  });
+
   it('exits 1 while a tracker in plan.dir holds a task, naming it and building nothing', async () => {
     const project = plantCheckout();
     writeFile(join(project.root, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [x] done\n- [BLOCKED] stuck\n');

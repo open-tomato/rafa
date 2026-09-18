@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve, sep } from 'node:path';
 
@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { EXIT_DONE, EXIT_REFUSED, RAFA_PACKAGE_NAME } from '../src/runtime/install.js';
 
-import { defaultSeams, runSnapshot, TAG } from './snapshot-runtime.js';
+import { defaultSeams, readOptions, runSnapshot, TAG } from './snapshot-runtime.js';
 
 /**
  * `bun run snapshot` as the thin caller of `src/runtime/install.ts`,
@@ -17,6 +17,10 @@ import { defaultSeams, runSnapshot, TAG } from './snapshot-runtime.js';
  * No case calls `defaultSeams` with no home, and none runs its build: a
  * case reads the seams' paths, or runs over a planted checkout and home
  * under a temporary directory of its own with a build that writes `dist/`.
+ *
+ * `--force` is held at both ends: the words {@link readOptions} reads,
+ * and the options reaching the install, which the case pairs with the
+ * same world refusing without them.
  */
 
 let base = '';
@@ -71,7 +75,35 @@ describe('defaultSeams', () => {
   });
 });
 
+describe('readOptions', () => {
+  it('reads --force and nothing else, and refuses any other word', () => {
+    expect(readOptions([])).toEqual({ force: false });
+    expect(readOptions(['--force'])).toEqual({ force: true });
+    expect(() => readOptions(['--forced', 'now'])).toThrow('unknown argument(s): --forced now; usage: bun run snapshot [--force]');
+  });
+});
+
 describe('runSnapshot', () => {
+  it('refuses a version already installed, and replaces that directory whole under --force', () => {
+    const { repoRoot, home } = plantCheckout();
+    const runtimeDir = join(home, '.rafa', 'runtime', '9.8.7');
+    writeFile(join(runtimeDir, 'marker.txt'), 'planted\n');
+    const errors: string[] = [];
+    const out: string[] = [];
+
+    const refused = runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), undefined);
+
+    expect(refused).toBe(EXIT_REFUSED);
+    expect(errors[0]).toBe(`${TAG} REFUSED — ${runtimeDir} already holds version 9.8.7, the version in package.json, and a loop may be running from it.`);
+    expect(out.some((line) => line.includes('building'))).toBe(false);
+
+    const forced = runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), join(home, '.rafa', 'bin'), readOptions(['--force']));
+
+    expect(forced).toBe(EXIT_DONE);
+    expect(existsSync(join(runtimeDir, 'marker.txt'))).toBe(false);
+    expect(readlinkSync(join(home, '.rafa', 'bin', 'rafa'))).toBe(join(runtimeDir, 'cli.js'));
+  });
+
   it('writes the refusal to error after the prefix and answers 1, building nothing', () => {
     const { repoRoot, home } = plantCheckout();
     writeFile(join(repoRoot, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [ ] a task left\n');

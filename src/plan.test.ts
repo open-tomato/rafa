@@ -378,7 +378,7 @@ function labelOf(event: CliEvent): string {
 }
 
 /** The refusal a line with no `--spec` gets. */
-const USAGE_REFUSAL = 'Usage: ralph plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]\n'
+const USAGE_REFUSAL = 'Usage: rafa plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]\n'
   + 'A spec is read against the project root, or under specs.dir (.rafa/specs) when the root holds none.';
 
 describe('rafa plan create in json mode', () => {

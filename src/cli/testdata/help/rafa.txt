@@ -11,6 +11,9 @@ Quick start:
   rafa issue list
   rafa effort collect
   rafa module list
+  rafa agent vendor tdd-guide
+  rafa skill check .claude/skills --project=.
+  rafa instinct check .rafa/instincts
   rafa init
   rafa doctor
   rafa self-update
@@ -18,11 +21,14 @@ Quick start:
   rafa describe --output=json
 
 Subjects:
-  plan     create a plan from a spec; list, show and validate plans
-  loop     start a plan; stop, pause, resume, show and list its sessions
-  issue    the tracker: list, show, create, comment on and move issues
-  effort   collect session and commit rows; report per plan
-  module   list the configured modules; run an action a module provides
+  plan       create a plan from a spec; list, show and validate plans
+  loop       start a plan; stop, pause, resume, show and list its sessions
+  issue      the tracker: list, show, create, comment on and move issues
+  effort     collect session and commit rows; report per plan
+  module     list the configured modules; run an action a module provides
+  agent      copy an agent definition into the project; list what a session sees
+  skill      check a skills directory; list each tier; demote and backfill it
+  instinct   check an instincts directory; list and show its records
 
 Commands:
   init, doctor, self-update, usage, describe
@@ -30,3 +36,4 @@ Commands:
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)
   -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)
+  --version       print "rafa <version>" and exit; typed alone, no short form

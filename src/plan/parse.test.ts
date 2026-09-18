@@ -194,7 +194,7 @@ describe('a plan', () => {
     ]);
   });
 
-  it('carries each task declaration, a skills= key beside a known one in its extras', () => {
+  it('carries each task declaration, a skills= key beside a known one on its record', () => {
     const flags = model.tasks.map((task) => resolveDeclarationFlags(task.declaration, NO_OWN_EFFORT).args);
     expect(flags).toEqual([
       ['--agent', 'loop-implementer', '--effort', 'high'],
@@ -202,7 +202,8 @@ describe('a plan', () => {
       ['--agent', 'tdd-guide'],
       ['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Bash'],
     ]);
-    expect(model.tasks[0]?.declaration?.extras).toEqual([{ key: 'skills', value: 'zod-schemas' }]);
+    expect(model.tasks[0]?.declaration?.skills).toEqual(['zod-schemas']);
+    expect(model.tasks[0]?.declaration?.extras).toEqual([]);
     expect(model.tasks[1]?.declaration).toBeNull();
   });
 

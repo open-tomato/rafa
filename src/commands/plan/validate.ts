@@ -19,31 +19,58 @@
  * sit on the task, in `TaskDeclaration.issues`, not in that list, and are
  * not checked here.
  *
+ * ## The agent roster
+ *
+ * Beside the parser's issues, the command checks the `agent=` of every
+ * still-to-run task against the agents a session would resolve
+ * (`agents/roster.ts`), which is the check `loop start`'s preflight
+ * halts on (`start/preflight.ts`): a name no loaded scope defines stops
+ * that task's dispatch with exit code 1 before any model call, so a plan
+ * carrying one does not run however well it parses.
+ *
+ * The roster is resolved against the project the dispatcher found from
+ * the working directory and the config that resolves there, whose
+ * `loop.settingSources` decides whether `~/.claude/agents` is in reach.
+ * A config `loadConfig` refuses is refused with exit code 1. Handed no
+ * project, the command says so and checks no agent, since it needs no
+ * repository to read a plan; that is why the check is the command's and
+ * not `validatePlan`'s, which reads one file and nothing else.
+ *
  * ## What it writes
  *
- * With no issue, json mode gives the terminal result `data`: `file`
- * (absolute), the number of `stages`, the task counts under `tasks`, and
- * an empty `issues`. Text mode writes one line naming the file as typed,
- * its stages and its counts.
+ * With nothing to report, json mode gives the terminal result `data`:
+ * `file` (absolute), the number of `stages`, the task counts under
+ * `tasks`, an empty `issues` and an empty `missingAgents`. Text mode
+ * writes one line naming the file as typed, its stages and its counts.
  *
  * With issues, each is written at `error`, in line order, as
  * `<file>:<line>: <reason>: <text>`, with the file as typed and the line
  * counting from one: a `log` event in json mode, an `error: ` line on
- * stdout in text mode. The command then throws `CommandExit` with exit
- * code 1 and a message counting them, which text mode writes to stderr
- * and json mode carries in the terminal result.
+ * stdout in text mode. Each missing agent follows them, at `error` too,
+ * as `<file>: <the line `missingAgentLine` words>`, which names the
+ * agent, the task lines that asked for it and the command that would fix
+ * it or that no user definition carries the name. The command then
+ * throws `CommandExit` with exit code 1 and a message counting what it
+ * found, which text mode writes to stderr and json mode carries in the
+ * terminal result.
  *
  * A line naming no file or more than one, and a path that is no file,
  * are refused with exit code 1 before anything is parsed.
  */
 import type { TaskCounts } from './plan-files.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { MissingAgent } from '../../agents/roster.js';
+import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaConfig } from '../../config.js';
 import type { PlanIssue } from '../../plan/index.js';
+import type { ProjectFound } from '../../project/scope.js';
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { missingAgentLine, missingPlanAgents, resolveAgentRoster } from '../../agents/roster.js';
 import { CommandExit } from '../../cli/command.js';
+import { loadConfig } from '../../config-load.js';
+import { ConfigError } from '../../config.js';
 import { parsePlan } from '../../plan/index.js';
 
 import { countTasks, expectOneArgument, formatCounts, isFile, issueLine, plural } from './plan-files.js';
@@ -66,11 +93,65 @@ export interface PlanValidation {
   readonly issues: readonly PlanIssue[];
 }
 
+/** A plan file read, with the agents of its still-to-run tasks checked. */
+export interface PlanValidationResult extends PlanValidation {
+  /** Every `agent=` no loaded scope defines, each with its fix; empty when no project was found. */
+  readonly missingAgents: readonly MissingAgent[];
+}
+
 /** The plan at the absolute path `file`, read, or a refusal with exit code 1 when it is no file. */
 export function validatePlan(file: string): PlanValidation {
   if (!isFile(file)) throw new CommandExit(1, `❌ Plan file not found: ${file}`);
   const model = parsePlan(readFileSync(file, 'utf8'));
   return { file, stages: model.stages.length, tasks: countTasks(model.tasks), issues: model.issues };
+}
+
+/** The config as it resolves for the project, refusing one `loadConfig` refuses. */
+function resolvedConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
+  try {
+    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    throw new CommandExit(1, [
+      '❌ rafa plan validate: the config cannot be used:',
+      ...error.problems.map((problem) => `   ${problem}`),
+    ].join('\n'));
+  }
+}
+
+/**
+ * The `agent=` of the plan's still-to-run tasks that no scope the project
+ * loads defines. None, with one line saying so, when the command was
+ * handed no project; see the module note.
+ */
+function checkAgents(context: RafaContext, markdown: string): readonly MissingAgent[] {
+  const project = context.project;
+  if (project === null) {
+    context.output.info('ℹ️  No project was found from the working directory, so no `agent=` was checked.');
+    return [];
+  }
+
+  const { settingSources } = resolvedConfig(project, (message) => {
+    context.output.warn(message);
+  });
+  const roots = { repoRoot: project.root, home: project.home };
+  return missingPlanAgents(markdown, resolveAgentRoster(roots, settingSources));
+}
+
+/** The refusal a plan with issues, missing agents or both ends with. */
+function refusalFor(typed: string, issues: number, agents: number): string {
+  const counts = [
+    issues > 0
+      ? plural(issues, 'issue')
+      : null,
+    agents > 0
+      ? plural(agents, 'unresolvable agent')
+      : null,
+  ].filter((count): count is string => count !== null);
+  const tail = issues > 0
+    ? 'the plan does not read as written'
+    : 'no session would be dispatched';
+  return `❌ ${typed}: ${counts.join(', ')}; ${tail}`;
 }
 
 /** The command, resolving the typed path against `workingDirectory`; see the module note. */
@@ -79,13 +160,18 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
     name: 'plan validate',
     subject: 'plan',
     action: 'validate',
-    summary: 'check that a plan file reads as written, starting no session',
+    summary: 'check that a plan file reads as written and routes to agents that resolve, starting no session',
     description: 'Reads one plan file with the plan parser, the rafa:* blocks and the checklist, and starts'
-      + ' no session. When the parser reads the whole file as written it prints the stages and the tasks'
-      + ' counted by checkbox. Otherwise it writes every issue the parser reported as an error line naming'
-      + ' the file, the line and the reason, then exits 1. The path is read relative to the working'
-      + ' directory, and no repository is needed. With `--output=json` each issue is an error log event,'
-      + ' and a plan with none is the data of the terminal result event.',
+      + ' no session. When the parser reads the whole file as written, and every `agent=` of its'
+      + ' still-to-run tasks resolves for a session spawned under `loop.settingSources`, it prints the'
+      + ' stages and the tasks counted by checkbox. Otherwise it writes every issue the parser reported as'
+      + ' an error line naming the file, the line and the reason, then one line per agent no loaded scope'
+      + ' defines with the `rafa agent vendor` command that would fix it, then exits 1 — the same check'
+      + ' `rafa loop start` halts on before it dispatches anything. The path is read relative to the'
+      + ' working directory; the agents are read from the project found from it and the config that'
+      + ' resolves there, and are left unchecked when there is no project. With `--output=json` each issue'
+      + ' and each missing agent is an error log event, and a plan with neither is the data of the terminal'
+      + ' result event.',
     args: [
       {
         name: 'file',
@@ -108,14 +194,18 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
     outputs: ['text', 'json'],
     run: async (context) => {
       const typed = expectOneArgument(context.args, USAGE);
-      const validation = validatePlan(resolve(workingDirectory(), typed));
+      const file = resolve(workingDirectory(), typed);
+      const validation = validatePlan(file);
       const { issues, stages, tasks } = validation;
-      if (issues.length > 0) {
+      const missingAgents = checkAgents(context, readFileSync(file, 'utf8'));
+      const result: PlanValidationResult = { ...validation, missingAgents };
+      if (issues.length > 0 || missingAgents.length > 0) {
         for (const issue of issues) context.output.error(issueLine(typed, issue));
-        throw new CommandExit(1, `❌ ${typed}: ${plural(issues.length, 'issue')}; the plan does not read as written`);
+        for (const agent of missingAgents) context.output.error(`${typed}: ${missingAgentLine(agent)}`);
+        throw new CommandExit(1, refusalFor(typed, issues.length, missingAgents.length));
       }
       if (context.outputMode === 'json') {
-        context.output.result(validation);
+        context.output.result(result);
         return;
       }
       context.output.info(`✅ ${typed}: no issues; ${plural(stages, 'stage')}, tasks ${formatCounts(tasks)}`);

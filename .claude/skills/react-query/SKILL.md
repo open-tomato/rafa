@@ -1,10 +1,15 @@
 ---
 name: react-query
-description: >
-  Use this skill when adding data fetching, caching, polling, or server-state
-  management to a React app that consumes this library. Covers useQuery,
-  useMutation, provider setup, query key conventions, and live-polling
-  patterns for job status (via the components-library/cache subpath export).
+description: "Use when adding data fetching, caching, polling, or server-state management via components-library/cache."
+prevents: server state duplicated into components and caches that never invalidate after a mutation
+signal: silent
+when_to_use: "You are wiring data fetching, caching, polling, or server-state into a React app that consumes this library. Prevents: server state duplicated into components and caches that never invalidate after a mutation"
+tags:
+  - react
+  - query
+  - typescript
+stack:
+  - typescript
 ---
 
 > Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
@@ -98,7 +103,7 @@ import { createServerCache } from 'components-library/cache/server';
 
 `createServerCache(redis)` takes an `ioredis` instance — `ioredis` is an
 optional peer dependency, installed only by server consumers. Wiring lives in
-`src/cache/server.ts`.
+`server.ts`.
 
 ---
 
@@ -232,8 +237,8 @@ This keeps the slow upstream calls low while job status stays fresh.
 
 | File | Purpose |
 |------|---------|
-| `src/cache/browser.ts` | Browser entry — `useCache` + re-exported TanStack hooks, `QueryClientProvider` |
-| `src/cache/provider.tsx` | `QueryProvider` — zero-config, SSR-safe singleton client |
-| `src/cache/queryClient.ts` | `defaultQueryClient` |
-| `src/cache/server.ts` | Server entry — `createServerCache` (Redis cache-aside) |
+| `browser.ts` | Browser entry — `useCache` + re-exported TanStack hooks, `QueryClientProvider` |
+| `provider.tsx` | `QueryProvider` — zero-config, SSR-safe singleton client |
+| `queryClient.ts` | `defaultQueryClient` |
+| `server.ts` | Server entry — `createServerCache` (Redis cache-aside) |
 | `src/cache/__tests__/` | Unit tests for both entries (jsdom project) |

@@ -40,7 +40,12 @@ answer both questions from one column.
 **A name that resolves to nothing STOPS the dispatch**, which is what
 makes a wrong row something a test can find rather than a silent
 downgrade: an unresolvable agent exits 1 with NO JSON at all and the
-whole roster on stderr, before any model call.
+whole roster on stderr, before any model call. `loop start` no longer
+waits for that: its preflight resolves the roster from the same two
+`.claude/agents` directories and refuses the run, ahead of every
+prerequisite probe, when a still-to-run task of the plan or the tracker
+names an agent no loaded scope defines (`src/start/preflight.ts`).
+`rafa plan validate` runs the same check and exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies
 both.** A declaration carrying an agent never passes `--model` or
@@ -76,6 +81,16 @@ checkout that wrote them. A sweep over tracked files never reaches a plan
 or a spec, and nothing reviews their text: leave a plan's or a spec's
 illustrative text, and a test quoting it verbatim, alone when a sweep
 turns up its subject.
+
+**The loop owns staging, so a task's own work is always unstaged.** No
+task runs `git add`; the loop stages and commits after the session ends.
+That puts every edit a task has made in the blast radius of
+`git checkout <file>` and `git restore <file>`, which restore from
+`HEAD` and not from the working tree of a moment ago — a task that
+mutates a module to prove a test reddens and then "reverts" that way
+throws away its own implementation along with the mutation. Copy the
+file to a scratch path first, restore from the copy, and verify with
+`shasum -c`.
 
 **`progress.txt` is not tracked**, living only via `.gitignore`. It is
 derived: `src/utils/progress.ts` rewrites it whole from the store's `findings`

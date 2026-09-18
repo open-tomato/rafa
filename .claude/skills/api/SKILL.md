@@ -1,11 +1,19 @@
 ---
 name: api
-description: >
-  Use when designing or modifying an HTTP endpoint or its client-side
-  consumption in this service — covers Zod validation at the route boundary,
-  response envelope shape, RESTful naming, auth/security requirements, and
-  pagination.
-tags: [api, rest, zod, openapi, express, jwt, pagination]
+description: "Use when adding or changing an HTTP route or its client — Zod boundary validation, response envelope, REST naming, pagination."
+tags:
+  - api
+  - rest
+  - zod
+  - openapi
+  - express
+  - jwt
+  - pagination
+prevents: unvalidated request input and inconsistent response shapes reaching callers
+signal: silent
+when_to_use: "You are adding or changing an HTTP endpoint in this service, or writing the client code that consumes one. Prevents: unvalidated request input and inconsistent response shapes reaching callers"
+stack:
+  - agnostic
 ---
 
 > Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, `.plans/`, `.specs/`, and `tools/`, which live at the umbrella repo root.

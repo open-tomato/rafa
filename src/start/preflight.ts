@@ -16,23 +16,34 @@
  *      left out, before anything is checked. The id keys the store's
  *      rows. `start()` hands in its session's id (`start/session.ts`),
  *      so the run id a halt names is the session's.
- *   2. **Reads the items** through `loadPlanPrerequisites`: the config's
+ *   2. **Checks the agent roster**, before any item is read and any
+ *      probe is run, through `agents/roster.ts`: every `agent=` the
+ *      still-to-run tasks of this run's checklist ask for, against the
+ *      names a session under `agents.settingSources` would resolve. A
+ *      name none of them answers refuses the run, because the dispatch
+ *      it is routed to exits 1 before any model call
+ *      (`context/workflow.md`). The checklist read is the tracker when
+ *      one is already beside the plan, and the plan otherwise, since the
+ *      tracker is created after this preflight; a document that cannot
+ *      be read is passed over, as the plan's own absence is refused by
+ *      `start()` before this runs.
+ *   3. **Reads the items** through `loadPlanPrerequisites`: the config's
  *      two tiers, with the plan's `PREREQUISITES-<stub>.md` merged in for
  *      this plan alone (`preflight/prerequisites-md.ts`). A file there
  *      that cannot be read refuses the run before any probe runs.
- *   3. **Prints the reminders** that file carries, through `info`: each
+ *   4. **Prints the reminders** that file carries, through `info`: each
  *      `human` item, and each `auto` item with no probe, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing.
- *   4. **Checks every item** through `runPreflight`
+ *   5. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
  *      optional item is warned about as it is found.
- *   5. **Stores a row per check** through `writePreflightChecks`
+ *   6. **Stores a row per check** through `writePreflightChecks`
  *      (`effort/store/preflight.ts`), under the repo root in the SQLite
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
- *   6. **Halts, or answers.** A failed required item, or rows that could
+ *   7. **Halts, or answers.** A failed required item, or rows that could
  *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
  *      code 1. Otherwise the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
@@ -60,6 +71,17 @@
  * halt as well, the halt comes first and the store's refusal replaces the
  * sentence about where the rows went.
  *
+ * An unresolvable agent refuses before any of that, naming the document
+ * it read, the sources it resolved under, and every missing name with
+ * the line that asked for it and the command that would fix it
+ * (`missingAgentLine`):
+ *
+ *     ❌ Refusing to start: PLAN_TRACKER-demo.md names 1 agent(s) no
+ *        loaded scope defines (loop.settingSources: project, local).
+ *        agent "tdd-guide" (line 7) resolves under no loaded scope:
+ *        run `rafa agent vendor tdd-guide`
+ *        Nothing was checked and nothing was dispatched.
+ *
  * ## The notice
  *
  * {@link knownMissingNotice} answers the `known-missing:` lines followed
@@ -72,6 +94,7 @@
  *
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
+import type { ClaudeSettingSource } from '../config.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type {
   PreflightItems,
@@ -81,14 +104,19 @@ import type {
 import type { PreflightOptions, PreflightReport } from '../preflight/run.js';
 
 import { randomUUID } from 'crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename } from 'path';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { missingAgentLine, missingPlanAgents, resolveAgentRoster } from '../agents/roster.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
+import { CONFIG_DEFAULTS } from '../config.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { loadPlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
+import { trackerPathFor } from '../utils/tracker.js';
 
 /**
  * The sentence a task prompt carries after its `known-missing:` lines,
@@ -96,6 +124,17 @@ import { runPreflight } from '../preflight/run.js';
  */
 export const KNOWN_MISSING_SENTENCE = 'A known-missing item is neither a bug to fix nor a credential to patch'
   + ' around: the preflight found it unavailable on this machine, so do the task without it.';
+
+/** What the agent roster is resolved against; see the module note. */
+export interface StartPreflightAgents {
+  /**
+   * What each spawned session loads settings from, `loop.settingSources`
+   * as the run resolved it. The config default when left out.
+   */
+  readonly settingSources?: readonly ClaudeSettingSource[];
+  /** The home whose `.claude/agents` loads under `user`. `homedir()` when left out. */
+  readonly home?: string;
+}
 
 /** What {@link runStartPreflight} checks, and the seams it checks through. */
 export interface StartPreflightOptions {
@@ -111,6 +150,8 @@ export interface StartPreflightOptions {
   readonly newRunId?: () => string;
   /** The clock the stored rows are stamped from. The system clock when left out. */
   readonly now?: PreflightWriterSeams['now'];
+  /** What the agent roster is resolved against. Each field left out is its own default. */
+  readonly agents?: StartPreflightAgents;
 }
 
 /** What a preflight that let the run through answers. */
@@ -134,6 +175,49 @@ export function knownMissingNotice(lines: readonly string[]): readonly string[] 
   return lines.length === 0
     ? []
     : [...lines, KNOWN_MISSING_SENTENCE];
+}
+
+/**
+ * The checklist the roster check reads: the run's tracker when one is
+ * already beside the plan, and the plan itself otherwise, since the
+ * tracker is copied from the plan after this preflight.
+ */
+function agentSourcePath(planPath: string): string {
+  const tracker = trackerPathFor(planPath);
+  return existsSync(tracker)
+    ? tracker
+    : planPath;
+}
+
+/** The text at `path`, or null when nothing readable sits there. */
+function readIfReadable(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refuses the run when a still-to-run task routes to an agent no scope
+ * the run loads defines, naming each with its fix; see the module note.
+ */
+function refuseUnresolvableAgents(options: StartPreflightOptions): void {
+  const path = agentSourcePath(options.planPath);
+  const markdown = readIfReadable(path);
+  if (markdown === null) return;
+
+  const settingSources = options.agents?.settingSources ?? CONFIG_DEFAULTS.settingSources;
+  const roots = { repoRoot: options.repoRoot, home: options.agents?.home ?? homedir() };
+  const missing = missingPlanAgents(markdown, resolveAgentRoster(roots, settingSources));
+  if (missing.length === 0) return;
+
+  throw new CommandExit(1, [
+    `❌ Refusing to start: ${basename(path)} names ${missing.length} agent(s) no loaded scope`
+      + ` defines (loop.settingSources: ${settingSources.join(', ')}).`,
+    ...missing.map((agent) => `   ${missingAgentLine(agent)}`),
+    '   Nothing was checked and nothing was dispatched.',
+  ].join('\n'));
 }
 
 /** The items for this plan, or the refusal of a PREREQUISITES file that cannot be read. */
@@ -191,6 +275,7 @@ function refusalOf(runId: string, halt: string | null, storeProblem: string | nu
  */
 export async function runStartPreflight(options: StartPreflightOptions): Promise<StartPreflight> {
   const runId = (options.newRunId ?? randomUUID)();
+  refuseUnresolvableAgents(options);
   const items = await loadItems(options);
   announceReminders(options.planPath, items.reminders);
 

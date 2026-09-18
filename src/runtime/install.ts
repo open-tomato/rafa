@@ -17,11 +17,14 @@
  *      for `plan.dir`;
  *   3. refuses while a tracker in `plan.dir` has a task left, before
  *      building;
- *   4. runs the build;
- *   5. copies `dist/` into `~/.rafa/runtime/<version>/`;
- *   6. links `~/.rafa/bin/rafa` at the copied `cli.js`, making the bin
+ *   4. refuses while `~/.rafa/runtime/<version>/` is already there,
+ *      unless it was forced, before building;
+ *   5. runs the build;
+ *   6. copies `dist/` into a staging directory beside
+ *      `~/.rafa/runtime/<version>/` and renames it into place;
+ *   7. links `~/.rafa/bin/rafa` at the copied `cli.js`, making the bin
  *      directory when it is missing;
- *   7. logs the path the link resolves to.
+ *   8. logs the path the link resolves to.
  *
  * What was refused or could not run is answered, never written:
  * {@link outcomeProblem} words it, so the script writes it to stderr and
@@ -64,18 +67,38 @@
  * that does not exist holds none. The refusal names every tracker with a
  * task left.
  *
- * ## Replacing a runtime in use
+ * ## A runtime already there refuses, and `--force` replaces it whole
  *
- * The version's directory usually exists already, and a loop may be
- * running from it. So each file is copied under a temporary name beside
- * its destination and renamed over it, and the link is created under a
- * temporary name and renamed over `rafa`: a reader meets the old file or
- * the new one and never a torn one, and a shell meets the old link or the
- * new one and never none. `ln -sf` promises neither, since its `-f`
- * unlinks the old link before it makes the new one (ln(1)). A file the
- * new build no longer writes stays where it is, a stale content-hashed
- * chunk being unreferenced and harmless, and nothing here deletes a
- * directory.
+ * `~/.rafa/runtime/<version>/` holds one version's build, and a loop may
+ * be running from it. Installing a second build under the same version
+ * would swap the runner under that loop, so an install whose version's
+ * directory is already there is refused at the `runtime-exists` reason,
+ * before the build, naming the directory and the version `package.json`
+ * gave. Raising the version in `package.json` gives the new build a
+ * directory of its own; {@link InstallOptions.force} installs over the
+ * old one anyway.
+ *
+ * Forced, the directory is replaced and never merged: nothing the old
+ * build left is kept, so a stale content-hashed chunk, or any other file
+ * planted there, is gone afterwards. The replacement is built beside the
+ * directory rather than into it, so no reader ever meets a half-replaced
+ * runtime: `dist/` is copied into a staging directory in the runtime
+ * root, the old directory is renamed aside, the staging directory is
+ * renamed into its place, and only then is the old one removed. A rename
+ * that fails after the old directory moved aside is answered by renaming
+ * it back, so the directory holds one whole build either way. A loop
+ * reading a file it already opened reads on; a file it opens after the
+ * removal is gone, which is what forcing an install over a live runtime
+ * costs. Measured 2026-09-17 on macOS 25.6 with bun 1.3.14: a descriptor
+ * opened before the swap still read the old file's bytes after that
+ * file's directory had been renamed aside and removed, and opening the
+ * same path afterwards answered `ENOENT`.
+ *
+ * Each file lands inside the staging directory by a rename too
+ * ({@link copyTree}), and the link is created under a temporary name and
+ * renamed over `rafa`, so a shell meets the old link or the new one and
+ * never none. `ln -sf` promises that neither, since its `-f` unlinks the
+ * old link before it makes the new one (ln(1)).
  *
  * ## Seams
  *
@@ -112,6 +135,9 @@ export { RAFA_PACKAGE_NAME };
 /** The link's name inside `~/.rafa/bin`. */
 export const LINK_NAME = 'rafa';
 
+/** How both callers spell {@link InstallOptions.force} on their line. */
+export const FORCE_FLAG = '--force';
+
 export const EXIT_DONE = 0;
 export const EXIT_REFUSED = 1;
 export const EXIT_COULD_NOT_RUN = 2;
@@ -144,6 +170,15 @@ export interface InstallSeams {
   readonly warn: (line: string) => void;
 }
 
+/** What one install is told to do beyond where it reads and writes. */
+export interface InstallOptions {
+  /**
+   * Replace a `~/.rafa/runtime/<version>/` already there, whole, instead
+   * of refusing it; see the module note. False unless it is set.
+   */
+  readonly force?: boolean;
+}
+
 /** A tracker with a task left. */
 export interface OpenTracker {
   /** The tracker's path, relative to the repo root. */
@@ -155,7 +190,10 @@ export interface OpenTracker {
 /** The step an install that could not run stopped at. */
 export type InstallStage = 'manifest' | 'config' | 'trackers' | 'build' | 'copy' | 'link';
 
-/** What one install did. */
+/**
+ * What one install did. A refusal carries the `reason` it refused for: a
+ * tracker with a task left, or a runtime already installed.
+ */
 export type InstallOutcome =
   | {
     readonly kind: 'done';
@@ -172,19 +210,31 @@ export type InstallOutcome =
   }
   | {
     readonly kind: 'refused';
+    readonly reason: 'trackers';
     /** The `plan.dir` looked in, absolute. */
     readonly planDir: string;
     readonly trackers: readonly OpenTracker[];
   }
+  | {
+    readonly kind: 'refused';
+    readonly reason: 'runtime-exists';
+    /** The version `package.json` gave, whose directory is already there. */
+    readonly version: string;
+    /** `~/.rafa/runtime/<version>/`, the directory that is already there. */
+    readonly runtimeDir: string;
+  }
   | { readonly kind: 'failed'; readonly stage: InstallStage; readonly message: string };
+
+/** What a step reached before the build leaves changed, which is nothing. */
+const NOTHING_DONE = 'nothing was built, copied or linked';
 
 /** What a failure at each step has and has not changed. */
 const AFTERMATH: Readonly<Record<InstallStage, string>> = {
-  manifest: 'nothing was built, copied or linked',
-  config: 'nothing was built, copied or linked',
-  trackers: 'nothing was built, copied or linked',
+  manifest: NOTHING_DONE,
+  config: NOTHING_DONE,
+  trackers: NOTHING_DONE,
   build: 'nothing was copied or linked',
-  copy: 'the runtime directory may hold part of this build, and the link was not changed',
+  copy: 'the runtime directory holds the build it held or this one, never a mix, and the link was not changed',
   link: 'the runtime directory holds this build, and the link may not point at it',
 };
 
@@ -220,13 +270,15 @@ export function outcomeProblem(outcome: InstallOutcome, repoRoot: string): strin
     case 'done':
       return null;
     case 'refused':
-      return refusalLines(outcome.trackers, relative(repoRoot, outcome.planDir) || '.');
+      return outcome.reason === 'trackers'
+        ? trackerRefusalLines(outcome.trackers, relative(repoRoot, outcome.planDir) || '.')
+        : runtimeRefusalLines(outcome.runtimeDir, outcome.version);
     case 'failed':
       return [`FAIL — ${outcome.stage}: ${outcome.message}`, `${AFTERMATH[outcome.stage]}.`];
   }
 }
 
-function refusalLines(open: readonly OpenTracker[], planDir: string): string[] {
+function trackerRefusalLines(open: readonly OpenTracker[], planDir: string): string[] {
   return [
     `REFUSED — ${open.length} plan tracker(s) in ${planDir} still hold a task, and a loop may be running from the runtime this would replace:`,
     ...open.map(({ path, task }) => {
@@ -235,7 +287,14 @@ function refusalLines(open: readonly OpenTracker[], planDir: string): string[] {
         : '[ ]';
       return `  ${path}:${task.lineNum + 1}  ${box} ${task.task}`;
     }),
-    `${AFTERMATH.trackers}. Finish those plans, then run it again.`,
+    `${NOTHING_DONE}. Finish those plans, then run it again.`,
+  ];
+}
+
+function runtimeRefusalLines(runtimeDir: string, version: string): string[] {
+  return [
+    `REFUSED — ${runtimeDir} already holds version ${version}, the version in package.json, and a loop may be running from it.`,
+    `${NOTHING_DONE}. Raise the version in package.json, or run it again with ${FORCE_FLAG} to replace that directory whole.`,
   ];
 }
 
@@ -288,6 +347,9 @@ export function readManifestVersion(repoRoot: string): string {
  * over whatever is there, answering how many files it copied. Each lands
  * by a rename, and a file `to` holds that `from` does not stays. An entry
  * that is neither a file nor a directory throws.
+ *
+ * An install copies into a staging directory of its own, so what `to`
+ * held is only ever what an interrupted run left there.
  */
 export function copyTree(from: string, to: string): number {
   mkdirSync(to, { recursive: true });
@@ -307,6 +369,45 @@ export function copyTree(from: string, to: string): number {
     }
   }
   return copied;
+}
+
+/**
+ * Copies `from` into a staging directory beside `to` and renames that
+ * into `to`'s place, replacing whatever `to` held, and answers how many
+ * files it copied. The staging directory is removed on any failure, and
+ * a `to` renamed aside is renamed back when the staging directory could
+ * not take its place, so `to` holds one whole build either way. See the
+ * module note.
+ */
+export function replaceTree(from: string, to: string): number {
+  const staging = temporaryName(to);
+  rmSync(staging, { recursive: true, force: true });
+  try {
+    const copied = copyTree(from, staging);
+    swapIn(staging, to);
+    return copied;
+  } catch (err) {
+    rmSync(staging, { recursive: true, force: true });
+    throw err;
+  }
+}
+
+/** Renames `staging` into `to`'s place and removes what `to` held. */
+function swapIn(staging: string, to: string): void {
+  if (!existsSync(to)) {
+    renameSync(staging, to);
+    return;
+  }
+  const outgoing = `${temporaryName(to)}.outgoing`;
+  rmSync(outgoing, { recursive: true, force: true });
+  renameSync(to, outgoing);
+  try {
+    renameSync(staging, to);
+  } catch (err) {
+    renameSync(outgoing, to);
+    throw err;
+  }
+  rmSync(outgoing, { recursive: true, force: true });
 }
 
 /**
@@ -380,17 +481,19 @@ function textLines(bytes: Uint8Array | undefined): string[] {
 /**
  * Installs one checkout, answering what it did. A step that throws is
  * answered as `failed` at that step; see the module note for the order.
+ * `options.force` replaces a runtime directory already there rather than
+ * refusing it.
  */
-export function installRuntime(seams: InstallSeams): InstallOutcome {
+export function installRuntime(seams: InstallSeams, options: InstallOptions = {}): InstallOutcome {
   try {
-    return runInstall(seams);
+    return runInstall(seams, options);
   } catch (err) {
     if (!(err instanceof StageFailure)) throw err;
     return { kind: 'failed', stage: err.stage, message: err.message };
   }
 }
 
-function runInstall(seams: InstallSeams): InstallOutcome {
+function runInstall(seams: InstallSeams, options: InstallOptions): InstallOutcome {
   const { repoRoot, home, log } = seams;
   const runtimeRoot = join(home, RUNTIME_SUBDIR);
   const linkPath = join(home, RAFA_BIN_DIR, LINK_NAME);
@@ -403,10 +506,14 @@ function runInstall(seams: InstallSeams): InstallOutcome {
   log(`plan dir: ${planDir}`);
 
   const open = inStage('trackers', () => openTrackers(repoRoot, planDir));
-  if (open.length > 0) return { kind: 'refused', planDir, trackers: open };
+  if (open.length > 0) return { kind: 'refused', reason: 'trackers', planDir, trackers: open };
 
   const distDir = join(repoRoot, 'dist');
   const runtimeDir = join(runtimeRoot, version);
+  const installed = existsSync(runtimeDir);
+  if (installed && options.force !== true) {
+    return { kind: 'refused', reason: 'runtime-exists', version, runtimeDir };
+  }
 
   log(`building ${repoRoot}`);
   const code = inStage('build', () => seams.build(repoRoot));
@@ -415,8 +522,10 @@ function runInstall(seams: InstallSeams): InstallOutcome {
     throw new StageFailure('build', `the build exited 0 and left no ${join(distDir, RUNTIME_ENTRY)}`);
   }
 
-  log(`copying ${distDir} into ${runtimeDir}`);
-  const copied = inStage('copy', () => copyTree(distDir, runtimeDir));
+  log(installed
+    ? `copying ${distDir} over ${runtimeDir}, replacing it whole`
+    : `copying ${distDir} into ${runtimeDir}`);
+  const copied = inStage('copy', () => replaceTree(distDir, runtimeDir));
   log(`copied ${copied} file(s)`);
 
   const resolved = inStage('link', () => relink(linkPath, join(runtimeDir, RUNTIME_ENTRY)));

@@ -1,6 +1,6 @@
 /**
  * Reads a command line into what the dispatcher does with it: run a
- * command, answer a help request, or refuse.
+ * command, answer a help request, answer the version, or refuse.
  *
  * Routing is pure. It reads the words and the registry, and writes,
  * imports and runs nothing, so every rule below is held by a case with
@@ -17,6 +17,12 @@
  * `rafa --output json loop start` the subject is `json`.
  *
  * ## What a line routes to
+ *
+ * `--version` before any `--` is read first, ahead of every other rule,
+ * so it is answered whatever else the line carries flags for. It is typed
+ * alone: with no routing word the line asks for the version, and beside
+ * one it is the `unexpected_version` refusal, `rafa loop --version`
+ * included. There is no short form, since `-v` is the verbosity.
  *
  * With no routing word, the line asks for the root help. A first word of
  * `help` asks for help on the words after it, as a `--help` or `-h` flag
@@ -38,8 +44,9 @@
  * (`unknown_subject`), a subject with no word after it
  * (`missing_action`), a subject with a word that is none of its actions
  * (`unknown_action`), a module word naming no mount (`unknown_module`),
- * and a mount with no action word or a word that is none of its actions
- * (`missing_action`, `unknown_action`). A message lists the actions a
+ * a mount with no action word or a word that is none of its actions
+ * (`missing_action`, `unknown_action`), and a `--version` typed beside a
+ * routing word (`unexpected_version`). A message lists the actions a
  * roster shows, so a hidden action is never named in one, and still
  * routes.
  *
@@ -50,13 +57,14 @@
  *
  * ## What a route carries
  *
- * `line` is the whole line without the words routed by, `help` included:
+ * `line` is the whole line without the words routed by, `help` included,
+ * and the whole line for a version route and for the refusal beside it:
  * what `assembleContext` reads the output mode, the verbosity, `args` and
  * `flags` from. `argv`, on a command route, is the words after the last
  * word routed by. `label` is what the start event calls the invocation:
  * the canonical spelling of the command run, with the module and its
- * action for a mounted one, `help` for a help request, and the words
- * typed for a refusal. `alias` is the routing words typed when an alias
+ * action for a mounted one, `help` for a help request, `version` for a
+ * version request, and the words typed for a refusal. `alias` is the routing words typed when an alias
  * routed the line, and null otherwise.
  */
 import type { RafaCommand } from './command.js';
@@ -66,7 +74,19 @@ import { commandSpelling } from './command.js';
 import { HELP_WORD, mountKey } from './registry.js';
 
 /** The refusals a line routes to. */
-export const ROUTE_REFUSALS = ['unknown_subject', 'missing_action', 'unknown_action', 'unknown_module'] as const;
+export const ROUTE_REFUSALS = [
+  'unknown_subject',
+  'missing_action',
+  'unknown_action',
+  'unknown_module',
+  'unexpected_version',
+] as const;
+
+/** The flag asking for the version. There is no short form: `-v` is the verbosity. */
+export const VERSION_FLAG = '--version';
+
+/** What the start event calls an invocation asking for the version. */
+export const VERSION_LABEL = 'version';
 
 /** One of the refusals a line routes to. */
 export type RouteRefusalCode = (typeof ROUTE_REFUSALS)[number];
@@ -90,6 +110,11 @@ interface RouteBase {
   readonly line: readonly string[];
   /** What the start event calls the invocation. */
   readonly label: string;
+}
+
+/** A line asking for the version. */
+export interface VersionRoute extends RouteBase {
+  readonly kind: 'version';
 }
 
 /** A line asking for help. */
@@ -118,13 +143,14 @@ export interface RefusalRoute extends RouteBase {
 }
 
 /** What a line routes to. */
-export type Route = HelpRoute | CommandRoute | RefusalRoute;
+export type Route = HelpRoute | VersionRoute | CommandRoute | RefusalRoute;
 
-/** The routing words of a line, where each sits in it, and whether a help flag was typed. */
+/** The routing words of a line, where each sits in it, and whether a help or version flag was typed. */
 interface LineWords {
   readonly positions: readonly number[];
   readonly words: readonly string[];
   readonly helpFlag: boolean;
+  readonly versionFlag: boolean;
 }
 
 /** How far a line's words resolved. `consumed` counts the routing words read. */
@@ -154,15 +180,18 @@ function isFlag(word: string): boolean {
 function readWords(argv: readonly string[]): LineWords {
   const positions: number[] = [];
   let helpFlag = false;
+  let versionFlag = false;
   for (const [index, word] of argv.entries()) {
     if (word === '--') break;
     if (!isFlag(word)) {
       positions.push(index);
     } else if (word === '--help' || word === '-h') {
       helpFlag = true;
+    } else if (word === VERSION_FLAG) {
+      versionFlag = true;
     }
   }
-  return { positions, words: positions.map((index) => argv[index] ?? ''), helpFlag };
+  return { positions, words: positions.map((index) => argv[index] ?? ''), helpFlag, versionFlag };
 }
 
 /** The actions a roster shows, as a refusal lists them. */
@@ -258,12 +287,27 @@ function resolveExec(
   };
 }
 
+/** The version route, or the refusal for a `--version` typed beside a routing word; see the module note. */
+function routeVersion(words: readonly string[], argv: readonly string[]): Route {
+  const line = [...argv];
+  if (words.length === 0) return { kind: 'version', label: VERSION_LABEL, line };
+  const typed = words.join(' ');
+  return {
+    kind: 'refusal',
+    code: 'unexpected_version',
+    message: `"${VERSION_FLAG}" is typed alone and takes no other word; got "${typed}"`,
+    label: typed,
+    line,
+  };
+}
+
 /**
  * Routes a line's words through a registry: the command to run, the help
  * asked for, or the refusal. See the module note.
  */
 export function routeLine(registry: CommandRegistry, argv: readonly string[]): Route {
-  const { positions, words: allWords, helpFlag } = readWords(argv);
+  const { positions, words: allWords, helpFlag, versionFlag } = readWords(argv);
+  if (versionFlag) return routeVersion(allWords, argv);
   const offset = allWords[0] === HELP_WORD
     ? 1
     : 0;

@@ -1,12 +1,14 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the twenty-four commands it registers: what the registry
+ * declarations of the thirty-three commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
- * the five `issue` actions, `module list` and `module exec` wrap none, and each is held to the
+ * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
+ * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list` and `instinct show`
+ * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
  *
@@ -98,6 +100,15 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'effort report': ['text', 'json'],
   'module list': ['text', 'json'],
   'module exec': ['text', 'json'],
+  'agent vendor': ['text', 'json'],
+  'agent list': ['text', 'json'],
+  'skill check': ['text', 'json'],
+  'skill list': ['text', 'json'],
+  'skill demote': ['text', 'json'],
+  'skill backfill': ['text', 'json'],
+  'instinct check': ['text', 'json'],
+  'instinct list': ['text', 'json'],
+  'instinct show': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
   'self-update': ['text', 'json'],
@@ -122,14 +133,23 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue move': [['id', 'state'], []],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
+  'agent vendor': [['name'], ['force']],
+  'agent list': [[], []],
+  'skill check': [['dir'], ['fix', 'project']],
+  'skill list': [[], ['tier']],
+  'skill demote': [['dir'], ['apply']],
+  'skill backfill': [['dir'], ['propose', 'apply', 'project']],
+  'instinct check': [['dir'], []],
+  'instinct list': [[], []],
+  'instinct show': [['id'], []],
   'init': [[], ['root', 'yes']],
   'doctor': [[], ['plan']],
-  'self-update': [[], []],
+  'self-update': [[], ['force']],
   'describe': [[], []],
 };
 
-/** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `init`, which makes one, and `describe`. */
-const OUTSIDE_A_PROJECT = ['module exec', 'init', 'describe'];
+/** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `skill check` and `instinct check`, whose only project seam is `--project`, `init`, which makes one, and `describe`. */
+const OUTSIDE_A_PROJECT = ['module exec', 'skill check', 'instinct check', 'init', 'describe'];
 
 /** A temporary directory of this file's own, holding the project and the home every routing case dispatches with. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-roster-'));
@@ -174,6 +194,17 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
   ['module list', 'module list', [], ''],
   ['modules exec', 'module exec', [], ''],
+  ['agent vendor tdd-guide', 'agent vendor', ['tdd-guide'], ''],
+  ['agents list', 'agent list', [], ''],
+  ['skill check .claude/skills --fix', 'skill check', ['.claude/skills', '--fix'], ''],
+  ['skills check .claude/skills --project=.', 'skill check', ['.claude/skills', '--project=.'], ''],
+  ['skill list --tier=user', 'skill list', ['--tier=user'], ''],
+  ['skill demote --apply .claude/skills', 'skill demote', ['--apply', '.claude/skills'], ''],
+  ['skill backfill .claude/skills --propose', 'skill backfill', ['.claude/skills', '--propose'], ''],
+  ['instinct check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
+  ['instincts check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
+  ['instinct list', 'instinct list', [], ''],
+  ['instinct show gate-order', 'instinct show', ['gate-order'], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['self-update', 'self-update', [], ''],
@@ -242,12 +273,12 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the five subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module']);
+  it('registers the eight subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module', 'agent', 'skill', 'instinct']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -268,6 +299,15 @@ describe('the core roster', () => {
       'effort report',
       'module list',
       'module exec',
+      'agent vendor',
+      'agent list',
+      'skill check',
+      'skill list',
+      'skill demote',
+      'skill backfill',
+      'instinct check',
+      'instinct list',
+      'instinct show',
       'init',
       'doctor',
       'self-update',
@@ -277,7 +317,7 @@ describe('the core roster', () => {
     expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length);
   });
 
-  it('runs every command inside a project but module exec, init and describe, which declare needsProject false', () => {
+  it('runs every command inside a project but module exec, the two checkers, init and describe, which declare needsProject false', () => {
     const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);

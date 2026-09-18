@@ -1,6 +1,17 @@
 ---
 name: git-workflow
-description: Use when pushing a branch, opening or updating a PR with `gh pr create`, naming a branch, rebasing and hitting conflicts, or force-pushing after a rebase — covers branch/commit/PR conventions, GITHUB_TOKEN workflow-chaining limits, `gh api` with special characters, and orphan-branch/shallow-clone pitfalls.
+description: "Use when pushing a branch, opening or updating a PR, naming a branch, rebasing, or force-pushing after a rebase."
+prevents: duplicate PRs and outbound PR bodies published with leaked references and wrong diff counts
+signal: silent
+when_to_use: "You are naming a branch, pushing it, opening or updating a pull request, or recovering from a rebase. Prevents: duplicate PRs and outbound PR bodies published with leaked references and wrong diff counts"
+tags:
+  - git
+  - workflow
+  - javascript
+  - shell
+stack:
+  - javascript
+  - shell
 ---
 
 # Git Workflow
@@ -123,11 +134,11 @@ Actions performed using the default `GITHUB_TOKEN` (including labels added by `g
 When using `gh api` to post comments or replies containing backticks, `$()`, or other shell metacharacters, security hooks may block the command. Instead of passing the body inline with `-f body="..."`, write a JSON file and use `--input`:
 
 ```bash
-# Write JSON body to a file (use the Write tool, not echo/cat)
-# File: .claude/tmp/reply_body.json
+# Write JSON body to a scratch file (use the Write tool, not echo/cat),
+# somewhere untracked such as reply_body.json under a tmp/ directory
 # {"body": "Your comment with `backticks` and special chars"}
 
-gh api repos/${GH_ORG}/${GH_REPO_NAME}/pulls/123/comments/456/replies --input .claude/tmp/reply_body.json
+gh api repos/${GH_ORG}/${GH_REPO_NAME}/pulls/123/comments/456/replies --input reply_body.json
 ```
 
 ## Force-pushing after rebase with changes ahead and behind head

@@ -9,7 +9,9 @@
  * reads: a flag ahead of the subject beside a flag value typed with a
  * space, an alias spelled as a subject beside that subject with one of
  * its actions, a subject asking for help beside the same subject asked
- * to run.
+ * to run. The version cases sit the same way: `--version` alone beside
+ * `--version` with a routing word after it, and beside the `-v` and `-V`
+ * that are no version flag.
  *
  * Six mutations of `route.ts` were driven on 2026-09-14, one run each
  * over the eight suites under `src/cli/`, with 326 pass before and after
@@ -100,6 +102,8 @@ function summaryOf(route: Route): Record<string, unknown> {
       };
     case 'help':
       return { kind: route.kind, request: requestOf(route.request), label: route.label, line: route.line };
+    case 'version':
+      return { kind: route.kind, label: route.label, line: route.line };
     case 'refusal':
       return { kind: route.kind, code: route.code, message: route.message, label: route.label, line: route.line };
   }
@@ -127,6 +131,11 @@ function ran(
 /** The summary of a help route. */
 function helped(request: string, line: string[]): Record<string, unknown> {
   return { kind: 'help', request, label: 'help', line };
+}
+
+/** The summary of a version route. */
+function versioned(line: string[]): Record<string, unknown> {
+  return { kind: 'version', label: 'version', line };
 }
 
 /** The summary of a refusal route. */
@@ -232,6 +241,36 @@ describe('a line asking for help', () => {
     ],
   ])('asks for help with %s', (_title, argv, expected) => {
     expect(summaryOf(routeLine(REGISTRY, argv))).toEqual(expected);
+  });
+});
+
+describe('a line asking for the version', () => {
+  it.each([
+    ['--version alone', ['--version'], versioned(['--version'])],
+    ['--version beside another flag', ['--output=json', '--version'], versioned(['--output=json', '--version'])],
+    ['--version ahead of the help flag, which it is read before', ['--help', '--version'], versioned(['--help', '--version'])],
+  ])('asks for the version with %s', (_title, argv, expected) => {
+    expect(summaryOf(routeLine(REGISTRY, argv))).toEqual(expected);
+  });
+
+  it.each([
+    ['a subject', ['loop', '--version'], 'loop'],
+    ['a subject and one of its actions', ['loop', 'start', '--version'], 'loop start'],
+    ['the help word', ['help', '--version'], 'help'],
+    ['a word no subject is spelled as', ['bogus', '--version'], 'bogus'],
+  ])('refuses --version beside %s', (_title, argv, typed) => {
+    expect(summaryOf(routeLine(REGISTRY, argv))).toEqual(refused(
+      'unexpected_version',
+      `"--version" is typed alone and takes no other word; got "${typed}"`,
+      typed,
+      argv,
+    ));
+  });
+
+  it('reads no version request from a --version after a -- , nor from the -v the verbosity is spelled', () => {
+    expect(summaryOf(routeLine(REGISTRY, ['--', '--version']))).toEqual(helped('root', ['--', '--version']));
+    expect(summaryOf(routeLine(REGISTRY, ['-v']))).toEqual(helped('root', ['-v']));
+    expect(summaryOf(routeLine(REGISTRY, ['-V']))).toEqual(helped('root', ['-V']));
   });
 });
 
