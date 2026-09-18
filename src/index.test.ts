@@ -530,6 +530,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-sections.js', ['messageOf']],
     ['../config.js', ['ConfigError']],
     ['../effort/store/legacy.js', ['readLegacyStore']],
+    ['../pr/preflight-items.js', ['ghPreflightItems']],
+    ['../pr/provider.js', ['resolvePrProvider']],
     ['../preflight/prerequisites-md.js', ['loadPlanPrerequisites', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
     ['../preflight/run.js', ['PROBE_TIMEOUT_MS', 'runPreflight']],
     ['../project/bin-path.js', ['readBinPath']],

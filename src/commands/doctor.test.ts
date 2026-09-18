@@ -21,6 +21,25 @@
  * the `PATH`. The clock seam answers 0, so every duration reads `0 ms` and
  * a line can be held whole.
  *
+ * ## The automatic items of the pull request provider
+ *
+ * Their cases drive both seams: the `origin` probe answers what the case
+ * plants, and every shell probe is answered from a recorded table, so no
+ * case here spawns git or `gh`. Every other case of this file leaves
+ * `readRemote` at the runner's own, and each plants a world under a
+ * temporary directory with no `origin`, which resolves `pr.provider:
+ * none` and adds no item — which is why their held lines did not move.
+ * Each provider case sits beside a control differing in one thing only:
+ * the remote, the configured provider, or what the `gh` probe answered.
+ *
+ * Three mutations of `src/commands/doctor.ts` were driven against them
+ * on 2026-09-18, each an exact string found once, the file run alone on
+ * a baseline of 23 pass and restored sha256-identical: the items
+ * appended to the required tier instead of prepended reddened 1 case,
+ * the `pr.provider: none` shortcut dropped reddened 1, and the
+ * `readRemote` seam dropped, which sends the probe to the real git in a
+ * temporary directory, reddened 5.
+ *
  * ## Spawned
  *
  * One case runs `bun src/rafa.ts doctor` in two scratch repositories
@@ -32,7 +51,8 @@
  */
 import type { DoctorResult, DoctorSeams } from './doctor.js';
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { ProbeOptions } from '../preflight/run.js';
+import type { PrerequisiteItem } from '../config.js';
+import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,6 +68,12 @@ import { configFilePath } from '../config.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
+import {
+  DEFAULT_GH_HOST,
+  ghAuthItem,
+  ghMissingMessage,
+  ghOnPathItem,
+} from '../pr/preflight-items.js';
 import { readBinPath } from '../project/bin-path.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
@@ -175,6 +201,34 @@ function pathsUnder(root: string): string[] {
 /** The line text mode ends with when the `PATH` order holds. */
 function aheadLine(world: World): string {
   return `${world.rafaBin} is on PATH, and ${world.bunBin} is not ahead of it.`;
+}
+
+/** A GitHub `origin`, as git writes one for an ssh clone. */
+const GITHUB_ORIGIN = 'git@github.com:open-tomato/rafa.git';
+
+/** A probe that passed, answering nothing on stderr. */
+const PASSED: ProbeRun = { exitCode: 0, stderr: '', timedOut: false };
+
+/** The probe of `item`, which every automatic item carries. */
+function probeOf(item: PrerequisiteItem): string {
+  const { probe } = item;
+  if (probe === undefined) throw new Error(`${item.name} carries no probe`);
+  return probe;
+}
+
+/**
+ * Seams whose `origin` probe is `readRemote` and whose shell probes are
+ * answered from `answers`, a probe named by none of them passing. So no
+ * case of the provider spawns git, `gh` or a shell.
+ */
+function ghSeams(readRemote: DoctorSeams['readRemote'], answers: Record<string, ProbeRun> = {}): DoctorSeams {
+  return {
+    readRemote,
+    checks: {
+      now: () => 0,
+      runProbe: (probe) => Promise.resolve(answers[probe] ?? PASSED),
+    },
+  };
 }
 
 describe('the preflight it prints', () => {
@@ -531,6 +585,119 @@ describe('json mode', () => {
     expect(result?.data).toBeUndefined();
     expect(result?.error?.code).toBe('command_exit');
     expect(result?.error?.message).toStartWith('rafa doctor: preflight halted: 1 required item failed\n  tool "needed": probe');
+  });
+});
+
+describe('the automatic items of the pull request provider', () => {
+  it('checks gh on PATH and gh auth status ahead of the configured tier, where a repository with no GitHub origin checks neither', async () => {
+    const world = plantWorld(requiredTool('exit 0'));
+    const controlWorld = plantWorld(requiredTool('exit 0'));
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => null) });
+
+    expect(run.stderr).toBe('');
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toEqual([
+      VERSION_LINE,
+      noPlanHead('3 items checked, 2 of them for the pull request provider'),
+      `  pass    required tool "gh", probe \`${probeOf(ghOnPathItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+      `  pass    required service "https://${DEFAULT_GH_HOST}", probe \`${probeOf(ghAuthItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+      '  pass    required tool "needed", probe `exit 0`, 0 ms',
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(world),
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)).toEqual([
+      VERSION_LINE,
+      noPlanHead('1 item from the config checked'),
+      '  pass    required tool "needed", probe `exit 0`, 0 ms',
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(controlWorld),
+    ]);
+  });
+
+  it('asks about the host origin names, where a configured provider with no origin asks about github.com', async () => {
+    const host = 'github.example.com';
+    const world = plantWorld(['pr:', '  provider: gh']);
+    const controlWorld = plantWorld(['pr:', '  provider: gh']);
+
+    const run = await doctor(world, [], { seams: ghSeams(() => `https://${host}/open-tomato/rafa.git`) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => null) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toContain(`  pass    required service "https://${host}", probe \`${probeOf(ghAuthItem(host))}\`, 0 ms`);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)).toContain(
+      `  pass    required service "https://${DEFAULT_GH_HOST}", probe \`${probeOf(ghAuthItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+    );
+  });
+
+  it('exits 1 with the item remedy when gh is absent, where the same repository with gh present exits 0', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const missing = probeOf(ghOnPathItem(DEFAULT_GH_HOST));
+    const failed = { exitCode: 1, stderr: `${ghMissingMessage(DEFAULT_GH_HOST)}\n`, timedOut: false };
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [missing]: failed }) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toBe([
+      'rafa doctor: preflight halted: 1 required item failed',
+      `  tool "gh": probe \`${missing}\` exited 1: ${ghMissingMessage(DEFAULT_GH_HOST)}`,
+      'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
+      '',
+    ].join('\n'));
+    expect(run.stderr).toContain('gh auth login --hostname github.com');
+    expect(control.exitCode).toBe(0);
+    expect(control.stderr).toBe('');
+  });
+
+  it('reads no origin at all under a configured pr.provider: none, where every other provider reads it once', async () => {
+    const world = plantWorld(['pr:', '  provider: none']);
+    const controlWorld = plantWorld();
+    const reads: string[] = [];
+    const readRemote = (dir: string): string => {
+      reads.push(dir);
+      return GITHUB_ORIGIN;
+    };
+
+    const run = await doctor(world, [], { seams: ghSeams(readRemote) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(readRemote) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toEqual([
+      VERSION_LINE,
+      noPlanHead('nothing to check'),
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(world),
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)[1]).toBe(noPlanHead('2 items checked, 2 of them for the pull request provider'));
+    expect(reads).toEqual([controlWorld.root]);
+  });
+
+  it('counts the provider items in the json result, where a repository with no GitHub origin counts none', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+
+    const run = await doctor(world, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, ['--output=json'], { seams: ghSeams(() => null) });
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    expect(run.exitCode).toBe(0);
+    expect(dataOf(run.stdout)?.automatic).toBe(2);
+    expect(dataOf(run.stdout)?.checks.map((check) => [check.tier, check.item.name])).toEqual([
+      ['required', 'gh'],
+      ['required', `https://${DEFAULT_GH_HOST}`],
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(dataOf(control.stdout)?.automatic).toBe(0);
+    expect(dataOf(control.stdout)?.checks).toEqual([]);
   });
 });
 

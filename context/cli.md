@@ -192,9 +192,12 @@ module's note is the long form.
   the default plan; a plan named that is no file is refused, and with no
   default plan there the config's items are checked alone. `PLAN.md`
   carries no stub, so a plan's `PREREQUISITES-<stub>.md` is merged in
-  through `--plan` only. Every item goes through `runPreflight` in the
-  project root with the context's environment, an optional failure warned
-  about as `loop start` warns. It generates no run id and writes no
+  through `--plan` only. The two automatic items a `gh` pull request
+  provider contributes go ahead of the configured required tier, as
+  `runStartPreflight` puts them, and a configured `pr.provider: none`
+  reads no `origin` at all (`src/pr/preflight-items.ts`). Every item goes
+  through `runPreflight` in the project root with the context's
+  environment, an optional failure warned about as `loop start` warns. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
   refusal, and 0 otherwise. After the report, whatever the preflight did,

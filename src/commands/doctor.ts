@@ -26,7 +26,17 @@
  *      refused. The default plan is named `PLAN.md`, which carries no stub
  *      and so no PREREQUISITES file: `--plan` is how a plan's items reach
  *      the report.
- *   3. **Every item**, through `runPreflight` (`preflight/run.ts`), as
+ *   3. **The pull request provider's automatic items**
+ *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status`
+ *      for `origin`'s host, both REQUIRED, when the provider resolves
+ *      to `gh` (`pr/provider.ts`). They go AHEAD of the configured
+ *      required tier, exactly as `runStartPreflight` puts them
+ *      (`start/preflight.ts`), because this command answers what
+ *      `loop start` would do and would say the wrong thing if it
+ *      checked a different set in a different order. A configured
+ *      `pr.provider: none` contributes none and reads no remote at
+ *      all; every other reading spawns the `origin` probe once.
+ *   4. **Every item**, through `runPreflight` (`preflight/run.ts`), as
  *      `loop start` checks them: each probe in the project root with stdin
  *      closed and the 30-second timeout, a presence check for an item with
  *      no probe, and a warning for each optional item that failed, written
@@ -87,14 +97,16 @@
  *
  * The project, its home and the environment are the dispatcher's
  * (`cli/dispatch.ts`), so a case names them through its options. How a
- * probe and a service request run, the timeout and the clock are
- * {@link DoctorSeams}, each left out being the runner's own.
+ * probe and a service request run, the timeout, the clock and the
+ * `origin` probe the provider is read through are {@link DoctorSeams},
+ * each left out being the runner's own.
  */
 import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { RafaConfig } from '../config.js';
+import type { PrerequisiteItem, RafaConfig } from '../config.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
+import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
-import type { PreflightCheck, PreflightOptions, PreflightReport } from '../preflight/run.js';
+import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { ProjectFound } from '../project/scope.js';
 
@@ -106,6 +118,8 @@ import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError } from '../config.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
+import { ghPreflightItems } from '../pr/preflight-items.js';
+import { resolvePrProvider } from '../pr/provider.js';
 import { loadPlanPrerequisites, mergePlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
 import { readBinPath } from '../project/bin-path.js';
@@ -116,6 +130,8 @@ import { isFile, plural } from './plan/plan-files.js';
 /** How the checks run; see the module note. Each left out is the runner's own. */
 export interface DoctorSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
+  /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
+  readonly readRemote?: ResolvePrProviderOptions['readRemote'];
 }
 
 /** The seams the registered command runs with: the runner's own, every one. */
@@ -131,6 +147,8 @@ export interface DoctorPreflight {
   readonly lookedFor: readonly string[];
   /** The plan's PREREQUISITES file that was merged in, absolute; null when none was. */
   readonly prerequisitesFile: string | null;
+  /** How many of the checked items the pull request provider contributed; 0 or 2. */
+  readonly automatic: number;
   /** Every check, and the halt and the `known-missing:` lines the runner worded. */
   readonly report: PreflightReport;
   /** The steps the PREREQUISITES file names and nothing checks. */
@@ -147,6 +165,8 @@ export interface DoctorResult {
   readonly prerequisitesFile: string | null;
   /** Every check, the required tier first. */
   readonly checks: readonly PreflightCheck[];
+  /** How many of them the pull request provider contributed, which are the first of the required tier. */
+  readonly automatic: number;
   /** The `known-missing:` line of each failed optional item, as every task prompt would carry it. */
   readonly knownMissing: readonly string[];
   /** The steps the PREREQUISITES file names and nothing checks. */
@@ -239,6 +259,20 @@ function mergedFile(plan: string | null): string | null {
     : null;
 }
 
+/** No automatic item, for a provider that contributes none. */
+const NO_AUTOMATIC_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
+
+/**
+ * The REQUIRED items the project's pull request provider contributes,
+ * as `runStartPreflight` builds them; see the module note.
+ */
+function automaticItems(root: string, config: RafaConfig, seams: DoctorSeams): readonly PrerequisiteItem[] {
+  const configured = config.prProvider ?? null;
+  if (configured === 'none') return NO_AUTOMATIC_ITEMS;
+
+  return ghPreflightItems(resolvePrProvider({ configured, dir: root, readRemote: seams.readRemote }));
+}
+
 /** Checks the preflight of the plan the line names; see the module note. */
 async function checkPreflight(context: RafaContext, project: ProjectFound, seams: DoctorSeams): Promise<DoctorPreflight> {
   expectNoArgument(context.args);
@@ -249,12 +283,15 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   const config = resolvedConfig(project, warn);
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
-  const report = await runPreflight(items, { ...seams.checks, cwd: project.root, env: context.env, warn });
+  const automatic = automaticItems(project.root, config, seams);
+  const tiers: PreflightTiers = { required: [...automatic, ...items.required], optional: items.optional };
+  const report = await runPreflight(tiers, { ...seams.checks, cwd: project.root, env: context.env, warn });
   return Object.freeze({
     root: project.root,
     plan,
     lookedFor,
     prerequisitesFile: mergedFile(plan),
+    automatic: automatic.length,
     report,
     reminders: items.reminders,
   });
@@ -292,23 +329,30 @@ function shownPath(path: string, root: string): string {
     : path;
 }
 
+/**
+ * How many items were checked: nothing, `count` of them with `whose`
+ * naming where they came from, or, once the pull request provider
+ * contributed any, how many of the `count` were its.
+ */
+function checkedPhrase(count: number, automatic: number, whose: string): string {
+  if (count === 0) return 'nothing to check';
+  if (automatic === 0) return `${plural(count, 'item')} ${whose}checked`;
+  return `${plural(count, 'item')} checked, ${String(automatic)} of them for the pull request provider`;
+}
+
 /** The head line: the plan or where none was found, the file merged in, and how many items were checked. */
 function headLine(preflight: DoctorPreflight): string {
-  const { root, plan, prerequisitesFile } = preflight;
+  const { root, plan, prerequisitesFile, automatic } = preflight;
   const count = preflight.report.checks.length;
   if (plan === null) {
     const where = preflight.lookedFor.map((path) => shownPath(path, root)).join(' or ');
-    const checked = count === 0
-      ? 'nothing to check'
-      : `${plural(count, 'item')} from the config checked`;
+    const checked = checkedPhrase(count, automatic, 'from the config ');
     return `Preflight with no plan, none being at ${where}: ${checked}, no run started.`;
   }
   const merged = prerequisitesFile === null
     ? ''
     : `, with ${basename(prerequisitesFile)} merged in`;
-  const checked = count === 0
-    ? 'nothing to check'
-    : `${plural(count, 'item')} checked`;
+  const checked = checkedPhrase(count, automatic, '');
   return `Preflight for ${shownPath(plan, root)}${merged}: ${checked}, no run started.`;
 }
 
@@ -367,6 +411,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings): DoctorR
     plan: preflight.plan,
     prerequisitesFile: preflight.prerequisitesFile,
     checks: preflight.report.checks,
+    automatic: preflight.automatic,
     knownMissing: preflight.report.knownMissing,
     reminders: preflight.reminders,
     binPath: install.binPath,
@@ -404,7 +449,9 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
     summary: 'check the prerequisites rafa loop start checks, and the install, starting no run',
     description: 'Checks the prerequisites `rafa loop start` checks before its first session and prints each'
       + ' check, starting no run and storing nothing: the required and optional items of'
-      + ' `.rafa/config.yaml`, with the `PREREQUISITES-<stub>.md` beside the plan merged in. The plan is the'
+      + ' `.rafa/config.yaml`, with the `PREREQUISITES-<stub>.md` beside the plan merged in, and, when the'
+      + ' repository resolves to `pr.provider: gh`, the two required items that provider adds ahead of them:'
+      + ' `gh` on PATH and `gh auth status` for the remote\'s host. The plan is the'
       + ' one `--plan=<file>` names, relative to the project root, or the default plan `rafa loop start`'
       + ` runs. Each probe runs in the project root with stdin closed and a ${String(PROBE_TIMEOUT_MS / 1000)}-second`
       + ' timeout. It exits 1 when a required item fails, naming the item, its probe and its exit code or'
