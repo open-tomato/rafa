@@ -244,15 +244,25 @@ export function trimWhenToUse(description: string, whenToUse: string): string {
     .replace(/\s+$/, '');
 }
 
-/** The failures of a check report, each as one comparable line. */
-function failureLines(issues: readonly CheckIssue[]): readonly string[] {
+/**
+ * The failures of a check report, each as one comparable line.
+ *
+ * Exported for `./propose.ts`, which makes the same before-and-after
+ * reading over the same files: two spellings of a failure line would
+ * let the two halves of the backfill disagree about whether a write
+ * made a file worse.
+ */
+export function failureLines(issues: readonly CheckIssue[]): readonly string[] {
   return issues
     .filter((issue) => issue.severity === 'failure')
     .map((issue) => `${issue.stage} ${issue.code} ${issue.field ?? '-'}: ${issue.message}`);
 }
 
-/** The entries of `after` that `before` does not already hold. */
-function addedFailures(
+/**
+ * The entries of `after` that `before` does not already hold. Exported
+ * beside {@link failureLines} and for the same reason.
+ */
+export function addedFailures(
   before: readonly string[],
   after: readonly string[],
 ): readonly string[] {
