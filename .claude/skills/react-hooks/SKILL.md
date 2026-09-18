@@ -1,6 +1,9 @@
 ---
 name: react-hooks
-description: Use when setState (setForm/setX) is called inside useEffect — resetting modal/drawer form state on an `open` prop, or syncing/filtering one piece of state from another — or when the IDE/ESLint flags "Calling setState synchronously within an effect can trigger cascading renders", react-hooks/exhaustive-deps, or stale state when reopening a modal for a different item.
+description: "Use when an effect calls setState — reset-on-open, derived state, or a cascading-renders or exhaustive-deps warning."
+prevents: stale per-session state and cascading re-renders from setState called inside an effect
+signal: loud
+when_to_use: "Recognize these shapes:. Prevents: stale per-session state and cascading re-renders from setState called inside an effect"
 ---
 
 > Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.

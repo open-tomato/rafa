@@ -1,10 +1,9 @@
 ---
 name: react-query
-description: >
-  Use this skill when adding data fetching, caching, polling, or server-state
-  management to a React app that consumes this library. Covers useQuery,
-  useMutation, provider setup, query key conventions, and live-polling
-  patterns for job status (via the components-library/cache subpath export).
+description: "Use when adding data fetching, caching, polling, or server-state management via components-library/cache."
+prevents: server state duplicated into components and caches that never invalidate after a mutation
+signal: silent
+when_to_use: "You are wiring data fetching, caching, polling, or server-state into a React app that consumes this library. Prevents: server state duplicated into components and caches that never invalidate after a mutation"
 ---
 
 > Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.

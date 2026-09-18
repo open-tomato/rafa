@@ -1,6 +1,9 @@
 ---
 name: dev-planner
-description: Use when producing or parsing a plan document (PLAN-<stub>.md, PREREQUISITES-<stub>.md) for the rafa agent loop — establishes the structured plan format with fenced blocks, task declaration syntax, and report format the loop parses and the planner generates.
+description: "Use when writing or parsing a PLAN-<stub>.md for the rafa loop — block syntax, task lines, and report format."
+prevents: "plan tasks the loop's parser silently skips because they are shaped wrong"
+signal: silent
+when_to_use: "You are generating a plan document for the rafa loop, or reading one the loop will parse. Prevents: plan tasks the loop's parser silently skips because they are shaped wrong"
 ---
 
 # dev-planner — Structured Plan Format Specification

@@ -1,11 +1,17 @@
 ---
 name: documentation
-description: >
-  Use when adding or updating TSDoc comments, wiring TypeDoc into the
-  service, documenting an Express route with OpenAPI/Swagger, or
-  deciding whether a doc belongs in the gitignored `.docs/` output or the
-  tracked `docs/` tree.
-tags: [tsdoc, typedoc, openapi, swagger, express, mcp, react]
+description: "Use when writing TSDoc, wiring TypeDoc, documenting a route with OpenAPI, or choosing between `.docs/` and `docs/`."
+tags:
+  - tsdoc
+  - typedoc
+  - openapi
+  - swagger
+  - express
+  - mcp
+  - react
+prevents: undocumented code and a docs command that wipes the tracked docs tree while exiting clean
+signal: silent
+when_to_use: "You are writing TSDoc, wiring documentation tooling, or deciding where a new document belongs. Prevents: undocumented code and a docs command that wipes the tracked docs tree while exiting clean"
 ---
 
 > Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, `.plans/`, `.specs/`, and `tools/`, which live at the umbrella repo root.

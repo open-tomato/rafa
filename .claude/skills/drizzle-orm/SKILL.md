@@ -1,6 +1,9 @@
 ---
 name: drizzle-orm
-description: Use when touching the database layer in any service — generating Drizzle SQL migrations, or resolving a Drizzle migration conflict (duplicate index, journal/snapshot mismatch) during a rebase.
+description: Use when touching the database layer — generating Drizzle migrations or resolving migration conflicts during a rebase.
+prevents: hand-written migrations and a journal or snapshot chain broken by a rebase
+signal: loud
+when_to_use: "You are changing the database schema, generating a migration, or untangling migration files during a rebase. Prevents: hand-written migrations and a journal or snapshot chain broken by a rebase"
 ---
 
 > Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, `.plans/`, `.specs/`, and `tools/`, which live at the umbrella repo root.

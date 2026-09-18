@@ -1,6 +1,9 @@
 ---
 name: git-workflow
-description: Use when pushing a branch, opening or updating a PR with `gh pr create`, naming a branch, rebasing and hitting conflicts, or force-pushing after a rebase — covers branch/commit/PR conventions, GITHUB_TOKEN workflow-chaining limits, `gh api` with special characters, and orphan-branch/shallow-clone pitfalls.
+description: "Use when pushing a branch, opening or updating a PR, naming a branch, rebasing, or force-pushing after a rebase."
+prevents: duplicate PRs and outbound PR bodies published with leaked references and wrong diff counts
+signal: silent
+when_to_use: "You are naming a branch, pushing it, opening or updating a pull request, or recovering from a rebase. Prevents: duplicate PRs and outbound PR bodies published with leaked references and wrong diff counts"
 ---
 
 # Git Workflow

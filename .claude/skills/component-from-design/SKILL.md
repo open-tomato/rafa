@@ -1,6 +1,9 @@
 ---
 name: component-from-design
-description: Use when implementing any component in this library from a design source — the bundle catalog page staged at design/bundle/ (rosetta-stone spec loop), the inline-styled design pages under design/pages/ (auth, topbar, whole-app screens), or a prose spec (the component's spec doc, when present — e.g. docs/specs/UI-<Name>.md). Turns the source into a verifiable atom/molecule/organism with CVA variants, a Storybook story per variant, a side-by-side screenshot comparison where a design artboard exists, and visual regression baselines.
+description: "Use when turning a design source (bundle spec, design page, or prose spec) into a CVA component with stories and baselines."
+prevents: a component shipped that silently diverges from the design source it claims to implement
+signal: silent
+when_to_use: "Three source situations, one skill. Prevents: a component shipped that silently diverges from the design source it claims to implement"
 ---
 
 > Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
