@@ -20,6 +20,7 @@ import { describe, expect, it } from 'bun:test';
 
 import * as checks from './checks.js';
 import * as gh from './gh.js';
+import * as provider from './provider.js';
 import * as types from './types.js';
 
 import * as barrel from './index.js';
@@ -44,6 +45,15 @@ describe('the pull request barrel', () => {
     expect(barrel.ghAuthOk).toBe(gh.ghAuthOk);
     expect(barrel.ghAuthOkIn).toBe(gh.ghAuthOkIn);
     expect(barrel.ghPullRequestsIn).toBe(gh.ghPullRequestsIn);
+  });
+
+  it('answers the provider readers of ./provider.js themselves', () => {
+    expect(barrel.isGitHubRemote).toBe(provider.isGitHubRemote);
+    expect(barrel.PR_NEEDS_GH).toBe(provider.PR_NEEDS_GH);
+    expect(barrel.PR_REFUSAL_EXIT).toBe(provider.PR_REFUSAL_EXIT);
+    expect(barrel.remoteHost).toBe(provider.remoteHost);
+    expect(barrel.requireGhProvider).toBe(provider.requireGhProvider);
+    expect(barrel.resolvePrProvider).toBe(provider.resolvePrProvider);
   });
 
   it('keeps the recorded fake out of the import graph of the loop', () => {

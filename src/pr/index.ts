@@ -4,8 +4,10 @@
  * `src/utils/pr.ts`, deleted with this barrel, was the one module the
  * wrap-up stage reached `gh` through, and it named the CLI in every
  * signature. This barrel is what replaced it: `./types.js` declares what a provider answers, `./gh.js` is the
- * adapter over the GitHub CLI, and `./checks.js` holds the check-row
- * readers, which are pure and belong to no provider.
+ * adapter over the GitHub CLI, `./checks.js` holds the check-row
+ * readers, which are pure and belong to no provider, and
+ * `./provider.js` answers which provider a repository gets and holds
+ * the one exit-2 refusal every `pr` action shares.
  *
  * It is a barrel, so it is imported as `../pr/index.js` and never as
  * `../pr.js` (`context/source.md`). It re-exports and defines nothing:
@@ -45,6 +47,12 @@ export type {
   PullRequestSummary,
 } from './types.js';
 export type { GhPullRequestsOptions } from './gh.js';
+export type {
+  GhProviderReading,
+  PrProviderReading,
+  PrProviderSource,
+  ResolvePrProviderOptions,
+} from './provider.js';
 
 export {
   classifyState,
@@ -56,3 +64,11 @@ export {
 } from './checks.js';
 export { isMergeMethod, MERGE_METHODS } from './types.js';
 export { createGhPullRequests, ghAuthOk, ghAuthOkIn, ghPullRequestsIn } from './gh.js';
+export {
+  isGitHubRemote,
+  PR_NEEDS_GH,
+  PR_REFUSAL_EXIT,
+  remoteHost,
+  requireGhProvider,
+  resolvePrProvider,
+} from './provider.js';
