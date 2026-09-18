@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project` |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`, and `skill list`, the skills each tier of `src/schema/tiers.ts` registers |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
@@ -48,13 +48,14 @@ module's note is the long form.
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment` and `issue move`;
   `effort collect`, `effort report`, `module list`, `module exec`,
-  `agent vendor`, `agent list`, `skill check`, `instinct check`, `init`,
+  `agent vendor`, `agent list`, `skill check`, `skill list`,
+  `instinct check`, `init`,
   `doctor`, `self-update`, `usage` and `describe`. The subjects are `plan`,
   `loop`, `issue`, `effort`, `module`, `agent`, `skill` and `instinct`: a
   subject is declared with its first action, never ahead of it.
-  `skill index`, `skill list`, `instinct list`, `instinct show`,
-  `instinct flag` and `instinct promote` are in the command tree and are
-  registered by none of it yet, so no roster names them.
+  `skill index`, `instinct list`, `instinct show`, `instinct flag` and
+  `instinct promote` are in the command tree and are registered by none
+  of it yet, so no roster names them.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
@@ -296,6 +297,23 @@ module's note is the long form.
   `rafa skill check --help` draws `[--project=<string>]` where the
   refusals' usage line says `[--project=<root>]`, as `agent vendor`
   draws `<name>` where its own says `<name>...`.
+- **`skill list [--tier=project|rafa|user]` lists what each tier
+  registers** (`src/commands/skill/list.ts`). The tiers are
+  `src/schema/tiers.ts`'s — `<root>/.claude/skills`, `skills/` beside
+  the running `cli.js`, and `~/.claude/skills`, in that order — and one
+  row per skill names its tier, the `stack` its frontmatter carries and
+  whether it passes `checkDirectory`, with the number of failures beside
+  a row that does not. Unlike the two checkers it runs INSIDE a project,
+  since the project tier is one of the three, and it reads the home off
+  the project the dispatcher resolved; the rafa tier is measured from
+  `Bun.main`, which is the command factory's one seam. The project tier
+  is checked against the project and the other two against none, so a
+  body naming a project path is a warning there rather than a failure.
+  A tier whose directory is absent prints its path and
+  `(no such directory)`. The exit code is 0 whatever the rows say — the
+  listing reports and `skill check` gates — and exit code 1 is kept for
+  a positional word and a `--tier` that is no tier. In json mode the
+  tiers, their rows and the two counts are the result's `data`.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and

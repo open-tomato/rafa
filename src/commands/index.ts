@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the twenty-eight registered so far wrap a
+ * of each is its command. Five of the twenty-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -30,7 +30,9 @@
  * the mounts the dispatcher made, nor `agent vendor` and `agent list`,
  * which copy and read agent definitions through `src/agents/roster.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
- * through `src/check/run.ts` and share `commands/check-report.ts`.
+ * through `src/check/run.ts` and share `commands/check-report.ts`, nor
+ * `skill list`, which runs those checks over the tiers
+ * `src/schema/tiers.ts` resolves.
  *
  * ## What is registered
  *
@@ -112,6 +114,7 @@ import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
 import selfUpdate from './self-update.js';
 import skillCheck from './skill/check.js';
+import skillList from './skill/list.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -122,7 +125,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
-  { name: 'skill', summary: 'check a skills directory: layout, schema, references and locality' },
+  { name: 'skill', summary: 'check a skills directory; list the skills each tier registers' },
   { name: 'instinct', summary: 'check an instincts directory against the instinct schema' },
 ]);
 
@@ -150,6 +153,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   agentVendor,
   agentList,
   skillCheck,
+  skillList,
   instinctCheck,
   init,
   doctor,
