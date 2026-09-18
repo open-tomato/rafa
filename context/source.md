@@ -18,6 +18,18 @@ the shapes the lint config forces.
   one: `./types.js` before `../../config.js`, the reverse of plain name
   order.
 
+### The size cap no gate reads
+
+**The 800-line cap is a convention only.** `eslint.base.mjs`,
+`eslint.config.mjs` and `sharedRules.mjs` carry no `max-lines` rule, so
+nothing refuses an oversized module and a file crosses the cap without
+any capture going red. `src/check/references.ts` is 825 lines at
+`12e6d17`, pushed over by its own ~130-line note recording measured
+corpus readings. Count the file with `wc -l` when a task adds to one
+already near the cap; a module that has to grow puts the new concern in
+a new file, and a note that has outgrown its module can move to the
+`context/` page that owns the subject.
+
 ### Shapes the lint config forces
 
 - **`@typescript-eslint/no-unused-vars` has no ignore pattern and no

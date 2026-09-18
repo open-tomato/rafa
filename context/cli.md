@@ -287,6 +287,20 @@ module's note is the long form.
   `missing-tool-off-stack`, a warning, because the machine the run
   happened on need not install a stack-gated skill's toolchain. Nothing
   else the resolution and locality stages judge moves with the `stack`.
+  A failing-file count is therefore a reading about the `PATH` it ran
+  under and about nothing else. The same 221 files of the user tier
+  answered 1 failing under one session's `PATH` and 9 under another's,
+  the difference being nine off-stack toolchains that resolved in the
+  first; so record the `PATH` beside any such count, and compare two
+  counts only when both were taken under the same one.
+  `--project` carries ONE root and knows no subpackage scope, so a body
+  path a skill's own prose scopes one directory down — a borrowed
+  cross-project skill declaring `Scope: packages/ui/` — resolves
+  against neither tier and fails in every checkout that bundles it.
+  The bundled cross-project skills have the leading directory stripped
+  from each such mention for that reason, leaving the filename, which
+  `isProjectPath` no longer reads as a path for want of a separator;
+  restoring the directory reddens both tiers.
   `--fix` fills `tags` and `stack` on a file whose only failures are
   those two missing fields, through `src/schema/frontmatter.ts`, so the
   body survives byte for byte, and the report is the re-check of what
@@ -358,6 +372,15 @@ module's note is the long form.
   whose record the checker fails are each refused ALONE, so one stale
   row does not throw away a review of 124. A second `--apply` reads the
   moved rows as `done` and changes nothing.
+  `skill backfill` rewrites the frontmatter of every skill the demotion
+  KEPT, so once it has run every surviving row of that report carries a
+  stale hash, and a re-`--apply` answers a wall of `file changed since
+  the report was written` that is hash drift and no reading at all
+  about the demotion. To count afterwards what a report turned into,
+  read the report with `parseDemotionReport` and `effectiveVerdict` and
+  match each observation row against the instinct scope's
+  `evidence[].path` through `readFrontmatter`; never re-run `--apply`
+  to measure.
   The exit code is the number of rows refused, capped at 255, and 1 is
   kept for the refusals above and for no directory, a second word and
   an `--apply` that read the directory as its value. In json mode the

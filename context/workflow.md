@@ -82,6 +82,16 @@ or a spec, and nothing reviews their text: leave a plan's or a spec's
 illustrative text, and a test quoting it verbatim, alone when a sweep
 turns up its subject.
 
+**The loop owns staging, so a task's own work is always unstaged.** No
+task runs `git add`; the loop stages and commits after the session ends.
+That puts every edit a task has made in the blast radius of
+`git checkout <file>` and `git restore <file>`, which restore from
+`HEAD` and not from the working tree of a moment ago — a task that
+mutates a module to prove a test reddens and then "reverts" that way
+throws away its own implementation along with the mutation. Copy the
+file to a scratch path first, restore from the copy, and verify with
+`shasum -c`.
+
 **`progress.txt` is not tracked**, living only via `.gitignore`. It is
 derived: `src/utils/progress.ts` rewrites it whole from the store's `findings`
 rows before every dispatch, so a render over an empty store blanks what a

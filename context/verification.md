@@ -29,8 +29,24 @@ when any test fails.
 
 **A green gate is a zero exit code.** Capture the exit code beside the
 gate name, not a word from the output. The test runner writes pass/fail
-counts after all tests complete, and its order is deterministic — measure
-the same gate twice and the counts move only when a test's result changed.
+counts after all tests complete, and its order is deterministic, so two
+runs of the same tree move only where a case reads an input the tree
+does not own — which one case does, below.
+
+**One case reads a live directory and can redden on a clean tree.**
+`src/tests/parity-differential.test.ts` runs the collector twice, once
+per backend, over `~/.claude/projects/-Users-marcos-projects-agentic-research`,
+and the sibling runs its own loop: a session appending to its `.jsonl`
+between the two collections changes `sizeBytes` and `modifiedAt`, and
+`holds every session row byte-identical between backends, keyed by
+session id` fails on those two fields alone. Measured 2026-09-18 at
+`12e6d17`: the full suite 4799 pass, 1 skip, 1 fail, that case, and the
+file alone 3 pass, 1 fail, the same case. So a single red count is not
+yet a reading about the change. Separate the two by re-running that file
+and diffing the two payloads the failure prints — a difference confined to
+`sizeBytes` and `modifiedAt` is the race, and any other field is a real
+parity failure. Do NOT reach for a stash-and-re-run to prove it
+pre-existing: that is a second full suite against a moving input.
 
 **Inside a Claude Code session, `bun test` names failures only.** The
 session sets `CLAUDECODE`, and with it set the runner prints no `(pass)`
