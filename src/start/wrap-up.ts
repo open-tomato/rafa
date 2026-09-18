@@ -17,6 +17,7 @@
 import type { ClaudeSettingSource } from '../config.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { ghPullRequestsIn } from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
@@ -40,6 +41,13 @@ import { withStamp } from './stamp.js';
  * stage, and a `stage` or `task` rendering holds one stage, or one
  * task line.
  *
+ * The merge-conflict bullet is NOT written here: it is
+ * `mechanicalConflictBullet()` from `pr/conflict-sentence.ts`, the one
+ * source the pinned resolve plans read the same sentence from
+ * (`pr/plans/load.ts`), so this prompt and those plans cannot drift on
+ * what an agent does with a conflicted lockfile. It sits mid-list, and
+ * the first line above it stays the classifier key.
+ *
  * `openPullRequest` is the branch's open PR as the loop read it before
  * the session, or null when it found none. The session is told which
  * rather than asked to look, so whether to create or to edit is decided
@@ -61,7 +69,7 @@ export function buildWrapUpPrompt(
     '* Use the plan title as the PR title, include the issue reference if you found it, e.g. "Implement user authentication (#42)".',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
     '* BEFORE pushing, bring the branch up to date with the base: `git fetch origin main` then `git merge origin/main`. A branch that conflicts with main gets NO CI run at all — GitHub cannot build `refs/pull/<n>/merge` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan\'s context is still loaded, is the cheapest place it will ever be.',
-    '* Resolve MECHANICAL conflicts yourself and do not stop for them: dependency version bumps (take the base\'s version unless this branch deliberately pinned it, and say which in the commit), lockfiles, generated artifacts, and complementary additions where both sides appended different material to the same file (keep BOTH). Stop only for a genuine semantic conflict — two sides changing the same behaviour incompatibly. In that case commit nothing, leave the branch as it is, and report the conflicting paths and both sides\' intent, so a human decides.',
+    mechanicalConflictBullet(),
     '* If the merge touched `bun.lock` or any `package.json`, run `bun install --frozen-lockfile` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base\'s copy (`git checkout origin/main -- bun.lock`), run a plain `bun install` so this branch\'s own dependencies are re-added, and confirm the frozen run then passes.',
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
     pullRequestStep(branch, openPullRequest),

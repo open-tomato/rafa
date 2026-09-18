@@ -87,12 +87,18 @@
  * pick the file would mean a hand-edited comment choosing which plan
  * runs.
  *
- * `conflictSentence` is a PARAMETER rather than a constant here for the
- * same reason the sentence is being lifted out of `buildWrapUpPrompt`
- * (`src/start/wrap-up.ts`): the wrap-up prompt and these plans must say
- * the same thing about a mechanical conflict, and the only way two
- * readers cannot drift is one source. This module is a reader of that
- * source, not a second copy of it.
+ * The conflict sentence is NOT written here. It lives in
+ * `../conflict-sentence.ts`, the one source `buildWrapUpPrompt`
+ * (`src/start/wrap-up.ts`) reads it from as well: the wrap-up prompt
+ * and these plans must say the same thing about a mechanical conflict,
+ * and the only way two readers cannot drift is one source. This module
+ * is a reader of that source, not a second copy of it.
+ *
+ * `PinnedPlanFill.conflictSentence` stays an OPTIONAL override of that
+ * default so a case can drive a sentence it can tell apart from the
+ * shipped one — a fill test asserting the default text would pass on a
+ * module that inlined its own copy of it, because the two strings would
+ * be equal. Nothing in the product passes it.
  */
 import type { TriageClass } from '../triage/classes.js';
 import type { TriageBlock } from '../triage/comment.js';
@@ -101,6 +107,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { MECHANICAL_CONFLICT_SENTENCE } from '../conflict-sentence.js';
 import { DEPENDENCY_BUMP_SIMPLE_CLASSES, SIMPLE_TRIAGE_CLASSES } from '../triage/classes.js';
 
 /** This module's own directory, the default both lookups start from. */
@@ -239,10 +246,11 @@ export interface PinnedPlanFill {
   /** The `rafa:triage` block the last assessment stored, fields and all. */
   readonly block: TriageBlock;
   /**
-   * The mechanical-conflict sentence, from the one module the wrap-up
-   * prompt reads it from too; see the module note.
+   * An override of {@link MECHANICAL_CONFLICT_SENTENCE}, the sentence
+   * the wrap-up prompt reads from the same module. Omitted outside
+   * tests; see the module note.
    */
-  readonly conflictSentence: string;
+  readonly conflictSentence?: string | undefined;
 }
 
 /** The conflicting paths as a plan spells them: each in backticks, comma-joined. */
@@ -260,7 +268,7 @@ function conflictFiles(files: readonly string[] | null): string {
  */
 export function pinnedPlanValues(fill: PinnedPlanFill): Record<string, string> {
   return {
-    [CONFLICT_SENTENCE_SLOT]: fill.conflictSentence,
+    [CONFLICT_SENTENCE_SLOT]: fill.conflictSentence ?? MECHANICAL_CONFLICT_SENTENCE,
     [CONFLICT_FILES_SLOT]: conflictFiles(fill.block.files),
   };
 }
