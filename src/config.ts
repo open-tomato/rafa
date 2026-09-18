@@ -22,7 +22,13 @@
  * The reader is three modules, and a name moving between them is a
  * refactor, never a change of behaviour. This file is the whole public
  * surface: everything the other two export that a caller reads is
- * re-exported here, so nothing outside the trio imports a sibling.
+ * re-exported here, so nothing outside the trio imports a sibling. The
+ * one exception is `MergeMethod`, which `config-sections.ts` re-exports
+ * from `pr/types.ts` so `config-schema.ts` can type a field with it. The
+ * pull request port owns that name, a caller reading
+ * {@link RafaConfig.prMergeMethod} imports it from `./pr/index.js`, and
+ * re-exporting it here would make the config a second place to learn it
+ * from.
  *
  *   - `config-sections.ts` holds every rule about a VALUE: the readers,
  *     the closed lists of values, the prerequisite item and module
@@ -38,10 +44,11 @@
  *
  * The split is what keeps each under the 800-line cap of
  * `context/source.md`, which no gate reads. Measured with `wc -l` at the
- * commit that split them: `config.ts` is 488 lines and
- * `config-schema.ts` is 330. A new setting is one field, one default and
- * one spec in `config-schema.ts`, and one line in {@link readLayer}'s
- * layer literal here; the literal is exhaustive on purpose, so a setting
+ * commit that added the `pr` section: `config.ts` is 506 lines,
+ * `config-schema.ts` 396 and `config-sections.ts` 478. A new setting is
+ * one field, one default and one spec in `config-schema.ts`, its reader
+ * in `config-sections.ts`, and one line in {@link readLayer}'s layer
+ * literal here; the literal is exhaustive on purpose, so a setting
  * added there and forgotten here does not compile.
  *
  * {@link parseConfigText} turns YAML text into one file layer and
@@ -82,6 +89,11 @@
  * YAML makes `null` of a key whose children are all commented out —
  * `plan:` above `  # inject: full` parses to `{ plan: null }` — and
  * refusing it would punish the commonest edit a config file receives.
+ * Two settings RESOLVE to null, `pr.provider` and `pr.base`, and the
+ * rule holds for them unchanged: a file naming one with no value is
+ * silent, and silence there resolves to the same null from the defaults
+ * layer, reported as `default` rather than `file`. What null means to a
+ * caller is `config-schema.ts`'s to say.
  *
  * A setting's dotted path is built by joining keys, so `plan.inject`
  * written flat at the top level reaches the same setting as `inject`
@@ -163,6 +175,7 @@ export type {
   OutputMode,
   PrerequisiteItem,
   PrerequisiteKind,
+  PrProvider,
   StoreBackend,
 } from './config-sections.js';
 export {
@@ -171,6 +184,7 @@ export {
   INJECT_MODES,
   MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
+  PR_PROVIDERS,
   PREREQUISITE_KINDS,
   STORE_BACKENDS,
 } from './config-sections.js';
@@ -307,6 +321,10 @@ function readLayer(
     modules: read('modules'),
     allowList: read('allowList'),
     settingSources: read('settingSources'),
+    prProvider: read('prProvider'),
+    prMergeMethod: read('prMergeMethod'),
+    prBase: read('prBase'),
+    prResolveBudget: read('prResolveBudget'),
   };
   return { layer, problems, extras };
 }

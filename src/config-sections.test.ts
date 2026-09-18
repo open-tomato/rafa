@@ -29,15 +29,18 @@ import {
   flag,
   isMapping,
   listOf,
+  mergeMethod,
   MODULE_SOURCE_KINDS,
   moduleSource,
   oneOf,
   optionalPrerequisite,
+  PR_PROVIDERS,
   PREREQUISITE_KINDS,
   requiredPrerequisite,
   STORE_BACKENDS,
   subsetOf,
   text,
+  usdAmount,
 } from './config-sections.js';
 
 /** Where every case reads its value. */
@@ -217,6 +220,104 @@ describe('subsetOf', () => {
     expect(problemsOf(sources, ['project', 'local'])).toEqual([
       'F: s is a list, expected a comma-separated subset of: user, project, local',
     ]);
+  });
+});
+
+/** The refusal every unusable dollar amount is named with. */
+const USD_EXPECTED = 'a number of US dollars above zero, '
+  + 'at most six digits either side of the point';
+
+describe('the pr provider reader', () => {
+  const provider = oneOf(PR_PROVIDERS);
+
+  it('accepts each of the two providers as itself', () => {
+    expect(PR_PROVIDERS.map((value) => valueOf(provider, value))).toEqual(['gh', 'none']);
+  });
+
+  it.each([
+    ['a different case', 'GH', '"GH"'],
+    ['the host rather than the CLI', 'github', '"github"'],
+    ['a provider nothing implements', 'gitlab', '"gitlab"'],
+    ['a YAML null, which the layer reads as silence', null, 'null'],
+    ['a boolean', false, 'false'],
+  ])('refuses %s, naming both providers', (_label, raw, found) => {
+    expect(problemsOf(provider, raw)).toEqual([
+      `F: s is ${found}, expected one of: gh, none`,
+    ]);
+  });
+
+  it('reads a file spelling none as the provider, not as no value', () => {
+    // YAML spells null `~`, `null` or nothing at all, so `provider: none`
+    // is the plain string and reaches the reader as a value. Measured on
+    // bun 1.3.14.
+    const parsed = Bun.YAML.parse('provider: none\n') as { provider: unknown };
+
+    expect(parsed.provider).toBe('none');
+    expect(valueOf(provider, parsed.provider)).toBe('none');
+  });
+});
+
+describe('mergeMethod', () => {
+  it('accepts each of the pull request port three methods as itself', () => {
+    const methods = ['squash', 'merge', 'rebase'];
+
+    expect(methods.map((raw) => valueOf(mergeMethod, raw))).toEqual(methods);
+  });
+
+  it.each([
+    ['a different case', 'Squash', '"Squash"'],
+    ['a method gh pr merge has not', 'ff-only', '"ff-only"'],
+    ['the flag rather than its value', '--squash', '"--squash"'],
+    ['a list of methods', ['squash'], 'a list'],
+    ['null', null, 'null'],
+  ])('refuses %s, naming the three in the order the port lists them', (_label, raw, found) => {
+    expect(problemsOf(mergeMethod, raw)).toEqual([
+      `F: s is ${found}, expected one of: squash, merge, rebase`,
+    ]);
+  });
+});
+
+describe('usdAmount', () => {
+  it.each([[2], [0.5], [0.01], [0.000001], [999999.999999]])('accepts %p dollars as itself', (raw) => {
+    expect(valueOf(usdAmount, raw)).toBe(raw);
+  });
+
+  it.each([
+    ['zero, which no session could run under', 0, '0'],
+    ['a negative amount', -1, '-1'],
+    ['more than six whole digits', 1000000, '1000000'],
+    ['more than six decimal places', 0.0000001, '1e-7'],
+    ['an amount String writes with an exponent', 1e21, '1e+21'],
+    ['a string spelled like a number', '2', '"2"'],
+    ['a string carrying the currency', '$2', '"$2"'],
+    ['a boolean', true, 'true'],
+    ['null', null, 'null'],
+    ['a list', [2], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(usdAmount, raw)).toEqual([`F: s is ${found}, expected ${USD_EXPECTED}`]);
+  });
+
+  it.each([
+    ['.inf', 'Infinity'],
+    ['-.inf', '-Infinity'],
+    ['.nan', 'NaN'],
+  ])('refuses %s, which the parser answers as a number', (written, found) => {
+    // The typeof check alone would accept each of these: `Bun.YAML.parse`
+    // answers a number for all three, measured on bun 1.3.14, and
+    // `String` writes each as something --max-budget-usd never takes.
+    const parsed = Bun.YAML.parse(`budget: ${written}\n`) as { budget: unknown };
+
+    expect(typeof parsed.budget).toBe('number');
+    expect(problemsOf(usdAmount, parsed.budget)).toEqual([
+      `F: s is ${found}, expected ${USD_EXPECTED}`,
+    ]);
+  });
+
+  it('accepts a number the parser read from a file, and refuses the same amount quoted', () => {
+    const parsed = Bun.YAML.parse('a: 1.50\nb: "1.50"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(usdAmount, parsed.a)).toBe(1.5);
+    expect(problemsOf(usdAmount, parsed.b)).toEqual([`F: s is "1.50", expected ${USD_EXPECTED}`]);
   });
 });
 

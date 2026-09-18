@@ -67,7 +67,48 @@
  * example in `.specs/modules-and-addons.md`, which `modules:` lists
  * "by source". This module accepts all three. Whether a source kind can
  * be loaded is the module loader's answer, not the config's.
+ *
+ * ## The two lists this module does not own
+ *
+ * Every other closed list here is declared here. Two of the `pr`
+ * section's are not, because another module is already their authority
+ * and a second spelling could disagree with it:
+ *
+ *   - {@link MergeMethod} and the three methods behind
+ *     {@link mergeMethod} are the pull request port's
+ *     (`pr/types.ts`), which spells them to match what `gh pr merge`
+ *     takes. The type is re-exported so `config-schema.ts` names a
+ *     field with it without reaching past this module, and nothing
+ *     more: a caller acting on a merge reads the port.
+ *   - The shape {@link usdAmount} accepts is `parseBudgetUsd`'s
+ *     (`utils/declaration.ts`), which is what a plan's `budget=` goes
+ *     through and therefore what `--max-budget-usd` has been measured
+ *     against. The reader asks it about `String(raw)`, so a config
+ *     value is accepted only when the number the loop would pass on
+ *     survives that round trip: `.inf`, `.nan`, `1e21` and `1e-7` are
+ *     each a number the parser returns and `String` writes as something
+ *     the flag never takes.
+ *
+ * Neither import is a cycle. `pr/types.ts` imports types alone and
+ * `utils/declaration.ts` imports nothing, so this module reaches both
+ * without either reaching back. The port is reached at `./pr/types.js`
+ * and not through the `./pr/index.js` barrel a caller outside `src/pr/`
+ * would normally use, because the barrel carries `pr/gh.ts`, which
+ * imports THIS module and the `gh` spawner behind it: importing it here
+ * would make the graph cyclic and put the CLI adapter behind every
+ * config read. That cycle was measured, not assumed, and it does not
+ * break: with the barrel imported instead, on bun 1.3.14, `MERGE_METHODS`
+ * read as its three values and `CONFIG_DEFAULTS.prMergeMethod` as
+ * `squash` with `config.js`, `pr/index.js` and `pr/gh.js` each imported
+ * first, and the config and `src/pr/` suites passed. The narrower import
+ * is the graph this module wants, not a fix for an observed failure.
  */
+import type { MergeMethod } from './pr/types.js';
+
+import { MERGE_METHODS } from './pr/types.js';
+import { parseBudgetUsd } from './utils/declaration.js';
+
+export type { MergeMethod } from './pr/types.js';
 
 /** One key a file carried that names nothing this version reads. */
 export interface ConfigExtra {
@@ -158,6 +199,19 @@ export const CLAUDE_SETTING_SOURCES = ['user', 'project', 'local'] as const;
 /** One of Claude Code's three setting sources. */
 export type ClaudeSettingSource = (typeof CLAUDE_SETTING_SOURCES)[number];
 
+/**
+ * The pull request providers a file may name: the GitHub CLI, and none.
+ *
+ * `none` is a provider and not an absence: under it the loop pushes the
+ * branch, prints the compare URL and skips the CI wait, which is a
+ * behaviour an operator chooses, where a setting left unnamed is one
+ * `pr/provider.ts` resolves off the `origin` remote.
+ */
+export const PR_PROVIDERS = ['gh', 'none'] as const;
+
+/** One of the two pull request providers. */
+export type PrProvider = (typeof PR_PROVIDERS)[number];
+
 /** A reading of `value` with nothing wrong. */
 function accepted<T>(value: T): Reading<T> {
   return { value, problems: [], extras: [] };
@@ -211,6 +265,27 @@ export function text(expected: string): Reader<string> {
 export const flag: Reader<boolean> = (raw, at) => typeof raw === 'boolean'
   ? accepted(raw)
   : refused(at, raw, 'true or false');
+
+/**
+ * Accepts one of the pull request port's three merge methods. The list
+ * is the port's, for the reason in the module note.
+ */
+export const mergeMethod: Reader<MergeMethod> = oneOf(MERGE_METHODS);
+
+/**
+ * Accepts a number of US dollars a session can be handed as a budget:
+ * above zero, at most six digits either side of the point, and no
+ * string spelled like one. What it accepts is `parseBudgetUsd`'s shape,
+ * asked about `String(raw)`; the module note says why.
+ */
+export const usdAmount: Reader<number> = (raw, at) => {
+  const usd = typeof raw === 'number'
+    ? parseBudgetUsd(String(raw))
+    : null;
+  return usd === null
+    ? refused(at, raw, 'a number of US dollars above zero, at most six digits either side of the point')
+    : accepted(usd);
+};
 
 /**
  * Accepts a list whose every entry `item` accepts, answered frozen.

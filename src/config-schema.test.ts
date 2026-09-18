@@ -47,6 +47,10 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['modules', 'modules'],
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
+  ['prProvider', 'pr.provider'],
+  ['prMergeMethod', 'pr.mergeMethod'],
+  ['prBase', 'pr.base'],
+  ['prResolveBudget', 'pr.resolveBudget'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -75,6 +79,7 @@ const TOP = [
   'modules',
   'allowList',
   'loop',
+  'pr',
 ];
 
 describe('SETTINGS', () => {
@@ -132,6 +137,7 @@ describe('SECTIONS', () => {
       'loop',
       'output',
       'plan',
+      'pr',
       'prerequisites',
       'specs',
       'tracker',
@@ -148,6 +154,10 @@ describe('knownKeysAbove', () => {
 
   it('answers a section for a key under it', () => {
     expect(knownKeysAbove('plan.depth')).toEqual(['plan', ['inject', 'dir']]);
+    expect(knownKeysAbove('pr.nonesuch')).toEqual([
+      'pr',
+      ['provider', 'mergeMethod', 'base', 'resolveBudget'],
+    ]);
   });
 
   it('collapses a list index, so an item key answers the item shape', () => {

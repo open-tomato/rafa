@@ -151,6 +151,11 @@ const PROJECT_TEXT = [
   'allowList: [my-output]',
   'loop:',
   '  settingSources: user, project',
+  'pr:',
+  '  provider: none',
+  '  mergeMethod: rebase',
+  '  base: trunk',
+  '  resolveBudget: 0.5',
   '',
 ].join('\n');
 
@@ -187,6 +192,10 @@ const PROJECT_VALUES: RafaConfig = {
   ],
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
+  prProvider: 'none',
+  prMergeMethod: 'rebase',
+  prBase: 'trunk',
+  prResolveBudget: 0.5,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -220,6 +229,11 @@ const USER_TEXT = [
   'allowList: [rafa-linear, my-output]',
   'loop:',
   '  settingSources: project, local',
+  'pr:',
+  '  provider: gh',
+  '  mergeMethod: merge',
+  '  base: develop',
+  '  resolveBudget: 3',
   '',
 ].join('\n');
 
@@ -246,6 +260,10 @@ const USER_VALUES: RafaConfig = {
   modules: [{ kind: 'npm', location: 'rafa-linear', ref: null }],
   allowList: ['rafa-linear', 'my-output'],
   settingSources: ['project', 'local'],
+  prProvider: 'gh',
+  prMergeMethod: 'merge',
+  prBase: 'develop',
+  prResolveBudget: 3,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -416,6 +434,26 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'loop.settingSources is "project,project", '
       + 'expected a comma-separated subset of: user, project, local',
     'loop:\n  settingSources: user', 'settingSources', ['user'],
+  ],
+  [
+    'pr.provider', 'pr:\n  provider: gitlab',
+    'pr.provider is "gitlab", expected one of: gh, none',
+    'pr:\n  provider: none', 'prProvider', 'none',
+  ],
+  [
+    'pr.mergeMethod', 'pr:\n  mergeMethod: Squash',
+    'pr.mergeMethod is "Squash", expected one of: squash, merge, rebase',
+    'pr:\n  mergeMethod: rebase', 'prMergeMethod', 'rebase',
+  ],
+  [
+    'pr.base', 'pr:\n  base: ""', 'pr.base is "", expected a branch name',
+    'pr:\n  base: trunk', 'prBase', 'trunk',
+  ],
+  [
+    'pr.resolveBudget', 'pr:\n  resolveBudget: 0',
+    'pr.resolveBudget is 0, expected a number of US dollars above zero, '
+      + 'at most six digits either side of the point',
+    'pr:\n  resolveBudget: 4', 'prResolveBudget', 4,
   ],
 ];
 

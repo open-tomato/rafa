@@ -10,9 +10,10 @@
  * holds every rule about a VALUE: the readers, the closed lists, the
  * item shapes, and why nothing is coerced.
  *
- * The pair sits under the 800-line cap of `context/source.md`, which no
- * gate reads. Measured with `wc -l` at the commit that split them:
- * `config-schema.ts` is 330 lines and `config.ts` is 488.
+ * The trio sits under the 800-line cap of `context/source.md`, which no
+ * gate reads. Measured with `wc -l` at the commit that added the `pr`
+ * section: `config-schema.ts` is 396 lines, `config.ts` 506 and
+ * `config-sections.ts` 478.
  *
  * ## The schema
  *
@@ -44,6 +45,39 @@
  *     resolves to a list in the order written, because the list is what
  *     a caller asks (does it include `user`?) and rebuilds the flag from.
  *
+ * ## The `pr` section
+ *
+ * `.specs/rafa-20-pr-commands.md` spells it `pr: { provider: gh | none,
+ * mergeMethod: squash | merge | rebase, base: <default branch> }`, and
+ * names `pr.resolveBudget` as what a `triage --resolve` session's
+ * `--max-budget-usd` comes from. Four readings it leaves to this module:
+ *
+ *   - `pr.provider` and `pr.base` default to NULL, and null here means
+ *     "nobody has said", not "off". The spec's default for the provider
+ *     is `gh` when `origin` is a GitHub remote and `none` otherwise, and
+ *     its default base is whatever the remote calls its default branch;
+ *     neither is a value this module can spell, because both are read
+ *     off the repository at use (`pr/provider.ts`). Writing either
+ *     default as a literal would be the silent choice the config refuses
+ *     everywhere else: `prBase: 'main'` would open a pull request into a
+ *     branch that may not exist on a repository whose default is
+ *     `master`. A file spelling `provider:` or `base:` with no value
+ *     says nothing, as every null does, and resolves to the same null.
+ *   - `pr.mergeMethod` defaults to `squash`, the first method the spec
+ *     lists and the one the merge flow is written for: it deletes the
+ *     local branch with `-D` because a squash leaves it unmerged in
+ *     git's eyes.
+ *   - `pr.resolveBudget` defaults to 2 US dollars, which the attempt
+ *     guard's default of two attempts caps at 4 for one pull request.
+ *     It is a number and not null: the spec has every resolve run carry
+ *     `--max-budget-usd`, so a session with no budget is not a state
+ *     this setting can be left in.
+ *   - No `pr` setting is a {@link CommandLineSetting}. `pr merge` takes
+ *     a `--method` flag, but that flag is the command's own argument for
+ *     one merge, read by the command beside this setting, and not a
+ *     layer over the config: a global `--merge-method` nobody typed
+ *     would be a flag this module invented.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -52,7 +86,9 @@
  * entry naming no field does not either. {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and the known-key index are
  * all read off it, so adding a setting is one field, one default, one
- * spec and one line in `config.ts`'s layer literal, and nothing else.
+ * spec, its reader in `config-sections.ts`, one line in `config.ts`'s
+ * layer literal and one commented line in `project/scaffold.ts`'s
+ * template, which `scaffold.test.ts` holds it to, and nothing else.
  *
  * Keys are looked up in a `Map` and a `Set`, never with `in` or an
  * object index. `Bun.YAML.parse` returns a key spelled `constructor`,
@@ -70,10 +106,12 @@ import type {
   ClaudeSettingSource,
   ConfigVersion,
   InjectMode,
+  MergeMethod,
   ModuleSource,
   OptionalPrerequisiteItem,
   OutputMode,
   PrerequisiteItem,
+  PrProvider,
   Reader,
   StoreBackend,
 } from './config-sections.js';
@@ -86,17 +124,20 @@ import {
   flag,
   INJECT_MODES,
   listOf,
+  mergeMethod,
   MODULE_SOURCE_KEYS,
   moduleSource,
   OPTIONAL_ITEM_KEYS,
   oneOf,
   optionalPrerequisite,
   OUTPUT_MODES,
+  PR_PROVIDERS,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
   STORE_BACKENDS,
   subsetOf,
   text,
+  usdAmount,
 } from './config-sections.js';
 
 /**
@@ -145,6 +186,23 @@ export interface RafaConfig {
   allowList: readonly string[];
   /** What each spawned session loads settings from. `loop.settingSources`. */
   settingSources: readonly ClaudeSettingSource[];
+  /**
+   * The provider every `pr` action goes through, or null to read it off
+   * the `origin` remote. `pr.provider`.
+   */
+  prProvider: PrProvider | null;
+  /** How `pr merge` merges, unless `--method` names another. `pr.mergeMethod`. */
+  prMergeMethod: MergeMethod;
+  /**
+   * The branch a pull request is opened into, or null for whatever the
+   * remote calls its default branch. `pr.base`.
+   */
+  prBase: string | null;
+  /**
+   * The budget in US dollars each `pr triage --resolve` session is
+   * spawned with. `pr.resolveBudget`.
+   */
+  prResolveBudget: number;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -178,6 +236,10 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   modules: Object.freeze([]),
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
+  prProvider: null,
+  prMergeMethod: 'squash',
+  prBase: null,
+  prResolveBudget: 2,
 });
 
 /** What the module knows about one setting. */
@@ -255,6 +317,10 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: subsetOf(CLAUDE_SETTING_SOURCES),
     cli: true,
   },
+  prProvider: { key: 'pr.provider', read: oneOf(PR_PROVIDERS), cli: false },
+  prMergeMethod: { key: 'pr.mergeMethod', read: mergeMethod, cli: false },
+  prBase: { key: 'pr.base', read: text('a branch name'), cli: false },
+  prResolveBudget: { key: 'pr.resolveBudget', read: usdAmount, cli: false },
 };
 
 /** Every setting name, read off the closed record above. */

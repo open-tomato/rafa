@@ -8,9 +8,13 @@
  *
  * Each file as written sets `version` and nothing else, with no unknown
  * key. Uncommented, every setting line of it resolves every setting from
- * the file to its default. The control drops one line and finds exactly
- * that setting answered by the default, so a setting added to the schema
- * without a line in the template reddens the uncommented case.
+ * the file to its default, but for {@link VALUELESS}: the two lines that
+ * carry a key and no value, whose defaults are read off the repository
+ * and cannot be spelled, stay silent uncommented and so are answered by
+ * the defaults layer. The control drops one more line and finds exactly
+ * that setting answered by the default beside those two, so a setting
+ * added to the schema without a line in the template reddens the
+ * uncommented case.
  *
  * ## A rerun
  *
@@ -105,6 +109,15 @@ function created(path: string, kind: ScopeWriteKind): ScopeWrite {
   return { path, kind, change: 'created' };
 }
 
+/**
+ * The settings whose template line carries no value, so an uncommented
+ * file leaves each to the defaults layer. See the module note.
+ */
+const VALUELESS: readonly (readonly [string, string])[] = [
+  ['prProvider', 'default'],
+  ['prBase', 'default'],
+];
+
 describe('the config files', () => {
   it.each([['project', projectConfigText()], ['user', userConfigText()]])('sets version 1 and nothing else in the %s file, with no unknown key', (_scope, text) => {
     const file = parseConfigText(text, 'config.yaml');
@@ -118,7 +131,8 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file });
 
     expect(resolved.config).toEqual(CONFIG_DEFAULTS);
-    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file')).toEqual([]);
+    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file'))
+      .toEqual(VALUELESS.map((pair) => [...pair]));
     expect(file.extras).toEqual([]);
   });
 
@@ -127,7 +141,10 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
     expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 1);
-    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file')).toEqual([['trackingAll', 'default']]);
+    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file')).toEqual([
+      ['trackingAll', 'default'],
+      ...VALUELESS.map((pair) => [...pair]),
+    ]);
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

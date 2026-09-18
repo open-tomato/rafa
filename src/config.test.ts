@@ -83,7 +83,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
-  + 'output, prerequisites, tracking, modules, allowList, loop)';
+  + 'output, prerequisites, tracking, modules, allowList, loop, pr)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -104,6 +104,10 @@ const SETTINGS: readonly ConfigSetting[] = [
   'modules',
   'allowList',
   'settingSources',
+  'prProvider',
+  'prMergeMethod',
+  'prBase',
+  'prResolveBudget',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -125,6 +129,10 @@ const DEFAULTS: RafaConfig = {
   modules: [],
   allowList: [],
   settingSources: ['project', 'local'],
+  prProvider: null,
+  prMergeMethod: 'squash',
+  prBase: null,
+  prResolveBudget: 2,
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -164,6 +172,11 @@ const FULL = [
   'allowList: [my-output]',
   'loop:',
   '  settingSources: user, project',
+  'pr:',
+  '  provider: none',
+  '  mergeMethod: rebase',
+  '  base: trunk',
+  '  resolveBudget: 0.5',
   '',
 ].join('\n');
 
@@ -200,6 +213,10 @@ const FULL_VALUES: RafaConfig = {
   ],
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
+  prProvider: 'none',
+  prMergeMethod: 'rebase',
+  prBase: 'trunk',
+  prResolveBudget: 0.5,
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -488,6 +505,26 @@ describe('parseConfigText', () => {
         'loop.settingSources is "project,project", '
           + 'expected a comma-separated subset of: user, project, local',
         'loop:\n  settingSources: user', 'settingSources', ['user'],
+      ],
+      [
+        'pr.provider', 'pr:\n  provider: github',
+        'pr.provider is "github", expected one of: gh, none',
+        'pr:\n  provider: none', 'prProvider', 'none',
+      ],
+      [
+        'pr.mergeMethod', 'pr:\n  mergeMethod: squash-merge',
+        'pr.mergeMethod is "squash-merge", expected one of: squash, merge, rebase',
+        'pr:\n  mergeMethod: merge', 'prMergeMethod', 'merge',
+      ],
+      [
+        'pr.base', 'pr:\n  base: 7', 'pr.base is 7, expected a branch name',
+        'pr:\n  base: develop', 'prBase', 'develop',
+      ],
+      [
+        'pr.resolveBudget', 'pr:\n  resolveBudget: "2"',
+        'pr.resolveBudget is "2", expected a number of US dollars above zero, '
+          + 'at most six digits either side of the point',
+        'pr:\n  resolveBudget: 1.25', 'prResolveBudget', 1.25,
       ],
     ];
 
