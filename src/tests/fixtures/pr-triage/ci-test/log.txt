@@ -1,0 +1,7 @@
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z ##[group]Run bun test
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z src/pr/triage/select.test.ts:
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z 12 |   it('lists more than three candidates instead of picking one', () => {
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z                                                                      ^
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z error: expected 3 candidates, received 4
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z ##[endgroup]
+gates	UNKNOWN STEP	2026-09-18T11:09:00Z ##[error]Process completed with exit code 1.

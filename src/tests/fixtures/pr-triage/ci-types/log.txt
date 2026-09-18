@@ -1,0 +1,4 @@
+gates	UNKNOWN STEP	2026-09-18T11:08:00Z ##[group]Run bunx tsc --noEmit
+gates	UNKNOWN STEP	2026-09-18T11:08:00Z src/pr/triage/select.ts(88,10): error TS2322: Type 'string' is not assignable to type 'number'.
+gates	UNKNOWN STEP	2026-09-18T11:08:00Z ##[endgroup]
+gates	UNKNOWN STEP	2026-09-18T11:08:00Z ##[error]Process completed with exit code 2.

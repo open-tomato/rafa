@@ -1,0 +1,5 @@
+gates	UNKNOWN STEP	2026-09-18T11:07:00Z ##[group]Run bunx eslint .
+gates	UNKNOWN STEP	2026-09-18T11:07:00Z src/pr/triage/select.ts
+gates	UNKNOWN STEP	2026-09-18T11:07:00Z   42:7  error  'unused' is assigned a value but never used  no-unused-vars
+gates	UNKNOWN STEP	2026-09-18T11:07:00Z ##[endgroup]
+gates	UNKNOWN STEP	2026-09-18T11:07:00Z ##[error]Process completed with exit code 1.

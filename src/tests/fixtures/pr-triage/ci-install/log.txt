@@ -1,0 +1,5 @@
+gates	UNKNOWN STEP	2026-09-18T11:06:00Z ##[group]Run bun install --frozen-lockfile
+gates	UNKNOWN STEP	2026-09-18T11:06:00Z bun install v1.3.1
+gates	UNKNOWN STEP	2026-09-18T11:06:00Z error: lockfile had changes, but lockfile is frozen
+gates	UNKNOWN STEP	2026-09-18T11:06:00Z ##[endgroup]
+gates	UNKNOWN STEP	2026-09-18T11:06:00Z ##[error]Process completed with exit code 1.

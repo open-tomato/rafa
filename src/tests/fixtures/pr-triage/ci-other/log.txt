@@ -1,0 +1,4 @@
+attestations	UNKNOWN STEP	2026-09-18T11:10:00Z ##[group]Run npx attest-cli publish
+attestations	UNKNOWN STEP	2026-09-18T11:10:00Z attest-cli: no signing key configured
+attestations	UNKNOWN STEP	2026-09-18T11:10:00Z ##[endgroup]
+attestations	UNKNOWN STEP	2026-09-18T11:10:00Z ##[error]Process completed with exit code 1.
