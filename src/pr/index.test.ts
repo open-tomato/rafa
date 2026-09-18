@@ -20,6 +20,7 @@ import { describe, expect, it } from 'bun:test';
 
 import * as checks from './checks.js';
 import * as gh from './gh.js';
+import * as merge from './merge.js';
 import * as none from './none.js';
 import * as preflightItems from './preflight-items.js';
 import * as provider from './provider.js';
@@ -47,6 +48,16 @@ describe('the pull request barrel', () => {
     expect(barrel.ghAuthOk).toBe(gh.ghAuthOk);
     expect(barrel.ghAuthOkIn).toBe(gh.ghAuthOkIn);
     expect(barrel.ghPullRequestsIn).toBe(gh.ghPullRequestsIn);
+  });
+
+  it('answers the merge readers of ./merge.js themselves', () => {
+    expect(barrel.cleanUpSteps).toBe(merge.cleanUpSteps);
+    expect(barrel.commandLine).toBe(merge.commandLine);
+    expect(barrel.parseWorkingTree).toBe(merge.parseWorkingTree);
+    expect(barrel.parseWorktrees).toBe(merge.parseWorktrees);
+    expect(barrel.readMergeRefusal).toBe(merge.readMergeRefusal);
+    expect(barrel.remainingFrom).toBe(merge.remainingFrom);
+    expect(barrel.worktreesHolding).toBe(merge.worktreesHolding);
   });
 
   it('answers the none-provider helpers of ./none.js themselves', () => {

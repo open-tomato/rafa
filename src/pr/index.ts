@@ -5,7 +5,9 @@
  * wrap-up stage reached `gh` through, and it named the CLI in every
  * signature. This barrel is what replaced it: `./types.js` declares what a provider answers, `./gh.js` is the
  * adapter over the GitHub CLI, `./checks.js` holds the check-row
- * readers, which are pure and belong to no provider, and
+ * readers, which are pure and belong to no provider,
+ * `./merge.js` holds what `pr merge` refuses on and the clean-up steps
+ * it runs afterwards, both as data, and
  * `./provider.js` answers which provider a repository gets and holds
  * the one exit-2 refusal every `pr` action shares,
  * `./preflight-items.js` builds the two required preflight items a `gh`
@@ -50,6 +52,17 @@ export type {
   PullRequestSummary,
 } from './types.js';
 export type { GhPullRequestsOptions } from './gh.js';
+export type {
+  CleanUpPlan,
+  MergeRefusal,
+  MergeRefusalReading,
+  MergeRefusalReason,
+  MergeState,
+  MergeStep,
+  MergeStepId,
+  WorkingTreeStatus,
+  WorktreeEntry,
+} from './merge.js';
 export type { PushOutcome } from './none.js';
 export type {
   GhProviderReading,
@@ -67,6 +80,15 @@ export {
   waitForChecks,
 } from './checks.js';
 export { isMergeMethod, MERGE_METHODS } from './types.js';
+export {
+  cleanUpSteps,
+  commandLine,
+  parseWorkingTree,
+  parseWorktrees,
+  readMergeRefusal,
+  remainingFrom,
+  worktreesHolding,
+} from './merge.js';
 export { compareUrl, pushBranch } from './none.js';
 export { createGhPullRequests, ghAuthOk, ghAuthOkIn, ghPullRequestsIn } from './gh.js';
 export {
