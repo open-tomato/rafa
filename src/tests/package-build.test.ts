@@ -67,6 +67,55 @@
  * naming `local,user` and holds those instead, and a config whose sources
  * the loop refuses stops the command before the stand-in is reached.
  *
+ * ## The asset-tree clause
+ *
+ * The three templates above are named files; the pinned resolve plans
+ * and the board templates are DIRECTORIES, so the build script ends with
+ * a loop over a table of `<source under src>:<name under dist>` pairs.
+ * Three readings shape it:
+ *
+ *   - It copies `*.md` and nothing else. `src/pr/plans/` holds
+ *     `load.ts` and `load.test.ts` beside the four plans, and copying
+ *     the directory whole would publish both, since `files` publishes
+ *     all of `dist`. A case reads `dist/plans` for a `.ts` file and
+ *     names the two source modules that would land there.
+ *   - A tree lands DIRECTLY under `dist/`, as `dist/plans` and
+ *     `dist/templates`, not at its source path. A bundle reading
+ *     `import.meta.url` answers its own directory, which is `dist/` for
+ *     `cli.js`, so `src/pr/plans/load.ts`'s first candidate is
+ *     `<moduleDir>/plans/<name>.md`; `PINNED_PLANS_DIRNAME` is that
+ *     name, and a case resolves every pinned plan through
+ *     `readPinnedPlan` pointed at `dist/` rather than only comparing
+ *     bytes.
+ *   - A tree that is not there is SKIPPED, and a tree that is there
+ *     with no markdown in it fails the build. `src/board/templates/`
+ *     carries no tracked file yet — its first is the spec issue
+ *     template a later task adds — and `cp src/board/templates/*.md`
+ *     against an absent directory would stop the build today. Measured
+ *     on bun 1.3.14, in a probe package carrying this clause alone:
+ *     with the directory absent, the `[ -d ]` guard skipped it and the
+ *     run exited 0; with it present and holding no markdown, the `cp`
+ *     matched nothing and the run exited 1. So the skip cannot hide a
+ *     tree that is there and ships nothing.
+ *
+ * That last reading is why the board tree's case reads a PLANTED file:
+ * `beforeAll` writes {@link PLANTED_BOARD_TEMPLATE} into the scratch
+ * package's `src/board/templates/` before the build runs, so the clause
+ * is read on a tree with a file in it without this repository carrying
+ * one. When the real template lands, the case reads it too: both tree
+ * cases list whatever markdown the scratch package's source tree holds
+ * and hold the copy to it byte for byte.
+ *
+ * Three mutations of the clause were driven on 2026-09-19, one run of
+ * this file each, 44 pass before and after and the manifest restored
+ * byte-identical (sha256). Dropping the whole loop reddened all five
+ * cases below, 39 pass and 5 fail. Dropping only
+ * `board/templates:templates` reddened the board tree case and the
+ * planted-file case, 2 of 44, and left the plan cases green, so the two
+ * table rows are read apart. Copying `*` instead of `*.md` reddened the
+ * TypeScript case and the `src/pr/plans` tree case, whose file list no
+ * longer matched the markdown it lists, again 2 of 44.
+ *
  * ## The describe case
  *
  * `rafa describe` stamps its document with the `version` of
@@ -199,6 +248,7 @@ import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatCandidates } from '../plan.js';
 import * as portsSource from '../ports/index.js';
+import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 
@@ -314,6 +364,28 @@ const TEMPLATES: [string, string][] = [
   [SKILL, 'SKILL.md'],
 ];
 
+/**
+ * The asset trees the build copies whole: each one’s directory under the
+ * package root, and the directory it lands in under `dist/`. See the module
+ * note on the clause.
+ */
+const ASSET_TREES: [string, string][] = [
+  ['src/pr/plans', 'plans'],
+  ['src/board/templates', 'templates'],
+];
+
+/**
+ * The board template planted into the scratch package before the build,
+ * since `src/board/templates/` carries no tracked file yet.
+ */
+const PLANTED_BOARD_TEMPLATE = 'spec-probe.md';
+
+/** What {@link PLANTED_BOARD_TEMPLATE} holds. */
+const PLANTED_BOARD_BODY = '<!-- No local paths. -->\n\n# Spec: a copied board template\n';
+
+/** The modules sitting beside the pinned plans, which the build must not copy. */
+const PLAN_READER_MODULES = ['load.ts', 'load.test.ts'];
+
 /** The spec the template cases plan from, and what `rafa plan` is told. */
 const SPEC = '# Spec: a build probe\n\nNothing to build.\n';
 const PLAN_ARGS = ['--spec=spec.md', '--no-progress'];
@@ -365,6 +437,9 @@ beforeAll(() => {
   mkdirSync(DIST, { recursive: true });
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
+  const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
+  mkdirSync(boardTemplates, { recursive: true });
+  writeFileSync(join(boardTemplates, PLANTED_BOARD_TEMPLATE), PLANTED_BOARD_BODY, 'utf8');
   writeFileSync(STALE_CHUNK, 'export const stale = true;\n', 'utf8');
   plantedBeforeBuild = existsSync(STALE_CHUNK);
   build = run([process.execPath, 'run', 'build'], PACKAGE_DIR, withBunOnPath());
@@ -780,4 +855,47 @@ describe('the prompt templates in the build', () => {
     expect(plan.stderr).toContain(join(bare, 'SKILL.md'));
     expect(existsSync(scratch.prompt)).toBe(false);
   }, 30_000);
+});
+
+describe('the asset trees in the build', () => {
+  it.each(ASSET_TREES)('copies every markdown file of %s into dist/%s, unchanged', (tree, name) => {
+    const source = join(PACKAGE_DIR, tree);
+    const built = join(DIST, name);
+    const names = readdirSync(source)
+      .filter((file) => file.endsWith('.md'))
+      .sort();
+    const differing = names.filter(
+      (file) => !existsSync(join(built, file))
+        || readFileSync(join(built, file), 'utf8') !== readFileSync(join(source, file), 'utf8'),
+    );
+
+    expect(names.length).toBeGreaterThan(0);
+    expect(differing).toEqual([]);
+    expect(readdirSync(built).sort()).toEqual(names);
+  });
+
+  it('copies the planted board template, so the board tree is read on a tree with a file in it', () => {
+    const built = join(DIST, 'templates', PLANTED_BOARD_TEMPLATE);
+
+    expect(existsSync(built)).toBe(true);
+    expect(readFileSync(built, 'utf8')).toBe(PLANTED_BOARD_BODY);
+  });
+
+  it('copies no TypeScript out of src/pr/plans, so the reader modules stay unpublished', () => {
+    const source = readdirSync(join(PACKAGE_DIR, 'src/pr/plans')).sort();
+    const copied = readdirSync(join(DIST, 'plans')).filter((file) => file.endsWith('.ts'));
+
+    expect(PLAN_READER_MODULES.filter((module) => !source.includes(module))).toEqual([]);
+    expect(copied).toEqual([]);
+  });
+
+  it('lands each pinned plan where readPinnedPlan looks for it from a bundle in dist', () => {
+    const differing = PINNED_PLAN_CLASSES.filter(
+      (triageClass) => readPinnedPlan(triageClass, { moduleDir: DIST })
+        !== readFileSync(join(PACKAGE_DIR, 'src/pr/plans', pinnedPlanFileName(triageClass)), 'utf8'),
+    );
+
+    expect(PINNED_PLAN_CLASSES.length).toBeGreaterThan(0);
+    expect(differing).toEqual([]);
+  });
 });
