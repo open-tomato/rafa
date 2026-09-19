@@ -1,7 +1,8 @@
 /**
  * Tests for the board naming convention (`src/board/naming.ts`): the
- * slug read off a title, and the spec path, the plan stub, the branch
- * and the pull-request title spelled from it.
+ * slug read off a title, the spec path, the plan stub, the branch and
+ * the pull-request title spelled from it, and the local notes file
+ * spelled from the number alone.
  *
  * Every function here is pure, so there is no seam to plant and nothing
  * to isolate: each case is a title in and a string out. What that buys
@@ -53,6 +54,11 @@
  *  - `requireIssueNumber` weakened to a `Number.isFinite` check: 3
  *    fail, the refusal case, the sentence over it, and the refusal
  *    asserted across the other four spellings.
+ *
+ * The two local-notes cases came later, with `src/board/issue.ts`,
+ * which appends that file to the snapshot it writes. They were not in
+ * the 23 and no count above counts them, which is why this file now
+ * holds 25.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -63,6 +69,8 @@ import {
   FALLBACK_SLUG,
   ID_PREFIX,
   MAX_SLUG_WORDS,
+  notesFileName,
+  notesPath,
   planStub,
   pullRequestTitle,
   slugFromTitle,
@@ -184,6 +192,21 @@ describe('the four spellings', () => {
     expect(() => specPath('.specs', 0, TITLE)).toThrow(RangeError);
     expect(() => branchName(0, TITLE)).toThrow(RangeError);
     expect(() => pullRequestTitle(0, TITLE)).toThrow(RangeError);
+  });
+});
+
+describe('the local notes file', () => {
+  it('spells the notes file from the id alone, whatever the title says', () => {
+    expect(notesFileName(ISSUE)).toBe('rafa-20-notes.md');
+    expect(notesPath('.specs', ISSUE)).toBe('.specs/rafa-20-notes.md');
+    expect(notesPath('/tmp/proj/.rafa/specs', ISSUE))
+      .toBe('/tmp/proj/.rafa/specs/rafa-20-notes.md');
+  });
+
+  it('refuses a number that is not a positive integer', () => {
+    expect(() => notesFileName(0)).toThrow(RangeError);
+    expect(() => notesPath('.specs', -1)).toThrow(RangeError);
+    expect(notesFileName(1)).toBe('rafa-1-notes.md');
   });
 });
 

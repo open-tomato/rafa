@@ -1,7 +1,8 @@
 /**
  * The one place a board item's names are spelled: the slug read from an
- * issue title, and the spec path, the plan stub, the branch and the
- * pull-request title built from it.
+ * issue title, the spec path, the plan stub, the branch and the
+ * pull-request title built from it, and the local notes file that sits
+ * beside the spec.
  *
  * Every piece of work on this repository has one issue, and that issue's
  * number is its id everywhere else (`.specs/rafa-20-pr-commands.md`):
@@ -9,12 +10,20 @@
  * ```text
  * id                  rafa-20
  * spec                <specs.dir>/rafa-20-pr-commands.md
+ * local notes         <specs.dir>/rafa-20-notes.md
  * plan stub           rafa-20-pr-commands
  * branch              feat/rafa-20-pr-commands
  * pull-request title  rafa-20: Pull request commands
  * ```
  *
- * The four spellings are ONE convention with four surfaces, and they are
+ * The local notes file is the one name with NO slug in it, on purpose: a
+ * person writes that file BEFORE any snapshot exists, on a machine that
+ * has not asked `gh` for the title, so a name carrying the slug would be
+ * a name they could not spell — and an issue retitled later would orphan
+ * the notes they had written under the old one. The id alone is enough,
+ * since it is unique already.
+ *
+ * The spellings are ONE convention with several surfaces, and they are
  * written here together because a caller that spells one of them by hand
  * is a caller that can disagree with the others. The disagreement is not
  * cosmetic: `src/effort/attribution.ts` matches a branch back to its
@@ -76,6 +85,9 @@ export const BRANCH_PREFIX = 'feat';
 
 /** The extension a spec snapshot is written under. */
 export const SPEC_EXTENSION = '.md';
+
+/** What the local notes file's name carries after the id, before the extension. */
+export const NOTES_SUFFIX = '-notes';
 
 /** How many words a slug keeps; the top of the spec's two-to-four. */
 export const MAX_SLUG_WORDS = 4;
@@ -177,6 +189,22 @@ export function specFileName(issue: number, title: string): string {
  */
 export function specPath(specsDir: string, issue: number, title: string): string {
   return path.join(specsDir, specFileName(issue, title));
+}
+
+/**
+ * The local notes file's name for an issue: `rafa-20-notes.md`. It
+ * carries no slug; the module note holds why.
+ */
+export function notesFileName(issue: number): string {
+  return `${boardId(issue)}${NOTES_SUFFIX}${SPEC_EXTENSION}`;
+}
+
+/**
+ * Where an issue's local notes live: beside its spec snapshot, under
+ * `specsDir` as `specs.dir` resolved it.
+ */
+export function notesPath(specsDir: string, issue: number): string {
+  return path.join(specsDir, notesFileName(issue));
 }
 
 /** The branch an issue is worked on: `feat/rafa-20-pr-commands`. */
