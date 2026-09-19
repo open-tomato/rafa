@@ -45,7 +45,7 @@ module's note is the long form.
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
-| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
+| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, and the two install warnings |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
@@ -323,13 +323,28 @@ module's note is the long form.
   environment, an optional failure warned about as `loop start` warns. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
-  refusal, and 0 otherwise. After the report, whatever the preflight did,
+  refusal, and 0 otherwise. Then, on a repository whose provider is
+  `gh`, it reads the board `rafa init --board` sets up
+  (`src/board/status.ts`) with one `gh label list` and, only when the
+  config names no `roadmap.issue`, one `gh issue list`, and prints
+  `  <outcome>  <name>` under `GitHub board:` for each of the six
+  labels, the spec issue template, the Roadmap issue and
+  `roadmap.issue`: `present`, `missing`, or `unknown` for a reading
+  that failed or found two open Roadmap issues, with the sentence
+  behind every outcome but `present`. A run with any row that is not
+  present ends them with `Run rafa init --board to set up <n> parts of
+  the board this run did not find.` The provider is the one reading the
+  automatic items resolved, so `pr.provider: none` opens no runner and
+  prints no row; nothing on the board is written, a row never changes
+  the exit code, and a halt prints its rows before the refusal. After
+  the report, whatever the preflight did,
   it warns when `.ralph/effort/` holds a store file and `.rafa/effort/`
   none (`src/effort/store/legacy.ts`), and when `~/.rafa/bin` is not
   ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text
   mode says so in an `info` line when the order holds. In json mode a
   preflight that did not halt gives the checks, the `known-missing:`
-  lines, the reminders and both readings as the result's `data`, and a
+  lines, the reminders, both readings and those rows as the result's
+  `data`, the rows null for a project with no GitHub board, and a
   halt gives the `command_exit` error and no `data`.
 - **`self-update` installs the checkout it runs in**
   (`src/commands/self-update.ts`), as `bun run snapshot` does: both call

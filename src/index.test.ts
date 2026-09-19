@@ -600,6 +600,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-board.js', ['boardStepChanged', 'renderBoardStep', 'runBoardStep']],
   ]],
   ['./commands/doctor.js', [
+    ['../adapters/tracker/github.js', ['createGhRunner']],
+    ['../board/status.js', ['boardGaps', 'readBoardStatus']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/version.js', ['versionLine']],
     ['../config-load.js', ['loadConfig']],
@@ -612,6 +614,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../preflight/run.js', ['PROBE_TIMEOUT_MS', 'runPreflight']],
     ['../project/bin-path.js', ['readBinPath']],
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
+    ['./init-board.js', ['BOARD_FIX', 'BOARD_HEADING']],
     ['./plan/plan-files.js', ['isFile', 'plural']],
   ]],
   ['./commands/self-update.js', [

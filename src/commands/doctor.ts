@@ -43,11 +43,34 @@
  *      as it is found. The environment is the one this invocation was
  *      handed, `process.env` for the registered command.
  *
+ * ## The board rows
+ *
+ * A repository that resolves to `pr.provider: gh` also gets one row per
+ * part of the GitHub board `rafa init --board` makes — the six labels,
+ * the spec issue template, the Roadmap issue and `roadmap.issue` — each
+ * read through {@link readBoardStatus} (`board/status.ts`) as present,
+ * missing or, for a reading that failed, unknown. A run with any row
+ * that is not present ends those lines with `rafa init --board` as the
+ * fix, which is the one command that would change them.
+ *
+ * The provider is resolved ONCE per run, by the same reading that
+ * decides the automatic items, so `pr.provider: none` costs no `gh`
+ * command and no board row. It is read AFTER the preflight, because the
+ * two `gh` commands it sends are worth nothing on a repository whose
+ * `gh` is missing or logged out, and the preflight is what says so.
+ *
+ * A board row never changes the exit code, and never changes a byte:
+ * this command reports the gaps and makes none of them. A run whose
+ * preflight halted prints its rows before the refusal, since they were
+ * read by then and a person reading a halt still wants the whole
+ * picture.
+ *
  * ## What it does not do
  *
  * It starts no run. No run id is generated, no row goes to the store's
  * `preflight` table, and no tracker, branch or session is touched. So
- * `rafa effort report` lists the halts of `loop start` runs alone.
+ * `rafa effort report` lists the halts of `loop start` runs alone. It
+ * writes nothing to the board either: the rows are read.
  *
  * ## The two warnings
  *
@@ -84,7 +107,9 @@
  * whatever the preflight then does; then {@link renderDoctor}'s lines: a
  * head naming the plan, or where none was found, and the PREREQUISITES
  * file merged in; one line per check; the steps that file names and
- * nothing checks; and the verdict with any `known-missing:` lines. A halt
+ * nothing checks; and the verdict with any `known-missing:` lines; then
+ * {@link renderBoard}'s lines for a repository that has a GitHub board,
+ * and none for one that has not. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
@@ -97,11 +122,15 @@
  *
  * The project, its home and the environment are the dispatcher's
  * (`cli/dispatch.ts`), so a case names them through its options. How a
- * probe and a service request run, the timeout, the clock and the
- * `origin` probe the provider is read through are {@link DoctorSeams},
- * each left out being the runner's own.
+ * probe and a service request run, the timeout, the clock, the
+ * `origin` probe the provider is read through and the runner the board
+ * rows are read with are {@link DoctorSeams}, each left out being the
+ * runner's own.
  */
+import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BoardRow, BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { PrProvider } from '../config-sections.js';
 import type { PrerequisiteItem, RafaConfig } from '../config.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
@@ -112,6 +141,8 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { basename, relative, resolve, sep } from 'node:path';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
+import { boardGaps, readBoardStatus } from '../board/status.js';
 import { CommandExit } from '../cli/command.js';
 import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
@@ -125,6 +156,7 @@ import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
 import { readBinPath } from '../project/bin-path.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 
+import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 import { isFile, plural } from './plan/plan-files.js';
 
 /** How the checks run; see the module note. Each left out is the runner's own. */
@@ -132,6 +164,8 @@ export interface DoctorSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
+  /** Opens the runner the board rows are read with. `gh` spawned in the root when left out. */
+  readonly openGh?: (root: string) => GhRunner;
 }
 
 /** The seams the registered command runs with: the runner's own, every one. */
@@ -149,6 +183,8 @@ export interface DoctorPreflight {
   readonly prerequisitesFile: string | null;
   /** How many of the checked items the pull request provider contributed; 0 or 2. */
   readonly automatic: number;
+  /** The pull request provider the project resolves to, which decided those items and the board rows. */
+  readonly provider: PrProvider;
   /** Every check, and the halt and the `known-missing:` lines the runner worded. */
   readonly report: PreflightReport;
   /** The steps the PREREQUISITES file names and nothing checks. */
@@ -175,6 +211,8 @@ export interface DoctorResult {
   readonly binPath: BinPathReading;
   /** Which store files each effort directory holds; null when they could not be checked. */
   readonly legacyStore: LegacyStoreReading | null;
+  /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
+  readonly board: BoardStatus | null;
 }
 
 /** The two readings about the install, read before the preflight. */
@@ -262,15 +300,24 @@ function mergedFile(plan: string | null): string | null {
 /** No automatic item, for a provider that contributes none. */
 const NO_AUTOMATIC_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
 
-/**
- * The REQUIRED items the project's pull request provider contributes,
- * as `runStartPreflight` builds them; see the module note.
- */
-function automaticItems(root: string, config: RafaConfig, seams: DoctorSeams): readonly PrerequisiteItem[] {
-  const configured = config.prProvider ?? null;
-  if (configured === 'none') return NO_AUTOMATIC_ITEMS;
+/** The provider and the REQUIRED items it contributes, read in one go. */
+interface ProviderReading {
+  readonly provider: PrProvider;
+  readonly items: readonly PrerequisiteItem[];
+}
 
-  return ghPreflightItems(resolvePrProvider({ configured, dir: root, readRemote: seams.readRemote }));
+/**
+ * The project's pull request provider and the REQUIRED items it
+ * contributes, as `runStartPreflight` builds them; see the module note.
+ * Read once per run: the board rows read the provider off this rather
+ * than probing `origin` a second time.
+ */
+function readProvider(root: string, config: RafaConfig, seams: DoctorSeams): ProviderReading {
+  const configured = config.prProvider ?? null;
+  if (configured === 'none') return { provider: 'none', items: NO_AUTOMATIC_ITEMS };
+
+  const reading = resolvePrProvider({ configured, dir: root, readRemote: seams.readRemote });
+  return { provider: reading.provider, items: ghPreflightItems(reading) };
 }
 
 /** Checks the preflight of the plan the line names; see the module note. */
@@ -283,18 +330,31 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   const config = resolvedConfig(project, warn);
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
-  const automatic = automaticItems(project.root, config, seams);
-  const tiers: PreflightTiers = { required: [...automatic, ...items.required], optional: items.optional };
+  const automatic = readProvider(project.root, config, seams);
+  const tiers: PreflightTiers = { required: [...automatic.items, ...items.required], optional: items.optional };
   const report = await runPreflight(tiers, { ...seams.checks, cwd: project.root, env: context.env, warn });
   return Object.freeze({
     root: project.root,
     plan,
     lookedFor,
     prerequisitesFile: mergedFile(plan),
-    automatic: automatic.length,
+    automatic: automatic.items.length,
+    provider: automatic.provider,
     report,
     reminders: items.reminders,
   });
+}
+
+/**
+ * Every part of the GitHub board as it stands, or null for a project
+ * whose provider is not `gh` and so has no board. Reads and writes
+ * nothing of its own; see the module note.
+ */
+async function checkBoard(preflight: DoctorPreflight, seams: DoctorSeams): Promise<BoardStatus | null> {
+  if (preflight.provider !== 'gh') return null;
+  const root = preflight.root;
+  const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
+  return readBoardStatus({ gh: openGh(root), root });
 }
 
 /** Both readings about the install; a store that cannot be checked is a warning, not a failure. */
@@ -396,6 +456,38 @@ export function renderDoctor(preflight: DoctorPreflight): readonly string[] {
   ];
 }
 
+/** How wide a board row's outcome column is: `present`, `missing` and `unknown` are each seven. */
+const OUTCOME_WIDTH = 7;
+
+/** A row as a line names it: a label under `label <name>`, anything else under its own name. */
+function rowName(row: BoardRow): string {
+  return row.kind === 'label'
+    ? `label ${row.name}`
+    : row.name;
+}
+
+/**
+ * One board row as a line. A row that is present says nothing more —
+ * "present" is the whole of it — and every other carries the sentence
+ * that made it: what was not there, or what could not be read.
+ */
+export function boardRowLine(row: BoardRow): string {
+  const line = `  ${row.outcome.padEnd(OUTCOME_WIDTH, ' ')}  ${rowName(row)}`;
+  return row.outcome === 'present'
+    ? line
+    : `${line}: ${row.detail}`;
+}
+
+/** The lines text mode writes for the board: the heading, a row each, and the fix when any row is not present. */
+export function renderBoard(board: BoardStatus | null): readonly string[] {
+  if (board === null) return [];
+  const gaps = boardGaps(board);
+  const fix = gaps.length === 0
+    ? []
+    : [`Run ${BOARD_FIX} to set up ${plural(gaps.length, 'part')} of the board this run did not find.`];
+  return [BOARD_HEADING, ...board.rows.map(boardRowLine), ...fix];
+}
+
 /** The refusal for a halt: the runner's own text, then what `loop start` would do. */
 function haltRefusal(halt: string): CommandExit {
   return new CommandExit(1, [
@@ -405,7 +497,7 @@ function haltRefusal(halt: string): CommandExit {
 }
 
 /** The data json mode gives for a preflight that did not halt. */
-function resultOf(preflight: DoctorPreflight, install: InstallReadings): DoctorResult {
+function resultOf(preflight: DoctorPreflight, install: InstallReadings, board: BoardStatus | null): DoctorResult {
   return {
     root: preflight.root,
     plan: preflight.plan,
@@ -416,6 +508,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings): DoctorR
     reminders: preflight.reminders,
     binPath: install.binPath,
     legacyStore: install.legacyStore,
+    board,
   };
 }
 
@@ -432,9 +525,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
   const install = readInstall(context, project);
   try {
     const preflight = await checkPreflight(context, project, seams);
-    if (context.outputMode !== 'json') for (const line of renderDoctor(preflight)) context.output.info(line);
+    const board = await checkBoard(preflight, seams);
+    if (context.outputMode !== 'json') {
+      for (const line of [...renderDoctor(preflight), ...renderBoard(board)]) context.output.info(line);
+    }
     if (preflight.report.halt !== null) throw haltRefusal(preflight.report.halt);
-    if (context.outputMode === 'json') context.output.result(resultOf(preflight, install));
+    if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, board));
   } finally {
     writeInstall(context, install);
   }
@@ -457,8 +553,13 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' timeout. It exits 1 when a required item fails, naming the item, its probe and its exit code or'
       + ' first line of stderr, where `rafa loop start` would halt, and 0 otherwise. It warns when'
       + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
-      + ' not on PATH ahead of `~/.bun/bin`; a warning never changes the exit code. With `--output=json` the'
-      + ' checks and both readings are the data of the terminal result event, unless a required item failed.',
+      + ' not on PATH ahead of `~/.bun/bin`; a warning never changes the exit code. On a repository whose'
+      + ' provider is `gh` it also reads the GitHub board `rafa init --board` sets up and prints one row per'
+      + ' part — the six labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
+      + ' missing, or unknown for a reading that failed, naming `rafa init --board` as the fix; it writes'
+      + ' nothing to the board and a row never changes the exit code. With `--output=json` the'
+      + ' checks, both readings and those rows are the data of the terminal result event, unless a required'
+      + ' item failed.',
     args: [],
     flags: [
       {
