@@ -116,6 +116,35 @@
  *     positive whole one, and `issueNumber` refuses it here instead,
  *     where a person can still fix the file.
  *
+ * ## The `release` section
+ *
+ * `.specs/rafa-21-changelog-and-release.md` spells it `release: {
+ * enabled: auto, versionFile: package.json, changelog: CHANGELOG.md,
+ * heading: "## {version} — {date}, {title}" }`, and those four values
+ * are the defaults here. Four readings it leaves to this module:
+ *
+ *   - `release.enabled` is not a flag. `auto`, its default, is a third
+ *     value meaning "on when both files below exist" — a reading
+ *     `release/enabled.ts` makes against a disk, which no value here
+ *     could stand for. What the reader takes beside it, and why `on`
+ *     and `off` are refused, is `config-sections.ts`'s to say.
+ *   - `release.versionFile` and `release.changelog` are paths relative
+ *     to the repository root, and neither is null. Null elsewhere here
+ *     means "nobody has said", and the spec has said: `package.json`
+ *     and `CHANGELOG.md`. The absence the spec cares about is the
+ *     FILE's — "a project with no version file gets the changelog
+ *     entry under a date heading and no bump" — which is a question
+ *     about a disk, answered at use and not spellable as a default.
+ *   - `release.heading` is free text. The spec makes it a template so
+ *     "a consumer's changelog has another shape" is an edit rather
+ *     than a fork, and which placeholders it may carry, and what an
+ *     unknown one renders to, is `release/changelog.ts`'s to say. So
+ *     nothing here refuses a heading for the placeholders it spells.
+ *   - No `release` setting is a {@link CommandLineSetting}, for the
+ *     reason the `pr` section gives: the `release` commands read these
+ *     settings beside their own arguments, and a global flag nobody
+ *     typed would be one this module invented.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -151,6 +180,7 @@ import type {
   PrerequisiteItem,
   PrProvider,
   Reader,
+  ReleaseEnabled,
   StoreBackend,
 } from './config-sections.js';
 
@@ -172,6 +202,8 @@ import {
   optionalPrerequisite,
   OUTPUT_MODES,
   PR_PROVIDERS,
+  RELEASE_AUTO,
+  releaseEnabled,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
   STORE_BACKENDS,
@@ -253,6 +285,23 @@ export interface RafaConfig {
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
    */
   roadmapIssue: number | null;
+  /**
+   * Whether a run bumps the version and writes a changelog entry, or
+   * `auto` to decide it off the two files below. `release.enabled`.
+   */
+  releaseEnabled: ReleaseEnabled;
+  /**
+   * The manifest the version is read from and written back to, from
+   * the repository root. `release.versionFile`.
+   */
+  releaseVersionFile: string;
+  /**
+   * The changelog an entry is inserted into, from the repository root.
+   * `release.changelog`.
+   */
+  releaseChangelog: string;
+  /** The template one entry's heading is rendered from. `release.heading`. */
+  releaseHeading: string;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -292,6 +341,10 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   prResolveBudget: 2,
   boardTrustedAuthors: Object.freeze([]),
   roadmapIssue: null,
+  releaseEnabled: RELEASE_AUTO,
+  releaseVersionFile: 'package.json',
+  releaseChangelog: 'CHANGELOG.md',
+  releaseHeading: '## {version} — {date}, {title}',
 });
 
 /** What the module knows about one setting. */
@@ -313,6 +366,9 @@ const directory = text('a directory path');
 
 /** The reader every tracker kind goes through. */
 const trackerKind = text('a tracker kind name');
+
+/** The reader both `release` file settings share. */
+const releaseFile = text('a file path');
 
 /**
  * Every setting, by name, in the order problems are reported.
@@ -379,6 +435,18 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: false,
   },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
+  releaseEnabled: { key: 'release.enabled', read: releaseEnabled, cli: false },
+  releaseVersionFile: {
+    key: 'release.versionFile',
+    read: releaseFile,
+    cli: false,
+  },
+  releaseChangelog: { key: 'release.changelog', read: releaseFile, cli: false },
+  releaseHeading: {
+    key: 'release.heading',
+    read: text('a changelog heading template'),
+    cli: false,
+  },
 };
 
 /** Every setting name, read off the closed record above. */

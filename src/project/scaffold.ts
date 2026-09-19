@@ -109,6 +109,11 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
   '# roadmap:',
   '#   issue:                       # the issue plan create --next reads; unset is the one titled Roadmap',
+  '# release:',
+  `#   enabled: ${String(CONFIG_DEFAULTS.releaseEnabled)}               # true | false | auto, which is on when both files below exist`,
+  `#   versionFile: ${CONFIG_DEFAULTS.releaseVersionFile}`,
+  `#   changelog: ${CONFIG_DEFAULTS.releaseChangelog}`,
+  `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
 ]);
 
 /** The line every file opens its settings with. */

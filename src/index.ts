@@ -131,6 +131,7 @@ export type {
   PrerequisiteKind,
   PrProvider,
   RafaConfig,
+  ReleaseEnabled,
   ResolvedConfig,
   StoreBackend,
 } from './config.js';
@@ -239,6 +240,7 @@ export {
   parseConfigText,
   PR_PROVIDERS,
   PREREQUISITE_KINDS,
+  RELEASE_AUTO,
   resolveConfig,
   STORE_BACKENDS,
 } from './config.js';

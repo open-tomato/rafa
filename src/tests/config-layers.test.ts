@@ -160,6 +160,11 @@ const PROJECT_TEXT = [
   '  trustedAuthors: [octocat]',
   'roadmap:',
   '  issue: 31',
+  'release:',
+  '  enabled: true',
+  '  versionFile: project.json',
+  '  changelog: docs/PROJECT-CHANGES.md',
+  '  heading: "### {version} on {date}"',
   '',
 ].join('\n');
 
@@ -202,6 +207,10 @@ const PROJECT_VALUES: RafaConfig = {
   prResolveBudget: 0.5,
   boardTrustedAuthors: ['octocat'],
   roadmapIssue: 31,
+  releaseEnabled: true,
+  releaseVersionFile: 'project.json',
+  releaseChangelog: 'docs/PROJECT-CHANGES.md',
+  releaseHeading: '### {version} on {date}',
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -244,6 +253,11 @@ const USER_TEXT = [
   '  trustedAuthors: ["dependabot[bot]", hubot]',
   'roadmap:',
   '  issue: 7',
+  'release:',
+  '  enabled: false',
+  '  versionFile: user.json',
+  '  changelog: docs/USER-CHANGES.md',
+  '  heading: "## {version}, {title}"',
   '',
 ].join('\n');
 
@@ -276,6 +290,10 @@ const USER_VALUES: RafaConfig = {
   prResolveBudget: 3,
   boardTrustedAuthors: ['dependabot[bot]', 'hubot'],
   roadmapIssue: 7,
+  releaseEnabled: false,
+  releaseVersionFile: 'user.json',
+  releaseChangelog: 'docs/USER-CHANGES.md',
+  releaseHeading: '## {version}, {title}',
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -476,6 +494,26 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'roadmap.issue', 'roadmap:\n  issue: 2.5',
     'roadmap.issue is 2.5, expected an issue number, a whole number above zero',
     'roadmap:\n  issue: 31', 'roadmapIssue', 31,
+  ],
+  [
+    'release.enabled', 'release:\n  enabled: "true"',
+    'release.enabled is "true", expected true, false or auto',
+    'release:\n  enabled: auto', 'releaseEnabled', 'auto',
+  ],
+  [
+    'release.versionFile', 'release:\n  versionFile: 2',
+    'release.versionFile is 2, expected a file path',
+    'release:\n  versionFile: deno.json', 'releaseVersionFile', 'deno.json',
+  ],
+  [
+    'release.changelog', 'release:\n  changelog: "  "',
+    'release.changelog is "  ", expected a file path',
+    'release:\n  changelog: NEWS.md', 'releaseChangelog', 'NEWS.md',
+  ],
+  [
+    'release.heading', 'release:\n  heading: []',
+    'release.heading is a list, expected a changelog heading template',
+    'release:\n  heading: "## {version}"', 'releaseHeading', '## {version}',
   ],
 ];
 

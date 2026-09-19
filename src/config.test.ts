@@ -84,7 +84,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap)';
+  + 'roadmap, release)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -111,6 +111,10 @@ const SETTINGS: readonly ConfigSetting[] = [
   'prResolveBudget',
   'boardTrustedAuthors',
   'roadmapIssue',
+  'releaseEnabled',
+  'releaseVersionFile',
+  'releaseChangelog',
+  'releaseHeading',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -138,6 +142,10 @@ const DEFAULTS: RafaConfig = {
   prResolveBudget: 2,
   boardTrustedAuthors: [],
   roadmapIssue: null,
+  releaseEnabled: 'auto',
+  releaseVersionFile: 'package.json',
+  releaseChangelog: 'CHANGELOG.md',
+  releaseHeading: '## {version} — {date}, {title}',
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -186,6 +194,11 @@ const FULL = [
   '  trustedAuthors: ["dependabot[bot]"]',
   'roadmap:',
   '  issue: 31',
+  'release:',
+  '  enabled: false',
+  '  versionFile: deno.json',
+  '  changelog: docs/CHANGES.md',
+  '  heading: "### {version} on {date}"',
   '',
 ].join('\n');
 
@@ -228,6 +241,10 @@ const FULL_VALUES: RafaConfig = {
   prResolveBudget: 0.5,
   boardTrustedAuthors: ['dependabot[bot]'],
   roadmapIssue: 31,
+  releaseEnabled: false,
+  releaseVersionFile: 'deno.json',
+  releaseChangelog: 'docs/CHANGES.md',
+  releaseHeading: '### {version} on {date}',
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -546,6 +563,26 @@ describe('parseConfigText', () => {
         'roadmap.issue', 'roadmap:\n  issue: 0',
         'roadmap.issue is 0, expected an issue number, a whole number above zero',
         'roadmap:\n  issue: 31', 'roadmapIssue', 31,
+      ],
+      [
+        'release.enabled', 'release:\n  enabled: on',
+        'release.enabled is "on", expected true, false or auto',
+        'release:\n  enabled: false', 'releaseEnabled', false,
+      ],
+      [
+        'release.versionFile', 'release:\n  versionFile: []',
+        'release.versionFile is a list, expected a file path',
+        'release:\n  versionFile: deno.json', 'releaseVersionFile', 'deno.json',
+      ],
+      [
+        'release.changelog', 'release:\n  changelog: ""',
+        'release.changelog is "", expected a file path',
+        'release:\n  changelog: docs/CHANGES.md', 'releaseChangelog', 'docs/CHANGES.md',
+      ],
+      [
+        'release.heading', 'release:\n  heading: 2',
+        'release.heading is 2, expected a changelog heading template',
+        'release:\n  heading: "### {version}"', 'releaseHeading', '### {version}',
       ],
     ];
 
