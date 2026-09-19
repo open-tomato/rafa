@@ -98,11 +98,11 @@ module's note is the long form.
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `skill demote` and `skill backfill`
+  `skill demote`, `skill backfill` and the `pr` actions
   wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `skill demote` and
-  `skill backfill` their `args` and `flags`.
+  each `issue` action, each checker, each listing, `skill demote`,
+  `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -645,11 +645,19 @@ module's note is the long form.
   `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` neither, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
-  declares `text` and `json`. Of the `issue` actions, `list` declares the
+  declares `text` and `json`. `plan create` declares the flags `spec`,
+  `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`
+  and `progress`, three of them mutually exclusive (`spec`, `issue` and
+  `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
   flags `state`, `type`, `module`, `search` and `limit`, `show` the
   argument `id`, `create` the flags `title`, `body`, `type`, `module` and
   `priority`, `comment` the argument `id` and the flag `body`, and `move`
-  the arguments `id` and `state`; each declares `text` and `json`.
+  the arguments `id` and `state`; each declares `text` and `json`. Of the `pr` actions, `pr current` and `pr list`
+  declare no argument and no flag, each with `text` and `json`. `pr show` and `pr view`
+  declare the argument `n` and no flag. `pr merge`
+  declares the argument `n` and the flags `yes` and `method`, and `pr triage`
+  the argument `n` and the flags `comment`, `resolve` and `max-attempts`;
+  each declares `text` and `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
@@ -673,11 +681,14 @@ module's note is the long form.
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
   `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1
-  for an unusable config, a missing `--spec`, a spec found neither against
-  the project root nor under `specs.dir`, and a plan already there, and
-  for a planner's rejection the exit code a `claude` planner's rejection
-  carries, or 1; it throws 3 for a spec the planner's own review judged
-  not ready, whatever the rejection would have carried. `effort collect` and
+  for an unusable config, none of `--spec`, `--issue` and `--next` named, a
+  spec found neither against the project root nor under `specs.dir`, a plan
+  already there, and for a planner's rejection the exit code a `claude`
+  planner's rejection carries, or 1; 2 for an issue author without write
+  access to the repository, an issue without `spec:ready`, and an issue
+  whose body matches a home path or a token shape; and 3 for a spec the
+  planner's own review judged not ready, whatever the rejection would have
+  carried. `effort collect` and
   `effort report` throw 1 for an unrecognised argument and an unusable
   config, one line per problem. An interrupted task throws
   `CommandExit(0)` once it is marked and its report stored; a failed,
@@ -721,6 +732,27 @@ module's note is the long form.
   `stop`, `pause` and `resume` also throw 1 for a session reading
   `stopped` or `done`, and `stop` for a signal refused for any reason but
   the pid being gone.
+  The `pr` actions throw 2 when `pr.provider` is not `gh`. `pr current`,
+  `pr show` and `pr view` throw 1 for a stray word, a config that cannot
+  be used, a branch that cannot be read, a detached HEAD, and a branch
+  with no open pull request. `pr list` throws 1 for a stray word, a config
+  that cannot be used, and an adapter call that rejects. `pr merge` throws
+  1 for a second word, a word that is no whole number from 1, a flag that
+  swallowed the number, a config that cannot be used, a branch that cannot
+  be read, a detached HEAD, a branch with no open pull request, a `--method`
+  that is none of the three GitHub merge methods, a number the repository
+  has no pull request for, a git reading that failed, each of the four
+  merge refusals (dirty tree, not green, not mergeable, branch in another
+  worktree), no terminal to ask on without `--yes`, a provider that would
+  not merge, and a clean-up step that failed. `pr triage` throws 1 for a
+  stray word, a word that is no whole number from 1, a flag that swallowed
+  the number, a config that cannot be used, a `--max-attempts` that is no
+  whole number from 1, `--resolve` beside `--no-comment`, a number the
+  repository has no pull request for, and a provider call that rejected; 2
+  for more than one red candidate with `--resolve`, a cross-repository pull
+  request with `--resolve`, and a pull request whose author is neither
+  trusted nor a known dependency-bump bot with `--resolve`; and 3 when the
+  attempt guard gives up.
 - **What changed for a phase 0 spelling**: `rafa effort` alone and
   `rafa effort help` refuse with exit code 1, where the phase 0 CLI
   printed its help and exited 0. An unknown first word writes
