@@ -1,6 +1,6 @@
 /**
- * Tests for the change-note writer and the migration that creates its
- * table.
+ * Tests for the change-note writer, the reader of a plan's notes, and
+ * the migration that creates their table.
  *
  * Every store sits under a fresh temporary repo root, and the disk is
  * real. Every reading goes through `bun:sqlite` directly and never
@@ -15,8 +15,8 @@
  *
  * Eight mutations of the writer and its migration were driven against
  * this file alone, with the unmutated sources green before and after and
- * restored byte-identical. All eight reddened at least one of its 39
- * cases: the dedupe index made non-unique (33), refused entries written
+ * restored byte-identical. All eight reddened at least one of the
+ * writer's 39 cases: the dedupe index made non-unique (33), refused entries written
  * anyway (11), the whole-write dispatch check dropped (5), the dedupe
  * key on the bare `area` column in both the index and the conflict
  * target (3), the level check accepting any value that is present (2),
@@ -27,6 +27,24 @@
  * bun 1.3.14 on SQLite 3.51.0, the insert then throws `ON CONFLICT
  * clause does not match any PRIMARY KEY or UNIQUE constraint`, which is
  * the reading `triage.ts` records for its own index.
+ *
+ * The reader's ten cases sit in their own block, and each reads a store
+ * written through `writeChanges` rather than planted, so the columns the
+ * writer fills and the ones the reader answers are checked against each
+ * other. Every case asking for one stub writes notes under another stub
+ * and under none beside them.
+ *
+ * Eight mutations of the reader were driven against this file, with the
+ * unmutated source green before and after and restored byte-identical.
+ * All eight redden: the stub filter dropped (3 cases), `ORDER BY seq`
+ * made `ORDER BY summary` (3), `collected_at` answered blank (2), and
+ * one each for `IS` made `=`, the missing-store guard dropped, the area
+ * answered null, the session id taken from the task line, and
+ * `ORDER BY seq` made `ORDER BY collected_at`. The last one SURVIVED
+ * until the backwards-clock case was written: with the stamps agreeing
+ * with the append order, both orderings answer the same rows in the same
+ * order, and measured on SQLite 3.51.0 a tie inside one write comes back
+ * in rowid order either way.
  */
 import type { ChangesWrite, ChangesWriteResult } from './changes.js';
 import type { FindingsWriterSeams } from './findings.js';
@@ -41,7 +59,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CHANGE_LEVELS, parseReport } from '../../report/parse.js';
 
-import { writeChanges } from './changes.js';
+import { readPlanChanges, writeChanges } from './changes.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 
 /** A changes row as the table holds it. */
@@ -666,5 +684,229 @@ describe('whole-write refusals', () => {
     expect(() => writeChanges(root, writeOf())).toThrow(refusal);
     expect(() => writeChanges(root, allRefused)).toThrow(refusal);
     expect(readRaw(root)).toEqual(before);
+  });
+});
+
+describe('readPlanChanges', () => {
+  /** A dispatch of one session under one plan stub. */
+  function dispatchOf(sessionId: string, planStub: string | null): ChangesWrite['dispatch'] {
+    return { sessionId, planStub, taskLine: `Task of ${sessionId}` };
+  }
+
+  /** The store a case reads from, read-only, module uninvolved. */
+  function storedSummaries(root: string, planStub: string | null): unknown[] {
+    const sql = 'SELECT summary FROM changes WHERE plan_stub IS ? ORDER BY seq';
+    return rawQuery<{ summary: string }>(root, sql, planStub as string).map(({ summary }) => summary);
+  }
+
+  it('answers every note under the stub, oldest first, and no other stub', () => {
+    const root = freshRoot('by-stub');
+    const stub = 'rafa-21-changelog-and-release';
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', stub),
+      changes: [change({ summary: 'first' }), change({ summary: 'second', area: null })],
+    }, seams('by-stub-1'));
+    writeChanges(root, {
+      dispatch: dispatchOf('s-2', 'rafa-20-pr-commands'),
+      changes: [change({ summary: 'another plan' })],
+    }, seams('by-stub-2'));
+    writeChanges(root, {
+      dispatch: dispatchOf('s-3', null),
+      changes: [change({ summary: 'no plan at all' })],
+    }, seams('by-stub-3'));
+    writeChanges(root, {
+      dispatch: dispatchOf('s-4', stub),
+      changes: [change({ summary: 'third' })],
+    }, seams('by-stub-4'));
+
+    // The control: all four writes landed, so a reader answering only the
+    // stub's three is filtering rather than missing rows.
+    expect(columnOf(root, 'summary'))
+      .toEqual(['first', 'second', 'another plan', 'no plan at all', 'third']);
+    expect(readPlanChanges(root, stub).map(({ summary }) => summary))
+      .toEqual(['first', 'second', 'third']);
+    expect(readPlanChanges(root, 'rafa-20-pr-commands').map(({ summary }) => summary))
+      .toEqual(['another plan']);
+  });
+
+  it('answers the notes of the sessions that resolved no plan for the null stub', () => {
+    const root = freshRoot('null-stub');
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', 'rafa-21-changelog-and-release'),
+      changes: [change({ summary: 'under a stub' })],
+    }, seams('null-stub-1'));
+    writeChanges(root, {
+      dispatch: dispatchOf('s-2', null),
+      changes: [change({ summary: 'under none' }), change({ summary: 'under none too' })],
+    }, seams('null-stub-2'));
+
+    expect(storedSummaries(root, null)).toEqual(['under none', 'under none too']);
+    expect(readPlanChanges(root, null).map(({ summary }) => summary))
+      .toEqual(['under none', 'under none too']);
+  });
+
+  it('answers each row whole: session, task line, level, area, summary, time', () => {
+    const root = freshRoot('fields');
+    const stub = 'rafa-21-changelog-and-release';
+    writeChanges(root, {
+      dispatch: { sessionId: 'aaaa-1111', planStub: stub, taskLine: 'Add the reader' },
+      changes: [
+        change({ level: 'major', area: 'cli', summary: 'rafa release tag ships' }),
+        change({ level: 'none', area: null, summary: 'Internal only' }),
+      ],
+    }, seams('fields'));
+
+    expect(readPlanChanges(root, stub)).toEqual([
+      {
+        sessionId: 'aaaa-1111',
+        taskLine: 'Add the reader',
+        level: 'major',
+        area: 'cli',
+        summary: 'rafa release tag ships',
+        collectedAt: '2026-09-20T10:00:00.000Z',
+      },
+      {
+        sessionId: 'aaaa-1111',
+        taskLine: 'Add the reader',
+        level: 'none',
+        area: null,
+        summary: 'Internal only',
+        collectedAt: '2026-09-20T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('keeps one write in the order the report listed its notes, times tied', () => {
+    const root = freshRoot('tied-times');
+    const stub = 'rafa-21-changelog-and-release';
+    const summaries = ['zebra last alphabetically', 'alpha first alphabetically', 'middle one'];
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', stub),
+      changes: summaries.map((summary) => change({ summary })),
+    }, seams('tied-times'));
+
+    // The control: every row carries the one write's time, so the order
+    // below cannot have come from the clock.
+    expect(new Set(columnOf(root, 'collected_at')).size).toBe(1);
+    expect(readPlanChanges(root, stub).map(({ summary }) => summary)).toEqual(summaries);
+  });
+
+  it('answers the writes in the order they landed, later clock or not', () => {
+    const root = freshRoot('across-writes');
+    const stub = 'rafa-21-changelog-and-release';
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', stub),
+      changes: [change({ summary: 'written first' })],
+    }, { now: () => new Date('2026-09-20T09:00:00.000Z'), newId: () => 'across-1' });
+    writeChanges(root, {
+      dispatch: dispatchOf('s-2', stub),
+      changes: [change({ summary: 'written second' })],
+    }, { now: () => new Date('2026-09-20T11:00:00.000Z'), newId: () => 'across-2' });
+
+    expect(readPlanChanges(root, stub).map(({ summary, collectedAt }) => [summary, collectedAt]))
+      .toEqual([
+        ['written first', '2026-09-20T09:00:00.000Z'],
+        ['written second', '2026-09-20T11:00:00.000Z'],
+      ]);
+  });
+
+  it('orders by the append order, not the stamp, when a clock goes backwards', () => {
+    const root = freshRoot('backwards-clock');
+    const stub = 'rafa-21-changelog-and-release';
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', stub),
+      changes: [change({ summary: 'written first' })],
+    }, { now: () => new Date('2026-09-20T11:00:00.000Z'), newId: () => 'backwards-1' });
+    writeChanges(root, {
+      dispatch: dispatchOf('s-2', stub),
+      changes: [change({ summary: 'written second' })],
+    }, { now: () => new Date('2026-09-20T09:00:00.000Z'), newId: () => 'backwards-2' });
+
+    // The control: the stamps disagree with the append order here, so the
+    // order below is `seq` and cannot be `collected_at`.
+    expect(columnOf(root, 'collected_at'))
+      .toEqual(['2026-09-20T11:00:00.000Z', '2026-09-20T09:00:00.000Z']);
+    expect(readPlanChanges(root, stub).map(({ summary }) => summary))
+      .toEqual(['written first', 'written second']);
+  });
+
+  it('answers none for a store that does not exist, creating nothing', () => {
+    const root = freshRoot('no-store');
+
+    expect(readPlanChanges(root, 'rafa-21-changelog-and-release')).toEqual([]);
+    expect(readPlanChanges(root, null)).toEqual([]);
+    expect(existsSync(storeFile(root))).toBe(false);
+    expect(existsSync(dirname(storeFile(root)))).toBe(false);
+    expect(existsSync(root)).toBe(false);
+
+    // The control: the same root, once written, answers the note, so the
+    // emptiness above was the missing store and not the query.
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', 'rafa-21-changelog-and-release'),
+      changes: [change({ summary: 'now it exists' })],
+    }, seams('no-store'));
+    expect(readPlanChanges(root, 'rafa-21-changelog-and-release').map(({ summary }) => summary))
+      .toEqual(['now it exists']);
+  });
+
+  it('answers none for a stub the store holds no note under', () => {
+    const root = freshRoot('unknown-stub');
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', 'rafa-21-changelog-and-release'),
+      changes: [change({ summary: 'the only note' })],
+    }, seams('unknown-stub'));
+
+    expect(readPlanChanges(root, 'rafa-99-nothing-here')).toEqual([]);
+    expect(readPlanChanges(root, null)).toEqual([]);
+  });
+
+  it('refuses a store past the version this rafa knows', () => {
+    const root = freshRoot('read-newer');
+    const stub = 'rafa-21-changelog-and-release';
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', stub),
+      changes: [change({ summary: 'stored before the bump' })],
+    }, seams('read-newer'));
+
+    // The control: the read works at this version, so the refusal below
+    // is the version and nothing else about the store.
+    expect(readPlanChanges(root, stub)).toHaveLength(1);
+
+    const db = new Database(storeFile(root));
+    db.run(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION + 1}`);
+    db.close();
+    const before = readRaw(root);
+
+    expect(() => readPlanChanges(root, stub))
+      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  it('brings a version-7 store forward and answers none, the table just made', () => {
+    const root = freshRoot('read-from-v7');
+    mkdirSync(dirname(storeFile(root)), { recursive: true });
+    const db = new Database(storeFile(root), { create: true, readwrite: true });
+    migrateSchema(db, storeFile(root), SQLITE_MIGRATIONS.slice(0, 7));
+    db.close();
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'changes'));
+
+    expect(readPlanChanges(root, 'rafa-21-changelog-and-release')).toEqual([]);
+    expect(tablesOf(root)).toEqual(TABLES);
+  });
+
+  it('answers a level the table holds, the closed set being what bounds it', () => {
+    const root = freshRoot('read-levels');
+    const stub = 'rafa-21-changelog-and-release';
+    writeChanges(root, {
+      dispatch: dispatchOf('s-1', stub),
+      changes: CHANGE_LEVELS.map((level) => change({ level, summary: `a ${level} line` })),
+    }, seams('read-levels'));
+
+    expect(readPlanChanges(root, stub).map(({ level }) => level)).toEqual([...CHANGE_LEVELS]);
+
+    // The control: nothing outside the set can reach a reader, because
+    // the table refuses it even from a writer outside this module.
+    expect(() => rawInsert(root, { plan_stub: stub, level: 'breaking' }))
+      .toThrow(/CHECK constraint failed/);
   });
 });

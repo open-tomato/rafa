@@ -57,7 +57,9 @@ file is absent; `readPreflightHalts` reads `preflight` back the same way,
 and `readSessionBudgets` the `dispatches` rows carrying a budget.
 `readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
 `task_reports` and `report_absences` back the same way, for the rough ETA
-of `rafa loop status`.
+of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
+`changes` row under one plan stub, in append order, for a release step to
+render.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
 `reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts` and

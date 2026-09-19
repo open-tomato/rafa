@@ -1,13 +1,15 @@
 /**
- * The change-note writer: one row in the store's `changes` table for
- * each entry of a task report's `changes` list.
+ * The change-note writer and reader: one row in the store's `changes`
+ * table for each entry of a task report's `changes` list, and every row
+ * one plan's sessions wrote read back under its stub.
  *
  * A task session ends its output with a `rafa:report` block, and its
  * `changes` list is what the task says its own diff is worth to a user
  * of the project: a `level`, an optional `area` heading, and one
  * `summary` line. {@link writeChanges} stores each entry as written.
- * Nothing here turns them into a changelog; this table is what a later
- * release step reads a plan's notes back out of, one row per note.
+ * Nothing here turns them into a changelog; {@link readPlanChanges} is
+ * what a later release step reads a plan's notes back out of, one row
+ * per note, and the rendering is that step's own.
  *
  * ## The row
  *
@@ -103,6 +105,33 @@
  * changes once shipped: widening it is a new migration, and the suite
  * pins the migration's set to `CHANGE_LEVELS`.
  *
+ * ## Reading a plan's notes back
+ *
+ * {@link readPlanChanges} answers every row stored under one plan stub,
+ * oldest first, which is what a release step renders a plan's changelog
+ * entry from. `plan_stub` is matched with `IS`, so the stub null reads
+ * the notes of the sessions that resolved no plan rather than none at
+ * all, as `readTaskFinishes` matches its own.
+ *
+ * Oldest first is `seq`, the append order, and not `collected_at`: one
+ * write stamps every row it inserts with the same time, so the clock
+ * cannot order the notes of a single report, while `seq` orders them as
+ * the report listed them. The two agree across writes whenever the clock
+ * runs forward, and where they disagree the append order is what is
+ * answered.
+ *
+ * Each row is answered whole but for `seq` and `id`, which are the
+ * store's own bookkeeping, and `plan_stub`, which the caller asked by.
+ * `level` is typed {@link ChangeLevel} rather than checked here: the
+ * migration's CHECK is what refuses any other value, including from a
+ * writer outside this module, and the suite pins that set to
+ * {@link CHANGE_LEVELS}.
+ *
+ * It opens and creates nothing when the store file does not exist, and
+ * answers none. A store that exists is opened through `withSqliteStore`,
+ * as `readTaskFinishes` opens it, so a store past this rafa's version is
+ * refused as it is for a write.
+ *
  * ## Writing nothing writes nothing, and still checks the schema
  *
  * A write left with no entry to insert, because the list was empty or
@@ -117,15 +146,16 @@ import type {
   FindingsDispatch,
   FindingsWriterSeams,
 } from './findings.js';
-import type { ReportChange } from '../../report/parse.js';
+import type { ChangeLevel, ReportChange } from '../../report/parse.js';
 import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 
 import { CHANGE_LEVELS } from '../../report/parse.js';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
-import { sqliteStorePath, writeSqliteStore } from './sqlite.js';
+import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's change notes and the dispatch they came from. */
 export interface ChangesWrite {
@@ -303,4 +333,64 @@ export function writeChanges(
 
   const appended = writeSqliteStore(path, rows.length, 0, (db) => insertRows(db, rows));
   return { path, appended, skipped: stored.length - appended, rejected };
+}
+
+/** One stored change note, as {@link readPlanChanges} answers it. */
+export interface PlanChange {
+  /** The session that reported the note. */
+  readonly sessionId: string;
+  /** The task line the note came from, as the dispatch quoted it. */
+  readonly taskLine: string;
+  /** How much of a release the change is worth. */
+  readonly level: ChangeLevel;
+  /** The heading the note groups under, or null when it named none. */
+  readonly area: string | null;
+  /** The changelog line itself. */
+  readonly summary: string;
+  /** When the note's write was stamped, ISO 8601. */
+  readonly collectedAt: string;
+}
+
+/** A changes row, as the read's query answers it. */
+interface PlanChangeRow {
+  readonly session_id: string;
+  readonly task_line: string;
+  readonly level: ChangeLevel;
+  readonly area: string | null;
+  readonly summary: string;
+  readonly collected_at: string;
+}
+
+/** Every note under one plan stub, in append order. */
+const SELECT_PLAN_CHANGES = `
+  SELECT session_id, task_line, level, area, summary, collected_at
+  FROM changes
+  WHERE plan_stub IS ?
+  ORDER BY seq
+`;
+
+/**
+ * Every change note stored under one plan stub, oldest first. Pass null
+ * for the notes of the sessions that resolved no plan.
+ *
+ * Answers none, opening nothing, when the store file does not exist, and
+ * throws when it exists and cannot be read. See the module note.
+ */
+export function readPlanChanges(repoRoot: string, planStub: string | null): PlanChange[] {
+  const path = sqliteStorePath(repoRoot);
+  if (!existsSync(path)) return [];
+
+  const rows = withSqliteStore(
+    path,
+    false,
+    (db) => db.query<PlanChangeRow, [string | null]>(SELECT_PLAN_CHANGES).all(planStub),
+  );
+  return rows.map((row) => ({
+    sessionId: row.session_id,
+    taskLine: row.task_line,
+    level: row.level,
+    area: row.area,
+    summary: row.summary,
+    collectedAt: row.collected_at,
+  }));
 }
