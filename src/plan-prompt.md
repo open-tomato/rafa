@@ -1,5 +1,25 @@
 # Plan-generation instructions
 
+## Naming conventions
+
+All rafa work follows a consistent naming scheme across specifications,
+plans, branches, and pull requests. The board is GitHub Issues on
+`open-tomato/rafa`; every spec has one issue labelled `type:spec`, whose
+ID appears as `rafa-<n>`.
+
+| Artifact | Pattern | Example |
+| --- | --- | --- |
+| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
+| `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
+| Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
+| Pull request title | `rafa-<n>: <title>` | `rafa-20: Add pull-request commands` |
+| Pull request body | `Closes #<n>` | `Closes #20` |
+
+The slug summarizes what the user gets, using two to four words joined by
+hyphens. The order of work lives in ONE place: the pinned "Roadmap" issue
+on the `open-tomato/rafa` board.
+
 * Before planning, review the spec as written: open your answer with a
   `rafa:spec-review` block carrying `verdict: ready` or `verdict: not-ready`,
   with empty `gaps:` for ready, or a list of `{heading, what}` gaps for
