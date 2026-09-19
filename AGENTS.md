@@ -22,6 +22,9 @@ back into every turn and the split would save nothing.
 - `context/cli.md` — `RafaCommand`, the command registry, routing, module
   command entries, the core roster, the dispatcher's events and exit code,
   the help levels with their snapshots, and the `describe` roster.
+- `context/pull-requests.md` — the `pr` subject, the provider and its
+  preflight items, merge, triage assessment and --resolve, trust, and the
+  readiness gate for plans from the board.
 
 ## This file is capped
 
