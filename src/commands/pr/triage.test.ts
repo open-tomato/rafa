@@ -33,6 +33,17 @@
  *     account the repository gives `read` and once by one it gives
  *     `admin`, so "an untrusted comment is ignored" is measured against
  *     the same comment being read as the store it is.
+ *
+ * The two remaining legs of the trust check the spec names —
+ * `.specs/rafa-20-pr-commands.md`'s "write-holder passes, outsider
+ * refused, lookup failure refused, allow-list honoured, a planted
+ * outsider triage comment ignored and reported" — are measured through
+ * this command too: a login the fake has never heard of is a failed
+ * lookup rather than `read`, and `board.trustedAuthors` is read off the
+ * project config this file plants, not handed over as a literal, so the
+ * allow-list case measures the actual config wiring
+ * (`src/commands/pr/pr-context.ts`) and not only `board/trust.ts`
+ * itself.
  */
 import type { TriageSeams } from './triage.js';
 import type { RafaCommand } from '../../cli/command.js';
@@ -450,6 +461,32 @@ describe('who the stored comment is read from', () => {
     expect(outcome.run.stdout).toContain('already assessed at');
     expect(outcome.run.stdout).not.toContain('was ignored');
     expect(outcome.fake.pull(41)?.comments).toHaveLength(1);
+  });
+
+  it('ignores a marker comment whose lookup failed, reporting that access could not be read', async () => {
+    // No permission is planted for `octocat`, so the fake answers 404
+    // and the reading is `lookup-failed` rather than `no-write-access`.
+    const outcome = await overPlantedComment('octocat');
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(outcome.run.stdout)
+      .toContain('whose write access to open-tomato/rafa could not be read');
+    expect(outcome.run.stdout).toContain('it was ignored and nothing in it was read');
+    expect(outcome.fake.pull(41)?.comments.map((one) => one.author.login))
+      .toEqual(['octocat', FAKE_COMMENT_AUTHOR]);
+  });
+
+  it('honours board.trustedAuthors read off the project config, spending no lookup on it', async () => {
+    const fake = plantedFake([RED_41]);
+    const head = fake.pull(41)?.headRefOid ?? '';
+    fake.update(41, (pull) => ({ ...pull, comments: [plantedTriage('rafa-bot', head)] }));
+    const config = `${GH_CONFIG}board:\n  trustedAuthors: [rafa-bot]\n`;
+
+    const outcome = await ran(caseSeams(fake).seams, freshProject(config), ['41']);
+
+    expect(outcome.run.stdout).toContain('already assessed at');
+    expect(outcome.run.stdout).not.toContain('was ignored');
+    expect(calls(fake).some((call) => call.includes('collaborators/rafa-bot/permission'))).toBe(false);
   });
 });
 

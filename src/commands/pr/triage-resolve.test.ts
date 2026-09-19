@@ -40,6 +40,16 @@
  *   - **A resolve run that fixed the pull request exits 0.** Its
  *     control is the stop cases: the same command, the same seams, a
  *     different stand-in loop.
+ *
+ * `'what --resolve does not run'` below also carries the trust check's
+ * remaining legs from `.specs/rafa-20-pr-commands.md`'s "write-holder
+ * passes, outsider refused, lookup failure refused, allow-list
+ * honoured": a login the fake has planted no permission for is a
+ * failed lookup rather than `read`, and `board.trustedAuthors` is read
+ * off the project config this file plants — not handed over as a
+ * literal — so that case measures the config wiring
+ * (`src/commands/pr/pr-context.ts`) reaching this command, and not only
+ * `board/trust.ts` or `triage-trust.ts` in isolation.
  */
 import type { TriageSeams } from './triage.js';
 import type { RafaCommand } from '../../cli/command.js';
@@ -186,6 +196,8 @@ interface CaseOptions {
   readonly trusted?: readonly string[];
   /** A permission per login for the accounts that hold no write access. */
   readonly reading?: Readonly<Record<string, string>>;
+  /** The project config text. {@link GH_CONFIG} when left out. */
+  readonly config?: string;
 }
 
 /** What one dispatched run left behind. */
@@ -215,7 +227,7 @@ async function resolved(options: CaseOptions): Promise<Ran> {
   const git = stubGit(options.files ?? ((): readonly string[] => ['bun.lock']), options.worktrees ?? true);
   const loops: LoopCall[] = [];
   let slept = 0;
-  const project = plantProject(mkdtempSync(join(tempBase, 'case-')), GH_CONFIG);
+  const project = plantProject(mkdtempSync(join(tempBase, 'case-')), options.config ?? GH_CONFIG);
   const seams: TriageSeams = {
     pullRequests: () => createGhPullRequests({ gh: fake.run }),
     readBranch: () => BRANCH,
@@ -484,6 +496,36 @@ describe('what --resolve does not run', () => {
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.loops).toHaveLength(1);
+  });
+
+  it('refuses a pull request whose author\'s permission lookup failed, rather than passing it', async () => {
+    const outcome = await resolved({
+      seeds: [{ ...CONFLICTED_41, author: { login: 'stranger', isBot: false, name: 'A Stranger' } }],
+      trusted: [FAKE_COMMENT_AUTHOR],
+      // No `reading` for `stranger`, so the fake answers a 404 and the
+      // reading is `lookup-failed` rather than `no-write-access`.
+    });
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain('whose write access to open-tomato/rafa could not be read');
+    expect(outcome.loops).toEqual([]);
+    expect(gitLines(outcome.git, 'worktree')).toEqual([]);
+  });
+
+  it('runs for an author board.trustedAuthors names, read off the project config, with no lookup spent', async () => {
+    const outcome = await resolved({
+      seeds: [{ ...CONFLICTED_41, author: { login: 'stranger', isBot: false, name: 'A Stranger' } }],
+      trusted: [FAKE_COMMENT_AUTHOR],
+      // Nothing is planted for `stranger`: only the config allow-list
+      // can trust this author, so a lookup spent on it would 404.
+      config: `${GH_CONFIG}board:\n  trustedAuthors: [stranger]\n`,
+      attempt: fixesIt,
+    });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.loops).toHaveLength(1);
+    expect(outcome.fake.calls().some((call) => call.join(' ').includes('collaborators/stranger/permission')))
+      .toBe(false);
   });
 
   it('refuses --resolve beside --no-comment, which has nowhere to raise the count', async () => {
