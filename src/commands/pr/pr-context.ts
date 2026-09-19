@@ -201,6 +201,8 @@ export interface PrContext {
   readonly mergeMethod: MergeMethod;
   /** `pr.base`, or null when nobody has named one. */
   readonly base: string | null;
+  /** `pr.resolveBudget`, the US dollars each `pr triage --resolve` session is capped at. */
+  readonly resolveBudget: number;
   /** The branch checked out at the project root; throws when git cannot read it. */
   readonly readBranch: () => string;
 }
@@ -220,7 +222,7 @@ export interface PullPick {
 }
 
 /** The pull request settings an action reads off the config. */
-type PrConfig = Pick<RafaConfig, 'prProvider' | 'prMergeMethod' | 'prBase'>;
+type PrConfig = Pick<RafaConfig, 'prProvider' | 'prMergeMethod' | 'prBase' | 'prResolveBudget'>;
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
 function projectOf(context: RafaContext): ProjectFound {
@@ -275,6 +277,7 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     pulls: makeProvider(project.root),
     mergeMethod: config.prMergeMethod,
     base: config.prBase,
+    resolveBudget: config.prResolveBudget,
     readBranch: () => readBranch(project.root),
   };
 }

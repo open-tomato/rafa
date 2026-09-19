@@ -143,7 +143,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr view': [['n'], []],
   'pr list': [[], []],
   'pr merge': [['n'], ['yes', 'method']],
-  'pr triage': [['n'], ['comment', 'max-attempts']],
+  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],

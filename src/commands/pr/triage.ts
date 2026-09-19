@@ -1,11 +1,13 @@
 /**
- * `rafa pr triage [<n>] [--no-comment] [--max-attempts=<count>]`: one
- * pull request assessed IN CODE — its class, the evidence the class was
- * read from, and a follow-up prompt a session can be handed as it
- * stands.
+ * `rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]`:
+ * one pull request assessed IN CODE — its class, the evidence the class
+ * was read from, and a follow-up prompt a session can be handed as it
+ * stands — and, under `--resolve`, handed to the ordinary loop over the
+ * pinned plan for its class (`./triage-resolve.ts`).
  *
- * No session is spawned and nothing is asked of a model. The whole
- * assessment is `src/pr/triage/`, every module of which is pure: the
+ * No session is spawned by an ASSESSMENT and nothing is asked of a
+ * model. The whole assessment is `src/pr/triage/`, every module of
+ * which is pure: the
  * closed class list (`classes.ts`), the classifier (`classify.ts`), the
  * log reader (`evidence.ts`), the conflict parser (`conflict.ts`), the
  * comment format (`comment.ts`), the four re-run readings (`rerun.ts`)
@@ -60,10 +62,24 @@
  * is read and refused here rather than at the resolve stage so that the
  * count a comment carries and the cap a line sets are one reading.
  *
- * `--resolve` itself is NOT read by this command. `PR_USAGE.triage`
- * spells it because the usage line is the spec's, and the resolve stage
- * is what makes it act; until then a line carrying it is assessed and
- * nothing is resolved.
+ * ## What `--resolve` adds, and what it leaves here
+ *
+ * The flag changes three things in this module and nothing else. The
+ * selection is told about it, so more than one red candidate refuses
+ * with the exit code `select.ts` gives that reading. `--no-comment`
+ * beside it is refused, because the counter a resolve run raises is
+ * stored in the comment and a run that may not write one would read the
+ * same count for ever. And the reading an assessment produced is handed
+ * to `resolvePullRequest` (`./triage-resolve.ts`), which owns the
+ * worktree, the plan, the budget, the CI wait, the attempt guard and
+ * the exit code 3; what comes back REPLACES the reading in the report,
+ * so the report shows the pull request as the run left it.
+ *
+ * The re-assessment between attempts is this module's `assessOne`,
+ * handed over as a callback. A resolve run therefore reads, classifies
+ * and comments through exactly the same path a bare `rafa pr triage`
+ * does, and there is no second assessment order to keep in step with
+ * this one.
  *
  * ## What is allowed to fail
  *
@@ -81,16 +97,22 @@
  * `pr-context.ts`'s: exit 2 for a provider that is not `gh`, exit 1 for
  * a second word, a word that is no whole number from 1, a flag that
  * swallowed the number, and a config that cannot be used. Its own, all
- * exit 1: a `--max-attempts` that is no whole number from 1, a number
- * the repository has no pull request for, and a provider call that
- * rejected.
+ * exit 1: a `--max-attempts` that is no whole number from 1,
+ * `--resolve` beside `--no-comment`, a number the repository has no
+ * pull request for, and a provider call that rejected. Under
+ * `--resolve`, two more from elsewhere: exit 2 for more than one red
+ * candidate (`select.ts`) and for a cross-repository pull request
+ * (`src/pr/worktree.ts`), and exit 3 when the attempt guard gives up.
  */
 import type { PrSeams } from './pr-context.js';
+import type { ResolveLoopRunner } from './resolve-loop.js';
 import type { TriageReading } from './triage-report.js';
+import type { ResolveResult } from './triage-resolve.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { GitRunner, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
 
+import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
@@ -109,6 +131,7 @@ import {
 } from './pr-context.js';
 import { readConflictFiles, readFailedLogs } from './triage-read.js';
 import { evidenceOf, renderTriages } from './triage-report.js';
+import { resolvePullRequest } from './triage-resolve.js';
 
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.triage;
@@ -123,15 +146,28 @@ export const DEFAULT_MAX_ATTEMPTS = 2;
  */
 const DETACHED_HEAD = 'HEAD';
 
-/** Whether a `--resolve` run has already fixed the pull request; see the module note. */
+/**
+ * What an ASSESSMENT says about a pull request having been resolved: no.
+ * An assessment runs no plan, so it never has that to report; the one
+ * comment whose headline reads `resolved` is written by the run that
+ * made it green (`./triage-resolve.ts`).
+ */
 const RESOLVED = false;
 
-/** How this action reaches git and the clock, beside what every `pr` action reaches. */
+/** How this action reaches git, the clock and a `--resolve` run, beside what every `pr` action reaches. */
 export interface TriageSeams extends PrSeams {
   /** The git runner for a root, which the conflict is read through. `createGitRunner` when left out. */
   readonly git?: (root: string) => GitRunner;
   /** The clock a triage is stamped with, ISO 8601. The system clock when left out. */
   readonly now?: () => string;
+  /** The home a `--resolve` run puts its worktree and its plans under. The project's when left out. */
+  readonly home?: string;
+  /** How one `--resolve` attempt runs the loop. `runResolveLoop` when left out. */
+  readonly runLoop?: ResolveLoopRunner;
+  /** The clock the `--resolve` CI wait measures with, in milliseconds. The system's when left out. */
+  readonly clock?: () => number;
+  /** The sleep between the `--resolve` CI wait's polls. A real timer when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -143,8 +179,12 @@ export interface PrTriageResult {
   readonly selection: TriageSelection | null;
   /** One reading per pull request assessed, in the order they were. */
   readonly readings: readonly TriageReading[];
+  /** What `--resolve` came to, or null when the line asked for none. */
+  readonly resolve: ResolveResult | null;
   /** The report text mode writes. */
   readonly text: string;
+  /** The exit code the command ends with: 3 for a `--resolve` that gave up, 0 otherwise. */
+  readonly exitCode: number;
 }
 
 /** What one pull request's assessment runs with. */
@@ -225,6 +265,7 @@ async function selectTargets(
   pr: AssessOptions['pr'],
   warn: (message: string) => void,
   now: string,
+  resolve: boolean,
 ): Promise<TriageSelection> {
   const branch = readBranchOrNone(pr, warn);
   const current = branch === null
@@ -233,8 +274,13 @@ async function selectTargets(
       `read the open pull request for the branch "${branch}"`,
       () => pr.pulls.findOpen(branch),
     );
-  if (current !== null) return selectTriagePullRequests({ current, candidates: [], now });
-  return selectTriagePullRequests({ current: null, candidates: await redPullRequests(pr), now });
+  if (current !== null) return selectTriagePullRequests({ current, candidates: [], now, resolve });
+  return selectTriagePullRequests({
+    current: null,
+    candidates: await redPullRequests(pr),
+    now,
+    resolve,
+  });
 }
 
 /** The pull request in full, or the refusal for a number the repository has none under. */
@@ -338,10 +384,26 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
   return { ...assessed, ...await commentOn(options, assessed, existing) };
 }
 
+/**
+ * Refuses `--resolve --no-comment`: the attempt counter lives in the
+ * triage comment, and a run that may not write one has nowhere to raise
+ * it, so a later invocation would read the same count for ever.
+ */
+function refuseResolveWithoutComment(wantsResolve: boolean, wantsComment: boolean): void {
+  if (!wantsResolve || wantsComment) return;
+  throw lineRefusal(
+    '--resolve writes the attempt count into the triage comment, and --no-comment writes none;'
+      + ' run one or the other',
+    USAGE,
+  );
+}
+
 /** Assesses what the line and the selection chose, and answers the whole report. */
 export async function runTriage(context: RafaContext, seams: TriageSeams): Promise<PrTriageResult> {
   const wantsComment = readBooleanFlag(context.flags, 'comment', USAGE, true);
+  const wantsResolve = readBooleanFlag(context.flags, 'resolve', USAGE, false);
   const maxAttempts = readMaxAttempts(context.flags, USAGE);
+  refuseResolveWithoutComment(wantsResolve, wantsComment);
   const asked = readPullArgument(context.args, USAGE);
   const pr = openPrContext(context, seams);
   const git = (seams.git ?? createGitRunner)(pr.project.root);
@@ -350,15 +412,54 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
   const selection = asked === null
     ? await selectTargets(pr, (message) => {
       context.output.warn(message);
-    }, now())
+    }, now(), wantsResolve)
     : null;
+  if (selection !== null && selection.exitCode !== 0) {
+    throw new CommandExit(selection.exitCode, selection.message);
+  }
   const numbers = asked === null
     ? (selection?.assess ?? []).map((one) => one.number)
     : [asked];
 
   const readings: TriageReading[] = [];
+  let resolve: ResolveResult | null = null;
   for (const number of numbers) {
-    readings.push(await assessOne({ pr, git, number, wantsComment, maxAttempts, at: now() }));
+    const assess = (): Promise<TriageReading> => assessOne({
+      pr,
+      git,
+      number,
+      wantsComment,
+      maxAttempts,
+      at: now(),
+    });
+    const reading = await assess();
+    if (!wantsResolve) {
+      readings.push(reading);
+      continue;
+    }
+    resolve = await resolvePullRequest({
+      pulls: pr.pulls,
+      root: pr.project.root,
+      home: seams.home ?? pr.project.home,
+      number,
+      reading,
+      maxAttempts,
+      budgetUsd: pr.resolveBudget,
+      now,
+      output: context.output,
+      git: seams.git ?? createGitRunner,
+      reassess: assess,
+      ...seams.runLoop === undefined
+        ? {}
+        : { runLoop: seams.runLoop },
+      ...seams.clock === undefined
+        ? {}
+        : { clock: seams.clock },
+      ...seams.sleep === undefined
+        ? {}
+        : { sleep: seams.sleep },
+    });
+    readings.push(resolve.reading);
   }
   const text = [
     ...selection === null
@@ -367,8 +468,11 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
     ...readings.length === 0
       ? []
       : [renderTriages(readings)],
+    ...resolve === null
+      ? []
+      : resolve.lines,
   ].join('\n\n');
-  return { selection, readings, text };
+  return { selection, readings, resolve, text, exitCode: resolve?.exitCode ?? 0 };
 }
 
 /** The command, reaching the provider, git, the branch and the clock through `seams`. */
@@ -388,9 +492,14 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       + ' assessed is shown its stored triage and assessed again by nothing. Without a number it assesses the open'
       + ' pull request of the branch checked out at the project root; with no pull request there it takes the red'
       + ' ones, assessing one, or the two or three of them that moved in the last 72 hours, and listing more than'
-      + ' three with the command for each. With `--output=json` the selection, every'
-      + ' reading and the rendered text are the data of the terminal result event. Refuses with exit code 2 where'
-      + ' `pr.provider` is not `gh`.',
+      + ' three with the command for each. With `--resolve` a pull request whose class is simple is handed to the'
+      + ' ordinary loop over the pinned plan for that class, in a worktree under `~/.rafa/worktrees/pr-<n>` removed'
+      + ' on success, each session capped at `pr.resolveBudget`; it waits on the checks after every attempt and, at'
+      + ' `--max-attempts` or on an attempt ending as the one before it, updates the comment, removes the worktree,'
+      + ' prints the follow-up prompt and exits 3. A cross-repository pull request, and more than one candidate,'
+      + ' are refused with exit code 2. With `--output=json` the selection, every'
+      + ' reading, what `--resolve` came to and the rendered text are the data of the terminal result event.'
+      + ' Refuses with exit code 2 where `pr.provider` is not `gh`.',
     args: [
       {
         name: 'n',
@@ -404,6 +513,12 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
         description: 'Leave the triage as a comment on the pull request; `--no-comment` reads one and writes none.',
         type: 'boolean',
         default: true,
+      },
+      {
+        name: 'resolve',
+        description: 'Run the pinned plan for a simple class in a worktree of its own, waiting on CI after each'
+          + ' attempt. Exits 3 when the attempt guard gives up.',
+        type: 'boolean',
       },
       {
         name: 'max-attempts',
@@ -425,15 +540,22 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
         cmd: 'rafa pr triage 41 --output=json',
         note: 'Writes a result event holding the class, the evidence and the follow-up prompt.',
       },
+      {
+        cmd: 'rafa pr triage 41 --resolve --max-attempts=3',
+        note: 'Runs the pinned plan for a simple class in ~/.rafa/worktrees/pr-41, up to three attempts.',
+      },
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
       const triaged = await runTriage(context, seams);
       if (context.outputMode === 'json') {
         context.output.result(triaged);
-        return;
+      } else if (triaged.text !== '') {
+        context.output.info(triaged.text);
       }
-      if (triaged.text !== '') context.output.info(triaged.text);
+      if (triaged.exitCode !== 0) {
+        throw new CommandExit(triaged.exitCode, triaged.resolve?.headline ?? '');
+      }
     },
   };
   return Object.freeze(command);

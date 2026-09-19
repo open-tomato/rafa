@@ -493,6 +493,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
   ]],
   ['./commands/pr/triage.js', [
+    ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/index.js', ['createGitRunner']],
     ['../../pr/triage/classify.js', ['classifyTriage']],
@@ -510,6 +511,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
     ['./triage-read.js', ['readConflictFiles', 'readFailedLogs']],
     ['./triage-report.js', ['evidenceOf', 'renderTriages']],
+    ['./triage-resolve.js', ['resolvePullRequest']],
   ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
