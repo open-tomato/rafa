@@ -116,6 +116,9 @@ built. A box is ticked by the change that finishes the feature.
   a broken skill before an agent can follow it
 - [x] The agents a plan needs are checked before the run, and copied
   into the project with one command
+- [x] Plan straight from the issue board, or from whatever is next on the roadmap
+- [x] Review, merge and clean up pull requests from the command line
+- [x] A failing pull request is diagnosed, and fixed when the fix is simple
 - [ ] A version bump and a changelog entry with every pull request
 - [ ] The right skills reach the right task, chosen when the plan is
   written
