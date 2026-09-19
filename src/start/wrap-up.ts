@@ -36,10 +36,11 @@ import { withStamp } from './stamp.js';
  * sessions were dispatched under, which is why this takes the plan and
  * no mode: there is no mode to get wrong. `full` renders the plan
  * document byte for byte (`plan/inject.ts`), so what is appended here
- * is the `full` rendering. The session titles the PR after the plan,
- * looks for its issue reference there and summarises the work of every
- * stage, and a `stage` or `task` rendering holds one stage, or one
- * task line.
+ * is the `full` rendering. The session titles the PR `rafa-<n>:
+ * <title>` from the plan title and the `issue: <n>` its `rafa:plan`
+ * block carries, closes that issue from the body with `Closes #<n>`
+ * and summarises the work of every stage, and a `stage` or `task`
+ * rendering holds one stage, or one task line.
  *
  * The merge-conflict bullet is NOT written here: it is
  * `mechanicalConflictBullet()` from `pr/conflict-sentence.ts`, the one
@@ -64,9 +65,9 @@ export function buildWrapUpPrompt(
     '* If there\'s anything worth keeping, take what\'s generally relevant from that file into the `context/` page that owns its subject, `README.md` or a pertinent skill under `.claude/skills/`. The root `AGENTS.md` is a capped map read into every turn of every session: point at the page from there if a new one is needed, never inline the finding itself.',
     '* Promote a finding ONLY when all three hold, and delete or keep it rather than promoting it when any one fails. It is PROJECT-SPECIFIC — a fact about THIS tree (its layout, its gates, its conventions, what a command here actually answers) and not a general technique, which belongs in a skill and not in this repo\'s docs. It is NOT ALREADY COVERED by a skill under `.claude/skills/` — read the skill that matches the finding\'s subject before writing anything, and extend that skill in place rather than restating it in a second document. And it NAMES WHAT IT REPLACES — the sentence, bullet or table row it supersedes, deleted in the SAME edit — or, when it replaces nothing, says so. A promotion landing beside the claim it should have replaced leaves two authorities on one subject, and nothing here compares two documents, so the stale one is never reported again.',
     '* If a learn/learn-eval skill is available in this session, invoke it now so reusable patterns from this run are persisted as skills.',
-    '* If it\'s present, extract the issue reference from the plan below (e.g. "#42") to be used in the PR title.',
-    `* If the reference is not present on the plan check if the branch name (${branch}) carries one (e.g. feat/42-slug).`,
-    '* Use the plan title as the PR title, include the issue reference if you found it, e.g. "Implement user authentication (#42)".',
+    '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
+    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
+    '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
     '* BEFORE pushing, bring the branch up to date with the base: `git fetch origin main` then `git merge origin/main`. A branch that conflicts with main gets NO CI run at all — GitHub cannot build `refs/pull/<n>/merge` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan\'s context is still loaded, is the cheapest place it will ever be.',
     mechanicalConflictBullet(),
