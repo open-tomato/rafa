@@ -3,7 +3,7 @@
  * the lines the loop prints about a record.
  *
  * Every output is a whole session output, prose and then a `rafa:report`
- * block, recorded under a fresh temporary repo root. What the four report
+ * block, recorded under a fresh temporary repo root. What the five report
  * tables hold is read back through `bun:sqlite` directly and never
  * through the writers, so each case reads the disk rather than the
  * answer.
@@ -20,6 +20,12 @@
  * cases reading that table were in, the module restored sha256-identical:
  * the row never written (4 of the 12 cases red) and the row written with a
  * NULL status whatever the report said (3).
+ *
+ * Three more came with the `changes` table, driven the same way once the
+ * cases reading it were in, the module restored sha256-identical: the
+ * notes never written (6 of the 14 cases red), the changes tally dropped
+ * from the summary line (3), and the refused notes left out of the
+ * warnings (1).
  */
 import type { TaskReportInput } from './record.js';
 
@@ -70,6 +76,12 @@ const FULL_REPORT = reportBlock(
   '  - what: "the collector double counts"',
   '    artifact: "count mismatch"',
   '    security: false',
+  'changes:',
+  '  - level: minor',
+  '    area: "effort store"',
+  '    summary: "A task report now records what its own diff changed."',
+  '  - level: patch',
+  '    summary: "The record summary counts change notes too."',
 );
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-record-'));
@@ -105,6 +117,9 @@ const DISPATCH = {
 /** The columns every report table takes from the dispatch and the loop. */
 const PROVENANCE = 'session_id, plan_stub, task_line, outcome';
 
+/** The same, for the one table that stores no outcome. */
+const CHANGE_PROVENANCE = 'session_id, plan_stub, task_line';
+
 /** Those columns as the default dispatch fills them. */
 const DISPATCHED = {
   session_id: 'aaaa-1111',
@@ -134,6 +149,25 @@ describe('recordTaskReport', () => {
       .toEqual([{ ...stored, what: 'the collector double counts', security: 0 }]);
     expect(rowsOf(root, 'report_absences', PROVENANCE)).toEqual([]);
 
+    // The changes table carries no outcome column, so its rows are read
+    // by the dispatch alone; the throw below is the control that the
+    // column is really absent and not merely left unselected.
+    expect(rowsOf(root, 'changes', `${CHANGE_PROVENANCE}, level, area, summary`)).toEqual([
+      {
+        ...DISPATCHED,
+        level: 'minor',
+        area: 'effort store',
+        summary: 'A task report now records what its own diff changed.',
+      },
+      {
+        ...DISPATCHED,
+        level: 'patch',
+        area: null,
+        summary: 'The record summary counts change notes too.',
+      },
+    ]);
+    expect(() => rowsOf(root, 'changes', 'outcome')).toThrow('no such column');
+
     // The session claimed done and the loop made its task blocked: the
     // one status row holds the two side by side.
     expect(rowsOf(root, 'task_reports', `${PROVENANCE}, status`))
@@ -147,7 +181,7 @@ describe('recordTaskReport', () => {
     expect(record.present).toBe(false);
     expect(rowsOf(root, 'report_absences', `${PROVENANCE}, reason, block_body`))
       .toEqual([{ ...DISPATCHED, outcome: 'failed', reason: 'no-block', block_body: null }]);
-    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'task_reports']) {
+    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'changes', 'task_reports']) {
       expect(rowsOf(root, table, 'id')).toEqual([]);
     }
   });
@@ -162,6 +196,7 @@ describe('recordTaskReport', () => {
     expect(absence?.['reason']).toBe('malformed-block');
     expect(String(absence?.['block_body'])).toContain('feedback: it broke: twice');
     expect(rowsOf(root, 'findings', 'id')).toEqual([]);
+    expect(rowsOf(root, 'changes', 'id')).toEqual([]);
     expect(rowsOf(root, 'task_reports', 'id')).toEqual([]);
   });
 
@@ -172,7 +207,7 @@ describe('recordTaskReport', () => {
     expect(record.present).toBe(true);
     expect(rowsOf(root, 'task_reports', `${PROVENANCE}, status`))
       .toEqual([{ ...DISPATCHED, outcome: 'done', status: 'done' }]);
-    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'report_absences']) {
+    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'changes', 'report_absences']) {
       expect(rowsOf(root, table, 'id')).toEqual([]);
     }
   });
@@ -193,6 +228,30 @@ describe('recordTaskReport', () => {
     ]);
   });
 
+  it('stores the change notes the writer keeps and leaves out the one it refuses', () => {
+    const root = freshRoot('changes-refused');
+    const report = reportBlock(
+      'status: done',
+      'changes:',
+      '  - level: patch',
+      '    summary: "The first note is written."',
+      '  - level: sweeping',
+      '    summary: "The level is outside the closed set."',
+      '  - level: none',
+      '    summary: "The third note is written too."',
+    );
+    const record = recordTaskReport(root, inputOf(outputOf(report)));
+
+    if (!record.present) throw new Error('a fixture output read wrongly');
+    expect(record.changes.appended).toBe(2);
+    expect(record.changes.rejected).toHaveLength(1);
+    expect(record.changes.rejected[0]).toMatchObject({ index: 1, field: 'level' });
+    expect(rowsOf(root, 'changes', 'level, summary')).toEqual([
+      { level: 'patch', summary: 'The first note is written.' },
+      { level: 'none', summary: 'The third note is written too.' },
+    ]);
+  });
+
   it('adds no row when one session output is recorded twice', () => {
     const root = freshRoot('twice');
     recordTaskReport(root, inputOf(outputOf(FULL_REPORT)));
@@ -204,10 +263,12 @@ describe('recordTaskReport', () => {
     if (!again.present || absentAgain.present) throw new Error('a fixture output read wrongly');
     expect([again.findings.appended, again.findings.skipped]).toEqual([0, 2]);
     expect([again.triage.blockers.skipped, again.triage.outOfScopeBugs.skipped]).toEqual([1, 1]);
+    expect([again.changes.appended, again.changes.skipped]).toEqual([0, 2]);
     expect([absentAgain.absence.appended, absentAgain.absence.skipped]).toEqual([0, 1]);
     expect([again.taskReport.appended, again.taskReport.skipped]).toEqual([0, 1]);
     expect(rowsOf(root, 'task_reports', 'session_id')).toEqual([{ session_id: 'aaaa-1111' }]);
     expect(rowsOf(root, 'findings', 'id')).toHaveLength(2);
+    expect(rowsOf(root, 'changes', 'id')).toHaveLength(2);
     expect(rowsOf(root, 'report_absences', 'id')).toHaveLength(1);
   });
 
@@ -234,6 +295,7 @@ describe('describeTaskReportRecord', () => {
         'findings 2 stored, 0 already held, 0 refused',
         'blockers 1 stored, 0 already held, 0 refused',
         'out-of-scope bugs 1 stored, 0 already held, 0 refused',
+        'changes 2 stored, 0 already held, 0 refused',
       ].join('; ')],
       warnings: [],
     });
@@ -246,6 +308,7 @@ describe('describeTaskReportRecord', () => {
 
     expect(lines.notes[0]).toContain('findings 0 stored, 2 already held, 0 refused');
     expect(lines.notes[0]).toContain('out-of-scope bugs 0 stored, 1 already held, 0 refused');
+    expect(lines.notes[0]).toContain('changes 0 stored, 2 already held, 0 refused');
   });
 
   it('warns once per report issue and once per entry a writer refused', () => {
@@ -270,6 +333,26 @@ describe('describeTaskReportRecord', () => {
     expect(lines.warnings[2]).toContain('findings[1].what');
     expect(lines.warnings[3]).toContain('findings[1] has no artifact');
     expect(lines.warnings[3]).toContain('not written');
+  });
+
+  it('counts the change notes and warns once per note the writer refused', () => {
+    const root = freshRoot('describe-changes');
+    const report = reportBlock(
+      'status: done',
+      'changes:',
+      '  - level: minor',
+      '    summary: "One note the writer keeps."',
+      '  - level: patch',
+      '    summary: ""',
+    );
+    const lines = describeTaskReportRecord(recordTaskReport(root, inputOf(outputOf(report))));
+
+    expect(lines.notes[0]).toContain('changes 1 stored, 0 already held, 1 refused');
+    // The parser reports the blank summary first, and the writer's
+    // refusal of the same entry comes last, after every other list.
+    expect(lines.warnings).toHaveLength(2);
+    expect(lines.warnings[0]).toContain('changes[1].summary');
+    expect(lines.warnings[1]).toBe('Report: changes[1].summary is missing; not written');
   });
 
   it('names a report that gives no status', () => {
