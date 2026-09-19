@@ -27,6 +27,10 @@
  *   - what: "..."
  *     artifact: "..."
  *     security: false
+ * changes:
+ *   - level: patch
+ *     area: "loop"
+ *     summary: "the loop waits for the running task's commit"
  * ```
  * ````
  *
@@ -77,12 +81,12 @@
  *   - A known key whose value is unusable is left null and reported as
  *     `unusable-field`. That covers a string field holding something
  *     other than a string or only whitespace, a closed-set field holding
- *     a value outside {@link REPORT_STATUSES}, {@link FINDING_KINDS} or
- *     {@link FINDING_SIGNALS}, and a `security` flag that is not a
- *     boolean. The sets are closed because stored rows are keyed on them.
- *     A later phase promotes a `silent` finding on its first sighting,
- *     for example, so a signal spelled any other way must not reach the
- *     store looking meaningful.
+ *     a value outside {@link REPORT_STATUSES}, {@link FINDING_KINDS},
+ *     {@link FINDING_SIGNALS} or {@link CHANGE_LEVELS}, and a `security`
+ *     flag that is not a boolean. The sets are closed because stored rows
+ *     are keyed on them. A later phase promotes a `silent` finding on its
+ *     first sighting, for example, so a signal spelled any other way must
+ *     not reach the store looking meaningful.
  *   - A list field holding something other than a list reads as empty,
  *     and is reported. A list entry that is not a mapping, or a
  *     `skills_used` entry that is not a usable string, is dropped and
@@ -90,9 +94,25 @@
  *
  * Required fields: `status`; a finding's `trigger`, `kind`, `what` and
  * `signal`; a blocker's `what`; an out-of-scope bug's `what` and
- * `security`. A missing `security` flag stays null rather than defaulting
- * to false, because this parser does not get to decide that a bug has no
- * security impact.
+ * `security`; a change note's `level` and `summary`. A missing `security`
+ * flag stays null rather than defaulting to false, because this parser
+ * does not get to decide that a bug has no security impact.
+ *
+ * ## Change notes
+ *
+ * `changes` is the list of changelog lines a task returns for its own
+ * diff. A note's `summary` is one line a user of the project would
+ * understand, and its `area` is the short free-text heading the changelog
+ * groups it under. Its `level` says how much of a release the change is
+ * worth, one of {@link CHANGE_LEVELS}: a task whose diff a user would
+ * notice nothing of writes `level: none`, and a task with nothing to say
+ * at all omits the list. An absent list is exactly that — empty, with no
+ * issue — because a note the task did not write is not one to invent.
+ *
+ * {@link CHANGE_LEVELS} is spelled in the order the spec writes it and
+ * carries no ranking. Whatever computes a release level out of a plan's
+ * notes orders them itself; reading precedence off this list's indices
+ * would make `none` the highest of the four.
  *
  * Strings are kept exactly as written, never trimmed. `artifact` is the
  * byte string a recurrence is matched on. A blank one is refused, because
@@ -156,6 +176,12 @@ export const FINDING_SIGNALS = ['loud', 'silent'] as const;
 /** One of the two finding signals. */
 export type FindingSignal = (typeof FINDING_SIGNALS)[number];
 
+/** How much of a release one change note is worth. */
+export const CHANGE_LEVELS = ['patch', 'minor', 'major', 'none'] as const;
+
+/** One of the four change levels. */
+export type ChangeLevel = (typeof CHANGE_LEVELS)[number];
+
 /** One key the parser does not know, at whatever level it was written. */
 export interface ReportExtra {
   /** The key as written. */
@@ -209,6 +235,18 @@ export interface ReportBug {
   readonly extras: readonly ReportExtra[];
 }
 
+/** One `changes` entry: a changelog line, as the task wrote it. */
+export interface ReportChange {
+  /** How much of a release the change is worth. Required. */
+  readonly level: ChangeLevel | null;
+  /** The short heading the changelog groups the line under. */
+  readonly area: string | null;
+  /** One line a user of the project would understand. Required. */
+  readonly summary: string | null;
+  /** Every key that names no field. */
+  readonly extras: readonly ReportExtra[];
+}
+
 /** A `rafa:report` block, read. */
 export interface TaskReport {
   /** The session's claim for its task. Required. */
@@ -223,6 +261,8 @@ export interface TaskReport {
   readonly blockers: readonly ReportBlocker[];
   /** Every usable `out_of_scope_bugs` entry, in order. */
   readonly outOfScopeBugs: readonly ReportBug[];
+  /** Every usable `changes` entry, in order. */
+  readonly changes: readonly ReportChange[];
   /** Every top-level key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -304,7 +344,15 @@ const REQUIRED = true;
 const OPTIONAL = false;
 
 /** The report's own keys. */
-const REPORT_KEYS = ['status', 'feedback', 'findings', 'skills_used', 'blockers', 'out_of_scope_bugs'];
+const REPORT_KEYS = [
+  'status',
+  'feedback',
+  'findings',
+  'skills_used',
+  'blockers',
+  'out_of_scope_bugs',
+  'changes',
+];
 
 /** A finding's keys. */
 const FINDING_KEYS = ['trigger', 'kind', 'what', 'cause', 'resolution', 'artifact', 'signal'];
@@ -314,6 +362,9 @@ const BLOCKER_KEYS = ['what', 'artifact'];
 
 /** An out-of-scope bug's keys. */
 const BUG_KEYS = ['what', 'artifact', 'security'];
+
+/** A change note's keys. */
+const CHANGE_KEYS = ['level', 'area', 'summary'];
 
 /** True for a mapping; false for a list, a scalar or null. */
 function isMapping(value: unknown): value is Mapping {
@@ -504,6 +555,18 @@ function readBug(item: unknown, field: string, issues: ReportIssue[]): ReportBug
   };
 }
 
+/** One `changes` entry. */
+function readChange(item: unknown, field: string, issues: ReportIssue[]): ReportChange | null {
+  const scope = entryScope(item, field, CHANGE_KEYS, issues);
+  if (scope === null) return null;
+  return {
+    level: choiceField(scope, 'level', CHANGE_LEVELS, REQUIRED),
+    area: stringField(scope, 'area', OPTIONAL),
+    summary: stringField(scope, 'summary', REQUIRED),
+    extras: scope.extras,
+  };
+}
+
 /** Reads the report's fields out of a parsed block body. */
 function readReport(document: Mapping, issues: ReportIssue[]): TaskReport {
   const scope = scopeOf(document, REPORT_KEYS, '', issues);
@@ -514,6 +577,7 @@ function readReport(document: Mapping, issues: ReportIssue[]): TaskReport {
     skillsUsed: listField(scope, 'skills_used', readSkill),
     blockers: listField(scope, 'blockers', readBlocker),
     outOfScopeBugs: listField(scope, 'out_of_scope_bugs', readBug),
+    changes: listField(scope, 'changes', readChange),
     extras: scope.extras,
   };
 }

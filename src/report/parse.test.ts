@@ -35,6 +35,15 @@
  * matched as fields. Six rows of the no-block table and the CRLF case
  * went red under none of them: what they pin is the block reader's
  * fence and line rules, which `plan/blocks.test.ts` drives.
+ *
+ * Seven more were driven on 2026-09-20, when `changes` joined the
+ * report: the list never read and `changes` dropped from the key roster
+ * (9 of 84 red each, the spec-example case among them, which sees the
+ * key land in `extras`), `level` and `summary` each made optional (2
+ * red each), `area` made required (1), `none` dropped from
+ * `CHANGE_LEVELS` (2), and `changes` read before
+ * `out_of_scope_bugs` (1, the issue-order case). The module was green
+ * before and after, and restored byte-identical (sha256) after each.
  */
 import type { ReportAbsent, ReportFinding, ReportPresent, ReportReading } from './parse.js';
 
@@ -42,7 +51,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'bun:test';
 
-import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from './parse.js';
+import { CHANGE_LEVELS, FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from './parse.js';
 
 /** A bare backtick fence, spelled once. */
 const FENCE = '```';
@@ -107,6 +116,10 @@ const SPEC_BODY = [
   '  - what: "..."',
   '    artifact: "..."',
   '    security: false',
+  'changes:',
+  '  - level: minor',
+  '    area: "loop"',
+  '    summary: "the task report carries change notes"',
 ];
 
 /** A finding with every required field and nothing else, as body lines. */
@@ -116,6 +129,16 @@ function findingLines(trigger: string, what: string, extra: readonly string[] = 
     '    kind: gotcha',
     `    what: "${what}"`,
     '    signal: loud',
+    ...extra,
+  ];
+}
+
+/** A change note with a level, an area and a summary, as body lines. */
+function changeLines(level: string, summary: string, extra: readonly string[] = []): string[] {
+  return [
+    `  - level: ${level}`,
+    '    area: "loop"',
+    `    summary: "${summary}"`,
     ...extra,
   ];
 }
@@ -157,6 +180,12 @@ describe('the report a session output ends with', () => {
       skillsUsed: ['progress-hygiene'],
       blockers: [{ what: 'LINEAR_API_KEY unset', artifact: '401 Unauthorized', extras: [] }],
       outOfScopeBugs: [{ what: '...', artifact: '...', security: false, extras: [] }],
+      changes: [{
+        level: 'minor',
+        area: 'loop',
+        summary: 'the task report carries change notes',
+        extras: [],
+      }],
       extras: [],
     });
     expect(reading.issues).toEqual([]);
@@ -173,6 +202,7 @@ describe('the report a session output ends with', () => {
     expect([...REPORT_STATUSES]).toEqual(['done', 'blocked']);
     expect([...FINDING_KINDS]).toEqual(['gotcha', 'pattern', 'location', 'skill-suggestion']);
     expect([...FINDING_SIGNALS]).toEqual(['loud', 'silent']);
+    expect([...CHANGE_LEVELS]).toEqual(['patch', 'minor', 'major', 'none']);
   });
 });
 
@@ -571,6 +601,80 @@ describe('the blockers and out_of_scope_bugs lists', () => {
 
     expect(reading.report).toMatchObject({ blockers: [], outOfScopeBugs: [] });
     expect(issuePairs(reading)).toEqual(['unusable-field blockers[0]', 'unusable-field out_of_scope_bugs[0]']);
+  });
+});
+
+describe('the changes list', () => {
+  it.each([...CHANGE_LEVELS])('reads level %s, with the area and summary beside it', (level) => {
+    const reading = reportOf('status: done', 'changes:', ...changeLines(level, 'loop pause waits for a commit'));
+
+    expect(reading.report.changes).toEqual([
+      { level, area: 'loop', summary: 'loop pause waits for a commit', extras: [] },
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('reads a note with no area, leaving it null and reporting nothing', () => {
+    const reading = reportOf(
+      'status: done',
+      'changes:',
+      '  - level: patch',
+      '    summary: "rafa release tag prints the publish line"',
+    );
+
+    expect(reading.report.changes).toEqual([{
+      level: 'patch',
+      area: null,
+      summary: 'rafa release tag prints the publish line',
+      extras: [],
+    }]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('carries every entry in order, identical entries included', () => {
+    const reading = reportOf(
+      'status: done',
+      'changes:',
+      ...changeLines('patch', 'first'),
+      ...changeLines('patch', 'first'),
+      ...changeLines('major', 'second'),
+      ...changeLines('none', 'third'),
+    );
+
+    expect(reading.report.changes.map((change) => [change.level, change.summary])).toEqual([
+      ['patch', 'first'],
+      ['patch', 'first'],
+      ['major', 'second'],
+      ['none', 'third'],
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('reports a missing level and summary in field order, keeping the entry', () => {
+    const reading = reportOf('status: done', 'changes:', '  - area: "loop"');
+
+    expect(reading.report.changes).toEqual([{ level: null, area: 'loop', summary: null, extras: [] }]);
+    expect(issuePairs(reading)).toEqual([
+      'missing-field changes[0].level',
+      'missing-field changes[0].summary',
+    ]);
+  });
+
+  it('answers its issues after the lists written above it', () => {
+    const reading = reportOf(
+      'status: done',
+      'changes:',
+      '  - area: "loop"',
+      'out_of_scope_bugs:',
+      '  - artifact: "401 Unauthorized"',
+    );
+
+    expect(issuePairs(reading)).toEqual([
+      'missing-field out_of_scope_bugs[0].what',
+      'missing-field out_of_scope_bugs[0].security',
+      'missing-field changes[0].level',
+      'missing-field changes[0].summary',
+    ]);
   });
 });
 
