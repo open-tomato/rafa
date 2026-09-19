@@ -135,6 +135,7 @@ import {
 } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { readPlanChanges } from '../effort/store/changes.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import {
   dispatchTask,
@@ -249,6 +250,99 @@ describe('a dispatched task session', () => {
     expect(first.sessionId).toMatch(UUID);
     expect(second.sessionId).toMatch(UUID);
     expect(first.sessionId).not.toBe(second.sessionId);
+  });
+});
+
+describe('a report\'s change notes, stored under a plan stub', () => {
+  beforeEach(() => {
+    setActiveOutput(sinkOutput({}));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** One captured output, its `changes` list holding two notes. */
+  const OUTPUT_WITH_CHANGES = [
+    'Done: two modules landed.',
+    '',
+    `${FENCE}rafa:report`,
+    'status: done',
+    'findings: []',
+    'blockers: []',
+    'out_of_scope_bugs: []',
+    'changes:',
+    '  - level: patch',
+    '    summary: "fixes a stand-in bug"',
+    '  - level: minor',
+    '    area: "cli"',
+    '    summary: "adds a stand-in flag"',
+    FENCE,
+    '',
+  ].join('\n');
+
+  /** One captured output whose report lists no `changes` at all. */
+  const OUTPUT_WITHOUT_CHANGES = [
+    'Done: nothing worth a changelog line.',
+    '',
+    `${FENCE}rafa:report`,
+    'status: done',
+    'findings: []',
+    'blockers: []',
+    'out_of_scope_bugs: []',
+    FENCE,
+    '',
+  ].join('\n');
+
+  it('reads the notes back under their plan stub, none under an absent list, and no row for the same output twice', () => {
+    const root = join(tempRoot, 'changes-integration');
+    mkdirSync(root, { recursive: true });
+
+    const dispatch = {
+      sessionId: 'cccc-1111',
+      taskText: 'Record the change notes',
+      output: OUTPUT_WITH_CHANGES,
+      declaration: null,
+      flags: [],
+    };
+    expect(storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done' })).toBe(true);
+
+    expect(readPlanChanges(root, 'a-plan-stub')).toEqual([
+      {
+        sessionId: 'cccc-1111',
+        taskLine: 'Record the change notes',
+        level: 'patch',
+        area: null,
+        summary: 'fixes a stand-in bug',
+        collectedAt: expect.any(String),
+      },
+      {
+        sessionId: 'cccc-1111',
+        taskLine: 'Record the change notes',
+        level: 'minor',
+        area: 'cli',
+        summary: 'adds a stand-in flag',
+        collectedAt: expect.any(String),
+      },
+    ]);
+
+    // An absent `changes` list stores nothing: a session recorded under
+    // another stub, and one whose report named no changes at all.
+    const noChangesDispatch = {
+      sessionId: 'cccc-2222',
+      taskText: 'Record nothing worth a note',
+      output: OUTPUT_WITHOUT_CHANGES,
+      declaration: null,
+      flags: [],
+    };
+    expect(storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch: noChangesDispatch, outcome: 'done' }))
+      .toBe(true);
+    expect(readPlanChanges(root, 'another-plan-stub')).toEqual([]);
+    expect(readPlanChanges(root, 'a-plan-stub')).toHaveLength(2);
+
+    // The same output recorded again, under the same session id, adds no row.
+    expect(storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done' })).toBe(true);
+    expect(readPlanChanges(root, 'a-plan-stub')).toHaveLength(2);
   });
 });
 
