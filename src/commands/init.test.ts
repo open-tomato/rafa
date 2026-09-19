@@ -72,6 +72,7 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { BOARD_LABELS } from '../board/setup.js';
 import { readBinPath } from '../project/bin-path.js';
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';
@@ -656,6 +657,31 @@ describe('the board step', () => {
     expect(prompter.record.asked).toBe(1);
     expect(resultOf(run.stdout).board).toMatchObject({ status: 'ran', asked: true });
     expect(gh.routes()[0]).toBe('repo view');
+  });
+
+  it('creates nothing on a second run of --board over the board the first one made, byte for byte', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+    const seams = seamsFor(world, {
+      readRemote: () => 'https://github.com/acme/widgets.git',
+      gh: () => gh.run,
+    });
+
+    const first = await init(world, ['--yes', '--board'], seams);
+    const sentFirst = gh.routes().length;
+    const madeFirst = gh.routes().filter((route) => route === 'label create');
+    const bytes = stateOf(world.base).map((entry) => entry.replace(/ \d+(\.\d+)? /, ' '));
+    ageAll(world.base);
+
+    const second = await init(world, ['--yes', '--board'], seams);
+
+    expect(first.exitCode).toBe(0);
+    expect(madeFirst).toHaveLength(BOARD_LABELS.length);
+    expect(second.exitCode).toBe(0);
+    expect(second.stdout.trimEnd().endsWith('Nothing changed.')).toBe(true);
+    expect(gh.routes().slice(sentFirst)).toEqual(['label list']);
+    expect(movedSincePast(world.base)).toEqual([]);
+    expect(stateOf(world.base).map((entry) => entry.replace(/ \d+(\.\d+)? /, ' '))).toEqual(bytes);
   });
 });
 
