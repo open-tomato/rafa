@@ -55,6 +55,15 @@ module's note is the long form.
   `dist/cli.js` bundles only what static imports reach. An action sits at
   `src/commands/<subject>/<action>.ts` and a top-level command at
   `src/commands/<name>.ts`, each module's default export its command.
+- **Each command module's static imports are spelled out too**, in
+  `src/index.test.ts`'s `COMMAND_MODULES`: per module, the exact
+  specifiers and the exact names taken from each, in the order the module
+  spells them. That is how the bundle's reach is held to a list rather
+  than to a habit, so `reads the imports <path> takes as the ones spelled
+  here` goes red the moment a module gains, drops or renames one import.
+  Adding an import to a command module is therefore a two-file change,
+  the module and that roster — the sibling of the declared-flag roster
+  `src/commands/index.test.ts` holds.
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
   and `plan validate`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
@@ -976,6 +985,14 @@ home and the warnings read before the invocation are options.
   default reads, runs
   `RAFA_UPDATE_HELP_SNAPSHOTS=1 bun test src/cli/help.test.ts`, reads the
   diff, and keeps this page true.
+- **The frozen set is three files** — `rafa.txt`, `rafa-loop.txt` and
+  `rafa-loop-start.txt` — and none of them renders another command's flag
+  list. A flag added to `init`, to `plan create` or to a `pr` action shows
+  only in that command's own `--help`, which is not snapshotted, so the
+  updater legitimately writes the three back BYTE-IDENTICAL. That is the
+  expected reading and not a writer that never fired; the control that
+  tells them apart is dirtying one snapshot with an extra line and
+  re-running the updater, which returns the file to its original sha.
 
 ### Describe
 

@@ -113,7 +113,13 @@ gate, and irreversible once `gh pr create` returns. Four checks, all cheap:
    40-hex string as a conflicting file. The name list is the CONFLICT set
    and not the changed-file set (the narrative below it carries
    `Auto-merging <path>` lines for files that merged cleanly), and exit 1
-   is the signal rather than an error. Do NOT rebase to clear it as an
+   is the signal rather than an error. Exit 1 has TWO causes though, a real
+   conflict or a failed invocation, so a CLEAN exit 0 is only worth trusting
+   beside a liveness control: build a two-sided conflict from loose objects
+   in a scratch repository (`git hash-object -w`, `git mktree`,
+   `git commit-tree` — no ref moved, no working tree touched), read it
+   through the same command, and confirm it answers exit 1 with a `CONFLICT`
+   line before believing the subject's exit 0. Do NOT rebase to clear it as an
    afterthought inside a PR task: every commit oid moves, and a body whose
    suite figures were measured at the pre-rebase tip stops describing the
    head it is attached to.
