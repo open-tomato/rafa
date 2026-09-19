@@ -4,6 +4,8 @@
  * rafa plan — generate a plan (and prerequisites) from a spec.
  *
  *   bun src/rafa.ts plan --spec=specs/my-feature.md [--stub=my-feature]
+ *   bun src/rafa.ts plan --issue=20
+ *   bun src/rafa.ts plan --next
  *
  * Wraps the spec in the plan-generation instructions (`plan-prompt.md`)
  * with the plan format inlined from the dev-planner skill, and hands it
@@ -20,15 +22,38 @@
  *
  * ## What the command keeps, and what the adapter does
  *
- * The command checks its command line (the config, `--spec`, `--stub`
- * and a plan already there), runs the usage check, reads `progress.txt`
- * unless `--no-progress` is given, and reads the template and the plan
- * format beside itself. It makes the adapter with the setting sources,
+ * The command checks its command line (the config, the spec source,
+ * `--stub` and a plan already there), runs the usage check, reads
+ * `progress.txt` unless `--no-progress` is given, and reads the template
+ * and the plan format beside itself. It makes the adapter with the setting sources,
  * `plan.dir` and {@link buildPlanPrompt} bound to what it read. The
  * adapter reads the spec, makes `plan.dir`, runs the session, and answers
  * the paths the session wrote or rejects.
  *
- * ## Where the spec and the plan are
+ * ## Which spec, and where the plan is
+ *
+ * Three flags name one spec, and they are mutually exclusive:
+ * `--spec=<file>`, `--issue=<n>` and `--next[=<roadmap-issue>]`. The
+ * words are read by `board/spec-source.ts` and the routes are resolved
+ * by `board/plan-spec.ts`, which builds the `gh` and `git` runners,
+ * runs the cheap board checks and answers ONE spec path — a file for
+ * `--spec`, and for the two board routes the snapshot of the issue body
+ * written under `specs.dir`. Everything below that point is what
+ * `--spec` always did: the stub, the prompt, the session, the stamp and
+ * the classifier keys. A line naming no source is refused with
+ * {@link usageRefusal}, and one naming two with the exclusion refusal,
+ * both exit code 1.
+ *
+ * `--dry-run` reads and refuses everything and writes nothing, and
+ * `--next` over a roadmap with nothing left prints a message; both end
+ * the command at 0 before any session is paid for, which is why the
+ * resolution is the first thing after the config.
+ *
+ * The board routes resolve BEFORE the plan-already-there refusal,
+ * because the stub is read off the snapshot's name and there is no name
+ * until the issue has been read. So `--issue` against a stub already
+ * planned writes the snapshot and then refuses; the snapshot is the
+ * text of an issue either way, and the refusal names the plan to remove.
  *
  * `--spec` names a file against the project root, and when nothing is
  * there, the same name under `specs.dir`; a spec in neither is refused,
@@ -52,10 +77,12 @@
  * `CommandExit` (`cli/command.ts`) and never by `process.exit`, so the
  * dispatcher writes the terminal event. A rejection throws the exit code
  * a `claude` planner's rejection carries, or 1 for any other, with the
- * rejection's message. An unusable config, a missing `--spec`, a spec
- * that does not exist and a plan already there each throw exit code 1
- * with the whole refusal as the message, and a spec the planner judged
- * not ready throws exit code 3 with every gap in it. Text mode writes
+ * rejection's message. An unusable config, a line naming no spec source
+ * or several, a spec that does not exist and a plan already there each
+ * throw exit code 1 with the whole refusal as the message; a board
+ * refusal — a closed or unlabelled issue, a leaking body, a snapshot
+ * that differs with no `--refresh` — throws exit code 2, and a spec the
+ * planner judged not ready throws exit code 3 with every gap in it. Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
  *
@@ -71,8 +98,10 @@
  * gaps on the issue when there is one, swaps `spec:ready` for
  * `spec:needs-work`, and throws `CommandExit(3)` carrying every gap.
  * `--spec=<file>` has no issue and so no labels to move: that route
- * removes, prints and exits 3. The issue routes, `--issue` and `--next`,
- * arrive in a later stage and fill {@link SpecReviewGateOptions.issue}.
+ * removes, prints and exits 3. The issue routes fill
+ * {@link SpecReviewGateOptions.issue} with the number and the board
+ * `board/plan-spec.ts` answers beside the spec, so a not-ready verdict
+ * on an issue is published where the spec came from.
  *
  * A REJECTION is weighed differently from an answer, by
  * {@link rejectedReview}. One whose review block was READ and judged the
@@ -88,9 +117,22 @@
  * `--skip-review` bypasses that gate ALONE, and the plan it keeps
  * records `review: skipped` ({@link recordSkippedReview},
  * `board/review-stamp.ts`). Both it and `--no-comment` are read through
- * `readGateFlags` rather than here, and are declared on
- * `commands/plan/create.ts` by the stage that adds `--issue`; the note
- * in `board/gate.ts` records why.
+ * `readGateFlags` rather than here, and both are declared on
+ * `commands/plan/create.ts` beside the board flags.
+ *
+ * ## What a plan off the board records
+ *
+ * A plan the issue routes generated records the issue it was planned
+ * from, `issue: <n>` in its `rafa:plan` block, as the spec asks
+ * ({@link recordPlanIssue}, `board/plan-field.ts`). The number is
+ * written QUOTED, since the plan reader takes that field as a string and
+ * reports a number as unusable; the note in `board/plan-field.ts` holds
+ * the measurement.
+ *
+ * Both records are written AFTER the gate, so a plan a not-ready verdict
+ * removed is never stamped, and both are warnings when they cannot be
+ * written: the plan is what the operator asked for, and a stamp that
+ * refused it would throw away a session already paid for.
  *
  * The project root is a parameter, the root the dispatcher resolved
  * (`src/commands/wrap.ts`): `--spec` resolves against it, `plan.dir` and
@@ -122,6 +164,7 @@
  */
 import type { AdapterRegistry } from './adapters/registry.js';
 import type { SpecReviewGateOptions } from './board/gate.js';
+import type { PlanFieldStamp } from './board/plan-field.js';
 import type { SpecReviewReading } from './board/spec-review.js';
 import type { RafaConfig } from './config.js';
 import type { GeneratedPlan, Planner, PlanRequest } from './ports/index.js';
@@ -135,7 +178,10 @@ import { activeOutput } from './adapters/output/active.js';
 import { ClaudePlannerError, planFilePath } from './adapters/planner/claude.js';
 import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { enforceSpecReview, readGateFlags, SKIP_REVIEW_FLAG } from './board/gate.js';
+import { issueFieldLine, stampPlanIssue } from './board/plan-field.js';
+import { resolvePlanSpec } from './board/plan-spec.js';
 import { REVIEW_SKIPPED_LINE, stampReviewSkipped } from './board/review-stamp.js';
+import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from './board/spec-source.js';
 import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
@@ -324,6 +370,19 @@ function findSpec(repoRoot: string, specArg: string, specsDir: string): string {
   return found;
 }
 
+/**
+ * The refusal a line naming no spec source gets: the usage, then
+ * {@link noSourceMessage}, which names each of the three flags and where
+ * a `--spec` file is looked for.
+ */
+export function usageRefusal(specsDir: string): string {
+  return [
+    'Usage: rafa plan create (--spec=<file>.md | --issue=<n> | --next[=<roadmap-issue>])',
+    '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment]',
+    noSourceMessage(specsDir),
+  ].join('\n');
+}
+
 /** Everything the readiness gate needs of a run but the verdict itself. */
 type GateBase = Omit<SpecReviewGateOptions, 'review'>;
 
@@ -368,40 +427,57 @@ async function generateOrExit(
 }
 
 /**
- * Records `review: skipped` in the plan `--skip-review` kept, and says
- * so. A plan that cannot be read, cannot be written, or holds no
- * readable `rafa:plan` block is WARNED about and nothing else: the plan
- * itself is what the operator asked for, and a stamp that refused it
- * would throw away a session already paid for.
+ * Records one line in the generated plan's `rafa:plan` block, answering
+ * whether the plan now carries it.
+ *
+ * A plan that cannot be read, cannot be written, or holds no readable
+ * `rafa:plan` block is WARNED about and nothing else, and answers false:
+ * the plan itself is what the operator asked for, and a stamp that
+ * refused it would throw away a session already paid for. `line` is what
+ * the warning calls the record.
  */
-function recordSkippedReview(repoRoot: string, planPath: string): void {
+function recordInPlan(
+  repoRoot: string,
+  planPath: string,
+  stamp: (written: string) => PlanFieldStamp,
+  line: string,
+): boolean {
   const file = path.resolve(repoRoot, planPath);
-  const unrecorded = (why: string): void => {
-    activeOutput().warn(`${planPath} does not record ${REVIEW_SKIPPED_LINE}: ${why}`);
+  const unrecorded = (why: string): boolean => {
+    activeOutput().warn(`${planPath} does not record ${line}: ${why}`);
+    return false;
   };
 
   let written: string;
   try {
     written = fs.readFileSync(file, 'utf8');
   } catch (error) {
-    unrecorded(messageOf(error));
-    return;
+    return unrecorded(messageOf(error));
   }
 
-  const stamp = stampReviewSkipped(written);
-  if (!stamp.recorded) {
-    unrecorded(stamp.note);
-    return;
-  }
-  if (stamp.answer !== 'unchanged') {
+  const stamped = stamp(written);
+  if (!stamped.recorded) return unrecorded(stamped.note);
+  if (stamped.answer !== 'unchanged') {
     try {
-      fs.writeFileSync(file, stamp.text, 'utf8');
+      fs.writeFileSync(file, stamped.text, 'utf8');
     } catch (error) {
-      unrecorded(messageOf(error));
-      return;
+      return unrecorded(messageOf(error));
     }
   }
+  return true;
+}
+
+/** Records `review: skipped` in the plan `--skip-review` kept, and says so. */
+function recordSkippedReview(repoRoot: string, planPath: string): void {
+  if (!recordInPlan(repoRoot, planPath, stampReviewSkipped, REVIEW_SKIPPED_LINE)) return;
   activeOutput().info(`⏭  ${SKIP_REVIEW_FLAG}: the spec was not reviewed, and ${planPath} records ${REVIEW_SKIPPED_LINE}.`);
+}
+
+/** Records the issue a board route planned from in the plan it wrote, and says so. */
+function recordPlanIssue(repoRoot: string, planPath: string, issue: number): void {
+  const line = issueFieldLine(issue);
+  if (!recordInPlan(repoRoot, planPath, (written) => stampPlanIssue(written, issue), line)) return;
+  activeOutput().info(`🔖 ${planPath} records ${line}, the issue it was planned from.`);
 }
 
 export default async function plan(
@@ -409,18 +485,26 @@ export default async function plan(
   repoRoot: string,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
-  const { settingSources, planDir, specsDir } = resolvePlanConfig(repoRoot, homedir());
+  const { settingSources, planDir, specsDir, roadmapIssue } = resolvePlanConfig(repoRoot, homedir());
   const flags = readGateFlags(args);
 
-  const specArg = argValue(args, '--spec');
-  if (!specArg) {
-    throw new CommandExit(1, [
-      'Usage: rafa plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]',
-      `A spec is read against the project root, or under specs.dir (${specsDir}) when the root holds none.`,
-    ].join('\n'));
-  }
+  const source = readSpecSourceFlags(args);
+  if (source.request === null) throw new CommandExit(SOURCE_REFUSAL_EXIT, usageRefusal(specsDir));
 
-  const specRequest = findSpec(repoRoot, specArg, specsDir);
+  const resolved = await resolvePlanSpec({
+    request: source.request,
+    refresh: source.refresh,
+    dryRun: source.dryRun,
+    repoRoot,
+    specsDir,
+    roadmapIssue,
+    findSpec: (spec) => findSpec(repoRoot, spec, specsDir),
+  });
+  // `--dry-run` and a roadmap with nothing left have both said their
+  // piece already; the run is over and no session is paid for.
+  if (resolved.outcome === 'stopped') return;
+
+  const specRequest = resolved.spec.path;
   const specPath = path.resolve(repoRoot, specRequest);
 
   const stub = argValue(args, '--stub') ?? stubFromSpecPath(specPath);
@@ -459,11 +543,11 @@ export default async function plan(
   });
 
   const gate: GateBase = {
-    source: specRequest,
+    source: resolved.spec.source,
     repoRoot,
     planPath: planFile,
     prerequisitesPath: planFilePath(planDir, `PREREQUISITES-${stub}.md`),
-    issue: null,
+    issue: resolved.gate,
     comment: flags.comment,
   };
 
@@ -482,6 +566,10 @@ export default async function plan(
       prerequisitesPath: generated.prerequisitesPath ?? gate.prerequisitesPath,
       review: generated.review,
     });
+  }
+
+  if (resolved.spec.issue !== null) {
+    recordPlanIssue(repoRoot, generated.planPath, resolved.spec.issue);
   }
 
   activeOutput().info(`\n✅ Plan ready: ${generated.planPath}`);

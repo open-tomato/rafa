@@ -38,6 +38,15 @@
  * `--detached`, which `loop start` now declares, is read by
  * `start/run-config.ts`, which refuses it.
  *
+ * `plan create` names two files because its board flags are read by
+ * three modules under `src/board/` and the words they read sit in one,
+ * `board/flags.ts`, which records why. The rule the case rests on is
+ * what forced that: a module holding a quoted `gh` argument, such as
+ * the `--json` of `gh issue view`, reads here as a flag the command
+ * declares. Measured on 2026-09-19 — a first draft of that module's own
+ * note quoted that word as a literal, and this case went red naming it,
+ * against a list otherwise equal.
+ *
  * Seven mutations were driven on 2026-09-14, one run each over this file,
  * with 28 pass before and after and every file restored byte-identical
  * (sha256), and each reddened at least one case. The `start` alias
@@ -73,7 +82,7 @@ const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
 /** The modules reading each command line, from `src/`. */
 const READERS: Readonly<Record<string, readonly string[]>> = {
-  'plan create': ['plan.ts'],
+  'plan create': ['plan.ts', 'board/flags.ts'],
   'loop start': ['start.ts', 'start/run-config.ts', 'start/runtime.ts'],
   'effort collect': ['effort/collect.ts'],
   'effort report': ['effort/report.ts'],

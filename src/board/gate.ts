@@ -50,20 +50,12 @@
  *
  * Both are read off the command line by {@link readGateFlags} rather
  * than by `src/plan.ts`, which is where the flags a wrapped phase 0
- * command declares are otherwise read. That is deliberate and
- * temporary: `src/commands/index.test.ts` holds `plan create`'s
- * declared flags equal to the quoted `--` literals in `src/plan.ts`,
- * and the stage that declares `--skip-review` and `--no-comment` on
- * `src/commands/plan/create.ts` is the one that adds `--issue` and
- * `--next` beside them and regenerates the help snapshots. Until then
- * the two flags are read and undeclared, so they work and `rafa plan
- * create --help` does not name them.
- *
- * That is measured, not assumed: on 2026-09-19 a bare
- * `args.includes('--skip-review')` added to `src/plan.ts` left
- * `src/commands/index.test.ts` at 140 pass and 1 fail — the case holding
- * `plan create`'s flags equal to that module's quoted literals — and the
- * module was restored from a scratch copy and verified with `shasum -c`.
+ * command declares are otherwise read, and both are DECLARED on
+ * `src/commands/plan/create.ts`. `src/commands/index.test.ts` holds
+ * that command's declared flags equal to the quoted `--` literals of
+ * the modules reading its line, and the words themselves live in
+ * `./flags.ts` for that case to read, which is why neither is spelled
+ * here: this module holds what they DO.
  *
  * ## An issue is optional, because `--spec` has none
  *
@@ -71,7 +63,8 @@
  * no labels to move and no issue to comment on. So {@link GateIssue} is
  * null for that route and every board write is skipped, while the
  * removal, the printed gaps and exit code 3 are the same. The issue
- * route arrives with `--issue` and `--next`.
+ * routes, `--issue` and `--next`, fill it with the number and the board
+ * `./plan-spec.ts` answers beside the spec.
  */
 import type { IssueBoard } from './issue-board.js';
 import type { SpecReviewGap, SpecReviewReading } from './spec-review.js';
@@ -84,6 +77,7 @@ import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
 
+import { NO_COMMENT_FLAG, SKIP_REVIEW_FLAG } from './flags.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import { specReviewCommentBody, writeSpecReviewComment } from './review-comment.js';
 
@@ -124,11 +118,12 @@ export const SPEC_NOT_READY_EXIT = 3;
 /** The label the gate puts on an issue whose spec it refused. */
 export const SPEC_NEEDS_WORK_LABEL = 'spec:needs-work';
 
-/** The flag that bypasses check 3, and check 3 alone. */
-export const SKIP_REVIEW_FLAG = '--skip-review';
-
-/** The flag that keeps the gaps off the board. */
-export const NO_COMMENT_FLAG = '--no-comment';
+/**
+ * The two flags this module reads, re-exported: the readings and the
+ * refusals are this module's, and the words are `./flags.js`'s, which
+ * records why they sit there.
+ */
+export { NO_COMMENT_FLAG, SKIP_REVIEW_FLAG };
 
 /** What the command line said about the gate. */
 export interface GateFlags {

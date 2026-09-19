@@ -191,8 +191,41 @@ module's note is the long form.
   (`src/board/review-stamp.ts`), where the plan reader keeps it as a
   header extra; `--no-comment` keeps the gaps off the board and moves the
   labels anyway. Both flags are read in `src/board/gate.ts` and declared
-  on no command yet, so neither is in any help text until the stage that
-  adds `--issue` declares them.
+  on `src/commands/plan/create.ts` beside the board flags.
+- **`plan create` plans from a file, an issue or the roadmap**
+  (`src/board/spec-source.ts`, `src/board/plan-spec.ts`).
+  `--spec=<file>`, `--issue=<n>` and `--next[=<roadmap-issue>]` are
+  mutually exclusive, and a line naming two, or none, is refused with
+  exit code 1 — the second with the command's usage and
+  `noSourceMessage`. The two board routes read the issue through
+  `gh issue view <n> --json number,title,body,state,labels`, refuse a
+  closed one and one without `type:spec`, run the checks below, and write
+  the body, with `<specs.dir>/rafa-<n>-notes.md` appended under
+  "Local notes", to `<specs.dir>/rafa-<n>-<slug>.md`. The planner reads
+  that snapshot, so the stub, the prompt, the session and the classifier
+  keys are `--spec`'s own; a snapshot already there that differs is
+  refused without `--refresh`. `--next` reads the roadmap issue
+  `roadmap.issue` names, else the pinned issue titled `Roadmap`, prints
+  each line it skipped with why, and exits 0 with a message when nothing
+  is left. `--dry-run` does every read and every refusal and stops before
+  the first write, on all three routes. The generated plan records
+  `issue: "<n>"` in its `rafa:plan` block, quoted because the plan reader
+  refuses a number there (`src/board/plan-field.ts`), and the gate's
+  comment and label swap go to that issue.
+- **Two of the readiness gate's checks run on a board route**
+  (`src/board/plan-spec.ts`): the `spec:ready` label and the leak
+  refusal, in that order, both exit 2 and both before the body is
+  snapshotted, so `--next` STOPS at a line that is not ready rather than
+  skipping it. Check 0, the author's trust, needs an `author` the read
+  does not ask for, and the completeness gaps land with the spec
+  template; until each does, an issue they would have caught reaches the
+  planner, which judges it as check 3.
+- **The words `plan create` reads live in `src/board/flags.ts`**, the
+  seven of the board routes and the gate, because
+  `src/commands/index.test.ts` holds the command's declared flags equal
+  to the quoted `--` literals of the modules named for it and a module
+  that also quotes a `gh` argument, as `src/board/issue.ts` does, cannot
+  be one of them. `src/plan.ts` keeps `--stub` and `--no-progress`.
 - **`init` sets up a project and needs none** (`src/commands/init.ts`),
   declaring `needsProject: false`.
   `--root=<path>` names the root, absolute or relative to the working

@@ -39,9 +39,11 @@
  *
  *  - `author`, which the trust check (check 0 of the readiness gate)
  *    reads. Nothing here can supply it, so the caller that runs the
- *    trust check reads the login itself. Widening the list is a
- *    one-word change to {@link ISSUE_VIEW_FIELDS}, and it is left to
- *    the task that wires the gate together rather than guessed at here.
+ *    trust check reads the login itself. `plan create` composes the
+ *    label check and the leak refusal and NOT check 0
+ *    (`./plan-spec.ts`), so the list is still the spec's own; widening
+ *    it is a one-word change to {@link ISSUE_VIEW_FIELDS}, left to the
+ *    task that wires the trust check in rather than guessed at here.
  *  - `url`, which is how the tracker adapter tells an issue from a pull
  *    request: `gh issue view` answers a pull request's number too, and
  *    only the URL says which it was. Without it, an open pull request
@@ -127,6 +129,7 @@ import { dirname, resolve } from 'node:path';
 import { CommandExit } from '../cli/command.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
+import { REFRESH_FLAG } from './flags.js';
 import { notesPath, specPath } from './naming.js';
 
 /** What every refusal and every failure this module raises opens with. */
@@ -141,8 +144,12 @@ export const SPEC_LABEL = 'type:spec';
 /** The exit code a refused issue ends the command with; the spec's own. */
 export const ISSUE_REFUSAL_EXIT = 2;
 
-/** The flag that takes the issue as it reads now over a snapshot that differs. */
-export const REFRESH_FLAG = '--refresh';
+/**
+ * The flag that takes the issue as it reads now over a snapshot that
+ * differs, re-exported: the rule and the refusal that names it are this
+ * module's, and the word is `./flags.js`'s, which records why.
+ */
+export { REFRESH_FLAG };
 
 /** The heading the local notes are appended under. */
 export const LOCAL_NOTES_HEADING = '## Local notes';

@@ -117,7 +117,14 @@ import type { GitRunner } from '../pr/git.js';
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 
-import { REFRESH_FLAG, requireSpecIssue, writeSpecSnapshot } from './issue.js';
+import {
+  DRY_RUN_FLAG,
+  ISSUE_FLAG,
+  NEXT_FLAG,
+  REFRESH_FLAG,
+  SPEC_FLAG,
+} from './flags.js';
+import { requireSpecIssue, writeSpecSnapshot } from './issue.js';
 import {
   createRoadmapReadings,
   exhaustedMessage,
@@ -131,17 +138,14 @@ import {
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board spec source';
 
-/** The flag naming a spec file outright. */
-export const SPEC_FLAG = '--spec';
-
-/** The flag naming the issue the spec is the body of. */
-export const ISSUE_FLAG = '--issue';
-
-/** The flag taking the first undone line of the roadmap. */
-export const NEXT_FLAG = '--next';
-
-/** The flag that reads and refuses everything, and writes nothing. */
-export const DRY_RUN_FLAG = '--dry-run';
+/**
+ * The four flags this module reads, re-exported: the readings and the
+ * refusals are this module's, and the words are `./flags.js`'s, which
+ * records why they sit there. `--refresh` is read here too and stays
+ * `./issue.ts`'s to re-export, since the rule it changes is that
+ * module's.
+ */
+export { DRY_RUN_FLAG, ISSUE_FLAG, NEXT_FLAG, SPEC_FLAG };
 
 /** The three flags, in the order a refusal names them. */
 export const SOURCE_FLAGS: readonly string[] = [SPEC_FLAG, ISSUE_FLAG, NEXT_FLAG];
