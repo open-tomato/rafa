@@ -742,6 +742,31 @@ describe('the start-only tier of the plan', () => {
       'bun',
     ]);
   });
+
+  it('halts on a first dispatch when its probe fails, and lets a resume through with the skip line instead', async () => {
+    const root = rootWithPrerequisites(START_PREREQUISITES);
+    const resumedRoot = rootWithPrerequisites(START_PREREQUISITES);
+    plantTracker(resumedRoot, '# Stage: one\n\n- [x] Already ran\n- [ ] Still to run\n');
+    const settings = settingsOf([], []);
+    const answers = { [CLEAN_PROBE]: answered(1, 'sh: not clean') };
+
+    const first = await drive(root, settings, answers);
+    const resumed = await drive(resumedRoot, settings, answers);
+
+    expect(first.result).toBeNull();
+    expect(first.refusal?.exitCode).toBe(1);
+    expect(first.probes).toEqual([`${CLEAN_PROBE} in ${root}`]);
+    expect(storedRows(root).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      `required ${CLEAN_CHECKOUT} fail`,
+    ]);
+
+    // The resume never runs the failing probe: it is skipped, not checked and failed.
+    expect(resumed.refusal).toBeNull();
+    expect(resumed.probes).toEqual([]);
+    expect(existsSync(sqliteStorePath(resumedRoot))).toBe(false);
+    expect(resumed.info).toEqual([`\n${skipLine(CLEAN_CHECKOUT)}`]);
+    expect(resumed.warn).toEqual([]);
+  });
 });
 
 /** Plants a file where the store's directory goes, so no row can be written under `root`. */
