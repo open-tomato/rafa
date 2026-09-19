@@ -31,19 +31,25 @@
  *      two tiers, with the plan's `PREREQUISITES-<stub>.md` merged in for
  *      this plan alone (`preflight/prerequisites-md.ts`). A file there
  *      that cannot be read refuses the run before any probe runs.
- *   4. **Prints the reminders** that file carries, through `info`: each
+ *   4. **Adds the pull request provider's automatic items**, through
+ *      `pr/preflight-items.ts`: `gh` on `PATH` and `gh auth status` for
+ *      `origin`'s host, both REQUIRED, when the provider resolves to
+ *      `gh`. They go AHEAD of the configured required tier, because a
+ *      run whose pull request could never be opened should halt at its
+ *      cheapest check rather than after the tiers a repository added.
+ *   5. **Prints the reminders** that file carries, through `info`: each
  *      `human` item, and each `auto` item with no probe, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing.
- *   5. **Checks every item** through `runPreflight`
+ *   6. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
  *      optional item is warned about as it is found.
- *   6. **Stores a row per check** through `writePreflightChecks`
+ *   7. **Stores a row per check** through `writePreflightChecks`
  *      (`effort/store/preflight.ts`), under the repo root in the SQLite
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
- *   7. **Halts, or answers.** A failed required item, or rows that could
+ *   8. **Halts, or answers.** A failed required item, or rows that could
  *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
  *      code 1. Otherwise the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
@@ -92,16 +98,33 @@
  * classifier key (`effort/classify.ts`), and `planStubFromPrompt` answers
  * the first stamp a prompt holds (`utils/plan-stamp.ts`).
  *
+ * ## The automatic items
+ *
+ * {@link automaticItems} resolves the provider (`pr/provider.ts`) from
+ * `settings.prProvider` and the repo root's `origin`, and answers what
+ * that reading contributes (`pr/preflight-items.ts`): two items for
+ * `gh`, none for `none`. They are prepended to the required tier, so
+ * they are checked first, they are counted in the line the preflight
+ * opens with, they are stored as rows like any other check, and one
+ * that fails halts the run before a session is paid for.
+ *
+ * A configured `pr.provider: none` answers with no item and reads no
+ * remote at all: the operator has said, and `resolvePrProvider` would
+ * otherwise spawn `git remote get-url origin` to reach the same answer.
+ * Every other reading spawns it once, through `readRemote`, which is
+ * this module's seam for that probe.
+ *
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
+import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
   PreflightItems,
   PrerequisiteReminder,
   PrerequisiteSettings,
 } from '../preflight/prerequisites-md.js';
-import type { PreflightOptions, PreflightReport } from '../preflight/run.js';
+import type { PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
 
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -114,6 +137,8 @@ import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS } from '../config.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
+import { ghPreflightItems } from '../pr/preflight-items.js';
+import { resolvePrProvider } from '../pr/provider.js';
 import { loadPlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
 import { trackerPathFor } from '../utils/tracker.js';
@@ -136,14 +161,21 @@ export interface StartPreflightAgents {
   readonly home?: string;
 }
 
+/**
+ * What the preflight reads off the config: the two prerequisite tiers,
+ * and `pr.provider` for the automatic items. A `prProvider` left out
+ * reads as null, which is the config's own default for it.
+ */
+export type StartPreflightSettings = PrerequisiteSettings & Partial<Pick<RafaConfig, 'prProvider'>>;
+
 /** What {@link runStartPreflight} checks, and the seams it checks through. */
 export interface StartPreflightOptions {
   /** The repo root: where each probe runs and the store's rows go. */
   readonly repoRoot: string;
   /** The plan the run executes; its `PREREQUISITES-<stub>.md` is merged in. */
   readonly planPath: string;
-  /** The config's two prerequisite tiers, as the run resolved them. */
-  readonly settings: PrerequisiteSettings;
+  /** The config's prerequisite tiers and provider, as the run resolved them. */
+  readonly settings: StartPreflightSettings;
   /** The runner's seams. Each left out is the runner's own default. */
   readonly checks?: Omit<PreflightOptions, 'cwd'>;
   /** Where the run's id comes from. `randomUUID` when left out. */
@@ -152,6 +184,8 @@ export interface StartPreflightOptions {
   readonly now?: PreflightWriterSeams['now'];
   /** What the agent roster is resolved against. Each field left out is its own default. */
   readonly agents?: StartPreflightAgents;
+  /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
+  readonly readRemote?: ResolvePrProviderOptions['readRemote'];
 }
 
 /** What a preflight that let the run through answers. */
@@ -220,6 +254,24 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   ].join('\n'));
 }
 
+/** No automatic item, for a provider that contributes none. */
+const NO_AUTOMATIC_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
+
+/**
+ * The REQUIRED items the run's pull request provider contributes, ahead
+ * of every configured item; see the module note.
+ */
+function automaticItems(options: StartPreflightOptions): readonly PrerequisiteItem[] {
+  const configured = options.settings.prProvider ?? null;
+  if (configured === 'none') return NO_AUTOMATIC_ITEMS;
+
+  return ghPreflightItems(resolvePrProvider({
+    configured,
+    dir: options.repoRoot,
+    readRemote: options.readRemote,
+  }));
+}
+
 /** The items for this plan, or the refusal of a PREREQUISITES file that cannot be read. */
 async function loadItems(options: StartPreflightOptions): Promise<PreflightItems> {
   try {
@@ -279,10 +331,14 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
   const items = await loadItems(options);
   announceReminders(options.planPath, items.reminders);
 
-  const count = items.required.length + items.optional.length;
+  const tiers: PreflightTiers = {
+    required: [...automaticItems(options), ...items.required],
+    optional: items.optional,
+  };
+  const count = tiers.required.length + tiers.optional.length;
   if (count > 0) activeOutput().info(`\n🛫 Preflight: checking ${count} prerequisite item(s) under run ${runId}.`);
 
-  const report = await runPreflight(items, { ...options.checks, cwd: options.repoRoot });
+  const report = await runPreflight(tiers, { ...options.checks, cwd: options.repoRoot });
   const storeProblem = report.checks.length === 0
     ? null
     : storeChecks(options, runId, report);

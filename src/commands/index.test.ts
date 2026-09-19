@@ -1,13 +1,14 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the thirty-three commands it registers: what the registry
+ * declarations of the thirty-nine commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
- * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list` and `instinct show`
+ * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list`, `instinct show`
+ * and the four `pr` readers beside `pr merge` and `pr triage`
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -36,6 +37,15 @@
  * and no phase 0 module reads, and skips the same flag inside a message.
  * `--detached`, which `loop start` now declares, is read by
  * `start/run-config.ts`, which refuses it.
+ *
+ * `plan create` names two files because its board flags are read by
+ * three modules under `src/board/` and the words they read sit in one,
+ * `board/flags.ts`, which records why. The rule the case rests on is
+ * what forced that: a module holding a quoted `gh` argument, such as
+ * the `--json` of `gh issue view`, reads here as a flag the command
+ * declares. Measured on 2026-09-19 — a first draft of that module's own
+ * note quoted that word as a literal, and this case went red naming it,
+ * against a list otherwise equal.
  *
  * Seven mutations were driven on 2026-09-14, one run each over this file,
  * with 28 pass before and after and every file restored byte-identical
@@ -72,7 +82,7 @@ const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
 /** The modules reading each command line, from `src/`. */
 const READERS: Readonly<Record<string, readonly string[]>> = {
-  'plan create': ['plan.ts'],
+  'plan create': ['plan.ts', 'board/flags.ts'],
   'loop start': ['start.ts', 'start/run-config.ts', 'start/runtime.ts'],
   'effort collect': ['effort/collect.ts'],
   'effort report': ['effort/report.ts'],
@@ -96,6 +106,12 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'issue create': ['text', 'json'],
   'issue comment': ['text', 'json'],
   'issue move': ['text', 'json'],
+  'pr current': ['text', 'json'],
+  'pr show': ['text', 'json'],
+  'pr view': ['text', 'json'],
+  'pr list': ['text', 'json'],
+  'pr merge': ['text', 'json'],
+  'pr triage': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
   'module list': ['text', 'json'],
@@ -131,6 +147,12 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue create': [[], ['title', 'body', 'type', 'module', 'priority']],
   'issue comment': [['id'], ['body']],
   'issue move': [['id', 'state'], []],
+  'pr current': [[], []],
+  'pr show': [['n'], []],
+  'pr view': [['n'], []],
+  'pr list': [[], []],
+  'pr merge': [['n'], ['yes', 'method']],
+  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
@@ -142,7 +164,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct check': [['dir'], []],
   'instinct list': [[], []],
   'instinct show': [['id'], []],
-  'init': [[], ['root', 'yes']],
+  'init': [[], ['root', 'yes', 'board']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
   'describe': [[], []],
@@ -189,6 +211,12 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['issue create --title=Timeouts', 'issue create', ['--title=Timeouts'], ''],
   ['issue comment 12 --body=Reproduced', 'issue comment', ['12', '--body=Reproduced'], ''],
   ['issue move 12 done', 'issue move', ['12', 'done'], ''],
+  ['pr current', 'pr current', [], ''],
+  ['prs show 41', 'pr show', ['41'], ''],
+  ['pr view', 'pr view', [], ''],
+  ['pr list', 'pr list', [], ''],
+  ['pr merge 41 --yes --method=squash', 'pr merge', ['41', '--yes', '--method=squash'], ''],
+  ['pr triage 41 --no-comment', 'pr triage', ['41', '--no-comment'], ''],
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
@@ -273,12 +301,12 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the eight subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'effort', 'module', 'agent', 'skill', 'instinct']);
+  it('registers the nine subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the four pr readers, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -295,6 +323,12 @@ describe('the core roster', () => {
       'issue create',
       'issue comment',
       'issue move',
+      'pr current',
+      'pr show',
+      'pr view',
+      'pr list',
+      'pr merge',
+      'pr triage',
       'effort collect',
       'effort report',
       'module list',

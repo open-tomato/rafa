@@ -3,7 +3,8 @@
  * prints for the config and a plan, the exit code a failed required item
  * gives, that it starts no run and stores no row, its refusals, the two
  * warnings beside the report, the `rafa <version>` line text mode opens
- * with, json mode, and the registered command spawned.
+ * with, the GitHub board rows and the fix they name, json mode, and the
+ * registered command spawned.
  *
  * ## The world
  *
@@ -21,6 +22,43 @@
  * the `PATH`. The clock seam answers 0, so every duration reads `0 ms` and
  * a line can be held whole.
  *
+ * ## The automatic items of the pull request provider
+ *
+ * Their cases drive both seams: the `origin` probe answers what the case
+ * plants, and every shell probe is answered from a recorded table, so no
+ * case here spawns git or `gh`. Every other case of this file leaves
+ * `readRemote` at the runner's own, and each plants a world under a
+ * temporary directory with no `origin`, which resolves `pr.provider:
+ * none` and adds no item — which is why their held lines did not move.
+ * Each provider case sits beside a control differing in one thing only:
+ * the remote, the configured provider, or what the `gh` probe answered.
+ *
+ * Three mutations of `src/commands/doctor.ts` were driven against them
+ * on 2026-09-18, each an exact string found once, the file run alone on
+ * a baseline of 23 pass and restored sha256-identical: the items
+ * appended to the required tier instead of prepended reddened 1 case,
+ * the `pr.provider: none` shortcut dropped reddened 1, and the
+ * `readRemote` seam dropped, which sends the probe to the real git in a
+ * temporary directory, reddened 5.
+ *
+ * ## The board rows
+ *
+ * Their cases drive a third seam: the `gh` runner the rows are read
+ * with is {@link fakeGh}, a recorded fake over one imaginary
+ * repository, and {@link ghSeams} hands one to every case of the
+ * provider too, since a `gh` provider now reads the board and the
+ * runner's own seam spawns `gh`. So no case of this file spawns it. A
+ * repository with no GitHub origin resolves `pr.provider: none`, reads
+ * no board and opens no runner, which is why every other case of this
+ * file kept its held lines.
+ *
+ * Two mutations of `src/commands/doctor.ts` were driven against them on
+ * 2026-09-19, the file run alone on a baseline of 28 pass and restored
+ * from a scratch copy verified with `shasum -c`: the `pr.provider: gh`
+ * shortcut in the board check dropped, so every project reads a board,
+ * reddened 8; the fix line dropped, so a board with gaps names no way
+ * to fill them, reddened 3.
+ *
  * ## Spawned
  *
  * One case runs `bun src/rafa.ts doctor` in two scratch repositories
@@ -32,7 +70,9 @@
  */
 import type { DoctorResult, DoctorSeams } from './doctor.js';
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { ProbeOptions } from '../preflight/run.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { PrerequisiteItem } from '../config.js';
+import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -41,6 +81,9 @@ import { delimiter, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { version } from '../../package.json';
+import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
+import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
+import { ROADMAP_ROW_NAME } from '../board/status.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import { versionLine } from '../cli/version.js';
@@ -48,10 +91,17 @@ import { configFilePath } from '../config.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
+import {
+  DEFAULT_GH_HOST,
+  ghAuthItem,
+  ghMissingMessage,
+  ghOnPathItem,
+} from '../pr/preflight-items.js';
 import { readBinPath } from '../project/bin-path.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readPlanFlag } from './doctor.js';
+import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-doctor-')));
@@ -175,6 +225,77 @@ function pathsUnder(root: string): string[] {
 /** The line text mode ends with when the `PATH` order holds. */
 function aheadLine(world: World): string {
   return `${world.rafaBin} is on PATH, and ${world.bunBin} is not ahead of it.`;
+}
+
+/** A GitHub `origin`, as git writes one for an ssh clone. */
+const GITHUB_ORIGIN = 'git@github.com:open-tomato/rafa.git';
+
+/** A probe that passed, answering nothing on stderr. */
+const PASSED: ProbeRun = { exitCode: 0, stderr: '', timedOut: false };
+
+/** The probe of `item`, which every automatic item carries. */
+function probeOf(item: PrerequisiteItem): string {
+  const { probe } = item;
+  if (probe === undefined) throw new Error(`${item.name} carries no probe`);
+  return probe;
+}
+
+/** What the `gh` runner of a case answers: the labels and the open issues of one imaginary repository. */
+interface FakeRepo {
+  readonly labels?: readonly string[];
+  readonly issues?: readonly { number: number; title: string }[];
+}
+
+/**
+ * A `gh` runner over `repo`, answering the two commands the board rows
+ * read and failing every other, and the argument lists it was handed.
+ * So no case of this file spawns `gh`.
+ */
+function fakeGh(repo: FakeRepo = {}): { run: GhRunner; calls: () => readonly string[] } {
+  const calls: string[] = [];
+  const run: GhRunner = (args) => {
+    const route = args.slice(0, 2).join(' ');
+    calls.push(route);
+    const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
+    if (route === 'label list') return ok(JSON.stringify((repo.labels ?? []).map((name) => ({ name }))));
+    if (route === 'issue list') return ok(JSON.stringify(repo.issues ?? []));
+    return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${route}` });
+  };
+  return { run, calls: () => calls };
+}
+
+/**
+ * Seams whose `origin` probe is `readRemote`, whose shell probes are
+ * answered from `answers`, a probe named by none of them passing, and
+ * whose board rows are read over a bare repository unless `openGh`
+ * names another. So no case of the provider spawns git, `gh` or a
+ * shell.
+ */
+function ghSeams(
+  readRemote: DoctorSeams['readRemote'],
+  answers: Record<string, ProbeRun> = {},
+  openGh: DoctorSeams['openGh'] = () => fakeGh().run,
+): DoctorSeams {
+  return {
+    readRemote,
+    openGh,
+    checks: {
+      now: () => 0,
+      runProbe: (probe) => Promise.resolve(answers[probe] ?? PASSED),
+    },
+  };
+}
+
+/** The lines a bare board prints: every row missing, and the fix. */
+function bareBoardLines(): string[] {
+  return [
+    BOARD_HEADING,
+    ...BOARD_LABELS.map((label) => `  missing  label ${label.name}: the repository carries no label of that name`),
+    `  missing  ${SPEC_TEMPLATE_PATH}: the repository carries no spec issue template`,
+    `  missing  ${ROADMAP_ROW_NAME}: no open issue is titled ${ROADMAP_TITLE}`,
+    `  missing  ${ROADMAP_SETTING}: the project config names no roadmap issue`,
+    `Run ${BOARD_FIX} to set up 9 parts of the board this run did not find.`,
+  ];
 }
 
 describe('the preflight it prints', () => {
@@ -531,6 +652,215 @@ describe('json mode', () => {
     expect(result?.data).toBeUndefined();
     expect(result?.error?.code).toBe('command_exit');
     expect(result?.error?.message).toStartWith('rafa doctor: preflight halted: 1 required item failed\n  tool "needed": probe');
+  });
+});
+
+describe('the automatic items of the pull request provider', () => {
+  it('checks gh on PATH and gh auth status ahead of the configured tier, where a repository with no GitHub origin checks neither', async () => {
+    const world = plantWorld(requiredTool('exit 0'));
+    const controlWorld = plantWorld(requiredTool('exit 0'));
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => null) });
+
+    expect(run.stderr).toBe('');
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toEqual([
+      VERSION_LINE,
+      noPlanHead('3 items checked, 2 of them for the pull request provider'),
+      `  pass    required tool "gh", probe \`${probeOf(ghOnPathItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+      `  pass    required service "https://${DEFAULT_GH_HOST}", probe \`${probeOf(ghAuthItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+      '  pass    required tool "needed", probe `exit 0`, 0 ms',
+      'Preflight passed: rafa loop start would go on to its first session.',
+      ...bareBoardLines(),
+      aheadLine(world),
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)).toEqual([
+      VERSION_LINE,
+      noPlanHead('1 item from the config checked'),
+      '  pass    required tool "needed", probe `exit 0`, 0 ms',
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(controlWorld),
+    ]);
+  });
+
+  it('asks about the host origin names, where a configured provider with no origin asks about github.com', async () => {
+    const host = 'github.example.com';
+    const world = plantWorld(['pr:', '  provider: gh']);
+    const controlWorld = plantWorld(['pr:', '  provider: gh']);
+
+    const run = await doctor(world, [], { seams: ghSeams(() => `https://${host}/open-tomato/rafa.git`) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => null) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toContain(`  pass    required service "https://${host}", probe \`${probeOf(ghAuthItem(host))}\`, 0 ms`);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)).toContain(
+      `  pass    required service "https://${DEFAULT_GH_HOST}", probe \`${probeOf(ghAuthItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+    );
+  });
+
+  it('exits 1 with the item remedy when gh is absent, where the same repository with gh present exits 0', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const missing = probeOf(ghOnPathItem(DEFAULT_GH_HOST));
+    const failed = { exitCode: 1, stderr: `${ghMissingMessage(DEFAULT_GH_HOST)}\n`, timedOut: false };
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [missing]: failed }) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toBe([
+      'rafa doctor: preflight halted: 1 required item failed',
+      `  tool "gh": probe \`${missing}\` exited 1: ${ghMissingMessage(DEFAULT_GH_HOST)}`,
+      'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
+      '',
+    ].join('\n'));
+    expect(run.stderr).toContain('gh auth login --hostname github.com');
+    expect(control.exitCode).toBe(0);
+    expect(control.stderr).toBe('');
+  });
+
+  it('reads no origin at all under a configured pr.provider: none, where every other provider reads it once', async () => {
+    const world = plantWorld(['pr:', '  provider: none']);
+    const controlWorld = plantWorld();
+    const reads: string[] = [];
+    const readRemote = (dir: string): string => {
+      reads.push(dir);
+      return GITHUB_ORIGIN;
+    };
+
+    const run = await doctor(world, [], { seams: ghSeams(readRemote) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(readRemote) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toEqual([
+      VERSION_LINE,
+      noPlanHead('nothing to check'),
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(world),
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)[1]).toBe(noPlanHead('2 items checked, 2 of them for the pull request provider'));
+    expect(reads).toEqual([controlWorld.root]);
+  });
+
+  it('counts the provider items in the json result, where a repository with no GitHub origin counts none', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+
+    const run = await doctor(world, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, ['--output=json'], { seams: ghSeams(() => null) });
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    expect(run.exitCode).toBe(0);
+    expect(dataOf(run.stdout)?.automatic).toBe(2);
+    expect(dataOf(run.stdout)?.checks.map((check) => [check.tier, check.item.name])).toEqual([
+      ['required', 'gh'],
+      ['required', `https://${DEFAULT_GH_HOST}`],
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(dataOf(control.stdout)?.automatic).toBe(0);
+    expect(dataOf(control.stdout)?.checks).toEqual([]);
+  });
+});
+
+describe('the board rows', () => {
+  it('prints a row per part and the fix over a bare board, where a board that is set up prints every row present', async () => {
+    const bare = plantWorld();
+    const ready = plantWorld(['roadmap:', '  issue: 31']);
+    plant(ready.root, SPEC_TEMPLATE_PATH, '# Spec\n');
+    const setUp = fakeGh({ labels: BOARD_LABELS.map((label) => label.name) });
+
+    const run = await doctor(bare, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(ready, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => setUp.run) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout).slice(-12)).toEqual([...bareBoardLines(), aheadLine(bare)]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout).slice(-11)).toEqual([
+      BOARD_HEADING,
+      ...BOARD_LABELS.map((label) => `  present  label ${label.name}`),
+      `  present  ${SPEC_TEMPLATE_PATH}`,
+      `  present  ${ROADMAP_ROW_NAME}`,
+      `  present  ${ROADMAP_SETTING}`,
+      aheadLine(ready),
+    ]);
+    expect(setUp.calls()).toEqual(['label list']);
+  });
+
+  it('prints no row and opens no runner where the provider is not gh, where a gh provider opens one', async () => {
+    const world = plantWorld(['pr:', '  provider: none']);
+    const controlWorld = plantWorld();
+    const opened: string[] = [];
+    const openGh: DoctorSeams['openGh'] = (root) => {
+      opened.push(root);
+      return fakeGh().run;
+    };
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, openGh) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, openGh) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).not.toContain(BOARD_HEADING);
+    expect(lines(control.stdout)).toContain(BOARD_HEADING);
+    expect(opened).toEqual([controlWorld.root]);
+  });
+
+  it('gives the rows as the board of the json result, where a repository with no GitHub board gives null', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+
+    const run = await doctor(world, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, ['--output=json'], { seams: ghSeams(() => null) });
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    expect(run.exitCode).toBe(0);
+    expect(dataOf(run.stdout)?.board?.rows.map((row) => [row.name, row.outcome])).toEqual([
+      ...BOARD_LABELS.map((label) => [label.name, 'missing']),
+      [SPEC_TEMPLATE_PATH, 'missing'],
+      [ROADMAP_ROW_NAME, 'missing'],
+      [ROADMAP_SETTING, 'missing'],
+    ]);
+    expect(dataOf(run.stdout)?.board?.roadmapIssue).toBe(null);
+    expect(control.exitCode).toBe(0);
+    expect(dataOf(control.stdout)?.board).toBe(null);
+  });
+
+  it('reports a row it could not read as unknown, where the same command answering reads it', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const failing: DoctorSeams['openGh'] = () => (args) => Promise.resolve(args[0] === 'label'
+      ? { ok: false, stdout: '', stderr: 'HTTP 401: Bad credentials' }
+      : { ok: true, stdout: '[]', stderr: '' });
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, failing) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toContain(
+      '  unknown  label type:spec: board setup: gh label list --limit 100 --json name failed: HTTP 401: Bad credentials',
+    );
+    expect(lines(control.stdout)).toContain('  missing  label type:spec: the repository carries no label of that name');
+  });
+
+  it('prints the rows before a halt refusal and leaves the exit code to the preflight', async () => {
+    const world = plantWorld(requiredTool(MISSING_TOOL_PROBE));
+
+    const failed = { exitCode: 127, stderr: 'sh: needed: not found\n', timedOut: false };
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [MISSING_TOOL_PROBE]: failed }) });
+
+    expect(run.exitCode).toBe(1);
+    expect(lines(run.stdout).slice(-12)).toEqual([...bareBoardLines(), aheadLine(world)]);
+    expect(run.stderr).toContain('rafa loop start would halt here, before any session.');
   });
 });
 

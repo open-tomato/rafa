@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/rafa",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -27,7 +27,7 @@
     "bun": ">=1.3.14"
   },
   "scripts": {
-    "build": "rm -rf dist && bun build src/rafa.ts --target=bun --outfile=dist/cli.js && bun build src/index.ts src/plan/index.ts src/effort/store/index.ts src/ports/index.ts --target=bun --splitting --root=src --outdir=dist && cp src/PROMPT.md src/plan-prompt.md .claude/skills/dev-planner/SKILL.md dist/",
+    "build": "rm -rf dist && bun build src/rafa.ts --target=bun --outfile=dist/cli.js && bun build src/index.ts src/plan/index.ts src/effort/store/index.ts src/ports/index.ts --target=bun --splitting --root=src --outdir=dist && cp src/PROMPT.md src/plan-prompt.md .claude/skills/dev-planner/SKILL.md dist/ && for tree in pr/plans:plans board/templates:templates; do src=src/${tree%:*}; out=dist/${tree#*:}; [ -d \"$src\" ] || continue; mkdir -p \"$out\" && cp \"$src\"/*.md \"$out\"/ || exit 1; done",
     "test": "bun test",
     "lint": "eslint .",
     "check-types": "tsc --noEmit",

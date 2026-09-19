@@ -109,9 +109,9 @@ starts at column 0.
   # Plan: Feature Title
 
   ```rafa:plan
-  stub: my-feature
-  issue: OPT-123
-  spec: .specs/my-feature.md
+  stub: rafa-123-my-feature
+  issue: 123
+  spec: .specs/rafa-123-my-feature.md
   ```
 
   ```rafa:context
@@ -144,18 +144,33 @@ Header metadata for the entire plan. Fields are YAML key-value pairs.
 
 ````markdown
 ```rafa:plan
-stub: my-feature
-issue: OPT-123
-spec: .specs/my-feature.md
+stub: rafa-123-my-feature
+issue: 123
+spec: .specs/rafa-123-my-feature.md
 ```
 ````
 
 Recognized fields:
-- `stub` — The plan identifier (string). Used to organize findings and dedupe rows across runs.
-- `issue` — Optional GitHub issue number (string, e.g., `"OPT-123"`). Links the work back to a tracker.
+- `stub` — The plan identifier (string, following the `rafa-<n>-<slug>` format). Used to organize findings and dedupe rows across runs.
+- `issue` — Optional GitHub issue number (integer, e.g., `123`). Links the work back to the `open-tomato/rafa` board.
 - `spec` — Optional path to the specification document that guided the plan.
 
 Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
+
+#### Naming conventions
+
+All rafa work follows a consistent naming scheme across specifications, plans, branches, and pull requests. The board is GitHub Issues on `open-tomato/rafa`; every spec has one issue labelled `type:spec`, whose ID appears as `rafa-<n>`.
+
+| Artifact | Pattern | Example |
+| --- | --- | --- |
+| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
+| `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
+| Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
+| Pull request title | `rafa-<n>: <title>` | `rafa-20: Add pull-request commands` |
+| Pull request body | `Closes #<n>` | `Closes #20` |
+
+The slug summarizes what the user gets, using two to four words joined by hyphens. The order of work lives in ONE place: the pinned "Roadmap" issue on the `open-tomato/rafa` board.
 
 ### `rafa:context`
 
@@ -467,9 +482,9 @@ Each module task below carries its own unit tests, and each stage closes on a te
   # Plan: Refactor authentication layer
 
   ```rafa:plan
-  stub: refactor-auth
-  issue: OPT-456
-  spec: .specs/auth-refactor.md
+  stub: rafa-456-refactor-auth
+  issue: 456
+  spec: .specs/rafa-456-refactor-auth.md
   ```
 
   ```rafa:context

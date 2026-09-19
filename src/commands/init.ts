@@ -53,6 +53,24 @@
  * the entry is `.rafa/`. Opting in is setting a flag in
  * `.rafa/config.yaml` and running `init` again, which rewrites the block.
  *
+ * ## The board step
+ *
+ * A repository whose pull request provider resolves to `gh` ends with
+ * the board step: one question, and the labels, the spec issue template
+ * and the pinned Roadmap issue `src/board/setup.ts` makes. The decision,
+ * the question and the lines are `./init-board.ts`'s; what is decided
+ * HERE is that it runs LAST, after the scopes are on disk. The
+ * `roadmap.issue` it may write goes into the `.rafa/config.yaml` this
+ * run has just made, and nothing it asks or sends can keep the project
+ * from being set up: a `gh` that is not installed, a repository nobody
+ * is authenticated for and a label that would not be made are reported
+ * as refused parts, never as a refusal of `init`.
+ *
+ * `--board` and `--no-board` answer the question for a script. The value
+ * of `--board` is read at the TOP of the run, before a root is chosen
+ * and so before anything is written, because `--board=later` is a line
+ * to refuse while `Nothing was written.` is still true.
+ *
  * ## A rerun
  *
  * Each writer writes only what is missing or stale, so a rerun over a
@@ -60,7 +78,10 @@
  * says so: the head line says the root is already a rafa project whose
  * `.rafa/config.yaml` is left as it was, and `Nothing changed.` follows.
  * An existing `.rafa/config.yaml` is never rewritten. A path missing
- * since, or a `tracking` flag changed since, is written and listed.
+ * since, or a `tracking` flag changed since, is written and listed. The
+ * board step keeps that true: every part it finds already there is
+ * reported as present and nothing is written, so `Nothing changed.`
+ * follows the board rows.
  *
  * ## The `PATH` check
  *
@@ -87,21 +108,25 @@
  *
  * In text mode, the head line naming the root and where it came from,
  * then one line per path created or updated, a path under the root
- * relative to it and a directory ending in `/`. Warnings go through the
- * context's `warn`: a `package.json` the monorepo walk could not read,
- * an unknown config key, the `tracking.all` notice and the `PATH`
- * warning. In json mode the terminal result's `data` is an
- * {@link InitResult}, every path absolute, and each warning a `log`
- * event.
+ * relative to it and a directory ending in `/`, then the board step's
+ * own rows. Warnings go through the context's `warn`: a `package.json`
+ * the monorepo walk could not read, an unknown config key, the
+ * `tracking.all` notice, the `PATH` warning and every sentence the
+ * board step came back with. In json mode the terminal result's `data`
+ * is an {@link InitResult}, every path absolute, and each warning a
+ * `log` event.
  *
  * ## Seams
  *
  * The working directory, the home, whether standard input is a terminal,
- * the prompter, the roots filesystem and the git probe are
- * {@link InitSeams}. The registered command reads `process.cwd()`,
- * `homedir()` and `process.stdin`, and prompts on stderr. The writes go
- * to the disk, under the root and the home the seams name.
+ * the prompter, the roots filesystem, the git probe, the `origin` probe
+ * and the `gh` runner are {@link InitSeams}. The registered command
+ * reads `process.cwd()`, `homedir()` and `process.stdin`, prompts on
+ * stderr, and spawns git and `gh` in the root. The writes go to the
+ * disk, under the root and the home the seams name.
  */
+import type { BoardStepResult } from './init-board.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
@@ -115,11 +140,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
 import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError, configFilePath } from '../config.js';
+import { resolvePrProvider } from '../pr/provider.js';
 import { readBinPath } from '../project/bin-path.js';
 import {
   applyTracking,
@@ -137,6 +164,9 @@ import {
 } from '../project/root-choice.js';
 import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/roots.js';
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
+import { gitRemoteUrl } from '../schema/project-id.js';
+
+import { boardStepChanged, renderBoardStep, runBoardStep } from './init-board.js';
 
 /** What `init` reads beside its line; see the module note. */
 export interface InitSeams {
@@ -152,6 +182,10 @@ export interface InitSeams {
   readonly fs: RootsFileSystem;
   /** The git probe the candidates read. */
   readonly gitToplevel: GitToplevelProbe;
+  /** The `origin` probe the pull request provider is resolved from. */
+  readonly readRemote: (dir: string) => string | null;
+  /** Opens the runner the board step sends every `gh` command through, in the root. */
+  readonly gh: (root: string) => GhRunner;
 }
 
 /** The seams the registered command runs with. */
@@ -162,6 +196,8 @@ export const DEFAULT_INIT_SEAMS: InitSeams = Object.freeze({
   openPrompter: () => createLinePrompter(process.stdin, process.stderr),
   fs: DISK_ROOTS_FILE_SYSTEM,
   gitToplevel,
+  readRemote: gitRemoteUrl,
+  gh: (root: string) => createGhRunner({ cwd: root }),
 });
 
 /** What json mode gives as the terminal result's `data`. */
@@ -174,7 +210,7 @@ export interface InitResult {
   readonly start: string;
   /** True when `.rafa/config.yaml` was already under the root, and left as it was. */
   readonly configExisted: boolean;
-  /** True when any write created or updated its path. */
+  /** True when any write created or updated its path, a board part this run made included. */
   readonly changed: boolean;
   /** Every path checked, in the order written: the project scope, `.gitignore`, the digest, the user scope. */
   readonly writes: readonly ScopeWrite[];
@@ -184,6 +220,8 @@ export interface InitResult {
   readonly binPath: BinPathReading;
   /** Each agent a plan under `plan.dir` routes to that resolves only in `~/.claude/agents`. */
   readonly vendorableAgents: readonly VendorableAgent[];
+  /** What the board step came to: what it made, or why it did not run (`./init-board.ts`). */
+  readonly board: BoardStepResult;
 }
 
 /** The line every refusal ends with. */
@@ -215,6 +253,19 @@ export function readYesFlag(value: string | boolean | undefined): boolean {
   if (value === undefined || value === false || value === 'false') return false;
   if (value === true || value === 'true') return true;
   throw refusal([`rafa init: --yes takes no value, and read "${value}" as one; name a root with --root=<path>`]);
+}
+
+/**
+ * True for `--board`, false for `--no-board` and null when the line said
+ * neither, which leaves the board step to ask. A value refuses: the
+ * board is set up or it is not, and `--board=later` names neither.
+ */
+export function readBoardFlag(value: string | boolean | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw refusal([`rafa init: --board takes no value, and read "${value}" as one;`
+    + ' set the board up with --board, or leave it alone with --no-board']);
 }
 
 /** The path `--root` names, or null without the flag, refusing the flag with no path. */
@@ -314,8 +365,16 @@ function trackingWrites(applied: TrackingApplied, digestExisted: boolean): reado
   ];
 }
 
+/** What the scopes came to, with the config they were written from. */
+interface ScopesWritten {
+  /** The result, but for the board step, which runs once these are on disk. */
+  readonly written: Omit<InitResult, 'board'>;
+  /** The config as it resolved for the root, which the provider is read from. */
+  readonly config: RafaConfig;
+}
+
 /** Checks, then writes, the scopes for `root`; see the module note for the order. */
-function initialise(root: ChosenRoot, start: string, home: string, context: RafaContext): InitResult {
+function initialise(root: ChosenRoot, start: string, home: string, context: RafaContext): ScopesWritten {
   const warn = (message: string): void => {
     context.output.warn(message);
   };
@@ -330,21 +389,53 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
   const writes = [...project, ...trackingWrites(tracking, digestExisted), ...writeUserScope(home)];
 
   return {
-    root: root.path,
-    source: root.source,
-    start,
-    configExisted,
-    changed: writes.some((write) => write.change !== 'unchanged'),
-    writes,
-    trackingNotice: tracking.notice.printed,
-    binPath: readBinPath(context.env['PATH'], home),
-    vendorableAgents: vendorableAgents({
-      repoRoot: root.path,
-      home,
-      planDir: config.planDir,
-      settingSources: config.settingSources,
-    }),
+    written: {
+      root: root.path,
+      source: root.source,
+      start,
+      configExisted,
+      changed: writes.some((write) => write.change !== 'unchanged'),
+      writes,
+      trackingNotice: tracking.notice.printed,
+      binPath: readBinPath(context.env['PATH'], home),
+      vendorableAgents: vendorableAgents({
+        repoRoot: root.path,
+        home,
+        planDir: config.planDir,
+        settingSources: config.settingSources,
+      }),
+    },
+    config,
   };
+}
+
+/**
+ * The board step for a project whose scopes are written: the provider
+ * read off the config and `origin`, then `./init-board.ts`. It runs LAST
+ * for two reasons — the `roadmap.issue` it may write goes into the
+ * `.rafa/config.yaml` this run has just made, and nothing it asks or
+ * sends can then keep the project from being set up.
+ */
+async function boardStep(
+  scopes: ScopesWritten,
+  wanted: boolean | null,
+  seams: InitSeams,
+): Promise<BoardStepResult> {
+  const root = scopes.written.root;
+  const provider = resolvePrProvider({
+    configured: scopes.config.prProvider,
+    dir: root,
+    readRemote: seams.readRemote,
+  }).provider;
+
+  return runBoardStep({
+    wanted,
+    provider,
+    root,
+    openGh: () => seams.gh(root),
+    isTerminal: seams.isTerminal,
+    openPrompter: seams.openPrompter,
+  });
 }
 
 /** A write's path as a line shows it: relative under the root, a directory ending in `/`. */
@@ -366,22 +457,31 @@ export function renderInit(result: InitResult): readonly string[] {
   const changed = result.writes
     .filter((write) => write.change !== 'unchanged')
     .map((write) => `  ${write.change}   ${shownPath(write, result.root)}`);
-  return changed.length === 0
-    ? [head, 'Nothing changed.']
-    : [head, ...changed];
+  const board = renderBoardStep(result.board);
+  return result.changed
+    ? [head, ...changed, ...board]
+    : [head, ...board, 'Nothing changed.'];
 }
 
 /** Runs `init` with `seams`; see the module note. */
 async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   expectNoArgument(context.args);
+  const wantsBoard = readBoardFlag(context.flags['board']);
   const start = seams.cwd();
   const home = seams.home();
   const root = await chooseRoot(context, seams, start, home);
-  const result = initialise(root, start, home, context);
+  const scopes = initialise(root, start, home, context);
+  const board = await boardStep(scopes, wantsBoard, seams);
+  const result: InitResult = {
+    ...scopes.written,
+    changed: scopes.written.changed || boardStepChanged(board),
+    board,
+  };
 
   if (context.outputMode === 'json') context.output.result(result);
   else for (const line of renderInit(result)) context.output.info(line);
   if (result.binPath.warning !== null) context.output.warn(result.binPath.warning);
+  for (const line of board.warnings) context.output.warn(line);
   for (const line of vendorableAgentWarnings(result.vendorableAgents, result.root)) context.output.warn(line);
 }
 
@@ -403,7 +503,9 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' they are missing. Only what is missing or stale is written, so a rerun changes no byte and says'
       + ' so. It warns when `~/.rafa/bin` is not on PATH ahead of `~/.bun/bin`, and when a plan under'
       + ' `plan.dir` routes to an agent that resolves only in `~/.claude/agents`, naming'
-      + ' `rafa agent vendor <name>`. With `--output=json` the'
+      + ' `rafa agent vendor <name>`. A repository whose pull request provider is `gh` ends with one'
+      + ' question about setting up the GitHub board, which `--board` and `--no-board` answer for a'
+      + ' script. With `--output=json` the'
       + ' root and every path checked are the data of the terminal result event.',
     args: [],
     flags: [
@@ -415,6 +517,13 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       {
         name: 'yes',
         description: 'Take the first root candidate without asking: the git toplevel, or the working directory.',
+        type: 'boolean',
+      },
+      {
+        name: 'board',
+        description: 'Set up the GitHub board without asking: the labels, `.github/ISSUE_TEMPLATE/spec.md`'
+          + ' and a pinned Roadmap issue named by `roadmap.issue`. `--no-board` leaves it alone. Without'
+          + ' either, a terminal is asked once and a run with no terminal leaves it alone.',
         type: 'boolean',
       },
     ],
@@ -430,6 +539,11 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       {
         cmd: 'rafa init --root=../my-monorepo',
         note: 'Sets up the project at the root named, asking nothing.',
+      },
+      {
+        cmd: 'rafa init --yes --board',
+        note: 'Takes the first candidate and sets up the GitHub board without asking: the labels, the spec'
+          + ' issue template and a pinned Roadmap issue. Each part already there is left as it is.',
       },
     ],
     outputs: ['text', 'json'],

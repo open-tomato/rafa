@@ -1,11 +1,10 @@
-import { spawnSync } from 'child_process';
-
 /**
- * Pull-request check-status helpers for the wrap-up stage.
+ * The check-row readers of a pull request: raw `gh pr checks` output in,
+ * one verdict out.
  *
- * The loop's last stage opens or updates the PR, and a PR is not finished
- * until CI has spoken about it. Two failure shapes made that worth
- * automating rather than leaving to the session's judgement:
+ * A PR is not finished until CI has spoken about it, and two failure
+ * shapes made that worth automating rather than leaving to the session's
+ * judgement:
  *
  *  - A CONFLICTING PR schedules no workflow run at all, because GitHub
  *    cannot build `refs/pull/<n>/merge` for a branch that does not merge
@@ -15,9 +14,18 @@ import { spawnSync } from 'child_process';
  *    step (a lockfile out of step with the merged manifests fails
  *    `bun install --frozen-lockfile`, and nothing downstream runs).
  *
- * Both are invisible from inside the session that pushed. Everything here
- * except `probeChecks` / `findOpenPullRequest` is pure so the polling
- * logic is testable without a network or a clock.
+ * Both are invisible from inside the session that pushed.
+ *
+ * Everything here is pure: the only effect {@link waitForChecks} has is
+ * the `probe` handed to it, and its clock and its wait are injected too,
+ * so the polling logic is testable without a network or a timer. The
+ * `gh` invocations that feed it live with the rest of the port, not
+ * here, which is what keeps `checks.test.ts` free of a process spawn.
+ *
+ * {@link waitForChecks} polls ROWS rather than stdout, so the poll runs
+ * over `PullRequests.checks` (`./types.ts`) without either side naming
+ * the CLI. {@link parseChecks} is what turns one provider's stdout into
+ * those rows, and the `gh` adapter is its only caller.
  */
 
 /** Whether a single check has passed, failed, or is still in flight. */
@@ -65,13 +73,6 @@ export function classifyState(state: string): CheckOutcome {
   return 'pending';
 }
 
-/**
- * Parses `gh pr checks --json name,state,link` output into rows.
- *
- * Returns an empty list for anything that is not a JSON array — `gh`
- * writes a plain `no checks reported` message and exits non-zero when a
- * PR has none, and that is a verdict here rather than an error.
- */
 function readString(value: unknown, fallback: string): string {
   return typeof value === 'string'
     ? value
@@ -88,6 +89,13 @@ function toRow(entry: Record<string, unknown>): CheckRow {
   };
 }
 
+/**
+ * Parses `gh pr checks --json name,state,link` output into rows.
+ *
+ * Returns an empty list for anything that is not a JSON array — `gh`
+ * writes a plain `no checks reported` message and exits non-zero when a
+ * PR has none, and that is a verdict here rather than an error.
+ */
 export function parseChecks(stdout: string): CheckRow[] {
   const trimmed = stdout.trim();
   if (!trimmed.startsWith('[')) return [];
@@ -112,7 +120,7 @@ export function parseChecks(stdout: string): CheckRow[] {
  * Reduces rows to one verdict. Pending outranks failure so a run that is
  * still going is never reported as red on a partial reading.
  */
-export function verdictOf(rows: CheckRow[]): ChecksVerdict {
+export function verdictOf(rows: readonly CheckRow[]): ChecksVerdict {
   if (rows.length === 0) return 'none';
   if (rows.some((r) => r.outcome === 'pending')) return 'pending';
   if (rows.some((r) => r.outcome === 'fail')) return 'red';
@@ -120,12 +128,12 @@ export function verdictOf(rows: CheckRow[]): ChecksVerdict {
 }
 
 /** Rows the caller should act on: the failing ones, for a repair prompt. */
-export function failingRows(rows: CheckRow[]): CheckRow[] {
+export function failingRows(rows: readonly CheckRow[]): CheckRow[] {
   return rows.filter((r) => r.outcome === 'fail');
 }
 
 /** One line per check, for the console and for a repair prompt. */
-export function formatRows(rows: CheckRow[]): string {
+export function formatRows(rows: readonly CheckRow[]): string {
   if (rows.length === 0) return '   (no checks reported)';
   const lines = rows.map((r) => {
     const suffix = r.link === ''
@@ -137,8 +145,12 @@ export function formatRows(rows: CheckRow[]): string {
 }
 
 export interface WaitOptions {
-  /** Returns raw `gh pr checks --json ...` stdout for one poll. */
-  probe: () => Promise<string>;
+  /**
+   * The rows of one poll. A caller on the port hands
+   * `PullRequests.checks` here, and a caller holding raw
+   * `gh pr checks --json ...` stdout hands {@link parseChecks} of it.
+   */
+  probe: () => Promise<readonly CheckRow[]>;
   timeoutMs: number;
   intervalMs: number;
   /** Injected for tests; defaults to the real clock. */
@@ -146,13 +158,13 @@ export interface WaitOptions {
   /** Injected for tests; defaults to a real timer. */
   sleep?: (ms: number) => Promise<void>;
   /** Called after every poll, for progress output. */
-  onPoll?: (rows: CheckRow[], verdict: ChecksVerdict, elapsedMs: number) => void;
+  onPoll?: (rows: readonly CheckRow[], verdict: ChecksVerdict, elapsedMs: number) => void;
 }
 
 export interface WaitResult {
   /** `timeout` means the deadline passed while checks were still running. */
   verdict: ChecksVerdict | 'timeout';
-  rows: CheckRow[];
+  rows: readonly CheckRow[];
   elapsedMs: number;
   polls: number;
 }
@@ -180,7 +192,7 @@ export async function waitForChecks(options: WaitOptions): Promise<WaitResult> {
   let polls = 0;
 
   while (true) {
-    const rows = parseChecks(await options.probe());
+    const rows = await options.probe();
     polls += 1;
     const verdict = verdictOf(rows);
     const elapsedMs = now() - started;
@@ -191,85 +203,5 @@ export async function waitForChecks(options: WaitOptions): Promise<WaitResult> {
       return { verdict: 'timeout', rows, elapsedMs, polls };
     }
     await sleep(options.intervalMs);
-  }
-}
-
-/**
- * Runs a `gh` subcommand, returning stdout whatever the exit code.
- *
- * `gh pr checks` exits non-zero for a red run AND for a PR with no
- * checks, so the exit code cannot carry the verdict — the rows do.
- * A missing `gh` binary surfaces as empty stdout, which reads as `none`
- * and is handled by the caller rather than crashing the loop.
- */
-export function runGh(args: string[], cwd?: string): string {
-  const result = spawnSync('gh', args, {
-    encoding: 'utf8',
-    cwd: cwd ?? process.cwd(),
-  });
-  return result.stdout ?? '';
-}
-
-/** True when `gh` is on PATH and authenticated for this repo. */
-export function isGhUsable(cwd?: string): boolean {
-  const result = spawnSync('gh', ['auth', 'status'], {
-    encoding: 'utf8',
-    cwd: cwd ?? process.cwd(),
-  });
-  return result.status === 0;
-}
-
-/** The open PR number for a branch, or null when there is none. */
-export function findOpenPullRequest(branch: string, cwd?: string): number | null {
-  const stdout = runGh(
-    ['pr', 'list', '--head', branch, '--state', 'open', '--json', 'number'],
-    cwd,
-  );
-  const trimmed = stdout.trim();
-  if (!trimmed.startsWith('[')) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    const first: unknown = parsed[0];
-    if (typeof first !== 'object' || first === null) return null;
-    const num = (first as Record<string, unknown>)['number'];
-    return typeof num === 'number'
-      ? num
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Raw check rows for one PR. */
-export function probeChecks(prNumber: number, cwd?: string): string {
-  return runGh(
-    ['pr', 'checks', String(prNumber), '--json', 'name,state,link'],
-    cwd,
-  );
-}
-
-/** `mergeable`/`mergeStateStatus`/`state`, or null when unreadable. */
-export function readMergeState(
-  prNumber: number,
-  cwd?: string,
-): { mergeable: string; mergeStateStatus: string; state: string } | null {
-  const stdout = runGh(
-    ['pr', 'view', String(prNumber), '--json', 'mergeable,mergeStateStatus,state'],
-    cwd,
-  );
-  const trimmed = stdout.trim();
-  if (!trimmed.startsWith('{')) return null;
-
-  try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    return {
-      mergeable: String(parsed['mergeable'] ?? 'UNKNOWN'),
-      mergeStateStatus: String(parsed['mergeStateStatus'] ?? 'UNKNOWN'),
-      state: String(parsed['state'] ?? 'UNKNOWN'),
-    };
-  } catch {
-    return null;
   }
 }

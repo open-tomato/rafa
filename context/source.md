@@ -30,6 +30,16 @@ already near the cap; a module that has to grow puts the new concern in
 a new file, and a note that has outgrown its module can move to the
 `context/` page that owns the subject.
 
+**The cap is a rule about modules, not about their tests.** At `b2bebfe`
+exactly one non-test file under `src/` is over it, `src/check/references.ts`
+above, while EIGHTEEN colocated `*.test.ts` files are, from
+`src/utils/commit.test.ts` at 811 to `src/effort/collect.test.ts` at 1297.
+A suite that grows past 800 lines beside the module it covers is therefore
+the tree's own convention and not a thing to split, and no capture reads
+it either way. Splitting one costs the shared world helpers a home, which
+is what keeps `src/commands/doctor.test.ts` (898) and
+`src/commands/init.test.ts` (806) whole.
+
 ### Shapes the lint config forces
 
 - **`@typescript-eslint/no-unused-vars` has no ignore pattern and no
@@ -40,3 +50,8 @@ a new file, and a note that has outgrown its module can move to the
   than an `a < b ? -1 : a > b ? 1 : 0` comparator.
 - **`eslint --fix` backslash-escapes an apostrophe in a single-quoted
   string**, so write test titles without one.
+- **Markdown is a lint target, and every fenced block needs a language**
+  (`markdown/fenced-code-language`). A fence shown INSIDE a fenced example
+  — a `context/` page quoting the comment a command writes, say — is read
+  as a real fence by the rule, so escape the inner backticks (`\`\`\``)
+  rather than nesting them bare.

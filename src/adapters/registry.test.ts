@@ -103,7 +103,7 @@
 import type { AdapterContext, AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
 import type { InstinctRecord, Tracker } from '../ports/index.js';
-import type { ClaudeSpawner } from '../utils/claude.js';
+import type { CapturingSpawner } from '../utils/claude.js';
 
 import {
   existsSync,
@@ -120,6 +120,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import ts from 'typescript';
+
+import { parseSpecReview } from '../board/spec-review.js';
 
 import {
   CORE_ADAPTER_REGISTRY,
@@ -138,6 +140,17 @@ const PORTS_ENTRY = fileURLToPath(new URL('../ports/index.ts', import.meta.url))
 
 /** The port types, in the order a refusal lists them. */
 const PORT_TYPES = 'tracker, store, learning, output, planner';
+
+/** What the planner case's session writes to stdout: a review judging the spec ready. */
+const PLANNER_SESSION_STDOUT = [
+  'I read the spec first.',
+  '',
+  '```rafa:spec-review',
+  'verdict: ready',
+  'gaps: []',
+  '```',
+  '',
+].join('\n');
 
 /** A probe declaring one version drifted and one widened. */
 const DRIFTED_PROBE = [
@@ -453,10 +466,10 @@ describe('the core adapter registry', () => {
     mkdirSync(root, { recursive: true });
     writeFileSync(join(root, 'spec.md'), 'the spec\n', 'utf8');
     const sessions: string[][] = [];
-    const claude: ClaudeSpawner = async (args, prompt) => {
+    const claude: CapturingSpawner = async (args, prompt) => {
       sessions.push([...args, prompt]);
       writeFileSync(join(root, 'plans-here', 'PLAN-probe.md'), 'the plan\n', 'utf8');
-      return 0;
+      return { exitCode: 0, stdout: PLANNER_SESSION_STDOUT };
     };
 
     const planner = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude').create({
@@ -469,7 +482,12 @@ describe('the core adapter registry', () => {
     const generated = await planner.create({ specPath: 'spec.md', stub: 'probe' });
 
     expect(root.startsWith(tempDir)).toBe(true);
-    expect(generated).toEqual({ planPath: 'plans-here/PLAN-probe.md', prerequisitesPath: null });
+    expect(generated).toEqual({
+      planPath: 'plans-here/PLAN-probe.md',
+      prerequisitesPath: null,
+      review: parseSpecReview(PLANNER_SESSION_STDOUT),
+    });
+    expect(generated.review?.answer).toBe('ready');
     expect(sessions).toEqual([
       ['-p', '--dangerously-skip-permissions', '--setting-sources', 'local', 'probe: the spec\n'],
     ]);

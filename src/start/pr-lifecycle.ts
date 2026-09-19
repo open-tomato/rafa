@@ -6,12 +6,43 @@
  * returned, unless the run was started with `--no-ci-wait`, and takes
  * the defaults of `--ci-timeout` and `--ci-attempts` from the constants
  * exported here. Every effect it has goes through
- * {@link PrLifecycleSeams}: `gh` through `utils/pr.ts`, the branch
- * through `utils/git.ts`, a repair session through `runClaude`, and the
- * poll's clock and wait through `waitForChecks`. So a test drives each
- * verdict with no network, no session and no 20-second wait. Every
- * repair session loads settings from the sources `start()` hands over,
- * the run's `loop.settingSources`.
+ * {@link PrLifecycleSeams}: the pull request through the `PullRequests`
+ * port (`pr/index.ts`), the branch through `utils/git.ts`, a repair
+ * session through `runClaude`, and the poll's clock and wait through
+ * `waitForChecks`. So a test drives each verdict with no network, no
+ * session and no 20-second wait. Every repair session loads settings
+ * from the sources `start()` hands over, the run's
+ * `loop.settingSources`.
+ *
+ * The port is what the gate reads a PR through, so nothing here names
+ * `gh`, a command or a JSON field: the provider answers records, and the
+ * default seams hold the `gh` adapter over the process's own directory.
+ * The one thing still spelled `gh` is {@link PrLifecycleSeams.isGhUsable},
+ * the reading that decides whether to skip the gate at all, and the
+ * repair prompt, which tells a session which commands to read logs with.
+ *
+ * ## The `none` provider
+ *
+ * Before anything is asked of `gh`, the gate reads which provider the
+ * repository gets ({@link PrLifecycleSeams.readProvider}, over
+ * `pr/provider.ts`). A reading of `none` has no CLI to open a pull
+ * request with and so nothing to poll, and it takes the whole of the
+ * gate's other path: the branch is PUSHED, the compare URL printed, and
+ * the CI wait skipped and said to be skipped (`pr/none.ts`). No PR is
+ * looked for, no check is polled and no repair session is spent, so
+ * `pr.provider: none` costs a `git push` and nothing else.
+ *
+ * That reading comes before {@link PrLifecycleSeams.isGhUsable} on
+ * purpose. The two skips are different facts and say different things:
+ * `none` is a configured answer and the push is the loop doing its job,
+ * while an unusable `gh` under a `gh` provider is a machine that cannot
+ * answer and leaves the operator with a PR nothing confirmed. Asking
+ * `gh auth status` first would print the second for a repository that
+ * means the first.
+ *
+ * A push that fails is reported and not rethrown, for the reason a
+ * provider that cannot be asked is: this is the run's last gate, and
+ * the commits are made either way.
  *
  * What the gate tells the operator goes through the active output
  * (`adapters/output/active.ts`): the wait, each poll, a green verdict
@@ -26,20 +57,30 @@
  * its drift guard reads that prefix and its infix from.
  */
 import type { ClaudeSettingSource } from '../config.js';
-import type { CheckRow, WaitOptions, WaitResult } from '../utils/pr.js';
+import type {
+  CheckRow,
+  PrProviderReading,
+  PullRequestDetail,
+  PullRequests,
+  PushOutcome,
+  WaitOptions,
+  WaitResult,
+} from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { messageOf } from '../config-sections.js';
+import {
+  compareUrl,
+  failingRows,
+  formatRows,
+  ghAuthOkIn,
+  ghPullRequestsIn,
+  pushBranch,
+  resolvePrProvider,
+  waitForChecks,
+} from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
-import {
-  failingRows,
-  findOpenPullRequest,
-  formatRows,
-  isGhUsable,
-  probeChecks,
-  readMergeState,
-  waitForChecks,
-} from '../utils/pr.js';
 
 import { withStamp } from './stamp.js';
 
@@ -52,8 +93,8 @@ export const CI_POLL_INTERVAL_MS = 20_000;
 /** Repair sessions spent on a red or conflicting PR before escalating. */
 export const DEFAULT_CI_ATTEMPTS = 2;
 
-/** A PR's `mergeable`, `mergeStateStatus` and `state`, or null when unreadable. */
-type MergeState = ReturnType<typeof readMergeState>;
+/** One PR in full, or null when the provider has no such PR. */
+type MergeState = PullRequestDetail | null;
 
 /**
  * The effects {@link verifyPullRequest} reaches through, in one object
@@ -63,14 +104,17 @@ type MergeState = ReturnType<typeof readMergeState>;
 export interface PrLifecycleSeams {
   /** The branch whose PR is verified. */
   readonly currentBranch: () => string;
+  /**
+   * Which provider the repository gets. A reading of `none` takes the
+   * gate's other path; see the module note.
+   */
+  readonly readProvider: () => PrProviderReading;
+  /** Pushes the branch to `origin` with upstream set, for a `none` provider. */
+  readonly pushBranch: (branch: string) => Promise<PushOutcome>;
   /** Whether `gh` is on PATH and authenticated. */
-  readonly isGhUsable: () => boolean;
-  /** The branch's open PR number, or null when it has none. */
-  readonly findOpenPullRequest: (branch: string) => number | null;
-  /** Raw `gh pr checks --json name,state,link` stdout for one poll. */
-  readonly probeChecks: (prNumber: number) => string;
-  /** The PR's merge state, or null when it cannot be read. */
-  readonly readMergeState: (prNumber: number) => MergeState;
+  readonly isGhUsable: () => Promise<boolean>;
+  /** The provider every read of the pull request goes through. */
+  readonly pulls: PullRequests;
   /**
    * Spawns one repair session with the prompt on stdin, loading settings
    * from the sources named; answers its exit code.
@@ -88,10 +132,13 @@ export interface PrLifecycleSeams {
 /** The real helpers, which {@link verifyPullRequest} runs on by default. */
 export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
   currentBranch: getCurrentBranch,
-  isGhUsable,
-  findOpenPullRequest,
-  probeChecks,
-  readMergeState,
+  // `configured: null` leaves the answer to `origin`. `start()` passes a
+  // reader carrying the run's own `pr.provider`; this default is what a
+  // caller that names no seam gets.
+  readProvider: () => resolvePrProvider({ configured: null, dir: process.cwd() }),
+  pushBranch: (branch) => Promise.resolve(pushBranch(process.cwd(), branch)),
+  isGhUsable: () => ghAuthOkIn(process.cwd()),
+  pulls: ghPullRequestsIn(process.cwd()),
   runClaude,
 };
 
@@ -149,7 +196,12 @@ async function repairPullRequest(
  *
  * Polls the PR's checks, and spends up to `maxAttempts` repair sessions on
  * a red or conflicting result before escalating to the operator. Skips
- * itself cleanly when `gh` is unusable, so the loop still works offline.
+ * itself cleanly when `gh` is unusable, so the loop still works offline,
+ * and reports rather than rethrows a provider that could not be asked
+ * once the gate has started, for the same reason.
+ *
+ * Under a `none` provider it pushes the branch, prints the compare URL
+ * and skips the wait instead, polling nothing; see the module note.
  *
  * Every repair session loads settings from `settingSources`, bound once
  * here so no attempt can spawn one under any other.
@@ -170,19 +222,71 @@ export async function verifyPullRequest(
   };
   const branch = io.currentBranch();
 
-  if (!io.isGhUsable()) {
+  const reading = io.readProvider();
+  if (reading.provider === 'none') {
+    await pushWithoutProvider(io, branch, reading);
+    return;
+  }
+
+  if (!await io.isGhUsable()) {
     activeOutput().warn('\n⚠️  `gh` is not available or not authenticated — skipping the CI check.');
     activeOutput().warn('   The PR has been pushed but nothing here confirms CI agreed with it.');
     return;
   }
 
-  for (let attempt = 0; attempt <= maxAttempts; attempt++) {
-    const isLastAttempt = attempt === maxAttempts;
-    if (await verifyAttempt(io, branch, timeoutMs, isLastAttempt) === 'stop') return;
+  try {
+    for (let attempt = 0; attempt <= maxAttempts; attempt++) {
+      const isLastAttempt = attempt === maxAttempts;
+      if (await verifyAttempt(io, branch, timeoutMs, isLastAttempt) === 'stop') return;
+    }
+  } catch (error) {
+    // The port throws when it could not be ASKED, where the helpers it
+    // replaced answered an empty reading. It is reported and not
+    // rethrown: this is the run's last gate, and the work is pushed
+    // either way.
+    activeOutput().error(`\n❌ Could not read the PR for ${branch}: ${messageOf(error)}`);
+    activeOutput().error('   The PR has been pushed but nothing here confirms CI agreed with it.');
+    return;
   }
 
   activeOutput().error(`\n❌ CI still not green after ${maxAttempts} repair attempt(s) on ${branch}.`);
   activeOutput().error('   Stopping rather than looping. Read the failing jobs and decide.');
+}
+
+/**
+ * The whole of the gate for a `none` provider: pushes `branch`, names
+ * where a pull request would be opened from, and says the CI wait was
+ * skipped. Reports a failed push and returns; see the module note.
+ */
+async function pushWithoutProvider(
+  io: AttemptSeams,
+  branch: string,
+  reading: PrProviderReading,
+): Promise<void> {
+  const output = activeOutput();
+  const said = reading.source === 'config'
+    ? 'pr.provider is none'
+    : 'origin is not a GitHub remote, so pr.provider resolves to none';
+  output.info(`\n⬆️  ${said} — pushing ${branch} and opening no pull request.`);
+
+  const push = await io.pushBranch(branch);
+  if (!push.ok) {
+    output.error(`\n❌ Could not push ${branch}.`);
+    if (push.output !== '') output.error(push.output);
+    output.error('   The work is committed locally. Push it yourself and open the PR by hand.');
+    return;
+  }
+  output.info(`\n✅ Pushed ${branch} to origin.`);
+
+  const url = compareUrl(reading.remote, branch);
+  if (url === null) {
+    output.warn('   origin names no web host, so there is no compare URL to open. Open the PR by hand.');
+  } else {
+    output.info(`   Open the pull request: ${url}`);
+  }
+
+  output.warn('\n⚠️  CI check skipped: with no pull request provider there is nothing to poll.');
+  output.warn('   The branch is pushed but nothing here confirms CI agreed with it.');
 }
 
 /**
@@ -196,11 +300,12 @@ async function verifyAttempt(
   timeoutMs: number,
   isLastAttempt: boolean,
 ): Promise<AttemptEnd> {
-  const prNumber = io.findOpenPullRequest(branch);
-  if (prNumber === null) {
+  const found = await io.pulls.findOpen(branch);
+  if (found === null) {
     activeOutput().warn(`\n⚠️  No open PR found for ${branch}. Nothing to verify.`);
     return 'stop';
   }
+  const prNumber = found.number;
 
   const result = await pollChecks(io, prNumber, timeoutMs);
   if (reportSettledVerdict(prNumber, result)) return 'stop';
@@ -209,7 +314,7 @@ async function verifyAttempt(
   // `none` and `red` both get a repair session, with different framing:
   // no checks at all is almost always a conflict, since GitHub cannot
   // build a merge ref for a PR that does not merge cleanly.
-  const merge = io.readMergeState(prNumber);
+  const merge = await io.pulls.get(prNumber);
   return result.verdict === 'none'
     ? handleNoChecks(io, branch, prNumber, merge)
     : handleRedChecks(io, branch, prNumber, result.rows);
@@ -224,7 +329,7 @@ function pollChecks(
   activeOutput().info(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
 
   return waitForChecks({
-    probe: () => Promise.resolve(io.probeChecks(prNumber)),
+    probe: async () => (await io.pulls.checks(prNumber)).rows,
     timeoutMs,
     intervalMs: CI_POLL_INTERVAL_MS,
     now: io.now,
@@ -258,8 +363,8 @@ function reportSettledVerdict(prNumber: number, result: WaitResult): boolean {
 
 /**
  * A PR with no checks. Nothing to do when it is merged, or when it is
- * not conflicting. A conflict, or a merge state that cannot be read, gets
- * a conflict-repair session.
+ * not conflicting. A conflict, or a PR the provider answers nothing for,
+ * gets a conflict-repair session.
  */
 async function handleNoChecks(
   io: AttemptSeams,
@@ -267,13 +372,13 @@ async function handleNoChecks(
   prNumber: number,
   merge: MergeState,
 ): Promise<AttemptEnd> {
-  if (merge?.state === 'MERGED') {
+  if (merge?.state === 'merged') {
     activeOutput().info(`\n✅ PR #${prNumber} is already merged.`);
     return 'stop';
   }
   if (merge !== null && merge.mergeStateStatus !== 'DIRTY') {
     activeOutput().warn(`\n⚠️  PR #${prNumber} reports no checks and is not conflicting`);
-    activeOutput().warn(`   (mergeable=${merge.mergeable} state=${merge.mergeStateStatus}).`);
+    activeOutput().warn(`   (GitHub says it is ${merge.mergeable}, merge state ${merge.mergeStateStatus}).`);
     activeOutput().warn('   Most likely no workflow matches the changed paths. Nothing to repair.');
     return 'stop';
   }
@@ -297,7 +402,7 @@ async function handleRedChecks(
   io: AttemptSeams,
   branch: string,
   prNumber: number,
-  rows: CheckRow[],
+  rows: readonly CheckRow[],
 ): Promise<AttemptEnd> {
   activeOutput().warn(`\n❌ CI red on PR #${prNumber}:`);
   activeOutput().warn(formatRows(rows));

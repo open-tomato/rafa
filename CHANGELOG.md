@@ -7,6 +7,16 @@ commit list. Versions follow semver; a phase is a minor, a fix between
 phases is a patch. Each released version is tagged `v<version>`
 (`v0.1.0` was never tagged; `f9954e2..da0a76c` is its range).
 
+## 0.4.0 — 2026-09-19, phase 3: pull requests and the board
+
+- Pull-request provider: read and list pull requests from GitHub; fetch, merge and triage GitHub pull requests.
+- Pull-request subjects in plans: `pr fetch`, `pr merge`, `pr assess`, `pr resolve`, `pr trust`; merge conflict detection and clean-up.
+- Triage and --resolve: assess pull request readiness, surface blockers, and resolve issues before merge.
+- Trust mechanism: declare trusted authors and branches; refuse merge from untrusted sources.
+- Readiness gate: verify merge safety before planning; no plan without a passing gate.
+- Board setup: `rafa init --board` creates labels and board structure; `spec:ready` label gates plan creation.
+- Plans from the board: `rafa plan create --issue <n>` reads GitHub issues marked `spec:ready` and creates plans.
+
 ## 0.3.0 — 2026-09-18, phase 2: schema, checker, demotion
 
 - Stack vocabulary, skill frontmatter v2 schema with `prevents`, `signal`, `when_to_use`, `paths`, `tags`, `stack`, and instinct record schema.

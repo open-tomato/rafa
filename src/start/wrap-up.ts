@@ -17,9 +17,10 @@
 import type { ClaudeSettingSource } from '../config.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
+import { ghPullRequestsIn } from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
-import { findOpenPullRequest } from '../utils/pr.js';
 
 import { withStamp } from './stamp.js';
 
@@ -35,10 +36,18 @@ import { withStamp } from './stamp.js';
  * sessions were dispatched under, which is why this takes the plan and
  * no mode: there is no mode to get wrong. `full` renders the plan
  * document byte for byte (`plan/inject.ts`), so what is appended here
- * is the `full` rendering. The session titles the PR after the plan,
- * looks for its issue reference there and summarises the work of every
- * stage, and a `stage` or `task` rendering holds one stage, or one
- * task line.
+ * is the `full` rendering. The session titles the PR `rafa-<n>:
+ * <title>` from the plan title and the `issue: <n>` its `rafa:plan`
+ * block carries, closes that issue from the body with `Closes #<n>`
+ * and summarises the work of every stage, and a `stage` or `task`
+ * rendering holds one stage, or one task line.
+ *
+ * The merge-conflict bullet is NOT written here: it is
+ * `mechanicalConflictBullet()` from `pr/conflict-sentence.ts`, the one
+ * source the pinned resolve plans read the same sentence from
+ * (`pr/plans/load.ts`), so this prompt and those plans cannot drift on
+ * what an agent does with a conflicted lockfile. It sits mid-list, and
+ * the first line above it stays the classifier key.
  *
  * `openPullRequest` is the branch's open PR as the loop read it before
  * the session, or null when it found none. The session is told which
@@ -56,12 +65,12 @@ export function buildWrapUpPrompt(
     '* If there\'s anything worth keeping, take what\'s generally relevant from that file into the `context/` page that owns its subject, `README.md` or a pertinent skill under `.claude/skills/`. The root `AGENTS.md` is a capped map read into every turn of every session: point at the page from there if a new one is needed, never inline the finding itself.',
     '* Promote a finding ONLY when all three hold, and delete or keep it rather than promoting it when any one fails. It is PROJECT-SPECIFIC — a fact about THIS tree (its layout, its gates, its conventions, what a command here actually answers) and not a general technique, which belongs in a skill and not in this repo\'s docs. It is NOT ALREADY COVERED by a skill under `.claude/skills/` — read the skill that matches the finding\'s subject before writing anything, and extend that skill in place rather than restating it in a second document. And it NAMES WHAT IT REPLACES — the sentence, bullet or table row it supersedes, deleted in the SAME edit — or, when it replaces nothing, says so. A promotion landing beside the claim it should have replaced leaves two authorities on one subject, and nothing here compares two documents, so the stale one is never reported again.',
     '* If a learn/learn-eval skill is available in this session, invoke it now so reusable patterns from this run are persisted as skills.',
-    '* If it\'s present, extract the issue reference from the plan below (e.g. "#42") to be used in the PR title.',
-    `* If the reference is not present on the plan check if the branch name (${branch}) carries one (e.g. feat/42-slug).`,
-    '* Use the plan title as the PR title, include the issue reference if you found it, e.g. "Implement user authentication (#42)".',
+    '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
+    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
+    '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
     '* BEFORE pushing, bring the branch up to date with the base: `git fetch origin main` then `git merge origin/main`. A branch that conflicts with main gets NO CI run at all — GitHub cannot build `refs/pull/<n>/merge` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan\'s context is still loaded, is the cheapest place it will ever be.',
-    '* Resolve MECHANICAL conflicts yourself and do not stop for them: dependency version bumps (take the base\'s version unless this branch deliberately pinned it, and say which in the commit), lockfiles, generated artifacts, and complementary additions where both sides appended different material to the same file (keep BOTH). Stop only for a genuine semantic conflict — two sides changing the same behaviour incompatibly. In that case commit nothing, leave the branch as it is, and report the conflicting paths and both sides\' intent, so a human decides.',
+    mechanicalConflictBullet(),
     '* If the merge touched `bun.lock` or any `package.json`, run `bun install --frozen-lockfile` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base\'s copy (`git checkout origin/main -- bun.lock`), run a plain `bun install` so this branch\'s own dependencies are re-added, and confirm the frozen run then passes.',
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
     pullRequestStep(branch, openPullRequest),
@@ -88,6 +97,25 @@ function pullRequestStep(branch: string, openPullRequest: number | null): string
 }
 
 /**
+ * The branch's open PR number as the loop reads it before the session,
+ * or null when it has none.
+ *
+ * A provider that could not be ASKED — `gh` absent, unauthenticated or
+ * offline — throws, and that is read as null here rather than stopping
+ * the wrap-up: the session still has to promote the findings, commit and
+ * push, and the create bullet already carries the reading of a refusal
+ * that must not turn into a second PR.
+ */
+async function openPullRequestNumber(branch: string): Promise<number | null> {
+  try {
+    const found = await ghPullRequestsIn(process.cwd()).findOpen(branch);
+    return found?.number ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Runs the wrap-up session over the plan the run was started on, loading
  * settings from `settingSources`, the run's `loop.settingSources`.
  */
@@ -96,7 +124,7 @@ export async function preserveProgress(
   settingSources: readonly ClaudeSettingSource[],
 ): Promise<void> {
   const branch = getCurrentBranch();
-  const prompt = buildWrapUpPrompt(branch, planContent, findOpenPullRequest(branch));
+  const prompt = buildWrapUpPrompt(branch, planContent, await openPullRequestNumber(branch));
   const exitCode = await runClaude(withStamp(prompt), settingSources);
   if (exitCode !== 0) {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);

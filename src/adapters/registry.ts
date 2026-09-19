@@ -106,7 +106,7 @@ import type {
   PortVersions,
   Tracker,
 } from '../ports/index.js';
-import type { ClaudeSpawner } from '../utils/claude.js';
+import type { CapturingSpawner } from '../utils/claude.js';
 
 import { describeValue } from '../config-sections.js';
 import { STORE_BACKENDS } from '../config.js';
@@ -191,10 +191,12 @@ export interface AdapterContext {
    */
   readonly planDir?: string;
   /**
-   * The spawner the `claude` planner's session goes through. Read by it
+   * The spawner the `claude` planner's session goes through, which
+   * answers the session's stdout beside its exit code, since the
+   * planner reads the spec review out of it. Read by that planner
    * alone; a spawner running `claude` when left out.
    */
-  readonly claude?: ClaudeSpawner;
+  readonly claude?: CapturingSpawner;
 }
 
 /**

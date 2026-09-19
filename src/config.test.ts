@@ -7,7 +7,11 @@
  * runs without a disk. Reading the files, from a project root and a
  * home, is `config-load.ts`, driven in `config-load.test.ts`. The value
  * readers are driven one by one in `config-sections.test.ts`; here each
- * section is reached through a file's text.
+ * section is reached through a file's text. The schema itself — the
+ * dotted file key per setting, the sections a file may open, and the
+ * known-key index — is `config-schema.ts`, driven in
+ * `config-schema.test.ts`; here it is reached through `config.js`,
+ * which re-exports every name a caller reads.
  *
  * Every precedence case plants values that DIFFER from the defaults in
  * each layer it names, which is what lets it fail: a resolver that
@@ -79,7 +83,8 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
-  + 'output, prerequisites, tracking, modules, allowList, loop)';
+  + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
+  + 'roadmap)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -100,6 +105,12 @@ const SETTINGS: readonly ConfigSetting[] = [
   'modules',
   'allowList',
   'settingSources',
+  'prProvider',
+  'prMergeMethod',
+  'prBase',
+  'prResolveBudget',
+  'boardTrustedAuthors',
+  'roadmapIssue',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -121,6 +132,12 @@ const DEFAULTS: RafaConfig = {
   modules: [],
   allowList: [],
   settingSources: ['project', 'local'],
+  prProvider: null,
+  prMergeMethod: 'squash',
+  prBase: null,
+  prResolveBudget: 2,
+  boardTrustedAuthors: [],
+  roadmapIssue: null,
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -160,6 +177,15 @@ const FULL = [
   'allowList: [my-output]',
   'loop:',
   '  settingSources: user, project',
+  'pr:',
+  '  provider: none',
+  '  mergeMethod: rebase',
+  '  base: trunk',
+  '  resolveBudget: 0.5',
+  'board:',
+  '  trustedAuthors: ["dependabot[bot]"]',
+  'roadmap:',
+  '  issue: 31',
   '',
 ].join('\n');
 
@@ -196,6 +222,12 @@ const FULL_VALUES: RafaConfig = {
   ],
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
+  prProvider: 'none',
+  prMergeMethod: 'rebase',
+  prBase: 'trunk',
+  prResolveBudget: 0.5,
+  boardTrustedAuthors: ['dependabot[bot]'],
+  roadmapIssue: 31,
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -247,7 +279,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(6);
+    expect(lists).toHaveLength(7);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -484,6 +516,36 @@ describe('parseConfigText', () => {
         'loop.settingSources is "project,project", '
           + 'expected a comma-separated subset of: user, project, local',
         'loop:\n  settingSources: user', 'settingSources', ['user'],
+      ],
+      [
+        'pr.provider', 'pr:\n  provider: github',
+        'pr.provider is "github", expected one of: gh, none',
+        'pr:\n  provider: none', 'prProvider', 'none',
+      ],
+      [
+        'pr.mergeMethod', 'pr:\n  mergeMethod: squash-merge',
+        'pr.mergeMethod is "squash-merge", expected one of: squash, merge, rebase',
+        'pr:\n  mergeMethod: merge', 'prMergeMethod', 'merge',
+      ],
+      [
+        'pr.base', 'pr:\n  base: 7', 'pr.base is 7, expected a branch name',
+        'pr:\n  base: develop', 'prBase', 'develop',
+      ],
+      [
+        'pr.resolveBudget', 'pr:\n  resolveBudget: "2"',
+        'pr.resolveBudget is "2", expected a number of US dollars above zero, '
+          + 'at most six digits either side of the point',
+        'pr:\n  resolveBudget: 1.25', 'prResolveBudget', 1.25,
+      ],
+      [
+        'board.trustedAuthors', 'board:\n  trustedAuthors: [octo cat]',
+        'board.trustedAuthors[0] is "octo cat", expected a GitHub login',
+        'board:\n  trustedAuthors: [octocat]', 'boardTrustedAuthors', ['octocat'],
+      ],
+      [
+        'roadmap.issue', 'roadmap:\n  issue: 0',
+        'roadmap.issue is 0, expected an issue number, a whole number above zero',
+        'roadmap:\n  issue: 31', 'roadmapIssue', 31,
       ],
     ];
 

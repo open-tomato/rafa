@@ -27,6 +27,45 @@
  *
  * Each rejection sits beside the case where the same fixture answers.
  *
+ * ## How far the board routes are driven here
+ *
+ * Second on the child's PATH beside the stand-in `claude` is a stand-in
+ * `gh` that answers `gh issue view 20` and exits 1, naming the words,
+ * for anything else. One case runs `--issue=20` through it whole: the
+ * snapshot written under `specs.dir`, the planner handed that file and
+ * the stub read off its name, and `issue: "20"` recorded in the plan the
+ * fixture wrote (the `plan-written` outcome, which exists so there is a
+ * file to stamp). So no case reaches GitHub, and a route that asked `gh`
+ * for anything else would fail naming it.
+ *
+ * The other two board cases need no board at all: a line naming two
+ * sources is refused before any read, and `--dry-run` stops before the
+ * planner. `--next` is not driven here — its walk is three more `gh` and
+ * `git` reads, driven over planted runners in
+ * `src/board/plan-spec.test.ts` and end to end in the integration suite.
+ *
+ * That every `--spec` case is green is a reading of its own: the board
+ * seams are built for every run (`src/board/plan-spec.ts`) and a file
+ * route calls none of them, so a resolution that spawned `gh` eagerly
+ * would redden this whole file.
+ *
+ * ## The readiness gate's cases
+ *
+ * Four outcomes drive the verdict `src/plan.ts` acts on. `not-ready`
+ * writes BOTH files and answers a review that judged the spec not
+ * ready, which is the one thing the gate cannot take the session's word
+ * for: the case holds both files gone and the command exited 3, and the
+ * `--skip-review` case holds the same outcome keeping them and the plan
+ * recording `review: skipped`. `not-ready-rejection` is the ordinary
+ * shape of that verdict, a session that wrote no plan, and is held to
+ * exit 3 with the gaps rather than to the adapter's own message.
+ * `absent-review` is the control that keeps the gate off a session that
+ * FAILED: its review is `absent`, which is not ready either, and the
+ * command must still end with the session's own exit code and message.
+ * The gaps are read out of a real `rafa:spec-review` block through
+ * `parseSpecReview`, so no case asserts against a reading the parser
+ * does not produce.
+ *
  * Nine mutations of `plan.ts` were driven on 2026-09-14 over this file,
  * `src/adapters/planner/claude.test.ts` and
  * `src/adapters/registry.test.ts`, one run each, with 79 pass before and
@@ -47,6 +86,24 @@
  * text and the json rejection cases. The plan-ready line written at
  * `warn`, and the usage refusal thrown with no message, each reddened its
  * json case alone.
+ *
+ * One mutation of `plan.ts` was driven on 2026-09-19 over this file, the
+ * module restored from a scratch copy and verified with `shasum -c`: the
+ * `recordPlanIssue` call dropped left 20 pass and 1 fail against 21 pass
+ * either side — the `--issue` case, the only one that reads a plan a
+ * board route wrote. The board flags declared and unread would redden
+ * `src/commands/index.test.ts` instead, which is where that pairing is
+ * held.
+ *
+ * One mutation of `plan.ts` was driven on 2026-09-19 over
+ * `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the module
+ * restored from a scratch copy and verified with `shasum -c`:
+ * `rejectedReview` answering every review a rejection carries, rather
+ * than the ones judged not ready, left 196 pass and 1 fail against 197
+ * pass either side — the `absent-review` case, which then exited 3 with
+ * the gate's refusal in place of the session's own failure. Four other
+ * mutations driven the same day over `gate.ts` are recorded in
+ * `src/board/gate.test.ts`; two of them redden cases in this file.
  */
 import type { CliEvent } from './ports/index.js';
 
@@ -66,6 +123,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from './board/naming.js';
 import { buildPlanPrompt, readPlanFormat } from './plan.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 
@@ -75,14 +133,54 @@ const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
 /** The spec every scratch repository holds at `spec.md`. */
 const SPEC = '# Spec: a command probe\n\nNothing to build.\n';
 
+/** The issue the stand-in `gh` answers `issue view` with; the one board read a case here makes. */
+const ISSUE = { number: 20, title: 'The board routes', body: '# Spec: the board routes\n\nNothing to build.\n' };
+
 /** The spec content the fixture hands the context's builder. */
 const FIXTURE_SPEC = 'the spec as the fixture hands it to the builder\n';
 
 /** The `progress.txt` every scratch repository holds. */
 const PROGRESS = 'a finding an earlier run left behind\n';
 
+/** The session output the fixture reads its not-ready review out of. */
+const NOT_READY_OUTPUT = [
+  'I read the spec first.',
+  '',
+  '```rafa:spec-review',
+  'verdict: not-ready',
+  'gaps:',
+  '  - heading: "Definition of done"',
+  '    what: "no item says how the merge clean-up is verified"',
+  '```',
+  '',
+].join('\n');
+
+/** The plan the fixture writes when it writes one anyway; it carries a header to stamp. */
+const WRITTEN_PLAN = [
+  '# Plan: spec',
+  '',
+  '```rafa:plan',
+  'stub: spec',
+  '```',
+  '',
+  '- [ ] Do the thing',
+  '',
+].join('\n');
+
 /** What the fixture planner does once asked for a plan. */
-type Outcome = 'plan' | 'prerequisites' | 'session-failed' | 'other-rejection';
+type Outcome =
+  | 'plan'
+  | 'prerequisites'
+  | 'session-failed'
+  | 'other-rejection'
+  /** Writes both files and answers a review that judged the spec not ready. */
+  | 'not-ready'
+  /** Writes nothing and rejects as the adapter does, carrying that review. */
+  | 'not-ready-rejection'
+  /** Rejects with a failed session whose output held no review block. */
+  | 'absent-review'
+  /** Writes the plan, holding a header to stamp, and answers it with no review. */
+  | 'plan-written';
 
 /**
  * The child: a registry holding the fixture planner, handed to the
@@ -91,7 +189,9 @@ type Outcome = 'plan' | 'prerequisites' | 'session-failed' | 'other-rejection';
  * note.
  */
 const PROBE = [
-  'import { writeFileSync } from "node:fs";',
+  'import { mkdirSync, writeFileSync } from "node:fs";',
+  'import { join } from "node:path";',
+  `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
@@ -116,9 +216,29 @@ const PROBE = [
   '      }));',
   '      if (outcome === "session-failed") throw new ClaudePlannerError("Plan generation failed (exit 3).", 3);',
   '      if (outcome === "other-rejection") throw new Error("the planner is unreachable");',
+  '      const planPath = context.planDir + "/PLAN-" + request.stub + ".md";',
+  '      const prerequisitesPath = context.planDir + "/PREREQUISITES-" + request.stub + ".md";',
+  `      const review = parseSpecReview(${JSON.stringify(NOT_READY_OUTPUT)});`,
+  '      if (outcome === "absent-review") {',
+  '        throw new ClaudePlannerError("Plan generation failed (exit 7).", 7, parseSpecReview("no block here"));',
+  '      }',
+  '      if (outcome === "not-ready-rejection") {',
+  '        throw new ClaudePlannerError("The session finished but " + planPath + " was not created.", 1, review);',
+  '      }',
+  '      if (outcome === "plan-written") {',
+  '        mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
+  `        writeFileSync(join(context.repoRoot, planPath), ${JSON.stringify(WRITTEN_PLAN)});`,
+  '        return { planPath, prerequisitesPath: null };',
+  '      }',
+  '      if (outcome === "not-ready") {',
+  '        mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
+  `        writeFileSync(join(context.repoRoot, planPath), ${JSON.stringify(WRITTEN_PLAN)});`,
+  '        writeFileSync(join(context.repoRoot, prerequisitesPath), "a prerequisite\\n");',
+  '        return { planPath, prerequisitesPath, review };',
+  '      }',
   '      return {',
-  '        planPath: context.planDir + "/PLAN-" + request.stub + ".md",',
-  '        prerequisitesPath: outcome === "prerequisites" ? context.planDir + "/PREREQUISITES-" + request.stub + ".md" : null,',
+  '        planPath,',
+  '        prerequisitesPath: outcome === "prerequisites" ? prerequisitesPath : null,',
   '      };',
   '    },',
   '  }),',
@@ -166,6 +286,27 @@ function plantScratch(): Scratch {
   const claude = join(bin, 'claude');
   writeFileSync(claude, ['#!/bin/sh', `: > '${spawned}'`, 'exit 97', ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
+
+  // The one board read `--issue` makes, answered by a stand-in: no case
+  // here reaches GitHub, and a second read would exit 1 naming its words.
+  const gh = join(bin, 'gh');
+  writeFileSync(gh, [
+    '#!/bin/sh',
+    'if [ "$1" = "issue" ] && [ "$2" = "view" ] && [ "$3" = "20" ]; then',
+    `  printf '%s' '${JSON.stringify({
+      number: ISSUE.number,
+      title: ISSUE.title,
+      body: ISSUE.body,
+      state: 'OPEN',
+      labels: [{ name: 'type:spec' }, { name: 'spec:ready' }],
+    })}'`,
+    '  exit 0',
+    'fi',
+    'echo "the stand-in gh was asked $*" >&2',
+    'exit 1',
+    '',
+  ].join('\n'), 'utf8');
+  chmodSync(gh, 0o755);
 
   const init = Bun.spawnSync(['git', 'init', '-q', '.'], { cwd: repo });
   if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr.toString()}`);
@@ -290,6 +431,46 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
+  it('snapshots the issue --issue names, plans from that file, and records the issue in the plan', () => {
+    const scratch = plantScratch();
+    const stub = 'rafa-20-board-routes';
+    const snapshot = specPath('.rafa/specs', ISSUE.number, ISSUE.title);
+
+    const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(snapshot).toBe(`.rafa/specs/${stub}.md`);
+    expect(readFileSync(join(scratch.repo, snapshot), 'utf8')).toBe(ISSUE.body);
+    expect(readRecord(scratch)).toMatchObject({ request: { specPath: snapshot, stub } });
+    const planned = readFileSync(join(scratch.repo, '.rafa', 'plans', `PLAN-${stub}.md`), 'utf8');
+    expect(planned.split('\n').slice(2, 5)).toEqual(['```rafa:plan', 'stub: spec', 'issue: "20"']);
+    expect(run.stdout).toContain(`🔖 .rafa/plans/PLAN-${stub}.md records issue: "20", the issue it was planned from.`);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('refuses a line naming two spec sources, asking for neither a plan nor a board read', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--issue=20', '--no-progress']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('--spec and --issue each name a spec, and a run plans from one');
+    expect(existsSync(scratch.record)).toBe(false);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('prints what it would plan from under --dry-run and asks the planner for nothing', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--dry-run', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('🔎 --dry-run: would plan from spec.md. Nothing was written.');
+    expect(run.stdout).not.toContain('Generating');
+    expect(existsSync(scratch.record)).toBe(false);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
   it('hands the planner a prompt holding progress.txt when --no-progress is not given', () => {
     const scratch = plantScratch();
 
@@ -336,6 +517,59 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
+  it('removes the plan and the prerequisites written against a not-ready review, and exits 3', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'not-ready', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(3);
+    expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md'))).toBe(false);
+    expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'PREREQUISITES-spec.md'))).toBe(false);
+    expect(run.stdout).toContain('🗑  Removed .rafa/plans/PLAN-spec.md');
+    expect(run.stdout).toContain('🗑  Removed .rafa/plans/PREREQUISITES-spec.md');
+    expect(run.stdout).not.toContain('Plan ready');
+    expect(run.stderr).toContain('❌ spec.md is not ready to plan from');
+    expect(run.stderr).toContain('"Definition of done": no item says how the merge clean-up is verified');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('exits 3 on the rejection a session that judged the spec not ready leaves behind', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'not-ready-rejection', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(3);
+    expect(run.stderr).toContain('❌ spec.md is not ready to plan from');
+    expect(run.stderr).not.toContain('was not created');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('keeps the failure of a session whose output held no review block, rather than gating on it', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'absent-review', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(7);
+    expect(run.stderr).toContain('\n❌ Plan generation failed (exit 7).\n');
+    expect(run.stderr).not.toContain('not ready to plan from');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('keeps the plan under --skip-review and records review: skipped in its rafa:plan block', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'not-ready', ['--spec=spec.md', '--no-progress', '--skip-review']);
+
+    expect(run.exitCode).toBe(0);
+    const plan = join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md');
+    expect(existsSync(plan)).toBe(true);
+    expect(readFileSync(plan, 'utf8')).toContain('stub: spec\nreview: skipped\n```');
+    expect(run.stdout).toContain('⏭  --skip-review: the spec was not reviewed, and .rafa/plans/PLAN-spec.md records review: skipped.');
+    expect(run.stdout).toContain('✅ Plan ready: .rafa/plans/PLAN-spec.md');
+    expect(run.stdout).not.toContain('not ready to plan from');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
   it('refuses a plan already there in plan.dir before asking the planner for one', () => {
     const scratch = plantScratch();
     mkdirSync(join(scratch.repo, '.rafa', 'plans'), { recursive: true });
@@ -377,9 +611,11 @@ function labelOf(event: CliEvent): string {
     : event.type;
 }
 
-/** The refusal a line with no `--spec` gets. */
-const USAGE_REFUSAL = 'Usage: rafa plan --spec=<spec-file>.md [--stub=<name>] [--no-progress]\n'
-  + 'A spec is read against the project root, or under specs.dir (.rafa/specs) when the root holds none.';
+/** The refusal a line naming none of the three spec sources gets. */
+const USAGE_REFUSAL = 'Usage: rafa plan create (--spec=<file>.md | --issue=<n> | --next[=<roadmap-issue>])\n'
+  + '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment]\n'
+  + 'no spec was named: pass --spec=<file>.md, read against the project root or under specs.dir'
+  + ' (.rafa/specs), --issue=<n> to plan from an issue, or --next to take the first undone line of the roadmap';
 
 describe('rafa plan create in json mode', () => {
   it('writes each line as an info event between the start and the one result', () => {
@@ -416,7 +652,7 @@ describe('rafa plan create in json mode', () => {
     });
   }, 30_000);
 
-  it('refuses a line with no --spec on stderr in text mode, and in the terminal result in json mode', () => {
+  it('refuses a line naming no spec source on stderr in text mode, and in the terminal result in json mode', () => {
     const scratch = plantScratch();
 
     const text = runPlan(scratch, 'plan', []);

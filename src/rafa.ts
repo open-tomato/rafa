@@ -5,6 +5,7 @@
  * core registry.
  *
  *   rafa plan create --spec=.rafa/specs/<file>.md [--stub=<name>]
+ *   rafa plan create --issue=<n> | --next[=<roadmap-issue>] [--refresh] [--dry-run]
  *   rafa plan list | show <stub> [--tracker] | validate <file>
  *   rafa loop start [--plan=.rafa/plans/PLAN-<stub>.md] [--start-at=HH:MM] [--inject=<mode>]
  *   rafa init [--root=<path>] [--yes]

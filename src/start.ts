@@ -162,6 +162,7 @@ import { fileURLToPath } from 'url';
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
+import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
 import { finishCleanExit } from './start/commit.js';
 import {
@@ -370,6 +371,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
             Math.max(1, ciTimeoutMin) * 60_000,
             Math.max(0, ciAttempts),
             settingSources,
+            // The gate takes its own path when this reads `none`: the
+            // branch pushed, the compare URL printed and no CI wait
+            // (`start/pr-lifecycle.ts`). The reading is made here
+            // because the run's `pr.provider` lives in this config.
+            {
+              readProvider: () => resolvePrProvider({
+                configured: runConfig.config.prProvider ?? null,
+                dir: repoRoot,
+              }),
+            },
           );
         }
         session.finished();

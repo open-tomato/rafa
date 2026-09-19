@@ -74,6 +74,30 @@ becomes an agent-setting record and the enqueue moves to record 1, so
 every prompt-keyed reader has to key on the type/operation pair and
 never on position.
 
+### Naming convention
+
+All rafa work follows a consistent naming scheme across specifications,
+plans, branches, and pull requests. The board is GitHub Issues on
+`open-tomato/rafa`; every spec has one issue labelled `type:spec`,
+whose ID appears as `rafa-<n>`.
+
+| Artifact | Pattern | Example |
+|---|---|---|
+| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
+| `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
+| Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
+| Pull request title | `rafa-<n>: <title>` | `rafa-20: Add pull-request commands` |
+| Pull request body | `Closes #<n>` | `Closes #20` |
+
+The slug summarizes what the user gets, using two to four words joined
+by hyphens.
+
+**The order of all work lives in ONE place: the pinned "Roadmap" issue**
+on the `open-tomato/rafa` board. The word "phase" and its letters are
+retired; merged work keeps its old file names and a table in the Roadmap
+issue maps them.
+
 ### Files beside the tree
 
 **`.plans/` and `.specs/` are gitignored**, so they live only in the

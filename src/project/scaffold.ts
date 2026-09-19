@@ -36,6 +36,14 @@
  * parses to {@link CONFIG_DEFAULTS}, which the tests hold, so a setting
  * added to the schema without a line here is caught there.
  *
+ * Two lines carry their key and no value, `pr.provider` and `pr.base`,
+ * because each resolves to null and null is what a key with no value
+ * parses to. Uncommented they are silent, so those two settings resolve
+ * from the defaults layer where every other resolves from the file, and
+ * the tests name both. The line is written anyway: it tells an operator
+ * the key exists and what it takes, which is the whole point of a
+ * template of commented settings.
+ *
  * A file is written only when nothing is at its path, with the `wx` flag,
  * so a file that appears between the check and the write is refused by
  * the system rather than overwritten. An existing file is never read,
@@ -92,6 +100,15 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# allowList: []',
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,
+  '# pr:',
+  '#   provider:                    # gh | none; unset reads it off the origin remote',
+  `#   mergeMethod: ${CONFIG_DEFAULTS.prMergeMethod}          # squash | merge | rebase`,
+  '#   base:                        # the branch a PR opens into; unset is the remote default',
+  `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
+  '# board:',
+  '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
+  '# roadmap:',
+  '#   issue:                       # the issue plan create --next reads; unset is the one titled Roadmap',
 ]);
 
 /** The line every file opens its settings with. */

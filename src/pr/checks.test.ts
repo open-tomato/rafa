@@ -1,5 +1,5 @@
 /**
- * Tests for the wrap-up stage's CI gate (src/utils/pr.ts).
+ * Tests for the pull request's check-row readers (`src/pr/checks.ts`).
  *
  * Everything here is driven through injected probes and an injected
  * clock, so no `gh`, no network and no real timers are involved. The
@@ -7,6 +7,8 @@
  * actually emitted for this repo, including the plain-text message it
  * writes when a PR has no checks at all.
  */
+
+import type { CheckRow } from './checks.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -17,7 +19,7 @@ import {
   parseChecks,
   verdictOf,
   waitForChecks,
-} from '../utils/pr.js';
+} from './checks.js';
 
 const JOB = 'https://github.com/o/r/actions/runs/1/job/2';
 
@@ -25,6 +27,15 @@ function rowsJson(states: Record<string, string>): string {
   const entries = Object.entries(states);
   const mapped = entries.map(([name, state]) => ({ name, state, link: JOB }));
   return JSON.stringify(mapped);
+}
+
+/**
+ * One poll's rows, read from the stdout `gh pr checks` writes for them.
+ * `waitForChecks` polls rows rather than stdout, so a case that wants a
+ * provider's own output goes through `parseChecks` as the adapter does.
+ */
+function rowsOf(states: Record<string, string>): CheckRow[] {
+  return parseChecks(rowsJson(states));
 }
 
 describe('classifyState', () => {
@@ -139,7 +150,7 @@ describe('waitForChecks', () => {
 
   it('returns green on the first poll when CI already passed', async () => {
     const result = await waitForChecks({
-      probe: () => Promise.resolve(rowsJson({ checks: 'SUCCESS' })),
+      probe: () => Promise.resolve(rowsOf({ checks: 'SUCCESS' })),
       timeoutMs: 60_000,
       intervalMs: 1_000,
       sleep: noSleep,
@@ -152,10 +163,10 @@ describe('waitForChecks', () => {
   it('keeps polling while checks are in flight', async () => {
     const states = ['PENDING', 'IN_PROGRESS', 'SUCCESS'];
     let call = 0;
-    const probe = (): Promise<string> => {
+    const probe = (): Promise<CheckRow[]> => {
       const state = states[call] ?? 'SUCCESS';
       call += 1;
-      return Promise.resolve(rowsJson({ checks: state }));
+      return Promise.resolve(rowsOf({ checks: state }));
     };
 
     const result = await waitForChecks({
@@ -173,7 +184,7 @@ describe('waitForChecks', () => {
     // A PR with no checks is conflicting or unmatched by any workflow;
     // neither resolves by waiting, so burning the deadline is wasted.
     const result = await waitForChecks({
-      probe: () => Promise.resolve('no checks reported'),
+      probe: () => Promise.resolve(parseChecks('no checks reported')),
       timeoutMs: 600_000,
       intervalMs: 1_000,
       sleep: noSleep,
@@ -186,7 +197,7 @@ describe('waitForChecks', () => {
   it('gives up at the deadline instead of polling forever', async () => {
     let clock = 0;
     const result = await waitForChecks({
-      probe: () => Promise.resolve(rowsJson({ checks: 'IN_PROGRESS' })),
+      probe: () => Promise.resolve(rowsOf({ checks: 'IN_PROGRESS' })),
       timeoutMs: 10_000,
       intervalMs: 2_000,
       now: () => {
@@ -203,7 +214,7 @@ describe('waitForChecks', () => {
   it('reports every poll to the caller', async () => {
     const seen: string[] = [];
     await waitForChecks({
-      probe: () => Promise.resolve(rowsJson({ checks: 'FAILURE' })),
+      probe: () => Promise.resolve(rowsOf({ checks: 'FAILURE' })),
       timeoutMs: 10_000,
       intervalMs: 1_000,
       sleep: noSleep,
