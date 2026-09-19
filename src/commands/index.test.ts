@@ -164,7 +164,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct check': [['dir'], []],
   'instinct list': [[], []],
   'instinct show': [['id'], []],
-  'init': [[], ['root', 'yes']],
+  'init': [[], ['root', 'yes', 'board']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
   'describe': [[], []],

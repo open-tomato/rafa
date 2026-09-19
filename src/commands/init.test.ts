@@ -38,8 +38,21 @@
  * a `bin/` of its own and git's directory, and a standard input that is
  * no terminal. So the registered command's own seams are read: the
  * working directory, `homedir()`, `process.stdin` and the real git.
+ *
+ * ## The board step
+ *
+ * The seams answer no `origin` and open a `gh` runner that throws, so
+ * every case but the board ones resolves `pr.provider: none`, runs no
+ * board step and reaches neither git nor GitHub — and a case that
+ * reached for a runner would say so rather than spawn one. The board
+ * cases hand in an `origin` of their own and a `gh` runner over one
+ * imaginary repository ({@link fakeGh}); what each part of the board
+ * comes to is held in `init-board.test.ts` and `src/board/setup.test.ts`,
+ * and what is held here is the step reaching the command's output, its
+ * json result and its warnings.
  */
 import type { InitResult, InitSeams } from './init.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '../project/root-choice.js';
 
 import {
@@ -66,7 +79,7 @@ import { rootCandidates } from '../project/roots.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
 import { dispatchCaptured, eventsOf, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
-import { createInitCommand, DEFAULT_INIT_SEAMS, readRootFlag, readYesFlag } from './init.js';
+import { createInitCommand, DEFAULT_INIT_SEAMS, readBoardFlag, readRootFlag, readYesFlag } from './init.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-')));
@@ -120,6 +133,10 @@ function seamsFor(world: World, overrides: Partial<InitSeams> = {}): InitSeams {
     gitToplevel: (dir) => dir === world.repo || dir.startsWith(`${world.repo}/`)
       ? world.repo
       : null,
+    readRemote: () => null,
+    gh: () => {
+      throw new Error('init opened a gh runner where none was expected');
+    },
     ...overrides,
   };
 }
@@ -156,6 +173,46 @@ function scripted(answers: readonly string[]) {
     return prompter;
   };
   return { record, open };
+}
+
+/** What a fake GitHub repository answers, and which commands fail on it. */
+interface FakeGhOptions {
+  /** The command prefixes that fail, each with what the failure writes. */
+  readonly fails?: Readonly<Record<string, string>>;
+}
+
+/**
+ * A `gh` runner over one imaginary repository, private and holding no
+ * label and no issue, keeping the first two words of every call. What
+ * each part of the board comes to is held in `init-board.test.ts` and
+ * `src/board/setup.test.ts`; this is here so a case can drive the step
+ * through the command without reaching GitHub.
+ */
+function fakeGh(options: FakeGhOptions = {}) {
+  const routes: string[] = [];
+  const labels: string[] = [];
+  const fails = options.fails ?? {};
+
+  const run: GhRunner = (args) => {
+    const route = args.slice(0, 2).join(' ');
+    routes.push(route);
+    const failure = fails[route];
+    if (failure !== undefined) return Promise.resolve({ ok: false, stdout: '', stderr: failure });
+
+    const ok = (stdout: string) => Promise.resolve({ ok: true, stdout, stderr: '' });
+    if (route === 'repo view') return ok(JSON.stringify({ visibility: 'PRIVATE' }));
+    if (route === 'label list') return ok(JSON.stringify(labels.map((name) => ({ name }))));
+    if (route === 'label create') {
+      labels.push(args[2] ?? '');
+      return ok('');
+    }
+    if (route === 'issue list') return ok('[]');
+    if (route === 'issue create') return ok('https://github.com/acme/widgets/issues/7\n');
+    if (route === 'issue pin') return ok('');
+    return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${route}` });
+  };
+
+  return { run, routes: () => [...routes] };
 }
 
 /** Every path under `dir`, `dir` first. */
@@ -362,6 +419,26 @@ describe('choosing the root', () => {
     expect(() => readRootFlag('')).toThrow('--root needs a path');
     expect(() => readRootFlag(false)).toThrow('--root needs a path');
   });
+
+  it('reads --board as true, --no-board as false and neither as nobody having said, refusing a value', () => {
+    expect([readBoardFlag(undefined), readBoardFlag(true), readBoardFlag('true')]).toEqual([null, true, true]);
+    expect([readBoardFlag(false), readBoardFlag('false')]).toEqual([false, false]);
+    expect(() => readBoardFlag('later')).toThrow('--board takes no value');
+  });
+
+  it('refuses a value read for --board before a root is chosen, writing nothing', async () => {
+    const world = plantWorld();
+
+    const run = await init(world, ['--yes', '--board=later']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr.split('\n')[0]).toBe(
+      'rafa init: --board takes no value, and read "later" as one;'
+      + ' set the board up with --board, or leave it alone with --no-board',
+    );
+    expect(run.stderr.trimEnd().endsWith('Nothing was written.')).toBe(true);
+    expect(existsSync(join(world.repo, '.rafa'))).toBe(false);
+  });
 });
 
 describe('what it writes', () => {
@@ -492,6 +569,93 @@ describe('what it writes', () => {
     expect(run.stderr).toStartWith(opening);
     expect(run.stderr).toEndWith('\nNothing was written.\n');
     expect(stateOf(world.base)).toEqual(before);
+  });
+});
+
+describe('the board step', () => {
+  it('sets the GitHub board up under --board, listing each part it made and naming the issue in the config', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+
+    const run = await init(world, ['--yes', '--board'], seamsFor(world, {
+      readRemote: () => 'https://github.com/acme/widgets.git',
+      gh: () => gh.run,
+    }));
+    const lines = run.stdout.split('\n');
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(lines).toContain('GitHub board:');
+    expect(lines).toContain('  created  label type:spec');
+    expect(lines.some((line) => line.startsWith('  created  Roadmap issue'))).toBe(true);
+    expect(readFileSync(join(world.repo, '.rafa', 'config.yaml'), 'utf8')).toContain('roadmap:\n  issue: 7');
+    expect(existsSync(join(world.repo, '.github', 'ISSUE_TEMPLATE', 'spec.md'))).toBe(true);
+    expect(gh.routes()).toContain('label create');
+  });
+
+  it('gives the step as the board of the result in json mode, and warns what it came back with', async () => {
+    const world = plantWorld();
+    const gh = fakeGh({ fails: { 'issue pin': 'could not pin' } });
+
+    const run = await init(world, ['--yes', '--board', '--output=json'], seamsFor(world, {
+      readRemote: () => 'git@github.com:acme/widgets.git',
+      gh: () => gh.run,
+    }));
+    const result = resultOf(run.stdout);
+    const logs = eventsOf(run.stdout).filter((event) => event.type === 'log');
+
+    expect(result.board.status).toBe('ran');
+    expect(result.board.report?.roadmapIssue).toBe(7);
+    expect(result.changed).toBe(true);
+    expect(logs.some((event) => JSON.stringify(event).includes('opened but not pinned'))).toBe(true);
+  });
+
+  it('leaves the board alone under --no-board, and on a repository whose origin is not GitHub, sending nothing', async () => {
+    const world = plantWorld();
+    const onGitHub = seamsFor(world, { readRemote: () => 'https://github.com/acme/widgets.git' });
+
+    const declined = await init(world, [`--root=${world.repo}`, '--no-board', '--output=json'], onGitHub);
+    const elsewhere = await init(world, [`--root=${world.repo}`, '--board', '--output=json'], seamsFor(world, {
+      readRemote: () => 'https://gitlab.com/acme/widgets.git',
+    }));
+
+    expect(declined.exitCode).toBe(0);
+    expect(resultOf(declined.stdout).board.status).toBe('declined');
+    expect(elsewhere.exitCode).toBe(0);
+    expect(resultOf(elsewhere.stdout).board.status).toBe('not-github');
+    expect(JSON.stringify(eventsOf(elsewhere.stdout))).toContain('--board sets up a GitHub board');
+    expect(existsSync(join(world.repo, '.github'))).toBe(false);
+  });
+
+  it('asks nothing and names --board without a terminal to ask on, leaving Nothing changed. true on a rerun', async () => {
+    const world = plantWorld();
+    const onGitHub = seamsFor(world, { readRemote: () => 'https://github.com/acme/widgets.git' });
+
+    const first = await init(world, [`--root=${world.repo}`], onGitHub);
+    const again = await init(world, [`--root=${world.repo}`], onGitHub);
+
+    expect(first.exitCode).toBe(0);
+    expect(first.stdout).toContain('The GitHub board step needs a terminal; run rafa init --board to set it up.');
+    expect(again.stdout.trimEnd().endsWith('Nothing changed.')).toBe(true);
+    expect(existsSync(join(world.repo, '.github'))).toBe(false);
+  });
+
+  it('asks once on a terminal, and sets the board up on a yes', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+    const prompter = scripted(['y']);
+
+    const run = await init(world, [`--root=${world.repo}`, '--output=json'], seamsFor(world, {
+      readRemote: () => 'https://github.com/acme/widgets.git',
+      gh: () => gh.run,
+      isTerminal: () => true,
+      openPrompter: prompter.open,
+    }));
+
+    expect(run.exitCode).toBe(0);
+    expect(prompter.record.asked).toBe(1);
+    expect(resultOf(run.stdout).board).toMatchObject({ status: 'ran', asked: true });
+    expect(gh.routes()[0]).toBe('repo view');
   });
 });
 

@@ -44,6 +44,7 @@ module's note is the long form.
 | `src/commands/pr/pr-context.ts` | what the six `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
+| `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
 | `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, and the two install warnings |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -283,7 +284,28 @@ module's note is the long form.
   carries is left to the preflight, which refuses on it. In json mode the
   result's `data` holds the root, its source, the working directory,
   whether the config existed, every path checked with its change, that
-  reading, and those vendorable uses.
+  reading, those vendorable uses, and what the board step came to.
+- **The board step runs last, and only where there is a board**
+  (`src/commands/init-board.ts`). The provider is resolved from
+  `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
+  anything but `gh` ends the step before a runner is opened, with a
+  warning only when `--board` asked for one. `--no-board` declines,
+  `--board` runs without asking, no terminal leaves the board alone and
+  prints the line naming `rafa init --board`, and otherwise the one
+  question `Set up the GitHub board for this repo? [y/N]` is asked
+  through `init`'s own prompter on stderr, with the extra line saying
+  issue bodies are public above it when `gh repo view --json visibility`
+  reads `PUBLIC`. That probe is sent only when the question is asked,
+  and a probe that fails leaves the line out and warns. What it makes is
+  `src/board/setup.ts`'s, each part printed as
+  `  <outcome>  <name>` under `GitHub board:`, with the detail of a part
+  refused or made — a label this run made apart, whose detail is the
+  shipped description. Nothing it comes to refuses `init`: a failed
+  command is a refused part. It runs after the scopes are written,
+  because the `roadmap.issue` it writes goes into the config this run
+  made, and a run that creates no part leaves `Nothing changed.` true.
+  `--board=<value>` is refused at the top of the run, while nothing has
+  been written.
 - **`doctor` checks what `loop start` would, and starts no run**
   (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
   first, before anything is checked, so the build that answered is read
@@ -605,7 +627,7 @@ module's note is the long form.
   each list equal to the quoted `--` literals of the modules reading that
   line. A wrapped command's `outputs` is `['text']` until it writes
   through the active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` neither, each with `text` and `json`. `describe` declares no flag, `init` the flags `root` and `yes` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` neither, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. Of the `issue` actions, `list` declares the
