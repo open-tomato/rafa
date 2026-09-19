@@ -83,7 +83,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
-  + 'output, prerequisites, tracking, modules, allowList, loop, pr)';
+  + 'output, prerequisites, tracking, modules, allowList, loop, pr, board)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -108,6 +108,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'prMergeMethod',
   'prBase',
   'prResolveBudget',
+  'boardTrustedAuthors',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -133,6 +134,7 @@ const DEFAULTS: RafaConfig = {
   prMergeMethod: 'squash',
   prBase: null,
   prResolveBudget: 2,
+  boardTrustedAuthors: [],
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -177,6 +179,8 @@ const FULL = [
   '  mergeMethod: rebase',
   '  base: trunk',
   '  resolveBudget: 0.5',
+  'board:',
+  '  trustedAuthors: ["dependabot[bot]"]',
   '',
 ].join('\n');
 
@@ -217,6 +221,7 @@ const FULL_VALUES: RafaConfig = {
   prMergeMethod: 'rebase',
   prBase: 'trunk',
   prResolveBudget: 0.5,
+  boardTrustedAuthors: ['dependabot[bot]'],
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -268,7 +273,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(6);
+    expect(lists).toHaveLength(7);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -525,6 +530,11 @@ describe('parseConfigText', () => {
         'pr.resolveBudget is "2", expected a number of US dollars above zero, '
           + 'at most six digits either side of the point',
         'pr:\n  resolveBudget: 1.25', 'prResolveBudget', 1.25,
+      ],
+      [
+        'board.trustedAuthors', 'board:\n  trustedAuthors: [octo cat]',
+        'board.trustedAuthors[0] is "octo cat", expected a GitHub login',
+        'board:\n  trustedAuthors: [octocat]', 'boardTrustedAuthors', ['octocat'],
       ],
     ];
 

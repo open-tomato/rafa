@@ -156,6 +156,8 @@ const PROJECT_TEXT = [
   '  mergeMethod: rebase',
   '  base: trunk',
   '  resolveBudget: 0.5',
+  'board:',
+  '  trustedAuthors: [octocat]',
   '',
 ].join('\n');
 
@@ -196,6 +198,7 @@ const PROJECT_VALUES: RafaConfig = {
   prMergeMethod: 'rebase',
   prBase: 'trunk',
   prResolveBudget: 0.5,
+  boardTrustedAuthors: ['octocat'],
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -234,6 +237,8 @@ const USER_TEXT = [
   '  mergeMethod: merge',
   '  base: develop',
   '  resolveBudget: 3',
+  'board:',
+  '  trustedAuthors: ["dependabot[bot]", hubot]',
   '',
 ].join('\n');
 
@@ -264,6 +269,7 @@ const USER_VALUES: RafaConfig = {
   prMergeMethod: 'merge',
   prBase: 'develop',
   prResolveBudget: 3,
+  boardTrustedAuthors: ['dependabot[bot]', 'hubot'],
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -454,6 +460,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'pr.resolveBudget is 0, expected a number of US dollars above zero, '
       + 'at most six digits either side of the point',
     'pr:\n  resolveBudget: 4', 'prResolveBudget', 4,
+  ],
+  [
+    'board.trustedAuthors', 'board:\n  trustedAuthors: octocat',
+    'board.trustedAuthors is "octocat", expected a list of GitHub logins',
+    'board:\n  trustedAuthors: [hubot]', 'boardTrustedAuthors', ['hubot'],
   ],
 ];
 

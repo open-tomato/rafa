@@ -78,6 +78,27 @@
  *     layer over the config: a global `--merge-method` nobody typed
  *     would be a flag this module invented.
  *
+ * ## The `board` section
+ *
+ * `.specs/rafa-20-pr-commands.md` names `board.trustedAuthors` as the
+ * allow-list beside the permission reading `src/board/trust.ts` makes:
+ * text off the board reaches an agent's prompt, so its author must hold
+ * write access on the repository or be listed here. Two readings it
+ * leaves to this module:
+ *
+ *   - It defaults to the EMPTY list, and empty is a working default
+ *     rather than a placeholder: with nothing listed, the permission
+ *     reading alone decides, which is the answer GitHub already holds
+ *     for every member. A name here is for the author a permission
+ *     lookup cannot speak for — a bot account, or a maintainer whose
+ *     access is held through an organisation the endpoint does not
+ *     report — and inventing one as a default would trust an account
+ *     nobody named.
+ *   - Each entry goes through `githubLogin` and not through `text`,
+ *     because a login from this setting is spliced into the
+ *     collaborators path; `config-sections.ts` records what that
+ *     narrower shape refuses and why.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -122,6 +143,7 @@ import {
   CLAUDE_SETTING_SOURCES,
   CONFIG_VERSIONS,
   flag,
+  githubLogin,
   INJECT_MODES,
   listOf,
   mergeMethod,
@@ -203,6 +225,11 @@ export interface RafaConfig {
    * spawned with. `pr.resolveBudget`.
    */
   prResolveBudget: number;
+  /**
+   * The logins trusted with board text besides the repository's own
+   * write-holders. `board.trustedAuthors`.
+   */
+  boardTrustedAuthors: readonly string[];
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -240,6 +267,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   prMergeMethod: 'squash',
   prBase: null,
   prResolveBudget: 2,
+  boardTrustedAuthors: Object.freeze([]),
 });
 
 /** What the module knows about one setting. */
@@ -321,6 +349,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   prMergeMethod: { key: 'pr.mergeMethod', read: mergeMethod, cli: false },
   prBase: { key: 'pr.base', read: text('a branch name'), cli: false },
   prResolveBudget: { key: 'pr.resolveBudget', read: usdAmount, cli: false },
+  boardTrustedAuthors: {
+    key: 'board.trustedAuthors',
+    read: listOf(githubLogin, 'GitHub logins'),
+    cli: false,
+  },
 };
 
 /** Every setting name, read off the closed record above. */

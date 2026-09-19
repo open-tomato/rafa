@@ -288,6 +288,31 @@ export const usdAmount: Reader<number> = (raw, at) => {
 };
 
 /**
+ * A GitHub account login as the collaborators endpoint takes one in a
+ * path: alphanumerics and hyphens opening with an alphanumeric, with the
+ * `[bot]` suffix a bot account carries.
+ *
+ * The shape is narrow on purpose. A login read from this setting is put
+ * into `repos/{owner}/{repo}/collaborators/<login>/permission` by
+ * `src/board/trust.ts`, so anything carrying `/`, `.`, `%`, whitespace
+ * or a leading `-` would either move that path or arrive at `gh` where a
+ * flag goes. It refuses the `app/<name>` spelling `gh --json author`
+ * writes for an app account for the same reason: that is `gh`'s
+ * rendering of a bot and not a login the endpoint resolves.
+ */
+const GITHUB_LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]*(?:\[bot\])?$/;
+
+/** True for a string shaped like a GitHub login; see {@link GITHUB_LOGIN}. */
+export function isGitHubLogin(value: unknown): value is string {
+  return typeof value === 'string' && GITHUB_LOGIN.test(value);
+}
+
+/** Accepts a GitHub account login, kept as written; see {@link GITHUB_LOGIN}. */
+export const githubLogin: Reader<string> = (raw, at) => isGitHubLogin(raw)
+  ? accepted(raw)
+  : refused(at, raw, 'a GitHub login');
+
+/**
  * Accepts a list whose every entry `item` accepts, answered frozen.
  * Every entry is read, so a list with two unusable entries names both.
  * `expected` names the entries, in the refusal of a value that is not a

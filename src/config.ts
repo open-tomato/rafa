@@ -325,6 +325,7 @@ function readLayer(
     prMergeMethod: read('prMergeMethod'),
     prBase: read('prBase'),
     prResolveBudget: read('prResolveBudget'),
+    boardTrustedAuthors: read('boardTrustedAuthors'),
   };
   return { layer, problems, extras };
 }

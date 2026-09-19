@@ -51,6 +51,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prMergeMethod', 'pr.mergeMethod'],
   ['prBase', 'pr.base'],
   ['prResolveBudget', 'pr.resolveBudget'],
+  ['boardTrustedAuthors', 'board.trustedAuthors'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -80,6 +81,7 @@ const TOP = [
   'allowList',
   'loop',
   'pr',
+  'board',
 ];
 
 describe('SETTINGS', () => {
@@ -133,6 +135,7 @@ describe('isCommandLineSetting', () => {
 describe('SECTIONS', () => {
   it('holds every dotted prefix a setting sits under, and no setting key', () => {
     expect([...SECTIONS].sort()).toEqual([
+      'board',
       'learning',
       'loop',
       'output',

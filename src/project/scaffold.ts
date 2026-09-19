@@ -105,6 +105,8 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   mergeMethod: ${CONFIG_DEFAULTS.prMergeMethod}          # squash | merge | rebase`,
   '#   base:                        # the branch a PR opens into; unset is the remote default',
   `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
+  '# board:',
+  '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
 ]);
 
 /** The line every file opens its settings with. */

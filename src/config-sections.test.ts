@@ -27,6 +27,8 @@ import {
   CLAUDE_SETTING_SOURCES,
   describeValue,
   flag,
+  githubLogin,
+  isGitHubLogin,
   isMapping,
   listOf,
   mergeMethod,
@@ -318,6 +320,43 @@ describe('usdAmount', () => {
 
     expect(valueOf(usdAmount, parsed.a)).toBe(1.5);
     expect(problemsOf(usdAmount, parsed.b)).toEqual([`F: s is "1.50", expected ${USD_EXPECTED}`]);
+  });
+});
+
+describe('githubLogin', () => {
+  it.each([
+    ['a plain login', 'octocat'],
+    ['one carrying a hyphen and digits', 'open-tomato-2'],
+    ['one in mixed case, kept as written', 'OctoCat'],
+    ['a bot account', 'dependabot[bot]'],
+    ['a single character', 'o'],
+  ])('accepts %s as itself', (_label, raw) => {
+    expect(valueOf(githubLogin, raw)).toBe(raw);
+  });
+
+  it.each([
+    ['a path that would move the permission path', '../../evil', '"../../evil"'],
+    ['a login carrying a slash, as gh renders an app account', 'app/dependabot', '"app/dependabot"'],
+    ['one opening with a hyphen, which gh would read as a flag', '-octocat', '"-octocat"'],
+    ['one carrying a space', 'octo cat', '"octo cat"'],
+    ['one carrying a percent escape', 'octo%2Fcat', '"octo%2Fcat"'],
+    ['one carrying a dot', 'octo.cat', '"octo.cat"'],
+    ['the empty string', '', '""'],
+    ['a number', 7, '7'],
+    ['null', null, 'null'],
+    ['a list of logins', ['octocat'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(githubLogin, raw)).toEqual([`F: s is ${found}, expected a GitHub login`]);
+  });
+
+  it('reads the same shape as the predicate the trust check narrows logins with', () => {
+    // The control pairs the two: a reader that accepted what the
+    // predicate refuses would put a login into the collaborators path
+    // that `src/board/trust.ts` would not.
+    expect(isGitHubLogin('octocat')).toBe(true);
+    expect(isGitHubLogin('dependabot[bot]')).toBe(true);
+    expect(isGitHubLogin('../../evil')).toBe(false);
+    expect(isGitHubLogin(7)).toBe(false);
   });
 });
 
