@@ -49,6 +49,23 @@
  * turn on — the version now on the base — is only true once the base
  * has been pulled.
  *
+ * ## The roadmap tick
+ *
+ * GitHub closes an issue the merged pull request says `Closes #<n>` for
+ * and does not tick the `- [ ] #<n>` box naming it on the roadmap, so
+ * this command ticks it (`.specs/rafa-20-pr-commands.md`). The rule and
+ * the two `gh` calls are `src/board/roadmap-tick.ts`'s and the decision
+ * to make them at all is `./merge-tick.ts`'s; what is decided HERE is
+ * WHEN, and it is straight after the provider merged, before the
+ * clean-up. The clean-up is local git and can fail, and a tick behind it
+ * would be the one piece of the merge that a failed `git pull` silently
+ * dropped — where the board write has nothing to do with this checkout
+ * and is as true then as it is after.
+ *
+ * Nothing it comes to fails the command, so a roadmap that cannot be
+ * read, an edit that would not land and a pull request closing no issue
+ * all leave the merge reported exactly as it happened.
+ *
  * ## The remote branch, and which remote
  *
  * Whether the remote branch is still there is read AFTER the merge, by
@@ -81,6 +98,8 @@
  */
 import type { FollowUp } from './merge-followups.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
+import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ChecksVerdict, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { Prompter } from '../../project/root-choice.js';
@@ -88,6 +107,8 @@ import type { Prompter } from '../../project/root-choice.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { createGhRunner } from '../../adapters/tracker/github.js';
+import { tickSentence } from '../../board/roadmap-tick.js';
 import { CommandExit } from '../../cli/command.js';
 import {
   cleanUpSteps,
@@ -105,6 +126,7 @@ import { createLinePrompter } from '../../project/root-choice.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
+import { tickRoadmapAfterMerge } from './merge-tick.js';
 import {
   lineRefusal,
   onProvider,
@@ -131,6 +153,8 @@ const YES_ANSWERS: readonly string[] = ['y', 'yes'];
 export interface MergeSeams extends PrSeams {
   /** The git runner for a root. `createGitRunner` when left out. */
   readonly git?: (root: string) => GitRunner;
+  /** The `gh` runner the roadmap tick sends its two calls through. `createGhRunner` when left out. */
+  readonly gh?: (root: string) => GhRunner;
   /** True when a question can be answered. Standard input being a TTY when left out. */
   readonly isTerminal?: () => boolean;
   /** Opens the prompter the question is asked through. Called only to ask. */
@@ -173,6 +197,8 @@ export interface PrMergeResult {
   readonly steps: readonly MergeStepReport[];
   /** The follow-ups that apply, empty when neither does. */
   readonly followUps: readonly FollowUp[];
+  /** What the roadmap tick came to, or null when the pull request closes no issue. */
+  readonly roadmapTick: RoadmapTickResult | null;
 }
 
 /** A refusal of this action with exit code 1. */
@@ -286,6 +312,33 @@ function followUpsFor(pr: PrContext, git: GitRunner): readonly FollowUp[] {
   });
 }
 
+/**
+ * Ticks the roadmap for the merge that just went through and prints the
+ * one line it came to; see the module note. A tick that could not be
+ * written is a warning and nothing else.
+ */
+async function reportTick(
+  context: RafaContext,
+  pr: PrContext,
+  seams: MergeSeams,
+  detail: PullRequestDetail,
+): Promise<RoadmapTickResult | null> {
+  const warn = (message: string): void => {
+    context.output.warn(message);
+  };
+  const tick = await tickRoadmapAfterMerge({
+    body: detail.body,
+    configured: pr.roadmapIssue,
+    gh: (seams.gh ?? ((root: string) => createGhRunner({ cwd: root })))(pr.project.root),
+    warn,
+  });
+  if (tick === null) return null;
+
+  if (tick.status === 'failed') warn(tickSentence(tick));
+  else context.output.info(tickSentence(tick));
+  return tick;
+}
+
 /** The line saying what is ready, which the remote delete having run changes. */
 function readyLine(base: string, branch: string, remoteBranchPresent: boolean): string {
   const remote = remoteBranchPresent
@@ -365,6 +418,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     detail: '',
     steps: [],
     followUps: [],
+    roadmapTick: null,
   };
   if (!yes && !await confirmed(seams)) {
     context.output.info('Nothing was merged.');
@@ -376,6 +430,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     throw refusal([`❌ ${pr.pulls.kind} would not merge #${detail.number}: ${outcome.detail}`]);
   }
   context.output.info(`Merged #${detail.number} into ${detail.baseRefName} (${method}).`);
+  const roadmapTick = await reportTick(context, pr, seams, detail);
 
   const remoteBranchPresent = remoteHoldsBranch(git, detail.headRefName, (message) => {
     context.output.warn(message);
@@ -389,7 +444,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     for (const followUp of followUps) context.output.info(`${INDENT}${followUp.command} — ${followUp.why}`);
   }
 
-  return { ...answered, merged: true, declined: false, detail: outcome.detail, steps, followUps };
+  return { ...answered, merged: true, declined: false, detail: outcome.detail, steps, followUps, roadmapTick };
 }
 
 /** The command, reaching the provider, git and the terminal through `seams`; see the module note. */
@@ -405,9 +460,11 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' request that is not green or does not merge, and on a head branch checked out in another worktree. It'
       + ' shows the pull request, its branches and the method and asks `Merge? [y/N]`; `--yes` skips the question,'
       + ' and without a terminal and without `--yes` it refuses. A step that fails never undoes the merge: it'
-      + ' prints what is left as commands to paste and exits 1. With `--output=json` the pull request, the method,'
-      + ' the steps that ran and the follow-ups are the data of the terminal result event. Refuses with exit'
-      + ' code 2 where `pr.provider` is not `gh`.',
+      + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
+      + ' every issue the pull request closes on the roadmap issue, warning rather than failing when that write'
+      + ' does not land. With `--output=json` the pull request, the method, the steps that ran, the follow-ups and'
+      + ' the roadmap tick are the data of the terminal result event. Refuses with exit code 2 where `pr.provider`'
+      + ' is not `gh`.',
     args: [
       {
         name: 'n',

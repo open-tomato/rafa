@@ -466,6 +466,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'onProvider', 'openPrContext', 'PR_USAGE']],
   ]],
   ['./commands/pr/merge.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../pr/index.js', [
       'cleanUpSteps',
@@ -482,6 +484,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../project/root-choice.js', ['createLinePrompter']],
     ['../../start/runtime.js', ['RUNTIME_SUBDIR']],
     ['./merge-followups.js', ['readFollowUps', 'readPackageFacts', 'versionTag']],
+    ['./merge-tick.js', ['tickRoadmapAfterMerge']],
     ['./pr-context.js', [
       'lineRefusal',
       'onProvider',

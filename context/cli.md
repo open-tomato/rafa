@@ -33,12 +33,13 @@ module's note is the long form.
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
 | `src/commands/issue/issue-tracker.ts` | what the five `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
-| `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged and both branches cleaned up after it; and `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class |
+| `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; and `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class |
 | `src/commands/pr/triage-read.ts` | what `pr triage` gathers that is neither the line nor the pull request: the Actions run id off a check link, the `--log-failed` capture of each failing run, and the conflicting file list, read with `git merge-tree` between refs resolved first and never fetched |
 | `src/commands/pr/triage-resolve.ts` | what `--resolve` does with an assessment: the worktree added and removed, the pinned plan filled and capped at `pr.resolveBudget`, one loop run an attempt, the CI wait after each, the attempt guard's two stops, the comment with its dependabot rebase note, and the exit code 3 a run that gave up ends with |
 | `src/commands/pr/triage-trust.ts` | board trust as `pr triage` asks it, over `src/board/trust.ts`: the newest `rafa:pr-triage` marker comment whose author holds write access or is listed in `board.trustedAuthors`, with every newer one passed over and reported rather than read, and the exit-2 refusal `--resolve` makes over a pull request whose own author is neither trusted nor a known dependency-bump bot |
 | `src/commands/pr/resolve-loop.ts` | one `--resolve` attempt's loop: the filled plan written under `~/.rafa/resolve/pr-<n>/attempt-<k>`, outside the worktree so the loop's own commit cannot push it, and `rafa loop start --plan=<file> --no-ci-wait` spawned in the worktree with its stdout forwarded a line at a time |
 | `src/commands/pr/triage-report.ts` | the one pure renderer of a triage: the head line, the re-run sentence, the class with its evidence or the stored triage, what was written, and the follow-up prompt whole |
+| `src/commands/pr/merge-tick.ts` | what `pr merge` decides about the roadmap tick: the issues the merged pull request closes, the roadmap issue `roadmap.issue` names or the search finds, and every failure on the way turned into a warning |
 | `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa release tag` while the version on the base carries no `v<version>` tag, and `bun run snapshot` while the project declares that script and the version is not installed under the home |
 | `src/commands/pr/pr-context.ts` | what the six `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
@@ -212,6 +213,24 @@ module's note is the long form.
   `issue: "<n>"` in its `rafa:plan` block, quoted because the plan reader
   refuses a number there (`src/board/plan-field.ts`), and the gate's
   comment and label swap go to that issue.
+- **`pr merge` ticks the roadmap after it merges**
+  (`src/commands/pr/merge-tick.ts`, `src/board/roadmap-tick.ts`). GitHub
+  closes an issue a merged pull request says `Closes #<n>` for and ticks
+  no `- [ ] #<n>` box, so the command reads the roadmap issue
+  `roadmap.issue` names, else the issue titled `Roadmap`, and writes the
+  box through `gh api repos/{owner}/{repo}/issues/<n>`, GET then PATCH.
+  Every unticked line naming a closed issue is ticked, a line inside a
+  fenced block is none, and the line breaks are kept as the body spelled
+  them. A write that failed, and a write whose answer is not the body
+  that was sent — the one edit conflict `gh` can show, since the issues
+  API takes no `If-Match` — re-reads the body and retries ONCE, so a
+  roadmap somebody else ticked meanwhile comes back
+  `nothing-to-tick` rather than being written over. The tick runs
+  straight after the provider merged and before the clean-up, and
+  nothing it comes to changes the exit code: a roadmap that cannot be
+  resolved, a board that will not take the edit and a pull request
+  closing no issue are a warning or a silence. `--output=json` carries it
+  as `roadmapTick`, null when the pull request closes nothing.
 - **Two of the readiness gate's checks run on a board route**
   (`src/board/plan-spec.ts`): the `spec:ready` label and the leak
   refusal, in that order, both exit 2 and both before the body is

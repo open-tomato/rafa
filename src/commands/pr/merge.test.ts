@@ -2,7 +2,7 @@
  * Tests for `rafa pr merge` (`merge.ts`): what it refuses before it
  * asks anything, the question and the two ways past it, the merge it
  * sends, each clean-up step it runs, what a failed step leaves, and the
- * follow-ups.
+ * follow-ups, and the roadmap tick it writes after the merge.
  *
  * Every case dispatches the real command from a project of its own
  * beside a home of its own under this file's temporary directory
@@ -21,6 +21,7 @@
  * opened under `--yes`, so "the question was skipped" is measured.
  */
 import type { MergeSeams } from './merge.js';
+import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
@@ -192,6 +193,41 @@ function fakeGit(root: string, over: Readonly<Record<string, GitResult>> = {}): 
   };
 }
 
+/** The roadmap issue the tick cases plant, and the body it carries. */
+const ROADMAP_ISSUE = 31;
+
+/** The roadmap body the planted issue holds before a tick. */
+const ROADMAP_BODY = '- [ ] #20 plans from the board\n- [ ] #33 the board setup\n';
+
+/** A config naming the GitHub CLI and the roadmap issue. */
+const ROADMAP_CONFIG = `${GH_CONFIG}roadmap:\n  issue: ${ROADMAP_ISSUE}\n`;
+
+/** A `gh` runner over one planted roadmap issue, and the log of every command it was handed. */
+interface FakeGh {
+  readonly gh: (root: string) => GhRunner;
+  /** Each command, in order, the arguments joined by a space. */
+  readonly ran: () => readonly string[];
+}
+
+/**
+ * A runner serving the roadmap read and write, storing what a PATCH
+ * sends. `broken` fails every call, which is how a board that will not
+ * take the tick is driven.
+ */
+function fakeGh(broken = false): FakeGh {
+  const ran: string[] = [];
+  let stored = ROADMAP_BODY;
+  const gh: GhRunner = (args) => {
+    ran.push(args.join(' '));
+    if (broken) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
+    const sent = args.find((arg) => arg.startsWith('body='));
+    if (sent !== undefined) stored = sent.slice('body='.length);
+    const answered: GhResult = { ok: true, stdout: JSON.stringify({ number: ROADMAP_ISSUE, body: stored }), stderr: '' };
+    return Promise.resolve(answered);
+  };
+  return { gh: () => gh, ran: () => [...ran] };
+}
+
 /** A prompter answering `answer` once, then nothing, and recording each question. */
 function stubPrompter(answer: string | null): { open: () => Prompter; asked: () => readonly string[] } {
   const asked: string[] = [];
@@ -215,6 +251,7 @@ function stubPrompter(answer: string | null): { open: () => Prompter; asked: () 
 interface CaseSeams {
   readonly seams: MergeSeams;
   readonly git: FakeGit;
+  readonly gh: FakeGh;
   readonly asked: () => readonly string[];
 }
 
@@ -226,11 +263,14 @@ interface CaseOptions {
   readonly answer?: string | null;
   /** False for a machine with no terminal to ask on. */
   readonly terminal?: boolean;
+  /** True for a board that fails every call the roadmap tick makes. */
+  readonly brokenBoard?: boolean;
 }
 
 /** Seams over `pulls` for a project, with the git and prompter controls. */
 function caseSeams(pulls: PullRequests, project: PlantedProject, options: CaseOptions = {}): CaseSeams {
   const git = fakeGit(project.root, options.git ?? {});
+  const gh = fakeGh(options.brokenBoard ?? false);
   const prompter = stubPrompter(Object.hasOwn(options, 'answer')
     ? options.answer ?? null
     : 'y');
@@ -240,10 +280,12 @@ function caseSeams(pulls: PullRequests, project: PlantedProject, options: CaseOp
       readBranch: () => BRANCH,
       readRemote: () => GITHUB_ORIGIN,
       git: git.git,
+      gh: gh.gh,
       isTerminal: () => options.terminal ?? true,
       openPrompter: prompter.open,
     },
     git,
+    gh,
     asked: prompter.asked,
   };
 }
@@ -628,6 +670,54 @@ describe('the follow-ups', () => {
   });
 });
 
+describe('the roadmap tick', () => {
+  it('spends no board call on a pull request whose body closes no issue', async () => {
+    const stub = stubPulls();
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project);
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([]);
+  });
+
+  it('ticks the line of the issue the merged pull request closes, and says so', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
+    ]);
+    expect(lines).toContain(`Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`);
+  });
+
+  it('ticks before the clean-up, so a clean-up that fails cannot drop the tick', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { git: { [`switch ${BASE}`]: failed('fatal: no such branch') } });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(seams.gh.ran()).toHaveLength(2);
+  });
+
+  it('warns and merges anyway when the board will not take the tick', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { brokenBoard: true });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toHaveLength(2);
+    expect(lines.some((line) => line.startsWith('warn: ') && line.includes('was not ticked'))).toBe(true);
+    expect(stub.sent()).toContain('merge 41 squash');
+  });
+});
+
 describe('json mode', () => {
   it('gives the pull request, the method, each step and the follow-ups as the result', async () => {
     const stub = stubPulls();
@@ -648,6 +738,21 @@ describe('json mode', () => {
       'prune-remotes',
     ]);
     expect((data['followUps'] as { id: string }[]).map((followUp) => followUp.id)).toEqual(['release-tag']);
+    expect(data['roadmapTick']).toBeNull();
+  });
+
+  it('carries what the roadmap tick came to for a pull request that closes an issue', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project);
+    const { events } = await ran(seams.seams, project, ['41', '--yes', '--output=json']);
+
+    expect(dataOf(events)['roadmapTick']).toMatchObject({
+      roadmap: ROADMAP_ISSUE,
+      status: 'ticked',
+      ticked: [20],
+      attempts: 1,
+    });
   });
 
   it('gives a declined merge as a result carrying no step at all', async () => {

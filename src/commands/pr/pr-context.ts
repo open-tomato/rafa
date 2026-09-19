@@ -205,6 +205,8 @@ export interface PrContext {
   readonly resolveBudget: number;
   /** `board.trustedAuthors`: the logins board text is trusted from without a permission lookup. */
   readonly trustedAuthors: readonly string[];
+  /** `roadmap.issue`, or null when nobody named one, as `pr merge` ticks it. */
+  readonly roadmapIssue: number | null;
   /** The branch checked out at the project root; throws when git cannot read it. */
   readonly readBranch: () => string;
 }
@@ -226,7 +228,7 @@ export interface PullPick {
 /** The pull request settings an action reads off the config. */
 type PrConfig = Pick<
   RafaConfig,
-  'prProvider' | 'prMergeMethod' | 'prBase' | 'prResolveBudget' | 'boardTrustedAuthors'
+  'prProvider' | 'prMergeMethod' | 'prBase' | 'prResolveBudget' | 'boardTrustedAuthors' | 'roadmapIssue'
 >;
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
@@ -284,6 +286,7 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     base: config.prBase,
     resolveBudget: config.prResolveBudget,
     trustedAuthors: config.boardTrustedAuthors,
+    roadmapIssue: config.roadmapIssue,
     readBranch: () => readBranch(project.root),
   };
 }
