@@ -116,6 +116,7 @@ function created(path: string, kind: ScopeWriteKind): ScopeWrite {
 const VALUELESS: readonly (readonly [string, string])[] = [
   ['prProvider', 'default'],
   ['prBase', 'default'],
+  ['roadmapIssue', 'default'],
 ];
 
 describe('the config files', () => {

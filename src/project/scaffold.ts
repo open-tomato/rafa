@@ -107,6 +107,8 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
+  '# roadmap:',
+  '#   issue:                       # the issue plan create --next reads; unset is the one titled Roadmap',
 ]);
 
 /** The line every file opens its settings with. */

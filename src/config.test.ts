@@ -83,7 +83,8 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
-  + 'output, prerequisites, tracking, modules, allowList, loop, pr, board)';
+  + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
+  + 'roadmap)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -109,6 +110,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'prBase',
   'prResolveBudget',
   'boardTrustedAuthors',
+  'roadmapIssue',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -135,6 +137,7 @@ const DEFAULTS: RafaConfig = {
   prBase: null,
   prResolveBudget: 2,
   boardTrustedAuthors: [],
+  roadmapIssue: null,
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -181,6 +184,8 @@ const FULL = [
   '  resolveBudget: 0.5',
   'board:',
   '  trustedAuthors: ["dependabot[bot]"]',
+  'roadmap:',
+  '  issue: 31',
   '',
 ].join('\n');
 
@@ -222,6 +227,7 @@ const FULL_VALUES: RafaConfig = {
   prBase: 'trunk',
   prResolveBudget: 0.5,
   boardTrustedAuthors: ['dependabot[bot]'],
+  roadmapIssue: 31,
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -535,6 +541,11 @@ describe('parseConfigText', () => {
         'board.trustedAuthors', 'board:\n  trustedAuthors: [octo cat]',
         'board.trustedAuthors[0] is "octo cat", expected a GitHub login',
         'board:\n  trustedAuthors: [octocat]', 'boardTrustedAuthors', ['octocat'],
+      ],
+      [
+        'roadmap.issue', 'roadmap:\n  issue: 0',
+        'roadmap.issue is 0, expected an issue number, a whole number above zero',
+        'roadmap:\n  issue: 31', 'roadmapIssue', 31,
       ],
     ];
 

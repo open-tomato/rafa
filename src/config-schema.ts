@@ -99,6 +99,23 @@
  *     collaborators path; `config-sections.ts` records what that
  *     narrower shape refuses and why.
  *
+ * ## The `roadmap` section
+ *
+ * `.specs/rafa-20-pr-commands.md` has `plan create --next` read its
+ * order off "the roadmap issue named by `roadmap.issue` in config, else
+ * the pinned issue titled Roadmap". Two readings it leaves here:
+ *
+ *   - It defaults to NULL, and null means "nobody has said" as it does
+ *     for `pr.provider` and `pr.base`. The fallback the spec names — the
+ *     issue titled `Roadmap` — is a number only a repository can answer,
+ *     and `src/board/roadmap.ts` asks it at use. Writing a literal here
+ *     would point every repository that has not run `rafa init --board`
+ *     at one project's issue number.
+ *   - It is a number and not a string. `gh issue view <n>` takes the
+ *     number, `src/board/naming.ts` refuses anything that is not a
+ *     positive whole one, and `issueNumber` refuses it here instead,
+ *     where a person can still fix the file.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -145,6 +162,7 @@ import {
   flag,
   githubLogin,
   INJECT_MODES,
+  issueNumber,
   listOf,
   mergeMethod,
   MODULE_SOURCE_KEYS,
@@ -230,6 +248,11 @@ export interface RafaConfig {
    * write-holders. `board.trustedAuthors`.
    */
   boardTrustedAuthors: readonly string[];
+  /**
+   * The issue whose task list `plan create --next` reads its order off,
+   * or null for the issue titled `Roadmap`. `roadmap.issue`.
+   */
+  roadmapIssue: number | null;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -268,6 +291,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   prBase: null,
   prResolveBudget: 2,
   boardTrustedAuthors: Object.freeze([]),
+  roadmapIssue: null,
 });
 
 /** What the module knows about one setting. */
@@ -354,6 +378,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: listOf(githubLogin, 'GitHub logins'),
     cli: false,
   },
+  roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
 };
 
 /** Every setting name, read off the closed record above. */

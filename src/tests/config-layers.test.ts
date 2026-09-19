@@ -158,6 +158,8 @@ const PROJECT_TEXT = [
   '  resolveBudget: 0.5',
   'board:',
   '  trustedAuthors: [octocat]',
+  'roadmap:',
+  '  issue: 31',
   '',
 ].join('\n');
 
@@ -199,6 +201,7 @@ const PROJECT_VALUES: RafaConfig = {
   prBase: 'trunk',
   prResolveBudget: 0.5,
   boardTrustedAuthors: ['octocat'],
+  roadmapIssue: 31,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -239,6 +242,8 @@ const USER_TEXT = [
   '  resolveBudget: 3',
   'board:',
   '  trustedAuthors: ["dependabot[bot]", hubot]',
+  'roadmap:',
+  '  issue: 7',
   '',
 ].join('\n');
 
@@ -270,6 +275,7 @@ const USER_VALUES: RafaConfig = {
   prBase: 'develop',
   prResolveBudget: 3,
   boardTrustedAuthors: ['dependabot[bot]', 'hubot'],
+  roadmapIssue: 7,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -465,6 +471,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'board.trustedAuthors', 'board:\n  trustedAuthors: octocat',
     'board.trustedAuthors is "octocat", expected a list of GitHub logins',
     'board:\n  trustedAuthors: [hubot]', 'boardTrustedAuthors', ['hubot'],
+  ],
+  [
+    'roadmap.issue', 'roadmap:\n  issue: 2.5',
+    'roadmap.issue is 2.5, expected an issue number, a whole number above zero',
+    'roadmap:\n  issue: 31', 'roadmapIssue', 31,
   ],
 ];
 

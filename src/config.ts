@@ -89,8 +89,8 @@
  * YAML makes `null` of a key whose children are all commented out —
  * `plan:` above `  # inject: full` parses to `{ plan: null }` — and
  * refusing it would punish the commonest edit a config file receives.
- * Two settings RESOLVE to null, `pr.provider` and `pr.base`, and the
- * rule holds for them unchanged: a file naming one with no value is
+ * Three settings RESOLVE to null — `pr.provider`, `pr.base` and
+ * `roadmap.issue` — and the rule holds for them unchanged: a file naming one with no value is
  * silent, and silence there resolves to the same null from the defaults
  * layer, reported as `default` rather than `file`. What null means to a
  * caller is `config-schema.ts`'s to say.
@@ -326,6 +326,7 @@ function readLayer(
     prBase: read('prBase'),
     prResolveBudget: read('prResolveBudget'),
     boardTrustedAuthors: read('boardTrustedAuthors'),
+    roadmapIssue: read('roadmapIssue'),
   };
   return { layer, problems, extras };
 }

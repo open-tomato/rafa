@@ -52,6 +52,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prBase', 'pr.base'],
   ['prResolveBudget', 'pr.resolveBudget'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
+  ['roadmapIssue', 'roadmap.issue'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -82,6 +83,7 @@ const TOP = [
   'loop',
   'pr',
   'board',
+  'roadmap',
 ];
 
 describe('SETTINGS', () => {
@@ -142,6 +144,7 @@ describe('SECTIONS', () => {
       'plan',
       'pr',
       'prerequisites',
+      'roadmap',
       'specs',
       'tracker',
       'tracking',

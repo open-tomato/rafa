@@ -288,6 +288,26 @@ export const usdAmount: Reader<number> = (raw, at) => {
 };
 
 /**
+ * Accepts an issue number as the board spells one: a whole number above
+ * zero, and no string spelled like one.
+ *
+ * The bound matches `src/board/naming.ts`, which refuses anything else
+ * with a `RangeError` rather than spelling `rafa-0` into a path. A
+ * setting read here is handed straight to `gh issue view <n>`, so `0`,
+ * `-1` and `2.5` are refused where the person can still fix the file,
+ * and not where a command has already been sent.
+ *
+ * `Bun.YAML.parse` reads `31`, `0x1f` and `3.1e1` all as the number 31,
+ * so the three spellings are one value here. A QUOTED `"31"` is refused,
+ * as every other reader refuses a string spelled like its type.
+ */
+export const issueNumber: Reader<number> = (raw, at) => typeof raw === 'number'
+  && Number.isSafeInteger(raw)
+  && raw > 0
+  ? accepted(raw)
+  : refused(at, raw, 'an issue number, a whole number above zero');
+
+/**
  * A GitHub account login as the collaborators endpoint takes one in a
  * path: alphanumerics and hyphens opening with an alphanumeric, with the
  * `[bot]` suffix a bot account carries.
