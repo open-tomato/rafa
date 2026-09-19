@@ -660,6 +660,77 @@ describe('the changes list', () => {
     ]);
   });
 
+  it('reads an absent or null changes key as empty, without an issue', () => {
+    expect(reportOf('status: done').report.changes).toEqual([]);
+    expect(reportOf('status: done', 'changes:').report.changes).toEqual([]);
+    expect(reportOf('status: done', 'changes:').issues).toEqual([]);
+  });
+
+  it.each([
+    ['a scalar', 'changes: the loop waits for a commit', '"the loop waits for a commit"'],
+    ['a mapping', 'changes: { level: patch }', 'a mapping'],
+  ])('reads changes holding %s as empty, and reports it', (_name, line, described) => {
+    const reading = reportOf('status: done', line);
+
+    expect(reading.report.changes).toEqual([]);
+    expect(reading.issues).toEqual([{
+      reason: 'unusable-field',
+      field: 'changes',
+      text: `changes is ${described}, not a list`,
+    }]);
+  });
+
+  it('drops an entry that is not a mapping, keeping its neighbours in order', () => {
+    const reading = reportOf(
+      'status: done',
+      'changes:',
+      ...changeLines('patch', 'first'),
+      '  - "the loop waits for a commit"',
+      '  -',
+      ...changeLines('minor', 'second'),
+    );
+
+    expect(reading.report.changes).toEqual([
+      { level: 'patch', area: 'loop', summary: 'first', extras: [] },
+      { level: 'minor', area: 'loop', summary: 'second', extras: [] },
+    ]);
+    expect(reading.issues).toEqual([
+      {
+        reason: 'unusable-field',
+        field: 'changes[1]',
+        text: 'changes[1] is "the loop waits for a commit", not a mapping of level, area, summary; dropped',
+      },
+      {
+        reason: 'unusable-field',
+        field: 'changes[2]',
+        text: 'changes[2] is nothing, not a mapping of level, area, summary; dropped',
+      },
+    ]);
+  });
+
+  it('refuses a level outside the closed set, keeping the entry', () => {
+    const reading = reportOf('status: done', 'changes:', '  - level: breaking', '    summary: "big change"');
+
+    expect(reading.report.changes[0]).toMatchObject({ level: null, summary: 'big change' });
+    expect(reading.issues.map((issue) => issue.text)).toEqual([
+      'changes[0].level is "breaking", not one of patch, minor, major, none',
+    ]);
+  });
+
+  it('refuses a blank summary, leaving it null', () => {
+    const reading = reportOf('status: done', 'changes:', '  - level: patch', '    summary: "   "');
+
+    expect(reading.report.changes[0]?.summary).toBeNull();
+    expect(reading.issues.map((issue) => issue.text)).toEqual(['changes[0].summary is blank']);
+  });
+
+  it('retains an unknown key inside a change entry as its extra', () => {
+    const reading = reportOf('status: done', 'changes:', ...changeLines('patch', 'first', ['    pr: 42']));
+
+    expect(reading.report.changes[0]?.extras).toEqual([{ key: 'pr', value: 42 }]);
+    expect(reading.issues).toEqual([]);
+  });
+
   it('answers its issues after the lists written above it', () => {
     const reading = reportOf(
       'status: done',
