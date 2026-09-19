@@ -41,15 +41,20 @@
  *      `human` item, and each `auto` item with no probe, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing.
- *   6. **Checks every item** through `runPreflight`
+ *   6. **Decides the start-only tier**, through `isFirstDispatch`
+ *      (`preflight/first-dispatch.ts`): the plan's `[start]` items are
+ *      probed ahead of the configured required tier on a first
+ *      dispatch, and on a resume each is skipped with one line naming
+ *      it and why. See below.
+ *   7. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
  *      optional item is warned about as it is found.
- *   7. **Stores a row per check** through `writePreflightChecks`
+ *   8. **Stores a row per check** through `writePreflightChecks`
  *      (`effort/store/preflight.ts`), under the repo root in the SQLite
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
- *   8. **Halts, or answers.** A failed required item, or rows that could
+ *   9. **Halts, or answers.** A failed required item, or rows that could
  *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
  *      code 1. Otherwise the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
@@ -114,6 +119,31 @@
  * Every other reading spawns it once, through `readRemote`, which is
  * this module's seam for that probe.
  *
+ * ## The start-only tier
+ *
+ * A `[start]` item of the plan's PREREQUISITES file names the state the
+ * run begins from — the sibling checkout holding no uncommitted change,
+ * say — which the run's own sessions then change
+ * (`preflight/prerequisites-md.ts`). So {@link startTier} probes those
+ * items on a FIRST DISPATCH alone, the reading `isFirstDispatch`
+ * (`preflight/first-dispatch.ts`) takes off the tracker beside the plan:
+ * a tracker that already holds a ticked task makes the run a resume.
+ *
+ * On a first dispatch they sit between the provider's automatic items
+ * and the configured required tier, so the state a plan says its run
+ * begins from is read before the tiers a repository added and after the
+ * two checks that cost nothing. They are required items there: they are
+ * counted in the line the preflight opens with, stored as rows like any
+ * other check, and one that fails halts the run.
+ *
+ * On a resume none of them is checked, so none is counted, stored, or
+ * able to halt. Each is named instead in one line of its own, through
+ * `info`, carrying the item and why it was passed over:
+ *
+ *     ⏭ start-only item tool "the sibling checkout is clean" was not
+ *       checked: it is probed on a first dispatch alone, and
+ *       PLAN_TRACKER-demo.md already holds a ticked task
+ *
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
 import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
@@ -139,6 +169,7 @@ import { CONFIG_DEFAULTS } from '../config.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
+import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import { loadPlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
 import { trackerPathFor } from '../utils/tracker.js';
@@ -254,8 +285,8 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   ].join('\n'));
 }
 
-/** No automatic item, for a provider that contributes none. */
-const NO_AUTOMATIC_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
+/** No item at all, for a tier that contributes none. */
+const NO_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
 
 /**
  * The REQUIRED items the run's pull request provider contributes, ahead
@@ -263,7 +294,7 @@ const NO_AUTOMATIC_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
  */
 function automaticItems(options: StartPreflightOptions): readonly PrerequisiteItem[] {
   const configured = options.settings.prProvider ?? null;
-  if (configured === 'none') return NO_AUTOMATIC_ITEMS;
+  if (configured === 'none') return NO_ITEMS;
 
   return ghPreflightItems(resolvePrProvider({
     configured,
@@ -283,6 +314,37 @@ async function loadItems(options: StartPreflightOptions): Promise<PreflightItems
       '   Nothing was checked and nothing was dispatched.',
     ].join('\n'));
   }
+}
+
+/** The line naming one start-only item a resume passed over, and why. */
+function skippedStartLine(item: PrerequisiteItem, tracker: string): string {
+  return `⏭ start-only item ${item.kind} ${JSON.stringify(item.name)} was not checked:`
+    + ' it is probed on a first dispatch alone,'
+    + ` and ${tracker} already holds a ticked task`;
+}
+
+/** Prints one line per start-only item this resume passes over. */
+function announceSkippedStart(planPath: string, skipped: readonly PrerequisiteItem[]): void {
+  const tracker = basename(trackerPathFor(planPath));
+  const output = activeOutput();
+  for (const [index, item] of skipped.entries()) {
+    const lead = index === 0
+      ? '\n'
+      : '';
+    output.info(`${lead}${skippedStartLine(item, tracker)}`);
+  }
+}
+
+/**
+ * The start-only items this run probes: the plan's on a first dispatch,
+ * and none on a resume, where each is named instead. See the module note.
+ */
+function startTier(planPath: string, items: PreflightItems): readonly PrerequisiteItem[] {
+  if (items.startRequired.length === 0) return NO_ITEMS;
+  if (isFirstDispatch(planPath)) return items.startRequired;
+
+  announceSkippedStart(planPath, items.startRequired);
+  return NO_ITEMS;
 }
 
 /** Prints each reminder of the plan's PREREQUISITES file, by its line. */
@@ -332,7 +394,7 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
   announceReminders(options.planPath, items.reminders);
 
   const tiers: PreflightTiers = {
-    required: [...automaticItems(options), ...items.required],
+    required: [...automaticItems(options), ...startTier(options.planPath, items), ...items.required],
     optional: items.optional,
   };
   const count = tiers.required.length + tiers.optional.length;

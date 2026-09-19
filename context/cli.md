@@ -329,7 +329,11 @@ module's note is the long form.
   `runStartPreflight` puts them, and a configured `pr.provider: none`
   reads no `origin` at all (`src/pr/preflight-items.ts`). Every item goes
   through `runPreflight` in the project root with the context's
-  environment, an optional failure warned about as `loop start` warns. It generates no run id and writes no
+  environment, an optional failure warned about as `loop start` warns. A
+  plan's start-only `[start]` items are the one set left out: `loop start`
+  probes that tier on a first dispatch alone, off the tracker beside the
+  plan, and this command reads no tracker, so none of them reaches this
+  report. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
   refusal, and 0 otherwise. Then, on a repository whose provider is
@@ -685,8 +689,11 @@ module's note is the long form.
   of every probe, a failed required prerequisite — the two automatic
   items a `gh` pull request provider contributes, `gh` on `PATH` and
   `gh auth status` for `origin`'s host, checked ahead of the configured
-  tiers, included — a PREREQUISITES file that cannot be read, or checks
-  the store refused (`start/preflight.ts`). A record of the plan refuses the
+  tiers, and the plan's `[start]` items, checked between the two on a
+  first dispatch and named in one line each on a resume
+  (`src/preflight/first-dispatch.ts`), included — a PREREQUISITES file
+  that cannot be read, or checks the store refused
+  (`start/preflight.ts`). A record of the plan refuses the
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
   `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1

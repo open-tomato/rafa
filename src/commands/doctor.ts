@@ -41,7 +41,12 @@
  *      closed and the 30-second timeout, a presence check for an item with
  *      no probe, and a warning for each optional item that failed, written
  *      as it is found. The environment is the one this invocation was
- *      handed, `process.env` for the registered command.
+ *      handed, `process.env` for the registered command. A plan's
+ *      start-only `[start]` items are the one set left out: `loop start`
+ *      probes that tier on a plan's FIRST DISPATCH alone, the reading it
+ *      takes off the tracker beside the plan (`start/preflight.ts`,
+ *      `preflight/first-dispatch.ts`), and this command starts no run and
+ *      reads no tracker, so none of them reaches this report.
  *
  * ## The board rows
  *
