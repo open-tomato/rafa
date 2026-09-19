@@ -54,9 +54,43 @@
  * a `claude` planner's rejection carries, or 1 for any other, with the
  * rejection's message. An unusable config, a missing `--spec`, a spec
  * that does not exist and a plan already there each throw exit code 1
- * with the whole refusal as the message. Text mode writes that message to
- * stderr, the bytes the command printed there before; json mode carries it
- * in the terminal result.
+ * with the whole refusal as the message, and a spec the planner judged
+ * not ready throws exit code 3 with every gap in it. Text mode writes
+ * that message to stderr, the bytes the command printed there before;
+ * json mode carries it in the terminal result.
+ *
+ * ## The readiness gate's verdict
+ *
+ * The plan prompt asks the session to judge the spec BEFORE planning and
+ * to open its answer with a `rafa:spec-review` block, which the planner
+ * reads once and carries back both on the plan it answers and on what it
+ * rejects with (`adapters/planner/claude.ts`). Neither of those acts on
+ * it. This command does, through {@link enforceSpecReview}
+ * (`board/gate.ts`): a review that is not ready removes the plan and the
+ * prerequisites file when the session wrote them anyway, publishes the
+ * gaps on the issue when there is one, swaps `spec:ready` for
+ * `spec:needs-work`, and throws `CommandExit(3)` carrying every gap.
+ * `--spec=<file>` has no issue and so no labels to move: that route
+ * removes, prints and exits 3. The issue routes, `--issue` and `--next`,
+ * arrive in a later stage and fill {@link SpecReviewGateOptions.issue}.
+ *
+ * A REJECTION is weighed differently from an answer, by
+ * {@link rejectedReview}. One whose review block was READ and judged the
+ * spec not ready is enforced: a session that judged a spec unplannable
+ * writes no plan, and that rejection is the ordinary shape of the
+ * verdict. One carrying an `absent` or `malformed` review is not,
+ * because the session did not finish and what the operator needs is the
+ * failure it ended with, not a gate refusal saying the review block was
+ * missing. On a plan the planner DID answer, `absent` and `malformed`
+ * are enforced as the spec says they are, since a session that ran to
+ * the end and judged nothing has judged nothing.
+ *
+ * `--skip-review` bypasses that gate ALONE, and the plan it keeps
+ * records `review: skipped` ({@link recordSkippedReview},
+ * `board/review-stamp.ts`). Both it and `--no-comment` are read through
+ * `readGateFlags` rather than here, and are declared on
+ * `commands/plan/create.ts` by the stage that adds `--issue`; the note
+ * in `board/gate.ts` records why.
  *
  * The project root is a parameter, the root the dispatcher resolved
  * (`src/commands/wrap.ts`): `--spec` resolves against it, `plan.dir` and
@@ -87,6 +121,8 @@
  * the loop cannot run on refuses the command before any session starts.
  */
 import type { AdapterRegistry } from './adapters/registry.js';
+import type { SpecReviewGateOptions } from './board/gate.js';
+import type { SpecReviewReading } from './board/spec-review.js';
 import type { RafaConfig } from './config.js';
 import type { GeneratedPlan, Planner, PlanRequest } from './ports/index.js';
 
@@ -98,6 +134,8 @@ import { fileURLToPath } from 'url';
 import { activeOutput } from './adapters/output/active.js';
 import { ClaudePlannerError, planFilePath } from './adapters/planner/claude.js';
 import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
+import { enforceSpecReview, readGateFlags, SKIP_REVIEW_FLAG } from './board/gate.js';
+import { REVIEW_SKIPPED_LINE, stampReviewSkipped } from './board/review-stamp.js';
 import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
@@ -286,20 +324,84 @@ function findSpec(repoRoot: string, specArg: string, specsDir: string): string {
   return found;
 }
 
+/** Everything the readiness gate needs of a run but the verdict itself. */
+type GateBase = Omit<SpecReviewGateOptions, 'review'>;
+
+/**
+ * The review a planner's rejection carries that the gate acts on: one
+ * whose block was READ and judged the spec not ready. Every other
+ * rejection answers undefined and keeps its own message; the module note
+ * records why.
+ */
+function rejectedReview(error: unknown): SpecReviewReading | undefined {
+  if (!(error instanceof ClaudePlannerError) || error.review === null) return undefined;
+  return error.review.answer === 'not-ready'
+    ? error.review
+    : undefined;
+}
+
 /**
  * The plan `planner` generates for `request`, or a `CommandExit` when it
  * rejects: its message the rejection's, and its exit code the one a
  * `claude` planner's rejection carries, or 1 for any other.
+ *
+ * A rejection is weighed by the gate first, unless `--skip-review`
+ * bypassed it, so a session that judged the spec unplannable and wrote
+ * no plan ends with the gate's exit code 3 and its gaps rather than with
+ * the adapter's "was not created" line.
  */
-async function generateOrExit(planner: Planner, request: PlanRequest): Promise<GeneratedPlan> {
+async function generateOrExit(
+  planner: Planner,
+  request: PlanRequest,
+  gate: GateBase,
+  skipReview: boolean,
+): Promise<GeneratedPlan> {
   try {
     return await planner.create(request);
   } catch (error) {
+    if (!skipReview) await enforceSpecReview({ ...gate, review: rejectedReview(error) });
     const exitCode = error instanceof ClaudePlannerError
       ? error.exitCode
       : 1;
     throw new CommandExit(exitCode, `\n❌ ${messageOf(error)}`);
   }
+}
+
+/**
+ * Records `review: skipped` in the plan `--skip-review` kept, and says
+ * so. A plan that cannot be read, cannot be written, or holds no
+ * readable `rafa:plan` block is WARNED about and nothing else: the plan
+ * itself is what the operator asked for, and a stamp that refused it
+ * would throw away a session already paid for.
+ */
+function recordSkippedReview(repoRoot: string, planPath: string): void {
+  const file = path.resolve(repoRoot, planPath);
+  const unrecorded = (why: string): void => {
+    activeOutput().warn(`${planPath} does not record ${REVIEW_SKIPPED_LINE}: ${why}`);
+  };
+
+  let written: string;
+  try {
+    written = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    unrecorded(messageOf(error));
+    return;
+  }
+
+  const stamp = stampReviewSkipped(written);
+  if (!stamp.recorded) {
+    unrecorded(stamp.note);
+    return;
+  }
+  if (stamp.answer !== 'unchanged') {
+    try {
+      fs.writeFileSync(file, stamp.text, 'utf8');
+    } catch (error) {
+      unrecorded(messageOf(error));
+      return;
+    }
+  }
+  activeOutput().info(`⏭  ${SKIP_REVIEW_FLAG}: the spec was not reviewed, and ${planPath} records ${REVIEW_SKIPPED_LINE}.`);
 }
 
 export default async function plan(
@@ -308,6 +410,7 @@ export default async function plan(
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
   const { settingSources, planDir, specsDir } = resolvePlanConfig(repoRoot, homedir());
+  const flags = readGateFlags(args);
 
   const specArg = argValue(args, '--spec');
   if (!specArg) {
@@ -355,8 +458,31 @@ export default async function plan(
     ),
   });
 
+  const gate: GateBase = {
+    source: specRequest,
+    repoRoot,
+    planPath: planFile,
+    prerequisitesPath: planFilePath(planDir, `PREREQUISITES-${stub}.md`),
+    issue: null,
+    comment: flags.comment,
+  };
+
   activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
-  const generated = await generateOrExit(planner, { specPath: specRequest, stub });
+  const generated = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
+
+  if (flags.skipReview) {
+    recordSkippedReview(repoRoot, generated.planPath);
+  } else {
+    // On an answer the paths are the planner's own, which are the files
+    // it saw; the ones in `gate` are this command's spelling of them,
+    // and are all a rejection leaves to go on.
+    await enforceSpecReview({
+      ...gate,
+      planPath: generated.planPath,
+      prerequisitesPath: generated.prerequisitesPath ?? gate.prerequisitesPath,
+      review: generated.review,
+    });
+  }
 
   activeOutput().info(`\n✅ Plan ready: ${generated.planPath}`);
   if (generated.prerequisitesPath !== null) {

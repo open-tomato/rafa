@@ -170,6 +170,29 @@ module's note is the long form.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
   `plan create` calls it.
+- **`plan create` enforces the planner's own verdict on the spec**
+  (`src/plan.ts`, `src/board/gate.ts`). The plan prompt asks the session
+  to open its answer with a `rafa:spec-review` block, the `claude`
+  planner reads it once and carries it back both on the plan it answers
+  and on its rejections (`src/adapters/planner/claude.ts`), and this
+  command is what acts on it. A verdict that is not ready removes
+  `PLAN-<stub>.md` and `PREREQUISITES-<stub>.md` when the session wrote
+  them anyway, posts the gaps as one `<!-- rafa:spec-review v1 -->`
+  comment on the issue, edited on a rerun
+  (`src/board/review-comment.ts`), swaps `spec:ready` for
+  `spec:needs-work` over `src/board/issue-board.ts`, and throws exit code
+  3 with every gap in the message. A comment or a label swap that fails
+  is a warning and changes neither the other write nor the exit code.
+  `--spec` names no issue, so that route removes, prints and exits 3. An
+  `absent` or `malformed` review is not ready either, except on a
+  rejection, where the session's own failure is what the command ends
+  with. `--skip-review` bypasses that gate alone and records
+  `review: skipped` in the plan's `rafa:plan` block
+  (`src/board/review-stamp.ts`), where the plan reader keeps it as a
+  header extra; `--no-comment` keeps the gaps off the board and moves the
+  labels anyway. Both flags are read in `src/board/gate.ts` and declared
+  on no command yet, so neither is in any help text until the stage that
+  adds `--issue` declares them.
 - **`init` sets up a project and needs none** (`src/commands/init.ts`),
   declaring `needsProject: false`.
   `--root=<path>` names the root, absolute or relative to the working
@@ -549,7 +572,8 @@ module's note is the long form.
   for an unusable config, a missing `--spec`, a spec found neither against
   the project root nor under `specs.dir`, and a plan already there, and
   for a planner's rejection the exit code a `claude` planner's rejection
-  carries, or 1. `effort collect` and
+  carries, or 1; it throws 3 for a spec the planner's own review judged
+  not ready, whatever the rejection would have carried. `effort collect` and
   `effort report` throw 1 for an unrecognised argument and an unusable
   config, one line per problem. An interrupted task throws
   `CommandExit(0)` once it is marked and its report stored; a failed,

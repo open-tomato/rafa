@@ -1,0 +1,273 @@
+/**
+ * What a `not-ready` verdict does: the plan and prerequisites files
+ * removed, the gaps posted on the issue, `spec:ready` swapped for
+ * `spec:needs-work`, and exit code 3.
+ *
+ * This is the enforcing half of check 3 of the readiness gate. The
+ * reading half is `./spec-review.ts`, which turns a planner session's
+ * output into one of four answers, and the planner adapter
+ * (`src/adapters/planner/claude.ts`) carries that reading back on every
+ * answer a session stands behind. NOTHING in either of those acts on
+ * the verdict, on purpose: the gate is the command's, which is what
+ * lets `--skip-review` weigh a verdict the planner still read.
+ *
+ * ## The session is not trusted to have written no plan
+ *
+ * The prompt tells a session that judged a spec not ready to write no
+ * plan, and the spec says the loop enforces that in CODE, because a
+ * prompt is an instruction and not a guarantee. So
+ * {@link enforceSpecReview} REMOVES `PLAN-<stub>.md` and
+ * `PREREQUISITES-<stub>.md` when they are there, and says so. A plan
+ * left behind would be picked up by the next `rafa loop start` as an
+ * ordinary plan, and nothing downstream would know it was written
+ * against a spec its own planner had refused.
+ *
+ * Removal is the one destructive act here, and it is bounded: exactly
+ * the two paths the caller names, each resolved under the repository
+ * root, each removed only when it is a file that exists, and only on a
+ * verdict that is not ready.
+ *
+ * ## What a failed write does NOT do
+ *
+ * The comment and the label swap are reported through the output and
+ * their failures are WARNINGS: neither changes the exit code, and
+ * neither stops the other. The verdict is the finding, and the comment
+ * and the labels are how it is published; a network failure while
+ * publishing must not turn "this spec is not ready" into "something
+ * went wrong", which is what would happen if the write's own rejection
+ * escaped and took the exit code with it. The gaps are in the refusal
+ * message either way, so an operator whose comment did not land still
+ * reads every one of them.
+ *
+ * ## What the two flags do
+ *
+ * `--skip-review` bypasses check 3 ALONE: the caller never reaches this
+ * module, and the plan it keeps records `review: skipped`
+ * (`./review-stamp.ts`). `--no-comment` suppresses the COMMENT alone,
+ * the flag's own scope and the one `rafa pr triage` gives it: the files
+ * are still removed, the labels still move, and the gaps are still
+ * printed, because the refusal message carries them.
+ *
+ * Both are read off the command line by {@link readGateFlags} rather
+ * than by `src/plan.ts`, which is where the flags a wrapped phase 0
+ * command declares are otherwise read. That is deliberate and
+ * temporary: `src/commands/index.test.ts` holds `plan create`'s
+ * declared flags equal to the quoted `--` literals in `src/plan.ts`,
+ * and the stage that declares `--skip-review` and `--no-comment` on
+ * `src/commands/plan/create.ts` is the one that adds `--issue` and
+ * `--next` beside them and regenerates the help snapshots. Until then
+ * the two flags are read and undeclared, so they work and `rafa plan
+ * create --help` does not name them.
+ *
+ * That is measured, not assumed: on 2026-09-19 a bare
+ * `args.includes('--skip-review')` added to `src/plan.ts` left
+ * `src/commands/index.test.ts` at 140 pass and 1 fail — the case holding
+ * `plan create`'s flags equal to that module's quoted literals — and the
+ * module was restored from a scratch copy and verified with `shasum -c`.
+ *
+ * ## An issue is optional, because `--spec` has none
+ *
+ * `--spec=<file>` runs the same first pass and prints the gaps; it has
+ * no labels to move and no issue to comment on. So {@link GateIssue} is
+ * null for that route and every board write is skipped, while the
+ * removal, the printed gaps and exit code 3 are the same. The issue
+ * route arrives with `--issue` and `--next`.
+ */
+import type { IssueBoard } from './issue-board.js';
+import type { SpecReviewGap, SpecReviewReading } from './spec-review.js';
+import type { Output } from '../ports/index.js';
+
+import { existsSync, rmSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { activeOutput } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
+import { messageOf } from '../config-sections.js';
+
+import { SPEC_READY_LABEL } from './readiness.js';
+import { specReviewCommentBody, writeSpecReviewComment } from './review-comment.js';
+
+/** The issue the gate publishes a refusal on, and the board it goes through. */
+export interface GateIssue {
+  /** The issue number the spec was read off. */
+  readonly number: number;
+  /** The board the comment and the label swap go through. */
+  readonly board: IssueBoard;
+}
+
+/** What {@link enforceSpecReview} is asked. */
+export interface SpecReviewGateOptions {
+  /**
+   * What the planner's session said about the spec, or undefined when
+   * no session judged it; see {@link enforceSpecReview}.
+   */
+  readonly review: SpecReviewReading | undefined;
+  /** What the refusal calls the spec: `issue #20`, or a spec file's path. */
+  readonly source: string;
+  /** The repository the two paths are resolved under. */
+  readonly repoRoot: string;
+  /** The plan the session was told to write, as the planner names it. */
+  readonly planPath: string;
+  /** The prerequisites file beside it, as the planner names it. */
+  readonly prerequisitesPath: string;
+  /** The issue to publish on, or null for a spec read off a file. */
+  readonly issue: GateIssue | null;
+  /** False under `--no-comment`: the gaps are printed and not posted. */
+  readonly comment: boolean;
+  /** Where the lines go; the active output when left out. */
+  readonly output?: Output;
+}
+
+/** The exit code a spec the planner judged not ready ends with; the spec's own. */
+export const SPEC_NOT_READY_EXIT = 3;
+
+/** The label the gate puts on an issue whose spec it refused. */
+export const SPEC_NEEDS_WORK_LABEL = 'spec:needs-work';
+
+/** The flag that bypasses check 3, and check 3 alone. */
+export const SKIP_REVIEW_FLAG = '--skip-review';
+
+/** The flag that keeps the gaps off the board. */
+export const NO_COMMENT_FLAG = '--no-comment';
+
+/** What the command line said about the gate. */
+export interface GateFlags {
+  /** True when `--skip-review` was given: check 3 is not run. */
+  readonly skipReview: boolean;
+  /** False when `--no-comment` was given: the gaps are printed and not posted. */
+  readonly comment: boolean;
+}
+
+/**
+ * The gate's two flags, read off the words a command was handed. Both
+ * are bare words: neither takes a value.
+ */
+export function readGateFlags(args: readonly string[]): GateFlags {
+  return {
+    skipReview: args.includes(SKIP_REVIEW_FLAG),
+    comment: !args.includes(NO_COMMENT_FLAG),
+  };
+}
+
+/** One gap, as the refusal names it. */
+function describeGap(gap: SpecReviewGap): string {
+  return `   • "${gap.heading}": ${gap.what}`;
+}
+
+/** What the operator does next, which differs by whether labels moved. */
+function remedyFor(issue: GateIssue | null): string {
+  return issue === null
+    ? '   Close the gaps in the spec, then plan from it again.'
+    : `   Close the gaps, label the issue ${SPEC_READY_LABEL} again, and plan from it again.`;
+}
+
+/**
+ * The refusal a not-ready review ends the command with: what the
+ * reading said, every gap on its own line, and what to do about it.
+ *
+ * `source` is the caller's name for the spec — `issue #20`, or a spec
+ * file's path — as `./readiness.ts` and `./leak.ts` take one.
+ */
+export function specNotReadyMessage(
+  source: string,
+  reading: string,
+  gaps: readonly SpecReviewGap[],
+  issue: GateIssue | null = null,
+): string {
+  return [
+    `❌ ${source} is not ready to plan from: ${reading}`,
+    ...gaps.map(describeGap),
+    remedyFor(issue),
+  ].join('\n');
+}
+
+/** True when `path`, under `repoRoot`, is a file that is there. */
+function isWrittenFile(repoRoot: string, path: string): boolean {
+  const full = resolve(repoRoot, path);
+  return existsSync(full) && statSync(full).isFile();
+}
+
+/** Removes the files a session wrote against a not-ready verdict, reporting each. */
+function removeWritten(options: SpecReviewGateOptions, output: Output): void {
+  for (const path of [options.planPath, options.prerequisitesPath]) {
+    if (!isWrittenFile(options.repoRoot, path)) continue;
+    try {
+      rmSync(resolve(options.repoRoot, path));
+      output.info(`🗑  Removed ${path}: the planner judged the spec not ready, so no plan stands.`);
+    } catch (error) {
+      output.warn(`${path} was written against a not-ready review and could not be removed: ${messageOf(error)}`);
+    }
+  }
+}
+
+/** Posts or edits the gaps comment, reporting what it did or why it could not. */
+async function publishGaps(
+  issue: GateIssue,
+  gaps: readonly SpecReviewGap[],
+  output: Output,
+): Promise<void> {
+  try {
+    const write = await writeSpecReviewComment({
+      issue: issue.number,
+      body: specReviewCommentBody(gaps),
+      board: issue.board,
+    });
+    output.info(`💬 ${write.action === 'posted'
+      ? 'Posted'
+      : 'Edited'} the review comment on issue #${String(issue.number)}.`);
+  } catch (error) {
+    output.warn(`the review comment on issue #${String(issue.number)} was not written: ${messageOf(error)}`);
+  }
+}
+
+/** Swaps the labels, reporting what it did or why it could not. */
+async function swapLabels(issue: GateIssue, output: Output): Promise<void> {
+  try {
+    await issue.board.swapLabels(issue.number, SPEC_READY_LABEL, SPEC_NEEDS_WORK_LABEL);
+    output.info(
+      `🏷  Swapped ${SPEC_READY_LABEL} for ${SPEC_NEEDS_WORK_LABEL} on issue #${String(issue.number)}.`,
+    );
+  } catch (error) {
+    output.warn(
+      `${SPEC_READY_LABEL} was not swapped for ${SPEC_NEEDS_WORK_LABEL} on issue`
+        + ` #${String(issue.number)}: ${messageOf(error)}`,
+    );
+  }
+}
+
+/**
+ * Lets a ready review through, and enforces a not-ready one.
+ *
+ * Returns for a review that is ready, and for one the caller left out:
+ * a planner that read no session output has judged nothing, and the
+ * `review` field of `GeneratedPlan` is optional for exactly that reason.
+ * Any other reading — `not-ready`, and the `absent` and `malformed`
+ * readings that are not ready either — removes the two files, publishes
+ * the gaps, swaps the labels and throws
+ * `CommandExit({@link SPEC_NOT_READY_EXIT}, {@link specNotReadyMessage})`.
+ *
+ * Which rejections of the planner carry a reading worth enforcing is
+ * the caller's decision, not this module's; `src/plan.ts` records the
+ * one it makes.
+ */
+export async function enforceSpecReview(options: SpecReviewGateOptions): Promise<void> {
+  const { review, issue } = options;
+  if (review === undefined || review.ready) return;
+
+  const output = options.output ?? activeOutput();
+  removeWritten(options, output);
+
+  if (issue !== null) {
+    if (options.comment) {
+      await publishGaps(issue, review.gaps, output);
+    } else {
+      output.info(`💬 ${NO_COMMENT_FLAG}: the gaps were not posted on issue #${String(issue.number)}.`);
+    }
+    await swapLabels(issue, output);
+  }
+
+  throw new CommandExit(
+    SPEC_NOT_READY_EXIT,
+    specNotReadyMessage(options.source, review.text, review.gaps, issue),
+  );
+}
