@@ -33,10 +33,11 @@
  *     And `plan.ts` imports the registry, which imports this module, so
  *     this module importing `buildPlanPrompt` from `plan.ts` would close
  *     an import cycle, where `src/` held none.
- *   - `spawn`: the seam the session goes through, handed to `runClaude`
- *     with the argument list `runClaude` builds. {@link spawnClaude} when
- *     left out. The tests hand over a spawner that records what it is
- *     handed, so no case spawns `claude`.
+ *   - `spawn`: the seam the session goes through, handed to
+ *     `runClaudeCaptured` with the argument list that builds.
+ *     {@link spawnClaudeCaptured} when left out. The tests hand over a
+ *     spawner that records what it is handed, so no case spawns
+ *     `claude`.
  *
  * ## What `create` does, in order
  *
@@ -48,16 +49,49 @@
  *   2. Reads the spec, rejecting with the read's own error when it cannot.
  *   3. Makes `planDir` when it is missing, since the session writes into
  *      it.
- *   4. Runs one session with the built prompt on stdin.
- *   5. Rejects when the session exits nonzero, whatever it wrote.
- *   6. Rejects when the session exits 0 and the plan is not there.
- *   7. Answers the plan's path, and the prerequisites' path when the
- *      session wrote that file, or null when it did not.
+ *   4. Runs one session with the built prompt on stdin, CAPTURING its
+ *      stdout.
+ *   5. Reads the session's `rafa:spec-review` block out of that stdout,
+ *      once, whatever the session went on to do.
+ *   6. Rejects when the session exits nonzero, whatever it wrote.
+ *   7. Rejects when the session exits 0 and the plan is not there.
+ *   8. Answers the plan's path, the prerequisites' path when the
+ *      session wrote that file or null when it did not, and the review
+ *      of step 5.
  *
- * The rejections of steps 1, 5 and 6 are {@link ClaudePlannerError}s. The
- * messages of steps 5 and 6 are the lines `rafa plan` printed for those
+ * The rejections of steps 1, 6 and 7 are {@link ClaudePlannerError}s. The
+ * messages of steps 6 and 7 are the lines `rafa plan` printed for those
  * failures before this adapter existed, so the command prints them as
  * they were.
+ *
+ * ## The review the session rides back on
+ *
+ * The plan prompt asks the session to judge the spec before planning and
+ * to open its answer with a `rafa:spec-review` block, which is check 3
+ * of the readiness gate. That block is in the session's OUTPUT and
+ * nowhere else, which is why this adapter spawns through the capturing
+ * door: {@link spawnClaude} answers an exit code alone, and a planner
+ * holding that exit code holds nothing the gate can read. The operator
+ * still sees the session as it runs, through the tee in
+ * {@link spawnClaudeCaptured}.
+ *
+ * `parseSpecReview` never throws and answers one of four readings, so
+ * the review is read ONCE, right after the session returns, and carried
+ * on every answer that session stands behind: the {@link GeneratedPlan},
+ * the failed-session rejection and the plan-not-written rejection. That
+ * last one is the ordinary shape of a not-ready verdict — a session that
+ * judged the spec unplannable writes no plan — so a rejection that lost
+ * the reading would leave `rafa plan` with nothing to post. The two
+ * rejections raised BEFORE any session, the plan already there and the
+ * spec that cannot be read, carry no review, because no session judged
+ * anything.
+ *
+ * Nothing here acts on the verdict. A planner that refused a not-ready
+ * spec would put the gate in two places and make `--skip-review`
+ * unreachable, since that flag bypasses check 3 alone and the session
+ * still writes its block. Removing a plan file a not-ready session left
+ * behind, posting the gaps, moving the labels and the exit code are
+ * `rafa plan`'s.
  *
  * ## Paths
  *
@@ -70,15 +104,17 @@
  * over, as `rafa plan` used `--stub=`, so a stub holding a `/` names a
  * file below a directory this adapter does not make.
  */
+import type { SpecReviewReading } from '../../board/spec-review.js';
 import type { ClaudeSettingSource } from '../../config.js';
 import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
-import type { ClaudeSpawner } from '../../utils/claude.js';
+import type { CapturingSpawner } from '../../utils/claude.js';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { posix, resolve } from 'node:path';
 
-import { runClaude, spawnClaude } from '../../utils/claude.js';
+import { parseSpecReview } from '../../board/spec-review.js';
+import { runClaudeCaptured, spawnClaudeCaptured } from '../../utils/claude.js';
 
 /** The exit code of a rejection no session exit code stands behind. */
 const FAILURE_EXIT_CODE = 1;
@@ -105,8 +141,8 @@ export interface ClaudePlannerOptions {
   readonly settingSources: readonly ClaudeSettingSource[];
   /** The session's prompt for one spec and stub. */
   readonly buildPrompt: PlanPromptBuilder;
-  /** The spawner the session goes through; {@link spawnClaude} when left out. */
-  readonly spawn?: ClaudeSpawner;
+  /** The spawner the session goes through; {@link spawnClaudeCaptured} when left out. */
+  readonly spawn?: CapturingSpawner;
 }
 
 /**
@@ -118,10 +154,17 @@ export class ClaudePlannerError extends Error {
   /** The session's exit code when the session failed, and 1 otherwise. */
   readonly exitCode: number;
 
-  constructor(message: string, exitCode: number) {
+  /**
+   * What the session said about the spec, or null when the rejection
+   * came before any session ran. See the module note.
+   */
+  readonly review: SpecReviewReading | null;
+
+  constructor(message: string, exitCode: number, review: SpecReviewReading | null = null) {
     super(message);
     this.name = 'ClaudePlannerError';
     this.exitCode = exitCode;
+    this.review = review;
   }
 }
 
@@ -130,7 +173,7 @@ export class ClaudePlannerError extends Error {
  * what `create` does. The planner answered is frozen.
  */
 export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
-  const { repoRoot, planDir, settingSources, buildPrompt, spawn = spawnClaude } = options;
+  const { repoRoot, planDir, settingSources, buildPrompt, spawn = spawnClaudeCaptured } = options;
 
   const create = async ({ specPath, stub }: PlanRequest): Promise<GeneratedPlan> => {
     const planPath = planFilePath(planDir, `PLAN-${stub}.md`);
@@ -143,14 +186,22 @@ export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
     const specContent = await readFile(resolve(repoRoot, specPath), 'utf8');
     await mkdir(resolve(repoRoot, planDir), { recursive: true });
 
-    const exitCode = await runClaude(buildPrompt(specContent, stub), settingSources, [], spawn);
+    const session = await runClaudeCaptured(
+      buildPrompt(specContent, stub),
+      settingSources,
+      [],
+      spawn,
+    );
+    const review = parseSpecReview(session.stdout);
+    const { exitCode } = session;
     if (exitCode !== 0) {
-      throw new ClaudePlannerError(`Plan generation failed (exit ${exitCode}).`, exitCode);
+      throw new ClaudePlannerError(`Plan generation failed (exit ${exitCode}).`, exitCode, review);
     }
     if (!isWritten(planPath)) {
       throw new ClaudePlannerError(
         `The session finished but ${planPath} was not created — inspect the output above.`,
         FAILURE_EXIT_CODE,
+        review,
       );
     }
     return {
@@ -158,6 +209,7 @@ export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
       prerequisitesPath: isWritten(prerequisitesPath)
         ? prerequisitesPath
         : null,
+      review,
     };
   };
 

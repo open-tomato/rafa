@@ -15,8 +15,10 @@
  * ## Types, and nothing else
  *
  * The entry exports no runtime value, so importing it runs nothing and
- * adds nothing to a service's bundle. That keeps three things a port
- * could otherwise carry out of this module:
+ * adds nothing to a service's bundle. Its one import is an `import
+ * type`, which the bundler erases, so naming {@link GeneratedPlan}'s
+ * review type pulls `src/board/spec-review.ts` into no bundle. That
+ * keeps three things a port could otherwise carry out of this module:
  *
  *   - The store's key projection, `EFFORT_KEY_PROJECTIONS`, which is a
  *     value. It stays on `./store`, beside the backends that read it.
@@ -90,6 +92,8 @@
  *     plan` has today. The webhook adapter phase 6 adds lands a plan on a
  *     branch, which may widen the answer.
  */
+import type { SpecReviewReading } from '../board/spec-review.js';
+
 export type {
   AppendResult,
   CommitEffortRow,
@@ -462,6 +466,21 @@ export interface GeneratedPlan {
    * when it wrote none: `PREREQUISITES-<stub>.md` in `plan.dir` today.
    */
   prerequisitesPath: string | null;
+  /**
+   * What the planner's own session said about the spec BEFORE it
+   * planned, read out of that session's output: the `rafa:spec-review`
+   * block of the readiness gate's check 3
+   * (`src/board/spec-review.ts`).
+   *
+   * Optional, because a planner that reads no session output has judged
+   * nothing and must still satisfy this port — the fixture planners the
+   * command's tests resolve, and the `webhook` adapter phase 6 adds.
+   * The `claude` adapter carries one on every plan it answers, `absent`
+   * when its session returned no block. Nothing here acts on it: the
+   * gate is `rafa plan`'s, which is what lets `--skip-review` weigh a
+   * verdict the planner still read.
+   */
+  review?: SpecReviewReading;
 }
 
 /**

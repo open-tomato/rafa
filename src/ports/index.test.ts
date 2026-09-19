@@ -71,6 +71,19 @@
  * `TrackerPortVersion` widened to `number` reddened the drifted version
  * refusal, and `PortVersions` without `planner` the clean probe; each
  * also reddened the registry suite's literal case.
+ *
+ * `GeneratedPlan.review` arrived on 2026-09-19 with the conforming
+ * probe's second planner, which carries a reading `parseSpecReview`
+ * built, and the refusal of a `review` that is a string. Two mutations
+ * of the entry were driven that day against this file, restored from a
+ * scratch copy and verified with `shasum -c`, at 21 pass and 0 fail
+ * either side. `review` made REQUIRED reddened the clean probe, whose
+ * first planner carries none, which is the one thing the field's
+ * optionality buys: a planner that reads no session output still
+ * satisfies the port. `review` widened to `unknown` reddened 2 — its
+ * own refusal, which then compiles clean, and the entry's own
+ * diagnostics, since the type import it no longer names is an unused
+ * local under the root tsconfig.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -189,6 +202,7 @@ function instinctLiteral(signal: string): string {
 const CONFORMING_PROBE = probeSource(
   `import { openNdjsonStore } from ${specifierOf('effort', 'store', 'ndjson.js')};`,
   `import { openSqliteStore } from ${specifierOf('effort', 'store', 'sqlite.js')};`,
+  `import { parseSpecReview } from ${specifierOf('board', 'spec-review.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),
   'export const ndjson: P.Store = openNdjsonStore("/nonexistent");',
   'export const sqlite: P.Store = openSqliteStore("/nonexistent");',
@@ -214,6 +228,13 @@ const CONFORMING_PROBE = probeSource(
   '  create: async (request) => ({',
   '    planPath: ".plans/PLAN-" + request.stub + ".md",',
   '    prerequisitesPath: null,',
+  '  }),',
+  '};',
+  'export const reviewed: P.Planner = {',
+  '  create: async (request) => ({',
+  '    planPath: ".plans/PLAN-" + request.stub + ".md",',
+  '    prerequisitesPath: null,',
+  '    review: parseSpecReview("nothing to read"),',
   '  }),',
   '};',
   'export const versions: P.PortVersions = {',
@@ -331,6 +352,19 @@ const REFUSALS: readonly Refusal[] = [
     ),
     code: 2322,
     names: 'prerequisitesPath',
+  },
+  {
+    title: 'a generated plan whose review is not a review reading',
+    file: 'planner-string-review.ts',
+    source: probeSource(
+      'export const planner: P.Planner = {',
+      '  create: async (request) => ({',
+      '    planPath: request.stub, prerequisitesPath: null, review: "ready",',
+      '  }),',
+      '};',
+    ),
+    code: 2322,
+    names: 'review',
   },
   {
     title: 'a port version other than the one its port declares',

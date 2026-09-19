@@ -1,11 +1,11 @@
 /**
  * Tests for the `claude` Planner adapter (`src/adapters/planner/claude.ts`).
  *
- * No case spawns `claude`. Each planner is made with a recording spawner,
- * which keeps the argument list and the prompt it is handed, notes whether
- * the plans directory was there when the session started, writes the files
- * a case names under the root as a session would, and answers the exit
- * code the case names. Every root is a directory of its own under one
+ * No case spawns `claude`. Each planner is made with a recording CAPTURING
+ * spawner, which keeps the argument list and the prompt it is handed, notes
+ * whether the plans directory was there when the session started, writes
+ * the files a case names under the root as a session would, and answers the
+ * exit code and the stdout the case names. Every root is a directory of its own under one
  * temporary directory this file creates and removes, and a case reads what
  * was left behind off the disk under that root. Every planner is made with
  * {@link PLAN_DIR} as its plans directory unless a case names another.
@@ -17,6 +17,47 @@
  * there beside a fresh root, and the missing spec beside the spec read. A
  * plan left in `.plans/`, the directory phase 0 wrote into, is neither
  * refused as already there nor read as the session's.
+ *
+ * ## The review
+ *
+ * The review cases drive one session per ANSWER the parser can give —
+ * ready, not-ready, absent and malformed — and read what the planner
+ * carried back. Each asserts the answer and `ready` beside it, because
+ * `ready` is what the gate acts on and three of the four answers share
+ * it; a planner that dropped the reading and put a fixed one in its
+ * place would satisfy exactly one of the four. Each expected reading is
+ * `parseSpecReview` over the same output, so these cases measure what
+ * the planner CARRIES and never re-measure the parser, whose own cases
+ * are in `src/board/spec-review.test.ts`.
+ *
+ * Two cases pin where the reading comes from. The prompt case hands the
+ * planner a builder that quotes a READY block into the prompt while the
+ * session answers a not-ready one, so a planner reading its own prompt
+ * answers the opposite verdict. The already-there case holds `review`
+ * null on the one rejection no session stands behind.
+ *
+ * No case asserts that the planner refuses a not-ready spec, because it
+ * does not: the gate is `rafa plan`'s, which is what leaves
+ * `--skip-review` somewhere to act.
+ *
+ * Six mutations of `claude.ts` were driven on 2026-09-19 over this file,
+ * `src/adapters/registry.test.ts` and `src/ports/index.test.ts`, one at
+ * a time, the module restored from a scratch copy and verified with
+ * `shasum -c` after each. 108 pass and 0 fail either side, and each
+ * count below is that run's own:
+ *
+ *   - the review dropped from the plan the planner answers: 10 fail.
+ *   - the review dropped from the plan-not-written rejection: 1 fail,
+ *     and dropped from the failed-session rejection: 1 fail. Each
+ *     rejection carries it for its own reason, so each has its own
+ *     case and neither stands in for the other.
+ *   - the review read from the PROMPT rather than from the session's
+ *     stdout: 7 fail. A planner that quoted its own prompt back would
+ *     answer whatever the prompt illustrated.
+ *   - a fixed ready reading in place of the parse, standing for a
+ *     planner that judges nothing and passes everything: 12 fail.
+ *   - the planner rejecting a spec its session judged not ready, the
+ *     gate put here rather than in `rafa plan`: 15 fail.
  *
  * Thirteen mutations of `claude.ts` were driven on 2026-09-14 over this
  * file, `src/adapters/registry.test.ts` and `src/plan.test.ts`, one run
@@ -41,7 +82,8 @@
  *     frozen case.
  */
 import type { ClaudePlannerOptions } from './claude.js';
-import type { ClaudeSpawner } from '../../utils/claude.js';
+import type { SpecReviewReading } from '../../board/spec-review.js';
+import type { CapturingSpawner } from '../../utils/claude.js';
 
 import {
   existsSync,
@@ -56,6 +98,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+
+import { MISSING_REVIEW_GAP, parseSpecReview } from '../../board/spec-review.js';
 
 import { ClaudePlannerError, createClaudePlanner, planFilePath } from './claude.js';
 
@@ -79,6 +123,26 @@ const PREREQUISITES = '.rafa/plans/PREREQUISITES-probe.md';
 
 /** The arguments ahead of the setting sources, as `claudeArgs` builds them. */
 const BASE_ARGS = ['-p', '--dangerously-skip-permissions', '--setting-sources'];
+
+/** A session output holding `body` as its review block, with prose either side. */
+function outputWith(body: string): string {
+  return `I read the spec before planning.\n\n\`\`\`rafa:spec-review\n${body}\n\`\`\`\n\n`
+    + 'Then the plan follows.\n';
+}
+
+/** The output of a session that judged the spec ready. */
+const READY_OUTPUT = outputWith('verdict: ready\ngaps: []');
+
+/** The output of a session that judged the spec not ready, naming one gap. */
+const NOT_READY_OUTPUT = outputWith(
+  'verdict: not-ready\ngaps:\n  - heading: "Definition of done"\n    what: "no item names a command"',
+);
+
+/** The output of a session whose block is not valid YAML. */
+const MALFORMED_OUTPUT = outputWith('verdict: ready\ngaps: [unclosed');
+
+/** The reading a session that wrote nothing at all answers: `absent`. */
+const ABSENT_REVIEW: SpecReviewReading = parseSpecReview('');
 
 let tempDir = '';
 let made = 0;
@@ -108,22 +172,24 @@ interface SessionCall {
   readonly plansDirExisted: boolean;
 }
 
-/** What a session does: the files it writes under the root, and its exit code. */
+/** What a session does: the files it writes under the root, its stdout and its exit code. */
 interface SessionScript {
   readonly writes?: readonly string[];
   readonly exitCode?: number;
+  /** What the session writes to stdout; nothing at all by default. */
+  readonly stdout?: string;
 }
 
 /** A spawner acting out `script` under `root`, and the calls it was handed. */
 function recordingSession(
   root: string,
-  { writes = [], exitCode = 0 }: SessionScript = {},
-): { spawn: ClaudeSpawner; calls: SessionCall[] } {
+  { writes = [], exitCode = 0, stdout = '' }: SessionScript = {},
+): { spawn: CapturingSpawner; calls: SessionCall[] } {
   const calls: SessionCall[] = [];
-  const spawn: ClaudeSpawner = async (args, prompt) => {
+  const spawn: CapturingSpawner = async (args, prompt) => {
     calls.push({ args: [...args], prompt, plansDirExisted: existsSync(join(root, PLAN_DIR)) });
     for (const file of writes) writeFileSync(join(root, file), `written by the session: ${file}\n`, 'utf8');
-    return exitCode;
+    return { exitCode, stdout };
   };
   return { spawn, calls };
 }
@@ -136,7 +202,7 @@ function buildPrompt(specContent: string, stub: string): string {
 /** A planner over `root`, made with `spawn`, {@link PLAN_DIR} and the default setting sources. */
 function plannerOver(
   root: string,
-  spawn: ClaudeSpawner,
+  spawn: CapturingSpawner,
   overrides: Partial<ClaudePlannerOptions> = {},
 ): ReturnType<typeof createClaudePlanner> {
   return createClaudePlanner({
@@ -175,7 +241,7 @@ describe('a claude planner generating a plan', () => {
     const generated = await plannerOver(root, session.spawn).create(REQUEST);
 
     expect(root.startsWith(tempDir)).toBe(true);
-    expect(generated).toEqual({ planPath: PLAN, prerequisitesPath: null });
+    expect(generated).toEqual({ planPath: PLAN, prerequisitesPath: null, review: ABSENT_REVIEW });
     expect(session.calls).toEqual([
       { args: [...BASE_ARGS, 'project,local'], prompt: `prompt for probe\n${SPEC}`, plansDirExisted: true },
     ]);
@@ -189,7 +255,7 @@ describe('a claude planner generating a plan', () => {
 
     const generated = await plannerOver(root, session.spawn).create(REQUEST);
 
-    expect(generated).toEqual({ planPath: PLAN, prerequisitesPath: PREREQUISITES });
+    expect(generated).toEqual({ planPath: PLAN, prerequisitesPath: PREREQUISITES, review: ABSENT_REVIEW });
   });
 
   it('writes into the plans directory it is made with and answers the paths in it', async () => {
@@ -198,7 +264,11 @@ describe('a claude planner generating a plan', () => {
 
     const generated = await plannerOver(root, session.spawn, { planDir: 'plans-here' }).create(REQUEST);
 
-    expect(generated).toEqual({ planPath: 'plans-here/PLAN-probe.md', prerequisitesPath: null });
+    expect(generated).toEqual({
+      planPath: 'plans-here/PLAN-probe.md',
+      prerequisitesPath: null,
+      review: ABSENT_REVIEW,
+    });
     expect(existsSync(join(root, PLAN_DIR))).toBe(false);
   });
 
@@ -206,15 +276,15 @@ describe('a claude planner generating a plan', () => {
     const root = freshRoot();
     const outside = join(tempDir, `plans-outside-${made}`);
     const plan = join(outside, 'PLAN-probe.md');
-    const spawn: ClaudeSpawner = async () => {
+    const spawn: CapturingSpawner = async () => {
       writeFileSync(plan, 'the plan\n', 'utf8');
-      return 0;
+      return { exitCode: 0, stdout: '' };
     };
 
     const generated = await plannerOver(root, spawn, { planDir: outside }).create(REQUEST);
 
     expect(outside.startsWith(tempDir)).toBe(true);
-    expect(generated).toEqual({ planPath: plan, prerequisitesPath: null });
+    expect(generated).toEqual({ planPath: plan, prerequisitesPath: null, review: ABSENT_REVIEW });
     expect(existsSync(join(root, '.rafa'))).toBe(false);
   });
 
@@ -328,5 +398,103 @@ describe('a claude planner rejecting', () => {
     expect((error as Error).message).toContain('ENOENT');
     expect(session.calls).toEqual([]);
     expect(existsSync(join(root, '.rafa'))).toBe(false);
+  });
+});
+
+describe('a claude planner reading its session review', () => {
+  it('carries the ready reading on the plan when the session judged the spec ready', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN], stdout: READY_OUTPUT });
+
+    const generated = await plannerOver(root, session.spawn).create(REQUEST);
+
+    expect(generated.review).toEqual(parseSpecReview(READY_OUTPUT));
+    expect(generated.review?.answer).toBe('ready');
+    expect(generated.review?.ready).toBe(true);
+    expect(generated.review?.gaps).toEqual([]);
+  });
+
+  it('carries the not-ready reading and its gaps on a plan the session wrote anyway', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN], stdout: NOT_READY_OUTPUT });
+
+    const generated = await plannerOver(root, session.spawn).create(REQUEST);
+
+    expect(generated.planPath).toBe(PLAN);
+    expect(generated.review).toEqual(parseSpecReview(NOT_READY_OUTPUT));
+    expect(generated.review?.answer).toBe('not-ready');
+    expect(generated.review?.ready).toBe(false);
+    expect(generated.review?.gaps).toEqual([
+      { heading: 'Definition of done', what: 'no item names a command' },
+    ]);
+  });
+
+  it('carries the absent reading when the session wrote no review block', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN], stdout: 'the plan is written.\n' });
+
+    const generated = await plannerOver(root, session.spawn).create(REQUEST);
+
+    expect(generated.review?.answer).toBe('absent');
+    expect(generated.review?.ready).toBe(false);
+    expect(generated.review?.gaps).toEqual([MISSING_REVIEW_GAP]);
+  });
+
+  it('carries the malformed reading when the block is no readable YAML', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN], stdout: MALFORMED_OUTPUT });
+
+    const generated = await plannerOver(root, session.spawn).create(REQUEST);
+
+    expect(generated.review?.answer).toBe('malformed');
+    expect(generated.review?.ready).toBe(false);
+    expect(generated.review?.gaps).toEqual([MISSING_REVIEW_GAP]);
+  });
+
+  it('reads the review out of the session stdout and never out of the prompt it was handed', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN], stdout: NOT_READY_OUTPUT });
+    const quotedPrompt = (specContent: string, stub: string): string => (
+      `${stub}: ${specContent}\n${READY_OUTPUT}`
+    );
+
+    const generated = await plannerOver(root, session.spawn, { buildPrompt: quotedPrompt })
+      .create(REQUEST);
+
+    expect(session.calls[0]?.prompt).toContain('verdict: ready');
+    expect(generated.review?.answer).toBe('not-ready');
+  });
+
+  it('carries the not-ready reading on the rejection when the session wrote no plan', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { stdout: NOT_READY_OUTPUT });
+
+    const error = await rejectionOf(plannerOver(root, session.spawn).create(REQUEST));
+
+    expect(error).toBeInstanceOf(ClaudePlannerError);
+    expect((error as ClaudePlannerError).exitCode).toBe(1);
+    expect((error as ClaudePlannerError).review).toEqual(parseSpecReview(NOT_READY_OUTPUT));
+  });
+
+  it('carries the reading on the rejection when the session failed', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN], exitCode: 3, stdout: NOT_READY_OUTPUT });
+
+    const error = await rejectionOf(plannerOver(root, session.spawn).create(REQUEST));
+
+    expect((error as ClaudePlannerError).exitCode).toBe(3);
+    expect((error as ClaudePlannerError).review).toEqual(parseSpecReview(NOT_READY_OUTPUT));
+  });
+
+  it('carries no reading on a rejection raised before any session ran', async () => {
+    const root = freshRoot();
+    mkdirSync(join(root, PLAN_DIR), { recursive: true });
+    writeFileSync(join(root, PLAN), 'an earlier plan\n', 'utf8');
+    const session = recordingSession(root, { writes: [PLAN], stdout: READY_OUTPUT });
+
+    const error = await rejectionOf(plannerOver(root, session.spawn).create(REQUEST));
+
+    expect(session.calls).toEqual([]);
+    expect((error as ClaudePlannerError).review).toBeNull();
   });
 });

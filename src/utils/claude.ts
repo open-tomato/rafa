@@ -3,23 +3,28 @@
  * has gone.
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
- * output only the operator reads. It has three call sites: plan
- * generation in the `claude` planner, `adapters/planner/claude.ts`,
- * which `plan.ts` makes, the wrap-up session in `start/wrap-up.ts`
- * and the CI-repair session in `start/pr-lifecycle.ts`, none of which
- * is routed — one model, one effort, every tool. So the flags are a
- * parameter with an EMPTY default: `runClaude(prompt, settingSources)`
- * spawns the base arguments and the setting sources, and nothing a
- * declaration could add.
+ * output only the operator reads. It has two call sites: the wrap-up
+ * session in `start/wrap-up.ts` and the CI-repair session in
+ * `start/pr-lifecycle.ts`, neither of which is routed — one model, one
+ * effort, every tool. So the flags are a parameter with an EMPTY
+ * default: `runClaude(prompt, settingSources)` spawns the base
+ * arguments and the setting sources, and nothing a declaration could
+ * add.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
- * LOOP reads as well, and the per-task dispatch is its caller, through
- * `runTaskSession` in `start/dispatch.ts`. A task session ends its
- * final message with a `rafa:report` block, and {@link spawnClaude}
- * answers the exit code alone, so a loop holding that session's exit
- * code holds nothing else. Its flags are the ones a task's routing
- * declaration resolved to, with the `--session-id` the loop picked for
- * that session ahead of them. The captured entry builds its argument
+ * LOOP reads as well. It has three callers: the per-task dispatch,
+ * through `runTaskSession` in `start/dispatch.ts`, the backfill
+ * proposal pass in `backfill/propose.ts`, and plan generation in the
+ * `claude` planner, `adapters/planner/claude.ts`, which `plan.ts`
+ * makes. Each of the three parses what its session wrote: a task
+ * session ends its final message with a `rafa:report` block, a plan
+ * session opens its answer with a `rafa:spec-review` one, and a
+ * proposal session's answer goes through `parseSessionAnswer`.
+ * {@link spawnClaude} answers the exit code alone, so a loop holding
+ * that session's exit code holds nothing else. A task session's flags are
+ * the ones its routing declaration resolved to, with the
+ * `--session-id` the loop picked for that session ahead of them, and
+ * the planner hands over none. The captured entry builds its argument
  * list through the same {@link claudeArgs} and hands the prompt over the
  * same way; only the spawner differs, {@link spawnClaudeCaptured} piping
  * stdout, echoing it on to the operator as it arrives and keeping the
