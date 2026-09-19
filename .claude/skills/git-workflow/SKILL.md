@@ -31,6 +31,19 @@ addresses it. This distinction is load-bearing: only `Closes` triggers
 GitHub's auto-close on merge. Working without an issue is fine — such a PR
 simply carries no issue link; do not invent one to satisfy the convention.
 
+### rafa project naming convention
+
+For the rafa project specifically, issue numbers are prefixed with `rafa-` and
+reflected throughout the spec and branch workflow:
+
+- **Issue reference** (in prose): `#rafa-<n>` — e.g., `#rafa-20`
+- **Spec file**: `.specs/rafa-<n>-<slug>.md` — e.g., `.specs/rafa-20-pr-commands.md`
+- **Plan stub** (in prose): `rafa-<n>-<slug>` — e.g., `rafa-20-pr-commands`
+- **Branch name**: `feat/rafa-<n>-<slug>` — e.g., `feat/rafa-20-pr-commands`
+- **PR title**: `rafa-<n>: <title>` — e.g., `rafa-20: Add PR commands`
+- **PR body closing line**: `Closes #<n>` — e.g., `Closes #20` (GitHub issue #20, not
+  `#rafa-20`; the prefix is a rafa naming convention, not a GitHub issue alias)
+
 ## Pushing and opening PRs
 
 When pushing changes and creating PRs:
