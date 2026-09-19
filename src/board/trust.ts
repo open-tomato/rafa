@@ -13,12 +13,22 @@
  * BODY, and that is the one question this module answers
  * (`.specs/rafa-20-pr-commands.md`).
  *
- * ONE function answers it — {@link readAuthorTrust} — and every caller
- * that lets board text reach a prompt asks it: `plan create --issue`,
- * `plan create --next`, the `rafa:pr-triage` and `rafa:spec-review`
- * marker-comment readers, and `pr triage --resolve`. A second reading
- * spelled somewhere else is a second place for the answer to drift, and
- * the one it would drift towards is a pass.
+ * ONE function answers it — {@link readAuthorTrust} — and a second
+ * reading spelled somewhere else is a second place for the answer to
+ * drift, with the one it would drift towards being a pass. So every
+ * caller comes here.
+ *
+ * TWO callers exist today, both in `src/commands/pr/triage-trust.ts`:
+ * the `rafa:pr-triage` marker-comment reader, and `pr triage --resolve`
+ * on the pull request's own author. The spec also asks for the check on
+ * `plan create --issue` and `plan create --next`, and NEITHER is wired:
+ * `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check and
+ * the leak refusal only, and `src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
+ * does not fetch `author`, so that route holds no login to ask about.
+ * Both modules record the gap; `context/pull-requests.md` carries what
+ * closing it costs. The `rafa:spec-review` reader is NOT a missing
+ * caller — it spends no trust reading by design, because nothing reads
+ * its comment back into a prompt (`src/board/review-comment.ts`).
  *
  * ## The reading
  *

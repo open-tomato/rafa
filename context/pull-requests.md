@@ -119,14 +119,27 @@ A pinned plan per simple class ships in the package
 the ordinary loop, so commits, reports and effort rows are the usual ones.
 
 - Workspace: `git worktree add ~/.rafa/worktrees/pr-<n> <branch>`, so the
-  operator's uncommitted work is never touched; removed on success. A
-  cross-repository PR is refused. Never a force-push.
+  operator's uncommitted work is never touched; removed on success, on the
+  guard's stop and on an unresolvable class. It is NOT removed when an
+  attempt THROWS between those points: a `CommandExit` out of a
+  re-assessment `gh` read, out of `waitForChecks` or out of
+  `writeResolvePlan` leaves `~/.rafa/worktrees/pr-<n>` on disk with no line
+  saying it is there. Nothing is lost — the worktree holds only pushed or
+  ignored content — and the next `--resolve` for the same pull request
+  reuses what it finds at that path, by PATH alone and without checking the
+  branch against the pull request's head. A cross-repository PR is refused.
+  Never a force-push.
 - `resolve-conflict-lockfile`: merge the base, take the base's lockfile,
   reinstall, run the gates, commit, push. `resolve-conflict-manifest`: keep
   both sides' entries, the higher version where both bumped one, then as
   above. `resolve-ci-install` and `resolve-ci-lint`: the `build-error-resolver`
   agent with the log excerpt in the task. The conflict sentence is the
-  wrap-up prompt's own, from one source.
+  wrap-up prompt's own, from one source (`src/pr/conflict-sentence.ts`),
+  which is why THREE suites read `buildWrapUpPrompt` and a bullet moved in
+  it can redden any of them: `src/start/wrap-up.test.ts`,
+  `src/pr/conflict-sentence.test.ts` and `src/tests/plan-injection.test.ts`,
+  the last because the prompt's FIRST line is the `wrap-up` classifier key
+  `PROMPT_SHAPES` reads. Run the three together before the full suite.
 - Then the existing CI wait. Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
@@ -138,10 +151,25 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. Trust applies wherever board text enters
-a prompt: the issue author for `plan create --issue`, the roadmap issue
-author for `plan create --next`, the triage marker comment author for
-`pr triage --resolve`, and the PR author for the same route.
+someone allowed to change the repo. TWO routes ask the question today, both
+through `src/commands/pr/triage-trust.ts`: the triage marker comment's
+author, and the pull request's author for `pr triage --resolve`.
+
+**The `plan create` routes do NOT ask it.** Check 0 below is specified and
+unwired: `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check
+and the leak refusal only, and `src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
+does not fetch `author`, so nothing on that route holds a login to read at
+all. An issue an outsider opened and a member labelled `spec:ready` is
+therefore snapshotted and planned from, and the label — which only a
+write-holder can add — is the whole of what stands between it and a plan.
+Wiring it is one widening of that field list, `author` threaded through
+`SpecIssue`, and `readAuthorTrust`/`requireTrustedAuthor` called from
+`inspectSpecIssue` ahead of the label check. Until that lands, read any
+sentence here about `--issue` or `--next` trust as the specification and
+not as the code. The `rafa:spec-review` comment reader spends no trust
+reading BY DESIGN, which is a different thing from this gap:
+`src/board/review-comment.ts` holds why, and it is that nothing ever reads
+that comment back into a prompt.
 
 The issue's AUTHOR must hold `admin`, `maintain` or `write` on the
 repository (`gh api repos/{owner}/{repo}/collaborators/{login}/permission`),
@@ -163,14 +191,23 @@ follow-up prompt.
 Four checks, cheapest first; any one failing writes no plan file:
 
 0. Trust (section above): the issue's author must hold write access or be
-   listed, checked before the body is snapshotted.
+   listed, checked before the body is snapshotted. NOT WIRED on either
+   `plan create` route — the section above names the gap and what closing
+   it costs.
 1. Label (a person's decision): the issue carries `spec:ready`. Without it:
    "issue #<n> is not marked spec:ready", exit 2. `plan create --next` STOPS
    at a next line that is not ready and says so; it never skips ahead.
-2. Code: every template heading is present and non-empty, "Tasks the plan
-   must carry" and "Definition of done" each hold at least one list item, no
-   placeholder survives (`TBD`, `TODO`, `???`, an unfilled template comment),
-   and the trust check passes. The refusal lists each gap with its heading.
+2. Code: the leak refusal (`src/board/leak.ts`), which IS wired and
+   refuses. The heading-completeness half is written as
+   `requireCompleteSpec` (`src/board/readiness.ts`) — every template
+   heading present and non-empty, "Tasks the plan must carry" and
+   "Definition of done" each holding at least one list item, no
+   placeholder surviving (`TBD`, `TODO`, `???`, an unfilled template
+   comment), each gap listed with its heading — and has no caller outside
+   its own tests, because refusing on it would refuse every spec opened
+   before `src/board/templates/spec.md` existed. What runs in its place
+   WARNS and never refuses: `warnOnThinListSections`, over those two list
+   headings alone.
 3. The planner's first pass (same session, no second one paid for): the plan
    prompt gains bullets, below its first line so the classifier key stays,
    telling the session to judge the spec BEFORE planning: can each
@@ -202,9 +239,11 @@ records `review: skipped`.
 - `plan create --issue=<n>` — the spec is issue `<n>`'s body, snapshotted to
   `<specs.dir>/rafa-<n>-<slug>.md` (slug from the title). Fetch the issue
   (`gh issue view <n> --json number,title,body,state,labels`), refuse a
-  closed issue or one without `type:spec`, and run the four readiness checks
-  above. An existing snapshot that differs is refused without `--refresh`. A
-  local file `<specs.dir>/rafa-<n>-notes.md`, when present, is appended
+  closed issue or one without `type:spec`, and run the readiness checks
+  that are wired — the `spec:ready` label, the leak refusal, the thin-list
+  warning and the planner's own review — per check 0 and check 2 above. An
+  existing snapshot that differs is refused without `--refresh`. A local
+  file `<specs.dir>/rafa-<n>-notes.md`, when present, is appended
   under "Local notes": machine paths and private hosts live there and never
   on the board. The plan's `rafa:plan` block gets `issue: <n>`.
 - `plan create --next[=<roadmap-issue>]` — the first undone line of the
@@ -221,7 +260,11 @@ Both routes are mutually exclusive with `--spec` and with each other.
 
 Ticking: `pr merge` ticks the PR's `Closes #<n>` line in the roadmap issue
 after the merge (GitHub closes the issue; it does not tick a task-list box).
-An edit conflict re-reads and retries once.
+An edit conflict re-reads and retries once — and the only conflict signal
+there is, is the body the PATCH answers with. The issues REST API takes no
+`If-Match` and `gh` sends no conditional request, so a lost update comes
+back as a success; comparing what the PATCH echoed against what was sent is
+what catches one.
 
 The spec template: `.github/ISSUE_TEMPLATE/spec.md` with label `type:spec`
 and the headings the planner expects: What you get, Starting position,
