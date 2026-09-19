@@ -65,6 +65,7 @@ import {
   TRIAGE_BLOCK_FENCE,
   TRIAGE_MARKER,
   triageCommentBody,
+  triageComments,
   triageHeadline,
   writeTriageBlock,
   writeTriageComment,
@@ -362,6 +363,17 @@ describe('which comment is the triage', () => {
     ];
 
     expect(findTriageComment(comments)?.id).toBe('2');
+  });
+
+  it('answers every marker comment newest first, which is the order a trust check walks', () => {
+    const comments = [
+      comment({ id: '1', body: bodyAround('class: "ci-test"') }),
+      comment({ id: '2', body: 'thanks' }),
+      comment({ id: '3', body: bodyAround('class: "conflict-lockfile"') }),
+    ];
+
+    expect(triageComments(comments).map((one) => one.id)).toEqual(['3', '1']);
+    expect(triageComments([comment({ body: 'thanks' })])).toEqual([]);
   });
 });
 

@@ -91,6 +91,24 @@
  * `./triage.ts` reports its own: the worktree, the branch and the
  * pushed commits are all real whatever GitHub said about a comment.
  *
+ * ## The author is trusted before anything is done
+ *
+ * The first step of a run, ahead of the assessment it was handed being
+ * looked at at all, is `requireTrustedResolveAuthor`
+ * (`./triage-trust.ts`): a pull request whose author holds no write
+ * access is refused with exit {@link RESOLVE_REFUSE_EXIT} and
+ * `trustRefusalMessage`'s sentence, unless the author is listed in
+ * `board.trustedAuthors` or is a known bump bot. A resolve run checks
+ * out that pull request's branch into a worktree and hands a session a
+ * plan over it, so the branch's content is board text in the strongest
+ * sense the spec has, and the check comes before the worktree, the plan
+ * and the counter alike.
+ *
+ * The bump bots are allowed because they are what `--resolve` is for: a
+ * lockfile conflict on a dependabot branch is the class the pinned
+ * plans were written against, and dependabot holds no write access for
+ * the lookup to report.
+ *
  * ## The dependabot note
  *
  * Pushing to a dependabot branch stops dependabot rebasing it, so a
@@ -102,6 +120,7 @@
  */
 import type { ResolveLoopOutcome, ResolveLoopRunner } from './resolve-loop.js';
 import type { TriageReading } from './triage-report.js';
+import type { TriageTrust } from './triage-trust.js';
 import type { Output } from '../../ports/index.js';
 import type { GitRunner, PullRequestDetail, PullRequests } from '../../pr/index.js';
 import type { AttemptOutcome, AttemptReading } from '../../pr/triage/attempts.js';
@@ -128,6 +147,7 @@ import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-life
 
 import { runResolveLoop, writeResolvePlan } from './resolve-loop.js';
 import { evidenceOf } from './triage-report.js';
+import { readTrustedTriageComment, requireTrustedResolveAuthor } from './triage-trust.js';
 
 /** The exit code a `--resolve` run that gave up ends with; the spec's. */
 export const RESOLVE_STOP_EXIT = 3;
@@ -150,6 +170,8 @@ export const DEPENDABOT_REBASE_NOTE = 'Note: rafa pushed to this dependabot bran
 export interface ResolveRun {
   /** The provider, for the checks poll and the comment writes. */
   readonly pulls: PullRequests;
+  /** How the author and the stored comment are trusted; see the module note. */
+  readonly trust: TriageTrust;
   /** The project root, whose git adds and removes the worktree. */
   readonly root: string;
   /** The home the worktree and the plans go under. */
@@ -254,7 +276,16 @@ function resolveCommentBody(
     : body;
 }
 
-/** Writes the triage comment, reporting a refused write rather than refusing the run. */
+/**
+ * Writes the triage comment, reporting a refused write rather than
+ * refusing the run.
+ *
+ * The comment it EDITS is found through `./triage-trust.ts` rather than
+ * through the writer's own lookup, so a marker comment planted by an
+ * account nobody trusted is neither edited nor read as the store this
+ * run raises its counter in. Each one passed over is warned about, one
+ * line, which is the "reported" half of ignoring it.
+ */
 async function writeResolveComment(
   run: ResolveRun,
   detail: PullRequestDetail,
@@ -264,7 +295,9 @@ async function writeResolveComment(
 ): Promise<void> {
   const body = resolveCommentBody(run, detail, assessment, attempts, resolved);
   try {
-    await writeTriageComment({ pulls: run.pulls, number: run.number, body });
+    const found = await readTrustedTriageComment(await run.pulls.comments(run.number), run.trust);
+    for (const ignored of found.ignored) run.output.warn(`   ${ignored.reason}`);
+    await writeTriageComment({ pulls: run.pulls, number: run.number, body, existing: found.comment });
   } catch (error) {
     run.output.warn(`   The triage comment could not be written: ${messageOf(error)}`);
   }
@@ -423,6 +456,7 @@ function attemptHeadline(run: ResolveRun, assessment: TriageAssessment, guard: A
 export async function resolvePullRequest(run: ResolveRun): Promise<ResolveResult> {
   const { reading } = run;
   const detail = reading.detail;
+  await requireTrustedResolveAuthor(detail, run.trust);
   const first = reading.assessment;
   if (first === null) {
     return nothingToDo(run, `Nothing was assessed for #${run.number}, so --resolve ran nothing.`);

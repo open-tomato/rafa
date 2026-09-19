@@ -14,7 +14,11 @@
  * measured against the real git in `triage-read.test.ts` and in
  * `src/pr/triage/conflict.test.ts`.
  *
- * Four controls carry readings that would otherwise pass while wrong:
+ * The permission lookup behind the trust check is a seam too, made over
+ * the same recorded fake, so the account a marker comment was written by
+ * is answered by the planted repository and no case spawns `gh` for it.
+ *
+ * Five controls carry readings that would otherwise pass while wrong:
  *
  *   - The provider factory records whether it was reached, so "a refused
  *     line makes no provider" is measured rather than assumed.
@@ -25,11 +29,15 @@
  *   - `--no-comment` asserts the log holds no `-X POST`, where the run
  *     without it holds one, so "writes none" is measured against a run
  *     that did write.
+ *   - the planted marker comment is read TWICE, once written by an
+ *     account the repository gives `read` and once by one it gives
+ *     `admin`, so "an untrusted comment is ignored" is measured against
+ *     the same comment being read as the store it is.
  */
 import type { TriageSeams } from './triage.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { CliEvent } from '../../ports/index.js';
-import type { FakePullRequestSeed } from '../../pr/gh-fake.js';
+import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner, PullRequests } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
@@ -39,6 +47,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGhPermissions } from '../../board/trust.js';
 import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
@@ -71,6 +80,9 @@ const GITHUB_ORIGIN = 'git@github.com:open-tomato/rafa.git';
 
 /** The branch the seams answer unless a case says otherwise. */
 const BRANCH = 'feat/pr-41';
+
+/** The login the recorded fake writes a comment as, which every case gives write access. */
+const FAKE_COMMENT_AUTHOR = 'rafa-fake';
 
 /** The Actions run the failing check of the planted pull request points at. */
 const RUN_ID = '9006';
@@ -113,11 +125,17 @@ const OID = '0'.repeat(40);
 /** A git runner that resolves nothing, so no conflict is read locally. */
 const NO_REFS: GitRunner = () => ({ ok: false, stdout: '', stderr: 'stub git: no such ref' });
 
-/** A fake `gh` repository, with `seeds` planted and the lint log under {@link RUN_ID}. */
+/**
+ * A fake `gh` repository, with `seeds` planted and the lint log under
+ * {@link RUN_ID}, and write access for the account the fake writes a
+ * comment as, which is what makes the triage comment it stores a
+ * comment the next run may read back (`triage-trust.ts`).
+ */
 function plantedFake(seeds: readonly FakePullRequestSeed[]): ReturnType<typeof createFakePrGh> {
   const fake = createFakePrGh({ now: () => '2026-09-19T09:00:05Z' });
   for (const seed of seeds) fake.plant(seed);
   fake.plantRun(RUN_ID, LINT_LOG);
+  fake.plantPermission(FAKE_COMMENT_AUTHOR, 'admin');
   return fake;
 }
 
@@ -135,8 +153,15 @@ interface SeamOptions {
   readonly git?: GitRunner;
 }
 
-/** Seams over `pulls`, recording every root a provider was made for. */
-function caseSeams(pulls: PullRequests, options: SeamOptions = {}): CaseSeams {
+/**
+ * Seams over `fake`, recording every root a provider was made for.
+ *
+ * The permission lookup is made over the same recorded fake, so the
+ * trust reading behind the marker comment is answered by the planted
+ * repository and no case spawns `gh` for it.
+ */
+function caseSeams(fake: ReturnType<typeof createFakePrGh>, options: SeamOptions = {}): CaseSeams {
+  const pulls: PullRequests = createGhPullRequests({ gh: fake.run });
   const roots: string[] = [];
   return {
     seams: {
@@ -146,6 +171,7 @@ function caseSeams(pulls: PullRequests, options: SeamOptions = {}): CaseSeams {
       },
       readBranch: options.readBranch ?? ((): string => options.branch ?? BRANCH),
       readRemote: () => GITHUB_ORIGIN,
+      permissions: () => createGhPermissions({ gh: fake.run }),
       git: () => options.git ?? NO_REFS,
       now: () => NOW,
     },
@@ -193,7 +219,7 @@ async function overFake(
   options: SeamOptions = {},
 ): Promise<Ran & { readonly fake: ReturnType<typeof createFakePrGh> }> {
   const fake = plantedFake(seeds);
-  const seams = caseSeams(createGhPullRequests({ gh: fake.run }), options);
+  const seams = caseSeams(fake, options);
   return { ...await ran(seams.seams, freshProject(), words), fake };
 }
 
@@ -207,7 +233,7 @@ const RED_41: FakePullRequestSeed = {
 
 describe('the line', () => {
   it('refuses a second word, naming the usage line, and makes no provider', async () => {
-    const seams = caseSeams(createGhPullRequests({ gh: plantedFake([RED_41]).run }));
+    const seams = caseSeams(plantedFake([RED_41]));
 
     const outcome = await ran(seams.seams, freshProject(), ['41', '42']);
 
@@ -243,7 +269,7 @@ describe('the line', () => {
   });
 
   it('refuses a repository whose provider is not gh with exit code 2 and the shared message', async () => {
-    const seams = caseSeams(createGhPullRequests({ gh: plantedFake([RED_41]).run }));
+    const seams = caseSeams(plantedFake([RED_41]));
 
     const outcome = await ran(seams.seams, freshProject(NONE_CONFIG), ['41']);
 
@@ -325,7 +351,7 @@ describe('assessing the pull request a number names', () => {
 describe('writing the comment, and not writing it', () => {
   it('edits the one comment already there when the head has moved, rather than posting a second', async () => {
     const fake = plantedFake([RED_41]);
-    const seams = caseSeams(createGhPullRequests({ gh: fake.run }));
+    const seams = caseSeams(fake);
     const project = freshProject();
 
     await ran(seams.seams, project, ['41']);
@@ -348,7 +374,7 @@ describe('writing the comment, and not writing it', () => {
 
   it('assesses nothing and shows the stored comment when the head has not moved', async () => {
     const fake = plantedFake([RED_41]);
-    const seams = caseSeams(createGhPullRequests({ gh: fake.run }));
+    const seams = caseSeams(fake);
     const project = freshProject();
 
     await ran(seams.seams, project, ['41']);
@@ -365,6 +391,65 @@ describe('writing the comment, and not writing it', () => {
 
     expect(outcome.run.stdout).toContain('so there is nothing to triage');
     expect(outcome.fake.pull(41)?.comments ?? []).toEqual([]);
+  });
+});
+
+describe('who the stored comment is read from', () => {
+  /** A marker comment written by `login`, pinned to the pull request's own head. */
+  function plantedTriage(login: string, head: string): FakePrComment {
+    const block = [
+      '```rafa:triage',
+      `head: "${head}"`,
+      'at: "2026-09-19T08:00:00Z"',
+      'class: "ci-lint"',
+      'simple: false',
+      'attempts: 0',
+      'files: []',
+      '```',
+    ].join('\n');
+    return {
+      id: 77,
+      author: { login, isBot: false, name: login },
+      body: `${TRIAGE_MARKER}\n**rafa triage**: \`ci-lint\`, not simple, not resolved\n\n${block}\n`,
+      createdAt: '2026-09-19T08:00:00Z',
+      updatedAt: '2026-09-19T08:00:00Z',
+    };
+  }
+
+  /**
+   * A run over pull request 41 carrying one marker comment written by
+   * `login`, whom the repository gives `permission` when one is named.
+   */
+  async function overPlantedComment(
+    login: string,
+    permission?: string,
+  ): Promise<Ran & { readonly fake: FakePrGh }> {
+    const fake = plantedFake([RED_41]);
+    if (permission !== undefined) fake.plantPermission(login, permission);
+    const head = fake.pull(41)?.headRefOid ?? '';
+    fake.update(41, (pull) => ({ ...pull, comments: [plantedTriage(login, head)] }));
+    const outcome = await ran(caseSeams(fake).seams, freshProject(), ['41']);
+    return { ...outcome, fake };
+  }
+
+  it('ignores a marker comment nobody trusted, reports it, and posts its own beside it', async () => {
+    const outcome = await overPlantedComment('stranger', 'read');
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(outcome.run.stdout)
+      .toContain('was written by stranger, who has no write access to open-tomato/rafa');
+    expect(outcome.run.stdout).toContain('it was ignored and nothing in it was read');
+    expect(outcome.run.stdout).toContain('Posted the triage comment:');
+    expect(outcome.fake.pull(41)?.comments.map((one) => one.author.login))
+      .toEqual(['stranger', FAKE_COMMENT_AUTHOR]);
+  });
+
+  it('reads the same comment as the store it is when a write-holder wrote it', async () => {
+    const outcome = await overPlantedComment(FAKE_COMMENT_AUTHOR);
+
+    expect(outcome.run.stdout).toContain('already assessed at');
+    expect(outcome.run.stdout).not.toContain('was ignored');
+    expect(outcome.fake.pull(41)?.comments).toHaveLength(1);
   });
 });
 

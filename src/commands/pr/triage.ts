@@ -81,6 +81,25 @@
  * does, and there is no second assessment order to keep in step with
  * this one.
  *
+ * ## Who the stored comment is read from
+ *
+ * The marker comment is a store — its head decides whether the pull
+ * request is assessed again, its `attempts` is the resolve counter, and
+ * the prompt under it is handed to a session — and on a public
+ * repository anyone at all can write one. So it is read through
+ * `./triage-trust.ts`: the newest marker comment whose AUTHOR holds
+ * write access, or is listed in `board.trustedAuthors`. One from
+ * anybody else is passed over, reported on the reading
+ * ({@link TriageReading.ignored}) and printed by the report, and
+ * nothing in it is read. A permission lookup that FAILED is untrusted
+ * too; `src/board/trust.ts` holds why.
+ *
+ * `--resolve` asks the other half of the same question: a pull request
+ * whose own author is untrusted is refused with exit code 2 before any
+ * worktree is added, unless the author is a known bump bot or listed.
+ * That refusal is `./triage-resolve.ts`'s first step, so it is made
+ * once wherever a resolve run is started from.
+ *
  * ## What is allowed to fail
  *
  * A comment that could not be written is REPORTED and does not refuse
@@ -100,23 +119,27 @@
  * exit 1: a `--max-attempts` that is no whole number from 1,
  * `--resolve` beside `--no-comment`, a number the repository has no
  * pull request for, and a provider call that rejected. Under
- * `--resolve`, two more from elsewhere: exit 2 for more than one red
- * candidate (`select.ts`) and for a cross-repository pull request
- * (`src/pr/worktree.ts`), and exit 3 when the attempt guard gives up.
+ * `--resolve`, three more from elsewhere: exit 2 for more than one red
+ * candidate (`select.ts`), for a cross-repository pull request
+ * (`src/pr/worktree.ts`) and for a pull request whose author is
+ * trusted with nothing (`src/board/trust.ts`), and exit 3 when the
+ * attempt guard gives up.
  */
 import type { PrSeams } from './pr-context.js';
 import type { ResolveLoopRunner } from './resolve-loop.js';
 import type { TriageReading } from './triage-report.js';
 import type { ResolveResult } from './triage-resolve.js';
+import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
+import type { Permissions } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { GitRunner, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
+import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
-import { findTriageComment, triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
+import { triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
 import { buildFollowUpPrompt } from '../../pr/triage/follow-up.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { selectTriagePullRequests } from '../../pr/triage/select.js';
@@ -132,6 +155,7 @@ import {
 import { readConflictFiles, readFailedLogs } from './triage-read.js';
 import { evidenceOf, renderTriages } from './triage-report.js';
 import { resolvePullRequest } from './triage-resolve.js';
+import { ghPermissionsIn, readTrustedTriageComment, repoLabel } from './triage-trust.js';
 
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.triage;
@@ -168,6 +192,12 @@ export interface TriageSeams extends PrSeams {
   readonly clock?: () => number;
   /** The sleep between the `--resolve` CI wait's polls. A real timer when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /**
+   * The permission lookup board trust is read through, for a root. A
+   * `gh api` lookup in the project root when left out
+   * (`./triage-trust.ts`).
+   */
+  readonly permissions?: (root: string) => Permissions;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -201,6 +231,8 @@ interface AssessOptions {
   readonly maxAttempts: number;
   /** When the assessment was read, ISO 8601. */
   readonly at: string;
+  /** The permission lookup the marker comment's author is read through. */
+  readonly permissions: Permissions;
 }
 
 /**
@@ -292,13 +324,31 @@ async function detailOf(pr: AssessOptions['pr'], number: number): Promise<PullRe
   return detail;
 }
 
-/** The marker comment on a pull request, through the port's comment list. */
+/**
+ * What a sentence about trust calls this repository, read off the pull
+ * request itself with the `origin` remote behind it; see
+ * `./triage-trust.ts`.
+ */
+function trustOf(options: AssessOptions, detail: PullRequestDetail): TriageTrust {
+  return {
+    permissions: options.permissions,
+    trustedAuthors: options.pr.trustedAuthors,
+    repo: repoLabel(detail.url, options.pr.reading.remote),
+  };
+}
+
+/**
+ * The marker comment a triage may read, through the port's comment list
+ * and the trust check: one written by an account without write access is
+ * passed over and reported, never read (`./triage-trust.ts`).
+ */
 async function triageCommentOf(
-  pr: AssessOptions['pr'],
-  number: number,
-): Promise<ReturnType<typeof findTriageComment>> {
+  options: AssessOptions,
+  detail: PullRequestDetail,
+): Promise<TrustedTriageComment> {
+  const { number, pr } = options;
   const comments = await onProvider(`read the comments of #${number}`, () => pr.pulls.comments(number));
-  return findTriageComment(comments);
+  return readTrustedTriageComment(comments, trustOf(options, detail));
 }
 
 /** What a reading that assessed nothing answers: the stored triage and no class. */
@@ -306,10 +356,12 @@ function storedOnly(
   detail: PullRequestDetail,
   rerun: TriageReading['rerun'],
   maxAttempts: number,
+  ignored: readonly IgnoredTriageComment[],
 ): TriageReading {
   return {
     detail,
     rerun,
+    ignored,
     assessment: null,
     logs: null,
     conflict: null,
@@ -325,7 +377,7 @@ function storedOnly(
 async function commentOn(
   options: AssessOptions,
   reading: TriageReading,
-  existing: ReturnType<typeof findTriageComment>,
+  existing: PullRequestComment | null,
 ): Promise<Pick<TriageReading, 'write' | 'writeProblem'>> {
   const { assessment, detail } = reading;
   if (reading.rerun.write === 'none' || assessment === null) return { write: null, writeProblem: null };
@@ -350,14 +402,15 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
   const { git, maxAttempts, number, pr } = options;
   const detail = await detailOf(pr, number);
   const checks = await onProvider(`read the checks of #${number}`, () => pr.pulls.checks(number));
-  const existing = await triageCommentOf(pr, number);
+  const found = await triageCommentOf(options, detail);
+  const existing = found.comment;
   const rerun = readTriageRerun({
     comment: existing,
     head: detail.headRefOid,
     rows: checks.rows,
     noComment: !options.wantsComment,
   });
-  if (!rerun.assesses) return storedOnly(detail, rerun, maxAttempts);
+  if (!rerun.assesses) return storedOnly(detail, rerun, maxAttempts, found.ignored);
 
   const logs = await readFailedLogs(pr.pulls, checks.rows);
   const conflict = detail.mergeable === 'mergeable'
@@ -372,6 +425,7 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
   const assessed: TriageReading = {
     detail,
     rerun,
+    ignored: found.ignored,
     assessment,
     logs,
     conflict,
@@ -407,6 +461,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
   const asked = readPullArgument(context.args, USAGE);
   const pr = openPrContext(context, seams);
   const git = (seams.git ?? createGitRunner)(pr.project.root);
+  const permissions = (seams.permissions ?? ghPermissionsIn)(pr.project.root);
   const now = seams.now ?? ((): string => new Date().toISOString());
 
   const selection = asked === null
@@ -431,6 +486,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
       wantsComment,
       maxAttempts,
       at: now(),
+      permissions,
     });
     const reading = await assess();
     if (!wantsResolve) {
@@ -438,6 +494,11 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
       continue;
     }
     resolve = await resolvePullRequest({
+      trust: {
+        permissions,
+        trustedAuthors: pr.trustedAuthors,
+        repo: repoLabel(reading.detail.url, pr.reading.remote),
+      },
       pulls: pr.pulls,
       root: pr.project.root,
       home: seams.home ?? pr.project.home,
@@ -496,8 +557,10 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       + ' ordinary loop over the pinned plan for that class, in a worktree under `~/.rafa/worktrees/pr-<n>` removed'
       + ' on success, each session capped at `pr.resolveBudget`; it waits on the checks after every attempt and, at'
       + ' `--max-attempts` or on an attempt ending as the one before it, updates the comment, removes the worktree,'
-      + ' prints the follow-up prompt and exits 3. A cross-repository pull request, and more than one candidate,'
-      + ' are refused with exit code 2. With `--output=json` the selection, every'
+      + ' prints the follow-up prompt and exits 3. It reads the triage comment only from an author holding write'
+      + ' access to the repository or listed in `board.trustedAuthors`, and ignores and reports one written by'
+      + ' anybody else. A cross-repository pull request, more than one candidate, and under `--resolve` a pull'
+      + ' request whose author is neither trusted nor a known dependency-bump bot, are refused with exit code 2. With `--output=json` the selection, every'
       + ' reading, what `--resolve` came to and the rendered text are the data of the terminal result event.'
       + ' Refuses with exit code 2 where `pr.provider` is not `gh`.',
     args: [

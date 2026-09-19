@@ -53,6 +53,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGhPermissions } from '../../board/trust.js';
 import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';
@@ -115,6 +116,12 @@ const NUL = String.fromCharCode(0);
 /** A merged tree OID, which is what a conflicted merge-tree stdout opens with. */
 const OID = '0'.repeat(40);
 
+/** The login a planted pull request carries when its seed names no author. */
+const PULL_AUTHOR = 'octo';
+
+/** The login the recorded fake writes a comment as. */
+const FAKE_COMMENT_AUTHOR = 'rafa-fake';
+
 /** A pull request with a lockfile conflict and no checks, which is `conflict-lockfile`. */
 const CONFLICTED_41: FakePullRequestSeed = {
   number: 41,
@@ -171,6 +178,14 @@ interface CaseOptions {
   readonly onSleep?: (fake: FakePrGh, slept: number) => void;
   /** The words after `pr triage`. */
   readonly words?: readonly string[];
+  /**
+   * The logins the repository gives write access to. The pull request's
+   * own author and the account the fake comments as when left out,
+   * which is what lets a run start at all (`./triage-trust.ts`).
+   */
+  readonly trusted?: readonly string[];
+  /** A permission per login for the accounts that hold no write access. */
+  readonly reading?: Readonly<Record<string, string>>;
 }
 
 /** What one dispatched run left behind. */
@@ -191,6 +206,12 @@ async function resolved(options: CaseOptions): Promise<Ran> {
   const fake = createFakePrGh({ now: () => NOW });
   for (const seed of options.seeds) fake.plant(seed);
   fake.plantRun(RUN_ID, LINT_LOG);
+  for (const login of options.trusted ?? [PULL_AUTHOR, FAKE_COMMENT_AUTHOR]) {
+    fake.plantPermission(login, 'admin');
+  }
+  for (const [login, permission] of Object.entries(options.reading ?? {})) {
+    fake.plantPermission(login, permission);
+  }
   const git = stubGit(options.files ?? ((): readonly string[] => ['bun.lock']), options.worktrees ?? true);
   const loops: LoopCall[] = [];
   let slept = 0;
@@ -201,6 +222,7 @@ async function resolved(options: CaseOptions): Promise<Ran> {
     readRemote: () => GITHUB_ORIGIN,
     git: () => git.runner,
     now: () => NOW,
+    permissions: () => createGhPermissions({ gh: fake.run }),
     clock: () => 0,
     sleep: async () => {
       slept += 1;
@@ -435,6 +457,33 @@ describe('what --resolve does not run', () => {
     expect(outcome.stderr).toContain('is on a fork');
     expect(outcome.loops).toEqual([]);
     expect(gitLines(outcome.git, 'worktree')).toEqual([]);
+  });
+
+  it('refuses a pull request whose author holds no write access, with exit 2 and no worktree', async () => {
+    const outcome = await resolved({
+      seeds: [{ ...CONFLICTED_41, author: { login: 'stranger', isBot: false, name: 'A Stranger' } }],
+      trusted: [FAKE_COMMENT_AUTHOR],
+      reading: { stranger: 'read' },
+    });
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain(
+      'pull request #41 was opened by stranger, who has no write access to open-tomato/rafa;'
+        + ' a member must open the pull request',
+    );
+    expect(outcome.loops).toEqual([]);
+    expect(gitLines(outcome.git, 'worktree')).toEqual([]);
+  });
+
+  it('runs for a dependabot pull request, which holds no write access either', async () => {
+    const outcome = await resolved({
+      seeds: [{ ...CONFLICTED_41, author: { login: 'dependabot[bot]', isBot: true, name: 'dependabot' } }],
+      trusted: [FAKE_COMMENT_AUTHOR],
+      attempt: fixesIt,
+    });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.loops).toHaveLength(1);
   });
 
   it('refuses --resolve beside --no-comment, which has nowhere to raise the count', async () => {

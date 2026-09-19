@@ -58,6 +58,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGhPermissions } from '../../board/trust.js';
 import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
 import { TRIAGE_CLASSES } from '../../pr/triage/classes.js';
@@ -112,6 +113,9 @@ async function readingsOf(
   const data = dataOf(eventsOf(run.stdout));
   return data['readings'] as readonly Record<string, unknown>[];
 }
+
+/** The login the recorded fake writes a comment as, which every case gives write access. */
+const FAKE_COMMENT_AUTHOR = 'rafa-fake';
 
 /** A git runner that resolves every ref and refuses to merge anything else; see the module note. */
 const NO_REFS: GitRunner = () => ({ ok: false, stdout: '', stderr: 'stub git: no such ref' });
@@ -235,6 +239,7 @@ describe('every class, read off its own captured fixture', () => {
       readRemote: () => GITHUB_ORIGIN,
       git: () => conflictGit(filesByHead),
       now: () => NOW,
+      permissions: () => createGhPermissions({ gh: fake.run }),
     };
     const project = freshProject();
 
@@ -256,6 +261,7 @@ describe('the four re-run readings, driven over one evolving fixture', () => {
     const number = seed.number;
     const fake = createFakePrGh({ now: () => NOW });
     fake.plant(seed);
+    fake.plantPermission(FAKE_COMMENT_AUTHOR, 'admin');
     const runId = fixture.checks[0] === undefined
       ? null
       : runIdOf(fixture.checks[0].link);
@@ -267,6 +273,7 @@ describe('the four re-run readings, driven over one evolving fixture', () => {
       readRemote: () => GITHUB_ORIGIN,
       git: () => NO_REFS,
       now: () => NOW,
+      permissions: () => createGhPermissions({ gh: fake.run }),
     };
     const project = freshProject();
 
@@ -330,6 +337,7 @@ describe('the bare line, over more than one candidate, including the 72-hour ski
       readRemote: () => GITHUB_ORIGIN,
       git: () => NO_REFS,
       now: () => NOW,
+      permissions: () => createGhPermissions({ gh: fake.run }),
     };
     const command = createPrTriageCommand(seams);
     const project = freshProject();

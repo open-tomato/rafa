@@ -67,6 +67,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGhPermissions } from '../../board/trust.js';
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../../pr/index.js';
 import { hasConflictMessage, readConflict } from '../../pr/triage/conflict.js';
@@ -179,6 +180,19 @@ function lockfileAt(git: GitRunner, branch: string): string {
   return git(['show', `${branch}:bun.lock`]).stdout;
 }
 
+/** The login a planted pull request carries, and the one the fake comments as. */
+const TRUSTED_LOGINS: readonly string[] = ['octo', 'rafa-fake'];
+
+/**
+ * Gives the pull request's author and the fake's own commenting account
+ * write access, which is what lets a resolve run start and what makes
+ * the triage comment it writes one the next read may trust
+ * (`./triage-trust.ts`).
+ */
+function plantTrust(fake: ReturnType<typeof createFakePrGh>): void {
+  for (const login of TRUSTED_LOGINS) fake.plantPermission(login, 'admin');
+}
+
 /** Whether git still lists a worktree at `path`. */
 function stillListed(git: GitRunner, path: string): boolean {
   return git(['worktree', 'list', '--porcelain']).stdout.includes(path);
@@ -202,11 +216,13 @@ describe('a real lockfile conflict the attempt actually fixes', () => {
     const repo = plantConflictRepo('green');
     const fake = createFakePrGh({ now: () => NOW });
     fake.plant(conflictedSeed(repo));
+    plantTrust(fake);
     const loops: LoopCall[] = [];
     let resolvedSha = '';
 
     const seams: TriageSeams = {
       pullRequests: () => createGhPullRequests({ gh: fake.run }),
+      permissions: () => createGhPermissions({ gh: fake.run }),
       now: () => NOW,
       clock: () => 0,
       sleep: async () => undefined,
@@ -258,10 +274,12 @@ describe('a real lockfile conflict no attempt fixes', () => {
     const repo = plantConflictRepo('stuck');
     const fake = createFakePrGh({ now: () => NOW });
     fake.plant(conflictedSeed(repo, { title: 'a driven resolve that stays broken' }));
+    plantTrust(fake);
     const loops: LoopCall[] = [];
 
     const seams: TriageSeams = {
       pullRequests: () => createGhPullRequests({ gh: fake.run }),
+      permissions: () => createGhPermissions({ gh: fake.run }),
       now: () => NOW,
       clock: () => 0,
       sleep: async () => undefined,

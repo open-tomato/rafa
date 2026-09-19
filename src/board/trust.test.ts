@@ -32,7 +32,11 @@
  * Seven mutations of `trust.ts` were driven against this file on
  * 2026-09-19, one at a time, the module restored from a scratch copy
  * and verified with `shasum -c` after each. 33 pass either side, and
- * each count below is the run's own:
+ * each count below is the run's own. The two `trustRefusalClause`
+ * cases came later, when the clause was exported for
+ * `src/commands/pr/triage-trust.ts` to report an ignored marker
+ * comment with: they were not in the 33 and no count below counts
+ * them, which is why this file now holds 35:
  *
  *  - a failed lookup answered as trusted, the mutation this whole
  *    module exists to prevent: 4 fail, both failed-lookup readings, the
@@ -73,6 +77,7 @@ import {
   readAuthorTrust,
   requireTrustedAuthor,
   TRUSTED_PERMISSIONS,
+  trustRefusalClause,
   trustRefusalMessage,
 } from './trust.js';
 
@@ -413,6 +418,27 @@ describe('trustRefusalMessage', () => {
 
     expect(() => trustRefusalMessage(ISSUE, reading))
       .toThrow('board trust: octocat is trusted, and has no refusal to name');
+  });
+});
+
+describe('trustRefusalClause', () => {
+  it('is the claim about access the refusal makes, and the one a caller reporting an ignored comment makes', async () => {
+    const outsider = await trustOf('mallory', answering('read'));
+    const unread = await trustOf('mallory', failing('gh api ... failed: HTTP 403'));
+
+    expect(trustRefusalClause('open-tomato/rafa', outsider))
+      .toBe('who has no write access to open-tomato/rafa');
+    expect(trustRefusalClause('open-tomato/rafa', unread))
+      .toBe('whose write access to open-tomato/rafa could not be read (gh api ... failed: HTTP 403)');
+    // The control: the refusal is built out of this clause, so the two
+    // cannot drift apart.
+    expect(trustRefusalMessage(ISSUE, outsider)).toContain(trustRefusalClause('open-tomato/rafa', outsider));
+  });
+
+  it('refuses to spell a clause for a trusted reading', async () => {
+    const reading = await trustOf('octocat', answering('write'));
+
+    expect(() => trustRefusalClause('open-tomato/rafa', reading)).toThrow(TypeError);
   });
 });
 

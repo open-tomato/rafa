@@ -98,11 +98,18 @@
  *
  * ## What it does not check
  *
- * WHO wrote the comment. A marker comment from an account without write
- * access is to be ignored and reported, through `src/board/trust.ts`,
- * which the trust stage wires into this reader's callers. Until then
- * every caller prints the author it found, so a triage nobody trusted is
- * at least attributed.
+ * WHO wrote the comment. {@link findTriageComment} and
+ * {@link triageComments} answer every marker comment they were handed,
+ * whoever wrote it, because nothing here may spawn and the trust
+ * reading is a `gh api` call (`src/board/trust.ts`).
+ *
+ * `src/commands/pr/triage-trust.ts` is where that check lives, and
+ * `rafa pr triage` reads its marker comment through it: a comment from
+ * an account without write access is dropped from the list and reported,
+ * so a planted one supplies neither the stored head, the attempt count
+ * nor the follow-up prompt. `src/commands/pr/last-triage.ts`, which
+ * `pr show` reads through, still takes the newest marker comment
+ * whoever wrote it, and prints the author beside it.
  */
 import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
@@ -217,20 +224,35 @@ export interface WriteTriageCommentOptions {
 }
 
 /**
+ * Every comment carrying the marker, NEWEST FIRST.
+ *
+ * The order is the one {@link findTriageComment} answers from, and it is
+ * also what a reader dropping an untrusted marker comment walks
+ * (`src/commands/pr/triage-trust.ts`): with the newest first, the triage
+ * that stands is the first trusted comment in this list, and a planted
+ * one is passed over rather than allowed to hide the comment under it.
+ */
+export function triageComments(
+  comments: readonly PullRequestComment[],
+): readonly PullRequestComment[] {
+  return [...comments]
+    .reverse()
+    .filter((comment) => comment.body.includes(TRIAGE_MARKER));
+}
+
+/**
  * The LAST comment carrying the marker, or null when none does.
  *
  * Last rather than first, because a comment posted by an older rafa and
  * then a newer one are both markers, and the newest is the triage that
  * stands. Ordinary comments after it change nothing.
+ *
+ * WHO wrote it is not read here; see the module note.
  */
 export function findTriageComment(
   comments: readonly PullRequestComment[],
 ): PullRequestComment | null {
-  for (let index = comments.length - 1; index >= 0; index -= 1) {
-    const comment = comments[index];
-    if (comment !== undefined && comment.body.includes(TRIAGE_MARKER)) return comment;
-  }
-  return null;
+  return triageComments(comments)[0] ?? null;
 }
 
 /** A field as it was read, and what to say about it when it was unusable. */

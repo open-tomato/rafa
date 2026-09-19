@@ -325,6 +325,30 @@ export async function readAuthorTrust(options: AuthorTrustOptions): Promise<Trus
 }
 
 /**
+ * The claim an untrusted `reading` is refused with, as a clause opening
+ * `who`: what GitHub answered about the login's access to `repo`, or
+ * that nobody answered and what went wrong.
+ *
+ * Exported because the refusal is not the only place the claim is made.
+ * A marker comment from an untrusted author is IGNORED rather than
+ * refused (`src/commands/pr/triage-trust.ts`), and the sentence
+ * reporting that says the same thing about access as
+ * {@link trustRefusalMessage} does — which it can only keep saying if
+ * there is one spelling of it.
+ *
+ * Throws a `TypeError` for a trusted reading, as
+ * {@link trustRefusalMessage} does.
+ */
+export function trustRefusalClause(repo: string, reading: TrustReading): string {
+  if (reading.trusted) {
+    throw new TypeError(`board trust: ${reading.login} is trusted, and has no refusal to name`);
+  }
+  return reading.refusal === 'lookup-failed'
+    ? `whose write access to ${repo} could not be read (${failureDetail(reading)})`
+    : `who has no write access to ${repo}`;
+}
+
+/**
  * The sentence an untrusted `reading` is refused with, naming `item`.
  *
  * Throws a `TypeError` for a trusted reading: there is no refusal to
@@ -332,14 +356,8 @@ export async function readAuthorTrust(options: AuthorTrustOptions): Promise<Trus
  * backwards.
  */
 export function trustRefusalMessage(item: BoardItem, reading: TrustReading): string {
-  if (reading.trusted) {
-    throw new TypeError(`board trust: ${reading.login} is trusted, and has no refusal to name`);
-  }
-
+  const because = trustRefusalClause(item.repo, reading);
   const opened = `${item.kind} #${String(item.number)} was opened by ${reading.login}`;
-  const because = reading.refusal === 'lookup-failed'
-    ? `whose write access to ${item.repo} could not be read (${failureDetail(reading)})`
-    : `who has no write access to ${item.repo}`;
   return `${opened}, ${because}; ${REMEDY[item.kind]}`;
 }
 

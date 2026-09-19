@@ -112,6 +112,7 @@ interface ReadingSeed {
   readonly write?: TriageReading['write'];
   readonly writeProblem?: string | null;
   readonly logProblems?: readonly string[];
+  readonly ignored?: TriageReading['ignored'];
   readonly unlinked?: readonly string[];
   readonly maxAttempts?: number;
 }
@@ -140,6 +141,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
     return {
       detail: pull,
       rerun,
+      ignored: seed.ignored ?? [],
       assessment: null,
       logs: null,
       conflict: null,
@@ -159,6 +161,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
   return {
     detail: pull,
     rerun,
+    ignored: seed.ignored ?? [],
     assessment,
     logs,
     conflict: null,
@@ -189,6 +192,32 @@ describe('the head line', () => {
   it('keeps the number alone when the title is blank', () => {
     expect(linesOf(renderTriage(reading({ detail: detail({ title: '  ' }) })))[0])
       .toBe('#41 — feat/rafa-20 → main — head 0badc0f');
+  });
+});
+
+describe('a marker comment the trust check passed over', () => {
+  it('prints its whole sentence under the re-run line, indented, and still prints the class', () => {
+    const planted = reading({
+      ignored: [{
+        id: '77',
+        url: 'https://github.com/open-tomato/rafa/pull/41#issuecomment-77',
+        author: 'stranger',
+        reason: 'the rafa:pr-triage comment ... was written by stranger, who has no write access to o/r;'
+          + ' it was ignored and nothing in it was read',
+      }],
+    });
+
+    const lines = linesOf(renderTriage(planted));
+
+    expect(lines[1]).toBe(planted.rerun.headline);
+    expect(lines[2]).toBe(
+      '   the rafa:pr-triage comment ... was written by stranger, who has no write access to o/r;'
+        + ' it was ignored and nothing in it was read',
+    );
+  });
+
+  it('prints nothing of its own when no comment was passed over', () => {
+    expect(renderTriage(reading())).not.toContain('was ignored');
   });
 });
 

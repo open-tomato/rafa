@@ -32,10 +32,15 @@
  *
  * What it adds over the format module is the {@link LastTriage} record
  * itself, and the author riding on it. WHO wrote the comment is not
- * checked: a marker comment from an account without write access is to
- * be ignored and reported, through `src/board/trust.ts`, which the trust
- * stage wires in. Until then every reader of this record prints the
- * login it found, so a triage nobody trusted is at least attributed.
+ * checked here, and this reading is a DISPLAY: `pr show` prints the
+ * stored class and the login that wrote it, and hands nothing on. The
+ * check lives where the comment is read as a STORE —
+ * `src/commands/pr/triage-trust.ts`, which `rafa pr triage` finds its
+ * marker comment through, dropping an untrusted one and reporting it, so
+ * that neither the stored head, the attempt count nor the follow-up
+ * prompt can come from a planted comment. So a triage `pr show` displays
+ * is always attributed, and one nobody trusted is a login the operator
+ * does not recognise beside a class they did not ask for.
  */
 import type { PullRequestComment } from '../../pr/index.js';
 import type { TriageBlock } from '../../pr/triage/comment.js';

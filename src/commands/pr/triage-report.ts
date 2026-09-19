@@ -32,6 +32,15 @@
  * comment's URL, its author, and the block it carries — which is the
  * spec's "show the comment".
  *
+ * ## An ignored comment is a line of its own
+ *
+ * A marker comment written by an account nobody trusted is dropped
+ * before the reading is built (`./triage-trust.ts`), and its whole
+ * sentence is printed under the re-run line, indented like the other
+ * evidence. That is the REPORT half of "ignored and reported": the
+ * command exits 0 over one, so the only place a person learns a comment
+ * was planted is here and in the `ignored` list json mode carries.
+ *
  * ## An excerpt is quoted, never folded
  *
  * The log excerpt is capped at {@link FAILED_LOG_TAIL_LINES} by the
@@ -48,6 +57,7 @@
  * of every line a person pastes, which in markdown is a code block.
  */
 import type { ConflictFilesReading, FailedLogsReading } from './triage-read.js';
+import type { IgnoredTriageComment } from './triage-trust.js';
 import type { PullRequestDetail } from '../../pr/index.js';
 import type { TriageAssessment } from '../../pr/triage/classify.js';
 import type { TriageBlock, TriageCommentWrite } from '../../pr/triage/comment.js';
@@ -70,6 +80,12 @@ export interface TriageReading {
   readonly detail: PullRequestDetail;
   /** Which of the four re-run readings this was; see the module note. */
   readonly rerun: RerunReading;
+  /**
+   * The marker comments passed over because nobody trusted who wrote
+   * them, newest first, and empty when none was
+   * (`./triage-trust.ts`). One line each; see the module note.
+   */
+  readonly ignored: readonly IgnoredTriageComment[];
   /** What the classifier concluded, or null when this reading assessed nothing. */
   readonly assessment: TriageAssessment | null;
   /** The failing job logs, or null when none was asked for. */
@@ -86,6 +102,11 @@ export interface TriageReading {
   readonly attempts: number;
   /** `--max-attempts`, which a `--resolve` run would stop at. */
   readonly maxAttempts: number;
+}
+
+/** One line per marker comment the trust check passed over; see the module note. */
+function ignoredLines(ignored: readonly IgnoredTriageComment[]): readonly string[] {
+  return ignored.map((comment) => `${INDENT}${comment.reason}`);
 }
 
 /** The evidence the reading carries, or `undefined` when no log was read. */
@@ -242,7 +263,7 @@ export function renderTriage(reading: TriageReading): string {
     ? storedLines(reading)
     : assessedLines(reading, assessment);
   const blocks: readonly (readonly string[])[] = [
-    [headLine(reading.detail), reading.rerun.headline, ...body],
+    [headLine(reading.detail), reading.rerun.headline, ...ignoredLines(reading.ignored), ...body],
     writeLines(reading),
     reading.prompt === null
       ? []
