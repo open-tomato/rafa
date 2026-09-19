@@ -89,9 +89,11 @@
  *     bytes.
  *   - A tree that is not there is SKIPPED, and a tree that is there
  *     with no markdown in it fails the build. `src/board/templates/`
- *     carries no tracked file yet — its first is the spec issue
- *     template a later task adds — and `cp src/board/templates/*.md`
- *     against an absent directory would stop the build today. Measured
+ *     now carries `spec.md`, the spec issue template, and carried no
+ *     tracked file when the clause was written: `cp
+ *     src/board/templates/*.md` against an absent directory would have
+ *     stopped the build, and the guard is what the next empty tree
+ *     needs too. Measured
  *     on bun 1.3.14, in a probe package carrying this clause alone:
  *     with the directory absent, the `[ -d ]` guard skipped it and the
  *     run exited 0; with it present and holding no markdown, the `cp`
@@ -100,11 +102,13 @@
  *
  * That last reading is why the board tree's case reads a PLANTED file:
  * `beforeAll` writes {@link PLANTED_BOARD_TEMPLATE} into the scratch
- * package's `src/board/templates/` before the build runs, so the clause
- * is read on a tree with a file in it without this repository carrying
- * one. When the real template lands, the case reads it too: both tree
- * cases list whatever markdown the scratch package's source tree holds
- * and hold the copy to it byte for byte.
+ * package's `src/board/templates/` before the build runs, and it was
+ * how the clause was read on a tree with a file in it while this
+ * repository carried none. It is kept now that `spec.md` is tracked,
+ * since it is the one file in either tree whose presence the case
+ * itself guarantees: both tree cases list whatever markdown the scratch
+ * package's source tree holds — the real template included — and hold
+ * the copy to it byte for byte.
  *
  * Three mutations of the clause were driven on 2026-09-19, one run of
  * this file each, 44 pass before and after and the manifest restored
@@ -376,7 +380,7 @@ const ASSET_TREES: [string, string][] = [
 
 /**
  * The board template planted into the scratch package before the build,
- * since `src/board/templates/` carries no tracked file yet.
+ * beside the tracked `spec.md`; see the module note on why it is kept.
  */
 const PLANTED_BOARD_TEMPLATE = 'spec-probe.md';
 

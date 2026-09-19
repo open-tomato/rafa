@@ -50,15 +50,20 @@
  *    author, and `ISSUE_VIEW_FIELDS` does not ask for it (`./issue.ts`
  *    records why the field list is the spec's own). Wiring it is a
  *    widening of that read, not a line here.
- *  - The rest of check 2, the completeness gaps
- *    (`requireCompleteSpec`), lands with the spec template, which is
- *    what the headings it looks for come from: the task that adds
- *    `src/board/templates/spec.md` is the one that warns, naming them,
- *    when the two list headings are missing.
+ *  - The rest of check 2, the completeness gaps over every template
+ *    heading (`requireCompleteSpec`), which would REFUSE a body the
+ *    template predates. What is wired instead is the half the spec
+ *    asks for by name: the two list headings, "Tasks the plan must
+ *    carry" and "Definition of done", WARNED about and never refused
+ *    ({@link warnOnThinListSections}). The plan is written from those
+ *    items, so a thin one costs a worse plan and a session, and a
+ *    refusal would stop every spec opened before
+ *    `src/board/templates/spec.md` existed.
  *
- * Until then an issue body those two would have caught still reaches the
- * planner, which judges the spec itself as check 3 and refuses it there
- * (`./gate.ts`). The cost is a session, not a wrong plan.
+ * So an issue body check 0 would have caught, and one whose other four
+ * headings are thin, still reaches the planner, which judges the spec
+ * itself as check 3 and refuses it there (`./gate.ts`). The cost is a
+ * session, not a wrong plan.
  *
  * ## The gate's issue
  *
@@ -75,13 +80,14 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 
+import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGitRunner } from '../pr/git.js';
 
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
-import { requireSpecReadyLabel } from './readiness.js';
+import { findListSectionGaps, listSectionWarning, requireSpecReadyLabel } from './readiness.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
 import { resolveSpecSource } from './spec-source.js';
 
@@ -94,8 +100,25 @@ export function issueSource(issue: number): string {
 }
 
 /**
+ * Warns, once, when either of the two headings the plan is written from
+ * is missing, empty or holds no list item, naming each of them
+ * (`./readiness.ts`). A body carrying both prints nothing.
+ *
+ * It runs AFTER the two refusals and before the snapshot, so a body
+ * that is about to be refused is not also commented on, and a warning
+ * changes neither what is written nor the exit code: `plan create`
+ * carries on and the planner judges the spec as check 3.
+ */
+export function warnOnThinListSections(issue: SpecIssue, output: Output): void {
+  const gaps = findListSectionGaps(issue.body);
+  if (gaps.length === 0) return;
+  output.warn(listSectionWarning(issueSource(issue.number), gaps));
+}
+
+/**
  * The checks that run on an issue as read, before a byte of it is
- * written: the `spec:ready` label, then the leak refusal. Throws
+ * written: the `spec:ready` label, then the leak refusal, then the thin
+ * list sections warned about. Throws
  * `CommandExit({@link BOARD_REFUSAL_EXIT}, ...)` at the first that
  * refuses; the module note holds which checks are here and which are
  * not.
@@ -103,9 +126,10 @@ export function issueSource(issue: number): string {
  * Answers a promise because that is what {@link resolveSpecSource} takes
  * for the seam, and not because anything here waits.
  */
-export function inspectSpecIssue(issue: SpecIssue): Promise<void> {
+export function inspectSpecIssue(issue: SpecIssue, output?: Output): Promise<void> {
   requireSpecReadyLabel(issue.number, issue.labels);
   requireNoLeak(issueSource(issue.number), issue.body);
+  warnOnThinListSections(issue, output ?? activeOutput());
   return Promise.resolve();
 }
 
@@ -158,6 +182,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
   const { repoRoot } = options;
   const gh = options.gh ?? createGhRunner({ cwd: repoRoot });
   const git = options.git ?? createGitRunner(repoRoot);
+  const output = options.output ?? activeOutput();
 
   const resolution = await resolveSpecSource({
     request: options.request,
@@ -167,14 +192,14 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     specsDir: options.specsDir,
     findSpec: options.findSpec,
     issues: createGhSpecIssueReader({ gh }),
-    inspect: inspectSpecIssue,
+    inspect: (issue: SpecIssue) => inspectSpecIssue(issue, output),
     roadmap: {
       configured: options.roadmapIssue,
       search: createGhRoadmapSearch({ gh }),
       git,
       pullRequests: createGhOpenPullRequests({ gh }),
     },
-    output: options.output,
+    output,
   });
 
   if (resolution.outcome === 'stopped') {

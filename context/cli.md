@@ -216,10 +216,25 @@ module's note is the long form.
   (`src/board/plan-spec.ts`): the `spec:ready` label and the leak
   refusal, in that order, both exit 2 and both before the body is
   snapshotted, so `--next` STOPS at a line that is not ready rather than
-  skipping it. Check 0, the author's trust, needs an `author` the read
-  does not ask for, and the completeness gaps land with the spec
-  template; until each does, an issue they would have caught reaches the
-  planner, which judges it as check 3.
+  skipping it. After them, and changing neither what is written nor the
+  exit code, it WARNS when "Tasks the plan must carry" or "Definition of
+  done" is missing, empty or holds no list item, naming each
+  (`findListSectionGaps` and `listSectionWarning` in
+  `src/board/readiness.ts`): the plan is written from those items, and a
+  refusal there would stop every spec opened before the template. Check
+  0, the author's trust, needs an `author` the read does not ask for,
+  and the completeness gaps over the other four headings
+  (`requireCompleteSpec`) are refusals a body the template predates
+  would not survive; until each lands, an issue they would have caught
+  reaches the planner, which judges it as check 3.
+- **The spec issue template is `src/board/templates/spec.md`**, a
+  package asset the build copies to `dist/templates/` and `rafa init
+  --board` writes to `.github/ISSUE_TEMPLATE/spec.md`. Its front matter
+  labels the issue `type:spec`, its first comment line says the issue is
+  public and takes no local path, host or credential, and its six `##`
+  headings are `TEMPLATE_HEADINGS` in that order, which is what the
+  readiness reading recognises. `src/tests/spec-template-source.test.ts`
+  holds the file to the code and the filled template to no gap.
 - **The words `plan create` reads live in `src/board/flags.ts`**, the
   seven of the board routes and the gate, because
   `src/commands/index.test.ts` holds the command's declared flags equal

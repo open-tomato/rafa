@@ -74,6 +74,15 @@
  * content after it, outside any fence. Prose under those two headings is
  * a paragraph about the work, and the plan is written from the items.
  *
+ * Those two are also read on their own, through
+ * {@link findListSectionGaps} and {@link listSectionWarning}: the spec
+ * asks `plan create --issue` to WARN, naming them, when either is
+ * missing, and `./plan-spec.ts` is the caller that prints it. A warning
+ * rather than a refusal because the two are what a plan is written from
+ * and a thin one costs a worse plan, not a wrong run — and because
+ * every spec opened before the template existed would otherwise stop at
+ * the gate.
+ *
  * ## Placeholders, and the documentation problem
  *
  * The spec names four: `TBD`, `TODO`, `???` and an unfilled template
@@ -543,4 +552,45 @@ export function requireCompleteSpec(source: string, body: string): void {
   const gaps = findReadinessGaps(body);
   if (gaps.length === 0) return;
   throw new CommandExit(READINESS_REFUSAL_EXIT, readinessRefusalMessage(source, gaps));
+}
+
+/** What the author must do about a thin list section. */
+const LIST_REMEDY = 'the plan is written from those items, so fill them in and rerun';
+
+/**
+ * The gaps under the two {@link LIST_HEADINGS} alone: each one missing,
+ * empty, or holding no list item. Placeholders are left out — a `TODO`
+ * under a filled list is a gap about the text, not about the list — so
+ * an empty answer means both sections carry something to plan from.
+ *
+ * A gap's `heading` is the template's own spelling
+ * ({@link findReadinessGaps}), which is what makes the filter a string
+ * comparison rather than a second pass over the body.
+ */
+export function findListSectionGaps(body: string): readonly ReadinessGap[] {
+  return findReadinessGaps(body)
+    .filter((gap) => gap.kind !== 'placeholder' && LIST_HEADINGS.includes(gap.heading));
+}
+
+/**
+ * The sentence a body whose list sections are thin is WARNED with: what
+ * `source` names, each of the two headings that is missing, empty or
+ * itemless, and what the author must do.
+ *
+ * A warning and not a refusal, which is the whole of the difference
+ * between this and {@link readinessRefusalMessage}: the spec asks
+ * `plan create --issue` to warn, naming them
+ * (`.specs/rafa-20-pr-commands.md`), and a run that refused here would
+ * stop every spec written before the template existed.
+ *
+ * Throws a `TypeError` for an empty list, as the refusals do: there is
+ * no warning to spell for a body whose lists are filled.
+ */
+export function listSectionWarning(source: string, gaps: readonly ReadinessGap[]): string {
+  if (gaps.length === 0) {
+    throw new TypeError(`board readiness: ${source} carries no thin list section, and has no warning to name`);
+  }
+
+  const named = gaps.map(describeGap).join(', ');
+  return `${source} gives the planner no list to plan from: ${named}; ${LIST_REMEDY}`;
 }

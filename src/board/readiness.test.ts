@@ -1,7 +1,8 @@
 /**
  * Tests for the board readiness checks (`src/board/readiness.ts`): the
  * `spec:ready` label, every template heading, the two list sections, the
- * placeholders, the heading each gap is named with, and the refusal.
+ * placeholders, the heading each gap is named with, the refusal, and the
+ * warning the two list sections are read on their own for.
  *
  * Both halves are pure, so there is no seam to plant: a label list in
  * and a boolean out, a body in and a list of gaps out. No case touches
@@ -28,8 +29,9 @@
  *
  * Twelve mutations of `readiness.ts` were driven against this file on
  * 2026-09-19, one at a time, the module restored from a scratch copy
- * and verified with `shasum -c` after each. 35 pass either side, and
- * each count below is that run's own:
+ * and verified with `shasum -c` after each. Those runs are the file as
+ * it stood BEFORE the list-section group below was added, 35 pass
+ * either side, and each count is that run's own:
  *
  *  - `hasSpecReadyLabel` answering true always, so every issue is
  *    ready: 3 fail, the whole label group.
@@ -66,8 +68,10 @@ import { describe, expect, it } from 'bun:test';
 import { CommandExit } from '../cli/command.js';
 
 import {
+  findListSectionGaps,
   findReadinessGaps,
   hasSpecReadyLabel,
+  listSectionWarning,
   LIST_HEADINGS,
   PLACEHOLDER_TOKENS,
   PREAMBLE_HEADING,
@@ -369,5 +373,47 @@ describe('the refusal sentence', () => {
     expect(thrown).toBeInstanceOf(CommandExit);
     expect((thrown as CommandExit).exitCode).toBe(2);
     expect((thrown as CommandExit).message).toBe(readinessRefusalMessage('issue #20', findReadinessGaps(body)));
+  });
+});
+
+describe('the two list sections read on their own', () => {
+  it('answers nothing for a body whose two sections both hold an item', () => {
+    expect(findListSectionGaps(bodyWith())).toEqual([]);
+  });
+
+  it('answers each of the two missing, empty or itemless, and only those', () => {
+    const body = bodyWith({
+      Design: null,
+      'Tasks the plan must carry': null,
+      'Definition of done': 'Prose alone, and no item.',
+    });
+
+    expect(findListSectionGaps(body).map((gap) => `${gap.kind} ${gap.heading}`)).toEqual([
+      'missing-heading Tasks the plan must carry',
+      'no-list-item Definition of done',
+    ]);
+    expect(findListSectionGaps(bodyWith({ 'Definition of done': '' })).map((gap) => gap.kind))
+      .toEqual(['empty-heading']);
+  });
+
+  it('leaves a placeholder under a filled section out, where the refusal keeps it', () => {
+    const body = bodyWith({ 'Definition of done': '- the gate refuses TODO bodies' });
+
+    expect(findListSectionGaps(body)).toEqual([]);
+    expect(findReadinessGaps(body).map((gap) => gap.kind)).toEqual(['placeholder']);
+  });
+
+  it('is warned about naming the source, each heading and what to do', () => {
+    const body = bodyWith({ 'Tasks the plan must carry': null, 'Definition of done': 'Prose alone.' });
+    const message = listSectionWarning('issue #20', findListSectionGaps(body));
+
+    expect(message).toContain('issue #20');
+    expect(message).toContain('"Tasks the plan must carry" is missing');
+    expect(message).toContain('"Definition of done" holds no list item');
+    expect(message).toContain('fill them in and rerun');
+  });
+
+  it('refuses to be spelled for a body whose lists are filled', () => {
+    expect(() => listSectionWarning('issue #20', [])).toThrow(TypeError);
   });
 });

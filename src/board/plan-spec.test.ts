@@ -1,6 +1,7 @@
 /**
  * Tests for the board side of `plan create` (`src/board/plan-spec.ts`):
- * the seams it builds, the two checks it runs on an issue as read, and
+ * the seams it builds, the two checks it runs on an issue as read, the
+ * warning it prints about the two headings a plan is written from, and
  * the gate issue it answers beside the spec.
  *
  * `./spec-source.test.ts` drives the routes themselves over planted
@@ -29,10 +30,28 @@
  * scratch copy and verified with `shasum -c`: the `inspect` seam left
  * unfilled, so the checks never run, left 6 pass and 2 fail against 8
  * pass either side — the label refusal and the leak refusal, and nothing
- * else, since no other case turns on them.
+ * else, since no other case turns on them. That run is the file as it
+ * stood before the warning group was added, which turns on the same
+ * seam and would redden with them.
+ *
+ * ## The warning, and how it could pass while wrong
+ *
+ * The warning is a LINE and nothing else: it changes no exit code, no
+ * file and no answer, so a wiring that dropped it would redden nothing
+ * unless a case read the output. The three cases below do — one holding
+ * both headings named, one control over a body carrying both, and one
+ * over an issue a refusal already stopped — and every other case in
+ * this file plants the silent output, whose planted bodies carry
+ * neither heading and would otherwise each print one.
+ *
+ * Driven on 2026-09-19, the module restored from a scratch copy and
+ * verified with `shasum -c`: the `warnOnThinListSections` call dropped
+ * from `inspectSpecIssue` left 9 pass and 2 fail against 11 pass, the
+ * two cases that read a warning and nothing else.
  */
 import type { SpecIssue } from './issue.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -129,12 +148,44 @@ function plantedGit(): { git: GitRunner; sent: () => readonly string[] } {
 /** An output that keeps nothing; the lines are `./spec-source.test.ts`'s subject. */
 const OUTPUT = sinkOutput({});
 
+/** What a case varies about one resolution. */
+interface PlanSpecFields {
+  readonly refresh?: boolean;
+  readonly dryRun?: boolean;
+  readonly roadmapIssue?: number | null;
+  /** Where the lines go, for a case reading them; the silent one otherwise. */
+  readonly output?: Output;
+}
+
+/** An output keeping every warning, for the cases that read one. */
+function warningSink(): { output: Output; warnings: () => readonly string[] } {
+  let warnings: readonly string[] = [];
+  const output = sinkOutput({ warn: (message) => { warnings = [...warnings, message]; } });
+  return { output, warnings: () => warnings };
+}
+
+/** A body carrying both list headings with an item under each. */
+function plannableBody(number: number): string {
+  return [
+    `# Issue ${String(number)}`,
+    '',
+    '## Tasks the plan must carry',
+    '',
+    '- add the module',
+    '',
+    '## Definition of done',
+    '',
+    '- bun test is green',
+    '',
+  ].join('\n');
+}
+
 /** What {@link resolvePlanSpec} is asked for one planted board. */
 function ask(
   request: Parameters<typeof resolvePlanSpec>[0]['request'],
   gh: GhRunner,
   git: GitRunner,
-  fields: { readonly refresh?: boolean; readonly dryRun?: boolean; readonly roadmapIssue?: number | null } = {},
+  fields: PlanSpecFields = {},
 ): ReturnType<typeof resolvePlanSpec> {
   return resolvePlanSpec({
     request,
@@ -146,7 +197,7 @@ function ask(
     findSpec: (spec) => spec,
     gh,
     git,
-    output: OUTPUT,
+    output: fields.output ?? OUTPUT,
   });
 }
 
@@ -258,12 +309,50 @@ describe('the checks one issue passes', () => {
   it('weighs the label before the leak, so an unready leaking issue is named unready', async () => {
     const both = issueOf(20, { labels: [SPEC_LABEL], body: 'Run it in /Users/ada/checkouts/rafa.\n' });
 
-    const refused = await refusal(() => inspectSpecIssue(both));
+    const refused = await refusal(() => inspectSpecIssue(both, OUTPUT));
 
     expect(refused.message).toBe(specReadyRefusalMessage(20));
   });
 
   it('lets an issue that is labelled and carries no leak through', async () => {
-    await expect(inspectSpecIssue(issueOf(20))).resolves.toBeUndefined();
+    await expect(inspectSpecIssue(issueOf(20), OUTPUT)).resolves.toBeUndefined();
+  });
+});
+
+describe('the warning about the two headings a plan is written from', () => {
+  it('names both when the body carries neither, and says nothing when it carries both', async () => {
+    const thin = warningSink();
+    await inspectSpecIssue(issueOf(20), thin.output);
+
+    expect(thin.warnings()).toHaveLength(1);
+    expect(thin.warnings()[0]).toContain('issue #20');
+    expect(thin.warnings()[0]).toContain('"Tasks the plan must carry" is missing');
+    expect(thin.warnings()[0]).toContain('"Definition of done" is missing');
+
+    // The control: the same call over a body carrying both warns about nothing.
+    const filled = warningSink();
+    await inspectSpecIssue(issueOf(20, { body: plannableBody(20) }), filled.output);
+    expect(filled.warnings()).toEqual([]);
+  });
+
+  it('is printed on the issue route, and changes neither the snapshot nor the answer', async () => {
+    const heard = warningSink();
+    const board = plantedGh([issueOf(20)]);
+
+    const resolved = await ask({ kind: 'issue', issue: 20 }, board.gh, plantedGit().git, { output: heard.output });
+
+    expect(heard.warnings()).toHaveLength(1);
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(resolved.spec.issue).toBe(20);
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(true);
+  });
+
+  it('is not printed over an issue a refusal already stopped', async () => {
+    const heard = warningSink();
+    const board = plantedGh([issueOf(20, { labels: [SPEC_LABEL] })]);
+
+    await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, plantedGit().git, { output: heard.output }));
+
+    expect(heard.warnings()).toEqual([]);
   });
 });
