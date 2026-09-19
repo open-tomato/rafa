@@ -38,19 +38,19 @@ is copied there as well.
 
 ### Tables outside the port
 
-`findings`, `blockers`, `out_of_scope_bugs`, `report_absences`,
-`task_reports`, `preflight` and `dispatches` are SQLite-only and stay out
-of the port's row map. Each arrives as a new `SQLITE_MIGRATIONS` entry, is written
-under the `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
-`effort.sqlite` whatever `store` selects. A writer that can be left with
-nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
-`writeTriage` and `writePreflightChecks` do, so an empty write on a store
-that exists still meets the schema check. `writeReportAbsence` always has
-its one row and opens `withSqliteStore` directly, as `writeTrackerRef`
-does. `writeTaskReport`
-always has its one row too, and passes `writeSqliteStore` a count of
-one, which opens the store as that direct call does; so does
-`writeDispatch` (`store/dispatches.ts`).
+`findings`, `blockers`, `out_of_scope_bugs`, `changes`,
+`report_absences`, `task_reports`, `preflight` and `dispatches` are
+SQLite-only and stay out of the port's row map. Each arrives as a new
+`SQLITE_MIGRATIONS` entry, is written under the `sqliteStorePath` that
+`store/sqlite.ts` exports, and lands in `effort.sqlite` whatever `store`
+selects. A writer that can be left with nothing to insert goes through
+`writeSqliteStore`, as `writeFindings`, `writeTriage`, `writeChanges`
+and `writePreflightChecks` do, so an empty write on a store that exists
+still meets the schema check. `writeReportAbsence` always has its one
+row and opens `withSqliteStore` directly, as `writeTrackerRef` does.
+`writeTaskReport` always has its one row too, and passes
+`writeSqliteStore` a count of one, which opens the store as that direct
+call does; so does `writeDispatch` (`store/dispatches.ts`).
 `readTaskReportTallies` reads that table back for `rafa effort report`,
 under the repo root whatever `store` selects, and opens nothing when the
 file is absent; `readPreflightHalts` reads `preflight` back the same way,
@@ -60,9 +60,10 @@ and `readSessionBudgets` the `dispatches` rows carrying a budget.
 of `rafa loop status`.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
-`reports.test.ts`, `preflight.test.ts` and `dispatches.test.ts`, and the
-filter the version-5 case of `preflight.test.ts` takes the later tables
-out with.
+`reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts` and
+`changes.test.ts`, and the filter the version-5 case of
+`preflight.test.ts` takes the later tables out with, beside the
+version-7 filter of `changes.test.ts`.
 
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
@@ -71,6 +72,14 @@ parser could use and the flags the session was spawned with, whatever
 became of the task, and then the report; a refused dispatch row stores no
 report. No column holds the outcome: `task_reports` and `report_absences`
 hold it under the same session id.
+
+**`changes` is the one report table with no `outcome` column.** A
+change note is about the diff, not about how the session ended, so
+`store/changes.ts` passes `checkDispatch` a null outcome and only the
+dispatch is checked; the session's verdict is in `task_reports` under
+the same session id. Its rows are deduplicated per session by every
+stored field — `level`, `area` and `summary` — as `triage` dedupes, not
+by an artifact.
 
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row
