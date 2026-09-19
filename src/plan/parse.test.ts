@@ -32,7 +32,7 @@ import { resolveDeclarationFlags } from '../utils/declaration.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import { isRafaBlockKind, readRafaBlocks } from './blocks.js';
-import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from './parse.js';
+import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS, PLAN_RELEASE_LEVELS } from './parse.js';
 
 /** No agent definition here declares an effort of its own. */
 const NO_OWN_EFFORT: AgentEffortLookup = () => false;
@@ -125,10 +125,14 @@ const PLAN_LINES = [
 const PLAN = doc(...PLAN_LINES);
 
 describe('the kinds and fields read', () => {
-  it('are three kinds the block reader knows, and three header fields', () => {
+  it('are three kinds the block reader knows, and four header fields', () => {
     expect(PLAN_BLOCK_KINDS).toEqual(['plan', 'context', 'stage-context']);
     for (const kind of PLAN_BLOCK_KINDS) expect(isRafaBlockKind(kind)).toBe(true);
-    expect(PLAN_HEADER_FIELDS).toEqual(['stub', 'issue', 'spec']);
+    expect(PLAN_HEADER_FIELDS).toEqual(['stub', 'issue', 'spec', 'release']);
+  });
+
+  it('hold the release field to four levels, none among them', () => {
+    expect(PLAN_RELEASE_LEVELS).toEqual(['patch', 'minor', 'major', 'none']);
   });
 });
 
@@ -140,6 +144,7 @@ describe('a plan', () => {
       stub: 'my-feature',
       issue: 'OPT-123',
       spec: '.specs/my-feature.md',
+      release: null,
       extras: [],
     });
     expect(model.context).toBe('Prose the loop injects into EVERY task.');
@@ -226,7 +231,7 @@ describe('a plan', () => {
 describe('a plan with no block', () => {
   it('reads a bare checklist with a null header and context, and reports nothing', () => {
     const model = parsePlan(doc('# Plan: Old', '', '# Stage: one', '- [ ] Task A', '- [x] Task B'));
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
     expect(model.context).toBeNull();
     expect(model.blocks).toEqual([]);
     expect(model.issues).toEqual([]);
@@ -239,7 +244,7 @@ describe('a plan with no block', () => {
 
   it('reads an empty document as an empty plan', () => {
     expect(parsePlan('')).toEqual({
-      header: { stub: null, issue: null, spec: null, extras: [] },
+      header: { stub: null, issue: null, spec: null, release: null, extras: [] },
       context: null,
       stages: [],
       tasks: [],
@@ -261,7 +266,7 @@ describe('a rafa: fence opened mid-paragraph', () => {
     const model = parsePlan(midParagraph);
     expect(model.blocks).toEqual([]);
     expect(model.context).toBeNull();
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
     expect(stageNamesOf(model)).toEqual(['one']);
     expect(textsOf(model)).toEqual(['A']);
     expect(model.issues).toEqual([]);
@@ -398,7 +403,7 @@ describe('a task line inside a rafa block', () => {
 describe('the header', () => {
   it('reads each field through a trailing comment', () => {
     const model = header('stub: a   # the plan', 'issue: OPT-1   # optional', 'spec: s.md');
-    expect(model.header).toEqual({ stub: 'a', issue: 'OPT-1', spec: 's.md', extras: [] });
+    expect(model.header).toEqual({ stub: 'a', issue: 'OPT-1', spec: 's.md', release: null, extras: [] });
     expect(model.issues).toEqual([]);
   });
 
@@ -408,6 +413,7 @@ describe('the header', () => {
       stub: 'a',
       issue: null,
       spec: null,
+      release: null,
       extras: [
         { key: 'tracker', value: 'linear' },
         { key: 'depth', value: 2 },
@@ -425,6 +431,10 @@ describe('the header', () => {
     ['a spec written as a mapping', 'spec', 'spec:\n  path: a', 'spec: a', 'a'],
     ['a blank spec', 'spec', 'spec: "  "', 'spec: " a "', ' a '],
     ['a stub no plan stamp can carry', 'stub', 'stub: my feature', 'stub: my-feature', 'my-feature'],
+    ['a release level capitalised', 'release', 'release: Patch', 'release: patch', 'patch'],
+    ['a release level that is no level', 'release', 'release: weekly', 'release: major', 'major'],
+    ['a release level written as a number', 'release', 'release: 2', 'release: minor', 'minor'],
+    ['a release level padded inside quotes', 'release', 'release: "  patch  "', 'release: patch', 'patch'],
   ] as const)('leaves the field null for %s, and reads the near miss', (_label, field, bad, good, value) => {
     const refused = header(bad);
     expect(refused.header[field]).toBeNull();
@@ -441,13 +451,45 @@ describe('the header', () => {
 
   it('reads the other fields beside an unusable one', () => {
     const model = header('stub: my-feature', 'issue: 42', 'spec: s.md');
-    expect(model.header).toEqual({ stub: 'my-feature', issue: null, spec: 's.md', extras: [] });
+    expect(model.header).toEqual({ stub: 'my-feature', issue: null, spec: 's.md', release: null, extras: [] });
+    expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
+  });
+
+  it.each([...PLAN_RELEASE_LEVELS])('reads release: %s as the level it spells, and nothing else', (level) => {
+    const model = header(`release: ${level}`);
+    expect(model.header.release).toBe(level);
+    expect(model.header.extras).toEqual([]);
+    expect(model.issues).toEqual([]);
+  });
+
+  it('tells a declared none from a plan that declares no release at all', () => {
+    expect(header('release: none').header.release).toBe('none');
+    expect(header('stub: a').header.release).toBeNull();
+    expect(header('stub: a').issues).toEqual([]);
+  });
+
+  it('names the four levels when the release is not one of them', () => {
+    expect(header('release: weekly').issues[0]?.text)
+      .toBe('rafa:plan release is "weekly", not one of patch, minor, major, none');
+    expect(header('release: 2').issues[0]?.text)
+      .toBe('rafa:plan release is 2, not one of patch, minor, major, none');
+  });
+
+  it('reads the other fields beside an unusable release', () => {
+    const model = header('stub: my-feature', 'release: weekly', 'spec: s.md');
+    expect(model.header).toEqual({
+      stub: 'my-feature',
+      issue: null,
+      spec: 's.md',
+      release: null,
+      extras: [],
+    });
     expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
   });
 
   it('reports a body that is not YAML against the opening fence, and reads the near miss', () => {
     const model = parsePlan(doc('# Plan: x', '```rafa:plan', 'stub: [a', '```'));
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
     expect(reasonsOf(model)).toEqual([['malformed-header', 2]]);
     expect(model.issues[0]?.text).toContain('not valid YAML');
     expect(header('stub: a').header.stub).toBe('a');
@@ -459,7 +501,7 @@ describe('the header', () => {
     ['two documents', ['stub: a', '---', 'stub: b']],
   ])('reports a body holding %s, which is no mapping of fields', (_label, lines) => {
     const model = header(...lines);
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
     expect(reasonsOf(model)).toEqual([['malformed-header', 1]]);
   });
 
@@ -469,7 +511,7 @@ describe('the header', () => {
     ['a blank line', ['']],
   ])('reads a body holding %s as a header that says nothing', (_label, lines) => {
     const model = header(...lines);
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
     expect(model.issues).toEqual([]);
     expect(model.blocks).toHaveLength(1);
   });
@@ -729,7 +771,7 @@ describe('a real plan file on disk', () => {
   const model = parsePlan(readFileSync(PATH, 'utf8'));
 
   it('reads no rafa:* block and reports nothing, so the checklist alone is under test', () => {
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
     expect(model.context).toBeNull();
     expect(model.blocks).toEqual([]);
     expect(model.issues).toEqual([]);
