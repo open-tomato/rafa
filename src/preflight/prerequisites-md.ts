@@ -28,7 +28,7 @@
  *
  * ## What the copy changes
  *
- * Each change is a file the source reads wrongly, and
+ * Most are a file the source reads wrongly, and
  * `prerequisites-md.test.ts` holds each beside a control.
  *
  *   - **A heading ends the section above it at its own level.** The
@@ -54,6 +54,24 @@
  *     item `PrerequisiteItem`, and `probeCommand?: string` is
  *     `probe: string | null`, the spelling that item uses. A span holding
  *     only whitespace is no probe.
+ *   - **A `[start]` item is probed on a plan's first dispatch alone.** An
+ *     item naming the state a run begins from — the sibling checkout
+ *     holding no uncommitted change, say — is true before the first
+ *     dispatch and false on every resume, because the run itself changed
+ *     that state. The source has no spelling for it: every probed item is
+ *     probed on every dispatch, so such an item halts the resume it was
+ *     written to guard. Here `[start]` is a third tag, written after an
+ *     item's box or on a heading exactly as `[auto]` is, whose probed
+ *     items land on {@link PlanPrerequisites.startRequired} rather than
+ *     `required`, for a caller that probes that list on a first dispatch
+ *     and skips it on a resume. Running them, and deciding which dispatch
+ *     this is, is no more this module's than running a probe is. Only the
+ *     bracketed `[start]` reads as the tag: a heading merely NAMING a
+ *     start, a `## Starting position` among a plan's sections, keeps the
+ *     tag it would have had, since a fuzzy match there would quietly move
+ *     items off the tier that halts a run. `[auto]` is still tested
+ *     first, so a heading carrying both reads `auto`, the tier probed
+ *     every time.
  *
  * ## What an item becomes
  *
@@ -64,12 +82,15 @@
  *     failure halts a run. Its `name` is the item's description and its
  *     `kind` is `tool`, the kind whose probe is a command. Every such item
  *     carries its probe, so its kind names nothing a check needs.
+ *   - A `start` item with a probe is a REQUIRED item too, held on
+ *     {@link PlanPrerequisites.startRequired} instead, the tier a caller
+ *     probes on a first dispatch and skips on a resume.
  *   - A `human` item is a {@link PrerequisiteReminder}: a line to print,
  *     held in neither tier, so it cannot halt a run. Plans carry unticked
  *     steps for after the merge, and those must not stop one.
- *   - An `auto` item with no probe is a reminder too, tagged `auto`. With
- *     nothing to run the source's checker asked a human, and here the
- *     item is named rather than dropped.
+ *   - An `auto` or `start` item with no probe is a reminder too, carrying
+ *     its own tag. With nothing to run the source's checker asked a
+ *     human, and here the item is named rather than dropped.
  *
  * Nothing becomes an OPTIONAL item: the markdown has no spelling for one.
  *
@@ -77,8 +98,10 @@
  *
  * {@link mergePlanPrerequisites} answers a new set: the config's required
  * items followed by the plan's, the config's optional items, and the
- * plan's reminders. The settings handed in are never written to, so a
- * merge for one plan leaves nothing behind for the next.
+ * plan's start-only items and reminders. The config has no spelling for a
+ * start-only item, so that list is the plan's alone. The settings handed
+ * in are never written to, so a merge for one plan leaves nothing behind
+ * for the next.
  *
  * {@link prerequisitesPathForPlan} names the file a plan's merge reads,
  * `PREREQUISITES-<stub>.md` beside `PLAN-<stub>.md`, where
@@ -100,8 +123,11 @@ import { basename, dirname, join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
 
-/** How a PREREQUISITES item is checked: by its probe, or by a human. */
-export type PrerequisiteTag = 'auto' | 'human';
+/**
+ * How a PREREQUISITES item is checked: by its probe on every dispatch, by
+ * its probe on a plan's first dispatch alone, or by a human.
+ */
+export type PrerequisiteTag = 'auto' | 'human' | 'start';
 
 /** One unticked item of a PREREQUISITES file; see the module note. */
 export interface MarkdownPrerequisite {
@@ -113,7 +139,7 @@ export interface MarkdownPrerequisite {
   tag: PrerequisiteTag;
   /** Where its first line sits, counted from 0. */
   lineIndex: number;
-  /** The first backticked span of an `auto` item, trimmed; else null. */
+  /** The first backticked span of a probed item, trimmed; else null. */
   probe: string | null;
 }
 
@@ -121,7 +147,7 @@ export interface MarkdownPrerequisite {
 export interface PrerequisiteReminder {
   /** The item's text, as {@link MarkdownPrerequisite.description}. */
   description: string;
-  /** `human`, or `auto` for an item with no probe to run. */
+  /** `human`, or `auto`/`start` for an item with no probe to run. */
   tag: PrerequisiteTag;
   /** Where the item's first line sits, counted from 1 as `grep -n` does. */
   line: number;
@@ -131,6 +157,8 @@ export interface PrerequisiteReminder {
 export interface PlanPrerequisites {
   /** Its `auto` items that carry a probe, as required items. */
   required: readonly PrerequisiteItem[];
+  /** Its `start` items that carry a probe; see the module note. */
+  startRequired: readonly PrerequisiteItem[];
   /** Its other unticked items. */
   reminders: readonly PrerequisiteReminder[];
 }
@@ -151,11 +179,13 @@ export type PrerequisiteSettings = Pick<
 type HeadingScope = readonly (PrerequisiteTag | null)[];
 
 const SECTION_AUTO_RE = /\[auto\]/i;
+const SECTION_START_RE = /\[start\]/i;
 const SECTION_HUMAN_RE = /\[human\]|manual|human|sign.?off|team/i;
 
 const ITEM_RE = /^-\s+\[\s*\]\s+/;
 const INLINE_AUTO_RE = /^-\s+\[\s*\]\s+\[auto\]\s+/i;
 const INLINE_HUMAN_RE = /^-\s+\[\s*\]\s+\[human\]\s+/i;
+const INLINE_START_RE = /^-\s+\[\s*\]\s+\[start\]\s+/i;
 const BACKTICK_RE = /`([^`]+)`/;
 
 const HEADING_MARKS_RE = /^#+/;
@@ -166,6 +196,7 @@ const PLAN_FILE_RE = /^PLAN-(.+)\.md$/;
 /** The tag a heading gives its section, or null when it names none. */
 function inferSectionTag(header: string): PrerequisiteTag | null {
   if (SECTION_AUTO_RE.test(header)) return 'auto';
+  if (SECTION_START_RE.test(header)) return 'start';
   if (SECTION_HUMAN_RE.test(header)) return 'human';
   return null;
 }
@@ -221,6 +252,7 @@ function continuationOf(lines: readonly string[], start: number): string[] {
 /** The tag written right after an item's box, or null when there is none. */
 function inlineTag(line: string): PrerequisiteTag | null {
   if (INLINE_AUTO_RE.test(line)) return 'auto';
+  if (INLINE_START_RE.test(line)) return 'start';
   if (INLINE_HUMAN_RE.test(line)) return 'human';
   return null;
 }
@@ -230,8 +262,14 @@ function stripItemPrefix(line: string): string {
   return line
     .replace(INLINE_AUTO_RE, '')
     .replace(INLINE_HUMAN_RE, '')
+    .replace(INLINE_START_RE, '')
     .replace(ITEM_RE, '')
     .trim();
+}
+
+/** True when a tag's item carries a probe; a `human` item never does. */
+function isProbedTag(tag: PrerequisiteTag): boolean {
+  return tag === 'auto' || tag === 'start';
 }
 
 /** The first backticked span of `description`, trimmed, or null. */
@@ -249,7 +287,7 @@ function readItem(
   const raw = lines[lineIndex] ?? '';
   const tag = inlineTag(raw) ?? inherited;
   const description = [stripItemPrefix(raw), ...continuationOf(lines, lineIndex + 1)].join(' ');
-  const probe = tag === 'auto'
+  const probe = isProbedTag(tag)
     ? extractProbe(description)
     : null;
   return Object.freeze({ raw, description, tag, lineIndex, probe });
@@ -286,14 +324,23 @@ export function parsePrerequisites(content: string): readonly MarkdownPrerequisi
   return Object.freeze(items);
 }
 
-/** An item the preflight can run: tagged `auto`, carrying a probe. */
+/** An item the preflight can run: tagged `auto` or `start`, carrying a probe. */
 function isProbed(item: MarkdownPrerequisite): item is MarkdownPrerequisite & { probe: string } {
-  return item.tag === 'auto' && item.probe !== null;
+  return isProbedTag(item.tag) && item.probe !== null;
 }
 
 /** A probed item as a required item; see the module note. */
 function requiredItem(item: MarkdownPrerequisite & { probe: string }): PrerequisiteItem {
   return Object.freeze({ kind: 'tool', name: item.description, probe: item.probe });
+}
+
+/** The probed items of `items` tagged `tag`, frozen, in file order. */
+function requiredItemsTagged(
+  items: readonly MarkdownPrerequisite[],
+  tag: PrerequisiteTag,
+): readonly PrerequisiteItem[] {
+  const probed = items.filter(isProbed).filter((item) => item.tag === tag);
+  return Object.freeze(probed.map(requiredItem));
 }
 
 /** An item the preflight only names. */
@@ -303,13 +350,15 @@ function reminderOf(item: MarkdownPrerequisite): PrerequisiteReminder {
 
 /**
  * What a PREREQUISITES file adds to a run: its probed `auto` items as
- * required items and its other unticked items as reminders, each list
- * in file order and frozen.
+ * required items, its probed `start` items as start-only required items,
+ * and its other unticked items as reminders, each list in file order and
+ * frozen.
  */
 export function planPrerequisites(content: string): PlanPrerequisites {
   const items = parsePrerequisites(content);
   return Object.freeze({
-    required: Object.freeze(items.filter(isProbed).map(requiredItem)),
+    required: requiredItemsTagged(items, 'auto'),
+    startRequired: requiredItemsTagged(items, 'start'),
     reminders: Object.freeze(items.filter((item) => !isProbed(item)).map(reminderOf)),
   });
 }
@@ -327,6 +376,7 @@ export function mergePlanPrerequisites(
   const plan = planPrerequisites(content ?? '');
   return Object.freeze({
     required: Object.freeze([...settings.prerequisitesRequired, ...plan.required]),
+    startRequired: plan.startRequired,
     optional: Object.freeze([...settings.prerequisitesOptional]),
     reminders: plan.reminders,
   });

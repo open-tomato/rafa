@@ -13,7 +13,9 @@
  * reads nothing: a sibling heading ending an `auto` section beside a
  * deeper heading inheriting it; a probe on an item's second line beside
  * the same line after a blank one; a fenced item and comment beside the
- * same lines unfenced.
+ * same lines unfenced; a `[start]` item beside the same item tagged
+ * `[auto]`, and a heading naming a start without brackets beside one
+ * carrying them.
  *
  * The mapping, the merge and the loader follow. The merge reads a config
  * resolved by the real config reader. No case reads a plan under
@@ -331,6 +333,68 @@ describe('parsePrerequisites: what the copy changes', () => {
     expect(items[0]?.probe).toBeNull();
   });
 
+  it('reads an inline [start] item as tagged start, with its probe', () => {
+    const items = parsePrerequisites('- [ ] [start] Sibling clean: `git -C ../skills status --porcelain`\n');
+    expect(items.map((item) => [item.description, item.tag, item.probe])).toEqual([
+      ['Sibling clean: `git -C ../skills status --porcelain`', 'start', 'git -C ../skills status --porcelain'],
+    ]);
+  });
+
+  it('reads the same item tagged [auto] as tagged auto, with the same probe', () => {
+    const items = parsePrerequisites('- [ ] [auto] Sibling clean: `git -C ../skills status --porcelain`\n');
+    expect(items.map((item) => [item.tag, item.probe])).toEqual([
+      ['auto', 'git -C ../skills status --porcelain'],
+    ]);
+  });
+
+  it('inherits start from a heading carrying [start]', () => {
+    const content = '## Before the first dispatch [start]\n\n- [ ] Sibling clean (`git status`)\n';
+    const items = parsePrerequisites(content);
+    expect(items.map((item) => [item.tag, item.probe])).toEqual([['start', 'git status']]);
+  });
+
+  it('keeps a start section over a deeper heading with no tag of its own', () => {
+    const content = '## Start state [start]\n\n### Siblings\n\n- [ ] Sibling clean (`git status`)\n';
+    const items = parsePrerequisites(content);
+    expect(items.map((item) => [item.tag, item.probe])).toEqual([['start', 'git status']]);
+  });
+
+  it('does not read a heading that names a start without brackets as start', () => {
+    const content = '## Starting position, restated at the start\n\n- [ ] Sibling clean (`git status`)\n';
+    const items = parsePrerequisites(content);
+    expect(items.map((item) => [item.tag, item.probe])).toEqual([['human', null]]);
+  });
+
+  it('lets an inline tag override a [start] heading, and [start] override any other', () => {
+    const content = [
+      '## Before the first dispatch [start]',
+      '',
+      '- [ ] [auto] Bun (`bun --version`)',
+      '- [ ] [human] Lead approves (`echo approved`)',
+      '',
+      '## Checks [auto]',
+      '',
+      '- [ ] [start] Sibling clean (`git status`)',
+      '',
+      '## Manual steps',
+      '',
+      '- [ ] [start] Sibling clean again (`git status`)',
+    ].join('\n');
+
+    const items = parsePrerequisites(content);
+    expect(items.map((item) => [item.tag, item.probe])).toEqual([
+      ['auto', 'bun --version'],
+      ['human', null],
+      ['start', 'git status'],
+      ['start', 'git status'],
+    ]);
+  });
+
+  it('reads a heading carrying both [auto] and [start] as auto', () => {
+    const content = '## Checks [auto] [start]\n\n- [ ] Bun (`bun --version`)\n';
+    expect(parsePrerequisites(content).map((item) => item.tag)).toEqual(['auto']);
+  });
+
   it('answers a frozen list of frozen items', () => {
     const items = parsePrerequisites('- [ ] [auto] Bun (`bun --version`)\n');
     expect(Object.isFrozen(items)).toBe(true);
@@ -386,6 +450,49 @@ describe('planPrerequisites', () => {
     expect(plan.reminders).toEqual([]);
   });
 
+  it('maps a start item with a probe to a start-only required item and never to a required one', () => {
+    const plan = planPrerequisites('- [ ] [start] Sibling clean: `git status`\n');
+    expect(plan.required).toEqual([]);
+    expect(plan.startRequired).toEqual([
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status' },
+    ]);
+    expect(plan.reminders).toEqual([]);
+  });
+
+  it('maps the same item tagged [auto] to a required item and leaves the start tier empty', () => {
+    const plan = planPrerequisites('- [ ] [auto] Sibling clean: `git status`\n');
+    expect(plan.required).toEqual([
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status' },
+    ]);
+    expect(plan.startRequired).toEqual([]);
+  });
+
+  it('maps a start item with no probe to a reminder tagged start', () => {
+    const plan = planPrerequisites('- [ ] [start] The sibling checkout has nothing uncommitted\n');
+    expect(plan.required).toEqual([]);
+    expect(plan.startRequired).toEqual([]);
+    expect(plan.reminders).toEqual([
+      { description: 'The sibling checkout has nothing uncommitted', tag: 'start', line: 1 },
+    ]);
+  });
+
+  it('keeps each tier in file order and holds no item on two tiers', () => {
+    const content = [
+      '## Checks [auto]',
+      '',
+      '- [ ] Bun (`bun --version`)',
+      '- [ ] [start] Sibling clean (`git status`)',
+      '- [ ] gh logged in (`gh auth status`)',
+      '- [ ] [start] Tracker absent (`test ! -e tracker`)',
+      '- [ ] [human] Lead approves',
+    ].join('\n');
+
+    const plan = planPrerequisites(content);
+    expect(plan.required.map((item) => item.probe)).toEqual(['bun --version', 'gh auth status']);
+    expect(plan.startRequired.map((item) => item.probe)).toEqual(['git status', 'test ! -e tracker']);
+    expect(plan.reminders.map((reminder) => reminder.description)).toEqual(['Lead approves']);
+  });
+
   it('answers frozen lists of frozen entries', () => {
     const plan = planPrerequisites('- [ ] [auto] Bun (`bun --version`)\n- [ ] Backup confirmed\n');
     expect(Object.isFrozen(plan)).toBe(true);
@@ -393,6 +500,12 @@ describe('planPrerequisites', () => {
     expect(Object.isFrozen(plan.required[0])).toBe(true);
     expect(Object.isFrozen(plan.reminders)).toBe(true);
     expect(Object.isFrozen(plan.reminders[0])).toBe(true);
+  });
+
+  it('answers a frozen start tier of frozen entries', () => {
+    const plan = planPrerequisites('- [ ] [start] Sibling clean (`git status`)\n');
+    expect(Object.isFrozen(plan.startRequired)).toBe(true);
+    expect(Object.isFrozen(plan.startRequired[0])).toBe(true);
   });
 });
 
@@ -437,11 +550,27 @@ describe('mergePlanPrerequisites', () => {
     expect(settings.prerequisitesOptional).toHaveLength(1);
   });
 
+  it('carries the plan start items alone, the config naming none', () => {
+    const settings = configuredSettings();
+    const merged = mergePlanPrerequisites(settings, `${PLAN_B}- [ ] [start] Sibling clean: \`git status\`\n`);
+    expect(merged.required.map((item) => item.probe)).toEqual(['bun --version', 'npm ping']);
+    expect(merged.startRequired).toEqual([
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status' },
+    ]);
+  });
+
+  it('leaves the start tier empty for a plan with no start item, and for no plan at all', () => {
+    const settings = configuredSettings();
+    expect(mergePlanPrerequisites(settings, PLAN_A).startRequired).toEqual([]);
+    expect(mergePlanPrerequisites(settings, null).startRequired).toEqual([]);
+  });
+
   it('answers a new frozen set', () => {
     const settings = configuredSettings();
     const merged = mergePlanPrerequisites(settings, PLAN_A);
     expect(Object.isFrozen(merged)).toBe(true);
     expect(Object.isFrozen(merged.required)).toBe(true);
+    expect(Object.isFrozen(merged.startRequired)).toBe(true);
     expect(Object.isFrozen(merged.optional)).toBe(true);
     expect(merged.optional).not.toBe(settings.prerequisitesOptional);
   });
@@ -493,6 +622,19 @@ describe('loadPlanPrerequisites', () => {
 
     const merged = await loadPlanPrerequisites(planPath, configuredSettings());
     expect(merged.required.map((item) => item.probe)).toEqual(['bun --version', 'docker info']);
+  });
+
+  it('merges the start items of the file beside the plan', async () => {
+    const planPath = plant('.plans/PLAN-s.md', '# Plan: s\n');
+    const prerequisitesPath = plant(
+      '.plans/PREREQUISITES-s.md',
+      '## Before the first dispatch [start]\n\n- [ ] Sibling clean: `git status`\n',
+    );
+    expect(isUnderRoot(prerequisitesPath)).toBe(true);
+
+    const merged = await loadPlanPrerequisites(planPath, configuredSettings());
+    expect(merged.required.map((item) => item.probe)).toEqual(['bun --version']);
+    expect(merged.startRequired.map((item) => item.probe)).toEqual(['git status']);
   });
 
   it('merges nothing for a plan in the same directory with no file of its own', async () => {
