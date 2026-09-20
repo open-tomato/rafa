@@ -34,8 +34,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 # local text and context files
-.specs
-.plans
 .tmp
 .docs
 .local

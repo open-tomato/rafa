@@ -799,7 +799,7 @@ describe('issues', () => {
 
 describe('a real plan file on disk', () => {
   /**
-   * This phase's own plan, read from `.plans/`, not a fixture. It is
+   * This phase's own plan, read from `.rafa/plans/`, not a fixture. It is
    * the frozen template the loop dispatches from — `PLAN_TRACKER-*.md`
    * is the copy its ticks land on — so its stage set, task count and
    * declarations hold still for the run and are pinned here as
@@ -808,7 +808,7 @@ describe('a real plan file on disk', () => {
    * yet, so this exercises the checklist grammar only; `blocks.test.ts`
    * and the cases above cover the block reader itself.
    */
-  const PATH = join(fileURLToPath(new URL('../../', import.meta.url)), '.plans/PLAN-phase-0-package-parity-cutover.md');
+  const PATH = join(fileURLToPath(new URL('../../', import.meta.url)), '.rafa/plans/PLAN-phase-0-package-parity-cutover.md');
   const model = parsePlan(readFileSync(PATH, 'utf8'));
 
   it('reads no rafa:* block and reports nothing, so the checklist alone is under test', () => {
