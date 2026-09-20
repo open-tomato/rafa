@@ -1,13 +1,14 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the thirty-nine commands it registers: what the registry
+ * declarations of the forty-one commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
- * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list`, `instinct show`
+ * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list`, `instinct show`,
+ * `release status`, `release tag`,
  * and the four `pr` readers beside `pr merge` and `pr triage`
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
@@ -130,6 +131,8 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'self-update': ['text', 'json'],
   'usage': ['text', 'json'],
   'describe': ['text', 'json'],
+  'release status': ['text', 'json'],
+  'release tag': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -164,6 +167,8 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct check': [['dir'], []],
   'instinct list': [[], []],
   'instinct show': [['id'], []],
+  'release status': [[], ['plan']],
+  'release tag': [[], []],
   'init': [[], ['root', 'yes', 'board', 'release']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
@@ -301,12 +306,12 @@ function literalFlags(source: string): string[] {
 }
 
 describe('the core roster', () => {
-  it('registers the nine subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct']);
+  it('registers the ten subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the four pr readers, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the four pr readers, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, the two release actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -342,6 +347,8 @@ describe('the core roster', () => {
       'instinct check',
       'instinct list',
       'instinct show',
+      'release status',
+      'release tag',
       'init',
       'doctor',
       'self-update',
