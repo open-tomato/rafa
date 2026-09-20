@@ -20,6 +20,8 @@
  * `~/.claude/agents` or `.claude/agents/build-error-resolver.md` in the
  * checkout.
  */
+import type { TriageBlock } from '../triage/comment.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,7 +31,6 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPlanValidateCommand } from '../../commands/plan/validate.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { DEPENDENCY_BUMP_SIMPLE_CLASSES } from '../triage/classes.js';
-import type { TriageBlock } from '../triage/comment.js';
 
 import { PINNED_PLAN_CLASSES, pinnedPlanValues, readPinnedPlan } from './load.js';
 

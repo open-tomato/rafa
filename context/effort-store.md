@@ -79,8 +79,15 @@ outside `out_of_scope_bugs_by_entry` because it is a function of `what`
 and `artifact`, which that index already holds, so a repeat of an entry
 is still the duplicate it was and keeps the scope on the row. A column
 added to one of these tables moves every COLUMN-list expectation, as a
-new table moves the table lists: the `COLUMNS` map and the whole-row
-case of `store/triage.test.ts` for this one.
+new table moves the table lists — for this one, exactly two: the
+`COLUMNS` map and the whole-row `toEqual` of `store/triage.test.ts`.
+The table-list expectations named above do NOT move for a column, and
+neither does `tests/store-version-guard.test.ts`: `sqlite.test.ts` and
+the guard spell table names only, and the guard builds its refusal
+wording from `SQLITE_SCHEMA_VERSION + 1` at import time, so a bumped
+version moves both sides of its comparison together. Read the two
+`store/triage.test.ts` expectations first and expect nothing else to
+redden.
 
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by

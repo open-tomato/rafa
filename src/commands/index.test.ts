@@ -397,7 +397,7 @@ describe('the core roster', () => {
   });
 });
 
-describe("the module note's count word", () => {
+describe('the module note\'s count word', () => {
   it('names the roster at exactly CORE_COMMANDS.length', () => {
     const match = INDEX_SOURCE.match(/Five of the ([a-z]+(?:-[a-z]+)?) registered so far/);
 
