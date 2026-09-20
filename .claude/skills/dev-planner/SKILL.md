@@ -111,7 +111,7 @@ starts at column 0.
   ```rafa:plan
   stub: rafa-123-my-feature
   issue: 123
-  spec: .specs/rafa-123-my-feature.md
+  spec: .rafa/specs/rafa-123-my-feature.md
   ```
 
   ```rafa:context
@@ -146,7 +146,7 @@ Header metadata for the entire plan. Fields are YAML key-value pairs.
 ```rafa:plan
 stub: rafa-123-my-feature
 issue: 123
-spec: .specs/rafa-123-my-feature.md
+spec: .rafa/specs/rafa-123-my-feature.md
 ```
 ````
 
@@ -164,7 +164,7 @@ All rafa work follows a consistent naming scheme across specifications, plans, b
 
 | Artifact | Pattern | Example |
 | --- | --- | --- |
-| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Specification file | `.rafa/specs/rafa-<n>-<slug>.md` | `.rafa/specs/rafa-20-pr-commands.md` |
 | Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
 | `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
@@ -499,7 +499,7 @@ Each module task below carries its own unit tests, and each stage closes on a te
   ```rafa:plan
   stub: rafa-456-refactor-auth
   issue: 456
-  spec: .specs/rafa-456-refactor-auth.md
+  spec: .rafa/specs/rafa-456-refactor-auth.md
   ```
 
   ```rafa:context
