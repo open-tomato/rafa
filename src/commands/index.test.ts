@@ -7,9 +7,9 @@
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
- * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list`, `instinct show`,
+ * `skill check`, `skill list`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
  * `release status`, `release tag`,
- * and the four `pr` readers beside `pr merge` and `pr triage`
+ * and the six `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -305,6 +305,22 @@ function literalFlags(source: string): string[] {
   return [...new Set(flags)].sort((a, b) => a.localeCompare(b));
 }
 
+/** Spelled English numbers this file's module note reaches for, ones and tens each named once. */
+const NUMBER_WORDS: Readonly<Record<string, number>> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+  sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+};
+
+/** The value a spelled English number names, a hyphenated tens word and ones word added together. */
+function numberWord(word: string): number {
+  return word.split('-').reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
+}
+
+/** The module note of `src/commands/index.ts`, read fresh so it stays honest as the roster grows. */
+const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
+
 describe('the core roster', () => {
   it('registers the ten subjects with an action, in roster order', () => {
     expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release']);
@@ -378,6 +394,19 @@ describe('the core roster', () => {
     expect(command.examples.length).toBeGreaterThan(0);
     expect(command.examples.filter((example) => !example.cmd.startsWith(`rafa ${spelling}`))).toEqual([]);
     expect(command.outputs).toEqual(OUTPUTS[spelling] ?? []);
+  });
+});
+
+describe('the module note\'s count word', () => {
+  it('names the roster at exactly CORE_COMMANDS.length', () => {
+    const match = INDEX_SOURCE.match(/Five of the ([a-z]+(?:-[a-z]+)?) registered so far/);
+
+    expect(match).not.toBeNull();
+    expect(numberWord(match?.[1] ?? '')).toBe(CORE_COMMANDS.length);
+  });
+
+  it('reads a planted wrong word as a count the roster does not match, the control', () => {
+    expect(numberWord('forty-two')).not.toBe(CORE_COMMANDS.length);
   });
 });
 

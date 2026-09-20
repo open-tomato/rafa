@@ -44,6 +44,26 @@
  * It locates these two fixtures and nothing else. The sibling's plan
  * roster and its git history are not looked for here.
  *
+ * ## Why a consumer freezes the logs before reading them
+ *
+ * The log directory is LIVE: the sibling runs its own loop, and a
+ * session appending to its `.jsonl` between two readings changes what
+ * the second one sees. A test that reads the directory twice — as
+ * `parity-differential.test.ts` does, once per store backend — then
+ * compares two collections of two different inputs, and a row whose
+ * `sizeBytes`, `lineCount`, `recordCount`, `recordTypeCounts`, `usage`
+ * or `lastTimestamp` moved between them reads as a parity failure
+ * neither backend caused.
+ *
+ * {@link freezeParitySessionLogs} is the answer: one copy of the loose
+ * logs, taken once, that every later reading is pointed at. The copy
+ * is a still of the live directory, so a difference between two
+ * readings of it is a difference between the two READERS, which is the
+ * property such a test is about. A consumer that reads the directory
+ * ONCE has no such race to close and needs no copy: the lineage test
+ * collects live, and its comparison is against rows the sibling's own
+ * collector wrote from those same live paths.
+ *
  * ## What counts as present
  *
  * Present means the resolver found what the tests read, not merely a
@@ -93,9 +113,9 @@
  */
 import type { Stats } from 'node:fs';
 
-import { statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, statSync, utimesSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 
 import { listSessionLogs, sessionLogDir } from '../effort/collect.js';
 
@@ -406,5 +426,93 @@ export function resolveParityFixture(
     present: false,
     absences,
     reason: `parity fixture absent: ${absences.map(describeAbsence).join('; ')}`,
+  };
+}
+
+/** One log in a frozen copy, as the collector lists it there. */
+export interface FrozenParitySessionLog {
+  /** The log's basename without its extension, which is the session id. */
+  sessionId: string;
+  /** The copy's path, under {@link FrozenParitySessionLogs.dir}. */
+  path: string;
+  /** The copy's size, which is the source's at the instant it was read. */
+  sizeBytes: number;
+  /** The source's mtime, carried onto the copy, to the millisecond. */
+  modifiedAtMs: number;
+}
+
+/** One log the freeze could not copy, and the error code that stopped it. */
+export interface UnfrozenParitySessionLog {
+  sessionId: string;
+  /** The fs error code, `EACCES` or `ENOENT` being the ones seen. */
+  code: string;
+}
+
+/** What one freeze produced: the copy to read, and anything left behind. */
+export interface FrozenParitySessionLogs {
+  /** The live directory the copies were taken from. */
+  source: string;
+  /** The directory holding the copies; what a consumer reads as `logDir`. */
+  dir: string;
+  /** Every copy, in {@link listSessionLogs} order; never the source's paths. */
+  logs: FrozenParitySessionLog[];
+  /** Every log that could not be copied; empty on a readable directory. */
+  unread: UnfrozenParitySessionLog[];
+}
+
+/**
+ * Copies the loose session logs of one directory into another, and
+ * answers the copy the collector should be pointed at.
+ *
+ * See the module note on why the parity tests read a copy at all. The
+ * population copied is `listSessionLogs`'s, so the freeze holds exactly
+ * the files the collector would have read live and no subagent
+ * transcript. Each copy carries its source's mtime, to the millisecond
+ * `utimesSync` takes, so a row's `modifiedAt` and any `--since` window
+ * read the instant the live log would have given rather than the
+ * instant of the freeze.
+ *
+ * A log that cannot be copied is reported in
+ * {@link FrozenParitySessionLogs.unread} and skipped rather than
+ * thrown: one unreadable log among a thousand is not a reason to fail
+ * a suite about two backends agreeing, and a consumer that wants it
+ * fatal can assert the list is empty. Every other error — a
+ * destination that cannot be made, a source directory that is not
+ * there — throws, because this runs in a `beforeAll` where a throw is
+ * read as the failure it is.
+ *
+ * The returned logs are listed from the COPY, not from the source: a
+ * size read off the live file could already be stale, while the copy's
+ * is what both backends will measure.
+ */
+export function freezeParitySessionLogs(
+  logDir: string,
+  destination: string,
+): FrozenParitySessionLogs {
+  mkdirSync(destination, { recursive: true });
+
+  const unread: UnfrozenParitySessionLog[] = [];
+  for (const candidate of listSessionLogs(logDir)) {
+    const copy = join(destination, basename(candidate.path));
+    try {
+      copyFileSync(candidate.path, copy);
+    } catch (error) {
+      unread.push({ sessionId: candidate.sessionId, code: errorCodeOf(error) });
+      continue;
+    }
+    const modifiedAt = new Date(candidate.modifiedAtMs);
+    utimesSync(copy, modifiedAt, modifiedAt);
+  }
+
+  return {
+    source: logDir,
+    dir: destination,
+    logs: listSessionLogs(destination).map((log) => ({
+      sessionId: log.sessionId,
+      path: log.path,
+      sizeBytes: log.sizeBytes,
+      modifiedAtMs: log.modifiedAtMs,
+    })),
+    unread,
   };
 }

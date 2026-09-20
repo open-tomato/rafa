@@ -125,3 +125,32 @@ describe('a planted failing copy of the same tier', () => {
       .toContain('schema missing-field (description)');
   });
 });
+
+describe('a planted body naming a tool no PATH directory holds', () => {
+  it('reddens with a missing-tool failure once one copied file names it', () => {
+    const seamRoot = mkdtempSync(join(tempBase, 'planted-tool-'));
+    const copyRoot = join(seamRoot, 'skills');
+    cpSync(SKILLS_DIR, copyRoot, { recursive: true });
+
+    const target = join(copyRoot, 'api', 'SKILL.md');
+    const before = readFileSync(target, 'utf8');
+    const broken = `${before}\n\`\`\`bash\nzzz-not-a-real-tool --version\n\`\`\`\n`;
+    writeFileSync(target, broken, 'utf8');
+
+    const report = checkDirectory(copyRoot, 'skill', {
+      projectRoot: REPO_ROOT,
+      pathDirs: ciPathDirs(seamRoot),
+      fix: false,
+    });
+
+    expect(report.failingFiles).toBe(1);
+    expect(report.exitCode).toBe(1);
+    const failed = report.reports.filter((entry) => entry.failed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0]?.path).toBe(target);
+    expect(failed[0]?.issues.map((issue) => `${issue.stage} ${issue.code}`))
+      .toContain('resolution missing-tool');
+    expect(failed[0]?.issues.some((issue) => issue.message.includes('zzz-not-a-real-tool')))
+      .toBe(true);
+  });
+});

@@ -84,7 +84,7 @@ import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
+import { bugKeyOf, createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import {
@@ -528,7 +528,7 @@ describe('what a public bug is filed with', () => {
     expect(issue?.contents).toContain(`## Feedback\n\n\`\`\`\n${FEEDBACK}\n\`\`\``);
     const rows = refRows(f.root);
     expect(rows.map((row) => [row.session_id, row.plan_stub, row.task_line, row.artifact, row.outcome])).toEqual([
-      ['session-1', 'demo', TASK_TEXT, 'ERR_ONE', 'blocked'],
+      ['session-1', 'demo', TASK_TEXT, bugKeyOf(f.trackerPath, 'ERR_ONE'), 'blocked'],
     ]);
     expect(JSON.parse(rows[0]!.tracker_ref)).toMatchObject({ kind: 'local', externalId: '1' });
     expect(lines.info).toEqual([

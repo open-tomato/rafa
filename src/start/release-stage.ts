@@ -106,8 +106,37 @@
  * request that cannot be found or cannot be asked is reported and NOT
  * thrown: the release is already decided by then, and the operator is
  * owed the reason on their terminal whether or not GitHub took it.
+ *
+ * ## Which provider is asked, and what a `none` reading costs
+ *
+ * WHICH provider that write goes through is a reading, not a constant.
+ * {@link ReleaseStageSeams.readProvider} answers it —
+ * `resolvePrProvider` (`src/pr/provider.ts`), the one reading in this
+ * repository that says `gh` or `none` — and it is taken BEFORE
+ * {@link ReleaseStageSeams.pulls} is called, so a repository that
+ * resolves to `none` spawns no `gh` at all rather than spawning one
+ * and reporting what it said. A run under `pr.provider: none` has no
+ * pull request to carry anything: the loop pushes the branch and
+ * prints a compare URL (`src/pr/none.ts`), and asking the GitHub CLI
+ * for a body there is a call that can only fail, slowly, on a machine
+ * that may not have `gh` installed.
+ *
+ * The reading is the RUN's, so `src/start.ts` hands this stage a
+ * reader carrying the run's own `pr.provider`, the way it already
+ * hands one to the CI gate. The default seam here leaves `configured`
+ * null, which is `origin` deciding — right for a caller that names no
+ * seam, and wrong for a GitHub Enterprise remote, which reads as not
+ * GitHub until a config says otherwise.
+ *
+ * A sentence that reaches no body is still a sentence the operator is
+ * owed, so the `none` path prints ONE line naming it: the sentence
+ * quoted, and the reading that kept it off the board. It prints at
+ * info rather than error level, because a configured `none` provider
+ * writing no body is the setting working and not a fault — the
+ * failure it reports, when there is one, was already printed above it
+ * at its own level.
  */
-import type { GitResult, GitRunner, PullRequests, PushOutcome } from '../pr/index.js';
+import type { GitResult, GitRunner, PrProviderReading, PullRequests, PushOutcome } from '../pr/index.js';
 import type { ChangelogNote } from '../release/changelog.js';
 import type {
   ReleasePreparation,
@@ -121,7 +150,7 @@ import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../config-sections.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { parsePlan } from '../plan/parse.js';
-import { createGitRunner, ghPullRequestsIn, gitSaid, pushBranch } from '../pr/index.js';
+import { createGitRunner, ghPullRequestsIn, gitSaid, pushBranch, resolvePrProvider } from '../pr/index.js';
 import { prepareRelease } from '../release/prepare.js';
 import { verifyRelease } from '../release/verify.js';
 import { getCurrentBranch } from '../utils/git.js';
@@ -144,6 +173,11 @@ export interface ReleaseStageSeams {
   readonly push: (repoRoot: string, branch: string) => PushOutcome;
   /** The provider the failure sentence is written through. */
   readonly pulls: (repoRoot: string) => PullRequests;
+  /**
+   * Which provider that is. A reading of `none` writes no body and
+   * reaches no `gh`; see the module note.
+   */
+  readonly readProvider: (repoRoot: string) => PrProviderReading;
   /** The branch whose pull request carries the sentence. */
   readonly currentBranch: () => string;
   /** When the release is being made; the entry's date comes from it. */
@@ -158,6 +192,10 @@ export const RELEASE_STAGE_SEAMS: ReleaseStageSeams = {
   git: createGitRunner,
   push: pushBranch,
   pulls: ghPullRequestsIn,
+  // `configured: null` leaves the answer to `origin`. `start()` passes
+  // a reader carrying the run's own `pr.provider`; this default is what
+  // a caller that names no seam gets.
+  readProvider: (repoRoot: string) => resolvePrProvider({ configured: null, dir: repoRoot }),
   currentBranch: getCurrentBranch,
   now: () => new Date(),
 };
@@ -425,6 +463,21 @@ async function carryIntoBody(
   }
 }
 
+/**
+ * Why a reading that is not `gh` leaves the sentence unwritten, as the
+ * record's own `problem` carries it.
+ */
+function noProviderProblem(reading: PrProviderReading): string {
+  const origin = reading.remote === null
+    ? 'origin is not set'
+    : `origin is ${reading.remote}`;
+  const because = reading.source === 'config'
+    ? 'pr.provider says so'
+    : origin;
+  return `this repository resolves to pr.provider: ${reading.provider}, because ${because},`
+    + ' so there is no pull request to write it to';
+}
+
 /** Says where the sentence went, or that it went nowhere. */
 function announceBody(write: ReleaseBodyWrite): void {
   const out = activeOutput();
@@ -452,6 +505,15 @@ async function reportFailure(
     out.info(`\n📦 ${sentence}`);
   } else {
     out.error(`\n❌ ${sentence}`);
+  }
+
+  // Read BEFORE the provider is built, so a `none` repository spawns no
+  // `gh`; the one line it prints names the sentence. See the module note.
+  const reading = io.readProvider(repoRoot);
+  if (reading.provider !== 'gh') {
+    const problem = noProviderProblem(reading);
+    out.info(`   No pull request body carries ${JSON.stringify(sentence)}: ${problem}.`);
+    return { outcome, sentence, body: unwritten(null, problem), ...made };
   }
 
   const body = await carryIntoBody(io.pulls(repoRoot), io.currentBranch(), sentence);

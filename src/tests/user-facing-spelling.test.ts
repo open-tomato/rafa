@@ -1,6 +1,7 @@
 /**
  * No string or template literal under `src/` spells a command
- * `ralph <command>`.
+ * `ralph <command>`, and no literal outside the tests spells the
+ * checkout-only entry `bun src/rafa.ts`.
  *
  * The binary is `rafa`, and a refusal or usage line naming the old
  * spelling sends a person to a command they do not have. The method is
@@ -8,10 +9,14 @@
  * word and is the one exempt literal; a comment or an identifier naming
  * it is no hit either, because the scan walks literals only.
  *
- * The planted literal in {@link PLANTED} is the control: this file is
- * excluded from the repository-wide scan, and a case scans this file on
- * its own and reads the plant back, so a scan that finds nothing
- * anywhere would fail here.
+ * `bun src/rafa.ts` runs only from a checkout of this repository, so a
+ * line a person reads must name the binary instead; the tests, which
+ * spawn the CLI that way, are exempt, as is a doc comment.
+ *
+ * The planted literals in {@link PLANTED} and {@link PLANTED_ENTRY} are
+ * the control: this file is excluded from both repository-wide scans,
+ * and a case scans this file on its own and reads each plant back, so a
+ * scan that finds nothing anywhere would fail here.
  */
 import { join } from 'node:path';
 
@@ -29,6 +34,12 @@ const SELF = 'tests/user-facing-spelling.test.ts';
 
 /** A literal naming a command under the old spelling, for the control. */
 const PLANTED = 'Usage: ralph plan --spec=<spec-file>.md';
+
+/** A literal naming the checkout-only entry, for the control. */
+const PLANTED_ENTRY = 'Execute with: bun src/rafa.ts start --plan=<path>';
+
+/** The checkout-only entry no user-facing literal outside the tests may name. */
+const CHECKOUT_ENTRY = 'bun src/rafa.ts';
 
 /**
  * Whether a literal is allowed to hold the word: the tagline names the
@@ -92,6 +103,27 @@ export function oldSpellings(path: string, source: string, words: ReadonlySet<st
   return hits;
 }
 
+/**
+ * Each `bun src/rafa.ts` a source's literals hold, as
+ * `<path>:<line>: bun src/rafa.ts`, in source order.
+ */
+export function checkoutEntries(path: string, source: string): string[] {
+  const hits: string[] = [];
+  for (const [line, text] of literalsOf(path, source)) {
+    let at = text.indexOf(CHECKOUT_ENTRY);
+    while (at !== -1) {
+      hits.push(`${path}:${line}: ${CHECKOUT_ENTRY}`);
+      at = text.indexOf(CHECKOUT_ENTRY, at + CHECKOUT_ENTRY.length);
+    }
+  }
+  return hits;
+}
+
+/** Whether a path under `src/` belongs to the tests, which spawn the CLI from the checkout. */
+function isTest(path: string): boolean {
+  return path.endsWith('.test.ts') || path.startsWith('tests/');
+}
+
 /** Every `.ts` file under `src/`, relative to `src/`, sorted. */
 async function sourcePaths(): Promise<string[]> {
   const glob = new Bun.Glob('**/*.ts');
@@ -110,6 +142,30 @@ describe('user-facing spelling', () => {
       hits.push(...oldSpellings(`src/${path}`, source, words));
     }
     expect(hits).toEqual([]);
+  });
+
+  test('no literal outside the tests names the checkout-only entry', async () => {
+    const hits: string[] = [];
+    for (const path of await sourcePaths()) {
+      if (isTest(path)) continue;
+      const source = await Bun.file(join(REPO_ROOT, 'src', path)).text();
+      hits.push(...checkoutEntries(`src/${path}`, source));
+    }
+    expect(hits).toEqual([]);
+  });
+
+  test('the checkout-entry scan reads the planted literal in this file back', async () => {
+    const source = await Bun.file(join(REPO_ROOT, 'src', SELF)).text();
+    const hits = checkoutEntries(`src/${SELF}`, source);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((hit) => hit.endsWith(`: ${CHECKOUT_ENTRY}`))).toBe(true);
+    expect(PLANTED_ENTRY).toContain(CHECKOUT_ENTRY);
+    expect(isTest(SELF)).toBe(true);
+  });
+
+  test('a doc comment naming the checkout-only entry is no hit', () => {
+    const source = ['/** Run it as bun src/rafa.ts start. */', 'export const note = 1;'].join('\n');
+    expect(checkoutEntries('probe.ts', source)).toEqual([]);
   });
 
   test('the scan reads the planted literal in this file back', async () => {

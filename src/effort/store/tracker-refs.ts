@@ -4,11 +4,17 @@
  * answered back for an artifact.
  *
  * Phase 1's triage files an out-of-scope bug through the Tracker port,
- * and a recurrence of its artifact in a later task comments on that
- * issue rather than filing a second one. {@link writeTrackerRef} stores
- * the reference `tracker.create` answered, and {@link readTrackerRef}
- * answers it for the artifact a later bug carries. The column is
- * `findings.tracker_ref`, which the findings writer leaves null.
+ * and a recurrence of it in a later task comments on that issue rather
+ * than filing a second one. {@link writeTrackerRef} stores the reference
+ * `tracker.create` answered, and {@link readTrackerRef} answers it for
+ * the key a later bug carries. The column is `findings.tracker_ref`,
+ * which the findings writer leaves null.
+ *
+ * The `artifact` this writer is given is whatever text its caller keys a
+ * recurrence by, and the rows below follow that text rather than any
+ * bug's artifact of its own: `triage/triage.ts` keys by the bug's
+ * artifact WITH the tracker file it was reported against, so two plans
+ * quoting one error string keep two references.
  *
  * ## The row
  *
@@ -20,7 +26,8 @@
  *     the outcome, the artifact and the reference, with a generated id,
  *     the write's time, and every report column (`kind`, `trigger`,
  *     `what`, `cause`, `resolution`, `signal`) null. The bug itself stays
- *     in `out_of_scope_bugs`, which joins on `session_id` and `artifact`.
+ *     in `out_of_scope_bugs`, whose own `artifact` is the bug's as
+ *     reported, and equals this row's only for a caller that keys by it.
  *   - It holds one with no reference, such as the finding the session
  *     reported under that artifact: the reference is set on it, and no
  *     other column changes.

@@ -40,8 +40,9 @@
  *  - `author`, which the trust check (check 0 of the readiness gate)
  *    reads. Nothing here can supply it, so the caller that runs the
  *    trust check reads the login itself. `plan create` composes the
- *    label check and the leak refusal and NOT check 0
- *    (`./plan-spec.ts`), so the list is still the spec's own; widening
+ *    label check, the leak refusal and the completeness refusal, and
+ *    NOT check 0 (`./plan-spec.ts`), so the list is still the spec's
+ *    own; widening
  *    it is a one-word change to {@link ISSUE_VIEW_FIELDS}, left to the
  *    task that wires the trust check in rather than guessed at here.
  *  - `url`, which is how the tracker adapter tells an issue from a pull

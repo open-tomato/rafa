@@ -18,7 +18,7 @@
  * both in `plan.dir`, `.rafa/plans` unless a config names another. The
  * stub defaults to the spec's basename. Execute the result with:
  *
- *   bun src/rafa.ts start --plan=.rafa/plans/PLAN-<stub>.md
+ *   rafa loop start --plan=.rafa/plans/PLAN-<stub>.md
  *
  * ## What the command keeps, and what the adapter does
  *
@@ -576,5 +576,5 @@ export default async function plan(
   if (generated.prerequisitesPath !== null) {
     activeOutput().info(`⚠️  Prerequisites detected: complete ${generated.prerequisitesPath} before starting the loop.`);
   }
-  activeOutput().info(`▶ Execute with: bun src/rafa.ts start --plan=${generated.planPath}`);
+  activeOutput().info(`▶ Execute with: rafa loop start --plan=${generated.planPath}`);
 }

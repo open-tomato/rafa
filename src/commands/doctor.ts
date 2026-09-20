@@ -36,17 +36,26 @@
  *      checked a different set in a different order. A configured
  *      `pr.provider: none` contributes none and reads no remote at
  *      all; every other reading spawns the `origin` probe once.
- *   4. **Every item**, through `runPreflight` (`preflight/run.ts`), as
+ *   4. **The plan's start-only `[start]` items**
+ *      (`preflight/prerequisites-md.ts`), between the provider's items
+ *      and the configured required tier, exactly where
+ *      `runStartPreflight` puts them (`start/preflight.ts`). `loop start`
+ *      probes that tier on a plan's FIRST DISPATCH alone, and this
+ *      command reads that one bit the way a run does: `isFirstDispatch`
+ *      (`preflight/first-dispatch.ts`) off the TRACKER beside the plan,
+ *      a `PLAN_TRACKER-<stub>.md` already holding a ticked task making
+ *      the next run a resume. Reading it starts nothing and writes
+ *      nothing: the tracker is a document this command opens, not a run
+ *      of its own. On a resume none of those items is checked, counted
+ *      or able to change the exit code, and one line names how many the
+ *      report passed over and the tracker that decided it, since on a
+ *      resume nothing else in the report would say they exist.
+ *   5. **Every item**, through `runPreflight` (`preflight/run.ts`), as
  *      `loop start` checks them: each probe in the project root with stdin
  *      closed and the 30-second timeout, a presence check for an item with
  *      no probe, and a warning for each optional item that failed, written
  *      as it is found. The environment is the one this invocation was
- *      handed, `process.env` for the registered command. A plan's
- *      start-only `[start]` items are the one set left out: `loop start`
- *      probes that tier on a plan's FIRST DISPATCH alone, the reading it
- *      takes off the tracker beside the plan (`start/preflight.ts`,
- *      `preflight/first-dispatch.ts`), and this command starts no run and
- *      reads no tracker, so none of them reaches this report.
+ *      handed, `process.env` for the registered command.
  *
  * ## The board rows
  *
@@ -111,8 +120,9 @@
  * before anything is checked so a person reads which build answered
  * whatever the preflight then does; then {@link renderDoctor}'s lines: a
  * head naming the plan, or where none was found, and the PREREQUISITES
- * file merged in; one line per check; the steps that file names and
- * nothing checks; and the verdict with any `known-missing:` lines; then
+ * file merged in; one line per check; the line naming the start-only
+ * items a resume passed over; the steps that file names and nothing
+ * checks; and the verdict with any `known-missing:` lines; then
  * {@link renderBoard}'s lines for a repository that has a GitHub board,
  * and none for one that has not. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
@@ -156,10 +166,12 @@ import { ConfigError } from '../config.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
+import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import { loadPlanPrerequisites, mergePlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
 import { readBinPath } from '../project/bin-path.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
+import { trackerPathFor } from '../utils/tracker.js';
 
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 import { isFile, plural } from './plan/plan-files.js';
@@ -176,6 +188,19 @@ export interface DoctorSeams {
 /** The seams the registered command runs with: the runner's own, every one. */
 export const DEFAULT_DOCTOR_SEAMS: DoctorSeams = Object.freeze({ checks: Object.freeze({}) });
 
+/**
+ * How a report read the plan's start-only `[start]` items: probed on a
+ * first dispatch, passed over on a resume. See the module note.
+ */
+export interface DoctorStartTier {
+  /** How many of them were checked: the plan's own on a first dispatch, none on a resume. */
+  readonly checked: number;
+  /** How many of them this resume passed over unchecked; 0 on a first dispatch. */
+  readonly skipped: number;
+  /** The tracker whose ticked task made this a resume, by its base name; null on a first dispatch. */
+  readonly tracker: string | null;
+}
+
 /** The preflight of one plan, checked with no run started. */
 export interface DoctorPreflight {
   /** The project root each probe ran in. */
@@ -190,6 +215,8 @@ export interface DoctorPreflight {
   readonly automatic: number;
   /** The pull request provider the project resolves to, which decided those items and the board rows. */
   readonly provider: PrProvider;
+  /** How the plan's start-only `[start]` items were read, and how many of the checked items are theirs. */
+  readonly startTier: DoctorStartTier;
   /** Every check, and the halt and the `known-missing:` lines the runner worded. */
   readonly report: PreflightReport;
   /** The steps the PREREQUISITES file names and nothing checks. */
@@ -208,6 +235,8 @@ export interface DoctorResult {
   readonly checks: readonly PreflightCheck[];
   /** How many of them the pull request provider contributed, which are the first of the required tier. */
   readonly automatic: number;
+  /** How the plan's start-only `[start]` items were read: how many were checked, and how many a resume passed over. */
+  readonly startTier: DoctorStartTier;
   /** The `known-missing:` line of each failed optional item, as every task prompt would carry it. */
   readonly knownMissing: readonly string[];
   /** The steps the PREREQUISITES file names and nothing checks. */
@@ -302,8 +331,8 @@ function mergedFile(plan: string | null): string | null {
     : null;
 }
 
-/** No automatic item, for a provider that contributes none. */
-const NO_AUTOMATIC_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
+/** No item at all, for a tier that contributes none. */
+const NO_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
 
 /** The provider and the REQUIRED items it contributes, read in one go. */
 interface ProviderReading {
@@ -319,10 +348,34 @@ interface ProviderReading {
  */
 function readProvider(root: string, config: RafaConfig, seams: DoctorSeams): ProviderReading {
   const configured = config.prProvider ?? null;
-  if (configured === 'none') return { provider: 'none', items: NO_AUTOMATIC_ITEMS };
+  if (configured === 'none') return { provider: 'none', items: NO_ITEMS };
 
   const reading = resolvePrProvider({ configured, dir: root, readRemote: seams.readRemote });
   return { provider: reading.provider, items: ghPreflightItems(reading) };
+}
+
+/** No start-only item read at all, for a run with no plan and a plan carrying none. */
+const NO_START_TIER: DoctorStartTier = Object.freeze({ checked: 0, skipped: 0, tracker: null });
+
+/** The start-only items this report probes, and how they were read. */
+interface StartReading {
+  readonly tier: DoctorStartTier;
+  readonly items: readonly PrerequisiteItem[];
+}
+
+/**
+ * The plan's start-only `[start]` items this report probes: the plan's
+ * own on a first dispatch, and none on a resume, which is what the
+ * tracker beside the plan says (`preflight/first-dispatch.ts`). See the
+ * module note.
+ */
+function readStartTier(plan: string | null, items: PreflightItems): StartReading {
+  const start = items.startRequired;
+  if (plan === null || start.length === 0) return { tier: NO_START_TIER, items: NO_ITEMS };
+  if (isFirstDispatch(plan)) return { tier: { checked: start.length, skipped: 0, tracker: null }, items: start };
+
+  const tracker = basename(trackerPathFor(plan));
+  return { tier: { checked: 0, skipped: start.length, tracker }, items: NO_ITEMS };
 }
 
 /** Checks the preflight of the plan the line names; see the module note. */
@@ -336,7 +389,11 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
   const automatic = readProvider(project.root, config, seams);
-  const tiers: PreflightTiers = { required: [...automatic.items, ...items.required], optional: items.optional };
+  const start = readStartTier(plan, items);
+  const tiers: PreflightTiers = {
+    required: [...automatic.items, ...start.items, ...items.required],
+    optional: items.optional,
+  };
   const report = await runPreflight(tiers, { ...seams.checks, cwd: project.root, env: context.env, warn });
   return Object.freeze({
     root: project.root,
@@ -345,6 +402,7 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
     prerequisitesFile: mergedFile(plan),
     automatic: automatic.items.length,
     provider: automatic.provider,
+    startTier: start.tier,
     report,
     reminders: items.reminders,
   });
@@ -430,6 +488,20 @@ function checkLine(check: PreflightCheck): string {
   return `  ${check.outcome.padEnd(7)} ${check.tier.padEnd(8)} ${item}, ${how}, ${String(check.durationMs)} ms`;
 }
 
+/**
+ * The line naming how many start-only items this resume passed over and
+ * the tracker that made it one; none on a first dispatch, where each
+ * such item has a check line of its own.
+ */
+function skippedStartLines(startTier: DoctorStartTier): readonly string[] {
+  const { skipped, tracker } = startTier;
+  if (skipped === 0 || tracker === null) return [];
+  return [
+    `${tracker} already holds a ticked task, so ${plural(skipped, 'start-only item')} of the plan went`
+      + ' unchecked: rafa loop start probes that tier on a first dispatch alone.',
+  ];
+}
+
 /** The steps the PREREQUISITES file names and nothing checks, under a line naming the file. */
 function reminderLines(preflight: DoctorPreflight): readonly string[] {
   const { reminders, prerequisitesFile } = preflight;
@@ -456,6 +528,7 @@ export function renderDoctor(preflight: DoctorPreflight): readonly string[] {
   return [
     headLine(preflight),
     ...preflight.report.checks.map(checkLine),
+    ...skippedStartLines(preflight.startTier),
     ...reminderLines(preflight),
     ...verdictLines(preflight.report),
   ];
@@ -509,6 +582,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, board: B
     prerequisitesFile: preflight.prerequisitesFile,
     checks: preflight.report.checks,
     automatic: preflight.automatic,
+    startTier: preflight.startTier,
     knownMissing: preflight.report.knownMissing,
     reminders: preflight.reminders,
     binPath: install.binPath,
@@ -552,7 +626,11 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' check, starting no run and storing nothing: the required and optional items of'
       + ' `.rafa/config.yaml`, with the `PREREQUISITES-<stub>.md` beside the plan merged in, and, when the'
       + ' repository resolves to `pr.provider: gh`, the two required items that provider adds ahead of them:'
-      + ' `gh` on PATH and `gh auth status` for the remote\'s host. The plan is the'
+      + ' `gh` on PATH and `gh auth status` for the remote\'s host. A plan\'s `[start]` items are checked'
+      + ' after those and ahead of the configured tiers, on a first dispatch alone: a'
+      + ' `PLAN_TRACKER-<stub>.md` beside the plan already holding a ticked task makes the next run a'
+      + ' resume, which checks none of them and says in one line how many it passed over.'
+      + ' The plan is the'
       + ' one `--plan=<file>` names, relative to the project root, or the default plan `rafa loop start`'
       + ` runs. Each probe runs in the project root with stdin closed and a ${String(PROBE_TIMEOUT_MS / 1000)}-second`
       + ' timeout. It exits 1 when a required item fails, naming the item, its probe and its exit code or'

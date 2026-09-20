@@ -40,8 +40,10 @@
  * ## How a dependency bump is recognised
  *
  * Two readings, either one enough
- * (`.specs/rafa-20-pr-commands.md`): the author is
- * {@link DEPENDENCY_BUMP_AUTHORS}, or the title opens
+ * (`.specs/rafa-20-pr-commands.md`): the author is one of
+ * {@link DEPENDENCY_BUMP_AUTHORS} — both of dependabot's login
+ * spellings, the app path `gh` itself writes and the bracketed one the
+ * payloads carry — or the title opens
  * {@link DEPENDENCY_BUMP_TITLE_PREFIX}. The title reading is kept
  * beside the author one because a bump does not always come from the
  * bot — a `chore(deps): bump …` branch pushed by hand, or a bot run
@@ -134,11 +136,18 @@ export const DEPENDENCY_BUMP_SIMPLE_CLASSES: readonly TriageClass[] = Object.fre
 
 /**
  * The logins whose pull requests are dependency bumps by authorship
- * alone. One today; a second bot is added here rather than at a call
- * site, so every reader agrees about which accounts those are.
+ * alone. Two, because dependabot answers under two spellings and only
+ * one of them is what `gh` writes: `src/pr/gh-fake-shapes.ts` records,
+ * off `cli/cli`'s own dependabot pull requests, that a bot author is
+ * `{"is_bot","login"}` whose login is the app path `app/dependabot`,
+ * NOT `dependabot[bot]`. The bracketed spelling is what the REST and
+ * webhook payloads carry, so it is kept beside the app path rather than
+ * replaced by it. A third bot is added here rather than at a call site,
+ * so every reader agrees about which accounts those are.
  */
 export const DEPENDENCY_BUMP_AUTHORS: readonly string[] = Object.freeze([
   'dependabot[bot]',
+  'app/dependabot',
 ] as const);
 
 /**

@@ -9,6 +9,10 @@ spec: .specs/rafa-20-pr-commands.md
 
 ```rafa:context
 The `bun install` step in CI failed. This plan routes the repair task to the build-error-resolver agent with the CI log excerpt, allowing it to diagnose and fix dependency-related issues.
+
+This triage already read the failing job's log, and the excerpt below is what it read; do not fetch it again.
+
+{FAILING_LOG}
 ```
 
 ## Description

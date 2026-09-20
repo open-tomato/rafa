@@ -182,6 +182,104 @@ describe('rafa skill check, spawned over a clean tier', () => {
   }, SPAWN_TIMEOUT);
 });
 
+/**
+ * Three false positives named in `src/check/references.ts`'s own note,
+ * each held beside a control naming a REAL missing tool or a real
+ * foreign path, so a loosening that stops the false positive cannot be
+ * mistaken for one that also stopped catching the true one.
+ *
+ * Measured at this stage's start (`823677386e3b860d8c12d92cd70e1e58ec746961`,
+ * before this stage's fix tasks land): the shell-function case was
+ * ALREADY GREEN — `definedFunctionNames` already reads a bare call to a
+ * function the body defines as no claim about `PATH` — while the other
+ * two were RED, each failing on its false positive's own message:
+ *
+ * - `bash fence holding JavaScript`: RED. The fence is `bash`, so
+ *   `const ready = true;` is read as a command line and `const` is
+ *   reported `missing-tool`, which is what `src/check/shell-lines.ts`
+ *   and its wiring into this module (this stage's next two tasks) exist
+ *   to stop.
+ * - `shell function defined and called bare`: GREEN already. `_ok`,
+ *   defined earlier in the same fence and then called bare, is not
+ *   reported; only the real missing tool beside it is.
+ * - `HTTP route carrying an extension`: RED. `/openapi.json` has no
+ *   second segment, but it also has an extension, so the current
+ *   {@link isAbsoluteReference} reads it as a path and reports it
+ *   `foreign-path`; this stage's fourth task is what reads a
+ *   single-segment extensioned token as a route instead.
+ */
+describe('rafa skill check, spawned over checker false-positive fixtures', () => {
+  it('stops reporting JavaScript inside a bash fence as a missing tool, and still reports a real one', () => {
+    const scratch = plantScratchRepo(tempBase);
+    writeFixture(scratch.repo, '.claude/skills/false-positives/bash-fence-js/SKILL.md', fileText(
+      cleanSkillFields('bash-fence-js'),
+      [
+        '',
+        'Sample code, illustrative only:',
+        '',
+        '```bash',
+        'const ready = true;',
+        '```',
+        '',
+        'The real setup step:',
+        '',
+        '```bash',
+        'zzz-fixture-missing-tool --version',
+        '```',
+        '',
+      ].join('\n'),
+    ));
+
+    const answered = runRafa(scratch, scratch.repo, ['skill', 'check', '.claude/skills/false-positives']);
+
+    expect(answered.stderr).not.toContain('the command const is in no directory');
+    expect(answered.stderr).toContain('the command zzz-fixture-missing-tool is in no directory');
+  }, SPAWN_TIMEOUT);
+
+  it('already reads a bare call to a function the body defines as no claim about PATH', () => {
+    const scratch = plantScratchRepo(tempBase);
+    writeFixture(scratch.repo, '.claude/skills/false-positives/shell-function-bare/SKILL.md', fileText(
+      cleanSkillFields('shell-function-bare'),
+      [
+        '',
+        '```bash',
+        '_ok() {',
+        '  echo "fine"',
+        '}',
+        '',
+        '_ok',
+        'zzz-fixture-missing-tool-2',
+        '```',
+        '',
+      ].join('\n'),
+    ));
+
+    const answered = runRafa(scratch, scratch.repo, ['skill', 'check', '.claude/skills/false-positives']);
+
+    expect(answered.stderr).not.toContain('the command _ok is in no directory');
+    expect(answered.stderr).toContain('the command zzz-fixture-missing-tool-2 is in no directory');
+  }, SPAWN_TIMEOUT);
+
+  it('stops reading a single-segment extensioned route as a foreign path, and still refuses a multi-segment one', () => {
+    const scratch = plantScratchRepo(tempBase);
+    writeFixture(scratch.repo, '.claude/skills/false-positives/http-route/SKILL.md', fileText(
+      cleanSkillFields('http-route'),
+      [
+        '',
+        'See `/openapi.json` for the schema.',
+        '',
+        'Never write `/workspace/project/config.yaml`, a different machine layout.',
+        '',
+      ].join('\n'),
+    ));
+
+    const answered = runRafa(scratch, scratch.repo, ['skill', 'check', '.claude/skills/false-positives']);
+
+    expect(answered.stderr).not.toContain('/openapi.json is an absolute path outside');
+    expect(answered.stderr).toContain('/workspace/project/config.yaml is an absolute path outside');
+  }, SPAWN_TIMEOUT);
+});
+
 describe('rafa skill check --fix, spawned', () => {
   it('fills tags and stack, leaving the body byte for byte', () => {
     const scratch = plantScratchRepo(tempBase);

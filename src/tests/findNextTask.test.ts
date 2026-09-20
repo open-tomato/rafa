@@ -1,13 +1,9 @@
 /**
- * Tests for the rafa start loop (scripts/ralph/start.ts).
+ * Tests for findNextTask, a tracker utility used by src/start.ts to locate the
+ * next task in the plan's checklist.
  *
- * Mocks:
- *  - 'fs'                     — no real disk I/O
- *  - './utils/claude.js'      — no real Claude subprocess
- *  - './utils/git.js'         — no real git invocations
- *  - './utils/tracker.js'     — tracker helpers (findNextTask, updateTrackerLine)
- *
- * findNextTask is tested as a pure function without mocking.
+ * No modules are mocked. findNextTask is tested as a pure function, validating
+ * its behavior over various checklist formats, rafa block handling, and edge cases.
  */
 
 import type { TaskInfo } from '../utils/tracker.js';

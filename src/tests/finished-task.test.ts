@@ -119,7 +119,7 @@ import {
 } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
-import { commitFinishedTask } from '../start/commit.js';
+import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
@@ -441,5 +441,49 @@ describe('a finished task that changed no tracked file', () => {
     // come from a commit the stub quietly let through.
     expect(commitCount(dir)).toBe('1');
     expect(stagedPaths(dir)).toBe('');
+  });
+
+  it('marks a session that wrote neither report nor commit BLOCKED, with its blocker comment, and stores blocked', () => {
+    const dir = plantRepo();
+    const trackerPath = plantTracker(dir);
+    const taskInfo = nextTask(trackerPath);
+
+    // What such a session leaves behind: an ignored write and no
+    // `rafa:report` block anywhere in its output.
+    write(dir, 'progress.txt', 'a finding\n');
+
+    const finished = finishCleanExit({
+      trackerPath,
+      taskInfo,
+      repoRoot: dir,
+      output: 'Done, and nothing to report.',
+    });
+
+    expect(finished.attempt.outcome).toBe('nothing-to-commit');
+    expect(finished.outcome).toBe('blocked');
+    expect(lineAt(trackerPath, taskInfo.lineNum))
+      .toBe(`- [BLOCKED] ${FIRST_TASK}  <!-- blocked: ${NOTHING_REPORTED_OR_COMMITTED} -->`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))).toMatchObject({
+      task: FIRST_TASK,
+      status: 'blocked',
+      blocker: NOTHING_REPORTED_OR_COMMITTED,
+    });
+
+    // The control, along the one axis: a fresh repository, the same
+    // helper, a tracked write git can see. Without it the mark above
+    // could be what every clean exit writes, blocked or not.
+    const committed = plantRepo();
+    const committedTracker = plantTracker(committed);
+    const committedInfo = nextTask(committedTracker);
+    write(committed, 'tracked.txt', 'work\n');
+    const done = finishCleanExit({
+      trackerPath: committedTracker,
+      taskInfo: committedInfo,
+      repoRoot: committed,
+      output: 'Done, and nothing to report.',
+    });
+
+    expect(done.outcome).toBe('done');
+    expect(lineAt(committedTracker, committedInfo.lineNum)).toBe(`- [x] ${FIRST_TASK}`);
   });
 });

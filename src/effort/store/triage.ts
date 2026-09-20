@@ -20,6 +20,7 @@
  * | `session_id`, `plan_stub`, `task_line` | the dispatch |
  * | `what`, `artifact` | the report entry, as parsed |
  * | `security`, bugs only | the report entry: 1, 0, or NULL for no flag |
+ * | `scope`, bugs only | read here off `what` and `artifact`: `machine` or `rafa` |
  * | `outcome` | the loop: `done`, `blocked` or `failed` |
  * | `collected_at` | the write's time, ISO 8601, one per write |
  *
@@ -30,6 +31,19 @@
  *     never defaults it to false, and neither does this writer: the flag
  *     is what decides whether a bug may be looked up in a public tracker
  *     at all, and a report's silence is not a `false`.
+ *   - `scope` is the one column read off an entry rather than copied
+ *     from it. A bug whose `what` and `artifact` name a system
+ *     toolchain, a machine's SDK path or a package-manager build failure
+ *     is a fault of the machine the session ran on and not of rafa, and
+ *     `triage/machine-fault.ts` is the whole of that reading; this
+ *     writer calls `isMachineFault` and stores `machine` or `rafa`.
+ *     `triage/triage.ts` takes the same reading to decide that such a
+ *     bug reaches no tracker at all, so the row and the routing can
+ *     never disagree about one bug. The column is nullable, and a row
+ *     written before version 9 reads NULL: it was stored before the
+ *     reading existed, which is neither `machine` nor `rafa`, and a
+ *     default would have claimed a reading nobody took. This writer
+ *     never stores NULL.
  *   - `outcome` is the loop's verdict beside the report's lists, so a
  *     blocker listed by a session the loop counted `done` stays apart
  *     from one listed by a session it marked `blocked`. It has no CHECK,
@@ -43,22 +57,26 @@
  *     Measured on SQLite 3.51.0, a nullable column
  *     added by `ALTER TABLE ... ADD COLUMN` keeps the rows and the unique
  *     index in force, so a later migration can add one if phase 1 wants
- *     it here.
+ *     it here — which is how `scope` arrived, at version 9.
  *
  * ## Where the tables live
  *
  * In the SQLite store's file, created by the third entry of
- * `SQLITE_MIGRATIONS` and written through `writeSqliteStore`, whichever
- * backend the `store` setting selects, as the findings table is.
+ * `SQLITE_MIGRATIONS`, the bugs table's `scope` added by the ninth, and
+ * written through `writeSqliteStore`, whichever backend the `store`
+ * setting selects, as the findings table is.
  * `findings.ts` says why a table like these is not a kind.
  *
  * ## Deduplication
  *
  * Within one session and one table, an entry duplicates an earlier one
- * only when every field the table stores from the report matches:
- * `what`, `artifact` and, for a bug, `security`. The earlier row stays,
- * whether it is on disk or earlier in the same write, and the later
- * entry adds nothing. A report written twice writes its rows once.
+ * only when every field the table stores FROM THE REPORT matches:
+ * `what`, `artifact` and, for a bug, `security`. `scope` is left out of
+ * the key, and needs no place in it: it is read off `what` and
+ * `artifact`, which are both in the key, so two entries that match on
+ * the key have the same scope. The earlier row stays, whether it is on
+ * disk or earlier in the same write, and the later entry adds nothing.
+ * A report written twice writes its rows once.
  *
  *   - This is narrower than the findings rule on purpose. A finding is a
  *     sighting, and sightings are deduplicated by artifact. A blocker or
@@ -114,7 +132,8 @@
  *
  * The tables refuse what they can themselves, through NOT NULL and CHECK
  * constraints, so a row written from outside cannot hold a missing or
- * empty `what`, an empty artifact, or a flag other than 0 or 1.
+ * empty `what`, an empty artifact, a flag other than 0 or 1, or a scope
+ * outside `machine` and `rafa`.
  *
  * ## Writing nothing writes nothing, and still checks the schema
  *
@@ -135,6 +154,8 @@ import type { ReportBlocker, ReportBug } from '../../report/parse.js';
 import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
+
+import { isMachineFault } from '../../triage/machine-fault.js';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
 import { sqliteStorePath, writeSqliteStore } from './sqlite.js';
@@ -251,6 +272,17 @@ const BLOCKERS: TriageTable<ReportBlocker> = {
   values: ({ what, artifact }) => [what, artifact],
 };
 
+/**
+ * What one bug is a bug OF, as the `scope` column holds it: `machine`
+ * when the machine-fault reading answers on its `what` and `artifact`,
+ * and `rafa` when it answers nothing. See the module note.
+ */
+function scopeOf(bug: ReportBug): 'machine' | 'rafa' {
+  return isMachineFault(bug)
+    ? 'machine'
+    : 'rafa';
+}
+
 /** The out-of-scope bugs list and its table. */
 const OUT_OF_SCOPE_BUGS: TriageTable<ReportBug> = {
   key: 'out_of_scope_bugs',
@@ -258,18 +290,19 @@ const OUT_OF_SCOPE_BUGS: TriageTable<ReportBug> = {
   insert: `
     INSERT INTO out_of_scope_bugs (
       id, session_id, plan_stub, task_line,
-      what, artifact, security,
+      what, artifact, security, scope,
       outcome, collected_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (session_id, what, ifnull(artifact, ''), ifnull(security, -1)) DO NOTHING
   `,
-  values: ({ what, artifact, security }) => [
-    what,
-    artifact,
-    security === null
+  values: (entry) => [
+    entry.what,
+    entry.artifact,
+    entry.security === null
       ? null
-      : Number(security),
+      : Number(entry.security),
+    scopeOf(entry),
   ],
 };
 

@@ -22,6 +22,7 @@ import type { PrSeams } from './pr-context.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
+import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -32,6 +33,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
+import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { SEPARATOR } from './current.js';
@@ -88,44 +90,12 @@ interface StubAnswers {
   readonly browse?: () => Promise<void>;
 }
 
-/** A stub provider, and the log of every member it was sent. */
-interface StubPulls {
-  readonly pulls: PullRequests;
-  /** Each member reached, in order, a browse written `browse 41`. */
-  readonly sent: () => readonly string[];
-}
-
 /** A provider answering `findOpen` and `browse`, refusing every other call and recording each. */
-function stubPulls(answers: StubAnswers = {}): StubPulls {
-  const sent: string[] = [];
-  const refuse = (name: string) => (): Promise<never> => {
-    sent.push(name);
-    return Promise.reject(new Error('the stub provider models findOpen and browse alone'));
-  };
-  const pulls: PullRequests = {
-    kind: 'gh',
-    findOpen: () => {
-      sent.push('findOpen');
-      return answers.findOpen === undefined
-        ? Promise.resolve(summary())
-        : answers.findOpen();
-    },
-    list: refuse('list'),
-    get: refuse('get'),
-    checks: refuse('checks'),
-    browse: (number: number) => {
-      sent.push(`browse ${number}`);
-      return answers.browse === undefined
-        ? Promise.resolve()
-        : answers.browse();
-    },
-    merge: refuse('merge'),
-    comments: refuse('comments'),
-    comment: refuse('comment'),
-    editComment: refuse('editComment'),
-    failedLog: refuse('failedLog'),
-  };
-  return { pulls, sent: () => [...sent] };
+function stubPulls(answers: StubAnswers = {}): PullRequestsDouble {
+  return createPullRequestsDouble({
+    findOpen: answers.findOpen ?? (() => Promise.resolve(summary())),
+    browse: answers.browse ?? (() => Promise.resolve()),
+  }, { refusal: 'the stub provider models findOpen and browse alone' });
 }
 
 /** The seams a case hands the command, with what the provider control recorded. */
@@ -305,7 +275,7 @@ describe('the refusals it takes from the shared context', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain(`No open pull request for the branch "${BRANCH}"`);
-    expect(stub.sent()).toEqual(['findOpen']);
+    expect(stub.sent()).toEqual([`findOpen ${BRANCH}`]);
   });
 
   it('refuses a detached HEAD by name, and opens nothing', async () => {

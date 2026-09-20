@@ -144,6 +144,16 @@ If `gh pr create` says `you must first push the current branch to a remote` even
 gh pr create --head <owner>:<branch> ...
 ```
 
+## `gh issue close --reason` takes two words
+
+`--reason` accepts only `completed` and `not planned`, and `not planned` is
+two words: written bare, `gh` parses `planned` as a positional argument and
+the close fails. Quote it.
+
+```bash
+gh issue close <n> --reason "not planned" --comment "<why>"
+```
+
 ## GITHUB_TOKEN and workflow chaining
 
 Actions performed using the default `GITHUB_TOKEN` (including labels added by `github-actions[bot]` via `actions/github-script`) do **not** trigger `pull_request_target` or other workflow events. This is a GitHub limitation to prevent infinite loops. If one workflow adds a label that should trigger another workflow (e.g., a labeling workflow adds `cc:rebase` to trigger a rebase workflow), the label-adding step must use a **PAT** or **GitHub App token** (e.g., a `PR_RW_GITHUB_TOKEN` secret) instead of `GITHUB_TOKEN`.

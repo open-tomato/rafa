@@ -68,21 +68,34 @@
  * ## What a shell fence is read as
  *
  * Inside a shell fence only COMMAND lines are read, for tools and for
- * paths alike. A comment, a heredoc body, the continuation of a line
- * ending in a backslash, and everything in a `console` fence that
- * carries no `$ ` prompt are all passed over: they are output or
- * data, and a first word taken off output (`Cannot find package`)
- * would be reported as a missing tool. The cost of that rule is named:
- * a `console` fence written with no prompts at all contributes no
- * tools, and nothing here notices. A line ending in `|` or `&&` is
- * not a continuation — the next line opens a command of its own, and
- * its first word is read as one.
+ * paths alike, and WHICH line is one is `shell-lines.ts`'s reading
+ * rather than this module's: a comment, a heredoc body, the
+ * continuation of a line ending in a backslash, and the unprompted
+ * lines of a `console` fence are all passed over there, as is the
+ * first word that is a builtin, an assignment or a flag. That module
+ * carries the note on each of those, and on what each one costs.
  *
- * A first word that is a shell keyword or builtin
- * ({@link SHELL_BUILTINS}), an assignment (`FOO=bar cmd` — the whole
- * line is skipped, not just the assignment), a flag, or anything not
- * shaped like a command name is not a tool. A first word holding a
- * separator (`./scripts/run.sh`) is a PATH, and is checked as one.
+ * What stays here is what a command line is then read FOR. A first
+ * word `shell-lines.ts` answers as a tool is looked up in
+ * `pathDirs`; a first word holding a separator (`./scripts/run.sh`)
+ * is a PATH, and is checked as one.
+ *
+ * ## A fence holding another language carries no command at all
+ *
+ * One line `shell-lines.ts` answers as another language's code makes
+ * the WHOLE fence foreign ({@link FenceReader.foreign}): every
+ * reference already read out of it is dropped, and every later line
+ * of it is passed over. Evidence is taken only from a line this
+ * module would have READ as a command, so a heredoc body is never
+ * evidence and the `python3 -c` line opening one still names its
+ * tool. Measured on 2026-09-20 over the 146 `SKILL.md` bodies of this
+ * repository's `.claude/skills`, of `~/.claude/skills` and of the
+ * sibling checkout's tier, read with no project root and this
+ * machine's `PATH`: 492 tool references and 25 tool issues BEFORE the
+ * rule, the same 492 and 25 AFTER, because NO fence of that corpus is
+ * read as foreign at all. `shell-lines.ts` carries why the unit is
+ * the fence rather than the line, and what those 25 and the 15 lines
+ * it does flag there are.
  *
  * ## Locality
  *
@@ -133,8 +146,7 @@ import { delimiter, isAbsolute, relative, resolve } from 'node:path';
 
 import { AGNOSTIC_STACK } from '../schema/stack.js';
 
-/** The fence info strings whose blocks hold shell command lines. */
-export const SHELL_FENCE_LANGUAGES: readonly string[] = ['bash', 'sh', 'shell', 'zsh', 'console'];
+import { commandOf, continuesLine, heredocTerminator, isForeignCodeLine, isShellFence, toolOf } from './shell-lines.js';
 
 /** The info strings of a fence that names files without being code. */
 export const TEXT_FENCE_LANGUAGES: readonly string[] = ['text', 'txt', 'plain', 'plaintext'];
@@ -162,23 +174,6 @@ export const SYSTEM_ROOTS: readonly string[] = [
 const KNOWN_ROOTS: readonly string[] = [
   ...HOME_ROOTS.map((root) => root.replace(/\/$/, '')),
   ...SYSTEM_ROOTS,
-];
-
-/**
- * First words that name no file on `PATH`: shell keywords, and the
- * builtins a POSIX shell runs itself. `test` and `echo` are here even
- * though `/bin` also holds them, because the shell never reaches
- * `/bin` for either.
- */
-export const SHELL_BUILTINS: readonly string[] = [
-  '.', ':', '[', 'alias', 'bg', 'break', 'builtin', 'case', 'cd', 'command',
-  'continue', 'declare', 'do', 'done', 'echo', 'elif', 'else', 'esac', 'eval',
-  'exec', 'exit', 'export', 'false', 'fc', 'fg', 'fi', 'for', 'function',
-  'getopts', 'hash', 'if', 'in', 'jobs', 'kill', 'let', 'local', 'logout',
-  'popd', 'printf', 'pushd', 'pwd', 'read', 'readonly', 'return', 'select',
-  'set', 'shift', 'source', 'test', 'then', 'time', 'times', 'trap', 'true',
-  'type', 'typeset', 'ulimit', 'umask', 'unalias', 'unset', 'until', 'wait',
-  'while',
 ];
 
 /**
@@ -339,9 +334,6 @@ const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 /** An inline code span, with its contents captured. */
 const CODE_SPAN = /`([^`\n]+)`/g;
 
-/** The shape a command name takes: a letter, then name characters. */
-const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_.+-]*$/;
-
 /** A trailing `:12` or `:12:3` on a path, as an editor prints one. */
 const LINE_SUFFIX = /:\d+(?::\d+)?$/;
 
@@ -354,16 +346,6 @@ const EXTENSION = /\.[A-Za-z][A-Za-z0-9]{0,7}$/;
 /** Characters that make a token a placeholder, a glob or an expression. */
 const NOT_A_PATH = /[<>*?|$"'`{}()[\]!,;@\\\s]/;
 
-/** A heredoc opener, with the terminator word captured. */
-const HEREDOC = /<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/;
-
-/**
- * A command line the next line continues: a trailing backslash, and
- * only that. A line ending in `|` or `&&` continues the PIPELINE, and
- * the next line opens with a command name of its own.
- */
-const CONTINUES = /\\$/;
-
 /** Whether any of `issues` counts towards the exit code. */
 export function hasReferenceFailure(issues: readonly ReferenceIssue[]): boolean {
   return issues.some((issue) => issue.severity === 'failure');
@@ -375,11 +357,6 @@ export function hasReferenceFailure(issues: readonly ReferenceIssue[]): boolean 
  */
 export function pathDirectories(value: string | undefined): readonly string[] {
   return (value ?? '').split(delimiter).filter((entry) => entry.length > 0);
-}
-
-/** Whether `info` names a fence holding shell command lines. */
-function isShellFence(info: string): boolean {
-  return SHELL_FENCE_LANGUAGES.includes(info);
 }
 
 /**
@@ -419,26 +396,31 @@ export function isProjectPath(token: string): boolean {
 /**
  * Whether `token` is an absolute path the locality rule judges.
  *
- * Beyond the shape every path needs, an absolute token has to look
- * like a FILE path and not like an HTTP route: its first segment is a
- * root this module already has a verdict for ({@link KNOWN_ROOTS}),
- * or it carries an extension, and in neither case does it open with a
- * `//` or a dot segment. That rule was written against a false
- * positive rather than a guess: over the corpus this module's note
- * describes, the shape-only test it replaces reported `/health`,
- * `/api/markets`, `/login`, `/.claude` and the `//` of a comment
- * marker as absolute paths outside the project — 109 hits, against 5
- * here, and the 5 that remain are `/openapi.json`, `/swagger.json`
- * and one docker path. What the rule gives up is the extensionless
- * directory under an unknown root: `/workspace/project` in a body is
- * no longer judged at all.
+ * Beyond the shape every path needs, an absolute token has to look like a
+ * FILE path and not like an HTTP route: its first segment is a root this
+ * module has a verdict for ({@link KNOWN_ROOTS}), or it carries an extension
+ * AND a second segment, and neither opens with a `//` or a dot segment. The
+ * shape-only test the extension half replaced read `/health`,
+ * `/api/markets`, `/login`, `/.claude` and a comment marker's `//` as paths
+ * outside the project — 109 hits against 5 on 2026-09-18; the second-segment
+ * half is about those 5: a route a server answers (`/openapi.json`) is one
+ * segment long and no machine's layout. Unjudged now: `/workspace/project`,
+ * `/probe.json`.
+ *
+ * Measured 2026-09-20 over the same 146-body corpus the fence rule above
+ * measures: 327 path references, 63 of them absolute, 0 `home-path` and 0
+ * `foreign-path` issues, all four the same BEFORE this half and AFTER, every
+ * absolute token there under a system root. Planting
+ * `/srv/data/payload.json` beside `/openapi.json` in every body lifts that 0
+ * to 146, the route still 0.
  */
 function isAbsoluteReference(token: string): boolean {
   if (!token.startsWith('/') || token === '/' || token.includes('//')) return false;
   if (SCHEME.test(token) || NOT_A_PATH.test(token)) return false;
 
-  const first = token.split('/')[1] ?? '';
+  const [first = '', second] = token.split('/').slice(1);
   if (first.startsWith('.')) return false;
+  if (second === undefined) return KNOWN_ROOTS.includes(token);
   return KNOWN_ROOTS.includes(`/${first}`) || EXTENSION.test(token);
 }
 
@@ -478,32 +460,6 @@ function pathTokens(text: string): string[] {
   return found;
 }
 
-/**
- * The tool a command line names, or null when its first word is not
- * one: a flag, an assignment, a builtin, a path, or anything not
- * shaped like a command name.
- */
-function toolOf(command: string): string | null {
-  const word = command.split(/\s+/)[0] ?? '';
-  if (word === '' || word.includes('=') || word.includes('/')) return null;
-  if (!TOOL_NAME.test(word) || SHELL_BUILTINS.includes(word)) return null;
-  return word;
-}
-
-/**
- * The command a line of a shell fence holds, or null when it holds
- * none: a comment, an empty line, or — in a `console` fence — a line
- * with no `$ ` prompt, which is output.
- */
-function commandOf(line: string, info: string): string | null {
-  const text = line.trim();
-  if (text === '' || text.startsWith('#')) return null;
-  if (text.startsWith('$ ') || text === '$') return text.slice(1).trim() || null;
-  if (info === 'console') return null;
-  if (text.startsWith('> ')) return null;
-  return text;
-}
-
 /** What one line of a fenced block is being read as. */
 interface FenceReader {
   /** The fence's language, lowercased. */
@@ -516,6 +472,13 @@ interface FenceReader {
   terminator: string | null;
   /** Whether the previous command line continues into this one. */
   continued: boolean;
+  /**
+   * Whether a line this fence would have read as a command was
+   * another language's code, which makes the WHOLE fence foreign.
+   */
+  foreign: boolean;
+  /** What this fence has named so far, held until it closes. */
+  readonly found: BodyReference[];
 }
 
 /**
@@ -547,51 +510,61 @@ function reference(
 }
 
 /** Reads one command line of a shell fence for its tool and its paths. */
-function readCommand(
-  reader: FenceReader,
-  line: string,
-  number: number,
-  found: BodyReference[],
-): void {
+function readCommand(reader: FenceReader, line: string, number: number): void {
   const command = commandOf(line, reader.info);
   if (command === null) return;
+  if (isForeignCodeLine(command)) {
+    reader.foreign = true;
+    return;
+  }
 
-  const heredoc = HEREDOC.exec(command);
-  if (heredoc?.[1]) {
-    reader.terminator = heredoc[1];
+  const terminator = heredocTerminator(command);
+  if (terminator !== null) {
+    reader.terminator = terminator;
   }
 
   if (!reader.continued) {
     const tool = toolOf(command);
-    if (tool !== null) found.push(reference('tool', tool, number, 'fence'));
+    if (tool !== null) reader.found.push(reference('tool', tool, number, 'fence'));
   }
-  reader.continued = CONTINUES.test(command);
+  reader.continued = continuesLine(command);
 
   for (const token of pathTokens(command)) {
-    found.push(reference('path', token, number, 'fence'));
+    reader.found.push(reference('path', token, number, 'fence'));
   }
 }
 
 /** Reads one line of a fenced block. */
-function readFenceLine(
-  reader: FenceReader,
-  line: string,
-  number: number,
-  found: BodyReference[],
-): void {
+function readFenceLine(reader: FenceReader, line: string, number: number): void {
+  if (reader.foreign) return;
+
   if (reader.terminator !== null) {
     if (line.trim() === reader.terminator) reader.terminator = null;
     return;
   }
 
   if (isShellFence(reader.info)) {
-    readCommand(reader, line, number, found);
+    readCommand(reader, line, number);
     return;
   }
 
   for (const token of pathTokens(line)) {
-    found.push(reference('path', token, number, 'fence'));
+    reader.found.push(reference('path', token, number, 'fence'));
   }
+}
+
+/** The reader a fence's opening line opens, having named nothing. */
+function openFence(open: RegExpExecArray): FenceReader {
+  const run = open[1] ?? '';
+  return {
+    info: fenceInfo(open[2] ?? ''),
+    delimiter: run[0] ?? '`',
+    length: run.length,
+    terminator: null,
+    continued: false,
+    foreign: false,
+    found: [],
+  };
 }
 
 /**
@@ -605,31 +578,33 @@ export function collectReferences(body: string): readonly BodyReference[] {
   const found: BodyReference[] = [];
   let reader: FenceReader | null = null;
 
-  body.split('\n').forEach((line, index) => {
+  for (const [index, line] of body.split('\n').entries()) {
     const number = index + 1;
     if (reader === null) {
       const open = FENCE_OPEN.exec(line);
-      if (open) {
-        const info = fenceInfo(open[2] ?? '');
-        const run = open[1] ?? '';
-        reader = { info, delimiter: run[0] ?? '`', length: run.length, terminator: null, continued: false };
-        return;
+      if (open !== null) {
+        reader = openFence(open);
+        continue;
       }
       for (const span of codeSpans(line)) {
         for (const token of pathTokens(span)) {
           found.push(reference('path', token, number, 'code-span'));
         }
       }
-      return;
+      continue;
     }
 
     if (closesFence(line, reader)) {
+      if (!reader.foreign) found.push(...reader.found);
       reader = null;
-      return;
+      continue;
     }
-    if (namesFiles(reader.info)) readFenceLine(reader, line, number, found);
-  });
+    if (namesFiles(reader.info)) readFenceLine(reader, line, number);
+  }
 
+  // A fence the body never closes still names what it named, so the
+  // last reader is flushed rather than dropped.
+  if (reader !== null && !reader.foreign) found.push(...reader.found);
   return found;
 }
 

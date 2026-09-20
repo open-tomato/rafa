@@ -126,6 +126,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { specPath } from './board/naming.js';
 import { buildPlanPrompt, readPlanFormat } from './plan.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
+import { completeSpecBody } from './tests/spec-bodies.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */
 const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -133,8 +134,18 @@ const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
 /** The spec every scratch repository holds at `spec.md`. */
 const SPEC = '# Spec: a command probe\n\nNothing to build.\n';
 
-/** The issue the stand-in `gh` answers `issue view` with; the one board read a case here makes. */
-const ISSUE = { number: 20, title: 'The board routes', body: '# Spec: the board routes\n\nNothing to build.\n' };
+/**
+ * The issue the stand-in `gh` answers `issue view` with; the one board
+ * read a case here makes. Its body fills every template heading
+ * (`./tests/spec-bodies.ts`) because the board route refuses an issue
+ * with a readiness gap before it snapshots one, and what this case is
+ * about is the snapshot.
+ */
+const ISSUE = {
+  number: 20,
+  title: 'The board routes',
+  body: completeSpecBody('Spec: the board routes', 'Nothing to build.'),
+};
 
 /** The spec content the fixture hands the context's builder. */
 const FIXTURE_SPEC = 'the spec as the fixture hands it to the builder\n';
@@ -371,7 +382,7 @@ describe('rafa plan through the adapter registry', () => {
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
-    expect(run.stdout).toContain('▶ Execute with: bun src/rafa.ts start --plan=.rafa/plans/PLAN-spec.md\n');
+    expect(run.stdout).toContain('▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md\n');
     expect(run.stdout).not.toContain('Prerequisites detected');
     expect(run.stdout).not.toContain('Including findings');
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
@@ -630,7 +641,7 @@ describe('rafa plan create in json mode', () => {
       'info:📝 Generating .rafa/plans/PLAN-spec.md from spec.md...',
       'info:\n✅ Plan ready: .rafa/plans/PLAN-spec.md',
       'info:⚠️  Prerequisites detected: complete .rafa/plans/PREREQUISITES-spec.md before starting the loop.',
-      'info:▶ Execute with: bun src/rafa.ts start --plan=.rafa/plans/PLAN-spec.md',
+      'info:▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md',
       'result',
     ]);
     expect(existsSync(scratch.spawned)).toBe(false);

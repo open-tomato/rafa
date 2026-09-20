@@ -22,7 +22,12 @@
  *      names a session under `agents.settingSources` would resolve. A
  *      name none of them answers refuses the run, because the dispatch
  *      it is routed to exits 1 before any model call
- *      (`context/workflow.md`). The checklist read is the tracker when
+ *      (`context/workflow.md`). The tasks read are the ones the
+ *      dispatcher will reach, a line a `rafa:*` block the document never
+ *      closed hides included: `findNextTask` runs such a line, so the
+ *      roster check reads it too (`PlanModel.hiddenTasks`), and the
+ *      refusal names it by the document and the line as it names any
+ *      other. The checklist read is the tracker when
  *      one is already beside the plan, and the plan otherwise, since the
  *      tracker is created after this preflight; a document that cannot
  *      be read is passed over, as the plan's own absence is refused by

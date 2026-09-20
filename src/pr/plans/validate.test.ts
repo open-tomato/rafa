@@ -20,6 +20,8 @@
  * `~/.claude/agents` or `.claude/agents/build-error-resolver.md` in the
  * checkout.
  */
+import type { TriageBlock } from '../triage/comment.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,8 +30,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPlanValidateCommand } from '../../commands/plan/validate.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
+import { DEPENDENCY_BUMP_SIMPLE_CLASSES } from '../triage/classes.js';
 
-import { PINNED_PLAN_CLASSES, readPinnedPlan } from './load.js';
+import { PINNED_PLAN_CLASSES, pinnedPlanValues, readPinnedPlan } from './load.js';
 
 /** The subject `plan validate` routes under. */
 const SUBJECTS = [{ name: 'plan', summary: 'plans' }];
@@ -69,6 +72,58 @@ describe('rafa plan validate over the pinned resolve plans', () => {
       expect(run.stderr).toBe('');
       expect(run.stdout.startsWith('✅ plan.md: no issues;')).toBe(true);
       expect(run.exitCode).toBe(0);
+    });
+  }
+});
+
+/**
+ * The same `{SLOT}` shape `load.ts`'s own `SLOT_PATTERN` matches
+ * (UPPER_SNAKE inside braces, `{agent=…}` excluded by its lower-case
+ * head); not exported from there, so read again here rather than
+ * loosened into a public constant only this file would use.
+ */
+const SLOT_PATTERN = /\{[A-Z][A-Z0-9_]*\}/g;
+
+/** A triage block with every field null but the ones a case names. */
+function blockWith(fields: Partial<TriageBlock>): TriageBlock {
+  return {
+    head: null,
+    at: null,
+    class: null,
+    simple: null,
+    attempts: null,
+    files: null,
+    ...fields,
+  };
+}
+
+/** Every `{SLOT}` name a raw plan template carries, deduplicated. */
+function slotsIn(template: string): string[] {
+  const found = template.match(SLOT_PATTERN) ?? [];
+  return [...new Set(found.map((token) => token.slice(1, -1)))];
+}
+
+describe('the slots a pinned plan carries are covered by its fill', () => {
+  for (const triageClass of PINNED_PLAN_CLASSES) {
+    it(`covers every slot ${triageClass}'s pinned plan carries`, () => {
+      const raw = readPinnedPlan(triageClass);
+      const values = {
+        ...pinnedPlanValues({ block: blockWith({ class: triageClass, files: ['bun.lock'] }) }),
+        FAILING_LOG: 'npm ERR! code ENOTFOUND',
+      };
+
+      const slots = slotsIn(raw);
+      const uncovered = slots.filter((slot) => values[slot] === undefined);
+
+      expect(uncovered).toEqual([]);
+    });
+  }
+
+  for (const ciClass of DEPENDENCY_BUMP_SIMPLE_CLASSES) {
+    it(`holds a failing-log slot on ${ciClass}'s pinned plan`, () => {
+      const raw = readPinnedPlan(ciClass);
+
+      expect(slotsIn(raw)).toContain('FAILING_LOG');
     });
   }
 });

@@ -77,6 +77,16 @@
  *     model and the dispatcher disagree. Either way each such line is
  *     reported as a `task-in-block` issue rather than dropped in
  *     silence.
+ *
+ *     The disagreement is ANSWERED as well as reported:
+ *     {@link PlanModel.hiddenTasks} holds the still-to-run lines a
+ *     block never closed hides, read exactly as {@link PlanModel.tasks}
+ *     reads a line outside every block. A reader that has to act on
+ *     what the dispatcher will RUN, rather than on what the plan says,
+ *     reads both lists — the agent roster check does, in
+ *     `agents/roster.ts`, for `start/preflight.ts` and for
+ *     `rafa plan validate` — while a reader of the plan as written
+ *     keeps `tasks` alone and is unchanged by the field.
  *   - A line inside any other fence is read fence-blind, as the
  *     checklist reads it, so the model holds every task the loop can
  *     dispatch. A plan illustrating the format indents its example
@@ -281,6 +291,23 @@ export interface PlanModel {
   /** Every task line, in source order, whatever its checkbox. */
   readonly tasks: readonly PlanTask[];
   /**
+   * The still-to-run task lines — `- [ ] ` and `- [BLOCKED] ` — that a
+   * `rafa:*` block the document never closed hides: body to
+   * {@link PlanModel.tasks} and dispatched by `findNextTask` all the
+   * same, each also reported as a `task-in-block` issue. In source
+   * order, and empty for every document whose blocks all close. A
+   * ticked line is left out, as the issue leaves it out: the dispatcher
+   * never picks one.
+   *
+   * Each entry is read as a task outside a block is read, so its
+   * `lineNum`, `status`, `text` and `declaration` are what
+   * `findNextTask` and `parseTaskDeclaration` answer for the same line.
+   * Its `stage` is the nearest heading the MODEL holds above it, which
+   * is the last one before the unclosed fence: a `# Stage:` line after
+   * that fence is the block's body and no heading.
+   */
+  readonly hiddenTasks: readonly PlanTask[];
+  /**
    * Every `rafa:*` block, as {@link readRafaBlocks} answered it, the
    * kinds this module ignores included.
    */
@@ -315,6 +342,8 @@ interface TaskLine {
 interface Checklist {
   readonly headings: readonly Heading[];
   readonly tasks: readonly PlanTask[];
+  /** The still-to-run lines a block never closed hides; see {@link PlanModel.hiddenTasks}. */
+  readonly hidden: readonly PlanTask[];
   readonly issues: readonly PlanIssue[];
 }
 
@@ -427,13 +456,25 @@ function taskInBlock(lineNum: number, status: PlanTaskStatus, block: RafaBlock):
   );
 }
 
+/** One task line as the model holds it, under the headings read so far. */
+function planTask(line: TaskLine, lineNum: number, headings: readonly Heading[]): PlanTask {
+  const { text, declaration } = parseTaskDeclaration(line.task);
+  const stage = headings.length > 0
+    ? headings.length - 1
+    : null;
+  return { task: line.task, lineNum, status: line.status, text, declaration, stage };
+}
+
 /**
  * Reads every stage heading and task line outside a `rafa:*` block,
- * and reports each open task line inside one.
+ * reports each open task line inside one, and answers separately the
+ * still-to-run lines a block never closed hides, which the dispatcher
+ * runs whatever this reader makes of them.
  */
 function readChecklist(markdown: string, blocks: readonly RafaBlock[]): Checklist {
   const headings: Heading[] = [];
   const tasks: PlanTask[] = [];
+  const hidden: PlanTask[] = [];
   const issues: PlanIssue[] = [];
 
   for (const [lineNum, line] of markdown.split('\n').entries()) {
@@ -442,6 +483,7 @@ function readChecklist(markdown: string, blocks: readonly RafaBlock[]): Checklis
     if (block !== undefined) {
       if (taskLine !== null && taskLine.status !== 'done') {
         issues.push(taskInBlock(lineNum, taskLine.status, block));
+        if (!block.closed) hidden.push(planTask(taskLine, lineNum, headings));
       }
       continue;
     }
@@ -453,14 +495,10 @@ function readChecklist(markdown: string, blocks: readonly RafaBlock[]): Checklis
     }
     if (taskLine === null) continue;
 
-    const { text, declaration } = parseTaskDeclaration(taskLine.task);
-    const stage = headings.length > 0
-      ? headings.length - 1
-      : null;
-    tasks.push({ task: taskLine.task, lineNum, status: taskLine.status, text, declaration, stage });
+    tasks.push(planTask(taskLine, lineNum, headings));
   }
 
-  return { headings, tasks, issues };
+  return { headings, tasks, hidden, issues };
 }
 
 /** The index of the last heading above the line at `lineNum`, or null. */
@@ -653,6 +691,7 @@ export function parsePlan(markdown: string): PlanModel {
     context: bound.context?.body ?? null,
     stages,
     tasks: checklist.tasks,
+    hiddenTasks: checklist.hidden,
     blocks,
     issues,
   };

@@ -45,15 +45,16 @@ counts after all tests complete, and its order is deterministic, so two
 runs of the same tree move only where a case reads an input the tree
 does not own — which one case does, below.
 
-**One case reads a live directory and can redden on a clean tree.**
+**One case reads a frozen copy of session logs.**
 `src/tests/parity-differential.test.ts` runs the collector twice, once
-per backend, over `~/.claude/projects/-Users-marcos-projects-agentic-research`,
-and the sibling runs its own loop: a session appending to its `.jsonl`
-between the two collections changes the row, and `holds every session
-row byte-identical between backends, keyed by session id` fails.
-Measured 2026-09-18 at `12e6d17`: the full suite 4799 pass, 1 skip, 1
-fail, that case, and the file alone 3 pass, 1 fail, the same case. So a
-single red count is not yet a reading about the change.
+per backend, over a frozen snapshot of logs from the sibling's session
+directory `~/.claude/projects/-Users-marcos-projects-agentic-research`.
+The snapshot eliminates the race condition where the live directory would
+change between collection passes: the sibling's loop would append to its
+`.jsonl` files while the test collects, altering the rows the test reads.
+Both backends now read identical input and are compared for parity, with
+the test validating that `holds every session row byte-identical between
+backends, keyed by session id`.
 
 The fields the race moves are NOT confined to `sizeBytes` and
 `modifiedAt`, as this paragraph read until 2026-09-20: one run during

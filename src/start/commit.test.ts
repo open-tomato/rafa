@@ -1,7 +1,8 @@
 /**
  * Tests for how the loop settles a task whose session returned 0: what
- * its report holds the task back on, and the mark and the outcome that
- * follow.
+ * its report holds the task back on, what the two absences hold it back
+ * on when it reported nothing and committed nothing, and the mark and the
+ * outcome that follow.
  *
  * {@link readReportHolds} is pure over an output, so its cases hand it
  * whole session outputs, prose and then a `rafa:report` block.
@@ -28,6 +29,16 @@
  * absence no leg aimed at: the clean report, a `blockers` value that is no
  * list beside a status spelled `Blocked`, a refused commit, and an output
  * with no report.
+ *
+ * The hold for a session that left NEITHER a report the loop could read
+ * NOR a commit came after that sweep, which aimed at none of it. Five
+ * mutations of it were driven against this file on 2026-09-20, each an
+ * exact string found once and restored sha256-identical, this file green
+ * before and after, and every one reddened at least one case here:
+ * dropping both absence holds (3 red), naming the report alone among them
+ * (2), holding on the missing report whatever git answered (3), leaving
+ * the blocker comment off the line (1), and telling the operator that the
+ * task was blocked by its own report (1).
  */
 import type { CommitAttempt } from '../utils/commit.js';
 
@@ -50,7 +61,7 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { finishCleanExit, readReportHolds } from './commit.js';
+import { finishCleanExit, NOTHING_REPORTED_OR_COMMITTED, readReportHolds } from './commit.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -81,6 +92,15 @@ const DONE_WITH_BLOCKER = outputWith(
   '    artifact: "401 Unauthorized"',
 );
 
+/** The hold naming the report a silent session never wrote. */
+const NO_REPORT_HOLD = 'no report: the session wrote no rafa:report block the loop could read';
+
+/** The hold naming the commit its work never made. */
+const NO_COMMIT_HOLD = 'no commit: the task changed no tracked file';
+
+/** An output whose last report block is there but unreadable. */
+const UNREADABLE = outputWith('status: blocked', 'feedback: it broke: twice');
+
 /** The open task every planted tracker dispatches first. */
 const FIRST_TASK = 'Wire the report into the loop';
 
@@ -106,6 +126,9 @@ const COMMITTED: CommitAttempt = {
   exitCode: 0,
   message: '',
 };
+
+/** What it answers for a task whose work changed no tracked file. */
+const NOTHING_TO_COMMIT: CommitAttempt = { ...COMMITTED, outcome: 'nothing-to-commit', sha: null };
 
 /** What a stubbed runner answers for a commit a hook refused. */
 const REFUSED: CommitAttempt = {
@@ -299,10 +322,8 @@ describe('finishCleanExit', () => {
   });
 
   it('marks a held task blocked when git had nothing to commit', () => {
-    const nothing: CommitAttempt = { ...COMMITTED, outcome: 'nothing-to-commit', sha: null };
-
-    const held = settle(DONE_WITH_BLOCKER, nothing);
-    const clean = settle(CLEAN, nothing);
+    const held = settle(DONE_WITH_BLOCKER, NOTHING_TO_COMMIT);
+    const clean = settle(CLEAN, NOTHING_TO_COMMIT);
 
     expect(held.line).toBe(`- [BLOCKED] ${FIRST_TASK}`);
     expect(held.finished.outcome).toBe('blocked');
@@ -323,6 +344,81 @@ describe('finishCleanExit', () => {
 
     expect(silent.line).toBe(`- [x] ${FIRST_TASK}`);
     expect(silent.finished).toMatchObject({ outcome: 'done', holds: [] });
+  });
+
+  it('holds a clean exit that wrote no report and changed no tracked file, rather than ticking it', () => {
+    // The signature the spec calls a held task: no report, no commit.
+    const silentAndEmpty = settle('Done, and nothing to report.', NOTHING_TO_COMMIT);
+
+    // The line trails the blocker comment the hold writes onto it, below.
+    expect(silentAndEmpty.line).toStartWith(`- [BLOCKED] ${FIRST_TASK}`);
+    expect(silentAndEmpty.finished.outcome).toBe('blocked');
+
+    // The control: a report present, but nothing changed, stays ticked.
+    const reportedAndEmpty = settle(CLEAN, NOTHING_TO_COMMIT);
+
+    expect(reportedAndEmpty.line).toBe(`- [x] ${FIRST_TASK}`);
+    expect(reportedAndEmpty.finished.outcome).toBe('done');
+
+    // The control: a file changed, but no report, stays ticked.
+    const silentAndChanged = settle('Done, and nothing to report.', COMMITTED);
+
+    expect(silentAndChanged.line).toBe(`- [x] ${FIRST_TASK}`);
+    expect(silentAndChanged.finished.outcome).toBe('done');
+  });
+
+  it('names the missing report and the missing commit, in the holds and to the operator', () => {
+    const silent = settle('Done, and nothing to report.', NOTHING_TO_COMMIT);
+
+    expect(silent.finished.holds).toEqual([NO_REPORT_HOLD, NO_COMMIT_HOLD]);
+    const spoken = errors.join('\n');
+    expect(spoken).toContain(`Task held: its session left neither a report nor a commit: ${FIRST_TASK}`);
+    expect(spoken).toContain(`   ${NO_REPORT_HOLD}`);
+    expect(spoken).toContain(`   ${NO_COMMIT_HOLD}`);
+    expect(spoken).not.toContain('blocked by its own report');
+
+    // The control: a report that holds the task names the report instead,
+    // and neither absence.
+    logs = [];
+    errors = [];
+    const reported = settle(DONE_WITH_BLOCKER, NOTHING_TO_COMMIT);
+
+    expect(reported.finished.holds).toEqual(['blocker: LINEAR_API_KEY unset']);
+    expect(errors.join('\n')).toContain('Task blocked by its own report');
+    expect(errors.join('\n')).not.toContain(NO_REPORT_HOLD);
+  });
+
+  it('writes what held such a task onto its line, so its next dispatch reads it', () => {
+    const silent = settle('Done, and nothing to report.', NOTHING_TO_COMMIT);
+
+    expect(silent.line).toContain(NOTHING_REPORTED_OR_COMMITTED);
+    expect(findNextTask(readFileSync(silent.trackerPath, 'utf8'))).toMatchObject({
+      task: FIRST_TASK,
+      status: 'blocked',
+      blocker: NOTHING_REPORTED_OR_COMMITTED,
+    });
+
+    // The control: a task its own report held carries no comment from
+    // here; `start/triage.ts` writes the report blocker onto that line.
+    const reported = settle(DONE_WITH_BLOCKER, NOTHING_TO_COMMIT);
+
+    expect(reported.line).toBe(`- [BLOCKED] ${FIRST_TASK}`);
+  });
+
+  it('holds a report block that is there but unreadable, when nothing was committed either', () => {
+    // A block the parser cannot read is no report the loop can act on.
+    expect(readReportHolds(UNREADABLE)).toEqual([]);
+
+    const unreadableAndEmpty = settle(UNREADABLE, NOTHING_TO_COMMIT);
+
+    expect(unreadableAndEmpty.finished.outcome).toBe('blocked');
+    expect(unreadableAndEmpty.finished.holds).toEqual([NO_REPORT_HOLD, NO_COMMIT_HOLD]);
+
+    // The control: the same unreadable block beside a commit still ticks.
+    const unreadableAndChanged = settle(UNREADABLE, COMMITTED);
+
+    expect(unreadableAndChanged.line).toBe(`- [x] ${FIRST_TASK}`);
+    expect(unreadableAndChanged.finished.outcome).toBe('done');
   });
 
   it('tells the operator what held the task, and that its work was committed', () => {

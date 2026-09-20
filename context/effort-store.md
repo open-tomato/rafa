@@ -67,6 +67,28 @@ A new table moves every full table-list expectation with it: two in
 `preflight.test.ts` takes the later tables out with, beside the
 version-7 filter of `changes.test.ts`.
 
+**`out_of_scope_bugs.scope` is read, not copied.** Every other column of
+these tables holds what a report wrote; `scope` holds what
+`src/triage/machine-fault.ts` reads off the bug's `what` and `artifact`,
+which `store/triage.ts` calls for each bug it stores: `machine` for a
+fault of the machine the session ran on, `rafa` otherwise, and never
+NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
+the one migration that creates no table, so a row a version-8 store
+already held reads NULL — stored before the reading existed. It is
+outside `out_of_scope_bugs_by_entry` because it is a function of `what`
+and `artifact`, which that index already holds, so a repeat of an entry
+is still the duplicate it was and keeps the scope on the row. A column
+added to one of these tables moves every COLUMN-list expectation, as a
+new table moves the table lists — for this one, exactly two: the
+`COLUMNS` map and the whole-row `toEqual` of `store/triage.test.ts`.
+The table-list expectations named above do NOT move for a column, and
+neither does `tests/store-version-guard.test.ts`: `sqlite.test.ts` and
+the guard spell table names only, and the guard builds its refusal
+wording from `SQLITE_SCHEMA_VERSION + 1` at import time, so a bumped
+version moves both sides of its comparison together. Read the two
+`store/triage.test.ts` expectations first and expect nothing else to
+redden.
+
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
 the session id, holding the block as written, each declared value the
@@ -101,15 +123,18 @@ and writes nothing for a run with no item to check. `rafa doctor` checks
 the same items and writes no row.
 
 **`findings` has two writers.** `store/tracker-refs.ts` keeps a filed
-issue's reference in the row the dispatch's session holds under the
-bug's artifact: it sets `tracker_ref` on that session's finding, or
-inserts a row holding only the dispatch, the artifact and the reference,
-and keeps a reference already there. `readTrackerRef` answers the oldest
-reference stored under an artifact, in any session. Write a report's
-findings before its references: a finding written after a reference
-under the same session and artifact is skipped as that row's duplicate.
-An inserted row reaches `progress.txt` as the bullet
-`- artifact: <artifact>`.
+issue's reference in the row the dispatch's session holds under the text
+its caller keys the recurrence by: it sets `tracker_ref` on that
+session's row for the key, or inserts a row holding only the dispatch,
+the key and the reference, and keeps a reference already there.
+`readTrackerRef` answers the oldest reference stored under a key, in any
+session. `triage/triage.ts` keys by the bug's artifact WITH the tracker
+file it was reported against, so its rows carry that key rather than a
+bare artifact and never land on a report's finding. A caller that does
+key by a bare artifact writes a report's findings first: a finding
+written after a reference under the same session and artifact is skipped
+as that row's duplicate. An inserted row reaches `progress.txt` as the
+bullet `- artifact: <key>`.
 
 ### Attribution
 

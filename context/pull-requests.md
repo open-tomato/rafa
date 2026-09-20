@@ -32,7 +32,8 @@ two automatic preflight items run before any task is paid for:
    login`
 
 `rafa doctor` prints both checks. With `provider: none` the loop pushes the
-branch, prints the compare URL, skips the CI wait, and says so. No other
+branch, prints the compare URL, skips the CI wait, skips the release
+stage's body write — there being no body — and says so each time. No other
 provider is built; the functions in `src/utils/pr.ts` move behind one
 `PullRequests` interface in `src/pr/` so a second provider is an adapter
 later.
@@ -41,10 +42,26 @@ Every `pr` action without a usable `gh` exits 2 with the same message.
 
 The port carries `comment`, `editComment` and `editBody`. `editBody` is
 rafa-21's: the release stage writes its failure sentence into a pull
-request body the wrap-up session already wrote. The port is NOT in
+request body the wrap-up session already wrote, when the provider that
+stage resolves is `gh`. The port is NOT in
 `PORT_VERSIONS` (`src/adapters/registry.ts` versions tracker, store,
 learning, output and planner only), so adding a method to it bumps no
 version.
+
+**For a test whose subject is the CALLER, build the provider with
+`createPullRequestsDouble()`** — imported from
+`../pr/pull-requests-double.js`, never from the barrel, which keeps a
+test helper out of the loop's import graph as `./gh-fake.js` is kept out.
+It answers the members the case names, refuses every other one, and
+records each call either way, refusals included, so "it refused and
+merged nothing" is read off `calls()` rather than inferred from a
+message; `sent()` spells one line per call, a squash merge of #41 as
+`merge 41 squash`, and `{ refusal }` gives a case its own refusal
+wording. Reach for it rather than writing a `PullRequests` literal in
+the test file: `check-types` opens no `*.test.ts`, so a hand-built
+literal goes stale in silence when the port grows a member — which is
+how `editBody` came to be missing from eight of them — while the
+builder is a module the types gate does read.
 
 **For a test that needs a real provider and no network, build one over
 the fake `gh`.** `createFakePrGh()` — imported from `../pr/gh-fake.js`,
@@ -170,8 +187,9 @@ through `src/commands/pr/triage-trust.ts`: the triage marker comment's
 author, and the pull request's author for `pr triage --resolve`.
 
 **The `plan create` routes do NOT ask it.** Check 0 below is specified and
-unwired: `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check
-and the leak refusal only, and `src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
+unwired: `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check,
+the leak refusal and the completeness refusal only, and
+`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
 does not fetch `author`, so nothing on that route holds a login to read at
 all. An issue an outsider opened and a member labelled `spec:ready` is
 therefore snapshotted and planned from, and the label — which only a
@@ -211,17 +229,22 @@ Four checks, cheapest first; any one failing writes no plan file:
 1. Label (a person's decision): the issue carries `spec:ready`. Without it:
    "issue #<n> is not marked spec:ready", exit 2. `plan create --next` STOPS
    at a next line that is not ready and says so; it never skips ahead.
-2. Code: the leak refusal (`src/board/leak.ts`), which IS wired and
-   refuses. The heading-completeness half is written as
+2. Code: BOTH halves are wired and both refuse, the leak first. The leak
+   refusal is `src/board/leak.ts`. The heading-completeness half is
    `requireCompleteSpec` (`src/board/readiness.ts`) — every template
    heading present and non-empty, "Tasks the plan must carry" and
    "Definition of done" each holding at least one list item, no
    placeholder surviving (`TBD`, `TODO`, `???`, an unfilled template
-   comment), each gap listed with its heading — and has no caller outside
-   its own tests, because refusing on it would refuse every spec opened
-   before `src/board/templates/spec.md` existed. What runs in its place
-   WARNS and never refuses: `warnOnThinListSections`, over those two list
-   headings alone.
+   comment), each gap listed with its heading, exit 2 before the
+   snapshot. It refuses every spec opened before
+   `src/board/templates/spec.md` existed, which is the cost the spec
+   chose to pay: such a body carries none of the six headings, so the
+   refusal names all six and the issue needs one hand edit before it can
+   be planned from. The warning that used to run in its place,
+   `warnOnThinListSections`, is gone with it — every gap it named is one
+   this refusal throws on — and `findListSectionGaps` and
+   `listSectionWarning` are left with no caller outside their own
+   tests.
 3. The planner's first pass (same session, no second one paid for): the plan
    prompt gains bullets, below its first line so the classifier key stays,
    telling the session to judge the spec BEFORE planning: can each

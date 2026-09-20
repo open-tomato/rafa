@@ -397,7 +397,20 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // pushed after the wait started would be a commit those checks
         // never read, and the wait would then report on a head the
         // release moved.
-        await finishRelease({ repoRoot, preparation: release });
+        // The reading that decides whether the failure sentence reaches a
+        // pull request body at all is made here too, and for the same
+        // reason: the run's `pr.provider` lives in this config, and a
+        // repository resolving to `none` has no pull request to carry it
+        // (`start/release-stage.ts`).
+        await finishRelease(
+          { repoRoot, preparation: release },
+          {
+            readProvider: () => resolvePrProvider({
+              configured: runConfig.config.prProvider ?? null,
+              dir: repoRoot,
+            }),
+          },
+        );
         if (ciWait) {
           await verifyPullRequest(
             Math.max(1, ciTimeoutMin) * 60_000,

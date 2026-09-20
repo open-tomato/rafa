@@ -45,6 +45,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
+import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { TRIAGE_MARKER } from './last-triage.js';
@@ -169,20 +170,12 @@ interface StubAnswers {
 
 /** A provider answering `findOpen`, `get`, `checks` and `comments`, and refusing every other call. */
 function stubPulls(answers: StubAnswers): PullRequests {
-  const refuse = (): Promise<never> => Promise.reject(new Error('the stub provider models the reading members alone'));
-  return {
-    kind: 'gh',
+  return createPullRequestsDouble({
     findOpen: answers.findOpen ?? (() => Promise.resolve(detail())),
-    list: refuse,
     get: answers.get ?? (() => Promise.resolve(detail())),
     checks: answers.checks ?? (() => Promise.resolve({ rows: [], verdict: 'none' })),
-    browse: refuse,
-    merge: refuse,
     comments: answers.comments ?? (() => Promise.resolve([])),
-    comment: refuse,
-    editComment: refuse,
-    failedLog: refuse,
-  };
+  }, { refusal: 'the stub provider models the reading members alone' }).pulls;
 }
 
 /** The seams a case hands the command, with what the provider control recorded. */

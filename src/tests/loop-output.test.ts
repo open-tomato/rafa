@@ -69,7 +69,12 @@
  *     the task session's tee and once through the wrap-up, which spawns
  *     through `runClaude`. In text mode there is no step line and no
  *     event, and the bytes of both sessions come out as they were written,
- *     the last line running into the loop's next one.
+ *     the last line running into the loop's next one. Its stand-in also
+ *     writes a tracked file per call ({@link Planting.claudeWork}), so the
+ *     task commits and is ticked: a session that leaves NEITHER a report
+ *     NOR a commit is held instead, and the run would stop there
+ *     (`start/commit.ts`). The commit is what the report absence is
+ *     paired with here, so the missing-report warning still reads.
  *
  * Both session cases run under `--inject=full`, so no injection fallback
  * warning sits among the lines they read.
@@ -234,11 +239,12 @@ const PROGRESS_PRESERVED = '\n✅ Progress preserved; PR opened or updated on th
  * No repository here carries a `package.json` or a `CHANGELOG.md`, and
  * `release.enabled` defaults to `auto`, so step 1 writes neither file
  * and answers the skip sentence below; step 3 then reports that same
- * sentence and tries to put it in the pull request body. Every scratch
- * PATH holds the stand-in `claude` and git alone, so `gh` is absent and
- * that write cannot happen — its reason names the run's own temporary
- * directory and whatever the spawn refused with, which is why the last
- * line is read as a pattern and the first two byte for byte.
+ * sentence and says where it did not go. No scratch repository here has
+ * an `origin`, so the provider the stage resolves is `none`
+ * (`src/pr/provider.ts`) and no `gh` is spawned at all — which is what
+ * makes the third line deterministic: it names the reading and the
+ * sentence, not a temporary directory and whatever a spawn refused
+ * with, so all three are read byte for byte.
  */
 const NO_RELEASE_SENTENCE = 'no version bump and no changelog entry: release.enabled is auto and package.json and CHANGELOG.md are not there';
 
@@ -249,15 +255,19 @@ const NO_RELEASE_PREPARED = `\n📦 No release prepared for this pull request: $
 const NO_RELEASE_REPORTED = `\n📦 ${NO_RELEASE_SENTENCE}`;
 
 /**
- * The line saying that sentence reached no pull request body, and why.
- *
- * Unanchored on purpose, so the one pattern reads both the message of a
- * json-mode event and the `error: `-prefixed line text mode writes.
+ * The line saying that sentence reached no pull request body, and why:
+ * an `info` line, because a repository with no GitHub origin writing no
+ * body is the provider reading working and not a fault.
  */
-const NO_RELEASE_BODY = /That line is not in the pull request body: the pull request body could not be written: /;
+const NO_RELEASE_BODY = `   No pull request body carries ${JSON.stringify(NO_RELEASE_SENTENCE)}:`
+  + ' this repository resolves to pr.provider: none, because origin is not set,'
+  + ' so there is no pull request to write it to.';
 
 /** The warning a session that wrote no report is stored with, as {@link labelOf} spells it. */
 const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/;
+
+/** The line naming the commit a task's work made, its sha abbreviated. */
+const COMMITTED_LINE = /^info: {3}Committed [0-9a-f]{7} .+$/;
 
 /** How long a case may run, over the kill below. */
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -277,6 +287,12 @@ interface Planting {
   readonly claudeExit?: number;
   /** What the stand-in writes to stdout on every call, byte for byte. Defaults to nothing. */
   readonly claudeStdout?: string;
+  /**
+   * A file, named relative to the repository, the stand-in appends a line
+   * to on every call, so the task's commit finds tracked work. Defaults to
+   * none, which leaves the task nothing to commit.
+   */
+  readonly claudeWork?: string;
 }
 
 /** One planted scratch repository and what a run under it reads. */
@@ -315,10 +331,14 @@ function plant(planting: Planting): Scratch {
   const claudeStdout = join(root, 'claude-stdout.txt');
   writeFileSync(claudeStdout, planting.claudeStdout ?? '', 'utf8');
   const claude = join(bin, 'claude');
+  const work = planting.claudeWork === undefined
+    ? []
+    : [`echo work >> '${join(repo, planting.claudeWork)}'`];
   writeFileSync(claude, [
     '#!/bin/sh',
     'while read -r _line; do :; done',
     `echo called >> '${callLog}'`,
+    ...work,
     `/bin/cat '${claudeStdout}'`,
     `exit ${planting.claudeExit ?? 0}`,
     '',
@@ -492,7 +512,8 @@ describe('loop start with no --plan', () => {
 /**
  * Each line a run with no open task writes, as its level and its
  * message, in order. A message written as a pattern is one carrying
- * something of the run's own; see {@link NO_RELEASE_BODY}.
+ * something of the run's own; every release line is a string, for the
+ * reason the module note gives.
  */
 function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | RegExp])[] {
   const { issues } = parsePlan(PLAN_DONE);
@@ -510,7 +531,7 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
     ['info', NO_RELEASE_PREPARED],
     ['info', PROGRESS_PRESERVED],
     ['info', NO_RELEASE_REPORTED],
-    ['error', NO_RELEASE_BODY],
+    ['info', NO_RELEASE_BODY],
   ];
 }
 
@@ -599,7 +620,12 @@ describe('a loop start run whose session fails', () => {
 });
 
 describe('a loop start run whose task and wrap-up sessions write to stdout', () => {
-  const planting: Planting = { branch: `feat/${STUB}`, plan: PLAN_OPEN, claudeStdout: SESSION_STDOUT };
+  const planting: Planting = {
+    branch: `feat/${STUB}`,
+    plan: PLAN_OPEN,
+    claudeStdout: SESSION_STDOUT,
+    claudeWork: 'work.txt',
+  };
 
   it('writes one step and each session line as an info event in json mode, every line NDJSON', () => {
     const scratch = plant(planting);
@@ -621,7 +647,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       `info:\n🔄 Executing task: ${TASK}`,
       ...SESSION_LINES,
       `info:✅ Task done: ${TASK}`,
-      'info:   Nothing to commit: the task changed no tracked file.',
+      expect.stringMatching(COMMITTED_LINE),
       expect.stringMatching(NO_REPORT_WARNING),
       'info:\n✅ All tasks completed!',
       `info:${WRAP_UP_STARTING}`,
@@ -630,7 +656,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       ...SESSION_LINES,
       `info:${PROGRESS_PRESERVED}`,
       `info:${NO_RELEASE_REPORTED}`,
-      expect.stringMatching(NO_RELEASE_BODY),
+      `info:${NO_RELEASE_BODY}`,
       'result',
     ]);
     expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');

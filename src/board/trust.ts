@@ -22,9 +22,10 @@
  * the `rafa:pr-triage` marker-comment reader, and `pr triage --resolve`
  * on the pull request's own author. The spec also asks for the check on
  * `plan create --issue` and `plan create --next`, and NEITHER is wired:
- * `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check and
- * the leak refusal only, and `src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
- * does not fetch `author`, so that route holds no login to ask about.
+ * `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check,
+ * the leak refusal and the completeness refusal only, and
+ * `src/board/issue.ts`'s `ISSUE_VIEW_FIELDS` does not fetch `author`,
+ * so that route holds no login to ask about.
  * Both modules record the gap; `context/pull-requests.md` carries what
  * closing it costs. The `rafa:spec-review` reader is NOT a missing
  * caller — it spends no trust reading by design, because nothing reads

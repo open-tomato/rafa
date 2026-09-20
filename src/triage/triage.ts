@@ -14,44 +14,66 @@
  *     text writes nothing and leaves an earlier comment as it was. The
  *     writer marks the line `[BLOCKED]` and refuses a ticked line, so a
  *     task the loop ticked keeps its tick.
- *   - Out-of-scope bugs, one at a time in list order, each routed by its
- *     `security` flag before anything is looked up. A bug with no usable
- *     `what` is skipped: it says nothing to file, and the store's triage
- *     writer refuses it for the same reason.
+ *   - Out-of-scope bugs, one at a time in list order, each routed before
+ *     anything is looked up: to the machine channel when the
+ *     machine-fault reading answers, and otherwise by its `security`
+ *     flag. A bug with no usable `what` is skipped: it says nothing to
+ *     file, and the store's triage writer refuses it for the same
+ *     reason.
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
  * declares a task for it.
  *
+ * ## The key a bug is looked up by
+ *
+ * A bug's recurrence key is its artifact WITH the file it was reported
+ * against: the base name of the task's tracker file, then the artifact on
+ * one line, joined by {@link KEY_SEPARATOR} ({@link bugKeyOf}). The
+ * artifact alone is not the defect. Two plans quoting one error string
+ * report two different bugs, and keying on that string alone commented the
+ * second on the first one's issue; keyed by the file as well, they stay
+ * two issues, and two wordings of one defect under one file stay one.
+ *
+ * A bug with no artifact has no key (roadmap Q18): it is filed every time,
+ * with no lookup and no reference stored. An artifact that is blank, or
+ * that holds a lone UTF-16 surrogate, which the store cannot key a
+ * reference by, counts as none.
+ *
  * ## A public bug
  *
- * A bug whose flag is `false` goes to the tracker the degradation chain
- * landed on, looked up by its artifact:
+ * A bug the machine reading below did not match, and whose flag is
+ * `false`, goes to the tracker the degradation chain landed on, looked
+ * up by its key:
  *
- *   1. The reference stored under the artifact (`readTrackerRef`). One of
- *      the tracker's own kind is the issue: the bug is commented on there,
- *      and nothing is stored. One of another kind is passed over, since
- *      the tracker cannot read it: a run that fell back from `github` to
- *      `local` asks `local` instead.
- *   2. `tracker.find` for a `bug` whose text holds the artifact. The first
- *      ref it answers is commented on, and stored under the artifact
+ *   1. The reference stored under the key (`readTrackerRef`, which keeps a
+ *      reference under the text its caller keys by, this module's key
+ *      rather than the bare artifact). One of the tracker's own kind is
+ *      the issue: the bug is commented on there, and nothing is stored.
+ *      One of another kind is passed over, since the tracker cannot read
+ *      it: a run that fell back from `github` to `local` asks `local`
+ *      instead.
+ *   2. The stored reference is missing: `tracker.find` for a `bug` whose
+ *      text holds the key's normalized text, the same key built from the
+ *      redacted artifact. Every issue this module files carries that text
+ *      in its `Recurrence key` section, so an issue filed for this bug
+ *      from a checkout whose store this run does not have is found, while
+ *      an issue that only quotes the artifact under another file is not.
+ *      The first ref it answers is commented on, and stored under the key
  *      (`writeTrackerRef`), so a later recurrence is answered by step 1.
  *   3. Neither: the bug is filed with `tracker.create`, and the reference
- *      it answers is stored under the artifact.
+ *      it answers is stored under the key.
  *
- * A bug with no artifact has no recurrence key (roadmap Q18): it is filed
- * every time, with no lookup and no reference stored. An artifact that is
- * blank, or that holds a lone UTF-16 surrogate, which the store cannot key
- * a reference by, counts as none.
- *
- * The references go into the rows the report's findings already hold, so
- * triage runs after the report is stored: a finding written after a
- * reference under the same session and artifact is lost
- * (`store/tracker-refs.ts`).
+ * A reference therefore goes into a findings row of its own, keyed by the
+ * bug's key and not by the artifact the report's findings are keyed by, so
+ * a finding this session reported under that artifact keeps its row
+ * whichever was written first, and `progress.txt` renders the reference's
+ * row as one more `- artifact: <key>` bullet (`store/tracker-refs.ts`).
  *
  * ## A security bug
  *
- * A bug whose flag is `true`, or missing, is filed only to the private
- * tracker: a second `local` tracker rooted at {@link PRIVATE_TRIAGE_DIR},
+ * A bug the machine reading below did not match, and whose flag is
+ * `true` or missing, is filed only to the private tracker: a second
+ * `local` tracker rooted at {@link PRIVATE_TRIAGE_DIR},
  * which `.gitignore` keeps ignored under every tracking flag
  * (`project/gitignore.ts`). The parser never defaults a missing flag, and
  * the qa-bug-reporter rule treats ambiguity as a match, so null counts as
@@ -72,6 +94,41 @@
  * tracker that is not of kind `local` or that is the public tracker
  * itself; {@link createPrivateTriageTracker} makes the one it defaults to.
  *
+ * ## A machine-scoped bug
+ *
+ * A bug whose `what` and `artifact` name a system toolchain, a machine's
+ * SDK path or a package-manager build failure is a fault of the MACHINE
+ * the session ran on and not of rafa. `./machine-fault.ts` is the whole
+ * of that reading, and its note holds the families, the near misses that
+ * shaped them and what it reads over the 27 bugs rafa's own runs filed.
+ * Such a bug goes to a third channel, which has no tracker at all:
+ *
+ *   - neither tracker is asked anything, the public one or the private
+ *     one: no `find`, no `create`, no `comment`;
+ *   - no reference is stored, and none is read. Nothing was filed for
+ *     it, so there is no issue a recurrence could be answered with;
+ *   - its action is `skipped`, its channel `machine`, and its problem is
+ *     one line for the operator naming the family and the text that
+ *     matched ({@link machineFaultSentence}, redacted as every problem
+ *     here is), so a run says why nothing was filed rather than saying
+ *     nothing.
+ *
+ * The bug is not lost. `writeTriage` (`effort/store/triage.ts`) stores
+ * every out-of-scope bug whatever triage did with it, and reads the SAME
+ * module for its row's `scope` column, so the row says `machine` and the
+ * routing and the row can never disagree about one bug. What is kept off
+ * is the board: nobody reading it can act on a malformed SDK stub on one
+ * machine, no rafa commit can fix one, and the artifact would carry that
+ * machine's own paths onto a public tracker. Issue #17 on
+ * `open-tomato/rafa` is the bug this channel exists for.
+ *
+ * The reading is taken BEFORE the `security` flag, so a machine fault a
+ * session flagged reaches the private tracker no more than it reaches
+ * the public one, and before the `what` check, so a machine-scoped bug
+ * with no `what` is skipped as a machine one: nothing was called for it
+ * either way, and the store refuses its row for the missing `what`
+ * whichever channel it went to.
+ *
  * ## What is filed
  *
  * The draft is a `bug` with `opt: 0`, since rafa keeps no OPT ledger and
@@ -83,13 +140,16 @@
  *
  * The title is the bug's `what` on one line, cut to
  * {@link TITLE_MAX_LENGTH} code points. The body opens with a sentence
- * saying where the issue came from, then five sections, each value in a
+ * saying where the issue came from, then six sections, each value in a
  * fence one backtick longer than any backtick run it holds, so the text a
  * session wrote is shown verbatim and never rendered: `What`, `Artifact`,
- * `Plan` (the plan stub), `Task` (the task text, as the dispatch quoted
- * it) and `Feedback` (the report's feedback). A missing artifact, stub or
- * feedback is a sentence saying so. A recurrence's comment carries the
- * same five sections under its own opening sentence.
+ * `Recurrence key` (the key step 2 searches for), `Plan` (the plan stub),
+ * `Task` (the task text, as the dispatch quoted it) and `Feedback` (the
+ * report's feedback). A missing artifact, key, stub or feedback is a
+ * sentence saying so. A recurrence's comment carries the same six sections
+ * under its own opening sentence, so an issue filed before this rafa, with
+ * no key section of its own, gains one from the first recurrence commented
+ * on it.
  *
  * ## Named secrets
  *
@@ -98,11 +158,12 @@
  * that is set. {@link redactSecrets} replaces each value with
  * `[redacted: <NAME>]`. Every value a session or the plan supplied goes
  * through it before it reaches a title, a body, a comment or a `find`
- * query: the artifact is searched for as it was filed, redacted, and the
- * title is cut after redaction, so no cut leaves part of a secret behind.
- * A problem this module answers is redacted too. The stored reference
- * stays keyed by the artifact as reported, since the store is local and
- * the session's finding row is keyed by that text.
+ * query: the key is searched for as it was filed, built from the redacted
+ * artifact, and the title is cut after redaction, so no cut leaves part of
+ * a secret behind. A problem this module answers is redacted too. The
+ * stored reference stays keyed by the key built from the artifact as
+ * reported, since the store is local, and two artifacts differing only in
+ * a secret's value would otherwise share one key.
  *
  * ## Failures
  *
@@ -114,6 +175,7 @@
  * second issue. A bug filed or commented on whose reference then cannot
  * be stored keeps its action and names the store's problem.
  */
+import type { MachineFault } from './machine-fault.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { RafaConfig } from '../config.js';
 import type {
@@ -125,13 +187,15 @@ import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
 import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
 import { messageOf } from '../config-sections.js';
 import { textProblem } from '../effort/store/findings.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
+
+import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR = join('.rafa', 'triage', 'private');
@@ -144,6 +208,9 @@ export const TRIAGE_MODULE = 'unassigned';
 
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
+
+/** What stands between a bug's file and its artifact in its key. */
+export const KEY_SEPARATOR = ': ';
 
 /** The most code points a filed title holds, its cut marker included. */
 export const TITLE_MAX_LENGTH = 120;
@@ -167,8 +234,11 @@ export interface NamedSecret {
   readonly value: string;
 }
 
-/** Where a bug goes: the tracker the chain landed on, or the private one. */
-export type BugChannel = 'public' | 'private';
+/**
+ * Where a bug goes: the tracker the chain landed on, the private one, or
+ * `machine`, the channel with no tracker at all; see the module note.
+ */
+export type BugChannel = 'public' | 'private' | 'machine';
 
 /** What became of one bug. */
 export type BugTriageAction =
@@ -176,7 +246,10 @@ export type BugTriageAction =
   | 'filed'
   /** An issue it recurs in was found and commented on. */
   | 'commented'
-  /** It had no `what` to file; nothing was called. */
+  /**
+   * Nothing was called for it: it is machine-scoped, or it had no `what`
+   * to file. Its problem says which.
+   */
   | 'skipped'
   /** A step failed before an issue was filed or commented on. */
   | 'failed';
@@ -221,7 +294,7 @@ export interface TriageResult {
 export interface TriageOptions {
   /** The repo root the store lives under. */
   readonly repoRoot: string;
-  /** The tracker file holding the task's line. */
+  /** The tracker file holding the task's line, and half of each bug's key. */
   readonly trackerPath: string;
   /** The task's line, counting from zero, as `findNextTask` answered it. */
   readonly lineNum: number;
@@ -359,6 +432,21 @@ function artifactOf(bug: ReportBug): string | null {
     : null;
 }
 
+/** `text` on one line, every run of whitespace one space, trimmed. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The key a bug's issue is looked up and kept under: the base name of the
+ * tracker file it was reported against, then its artifact on one line,
+ * joined by {@link KEY_SEPARATOR}. The base name, rather than the path, so
+ * one plan keys the same from two checkouts; see the module note.
+ */
+export function bugKeyOf(trackerPath: string, artifact: string): string {
+  return `${basename(trackerPath)}${KEY_SEPARATOR}${oneLine(artifact)}`;
+}
+
 /** A value in a fence one backtick longer than any run of backticks it holds. */
 function fenced(value: string): string {
   const runs = Array.from(value.matchAll(/`+/g), (run) => run[0].length);
@@ -371,7 +459,7 @@ function fenced(value: string): string {
 
 /** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
 export function issueTitle(redactedWhat: string): string {
-  const line = redactedWhat.replace(/\s+/g, ' ').trim();
+  const line = oneLine(redactedWhat);
   const points = Array.from(line);
   if (points.length <= TITLE_MAX_LENGTH) return line;
   const kept = points.slice(0, TITLE_MAX_LENGTH - TITLE_CUT.length).join('');
@@ -382,6 +470,8 @@ export function issueTitle(redactedWhat: string): string {
 interface BugValues {
   readonly what: string;
   readonly artifact: string | null;
+  /** The key `find` is asked for, redacted, or null for a bug with none. */
+  readonly key: string | null;
   readonly planStub: string | null;
   readonly taskText: string;
   readonly feedback: string | null;
@@ -400,12 +490,13 @@ function section(
   return `## ${heading}\n\n${shown}`;
 }
 
-/** An issue body or a comment: `opening`, then the five sections; see the module note. */
+/** An issue body or a comment: `opening`, then the six sections; see the module note. */
 function issueText(opening: string, values: BugValues, redact: (text: string) => string): string {
   return [
     opening,
     section('What', values.what, '', redact),
     section('Artifact', values.artifact, 'The report gave no artifact, so a recurrence files again.', redact),
+    section('Recurrence key', values.key, 'The report gave no artifact, so this bug has no key.', redact),
     section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
     section('Task', values.taskText, '', redact),
     section('Feedback', values.feedback, 'The report gave no feedback.', redact),
@@ -416,10 +507,10 @@ function issueText(opening: string, values: BugValues, redact: (text: string) =>
 interface Filing {
   readonly draft: IssueDraft;
   readonly comment: string;
-  /** The redacted artifact `find` is asked for, or null for a bug with none. */
+  /** The redacted key `find` is asked for, or null for a bug with none. */
   readonly searchText: string | null;
-  /** The artifact as reported, the key a reference is stored under. */
-  readonly artifact: string | null;
+  /** The key a reference is stored under, from the artifact as reported. */
+  readonly key: string | null;
 }
 
 /** The filing for one bug. */
@@ -430,9 +521,13 @@ function filingFor(
   redact: (text: string) => string,
 ): Filing {
   const artifact = artifactOf(bug);
+  const searchText = artifact === null
+    ? null
+    : bugKeyOf(options.trackerPath, redact(artifact));
   const values: BugValues = {
     what,
     artifact,
+    key: searchText,
     planStub: options.dispatch.planStub,
     taskText: options.dispatch.taskLine,
     feedback: options.report.feedback,
@@ -449,21 +544,24 @@ function filingFor(
       blockedBy: [],
     },
     comment: issueText(COMMENT_OPENING, values, redact),
-    searchText: artifact === null
+    searchText,
+    key: artifact === null
       ? null
-      : redact(artifact),
-    artifact,
+      : bugKeyOf(options.trackerPath, artifact),
   };
 }
 
+/** The channels that have a tracker to route a bug to: every one but `machine`. */
+type TrackedChannel = Exclude<BugChannel, 'machine'>;
+
 /** Where one channel files, and the store calls only the public channel makes. */
 interface Route {
-  readonly channel: BugChannel;
+  readonly channel: TrackedChannel;
   readonly tracker: Tracker;
-  /** The reference stored under an artifact; null for a channel that never reads the store. */
-  readonly readStored: ((artifact: string) => IssueRef | null) | null;
-  /** Stores a reference under an artifact; null for a channel that never writes the store. */
-  readonly store: ((artifact: string, ref: IssueRef) => TrackerRefWriteAction) | null;
+  /** The reference stored under a key; null for a channel that never reads the store. */
+  readonly readStored: ((key: string) => IssueRef | null) | null;
+  /** Stores a reference under a key; null for a channel that never writes the store. */
+  readonly store: ((key: string, ref: IssueRef) => TrackerRefWriteAction) | null;
 }
 
 /** One bug on its way through a route. */
@@ -510,10 +608,10 @@ async function settle(
   foundBy: RecurrenceSource | null,
 ): Promise<BugTriage> {
   const { store } = run.route;
-  const { artifact } = run.filing;
-  if (store === null || artifact === null) return resultOf(run, action, { ref, foundBy });
+  const { key } = run.filing;
+  if (store === null || key === null) return resultOf(run, action, { ref, foundBy });
 
-  const stored = await step(run, 'storing the reference', () => store(artifact, ref));
+  const stored = await step(run, 'storing the reference', () => store(key, ref));
   return stored.ok
     ? resultOf(run, action, { ref, foundBy, stored: stored.value })
     : resultOf(run, action, { ref, foundBy, problem: stored.problem });
@@ -536,15 +634,15 @@ async function commentOn(run: BugRun, ref: IssueRef, foundBy: RecurrenceSource):
     : settle(run, 'commented', ref, foundBy);
 }
 
-/** Looks the bug up by its artifact, then comments on what is found or files it. */
+/** Looks the bug up by its key, then comments on what is found or files it. */
 async function triageBug(run: BugRun): Promise<BugTriage> {
   const { route, filing } = run;
-  const { artifact, searchText } = filing;
-  if (artifact === null || searchText === null) return fileNew(run);
+  const { key, searchText } = filing;
+  if (key === null || searchText === null) return fileNew(run);
 
   const { readStored } = route;
   if (readStored !== null) {
-    const stored = await step(run, 'reading the stored reference', () => readStored(artifact));
+    const stored = await step(run, 'reading the stored reference', () => readStored(key));
     if (!stored.ok) return resultOf(run, 'failed', { problem: stored.problem });
     if (stored.value !== null && stored.value.kind === route.tracker.kind) {
       return commentOn(run, stored.value, 'store');
@@ -557,6 +655,24 @@ async function triageBug(run: BugRun): Promise<BugTriage> {
   return match === undefined
     ? fileNew(run)
     : commentOn(run, match, 'find');
+}
+
+/** A bug nothing was called for: its row, on the channel it was read onto. */
+function skippedRow(index: number, channel: BugChannel, problem: string): BugTriage {
+  return { index, channel, action: 'skipped', ref: null, foundBy: null, stored: null, problem };
+}
+
+/**
+ * The one line a machine-scoped bug's row carries, for the operator to
+ * read: the bug's place in the report, then the family and the text that
+ * matched. Redacted, as every problem this module answers is.
+ */
+function machineProblem(
+  index: number,
+  fault: MachineFault,
+  redact: (text: string) => string,
+): string {
+  return redact(`out_of_scope_bugs[${index}] is ${machineFaultSentence(fault)}`);
 }
 
 /** Throws unless `privateTracker` may take security bugs; see the module note. */
@@ -576,9 +692,11 @@ function checkPrivateTracker(tracker: Tracker, privateTracker: Tracker): void {
 
 /**
  * Triages one stored report: writes its blocker text onto the task's
- * tracker line, then files, or comments on, each out-of-scope bug through
- * the channel its `security` flag routes it to, and answers what became of
- * each; see the module note.
+ * tracker line, then files, or comments on, each out-of-scope bug
+ * through the channel it is routed to — the machine one, which files
+ * nothing, when the machine-fault reading answers, and otherwise the one
+ * its `security` flag names — and answers what became of each; see the
+ * module note.
  *
  * Rejects, having written and called nothing, only for a private tracker
  * it refuses. Every other failure is answered in the result.
@@ -590,15 +708,15 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
 
   const blocker = triageBlockers(options);
   const redact = (text: string): string => redactSecrets(text, options.secrets);
-  const routes: Readonly<Record<BugChannel, Route>> = {
+  const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
       channel: 'public',
       tracker: options.tracker,
-      readStored: (artifact) => readTrackerRef(repoRoot, artifact),
-      store: (artifact, ref) => writeTrackerRef(repoRoot, {
+      readStored: (key) => readTrackerRef(repoRoot, key),
+      store: (key, ref) => writeTrackerRef(repoRoot, {
         dispatch: options.dispatch,
         outcome: options.outcome,
-        artifact,
+        artifact: key,
         ref,
       }, options.seams).action,
     },
@@ -607,20 +725,17 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
 
   const bugs: BugTriage[] = [];
   for (const [index, bug] of options.report.outOfScopeBugs.entries()) {
+    const fault = readMachineFault(bug);
+    if (fault !== null) {
+      bugs.push(skippedRow(index, 'machine', machineProblem(index, fault, redact)));
+      continue;
+    }
     const route = bug.security === false
       ? routes.public
       : routes.private;
     const what = bug.what;
     if (!hasText(what)) {
-      bugs.push({
-        index,
-        channel: route.channel,
-        action: 'skipped',
-        ref: null,
-        foundBy: null,
-        stored: null,
-        problem: `out_of_scope_bugs[${index}] has no what to file`,
-      });
+      bugs.push(skippedRow(index, route.channel, `out_of_scope_bugs[${index}] has no what to file`));
       continue;
     }
     const filing = filingFor(what, bug, options, redact);

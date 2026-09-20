@@ -25,6 +25,13 @@
  * The `unreadable` rows plant a permission-denied directory, which
  * running as root defeats, so they are skipped there rather than
  * reporting a false red.
+ *
+ * The freeze carries a fourth property, in the last describe block: a
+ * copy taken from a directory that then MOVES still holds what it
+ * froze. Every case there appends to its source after freezing and
+ * asserts the growth is visible on the source — the control that says
+ * the copy's stillness came from the copying and not from a source
+ * that never moved.
  */
 import type {
   ParityAbsence,
@@ -34,12 +41,17 @@ import type {
 } from './parity-fixture.js';
 
 import {
+  appendFileSync,
   chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -51,6 +63,7 @@ import {
   PARITY_ABSENCE_CODES,
   PARITY_LOG_DIR_ENV,
   PARITY_STORE_DIR_ENV,
+  freezeParitySessionLogs,
   parityFixturePaths,
   resolveParityFixture,
 } from './parity-fixture.js';
@@ -535,5 +548,107 @@ describe('the skip reason', () => {
       + `session logs at ${tree.logDir}: cannot be read, EACCES`
       + ' (from RAFA_PARITY_LOG_DIR)',
     );
+  });
+});
+
+/** The second loose log the freeze cases plant beside {@link SESSION_ID}. */
+const SECOND_SESSION_ID = 'bbbb-2222';
+
+/** The first log's only line, as {@link plantFixture} writes it. */
+const FIRST_LOG_BYTES = '{}\n';
+
+/** An mtime old enough that no copy could have acquired it by accident. */
+const OLD_MTIME = new Date('2020-01-02T03:04:05.000Z');
+
+/** Plants a second loose log, and answers its path. */
+function plantSecondLog(tree: Planted): string {
+  const path = join(tree.logDir, `${SECOND_SESSION_ID}.jsonl`);
+  writeFileSync(path, '{"two":1}\n');
+  return path;
+}
+
+/** A destination the freeze has to create, under a fresh scratch root. */
+function freezeDestination(): string {
+  return join(makeScratch(), 'frozen');
+}
+
+describe('freezing the session logs', () => {
+  it('copies every loose log into a destination it creates', () => {
+    const tree = plantFixture();
+    const second = plantSecondLog(tree);
+    const nested = join(tree.logDir, SESSION_ID, 'subagents');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(join(nested, 'agent-1.jsonl'), '{"sub":true}\n');
+    const destination = freezeDestination();
+    expect(existsSync(destination)).toBe(false);
+
+    const frozen = freezeParitySessionLogs(tree.logDir, destination);
+
+    expect(frozen.source).toBe(tree.logDir);
+    expect(frozen.dir).toBe(destination);
+    expect(frozen.unread).toEqual([]);
+    // The subagent transcript is not in the population; the two loose
+    // logs are, with the copy holding the source bytes.
+    const names = readdirSync(destination).sort();
+
+    expect(names)
+      .toEqual([`${SESSION_ID}.jsonl`, `${SECOND_SESSION_ID}.jsonl`].sort());
+    expect(frozen.logs.map((log) => log.sessionId).sort())
+      .toEqual([SESSION_ID, SECOND_SESSION_ID].sort());
+    expect(frozen.logs.map((log) => log.path).sort())
+      .toEqual(names.map((name) => join(destination, name)));
+    expect(readFileSync(join(destination, `${SECOND_SESSION_ID}.jsonl`), 'utf8'))
+      .toBe(readFileSync(second, 'utf8'));
+  });
+
+  it('carries the source mtime and size onto each copy', () => {
+    const tree = plantFixture();
+    const second = plantSecondLog(tree);
+    utimesSync(second, OLD_MTIME, OLD_MTIME);
+
+    const frozen = freezeParitySessionLogs(tree.logDir, freezeDestination());
+
+    const copy = frozen.logs.find((log) => log.sessionId === SECOND_SESSION_ID);
+    if (copy === undefined) throw new Error('the second log was not frozen');
+
+    // An mtime of the freeze instant, rather than the source's, would
+    // put this copy last in the collector ordering and shift every
+    // row's modifiedAt to now.
+    expect(copy.modifiedAtMs).toBe(OLD_MTIME.getTime());
+    expect(statSync(copy.path).mtimeMs).toBe(OLD_MTIME.getTime());
+    expect(copy.sizeBytes).toBe(statSync(second).size);
+    // Oldest first, which is the collector listing this reports from.
+    expect(frozen.logs[0]?.sessionId).toBe(SECOND_SESSION_ID);
+  });
+
+  it('keeps the copy at the bytes it froze once the source grows', () => {
+    const tree = plantFixture();
+    const source = join(tree.logDir, `${SESSION_ID}.jsonl`);
+    const frozen = freezeParitySessionLogs(tree.logDir, freezeDestination());
+    const copy = frozen.logs[0];
+    if (copy === undefined) throw new Error('nothing was frozen');
+
+    appendFileSync(source, '{"appended":true}\n');
+
+    // The control: the source really did move under the copy, and a
+    // freeze taken after the append does see the growth.
+    expect(statSync(source).size).toBeGreaterThan(copy.sizeBytes);
+    const later = freezeParitySessionLogs(tree.logDir, freezeDestination());
+    expect(later.logs[0]?.sizeBytes).toBe(statSync(source).size);
+
+    expect(readFileSync(copy.path, 'utf8')).toBe(FIRST_LOG_BYTES);
+    expect(statSync(copy.path).size).toBe(copy.sizeBytes);
+  });
+
+  it.skipIf(isRoot)('reports a log it may not read rather than throwing', () => {
+    const tree = plantFixture();
+    plantSecondLog(tree);
+    lock(join(tree.logDir, `${SESSION_ID}.jsonl`));
+
+    const frozen = freezeParitySessionLogs(tree.logDir, freezeDestination());
+
+    expect(frozen.unread)
+      .toEqual([{ sessionId: SESSION_ID, code: 'EACCES' }]);
+    expect(frozen.logs.map((log) => log.sessionId)).toEqual([SECOND_SESSION_ID]);
   });
 });

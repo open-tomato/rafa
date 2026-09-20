@@ -248,6 +248,7 @@ describe('a plan with no block', () => {
       context: null,
       stages: [],
       tasks: [],
+      hiddenTasks: [],
       blocks: [],
       issues: [],
     });
@@ -672,6 +673,46 @@ describe('a block never closed', () => {
     expect(reasonsOf(model)).toEqual([['unclosed-block', 1], ['task-in-block', 4]]);
     expect(model.issues[1]?.text).toContain('findNextTask still dispatches it');
     expect(findNextTask(unclosed)).toMatchObject({ task: 'Swallowed', lineNum: 3 });
+  });
+
+  it('answers the still-to-run lines it hides, read as a line outside every block is read', () => {
+    const unclosed = doc(
+      '# Stage: one',
+      '- [ ] Open, and read',
+      '```rafa:context',
+      'c',
+      '# Stage: swallowed',
+      '- [ ] Hidden  {agent=tdd-guide}',
+      '- [BLOCKED] Hidden and blocked  <!-- blocked: the gate -->',
+      '- [x] Hidden and ticked',
+    );
+    const model = parsePlan(unclosed);
+
+    expect(textsOf(model)).toEqual(['Open, and read']);
+    expect(model.hiddenTasks.map((task) => [task.text, task.lineNum, task.status, task.stage])).toEqual([
+      ['Hidden', 5, 'unchecked', 0],
+      ['Hidden and blocked', 6, 'blocked', 0],
+    ]);
+    expect(model.hiddenTasks[0]?.declaration?.agent).toBe('tdd-guide');
+    // The dispatcher over the same document: the blocked hidden line, at the same number.
+    expect(findNextTask(unclosed)).toMatchObject({ task: 'Hidden and blocked', lineNum: 6, status: 'blocked' });
+  });
+
+  it('hides nothing once closed, where the same line is a task of the model, the near miss', () => {
+    const closed = doc('# Stage: one', '```rafa:context', 'c', '```', '- [ ] Hidden  {agent=tdd-guide}');
+    const model = parsePlan(closed);
+
+    expect(model.hiddenTasks).toEqual([]);
+    expect(textsOf(model)).toEqual(['Hidden']);
+  });
+
+  it('hides nothing a CLOSED block holds, which the dispatcher skips rather than runs', () => {
+    const quoted = doc('```rafa:context', '- [ ] Quoted  {agent=tdd-guide}', '```', '- [ ] Planned');
+    const model = parsePlan(quoted);
+
+    expect(reasonsOf(model)).toEqual([['task-in-block', 2]]);
+    expect(model.hiddenTasks).toEqual([]);
+    expect(findNextTask(quoted)).toMatchObject({ task: 'Planned', lineNum: 3 });
   });
 
   it('reads everything once closed, the near miss', () => {
