@@ -39,6 +39,18 @@
  * no terminal. So the registered command's own seams are read: the
  * working directory, `homedir()`, `process.stdin` and the real git.
  *
+ * ## The release step
+ *
+ * The step is driven here through the command: the flags, the question
+ * asked once on a terminal, the setting read back out of the config
+ * `init` has just written, and the rerun that asks nothing because the
+ * config already answers. What the step decides on its own and what the
+ * edit does to the text are held in `init-release.test.ts` and
+ * `src/release/setting.test.ts`. Every case whose world has no
+ * `package.json` and no `CHANGELOG.md` is the ordinary one here, since
+ * a world is planted empty; the case that plants both is what shows the
+ * two lines above the question are absent when nothing is missing.
+ *
  * ## The board step
  *
  * The seams answer no `origin` and open a `gh` runner that throws, so
@@ -73,6 +85,7 @@ import { delimiter, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { BOARD_LABELS } from '../board/setup.js';
+import { parseConfigText } from '../config.js';
 import { readBinPath } from '../project/bin-path.js';
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';
@@ -80,7 +93,15 @@ import { rootCandidates } from '../project/roots.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
 import { dispatchCaptured, eventsOf, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
-import { createInitCommand, DEFAULT_INIT_SEAMS, readBoardFlag, readRootFlag, readYesFlag } from './init.js';
+import { RELEASE_FIX } from './init-release.js';
+import {
+  createInitCommand,
+  DEFAULT_INIT_SEAMS,
+  readBoardFlag,
+  readReleaseFlag,
+  readRootFlag,
+  readYesFlag,
+} from './init.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-')));
@@ -263,17 +284,32 @@ function createdLines(root: string, home: string): readonly string[] {
   ].map((line) => line.replace(root, ''));
 }
 
-describe('choosing the root', () => {
-  it('sets up the project at the root --root names, relative to the working directory, asking nothing', async () => {
-    const world = plantWorld();
+/** What `release.enabled` resolves to in the project config under `root`, and null when it names none. */
+function settingUnder(root: string): boolean | 'auto' | null {
+  const path = join(root, '.rafa', 'config.yaml');
+  return parseConfigText(readFileSync(path, 'utf8'), path).values.releaseEnabled ?? null;
+}
 
-    const run = await init(world, ['--root=..'], seamsFor(world, { isTerminal: () => true }));
+/** The line the release step prints when nobody was asked; see `init-release.ts`. */
+const RELEASE_UNSET_LINE = `release.enabled is left unset, which reads as auto; run ${RELEASE_FIX} to set it.`;
+
+describe('choosing the root', () => {
+  it('sets up the project at the root --root names, relative to the working directory, asking nothing about it', async () => {
+    const world = plantWorld();
+    const script = scripted(['n']);
+
+    const run = await init(world, ['--root=..'], seamsFor(world, {
+      isTerminal: () => true,
+      openPrompter: script.open,
+    }));
 
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
     expect(run.stdout.split('\n')[0]).toBe(`Initialised a rafa project at ${world.repo} (named by --root).`);
     expect(existsSync(join(world.repo, '.rafa', 'config.yaml'))).toBe(true);
     expect(existsSync(join(world.sub, '.rafa'))).toBe(false);
+    expect(script.record.asked).toBe(1);
+    expect(script.record.said.some((line) => line.includes('candidate'))).toBe(false);
   });
 
   it('takes the git toplevel above the working directory under --yes', async () => {
@@ -376,11 +412,16 @@ describe('choosing the root', () => {
     expect(run.exitCode).toBe(0);
     expect([resultOf(run.stdout).root, resultOf(run.stdout).source]).toEqual([world.base, 'monorepo']);
     expect(script.record).toEqual({
-      said: [candidateLines(found).join('\n'), 'no candidate is numbered 9; type 1 to 2, or a path'],
-      asked: 2,
-      opened: 1,
-      closed: 1,
+      said: [
+        candidateLines(found).join('\n'),
+        'no candidate is numbered 9; type 1 to 2, or a path',
+        'There is no CHANGELOG.md here yet; release.changelog names the path an entry is written to.',
+      ],
+      asked: 3,
+      opened: 2,
+      closed: 2,
     });
+    expect(resultOf(run.stdout).release).toMatchObject({ status: 'unanswered', asked: true, enabled: null });
   });
 
   it('refuses when the input ends before a root is chosen, closing the prompter and writing nothing', async () => {
@@ -427,6 +468,26 @@ describe('choosing the root', () => {
     expect(() => readBoardFlag('later')).toThrow('--board takes no value');
   });
 
+  it('reads --release as true, --no-release as false and neither as nobody having said, refusing a value', () => {
+    expect([readReleaseFlag(undefined), readReleaseFlag(true), readReleaseFlag('true')]).toEqual([null, true, true]);
+    expect([readReleaseFlag(false), readReleaseFlag('false')]).toEqual([false, false]);
+    expect(() => readReleaseFlag('later')).toThrow('--release takes no value');
+  });
+
+  it('refuses a value read for --release before a root is chosen, writing nothing', async () => {
+    const world = plantWorld();
+
+    const run = await init(world, ['--yes', '--release=later']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr.split('\n')[0]).toBe(
+      'rafa init: --release takes no value, and read "later" as one;'
+      + ' turn the release on with --release, or leave it alone with --no-release',
+    );
+    expect(run.stderr.trimEnd().endsWith('Nothing was written.')).toBe(true);
+    expect(existsSync(join(world.repo, '.rafa'))).toBe(false);
+  });
+
   it('refuses a value read for --board before a root is chosen, writing nothing', async () => {
     const world = plantWorld();
 
@@ -452,6 +513,7 @@ describe('what it writes', () => {
     expect(run.stdout).toBe([
       `Initialised a rafa project at ${world.repo} (named by --root).`,
       ...createdLines(world.repo, world.home),
+      RELEASE_UNSET_LINE,
       '',
     ].join('\n'));
     expect(readFileSync(join(world.repo, '.rafa', 'config.yaml'), 'utf8')).toBe(projectConfigText());
@@ -472,6 +534,7 @@ describe('what it writes', () => {
 
     expect(text.stdout).toBe([
       `${world.repo} (named by --root) is already a rafa project: its .rafa/config.yaml is left as it was.`,
+      RELEASE_UNSET_LINE,
       'Nothing changed.',
       '',
     ].join('\n'));
@@ -495,6 +558,7 @@ describe('what it writes', () => {
       `${world.repo} (named by --root) is already a rafa project: its .rafa/config.yaml is left as it was.`,
       '  updated   .gitignore',
       '  updated   .rafa/tracking.digest',
+      RELEASE_UNSET_LINE,
       '',
     ].join('\n'));
     expect(movedSincePast(world.base)).toEqual([join(world.repo, '.gitignore'), join(world.repo, '.rafa', 'tracking.digest')]);
@@ -573,6 +637,113 @@ describe('what it writes', () => {
   });
 });
 
+describe('the release step', () => {
+  it('writes release.enabled under --release and --no-release, asking nothing, and lists the line', async () => {
+    const on = plantWorld();
+    const off = plantWorld();
+
+    const turnedOn = await init(on, ['--yes', '--release']);
+    const turnedOff = await init(off, ['--yes', '--no-release', '--output=json']);
+
+    expect(turnedOn.exitCode).toBe(0);
+    expect(turnedOn.stdout).toContain('release.enabled: true (on) written to .rafa/config.yaml.');
+    expect(settingUnder(on.repo)).toBe(true);
+    expect(resultOf(turnedOff.stdout).release).toMatchObject({ status: 'set', asked: false, enabled: false });
+    expect(resultOf(turnedOff.stdout).changed).toBe(true);
+    expect(settingUnder(off.repo)).toBe(false);
+  });
+
+  it('leaves the setting unset under --yes, and names the fix', async () => {
+    const world = plantWorld();
+    const json = plantWorld();
+
+    const run = await init(world, ['--yes']);
+    const asJson = await init(json, ['--yes', '--output=json']);
+
+    expect(run.stdout).toContain(RELEASE_FIX);
+    expect(settingUnder(world.repo)).toBe(null);
+    expect(resultOf(asJson.stdout).release).toMatchObject({ status: 'unanswered', asked: false, enabled: null });
+    expect(resultOf(asJson.stdout).changed).toBe(true);
+  });
+
+  it('asks once on a terminal and writes the answer, the question naming both configured files', async () => {
+    const world = plantWorld();
+    writeFileSync(join(world.repo, 'package.json'), '{"version":"0.1.0"}');
+    writeFileSync(join(world.repo, 'CHANGELOG.md'), '# Changelog\n');
+    const script = scripted(['y']);
+
+    const run = await init(world, [`--root=${world.repo}`, '--output=json'], seamsFor(world, {
+      isTerminal: () => true,
+      openPrompter: script.open,
+    }));
+
+    expect(run.exitCode).toBe(0);
+    expect(resultOf(run.stdout).release).toMatchObject({ status: 'set', asked: true, enabled: true });
+    expect(script.record.asked).toBe(1);
+    expect(script.record.said).toEqual([]);
+    expect(settingUnder(world.repo)).toBe(true);
+  });
+
+  it('changes no byte on a rerun of --release over the answer the first run wrote', async () => {
+    const world = plantWorld();
+    const first = await init(world, ['--yes', '--release']);
+    const bytes = stateOf(world.base).map((entry) => entry.replace(/ \d+(\.\d+)? /u, ' '));
+    ageAll(world.base);
+
+    const second = await init(world, ['--yes', '--release', '--output=json']);
+
+    expect(first.exitCode).toBe(0);
+    expect(second.exitCode).toBe(0);
+    expect(resultOf(second.stdout).release).toMatchObject({ status: 'present', asked: false, enabled: true });
+    expect(resultOf(second.stdout).changed).toBe(false);
+    expect(movedSincePast(world.base)).toEqual([]);
+    expect(stateOf(world.base).map((entry) => entry.replace(/ \d+(\.\d+)? /u, ' '))).toEqual(bytes);
+  });
+
+  it('asks nothing on a rerun over a project that answered, whatever a terminal would have said', async () => {
+    const world = plantWorld();
+    await init(world, ['--yes', '--no-release']);
+    const script = scripted(['y']);
+
+    const again = await init(world, ['--yes', '--output=json'], seamsFor(world, {
+      isTerminal: () => true,
+      openPrompter: script.open,
+    }));
+
+    expect(script.record.opened).toBe(0);
+    expect(resultOf(again.stdout).release).toMatchObject({ status: 'present', enabled: false });
+    expect(again.stdout).toContain('"asked":false');
+  });
+
+  it('leaves room for the board step, which writes roadmap.issue into the same config after it', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+
+    const run = await init(world, ['--yes', '--release', '--board'], seamsFor(world, {
+      readRemote: () => 'https://github.com/acme/widgets.git',
+      gh: () => gh.run,
+    }));
+
+    expect(run.exitCode).toBe(0);
+    expect(settingUnder(world.repo)).toBe(true);
+    expect(readFileSync(join(world.repo, '.rafa', 'config.yaml'), 'utf8')).toContain('roadmap:\n  issue: 7');
+  });
+
+  it('warns and sets the project up anyway when the config spells release in a shape it cannot edit', async () => {
+    const world = plantWorld();
+    mkdirSync(join(world.repo, '.rafa'), { recursive: true });
+    writeFileSync(join(world.repo, '.rafa', 'config.yaml'), 'version: 1\nrelease: {enabled: auto}\n');
+
+    const run = await init(world, ['--yes', '--release']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('a shape this command does not edit');
+    expect(readFileSync(join(world.repo, '.rafa', 'config.yaml'), 'utf8'))
+      .toBe('version: 1\nrelease: {enabled: auto}\n');
+    expect(existsSync(join(world.repo, '.rafa', 'plans'))).toBe(true);
+  });
+});
+
 describe('the board step', () => {
   it('sets the GitHub board up under --board, listing each part it made and naming the issue in the config', async () => {
     const world = plantWorld();
@@ -641,10 +812,10 @@ describe('the board step', () => {
     expect(existsSync(join(world.repo, '.github'))).toBe(false);
   });
 
-  it('asks once on a terminal, and sets the board up on a yes', async () => {
+  it('asks the release question and then the board one on a terminal, and sets the board up on a yes', async () => {
     const world = plantWorld();
     const gh = fakeGh();
-    const prompter = scripted(['y']);
+    const prompter = scripted(['n', 'y']);
 
     const run = await init(world, [`--root=${world.repo}`, '--output=json'], seamsFor(world, {
       readRemote: () => 'https://github.com/acme/widgets.git',
@@ -654,7 +825,8 @@ describe('the board step', () => {
     }));
 
     expect(run.exitCode).toBe(0);
-    expect(prompter.record.asked).toBe(1);
+    expect(prompter.record.asked).toBe(2);
+    expect(resultOf(run.stdout).release).toMatchObject({ status: 'set', asked: true, enabled: false });
     expect(resultOf(run.stdout).board).toMatchObject({ status: 'ran', asked: true });
     expect(gh.routes()[0]).toBe('repo view');
   });
@@ -695,7 +867,12 @@ describe('the PATH check', () => {
 
     const warning = readBinPath(missing.bunBin, missing.home).warning;
     expect(warning).toStartWith(`${missing.rafaBin} is not on PATH;`);
-    expect(warned.stdout).toEndWith(`${join(missing.home, '.rafa', 'instincts')}/\nwarn: ${String(warning)}\n`);
+    expect(warned.stdout).toEndWith([
+      `${join(missing.home, '.rafa', 'instincts')}/`,
+      RELEASE_UNSET_LINE,
+      `warn: ${String(warning)}`,
+      '',
+    ].join('\n'));
     expect(quiet.stdout).not.toContain('warn: ');
     expect(warned.exitCode).toBe(0);
   });

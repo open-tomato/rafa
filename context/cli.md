@@ -45,6 +45,7 @@ module's note is the long form.
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
+| `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
 | `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, and the two install warnings |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -293,7 +294,27 @@ module's note is the long form.
   carries is left to the preflight, which refuses on it. In json mode the
   result's `data` holds the root, its source, the working directory,
   whether the config existed, every path checked with its change, that
-  reading, those vendorable uses, and what the board step came to.
+  reading, those vendorable uses, and what the release step and the
+  board step each came to.
+- **The release step asks once, and only where nobody has answered**
+  (`src/commands/init-release.ts`). `--release` writes
+  `release.enabled: true` and `--no-release` writes `false`, both
+  without asking; a project config that already sets the setting is left
+  exactly as it is; `--yes` and a run with no terminal ask nothing and
+  leave it unset, printing the line naming `rafa init --release`; and
+  otherwise the one question
+  `Bump <versionFile> and add a <changelog> entry with every pull
+  request? [Y/n]` is asked through `init`'s own prompter on stderr, with
+  a line above it for each of the two configured files that is missing.
+  Anything but `n` or `no` is a yes, and an input that ENDED is nobody
+  answering and leaves the setting unset. The answer is written into the
+  `.rafa/config.yaml` this run made by uncommenting that one line and
+  leaving the other three `release` settings commented
+  (`src/release/setting.ts`), and the text is parsed back as that answer
+  before a byte is written. Nothing it comes to refuses `init`: a config
+  it cannot read or edit is a warning. It runs after the scopes and
+  before the board step. `--release=<value>` is refused at the top of
+  the run, while nothing has been written.
 - **The board step runs last, and only where there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
   `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and

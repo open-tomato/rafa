@@ -53,6 +53,22 @@
  * the entry is `.rafa/`. Opting in is setting a flag in
  * `.rafa/config.yaml` and running `init` again, which rewrites the block.
  *
+ * ## The release step
+ *
+ * Once the scopes are on disk, one question decides whether this
+ * project bumps a version and writes a changelog entry with every pull
+ * request, and the answer is written as `release.enabled` into the
+ * `.rafa/config.yaml` this run has just made. The decision, the
+ * question and the line are `./init-release.ts`'s; what is decided HERE
+ * is that it runs after the scopes and BEFORE the board step, which
+ * stays the last thing `init` does. Like the board step it refuses
+ * nothing: a config it cannot read or write is a warning.
+ *
+ * `--release` and `--no-release` answer the question for a script, and
+ * `--yes` leaves the setting unset — `--yes` is how a line says it will
+ * answer nothing. The value of `--release` is read at the TOP of the
+ * run, with `--board`'s and for the same reason.
+ *
  * ## The board step
  *
  * A repository whose pull request provider resolves to `gh` ends with
@@ -81,7 +97,9 @@
  * since, or a `tracking` flag changed since, is written and listed. The
  * board step keeps that true: every part it finds already there is
  * reported as present and nothing is written, so `Nothing changed.`
- * follows the board rows.
+ * follows the board rows. The release step keeps it too: a project
+ * whose config already names `release.enabled` is left as it is and
+ * asked nothing.
  *
  * ## The `PATH` check
  *
@@ -108,11 +126,11 @@
  *
  * In text mode, the head line naming the root and where it came from,
  * then one line per path created or updated, a path under the root
- * relative to it and a directory ending in `/`, then the board step's
- * own rows. Warnings go through the context's `warn`: a `package.json`
- * the monorepo walk could not read, an unknown config key, the
- * `tracking.all` notice, the `PATH` warning and every sentence the
- * board step came back with. In json mode the terminal result's `data`
+ * relative to it and a directory ending in `/`, then the release step's
+ * line and the board step's own rows. Warnings go through the context's
+ * `warn`: a `package.json` the monorepo walk could not read, an unknown
+ * config key, the `tracking.all` notice, the `PATH` warning and every
+ * sentence the release step and the board step came back with. In json mode the terminal result's `data`
  * is an {@link InitResult}, every path absolute, and each warning a
  * `log` event.
  *
@@ -120,12 +138,14 @@
  *
  * The working directory, the home, whether standard input is a terminal,
  * the prompter, the roots filesystem, the git probe, the `origin` probe
- * and the `gh` runner are {@link InitSeams}. The registered command
+ * and the `gh` runner are {@link InitSeams}. The terminal and the
+ * prompter are what the release step and the board step ask through. The registered command
  * reads `process.cwd()`, `homedir()` and `process.stdin`, prompts on
  * stderr, and spawns git and `gh` in the root. The writes go to the
  * disk, under the root and the home the seams name.
  */
 import type { BoardStepResult } from './init-board.js';
+import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
@@ -167,6 +187,7 @@ import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project
 import { gitRemoteUrl } from '../schema/project-id.js';
 
 import { boardStepChanged, renderBoardStep, runBoardStep } from './init-board.js';
+import { renderReleaseStep, runReleaseStep } from './init-release.js';
 
 /** What `init` reads beside its line; see the module note. */
 export interface InitSeams {
@@ -220,6 +241,8 @@ export interface InitResult {
   readonly binPath: BinPathReading;
   /** Each agent a plan under `plan.dir` routes to that resolves only in `~/.claude/agents`. */
   readonly vendorableAgents: readonly VendorableAgent[];
+  /** What the release step came to: the setting it wrote, or why it wrote none (`./init-release.ts`). */
+  readonly release: ReleaseStepResult;
   /** What the board step came to: what it made, or why it did not run (`./init-board.ts`). */
   readonly board: BoardStepResult;
 }
@@ -268,6 +291,19 @@ export function readBoardFlag(value: string | boolean | undefined): boolean | nu
     + ' set the board up with --board, or leave it alone with --no-board']);
 }
 
+/**
+ * True for `--release`, false for `--no-release` and null when the line
+ * said neither, which leaves the release step to ask. A value refuses,
+ * for the reason {@link readBoardFlag} gives.
+ */
+export function readReleaseFlag(value: string | boolean | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw refusal([`rafa init: --release takes no value, and read "${value}" as one;`
+    + ' turn the release on with --release, or leave it alone with --no-release']);
+}
+
 /** The path `--root` names, or null without the flag, refusing the flag with no path. */
 export function readRootFlag(value: string | boolean | undefined): string | null {
   if (value === undefined) return null;
@@ -297,8 +333,13 @@ async function promptedRoot(found: RootCandidates, seams: InitSeams, refusalSeam
 }
 
 /** The root the line and the seams choose; see the module note. */
-async function chooseRoot(context: RafaContext, seams: InitSeams, start: string, home: string): Promise<ChosenRoot> {
-  const yes = readYesFlag(context.flags['yes']);
+async function chooseRoot(
+  context: RafaContext,
+  seams: InitSeams,
+  start: string,
+  home: string,
+  yes: boolean,
+): Promise<ChosenRoot> {
   const named = readRootFlag(context.flags['root']);
   const refusalSeams: RefusalSeams = { home, fs: seams.fs };
   if (named !== null) return takeReading(namedRoot(named, start, 'root-flag', refusalSeams), null);
@@ -367,8 +408,8 @@ function trackingWrites(applied: TrackingApplied, digestExisted: boolean): reado
 
 /** What the scopes came to, with the config they were written from. */
 interface ScopesWritten {
-  /** The result, but for the board step, which runs once these are on disk. */
-  readonly written: Omit<InitResult, 'board'>;
+  /** The result, but for the two steps that run once these are on disk. */
+  readonly written: Omit<InitResult, 'board' | 'release'>;
   /** The config as it resolved for the root, which the provider is read from. */
   readonly config: RafaConfig;
 }
@@ -438,6 +479,30 @@ async function boardStep(
   });
 }
 
+/**
+ * The release step for a project whose scopes are written: whether this
+ * project bumps a version and writes a changelog entry with every pull
+ * request, decided and written by `./init-release.ts` as
+ * `release.enabled` in the `.rafa/config.yaml` this run has just made.
+ * It runs before the board step, which stays the last thing `init`
+ * does.
+ */
+async function releaseStep(
+  scopes: ScopesWritten,
+  wanted: boolean | null,
+  yes: boolean,
+  seams: InitSeams,
+): Promise<ReleaseStepResult> {
+  return runReleaseStep({
+    wanted,
+    yes,
+    root: scopes.written.root,
+    settings: scopes.config,
+    isTerminal: seams.isTerminal,
+    openPrompter: seams.openPrompter,
+  });
+}
+
 /** A write's path as a line shows it: relative under the root, a directory ending in `/`. */
 function shownPath(write: ScopeWrite, root: string): string {
   const shown = write.path.startsWith(`${root}${sep}`)
@@ -457,30 +522,35 @@ export function renderInit(result: InitResult): readonly string[] {
   const changed = result.writes
     .filter((write) => write.change !== 'unchanged')
     .map((write) => `  ${write.change}   ${shownPath(write, result.root)}`);
-  const board = renderBoardStep(result.board);
+  const steps = [...renderReleaseStep(result.release), ...renderBoardStep(result.board)];
   return result.changed
-    ? [head, ...changed, ...board]
-    : [head, ...board, 'Nothing changed.'];
+    ? [head, ...changed, ...steps]
+    : [head, ...steps, 'Nothing changed.'];
 }
 
 /** Runs `init` with `seams`; see the module note. */
 async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   expectNoArgument(context.args);
   const wantsBoard = readBoardFlag(context.flags['board']);
+  const wantsRelease = readReleaseFlag(context.flags['release']);
+  const yes = readYesFlag(context.flags['yes']);
   const start = seams.cwd();
   const home = seams.home();
-  const root = await chooseRoot(context, seams, start, home);
+  const root = await chooseRoot(context, seams, start, home, yes);
   const scopes = initialise(root, start, home, context);
+  const release = await releaseStep(scopes, wantsRelease, yes, seams);
   const board = await boardStep(scopes, wantsBoard, seams);
   const result: InitResult = {
     ...scopes.written,
-    changed: scopes.written.changed || boardStepChanged(board),
+    changed: scopes.written.changed || release.changed || boardStepChanged(board),
+    release,
     board,
   };
 
   if (context.outputMode === 'json') context.output.result(result);
   else for (const line of renderInit(result)) context.output.info(line);
   if (result.binPath.warning !== null) context.output.warn(result.binPath.warning);
+  for (const line of release.warnings) context.output.warn(line);
   for (const line of board.warnings) context.output.warn(line);
   for (const line of vendorableAgentWarnings(result.vendorableAgents, result.root)) context.output.warn(line);
 }
@@ -505,7 +575,9 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' `plan.dir` routes to an agent that resolves only in `~/.claude/agents`, naming'
       + ' `rafa agent vendor <name>`. A repository whose pull request provider is `gh` ends with one'
       + ' question about setting up the GitHub board, which `--board` and `--no-board` answer for a'
-      + ' script. With `--output=json` the'
+      + ' script. On a terminal it also asks once whether every pull request bumps the version and gains'
+      + ' a changelog entry, and writes the answer as `release.enabled`; `--release` and `--no-release`'
+      + ' answer that one, and `--yes` leaves it unset. With `--output=json` the'
       + ' root and every path checked are the data of the terminal result event.',
     args: [],
     flags: [
@@ -526,6 +598,14 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
           + ' either, a terminal is asked once and a run with no terminal leaves it alone.',
         type: 'boolean',
       },
+      {
+        name: 'release',
+        description: 'Write `release.enabled: true` without asking, so every pull request bumps'
+          + ' `release.versionFile` and gains a `release.changelog` entry. `--no-release` writes `false`.'
+          + ' Without either, a terminal is asked once, and `--yes` or a run with no terminal leaves the'
+          + ' setting unset at its default `auto`.',
+        type: 'boolean',
+      },
     ],
     examples: [
       {
@@ -539,6 +619,10 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       {
         cmd: 'rafa init --root=../my-monorepo',
         note: 'Sets up the project at the root named, asking nothing.',
+      },
+      {
+        cmd: 'rafa init --yes --release',
+        note: 'Takes the first candidate and writes release.enabled: true, asking nothing.',
       },
       {
         cmd: 'rafa init --yes --board',
