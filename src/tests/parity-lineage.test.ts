@@ -6,9 +6,11 @@
  *
  * This is the second of the two parity tests the spec calls for, and it
  * is not `parity-differential.test.ts`. That file runs the collector
- * TWICE, once per backend, over the same live inputs, and asks only
- * whether NDJSON and SQLite agree with EACH OTHER. This file runs the
- * collector ONCE, through the NDJSON backend alone, and asks whether
+ * TWICE, once per backend, over ONE FROZEN COPY of the sibling's logs
+ * — it reads the directory twice, so it cannot let the sibling append
+ * between the two runs — and asks only whether NDJSON and SQLite agree
+ * with EACH OTHER. This file runs the collector ONCE, through the
+ * NDJSON backend alone, over the live directory, and asks whether
  * rafa reproduces what a DIFFERENT, older collector already wrote — the
  * sibling's own `tools/ralph/effort/collect.ts`, before this package
  * existed. That is the property phase 0's cutover actually depends on:

@@ -9,15 +9,43 @@
  * (`~/projects/agentic-research/.ralph/effort/*.ndjson`) — that
  * comparison, against what the sibling's own collector already wrote,
  * is the LINEAGE parity test. This one runs rafa's collector twice,
- * once per backend, over the same live inputs, and asks only whether
- * the two backends agree with EACH OTHER. A backend whose key
- * projection disagreed with the collector's own selection logic — the
- * exact failure mode `effort/collect.ts`'s module note calls out — is
- * what this is built to catch: it would show up here as a row missing
- * on one side, or duplicated, well before it showed up as a wrong
- * total in a report.
+ * once per backend, over the same inputs, and asks only whether the
+ * two backends agree with EACH OTHER. A backend whose key projection
+ * disagreed with the collector's own selection logic — the exact
+ * failure mode `effort/collect.ts`'s module note calls out — is what
+ * this is built to catch: it would show up here as a row missing on
+ * one side, or duplicated, well before it showed up as a wrong total
+ * in a report.
  *
- * ## Why the live directory, when planted-data cases already exist
+ * ## The logs are frozen once, and both backends read the copy
+ *
+ * The sibling's log directory is live, and the sibling runs its own
+ * loop. Read twice, once per backend, it is not one input but two: a
+ * session appending to its `.jsonl` between the two collections moves
+ * that row's `sizeBytes`, `lineCount`, `recordCount`,
+ * `recordTypeCounts`, `usage` and `lastTimestamp`, and the byte-identity
+ * case below fails having compared a row to a LATER version of itself.
+ * That is a race in this file, not a disagreement between backends,
+ * and no re-reading of the result can tell the two apart from the
+ * failure line alone.
+ *
+ * So the logs are copied once, by {@link freezeParitySessionLogs}, into
+ * one directory under the same temporary root, and both collections
+ * read that copy. The copy carries each log's mtime, so the rows are
+ * the ones the live directory would have produced at the instant of the
+ * freeze — only `filePath` names the copy rather than the original,
+ * which is equally true on both sides and so is compared like any other
+ * field. Whatever the sibling appends afterwards lands in a file no
+ * collection here reads.
+ *
+ * Freezing removes a race; it must not remove the property. The
+ * liveness control below asserts that the copy still carries the very
+ * fields the race used to move — a nonzero `sizeBytes` matching the
+ * frozen file on disk, a nonzero `lineCount` and `recordCount` — so a
+ * freeze that copied empty files, or truncated them, is a red case
+ * here rather than a parity run that agreed about nothing.
+ *
+ * ## Why the sibling's directory, when planted-data cases already exist
  *
  * `effort/store/sqlite.test.ts`'s "parity with the NDJSON backend" and
  * `effort/collect.test.ts`'s "the session row both backends store"
@@ -25,10 +53,11 @@
  * can catch a real session log's own irregularities — an unusual
  * character in a branch name, a histogram key no planted row ever
  * carried, a commit subject someone pasted a tab into. Running the
- * real collector over the real sibling directory is what a small
- * fixture cannot substitute for; that is the whole reason this suite
- * is gated on {@link resolveParityFixture} rather than planting its
- * own tree the way those two do.
+ * real collector over the sibling's real logs is what a small fixture
+ * cannot substitute for; that is the whole reason this suite is gated
+ * on {@link resolveParityFixture} rather than planting its own tree
+ * the way those two do. The freeze above copies those logs; it does
+ * not simplify them.
  *
  * ## What "byte-identical" is checked against
  *
@@ -80,13 +109,14 @@
  * file, its default store location and its `plan.dir`, from being
  * consulted at all.
  */
+import type { FrozenParitySessionLogs } from './parity-fixture.js';
 import type {
   CommitEffortRow,
   EffortStore,
   SessionEffortRow,
 } from '../effort/store/types.js';
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -95,7 +125,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { collectEffort } from '../effort/collect.js';
 import { openNdjsonStore, openSqliteStore } from '../effort/store/index.js';
 
-import { resolveParityFixture } from './parity-fixture.js';
+import {
+  freezeParitySessionLogs,
+  resolveParityFixture,
+} from './parity-fixture.js';
 
 /** Never throws; see the module note on {@link resolveParityFixture}. */
 const fixture = resolveParityFixture();
@@ -180,18 +213,25 @@ const title = fixture.present
   ? 'the differential parity test, over the live sibling directory'
   : `the differential parity test (${fixture.reason})`;
 
+/** The directory name the frozen logs sit in, under the temporary root. */
+const FROZEN_LOG_DIR = 'frozen-logs';
+
 let tempRoot: string | null = null;
+let frozen: FrozenParitySessionLogs | null = null;
 let ndjson: Collected | null = null;
 let sqlite: Collected | null = null;
 
-/** Runs the whole collector once, into a fresh store over one backend. */
-async function collectOnce(store: EffortStore): Promise<Collected> {
-  if (!fixture.present) {
-    throw new Error('unreachable: the describe block is skipped when absent');
-  }
+/**
+ * Runs the whole collector once, into a fresh store over one backend,
+ * reading the frozen copy of the logs rather than the live directory.
+ */
+async function collectOnce(
+  store: EffortStore,
+  logDir: string,
+): Promise<Collected> {
   await collectEffort({
     repoRoot: SIBLING_CHECKOUT_ROOT,
-    logDir: fixture.logDir,
+    logDir,
     plansDir: join(SIBLING_CHECKOUT_ROOT, '.plans'),
     store,
     verbose: false,
@@ -212,10 +252,17 @@ const BEFORE_ALL_TIMEOUT_MS = 120_000;
 
 describe.skipIf(!fixture.present)(title, () => {
   beforeAll(async () => {
+    if (!fixture.present) {
+      throw new Error('unreachable: the describe block is skipped when absent');
+    }
     tempRoot = mkdtempSync(join(tmpdir(), 'rafa-parity-differential-'));
+    frozen = freezeParitySessionLogs(
+      fixture.logDir,
+      join(tempRoot, FROZEN_LOG_DIR),
+    );
 
     for (const backend of BACKENDS) {
-      const result = await collectOnce(backend.open(tempRoot));
+      const result = await collectOnce(backend.open(tempRoot), frozen.dir);
       if (backend.name === 'ndjson') {
         ndjson = result;
       } else {
@@ -236,6 +283,51 @@ describe.skipIf(!fixture.present)(title, () => {
     expect(ndjson.commits.length).toBeGreaterThan(0);
     expect(sqlite.sessions.length).toBe(ndjson.sessions.length);
     expect(sqlite.commits.length).toBe(ndjson.commits.length);
+  });
+
+  /**
+   * The liveness control for the freeze. Byte-identity between two
+   * readings of ONE frozen directory is cheap to satisfy the wrong way:
+   * a freeze that copied nothing readable would make both backends
+   * agree about rows that carry no counters at all. So this holds the
+   * copy to the very fields the live race used to move —
+   * {@link SessionEffortRow.sizeBytes} equal to the frozen file as it
+   * stands AFTER both collections, and nonzero `lineCount` and
+   * `recordCount` across the copy — and holds every stored row to a
+   * log that is actually in it. The `ndjson` side alone is read here
+   * because the case above already holds `sqlite` byte-identical to it.
+   */
+  it('holds the frozen copy still carrying the fields the race moved', () => {
+    if (frozen === null || ndjson === null) throw new Error('not collected');
+
+    expect(frozen.unread).toEqual([]);
+    expect(frozen.logs.length).toBeGreaterThan(0);
+    expect(ndjson.sessions.length).toBeLessThanOrEqual(frozen.logs.length);
+
+    const frozenById = new Map(frozen.logs.map((log) => [log.sessionId, log]));
+    for (const row of ndjson.sessions) {
+      const log = frozenById.get(row.sessionId);
+      if (log === undefined) {
+        throw new Error(
+          `parity differential: ${row.sessionId} is in no frozen log`,
+        );
+      }
+      expect(row.filePath).toBe(log.path);
+      expect(row.sizeBytes).toBe(statSync(log.path).size);
+    }
+
+    const totals = ndjson.sessions.reduce(
+      (sums, row) => ({
+        lineCount: sums.lineCount + row.lineCount,
+        recordCount: sums.recordCount + row.recordCount,
+        sizeBytes: sums.sizeBytes + row.sizeBytes,
+      }),
+      { lineCount: 0, recordCount: 0, sizeBytes: 0 },
+    );
+
+    expect(totals.sizeBytes).toBeGreaterThan(0);
+    expect(totals.lineCount).toBeGreaterThan(0);
+    expect(totals.recordCount).toBeGreaterThan(0);
   });
 
   it('holds every session row byte-identical between backends, keyed by session id', () => {
