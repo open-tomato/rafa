@@ -267,8 +267,8 @@ Change note entry fields:
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `level` | string | yes | How much of a release the diff is worth: `patch`, `minor`, `major` or `none` |
-| `summary` | string | yes | One line a user of the project would understand, quoted |
 | `area` | string | no | The changelog section the line groups under (e.g., `cli`, `store`) |
+| `summary` | string | yes | One line a user of the project would understand, quoted |
 
 Blocker/bug entry fields:
 
