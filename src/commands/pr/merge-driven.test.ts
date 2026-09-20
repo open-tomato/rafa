@@ -46,6 +46,7 @@ import type {
   PullRequestDetail,
   PullRequests,
 } from '../../pr/index.js';
+import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { spawnSync } from 'node:child_process';
@@ -55,6 +56,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createPrMergeCommand, summaryLine } from './merge.js';
@@ -178,48 +180,13 @@ interface StubAnswers {
   readonly merge?: () => Promise<MergeOutcome>;
 }
 
-/** A stub provider, and the log of every member it was sent; GitHub itself is out of scope here. */
-interface StubPulls {
-  readonly pulls: PullRequests;
-  readonly sent: () => readonly string[];
-}
-
-/** A provider answering `get`, `checks` and `merge`, refusing every other call and recording each. */
-function stubPulls(answers: StubAnswers = {}): StubPulls {
-  const sent: string[] = [];
-  const refuse = (name: string) => (): Promise<never> => {
-    sent.push(name);
-    return Promise.reject(new Error('the stub provider models get, checks and merge alone'));
-  };
-  const pulls: PullRequests = {
-    kind: 'gh',
-    findOpen: refuse('findOpen'),
-    list: refuse('list'),
-    get: (number: number) => {
-      sent.push(`get ${number}`);
-      return answers.get === undefined
-        ? Promise.resolve(detail())
-        : answers.get();
-    },
-    checks: (number: number) => {
-      sent.push(`checks ${number}`);
-      return answers.checks === undefined
-        ? Promise.resolve({ rows: [], verdict: 'green' as const })
-        : answers.checks();
-    },
-    browse: refuse('browse'),
-    merge: (number: number, method: string) => {
-      sent.push(`merge ${number} ${method}`);
-      return answers.merge === undefined
-        ? Promise.resolve({ merged: true, detail: 'Squashed and merged pull request' })
-        : answers.merge();
-    },
-    comments: refuse('comments'),
-    comment: refuse('comment'),
-    editComment: refuse('editComment'),
-    failedLog: refuse('failedLog'),
-  };
-  return { pulls, sent: () => [...sent] };
+/** A provider answering `get`, `checks` and `merge`, refusing every other call and recording each; GitHub itself is out of scope here. */
+function stubPulls(answers: StubAnswers = {}): PullRequestsDouble {
+  return createPullRequestsDouble({
+    get: answers.get ?? (() => Promise.resolve(detail())),
+    checks: answers.checks ?? (() => Promise.resolve({ rows: [], verdict: 'green' as const })),
+    merge: answers.merge ?? (() => Promise.resolve({ merged: true, detail: 'Squashed and merged pull request' })),
+  }, { refusal: 'the stub provider models get, checks and merge alone' });
 }
 
 /** What one driven run left, over real git and the real command output. */

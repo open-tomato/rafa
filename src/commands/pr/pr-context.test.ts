@@ -38,6 +38,7 @@ import { CommandExit } from '../../cli/command.js';
 import { configFilePath } from '../../config.js';
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
+import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {
@@ -96,20 +97,7 @@ function flagSets(...sets: readonly Readonly<Record<string, string | boolean>>[]
 
 /** A provider answering `findOpen` with `answer` and refusing every other call. */
 function stubPulls(answer: () => Promise<PullRequestSummary | null>): PullRequests {
-  const refuse = (): Promise<never> => Promise.reject(new Error('the stub provider models findOpen alone'));
-  return {
-    kind: 'gh',
-    findOpen: answer,
-    list: refuse,
-    get: refuse,
-    checks: refuse,
-    browse: refuse,
-    merge: refuse,
-    comments: refuse,
-    comment: refuse,
-    editComment: refuse,
-    failedLog: refuse,
-  };
+  return createPullRequestsDouble({ findOpen: answer }, { refusal: 'the stub provider models findOpen alone' }).pulls;
 }
 
 /** The seams a case hands the probe, with what each of the two controls recorded. */

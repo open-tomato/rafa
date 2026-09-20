@@ -32,6 +32,7 @@ import type {
   PullRequestDetail,
   PullRequests,
 } from '../../pr/index.js';
+import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { Prompter } from '../../project/root-choice.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
@@ -42,6 +43,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { PR_NEEDS_GH } from '../../pr/index.js';
+import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { createPrMergeCommand, summaryLine } from './merge.js';
@@ -106,49 +108,13 @@ interface StubAnswers {
   readonly merge?: () => Promise<MergeOutcome>;
 }
 
-/** A stub provider, and the log of every member it was sent. */
-interface StubPulls {
-  readonly pulls: PullRequests;
-  /** Each member reached, in order, a merge written `merge 41 squash`. */
-  readonly sent: () => readonly string[];
-}
-
 /** A provider answering the three members this action sends, refusing every other call and recording each. */
-function stubPulls(answers: StubAnswers = {}): StubPulls {
-  const sent: string[] = [];
-  const refuse = (name: string) => (): Promise<never> => {
-    sent.push(name);
-    return Promise.reject(new Error('the stub provider models get, checks and merge alone'));
-  };
-  const pulls: PullRequests = {
-    kind: 'gh',
-    findOpen: refuse('findOpen'),
-    list: refuse('list'),
-    get: (number: number) => {
-      sent.push(`get ${number}`);
-      return answers.get === undefined
-        ? Promise.resolve(detail())
-        : answers.get();
-    },
-    checks: (number: number) => {
-      sent.push(`checks ${number}`);
-      return answers.checks === undefined
-        ? Promise.resolve({ rows: [], verdict: 'green' })
-        : answers.checks();
-    },
-    browse: refuse('browse'),
-    merge: (number: number, method: string) => {
-      sent.push(`merge ${number} ${method}`);
-      return answers.merge === undefined
-        ? Promise.resolve({ merged: true, detail: 'Squashed and merged pull request #41' })
-        : answers.merge();
-    },
-    comments: refuse('comments'),
-    comment: refuse('comment'),
-    editComment: refuse('editComment'),
-    failedLog: refuse('failedLog'),
-  };
-  return { pulls, sent: () => [...sent] };
+function stubPulls(answers: StubAnswers = {}): PullRequestsDouble {
+  return createPullRequestsDouble({
+    get: answers.get ?? (() => Promise.resolve(detail())),
+    checks: answers.checks ?? (() => Promise.resolve({ rows: [], verdict: 'green' })),
+    merge: answers.merge ?? (() => Promise.resolve({ merged: true, detail: 'Squashed and merged pull request #41' })),
+  }, { refusal: 'the stub provider models get, checks and merge alone' });
 }
 
 /** A git answer that worked, carrying `stdout`. */

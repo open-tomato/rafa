@@ -3,10 +3,10 @@
  *
  * Every case drives {@link verifyPullRequest} through a complete stub of
  * its seams, so no `gh`, no git, no Claude session and no timer is
- * reached. The stub's provider is a whole {@link PullRequests}: the four
- * members the gate reads answer from a script, and the seven it must
- * never reach throw, so a gate that started listing or merging fails the
- * case rather than passing on an unread call. A poll, merge read or
+ * reached. The stub's provider is built on {@link createPullRequestsDouble}:
+ * the four members the gate reads answer from a script, and the seven it
+ * must never reach refuse, so a gate that started listing or merging fails
+ * the case rather than passing on an unread call. A poll, merge read or
  * repair session the script did not plan throws the same way. The check
  * rows go in as the `gh pr checks --json name,state,link` stdout
  * `src/pr/checks.test.ts` parses, read through `parseChecks` as the `gh`
@@ -75,7 +75,6 @@ import type {
   PrProviderReading,
   PullRequestDetail,
   PullRequestSummary,
-  PullRequests,
   PushOutcome,
 } from '../pr/index.js';
 
@@ -86,6 +85,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '../adapters/output/active.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { parseChecks, verdictOf } from '../pr/index.js';
+import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
@@ -221,14 +221,6 @@ interface Stubbed {
   readonly sources: (readonly ClaudeSettingSource[])[];
 }
 
-/**
- * A port member the gate must never reach: a gate that started listing
- * or merging throws here and fails the case that let it.
- */
-function unreached(member: string): never {
-  throw new Error(`unplanned ${member}`);
-}
-
 /** Answers a planned queue one entry per call, and throws past its end. */
 function answer<T>(queue: readonly T[], what: string): () => T {
   let taken = 0;
@@ -249,8 +241,7 @@ function stub(script: Script): Stubbed {
   const nextExit = answer(script.exits ?? [], 'repair session');
   let clock = 0;
 
-  const pulls: PullRequests = {
-    kind: 'gh',
+  const { pulls } = createPullRequestsDouble({
     findOpen: (branch: string): Promise<PullRequestSummary | null> => {
       calls.push(`pr list ${branch}`);
       const number = script.prNumber === undefined
@@ -269,14 +260,7 @@ function stub(script: Script): Stubbed {
       const rows = parseChecks(nextProbe());
       return Promise.resolve({ rows, verdict: verdictOf(rows) });
     },
-    list: () => unreached('list'),
-    browse: () => unreached('browse'),
-    merge: () => unreached('merge'),
-    comments: () => unreached('comments'),
-    comment: () => unreached('comment'),
-    editComment: () => unreached('editComment'),
-    failedLog: () => unreached('failedLog'),
-  };
+  });
 
   const seams: PrLifecycleSeams = {
     currentBranch: () => BRANCH,
