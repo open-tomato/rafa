@@ -69,6 +69,9 @@ Examples:
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md --start-at=23:00 --inject=task --no-ci-wait
       Starts at 23:00, hands each task session the plan context and its own task
       line, and finishes at the push.
+  rafa loop start --plan=.rafa/plans/PLAN-my-feature.md --create-branch
+      Run from `main`, creates `feat/my-feature` from the latest `origin/main`
+      without asking, and runs the plan there.
 
 Outputs:
   text, json

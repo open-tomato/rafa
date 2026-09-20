@@ -129,6 +129,11 @@ const wrapped = wrapPhaseZeroCommand({
       note: 'Starts at 23:00, hands each task session the plan context and its own task line,'
         + ' and finishes at the push.',
     },
+    {
+      cmd: 'rafa loop start --plan=.rafa/plans/PLAN-my-feature.md --create-branch',
+      note: 'Run from `main`, creates `feat/my-feature` from the latest `origin/main` without'
+        + ' asking, and runs the plan there.',
+    },
   ],
   aliases: ['start'],
   outputs: ['text', 'json'],
