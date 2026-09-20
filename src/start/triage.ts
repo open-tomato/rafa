@@ -17,8 +17,11 @@
  *
  * The public tracker is resolved through `resolveTracker`
  * (`adapters/tracker/resolve.ts`) at most once per run: when a report
- * first lists a bug `triageReport` would take to it, one with a `what`
- * and a `security` flag of `false`. Every later report of the run files
+ * first lists a bug `triageReport` may take to it, one with a `what`
+ * and a `security` flag of `false`. A machine-scoped bug carries that
+ * shape and reaches no tracker at all (`triage/triage.ts`), so a report
+ * whose only such bug is that one resolves a chain it then files
+ * nothing to. Every later report of the run files
  * through the tracker that resolution landed on. A chain that landed
  * nowhere is not tried again either: it is warned about once, and each
  * public bug of the run fails on its refusal.
@@ -58,7 +61,9 @@
  *
  * The loop never dispatches a task for an out-of-scope bug; a plan that
  * wants one fixed declares a task. Nothing here adds a line to the tracker
- * file. A bug becomes an issue file or a comment, and a stored reference.
+ * file. A bug becomes an issue file or a comment, and a stored reference,
+ * unless it is machine-scoped: that one becomes a warned line here and
+ * its stored row alone (`triage/triage.ts`).
  * A blocker's text goes onto its own task's line, escaped
  * (`writeTrackerBlocker` in `utils/tracker.ts`), so no text a session wrote
  * opens a line `findNextTask` could answer as a task.
@@ -170,7 +175,12 @@ export function unresolvedTracker(kind: TrackerKind, reason: string): Tracker {
   });
 }
 
-/** True for a bug `triageReport` takes to the public tracker: a `what`, and a flag of `false`. */
+/**
+ * True for a bug that may reach the public tracker: a `what`, and a flag
+ * of `false`. Not every one of them does, since `triageReport` keeps a
+ * machine-scoped bug off every tracker (`triage/triage.ts`); the reading
+ * is the module note's, and is not taken again here.
+ */
 function filesPublicly(bug: ReportBug): boolean {
   return bug.security === false && typeof bug.what === 'string' && bug.what.trim().length > 0;
 }

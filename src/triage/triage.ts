@@ -14,10 +14,12 @@
  *     text writes nothing and leaves an earlier comment as it was. The
  *     writer marks the line `[BLOCKED]` and refuses a ticked line, so a
  *     task the loop ticked keeps its tick.
- *   - Out-of-scope bugs, one at a time in list order, each routed by its
- *     `security` flag before anything is looked up. A bug with no usable
- *     `what` is skipped: it says nothing to file, and the store's triage
- *     writer refuses it for the same reason.
+ *   - Out-of-scope bugs, one at a time in list order, each routed before
+ *     anything is looked up: to the machine channel when the
+ *     machine-fault reading answers, and otherwise by its `security`
+ *     flag. A bug with no usable `what` is skipped: it says nothing to
+ *     file, and the store's triage writer refuses it for the same
+ *     reason.
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
  * declares a task for it.
@@ -39,8 +41,9 @@
  *
  * ## A public bug
  *
- * A bug whose flag is `false` goes to the tracker the degradation chain
- * landed on, looked up by its key:
+ * A bug the machine reading below did not match, and whose flag is
+ * `false`, goes to the tracker the degradation chain landed on, looked
+ * up by its key:
  *
  *   1. The reference stored under the key (`readTrackerRef`, which keeps a
  *      reference under the text its caller keys by, this module's key
@@ -68,8 +71,9 @@
  *
  * ## A security bug
  *
- * A bug whose flag is `true`, or missing, is filed only to the private
- * tracker: a second `local` tracker rooted at {@link PRIVATE_TRIAGE_DIR},
+ * A bug the machine reading below did not match, and whose flag is
+ * `true` or missing, is filed only to the private tracker: a second
+ * `local` tracker rooted at {@link PRIVATE_TRIAGE_DIR},
  * which `.gitignore` keeps ignored under every tracking flag
  * (`project/gitignore.ts`). The parser never defaults a missing flag, and
  * the qa-bug-reporter rule treats ambiguity as a match, so null counts as
@@ -89,6 +93,41 @@
  * {@link triageReport} refuses, before anything is written, a private
  * tracker that is not of kind `local` or that is the public tracker
  * itself; {@link createPrivateTriageTracker} makes the one it defaults to.
+ *
+ * ## A machine-scoped bug
+ *
+ * A bug whose `what` and `artifact` name a system toolchain, a machine's
+ * SDK path or a package-manager build failure is a fault of the MACHINE
+ * the session ran on and not of rafa. `./machine-fault.ts` is the whole
+ * of that reading, and its note holds the families, the near misses that
+ * shaped them and what it reads over the 27 bugs rafa's own runs filed.
+ * Such a bug goes to a third channel, which has no tracker at all:
+ *
+ *   - neither tracker is asked anything, the public one or the private
+ *     one: no `find`, no `create`, no `comment`;
+ *   - no reference is stored, and none is read. Nothing was filed for
+ *     it, so there is no issue a recurrence could be answered with;
+ *   - its action is `skipped`, its channel `machine`, and its problem is
+ *     one line for the operator naming the family and the text that
+ *     matched ({@link machineFaultSentence}, redacted as every problem
+ *     here is), so a run says why nothing was filed rather than saying
+ *     nothing.
+ *
+ * The bug is not lost. `writeTriage` (`effort/store/triage.ts`) stores
+ * every out-of-scope bug whatever triage did with it, and reads the SAME
+ * module for its row's `scope` column, so the row says `machine` and the
+ * routing and the row can never disagree about one bug. What is kept off
+ * is the board: nobody reading it can act on a malformed SDK stub on one
+ * machine, no rafa commit can fix one, and the artifact would carry that
+ * machine's own paths onto a public tracker. Issue #17 on
+ * `open-tomato/rafa` is the bug this channel exists for.
+ *
+ * The reading is taken BEFORE the `security` flag, so a machine fault a
+ * session flagged reaches the private tracker no more than it reaches
+ * the public one, and before the `what` check, so a machine-scoped bug
+ * with no `what` is skipped as a machine one: nothing was called for it
+ * either way, and the store refuses its row for the missing `what`
+ * whichever channel it went to.
  *
  * ## What is filed
  *
@@ -136,6 +175,7 @@
  * second issue. A bug filed or commented on whose reference then cannot
  * be stored keeps its action and names the store's problem.
  */
+import type { MachineFault } from './machine-fault.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { RafaConfig } from '../config.js';
 import type {
@@ -154,6 +194,8 @@ import { messageOf } from '../config-sections.js';
 import { textProblem } from '../effort/store/findings.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
+
+import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR = join('.rafa', 'triage', 'private');
@@ -192,8 +234,11 @@ export interface NamedSecret {
   readonly value: string;
 }
 
-/** Where a bug goes: the tracker the chain landed on, or the private one. */
-export type BugChannel = 'public' | 'private';
+/**
+ * Where a bug goes: the tracker the chain landed on, the private one, or
+ * `machine`, the channel with no tracker at all; see the module note.
+ */
+export type BugChannel = 'public' | 'private' | 'machine';
 
 /** What became of one bug. */
 export type BugTriageAction =
@@ -201,7 +246,10 @@ export type BugTriageAction =
   | 'filed'
   /** An issue it recurs in was found and commented on. */
   | 'commented'
-  /** It had no `what` to file; nothing was called. */
+  /**
+   * Nothing was called for it: it is machine-scoped, or it had no `what`
+   * to file. Its problem says which.
+   */
   | 'skipped'
   /** A step failed before an issue was filed or commented on. */
   | 'failed';
@@ -503,9 +551,12 @@ function filingFor(
   };
 }
 
+/** The channels that have a tracker to route a bug to: every one but `machine`. */
+type TrackedChannel = Exclude<BugChannel, 'machine'>;
+
 /** Where one channel files, and the store calls only the public channel makes. */
 interface Route {
-  readonly channel: BugChannel;
+  readonly channel: TrackedChannel;
   readonly tracker: Tracker;
   /** The reference stored under a key; null for a channel that never reads the store. */
   readonly readStored: ((key: string) => IssueRef | null) | null;
@@ -606,6 +657,24 @@ async function triageBug(run: BugRun): Promise<BugTriage> {
     : commentOn(run, match, 'find');
 }
 
+/** A bug nothing was called for: its row, on the channel it was read onto. */
+function skippedRow(index: number, channel: BugChannel, problem: string): BugTriage {
+  return { index, channel, action: 'skipped', ref: null, foundBy: null, stored: null, problem };
+}
+
+/**
+ * The one line a machine-scoped bug's row carries, for the operator to
+ * read: the bug's place in the report, then the family and the text that
+ * matched. Redacted, as every problem this module answers is.
+ */
+function machineProblem(
+  index: number,
+  fault: MachineFault,
+  redact: (text: string) => string,
+): string {
+  return redact(`out_of_scope_bugs[${index}] is ${machineFaultSentence(fault)}`);
+}
+
 /** Throws unless `privateTracker` may take security bugs; see the module note. */
 function checkPrivateTracker(tracker: Tracker, privateTracker: Tracker): void {
   if (privateTracker.kind !== 'local') {
@@ -623,9 +692,11 @@ function checkPrivateTracker(tracker: Tracker, privateTracker: Tracker): void {
 
 /**
  * Triages one stored report: writes its blocker text onto the task's
- * tracker line, then files, or comments on, each out-of-scope bug through
- * the channel its `security` flag routes it to, and answers what became of
- * each; see the module note.
+ * tracker line, then files, or comments on, each out-of-scope bug
+ * through the channel it is routed to — the machine one, which files
+ * nothing, when the machine-fault reading answers, and otherwise the one
+ * its `security` flag names — and answers what became of each; see the
+ * module note.
  *
  * Rejects, having written and called nothing, only for a private tracker
  * it refuses. Every other failure is answered in the result.
@@ -637,7 +708,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
 
   const blocker = triageBlockers(options);
   const redact = (text: string): string => redactSecrets(text, options.secrets);
-  const routes: Readonly<Record<BugChannel, Route>> = {
+  const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
       channel: 'public',
       tracker: options.tracker,
@@ -654,20 +725,17 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
 
   const bugs: BugTriage[] = [];
   for (const [index, bug] of options.report.outOfScopeBugs.entries()) {
+    const fault = readMachineFault(bug);
+    if (fault !== null) {
+      bugs.push(skippedRow(index, 'machine', machineProblem(index, fault, redact)));
+      continue;
+    }
     const route = bug.security === false
       ? routes.public
       : routes.private;
     const what = bug.what;
     if (!hasText(what)) {
-      bugs.push({
-        index,
-        channel: route.channel,
-        action: 'skipped',
-        ref: null,
-        foundBy: null,
-        stored: null,
-        problem: `out_of_scope_bugs[${index}] has no what to file`,
-      });
+      bugs.push(skippedRow(index, route.channel, `out_of_scope_bugs[${index}] has no what to file`));
       continue;
     }
     const filing = filingFor(what, bug, options, redact);

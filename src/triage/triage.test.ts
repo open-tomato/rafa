@@ -805,6 +805,113 @@ describe('a machine-scoped bug', () => {
     expect(onlyIssue(f.publicDir).draft.title).toBe('Parser drops the last line');
     expect(refRows(f.root)).toHaveLength(1);
   });
+
+  it('is skipped with one line naming the family and the text that matched', async () => {
+    const f = fixture();
+    const report = reportWith({
+      outOfScopeBugs: [bug('Build fails linking against the installed SDK', LINKER_ARTIFACT, false)],
+    });
+
+    const result = await triage(f, report);
+
+    expect(result.bugs).toEqual([{
+      index: 0,
+      channel: 'machine',
+      action: 'skipped',
+      ref: null,
+      foundBy: null,
+      stored: null,
+      problem: 'out_of_scope_bugs[0] is machine-scoped (toolchain): tapi error',
+    }]);
+  });
+
+  it('reaches no store: none is read, none is written, and no store file is made', async () => {
+    const f = fixture();
+    const machineOnly = reportWith({
+      outOfScopeBugs: [bug('Build fails linking against the installed SDK', LINKER_ARTIFACT, false)],
+    });
+
+    await triage(f, machineOnly);
+
+    expect(existsSync(sqliteStorePath(f.root))).toBe(false);
+    expect(f.publicSpy.calls).toEqual([]);
+    expect(f.privateSpy.calls).toEqual([]);
+
+    // Control: the same fixture makes the store file for a rafa bug.
+    await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
+
+    expect(existsSync(sqliteStorePath(f.root))).toBe(true);
+    expect(refRows(f.root)).toHaveLength(1);
+  });
+
+  it('is read before the security flag, so a flagged one reaches neither tracker', async () => {
+    const f = fixture();
+    const report = reportWith({
+      outOfScopeBugs: [bug('Build leaks the token while linking the SDK', LINKER_ARTIFACT, true)],
+    });
+
+    const result = await triage(f, report);
+
+    expect(result.bugs[0]).toMatchObject({ channel: 'machine', action: 'skipped' });
+    expect(f.privateSpy.calls).toEqual([]);
+    expect(issueFiles(f.privateDir)).toEqual([]);
+    expect(f.publicSpy.calls).toEqual([]);
+  });
+
+  it('is read before the security flag, the control: the same bug with no machine text is filed privately', async () => {
+    const f = fixture();
+    const report = reportWith({
+      outOfScopeBugs: [bug('Build leaks the token while linking the SDK', ARTIFACT, true)],
+    });
+
+    const result = await triage(f, report);
+
+    expect(result.bugs[0]).toMatchObject({ channel: 'private', action: 'filed' });
+    expect(methodsOf(f.privateSpy)).toEqual(['find', 'create']);
+    expect(issueFiles(f.privateDir)).toHaveLength(1);
+  });
+
+  it('with no what is skipped as a machine one, its line naming the machine and not the missing what', async () => {
+    const f = fixture();
+    const report = reportWith({ outOfScopeBugs: [bug(null, LINKER_ARTIFACT, false)] });
+
+    const result = await triage(f, report);
+
+    expect(result.bugs[0]).toMatchObject({
+      channel: 'machine',
+      action: 'skipped',
+      problem: 'out_of_scope_bugs[0] is machine-scoped (toolchain): tapi error',
+    });
+    expect(f.publicSpy.calls).toEqual([]);
+
+    // Control: a bug with no what and nothing of the machine in it keeps the older line.
+    const other = await triage(f, reportWith({ outOfScopeBugs: [bug(null, ARTIFACT, false)] }));
+
+    expect(other.bugs[0]).toMatchObject({
+      channel: 'public',
+      action: 'skipped',
+      problem: 'out_of_scope_bugs[0] has no what to file',
+    });
+  });
+
+  it('has its line redacted of every named secret the matched text held', async () => {
+    const f = fixture();
+    const secret: NamedSecret = { name: 'BUILD_KEY', value: 's3cretBuild' };
+    const report = reportWith({
+      outOfScopeBugs: [bug('Build cannot open the SDK', 'clang: cannot open /Users/u/sdks/s3cretBuild.sdk', false)],
+    });
+
+    const result = await triage(f, report, { secrets: [secret] });
+
+    expect(result.bugs[0]!.problem)
+      .toBe('out_of_scope_bugs[0] is machine-scoped (sdk-path): [redacted: BUILD_KEY].sdk');
+
+    // Control: the same reading shows the value when no secret is named.
+    const unredacted = await triage(f, report, { secrets: [] });
+
+    expect(unredacted.bugs[0]!.problem)
+      .toBe('out_of_scope_bugs[0] is machine-scoped (sdk-path): s3cretBuild.sdk');
+  });
 });
 
 describe('named secrets in what is filed', () => {
