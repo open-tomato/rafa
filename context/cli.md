@@ -27,6 +27,7 @@ module's note is the long form.
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
+| `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -74,10 +75,11 @@ module's note is the long form.
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `skill check`, `skill list`,
   `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `init`, `doctor`, `self-update`, `usage` and
+  `instinct show`, `release status`, `release tag`, `init`, `doctor`,
+  `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
-  `module`, `agent`, `skill` and `instinct`: a subject is declared with
-  its first action, never ahead of it.
+  `module`, `agent`, `skill`, `instinct` and `release`: a subject is
+  declared with its first action, never ahead of it.
   `skill index`, `instinct flag` and `instinct promote` are in the
   command tree and are registered by none of it yet, so no roster names
   them.
