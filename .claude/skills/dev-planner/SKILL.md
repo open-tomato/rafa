@@ -154,6 +154,8 @@ Recognized fields:
 - `stub` — The plan identifier (string, following the `rafa-<n>-<slug>` format). Used to organize findings and dedupe rows across runs.
 - `issue` — Optional GitHub issue number (integer, e.g., `123`). Links the work back to the `open-tomato/rafa` board.
 - `spec` — Optional path to the specification document that guided the plan.
+- `changes` — Optional one-line summary of the change for the changelog, written at the user level (e.g., "Add pull-request merge commands").
+- `release:` — Optional release level for the plan's overall change: `major`, `minor`, or `patch`.
 
 Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
 
@@ -247,6 +249,8 @@ Report fields:
 | `skills_used` | list of strings | Names of skills referenced or applied |
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
 | `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
+| `changes` | string | One-line summary of the change for the changelog, written at the user level (e.g., "Add pull-request merge commands") |
+| `release:` | string | The release level for this change: `major`, `minor`, or `patch` |
 
 Finding entry fields:
 
@@ -375,18 +379,18 @@ The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, wh
   invariant sweeps), live-seam runs, migrations, and close-out — these
   preserve resumability where a halt is most likely.
 * The RUNNER owns the push, the pull request, the merge with the base,
-  and the wait for CI. After the last task it runs a wrap-up session
-  that promotes findings, compacts `progress.txt`, merges `origin/main`,
-  commits, pushes and opens (or updates) the PR — and then polls that
-  PR's checks, spending repair sessions on a red or conflicting result.
-  So a plan must NOT carry a task that opens a PR, resolves a merge
-  conflict, waits on CI, or compacts `progress.txt`. Two openers race:
-  measured, one run cut a second branch and opened a second PR for a
-  single plan. A close-out task SHOULD still take the mergeability
-  reading (`git merge-tree --write-tree origin/main HEAD`) and assemble
-  the body material — the gate captures, the test plan, the recorded
-  debt — into the plan's close-out notes for that wrap-up session to
-  use.
+  the wait for CI, and the version bump and changelog entry. After the last
+  task it runs a wrap-up session that promotes findings, compacts
+  `progress.txt`, merges `origin/main`, commits, pushes and opens (or
+  updates) the PR — and then polls that PR's checks, spending repair sessions
+  on a red or conflicting result. So a plan must NOT carry a task that opens
+  a PR, resolves a merge conflict, waits on CI, compacts `progress.txt`,
+  or writes a version bump or changelog entry. Two openers race: measured,
+  one run cut a second branch and opened a second PR for a single plan. A
+  close-out task SHOULD still take the mergeability reading (`git merge-tree
+  --write-tree origin/main HEAD`) and assemble the body material — the gate
+  captures, the test plan, the recorded debt — into the plan's close-out
+  notes for that wrap-up session to use.
 
 ---
 
