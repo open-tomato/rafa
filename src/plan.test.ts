@@ -124,7 +124,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from './board/naming.js';
-import { buildPlanPrompt, readPlanFormat } from './plan.js';
+import { buildPlanPrompt, readPlanFormat, runBranchLine } from './plan.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
 
@@ -366,6 +366,26 @@ function expectedPrompt(progress: string | undefined, planDir: string = DEFAULT_
   return buildPlanPrompt(template, readPlanFormat(SRC_DIR), FIXTURE_SPEC, 'spec', planDir, progress);
 }
 
+/** The branch line the fixture's plan path earns, as both output cases read it. */
+const BRANCH_LINE = '   Runs on feat/spec — started from the base branch, the run offers to create it.';
+
+describe('the branch line printed under the Execute with hint', () => {
+  it('names feat/ and the stub the plan path carries', () => {
+    expect(runBranchLine('.rafa/plans/PLAN-rafa-49.md')).toBe(
+      '   Runs on feat/rafa-49 — started from the base branch, the run offers to create it.',
+    );
+  });
+
+  it('reads the stub off the file name, not the directory holding it', () => {
+    expect(runBranchLine('/tmp/some-repo/.plans/PLAN-my-feature.md'))
+      .toBe(runBranchLine('PLAN-my-feature.md'));
+  });
+
+  it('answers null for a plan whose name carries no stub, which loop start would name no branch for', () => {
+    expect(runBranchLine('.rafa/plans/PLAN.md')).toBe(null);
+  });
+});
+
 describe('rafa plan through the adapter registry', () => {
   it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', () => {
     const scratch = plantScratch();
@@ -382,7 +402,9 @@ describe('rafa plan through the adapter registry', () => {
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
-    expect(run.stdout).toContain('▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md\n');
+    expect(run.stdout).toContain(
+      `▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md\n${BRANCH_LINE}\n`,
+    );
     expect(run.stdout).not.toContain('Prerequisites detected');
     expect(run.stdout).not.toContain('Including findings');
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
@@ -644,6 +666,7 @@ describe('rafa plan create in json mode', () => {
       'info:\n✅ Plan ready: .rafa/plans/PLAN-spec.md',
       'info:⚠️  Prerequisites detected: complete .rafa/plans/PREREQUISITES-spec.md before starting the loop.',
       'info:▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md',
+      `info:${BRANCH_LINE}`,
       'result',
     ]);
     expect(existsSync(scratch.spawned)).toBe(false);

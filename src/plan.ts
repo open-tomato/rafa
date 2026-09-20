@@ -20,6 +20,9 @@
  *
  *   rafa loop start --plan=.rafa/plans/PLAN-<stub>.md
  *
+ * and the hint that line is printed in names the branch that run will
+ * be on, `feat/<stub>`; see {@link runBranchLine}.
+ *
  * ## What the command keeps, and what the adapter does
  *
  * The command checks its command line (the config, the spec source,
@@ -186,7 +189,9 @@ import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
+import { branchNameFor } from './start/branch-decision.js';
 import { checkUsage } from './utils/claude.js';
+import { planStubFromPath } from './utils/plan-stamp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -321,6 +326,27 @@ export function buildPlanPrompt(
 /** Derives the plan stub from a spec path: specs/my-feature.md → my-feature. */
 export function stubFromSpecPath(specPath: string): string {
   return path.basename(specPath).replace(/\.md$/, '');
+}
+
+/**
+ * The branch `rafa loop start` will run this plan on, as a line printed
+ * under the `Execute with` hint — or null when there is none to name.
+ *
+ * The stub is read back off the plan the planner wrote, with
+ * {@link planStubFromPath}, rather than off the `--stub` this command
+ * resolved: the path is the adapter's own, and `loop start` derives the
+ * branch from that same path, so what is printed here is the name the
+ * run will build. A plan whose name carries no stub (`PLAN.md`) answers
+ * null, because `loop start` would name no branch for it either and a
+ * `feat/` with nothing after it is not a name to print.
+ *
+ * Exported for tests.
+ */
+export function runBranchLine(planPath: string): string | null {
+  const stub = planStubFromPath(planPath);
+  return stub === null
+    ? null
+    : `   Runs on ${branchNameFor(stub)} — started from the base branch, the run offers to create it.`;
 }
 
 /**
@@ -577,4 +603,8 @@ export default async function plan(
     activeOutput().info(`⚠️  Prerequisites detected: complete ${generated.prerequisitesPath} before starting the loop.`);
   }
   activeOutput().info(`▶ Execute with: rafa loop start --plan=${generated.planPath}`);
+  const branchLine = runBranchLine(generated.planPath);
+  if (branchLine !== null) {
+    activeOutput().info(branchLine);
+  }
 }
