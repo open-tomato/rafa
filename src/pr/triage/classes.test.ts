@@ -110,6 +110,11 @@ describe('the dependency bump reading', () => {
     expect(isDependencyBump(pr('  Chore(Deps): bump react', 'marcos'))).toBe(true);
     expect(isDependencyBump(pr('Update things', 'Dependabot[Bot]'))).toBe(true);
   });
+
+  it('reads the app/dependabot author as a bump whatever its title says, unlike a human author', () => {
+    expect(isDependencyBump(pr('Update things', 'app/dependabot'))).toBe(true);
+    expect(isDependencyBump(pr('Update things', 'marcos'))).toBe(false);
+  });
 });
 
 describe('the eligibility rule', () => {
