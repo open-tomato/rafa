@@ -7,9 +7,9 @@
  * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
- * `skill check`, `skill list`, `skill demote`, `instinct check`, `instinct list`, `instinct show`,
+ * `skill check`, `skill list`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
  * `release status`, `release tag`,
- * and the four `pr` readers beside `pr merge` and `pr triage`
+ * and the six `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
