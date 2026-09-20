@@ -601,6 +601,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../project/scaffold.js', ['scaffoldConflicts', 'writeProjectScope', 'writeUserScope']],
     ['../schema/project-id.js', ['gitRemoteUrl']],
     ['./init-board.js', ['boardStepChanged', 'renderBoardStep', 'runBoardStep']],
+    ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
   ['./commands/doctor.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
