@@ -23,7 +23,10 @@
 import type { PullRequestsAnswers } from './pull-requests-double.js';
 import type { PullRequests } from './types.js';
 
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'bun:test';
+import ts from 'typescript';
 
 import { createPullRequestsDouble } from './pull-requests-double.js';
 
@@ -184,5 +187,67 @@ describe('the pull request double', () => {
 
     expect(await double.pulls.get(41)).toBeNull();
     await expect(double.pulls.list()).rejects.toThrow('was sent list');
+  });
+});
+
+describe('the double against the declaration in src/pr/types.ts', () => {
+  /**
+   * The function-typed members the `PullRequests` interface declares in
+   * `source`, in declaration order. Reads the AST the way
+   * `src/tests/user-facing-spelling.test.ts` reads source, rather than
+   * `Object.keys` on a value, so a member `pull-requests-double.ts` never
+   * bound is missed by nothing here: `membersOf` above reads the double
+   * itself, which cannot see a member it never grew.
+   */
+  function functionMembersOf(source: string): readonly string[] {
+    const file = ts.createSourceFile('types.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const members: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isInterfaceDeclaration(node) && node.name.text === 'PullRequests') {
+        for (const member of node.members) {
+          if (
+            ts.isPropertySignature(member)
+            && ts.isIdentifier(member.name)
+            && member.type !== undefined
+            && ts.isFunctionTypeNode(member.type)
+          ) {
+            members.push(member.name.text);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return members;
+  }
+
+  it('answers every function-typed member the interface declares, read off the source and not off the double', async () => {
+    const source = await Bun.file(join(import.meta.dir, 'types.ts')).text();
+    const declared = functionMembersOf(source);
+    const double = createPullRequestsDouble(everyMember(createPullRequestsDouble().pulls));
+
+    // The count guards against a reader that silently found nothing.
+    expect(declared.length).toBeGreaterThan(10);
+    expect(declared).toEqual(membersOf(double.pulls));
+    for (const member of declared) {
+      expect(await send(double.pulls, member)).toBe(member);
+    }
+  });
+
+  it('reads a planted extra member back, the control on the reader above', () => {
+    const planted = 'plantedExtraMember';
+    const probe = [
+      'export interface PullRequests {',
+      `  ${planted}: (n: number) => Promise<void>;`,
+      '  get: (number: number) => Promise<null>;',
+      '}',
+    ].join('\n');
+
+    const declared = functionMembersOf(probe);
+
+    expect(declared).toContain(planted);
+    // A member the reader finds but the double never bound fails the same
+    // way the case above would if the port grew one the double missed.
+    expect(() => send(createPullRequestsDouble().pulls, planted)).toThrow('the double carries no member');
   });
 });
