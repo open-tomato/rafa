@@ -57,10 +57,15 @@ import type {
 } from '../release/prepare.js';
 import type { ReleaseRefused, ReleaseVerified } from '../release/verify.js';
 
-import { afterEach, describe, expect, it } from 'bun:test';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { RELEASE_AUTO } from '../config-sections.js';
+import { verifyRelease } from '../release/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { bodyWithSentence, finishRelease, prepareReleaseStage, RELEASE_STAGE_SEAMS } from './release-stage.js';
@@ -324,6 +329,67 @@ function commitArgv(paths: string, subject = `chore: release ${VERSION}`): strin
   ];
 }
 
+/** A temporary directory this file's own planted-edit case writes into. */
+const PLANTED_ROOT = mkdtempSync(join(tmpdir(), 'rafa-release-stage-'));
+
+afterAll(() => {
+  rmSync(PLANTED_ROOT, { recursive: true, force: true });
+});
+
+/** `path`'s text, or null when it is not there. */
+function textAt(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A preparation whose two files are REAL, on disk under
+ * {@link PLANTED_ROOT}, so the real `verifyRelease` — not the stubbed
+ * `verify` seam every other case here scripts — reads and restores
+ * actual bytes. `before`/`after` mirror a real insertion: `after` puts
+ * the entry's heading and line above the older release, leaving the
+ * preamble line and the older section's own line untouched around it.
+ */
+function plantedPrepared(): { readonly prepared: ReleasePrepared; readonly changelog: string; readonly versionFile: string } {
+  const changelog = join(PLANTED_ROOT, 'CHANGELOG.md');
+  const versionFile = join(PLANTED_ROOT, 'package.json');
+  const before = [
+    '# Changelog',
+    '',
+    'Every notable change to this project, newest first.',
+    '',
+    '## 0.4.0 — 2026-09-19, the one before',
+    '',
+    '- loop: the loop learned to stop',
+    '',
+  ].join('\n');
+  const after = [
+    '# Changelog',
+    '',
+    'Every notable change to this project, newest first.',
+    '',
+    HEADING,
+    '',
+    '- loop: the wrap-up now commits the release',
+    '',
+    '## 0.4.0 — 2026-09-19, the one before',
+    '',
+    '- loop: the loop learned to stop',
+    '',
+  ].join('\n');
+  return {
+    prepared: prepared({
+      changelog: { path: 'CHANGELOG.md', resolved: changelog, before, after },
+      versionFile: { path: 'package.json', resolved: versionFile, before: '{"version":"0.4.0"}', after: '{"version":"0.5.0"}' },
+    }),
+    changelog,
+    versionFile,
+  };
+}
+
 afterEach(() => {
   setActiveOutput(null);
 });
@@ -523,6 +589,37 @@ describe('finishRelease', () => {
     expect(world.calls).toEqual(['findOpen', `get ${PR}`, `editBody ${PR}`]);
     expect(world.bodies).toEqual([`Closes #21\n\n${REFUSAL_SENTENCE}`]);
     expect(world.error[0]).toContain(REFUSAL_SENTENCE);
+  });
+
+  it('refuses a session that rewrote a line outside the new section, restores step 1s text byte for byte, and carries the refusal into the pull request body', async () => {
+    const at = plantedPrepared();
+    // The wrap-up session's OWN edit: it merges in a change to the preamble,
+    // a line entirely outside the section it was told to rewrite.
+    const planted = at.prepared.changelog.after.replace(
+      'Every notable change to this project, newest first.',
+      'Every notable change to this project, newest first, rewritten.',
+    );
+    writeFileSync(at.changelog, planted);
+    writeFileSync(at.versionFile, at.prepared.versionFile?.after ?? '');
+    const world = stub({});
+
+    const finish = await finishRelease(
+      { repoRoot: REPO, preparation: at.prepared },
+      { ...world.seams, verify: verifyRelease },
+    );
+
+    expect(finish.outcome).toBe('refused');
+    expect(finish.sentence).toContain('outside the');
+    expect(finish.sentence).toContain(
+      'reads "Every notable change to this project, newest first, rewritten." where the loop left'
+        + ' "Every notable change to this project, newest first."',
+    );
+    expect(finish.sha).toBeNull();
+    // Step 1's text is back, byte for byte, not merely "a" text.
+    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
+    expect(textAt(at.versionFile)).toBe(at.prepared.versionFile?.after ?? null);
+    expect(world.git).toEqual([]);
+    expect(world.bodies).toEqual([`Closes #21\n\n${finish.sentence}`]);
   });
 
   it('reports a staging that git refused, and sends no commit', async () => {
