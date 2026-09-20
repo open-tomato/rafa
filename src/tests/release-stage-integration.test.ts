@@ -37,7 +37,8 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '../adapters/output/active.js';
 import { RELEASE_AUTO } from '../config-sections.js';
 import { writeChanges } from '../effort/store/changes.js';
-import { createGitRunner } from '../pr/index.js';
+import { createFakePrGh } from '../pr/gh-fake.js';
+import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
 import { sinkOutput } from './output-sinks.js';
@@ -127,11 +128,13 @@ interface ScratchRelease {
 /**
  * Plants a repository with one commit on `main` carrying
  * {@link BASE_VERSION}, a bare `origin` it is pushed to, `BRANCH` checked
- * out from it, and the two {@link NOTES} stored under {@link PLAN_STUB}
- * through the real effort store — exactly as a plan's task sessions
- * would leave them for the wrap-up to read back.
+ * out from it, and `notes` stored under {@link PLAN_STUB} through the
+ * real effort store — exactly as a plan's task sessions would leave them
+ * for the wrap-up to read back. An empty `notes` never calls the store
+ * at all, which is what a plan whose run stored no change note looks
+ * like on disk.
  */
-function plantScratchRelease(name: string): ScratchRelease {
+function plantScratchRelease(name: string, notes: readonly ReportChange[] = NOTES): ScratchRelease {
   const root = join(tempBase, name);
   const origin = join(root, 'origin.git');
   const repo = join(root, 'repo');
@@ -153,10 +156,12 @@ function plantScratchRelease(name: string): ScratchRelease {
   git(['push', '--quiet', '-u', 'origin', 'main']);
   git(['checkout', '--quiet', '-b', BRANCH]);
 
-  writeChanges(repo, {
-    dispatch: { sessionId: 'scratch-session-1', planStub: PLAN_STUB, taskLine: '- [x] Ship a scratch release end to end' },
-    changes: NOTES,
-  });
+  if (notes.length > 0) {
+    writeChanges(repo, {
+      dispatch: { sessionId: 'scratch-session-1', planStub: PLAN_STUB, taskLine: '- [x] Ship a scratch release end to end' },
+      changes: notes,
+    });
+  }
 
   return { repo, origin, git };
 }
@@ -225,4 +230,92 @@ describe('the release stage over a scratch repository', () => {
       expect(remoteTip).toBe(finish.sha);
     },
   );
+
+  /**
+   * The two ways a level comes out `none`: `release/level.ts`'s "the
+   * declaration wins outright, `none` included" and its "a plan with no
+   * notes at all reads as `none` from `default`". Neither writes either
+   * release file, and each carries its own sentence — the record's own,
+   * per `release/prepare.ts` — into the pull request body, over a real
+   * `gh` fake rather than a hand-stubbed provider, so this suite checks
+   * the same read-modify-write `carryIntoBody` performs against a real
+   * one.
+   */
+  it.each([
+    [
+      'a plan declaring release: none',
+      'declares-none',
+      [
+        `# Plan: ${TITLE}`,
+        '',
+        '```rafa:plan',
+        `stub: ${PLAN_STUB}`,
+        'issue: "99"',
+        'release: none',
+        '```',
+        '',
+        '- [x] Ship a scratch release end to end',
+      ].join('\n'),
+      [] as readonly ReportChange[],
+      'the plan declares release: none, so this pull request ships no version bump and no changelog entry',
+    ],
+    [
+      'a plan whose run stored no change note',
+      'no-change-note',
+      [
+        `# Plan: ${TITLE}`,
+        '',
+        '```rafa:plan',
+        `stub: ${PLAN_STUB}`,
+        'issue: "99"',
+        '```',
+        '',
+        '- [x] Ship a scratch release end to end',
+      ].join('\n'),
+      [] as readonly ReportChange[],
+      'this plan stored no change note and declares no release level, so this pull request ships no version bump and no changelog entry',
+    ],
+  ])('writes neither release file for %s, and carries the sentence into the pull request body', async (
+    _label,
+    scratchName,
+    plan,
+    notes,
+    sentence,
+  ) => {
+    const scratch = plantScratchRelease(scratchName, notes);
+    setActiveOutput(sinkOutput({}));
+
+    const fakeGh = createFakePrGh();
+    fakeGh.plant({ number: 42, headRefName: BRANCH, body: 'What this pull request does.' });
+
+    const preparation = prepareReleaseStage(
+      { repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: plan },
+      { now: () => new Date('2026-09-20T09:00:00Z') },
+    );
+
+    if (preparation === null || preparation.kind !== 'skipped') {
+      throw new Error(`expected a skipped release, got ${JSON.stringify(preparation)}`);
+    }
+    expect(preparation.sentence).toBe(sentence);
+
+    const finish = await finishRelease(
+      { repoRoot: scratch.repo, preparation },
+      { currentBranch: () => BRANCH, pulls: () => createGhPullRequests({ gh: fakeGh.run }) },
+    );
+
+    expect(finish.outcome).toBe('skipped');
+    expect(finish.sentence).toBe(sentence);
+
+    // Neither release file was touched.
+    expect(readFileSync(join(scratch.repo, 'CHANGELOG.md'), 'utf8')).toBe(CHANGELOG_BEFORE);
+    expect(readFileSync(join(scratch.repo, 'package.json'), 'utf8')).toBe(PACKAGE_JSON_BEFORE);
+
+    // No commit landed beyond the one the scratch repository started with.
+    const subjects = scratch.git(['log', '--format=%s']).stdout.trim().split('\n');
+    expect(subjects).toEqual(['first']);
+
+    // The sentence reached the real pull request body, under what was there.
+    const pull = fakeGh.pull(42);
+    expect(pull?.body).toBe(`What this pull request does.\n\n${sentence}`);
+  });
 });
