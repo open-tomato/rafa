@@ -67,6 +67,21 @@ A new table moves every full table-list expectation with it: two in
 `preflight.test.ts` takes the later tables out with, beside the
 version-7 filter of `changes.test.ts`.
 
+**`out_of_scope_bugs.scope` is read, not copied.** Every other column of
+these tables holds what a report wrote; `scope` holds what
+`src/triage/machine-fault.ts` reads off the bug's `what` and `artifact`,
+which `store/triage.ts` calls for each bug it stores: `machine` for a
+fault of the machine the session ran on, `rafa` otherwise, and never
+NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
+the one migration that creates no table, so a row a version-8 store
+already held reads NULL — stored before the reading existed. It is
+outside `out_of_scope_bugs_by_entry` because it is a function of `what`
+and `artifact`, which that index already holds, so a repeat of an entry
+is still the duplicate it was and keeps the scope on the row. A column
+added to one of these tables moves every COLUMN-list expectation, as a
+new table moves the table lists: the `COLUMNS` map and the whole-row
+case of `store/triage.test.ts` for this one.
+
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
 the session id, holding the block as written, each declared value the

@@ -522,6 +522,118 @@ describe('writeTriage rows', () => {
   });
 });
 
+describe('the scope column', () => {
+  /**
+   * #17's artifact, as its body carries it: a linker failure against an
+   * Xcode Command Line Tools SDK installed on the machine the session
+   * ran on, which is a fault of that machine and not of rafa.
+   */
+  const LINKER_ARTIFACT = 'ld: tapi error: malformed file: '
+    + '\'/Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk/usr/lib/libSystem.tbd\'';
+
+  /** The columns one table holds, in `cid` order. */
+  function columnNames(db: Database, table: string): string[] {
+    return db
+      .query<{ name: string }, [string]>('SELECT name FROM pragma_table_info(?) ORDER BY cid')
+      .all(table)
+      .map(({ name }) => name);
+  }
+
+  /** A version-8 store, the last one the bugs table had no scope in. */
+  function plantVersion8(root: string): void {
+    mkdirSync(dirname(storeFile(root)), { recursive: true });
+    const db = new Database(storeFile(root), { create: true, readwrite: true });
+    try {
+      migrateSchema(db, storeFile(root), SQLITE_MIGRATIONS.slice(0, 8));
+      expect(columnNames(db, 'out_of_scope_bugs')).not.toContain('scope');
+      db.run(
+        'INSERT INTO out_of_scope_bugs'
+          + ' (id, session_id, task_line, what, artifact, security, outcome, collected_at)'
+          + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          'v8-1',
+          'aaaa-1111',
+          'A task from before the reading',
+          'report writer drops the last line',
+          'Unexpected end of JSON input',
+          0,
+          'done',
+          '2026-09-13T00:00:00.000Z',
+        ],
+      );
+    } finally {
+      db.close();
+    }
+  }
+
+  it('reads machine off a toolchain bug and rafa off the rest, in one write', () => {
+    const root = freshRoot('scope');
+    const write = writeOf({
+      outOfScopeBugs: [
+        bug({ what: 'Build fails linking against the installed SDK', artifact: LINKER_ARTIFACT }),
+        bug({ what: 'brew install libpq fails to build', artifact: null }),
+        bug(),
+        bug({ what: 'the loop reruns a task it already committed', artifact: null }),
+      ],
+    });
+
+    writeTriage(root, write, seams('scope'));
+
+    expect(columnOf(root, 'out_of_scope_bugs', 'scope'))
+      .toEqual(['machine', 'machine', 'rafa', 'rafa']);
+  });
+
+  it('holds machine, rafa or NULL, and nothing else', () => {
+    const root = freshRoot('schema-scope');
+    writeTriage(root, writeOf({ outOfScopeBugs: [bug()] }));
+
+    for (const scope of ['machine', 'rafa', null]) {
+      expect(() => rawInsert(root, 'out_of_scope_bugs', { scope })).not.toThrow();
+    }
+    expect(() => rawInsert(root, 'out_of_scope_bugs', { scope: 'MACHINE' }))
+      .toThrow(/CHECK constraint failed/);
+    expect(() => rawInsert(root, 'out_of_scope_bugs', { scope: '' }))
+      .toThrow(/CHECK constraint failed/);
+  });
+
+  it('is on the bugs table alone, and no blocker carries one', () => {
+    const root = freshRoot('scope-bugs-only');
+    writeTriage(root, writeOf({ blockers: [blocker()], outOfScopeBugs: [bug()] }));
+
+    expect(() => rawInsert(root, 'blockers', { scope: 'machine' }))
+      .toThrow(/no column named scope/);
+  });
+
+  it('brings a version-8 store forward, keeping its bugs and reading NULL on each', () => {
+    const root = freshRoot('from-v8');
+    plantVersion8(root);
+
+    const result = writeTriage(
+      root,
+      writeOf({ outOfScopeBugs: [bug({ what: 'a bug reported after the reading' })] }),
+      seams('from-v8'),
+    );
+
+    expect(counts(result)).toEqual({ blockers: listOf(0, 0), outOfScopeBugs: listOf(1, 0) });
+    expect(rawQuery(root, 'PRAGMA user_version'))
+      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(columnOf(root, 'out_of_scope_bugs', 'what'))
+      .toEqual(['report writer drops the last line', 'a bug reported after the reading']);
+    expect(columnOf(root, 'out_of_scope_bugs', 'scope')).toEqual([null, 'rafa']);
+  });
+
+  it('is outside the dedupe key, so a row stored before the reading keeps its NULL', () => {
+    const root = freshRoot('dedupe-scope');
+    plantVersion8(root);
+
+    const result = writeTriage(root, writeOf({ outOfScopeBugs: [bug()] }), seams('dedupe-scope'));
+
+    expect(counts(result)).toEqual({ blockers: listOf(0, 0), outOfScopeBugs: listOf(0, 1) });
+    expect(columnOf(root, 'out_of_scope_bugs', 'id')).toEqual(['v8-1']);
+    expect(columnOf(root, 'out_of_scope_bugs', 'scope')).toEqual([null]);
+  });
+});
+
 describe('deduplication', () => {
   it('keeps the first of two identical entries within a write, a missing artifact and flag included', () => {
     const root = freshRoot('identical');
