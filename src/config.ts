@@ -20,10 +20,11 @@
  * ## Where the rules live
  *
  * The reader is three modules, and a name moving between them is a
- * refactor, never a change of behaviour. This file is the whole public
- * surface: everything the other two export that a caller reads is
- * re-exported here, so nothing outside the trio imports a sibling. The
- * one exception is `MergeMethod`, which `config-sections.ts` re-exports
+ * refactor, never a change of behaviour. This file is intended as the
+ * public surface, re-exporting everything the other two export for a
+ * caller to import rather than reaching into a sibling; however, 75
+ * modules currently import `config-sections.js` directly. The one
+ * exception is `MergeMethod`, which `config-sections.ts` re-exports
  * from `pr/types.ts` so `config-schema.ts` can type a field with it. The
  * pull request port owns that name, a caller reading
  * {@link RafaConfig.prMergeMethod} imports it from `./pr/index.js`, and
