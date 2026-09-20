@@ -48,6 +48,21 @@ stage resolves is `gh`. The port is NOT in
 learning, output and planner only), so adding a method to it bumps no
 version.
 
+**For a test whose subject is the CALLER, build the provider with
+`createPullRequestsDouble()`** — imported from
+`../pr/pull-requests-double.js`, never from the barrel, which keeps a
+test helper out of the loop's import graph as `./gh-fake.js` is kept out.
+It answers the members the case names, refuses every other one, and
+records each call either way, refusals included, so "it refused and
+merged nothing" is read off `calls()` rather than inferred from a
+message; `sent()` spells one line per call, a squash merge of #41 as
+`merge 41 squash`, and `{ refusal }` gives a case its own refusal
+wording. Reach for it rather than writing a `PullRequests` literal in
+the test file: `check-types` opens no `*.test.ts`, so a hand-built
+literal goes stale in silence when the port grows a member — which is
+how `editBody` came to be missing from eight of them — while the
+builder is a module the types gate does read.
+
 **For a test that needs a real provider and no network, build one over
 the fake `gh`.** `createFakePrGh()` — imported from `../pr/gh-fake.js`,
 never from the barrel — plus `createGhPullRequests({ gh: fake.run })`
