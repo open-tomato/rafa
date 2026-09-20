@@ -130,6 +130,18 @@ function skippedRelease(): ReleaseSkipped {
 }
 
 describe('the wrap-up prompt\'s release bullets', () => {
+  test('keeps the classifier key first-line whatever the release preparation holds', () => {
+    const prepared = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+    const skipped = buildWrapUpPrompt(BRANCH, PLAN, null, skippedRelease());
+
+    for (const prompt of [prepared, skipped]) {
+      const [firstLine] = prompt.split('\n');
+
+      expect(firstLine).toBe('* Read `@progress.txt` in full.');
+      expect(classifyPromptContent(prompt)).toBe('wrap-up');
+    }
+  });
+
   test('asks for the rewrite under the prepared heading and nowhere else', () => {
     const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
 
