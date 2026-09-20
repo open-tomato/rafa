@@ -120,9 +120,22 @@
  * conflicting PR gets no CI run at all, so without this last stage the
  * loop can report a finished plan whose code was never checked once.
  *
+ * The release is wrapped around that session, in three parts
+ * (`start/release-stage.ts`). Before it is spawned, the loop writes the
+ * changelog entry and the version bump this pull request ships, or says
+ * why it ships neither, and hands that record to the session, whose
+ * prompt asks it to rewrite the entry's raw lines and to leave both
+ * files unstaged. Once the session returns, and BEFORE the CI gate, the
+ * loop verifies that rewrite, restores its own text on a refusal, and
+ * commits and pushes those two files alone under `chore: release
+ * <version>`. Every outcome short of a pushed release puts one sentence
+ * in the pull request body. A stage that could not run at all prepares
+ * nothing, and the wrap-up runs without a release rather than not at
+ * all.
+ *
  * Every line this module, `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
- * `start/triage.ts` and `start/wrap-up.ts` write goes
+ * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -178,6 +191,7 @@ import {
   verifyPullRequest,
 } from './start/pr-lifecycle.js';
 import { runStartPreflight } from './start/preflight.js';
+import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import {
   announcePlanIssues,
   argValue,
@@ -365,7 +379,25 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         activeOutput().info('\n✅ All tasks completed!');
         activeOutput().info('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
         activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
-        await preserveProgress(planContent, settingSources);
+        // Step 1 of the release, written BEFORE the session that
+        // rewrites it (`start/release-stage.ts`), and handed to the
+        // session as the record its prompt's release bullets are built
+        // from. A preparation of null is the stage having failed to run
+        // at all, and the wrap-up carries on without a release.
+        const release = prepareReleaseStage({
+          repoRoot,
+          settings: runConfig.config,
+          planStub,
+          planContent,
+        });
+        await preserveProgress(planContent, settingSources, release);
+        // Step 3, over that same record, after the session has returned
+        // and BEFORE the CI gate: the verification, the restore on a
+        // refusal, the `chore: release` commit and its push. A release
+        // pushed after the wait started would be a commit those checks
+        // never read, and the wait would then report on a head the
+        // release moved.
+        await finishRelease({ repoRoot, preparation: release });
         if (ciWait) {
           await verifyPullRequest(
             Math.max(1, ciTimeoutMin) * 60_000,

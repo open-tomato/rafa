@@ -118,7 +118,8 @@ module's note is the long form.
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
   `start/wrap-up.ts`,
-  `start/dispatch.ts`, `start/triage.ts`, `adapters/tracker/resolve.ts`,
+  `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
+  `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,

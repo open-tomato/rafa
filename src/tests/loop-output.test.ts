@@ -8,7 +8,8 @@
  * `src/start/pause.ts`,
  * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
- * `src/start/triage.ts`, `src/adapters/tracker/resolve.ts`,
+ * `src/start/triage.ts`, `src/start/release-stage.ts`,
+ * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
@@ -16,6 +17,19 @@
  * TypeScript and walked by `source-uses.ts`, so a comment or a string
  * naming either is no reading. The control walks a planted source holding
  * each in code, in a comment and in a string.
+ *
+ * ## The release lines
+ *
+ * A run that reaches its wrap-up now runs the release around that
+ * session (`src/start.ts`), and no scratch repository here carries a
+ * `package.json` or a `CHANGELOG.md`, so every such run writes the
+ * three lines of {@link NO_RELEASE_PREPARED}, {@link
+ * NO_RELEASE_REPORTED} and {@link NO_RELEASE_BODY}: step 1 saying it
+ * prepared nothing, step 3 repeating that sentence, and the reason it
+ * reached no pull request body. They are asserted in the positions they
+ * are written in — the first BEFORE the session's own bytes and the
+ * other two after — so a release run on the wrong side of that session
+ * fails these cases.
  *
  * ## The command cases
  *
@@ -143,6 +157,7 @@ const ROUTED_MODULES: string[] = [
   'start/wrap-up.ts',
   'start/dispatch.ts',
   'start/triage.ts',
+  'start/release-stage.ts',
   'adapters/tracker/resolve.ts',
   'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
@@ -211,6 +226,35 @@ const WRAP_UP_QUIET = '   This is one full Claude session with no intermediate o
 
 /** The line a wrap-up session that exited 0 ends with. */
 const PROGRESS_PRESERVED = '\n✅ Progress preserved; PR opened or updated on this branch.';
+
+/**
+ * The three lines the release stage adds around that session in a
+ * scratch repository (`start/release-stage.ts`).
+ *
+ * No repository here carries a `package.json` or a `CHANGELOG.md`, and
+ * `release.enabled` defaults to `auto`, so step 1 writes neither file
+ * and answers the skip sentence below; step 3 then reports that same
+ * sentence and tries to put it in the pull request body. Every scratch
+ * PATH holds the stand-in `claude` and git alone, so `gh` is absent and
+ * that write cannot happen — its reason names the run's own temporary
+ * directory and whatever the spawn refused with, which is why the last
+ * line is read as a pattern and the first two byte for byte.
+ */
+const NO_RELEASE_SENTENCE = 'no version bump and no changelog entry: release.enabled is auto and package.json and CHANGELOG.md are not there';
+
+/** Step 1 saying it prepared nothing, before the session is spawned. */
+const NO_RELEASE_PREPARED = `\n📦 No release prepared for this pull request: ${NO_RELEASE_SENTENCE}`;
+
+/** Step 3 reporting the same sentence, after that session returned. */
+const NO_RELEASE_REPORTED = `\n📦 ${NO_RELEASE_SENTENCE}`;
+
+/**
+ * The line saying that sentence reached no pull request body, and why.
+ *
+ * Unanchored on purpose, so the one pattern reads both the message of a
+ * json-mode event and the `error: `-prefixed line text mode writes.
+ */
+const NO_RELEASE_BODY = /That line is not in the pull request body: the pull request body could not be written: /;
 
 /** The warning a session that wrote no report is stored with, as {@link labelOf} spells it. */
 const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/;
@@ -445,8 +489,12 @@ describe('loop start with no --plan', () => {
   }, RUN_TIMEOUT);
 });
 
-/** Each line a run with no open task writes, as its level and its message, in order. */
-function noTaskLines(): readonly (readonly ['info' | 'warn', string])[] {
+/**
+ * Each line a run with no open task writes, as its level and its
+ * message, in order. A message written as a pattern is one carrying
+ * something of the run's own; see {@link NO_RELEASE_BODY}.
+ */
+function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | RegExp])[] {
   const { issues } = parsePlan(PLAN_DONE);
   if (issues.length === 0) throw new Error('the planted plan holds no issue to announce');
   return [
@@ -459,8 +507,25 @@ function noTaskLines(): readonly (readonly ['info' | 'warn', string])[] {
     ['info', '\n✅ All tasks completed!'],
     ['info', WRAP_UP_STARTING],
     ['info', WRAP_UP_QUIET],
+    ['info', NO_RELEASE_PREPARED],
     ['info', PROGRESS_PRESERVED],
+    ['info', NO_RELEASE_REPORTED],
+    ['error', NO_RELEASE_BODY],
   ];
+}
+
+/**
+ * One entry of {@link noTaskLines} as the lines text mode writes for
+ * it: an `info` message as it was, a warning or an error after its
+ * `warn: ` or `error: ` prefix, split on the newlines the message
+ * itself carries. A message written as a pattern stays one line.
+ */
+function textLines(level: 'info' | 'warn' | 'error', message: string | RegExp): readonly unknown[] {
+  if (typeof message !== 'string') return [expect.stringMatching(message)];
+  const prefix = level === 'info'
+    ? ''
+    : `${level}: `;
+  return `${prefix}${message}`.split('\n');
 }
 
 describe('a loop start run with no open task', () => {
@@ -473,7 +538,14 @@ describe('a loop start run with no open task', () => {
     expect(run.stderr).toBe('');
     expect(eventsOf(run.stdout)).toEqual([
       { type: 'start', command: 'loop start', ts: expect.any(String) },
-      ...noTaskLines().map(([level, message]) => ({ type: 'log' as const, level, message, ts: expect.any(String) })),
+      ...noTaskLines().map(([level, message]) => ({
+        type: 'log' as const,
+        level,
+        message: typeof message === 'string'
+          ? message
+          : expect.stringMatching(message),
+        ts: expect.any(String),
+      })),
       { type: 'result', ok: true, ts: expect.any(String) },
     ]);
 
@@ -485,13 +557,14 @@ describe('a loop start run with no open task', () => {
     const scratch = plant({ branch: STUB, plan: PLAN_DONE });
 
     const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait']);
-    const expected = noTaskLines()
-      .map(([level, message]) => (level === 'info'
-        ? `${message}\n`
-        : `warn: ${message}\n`))
-      .join('');
+    // Read line by line rather than as one string: the last line
+    // carries the run's own temporary path, so it is the one entry
+    // matched as a pattern.
+    const expected = noTaskLines().flatMap(([level, message]) => textLines(level, message));
 
-    expect(run).toEqual({ exitCode: 0, stdout: expected, stderr: '' });
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.stdout.split('\n')).toEqual([...expected, '']);
   }, RUN_TIMEOUT);
 });
 
@@ -553,8 +626,11 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       'info:\n✅ All tasks completed!',
       `info:${WRAP_UP_STARTING}`,
       `info:${WRAP_UP_QUIET}`,
+      `info:${NO_RELEASE_PREPARED}`,
       ...SESSION_LINES,
       `info:${PROGRESS_PRESERVED}`,
+      `info:${NO_RELEASE_REPORTED}`,
+      expect.stringMatching(NO_RELEASE_BODY),
       'result',
     ]);
     expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');
@@ -568,7 +644,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
     expect(run.stdout).toContain(`\n🔄 Executing task: ${TASK}\n${SESSION_STDOUT}✅ Task done: ${TASK}\n`);
-    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${SESSION_STDOUT}${PROGRESS_PRESERVED}\n`);
+    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED}\n`);
     expect(run.stdout.split(SESSION_STDOUT)).toHaveLength(3);
     expect(run.stdout).not.toContain('step: ');
     expect(run.stdout.split('\n').filter((line) => line.startsWith('{'))).toEqual([]);

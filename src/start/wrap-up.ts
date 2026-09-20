@@ -1,14 +1,16 @@
 /**
  * The session the loop runs once the tracker holds no task left.
  *
- * `start()` hands {@link preserveProgress} the plan it was started on
- * and the setting sources its config resolved to, and the session built
- * here, loading settings from those sources, promotes the run's findings, syncs the
- * branch with main, commits, pushes and opens or updates the PR.
- * `start()` waits on that PR's checks after it returns. The line it
- * closes with, naming whether the session succeeded, goes through the
- * active output (`adapters/output/active.ts`): `info` on success, and
- * `error` on a failure, which does not stop `start()`.
+ * `start()` hands {@link preserveProgress} the plan it was started on,
+ * the setting sources its config resolved to, and the release
+ * preparation `start/release-stage.ts` made just before the call; and
+ * the session built here, loading settings from those sources,
+ * promotes the run's findings, syncs the branch with main, commits,
+ * pushes and opens or updates the PR. `start()` finishes that release
+ * and then waits on the PR's checks after it returns. The line this
+ * module closes with, naming whether the session succeeded, goes
+ * through the active output (`adapters/output/active.ts`): `info` on
+ * success, and `error` on a failure, which does not stop `start()`.
  *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
@@ -223,13 +225,22 @@ async function openPullRequestNumber(branch: string): Promise<number | null> {
 /**
  * Runs the wrap-up session over the plan the run was started on, loading
  * settings from `settingSources`, the run's `loop.settingSources`.
+ *
+ * `release` is step 1's record, as `prepareReleaseStage`
+ * (`start/release-stage.ts`) answered it just before this call, and
+ * null when no preparation ran at all — this session then gets no
+ * release bullet of any kind ({@link buildWrapUpPrompt}). It is handed
+ * over rather than prepared here because the loop verifies and commits
+ * the same record after this session returns: a preparation made
+ * inside this function would leave `start.ts` nothing to finish.
  */
 export async function preserveProgress(
   planContent: string,
   settingSources: readonly ClaudeSettingSource[],
+  release: ReleasePreparation | null = null,
 ): Promise<void> {
   const branch = getCurrentBranch();
-  const prompt = buildWrapUpPrompt(branch, planContent, await openPullRequestNumber(branch));
+  const prompt = buildWrapUpPrompt(branch, planContent, await openPullRequestNumber(branch), release);
   const exitCode = await runClaude(withStamp(prompt), settingSources);
   if (exitCode !== 0) {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);
