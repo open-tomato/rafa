@@ -40,6 +40,13 @@
  *     and the stand-in answers accordingly. The run stops there: the task
  *     is left `[BLOCKED]` with `budget exceeded` as its blocker comment,
  *     and the second task is never dispatched.
+ *   - **A stand-in session that writes no report and leaves no commit**:
+ *     {@link plantMuteStandIn} answers a plain sentence instead of
+ *     {@link STAND_IN_REPORT}, and nothing tracked changes. The run stops
+ *     on its first task exactly as the module note above says it would:
+ *     `[BLOCKED]` with {@link NOTHING_REPORTED_OR_COMMITTED} as its
+ *     blocker comment, never ticked, the second task never dispatched,
+ *     and the session's `report_absences` row reads `blocked`.
  *   - **`--runtime`**: `--runtime=src` resolves against the working
  *     directory to the scratch checkout's own `src/`, which
  *     `start/runtime.ts` refuses before the plan is even read, whether or
@@ -68,9 +75,12 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readSessions } from '../loop/sessions.js';
+import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { resultEvent } from './loop-session-fixtures.js';
@@ -199,14 +209,34 @@ function plantStandIn(scratch: Scratch): void {
   chmodSync(scratch.claude, 0o755);
 }
 
+/**
+ * Writes a stand-in `claude` that drains its prompt, sleeps
+ * {@link STAND_IN_DELAY_SECONDS}, logs the call, then answers a plain
+ * sentence carrying no `rafa:report` block at all, and exits 0: what a
+ * session leaves behind when it writes neither a report nor a commit.
+ */
+function plantMuteStandIn(scratch: Scratch): void {
+  writeFileSync(scratch.claude, [
+    '#!/bin/sh',
+    'while read -r _line; do :; done',
+    `/bin/sleep ${STAND_IN_DELAY_SECONDS}`,
+    `echo called >> '${scratch.callLog}'`,
+    'echo "Done, and nothing to report."',
+    'exit 0',
+    '',
+  ].join('\n'), 'utf8');
+  chmodSync(scratch.claude, 0o755);
+}
+
 let planted = 0;
 
 /**
  * A scratch git repository on {@link BRANCH}, its own HOME and `bin/`
  * beside it, holding `.rafa/config.yaml` and `planText` at
- * `.plans/PLAN-<stub>.md`. See the module note.
+ * `.plans/PLAN-<stub>.md`, with `standIn` written to its `bin/claude`.
+ * See the module note.
  */
-function plant(planText: string): Scratch {
+function plant(planText: string, standIn: (scratch: Scratch) => void = plantStandIn): Scratch {
   planted += 1;
   const root = join(tempRoot, `run-${planted}`);
   const repo = join(root, 'repo');
@@ -223,7 +253,7 @@ function plant(planText: string): Scratch {
     callLog: join(root, 'calls.log'),
     path: [bin, dirname(gitBinary)].join(delimiter),
   };
-  plantStandIn(scratch);
+  standIn(scratch);
 
   git(repo, home, 'init', '-q', '.');
   git(repo, home, 'config', 'user.email', 'loop@example.test');
@@ -389,6 +419,38 @@ describe('a stand-in session ending on its budget', () => {
     expect(tracker).toContain(`- [ ] ${TASK2}`);
     expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\n');
     expect(soleSession(scratch.repo)?.state).toBe('stopped');
+  }, RUN_TIMEOUT);
+});
+
+describe('a stand-in session that writes no report and leaves no commit', () => {
+  it('holds the task rather than ticking it, stops the run there, and stores the session blocked', () => {
+    const scratch = plant(PLAN_TWO_TASKS, plantMuteStandIn);
+
+    const started = run(scratch, ['loop', 'start', ...RUN_FLAGS]);
+
+    expect(started.exitCode).toBe(0);
+    const tracker = readFileSync(join(scratch.repo, '.plans', TRACKER_NAME), 'utf8');
+    expect(tracker).toContain(`- [BLOCKED] ${TASK1}  <!-- blocked: ${NOTHING_REPORTED_OR_COMMITTED} -->`);
+    expect(tracker).toContain(`- [ ] ${TASK2}`);
+
+    // The stand-in was called once: the second task was never dispatched.
+    expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\n');
+
+    expect(soleSession(scratch.repo)?.state).toBe('stopped');
+
+    // The run's own session id (above) is not the task's: `dispatchTask`
+    // spawns each task session under an id of its own, which is the one
+    // `report_absences` keys on. The task ran exactly once, so its row is
+    // the store's only one.
+    const db = new Database(sqliteStorePath(scratch.repo), { readonly: true });
+    try {
+      const row = db.query<{ outcome: string; reason: string; task_line: string }, []>(
+        'SELECT outcome, reason, task_line FROM report_absences',
+      ).get();
+      expect(row).toEqual({ outcome: 'blocked', reason: 'no-block', task_line: TASK1 });
+    } finally {
+      db.close();
+    }
   }, RUN_TIMEOUT);
 });
 
