@@ -32,7 +32,12 @@
  * a failure (2), reading paths out of every fence (2), dropping the
  * `console` prompt rule (2), treating a `&&`-terminated line as a
  * continuation (2), and dropping the skill directory from the path
- * classification so a script resolved as a project path (4).
+ * classification so a script resolved as a project path (4). The code
+ * two of those five legs mutate has since moved to
+ * `check/shell-lines.ts` — the `console` prompt rule and the
+ * continuation rule are `commandOf` and `continuesLine` there — so a
+ * re-run of those two edits `check/shell-lines.ts` and still reads
+ * this file for the reddening.
  *
  * Two more were driven for the stack demotion on 2026-09-18, the
  * module restored sha256-identical after each: making

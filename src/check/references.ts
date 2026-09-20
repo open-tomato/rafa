@@ -68,21 +68,17 @@
  * ## What a shell fence is read as
  *
  * Inside a shell fence only COMMAND lines are read, for tools and for
- * paths alike. A comment, a heredoc body, the continuation of a line
- * ending in a backslash, and everything in a `console` fence that
- * carries no `$ ` prompt are all passed over: they are output or
- * data, and a first word taken off output (`Cannot find package`)
- * would be reported as a missing tool. The cost of that rule is named:
- * a `console` fence written with no prompts at all contributes no
- * tools, and nothing here notices. A line ending in `|` or `&&` is
- * not a continuation — the next line opens a command of its own, and
- * its first word is read as one.
+ * paths alike, and WHICH line is one is `shell-lines.ts`'s reading
+ * rather than this module's: a comment, a heredoc body, the
+ * continuation of a line ending in a backslash, and the unprompted
+ * lines of a `console` fence are all passed over there, as is the
+ * first word that is a builtin, an assignment or a flag. That module
+ * carries the note on each of those, and on what each one costs.
  *
- * A first word that is a shell keyword or builtin
- * ({@link SHELL_BUILTINS}), an assignment (`FOO=bar cmd` — the whole
- * line is skipped, not just the assignment), a flag, or anything not
- * shaped like a command name is not a tool. A first word holding a
- * separator (`./scripts/run.sh`) is a PATH, and is checked as one.
+ * What stays here is what a command line is then read FOR. A first
+ * word `shell-lines.ts` answers as a tool is looked up in
+ * `pathDirs`; a first word holding a separator (`./scripts/run.sh`)
+ * is a PATH, and is checked as one.
  *
  * ## Locality
  *
@@ -133,8 +129,7 @@ import { delimiter, isAbsolute, relative, resolve } from 'node:path';
 
 import { AGNOSTIC_STACK } from '../schema/stack.js';
 
-/** The fence info strings whose blocks hold shell command lines. */
-export const SHELL_FENCE_LANGUAGES: readonly string[] = ['bash', 'sh', 'shell', 'zsh', 'console'];
+import { commandOf, continuesLine, heredocTerminator, isShellFence, toolOf } from './shell-lines.js';
 
 /** The info strings of a fence that names files without being code. */
 export const TEXT_FENCE_LANGUAGES: readonly string[] = ['text', 'txt', 'plain', 'plaintext'];
@@ -162,23 +157,6 @@ export const SYSTEM_ROOTS: readonly string[] = [
 const KNOWN_ROOTS: readonly string[] = [
   ...HOME_ROOTS.map((root) => root.replace(/\/$/, '')),
   ...SYSTEM_ROOTS,
-];
-
-/**
- * First words that name no file on `PATH`: shell keywords, and the
- * builtins a POSIX shell runs itself. `test` and `echo` are here even
- * though `/bin` also holds them, because the shell never reaches
- * `/bin` for either.
- */
-export const SHELL_BUILTINS: readonly string[] = [
-  '.', ':', '[', 'alias', 'bg', 'break', 'builtin', 'case', 'cd', 'command',
-  'continue', 'declare', 'do', 'done', 'echo', 'elif', 'else', 'esac', 'eval',
-  'exec', 'exit', 'export', 'false', 'fc', 'fg', 'fi', 'for', 'function',
-  'getopts', 'hash', 'if', 'in', 'jobs', 'kill', 'let', 'local', 'logout',
-  'popd', 'printf', 'pushd', 'pwd', 'read', 'readonly', 'return', 'select',
-  'set', 'shift', 'source', 'test', 'then', 'time', 'times', 'trap', 'true',
-  'type', 'typeset', 'ulimit', 'umask', 'unalias', 'unset', 'until', 'wait',
-  'while',
 ];
 
 /**
@@ -339,9 +317,6 @@ const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 /** An inline code span, with its contents captured. */
 const CODE_SPAN = /`([^`\n]+)`/g;
 
-/** The shape a command name takes: a letter, then name characters. */
-const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_.+-]*$/;
-
 /** A trailing `:12` or `:12:3` on a path, as an editor prints one. */
 const LINE_SUFFIX = /:\d+(?::\d+)?$/;
 
@@ -354,16 +329,6 @@ const EXTENSION = /\.[A-Za-z][A-Za-z0-9]{0,7}$/;
 /** Characters that make a token a placeholder, a glob or an expression. */
 const NOT_A_PATH = /[<>*?|$"'`{}()[\]!,;@\\\s]/;
 
-/** A heredoc opener, with the terminator word captured. */
-const HEREDOC = /<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/;
-
-/**
- * A command line the next line continues: a trailing backslash, and
- * only that. A line ending in `|` or `&&` continues the PIPELINE, and
- * the next line opens with a command name of its own.
- */
-const CONTINUES = /\\$/;
-
 /** Whether any of `issues` counts towards the exit code. */
 export function hasReferenceFailure(issues: readonly ReferenceIssue[]): boolean {
   return issues.some((issue) => issue.severity === 'failure');
@@ -375,11 +340,6 @@ export function hasReferenceFailure(issues: readonly ReferenceIssue[]): boolean 
  */
 export function pathDirectories(value: string | undefined): readonly string[] {
   return (value ?? '').split(delimiter).filter((entry) => entry.length > 0);
-}
-
-/** Whether `info` names a fence holding shell command lines. */
-function isShellFence(info: string): boolean {
-  return SHELL_FENCE_LANGUAGES.includes(info);
 }
 
 /**
@@ -478,32 +438,6 @@ function pathTokens(text: string): string[] {
   return found;
 }
 
-/**
- * The tool a command line names, or null when its first word is not
- * one: a flag, an assignment, a builtin, a path, or anything not
- * shaped like a command name.
- */
-function toolOf(command: string): string | null {
-  const word = command.split(/\s+/)[0] ?? '';
-  if (word === '' || word.includes('=') || word.includes('/')) return null;
-  if (!TOOL_NAME.test(word) || SHELL_BUILTINS.includes(word)) return null;
-  return word;
-}
-
-/**
- * The command a line of a shell fence holds, or null when it holds
- * none: a comment, an empty line, or — in a `console` fence — a line
- * with no `$ ` prompt, which is output.
- */
-function commandOf(line: string, info: string): string | null {
-  const text = line.trim();
-  if (text === '' || text.startsWith('#')) return null;
-  if (text.startsWith('$ ') || text === '$') return text.slice(1).trim() || null;
-  if (info === 'console') return null;
-  if (text.startsWith('> ')) return null;
-  return text;
-}
-
 /** What one line of a fenced block is being read as. */
 interface FenceReader {
   /** The fence's language, lowercased. */
@@ -556,16 +490,16 @@ function readCommand(
   const command = commandOf(line, reader.info);
   if (command === null) return;
 
-  const heredoc = HEREDOC.exec(command);
-  if (heredoc?.[1]) {
-    reader.terminator = heredoc[1];
+  const terminator = heredocTerminator(command);
+  if (terminator !== null) {
+    reader.terminator = terminator;
   }
 
   if (!reader.continued) {
     const tool = toolOf(command);
     if (tool !== null) found.push(reference('tool', tool, number, 'fence'));
   }
-  reader.continued = CONTINUES.test(command);
+  reader.continued = continuesLine(command);
 
   for (const token of pathTokens(command)) {
     found.push(reference('path', token, number, 'fence'));
