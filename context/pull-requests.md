@@ -249,7 +249,8 @@ Four checks, cheapest first; any one failing writes no plan file:
    prompt gains bullets, below its first line so the classifier key stays,
    telling the session to judge the spec BEFORE planning: can each
    definition-of-done item be shown by a command, does each task name what it
-   changes, is anything the plan would have to guess. It opens its answer with
+   changes, is anything the plan would have to guess. It ends its final
+   message with
 
    ```yaml
    rafa:spec-review
@@ -259,12 +260,23 @@ Four checks, cheapest first; any one failing writes no plan file:
        what: "no item says how the merge clean-up is verified"
    ```
 
-   On `not-ready` the session writes no plan and no prerequisites; the loop
-   enforces that in code (a plan file that appears anyway is removed), posts
-   the gaps as one comment on the issue (marker `<!-- rafa:spec-review v1 -->`
-   , edited on a rerun; `--no-comment` prints only), swaps `spec:ready` for
-   `spec:needs-work`, and exits 3. A missing or malformed block is treated as
-   `not-ready` with the gap "the review block was not returned".
+   On an explicit `verdict: not-ready` the session writes no plan and no
+   prerequisites; the loop enforces that in code (a plan file that appears
+   anyway is removed), posts the gaps as one comment on the issue (marker
+   `<!-- rafa:spec-review v1 -->`, edited on a rerun; `--no-comment` prints
+   only), swaps `spec:ready` for `spec:needs-work`, and exits 3.
+
+   A MISSING or malformed block is not that verdict and is not treated as
+   one. It is weighed against the plan the session wrote: one that
+   `plan validate` reads without an issue STANDS, with one warning, no
+   comment, no label change and nothing removed, and its `rafa:plan` block
+   records `review: missing`. Only a plan that does not read as written is
+   removed for it, and even then nothing is posted and no label moves,
+   since no session judged the spec; that refusal names every parser issue
+   and exits 3. The rule until 2026-09-20 was the opposite — an unread
+   block was a `not-ready` verdict — and it deleted a valid 22-task plan
+   of this repository's own over a prompt the session had no place to
+   answer (`src/board/gate.ts` holds the reading).
 
 `--skip-review` bypasses check 3 only, and the plan's `rafa:plan` block
 records `review: skipped`.

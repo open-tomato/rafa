@@ -51,7 +51,7 @@
  *
  * ## The readiness gate's cases
  *
- * Four outcomes drive the verdict `src/plan.ts` acts on. `not-ready`
+ * Five outcomes drive the verdict `src/plan.ts` acts on. `not-ready`
  * writes BOTH files and answers a review that judged the spec not
  * ready, which is the one thing the gate cannot take the session's word
  * for: the case holds both files gone and the command exited 3, and the
@@ -62,6 +62,13 @@
  * `absent-review` is the control that keeps the gate off a session that
  * FAILED: its review is `absent`, which is not ready either, and the
  * command must still end with the session's own exit code and message.
+ * `missing-review` is the same absent reading on a session that
+ * ANSWERED: the plan reads as written, so the command must exit 0, keep
+ * it, warn exactly ONCE and record `review: missing`. That case counts
+ * the warn lines rather than looking for one, because the reading it
+ * holds is "the operator is told once", which a second warning would
+ * break while every substring assertion still passed.
+ *
  * The gaps are read out of a real `rafa:spec-review` block through
  * `parseSpecReview`, so no case asserts against a reading the parser
  * does not produce.
@@ -94,6 +101,13 @@
  * board route wrote. The board flags declared and unread would redden
  * `src/commands/index.test.ts` instead, which is where that pairing is
  * held.
+ *
+ * One mutation of `plan.ts` was driven on 2026-09-20 over
+ * `env -u CLAUDECODE bun test src/board/gate.test.ts src/plan.test.ts`,
+ * the module restored from a scratch copy and verified with
+ * `shasum -c`: the `recordMissingReview` call dropped left 41 pass and
+ * 1 fail against 42 pass either side — the `missing-review` case, the
+ * only one that reads a plan an unread review left standing.
  *
  * One mutation of `plan.ts` was driven on 2026-09-19 over
  * `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the module
@@ -235,6 +249,11 @@ const PROBE = [
   '      }',
   '      if (outcome === "not-ready-rejection") {',
   '        throw new ClaudePlannerError("The session finished but " + planPath + " was not created.", 1, review);',
+  '      }',
+  '      if (outcome === "missing-review") {',
+  '        mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
+  `        writeFileSync(join(context.repoRoot, planPath), ${JSON.stringify(WRITTEN_PLAN)});`,
+  '        return { planPath, prerequisitesPath: null, review: parseSpecReview("I wrote the plan and stopped.") };',
   '      }',
   '      if (outcome === "plan-written") {',
   '        mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
@@ -586,6 +605,28 @@ describe('rafa plan through the adapter registry', () => {
     expect(run.exitCode).toBe(7);
     expect(run.stderr).toContain('\n❌ Plan generation failed (exit 7).\n');
     expect(run.stderr).not.toContain('not ready to plan from');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('keeps a plan whose session returned no review block, recording review: missing and warning once', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'missing-review', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    const plan = join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md');
+    expect(readFileSync(plan, 'utf8')).toContain('stub: spec\nreview: missing\n```');
+    expect(run.stdout).toContain(
+      'warn: the session output holds no rafa:spec-review block;'
+        + ' .rafa/plans/PLAN-spec.md reads as written, so the plan stands unreviewed',
+    );
+    expect(run.stdout.match(/^warn: /gmu)).toHaveLength(1);
+    expect(run.stdout).toContain(
+      '🔍 .rafa/plans/PLAN-spec.md records review: missing:'
+        + ' the session returned no readable rafa:spec-review block.',
+    );
+    expect(run.stdout).toContain('✅ Plan ready: .rafa/plans/PLAN-spec.md');
+    expect(run.stdout).not.toContain('not ready to plan from');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 

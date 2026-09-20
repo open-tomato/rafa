@@ -199,7 +199,7 @@ module's note is the long form.
   to end its final message with a `rafa:spec-review` block, the `claude`
   planner reads it once and carries it back both on the plan it answers
   and on its rejections (`src/adapters/planner/claude.ts`), and this
-  command is what acts on it. A verdict that is not ready removes
+  command is what acts on it. An explicit `verdict: not-ready` removes
   `PLAN-<stub>.md` and `PREREQUISITES-<stub>.md` when the session wrote
   them anyway, posts the gaps as one `<!-- rafa:spec-review v1 -->`
   comment on the issue, edited on a rerun
@@ -208,14 +208,18 @@ module's note is the long form.
   3 with every gap in the message. A comment or a label swap that fails
   is a warning and changes neither the other write nor the exit code.
   `--spec` names no issue, so that route removes, prints and exits 3. An
-  `absent` or `malformed` review is not ready either, except on a
-  rejection, where the session's own failure is what the command ends
-  with. `--skip-review` bypasses that gate alone and records
-  `review: skipped` in the plan's `rafa:plan` block
-  (`src/board/review-stamp.ts`), where the plan reader keeps it as a
-  header extra; `--no-comment` keeps the gaps off the board and moves the
-  labels anyway. Both flags are read in `src/board/gate.ts` and declared
-  on `src/commands/plan/create.ts` beside the board flags.
+  `absent` or `malformed` review is NOT that verdict: on a rejection the
+  session's own failure is what the command ends with, and on a plan the
+  planner answered the gate weighs the plan itself with `plan validate`'s
+  reader — one that reads as written stands, with one warning, nothing
+  removed and no board write, and records `review: missing` in its
+  `rafa:plan` block, while one that does not is removed and exits 3 with
+  every parser issue named and still nothing posted. `--skip-review`
+  bypasses that gate alone and records `review: skipped` in the same
+  block (`src/board/review-stamp.ts`), where the plan reader keeps either
+  word as a header extra; `--no-comment` keeps the gaps off the board and
+  moves the labels anyway. Both flags are read in `src/board/gate.ts` and
+  declared on `src/commands/plan/create.ts` beside the board flags.
 - **`plan create` plans from a file, an issue or the roadmap**
   (`src/board/spec-source.ts`, `src/board/plan-spec.ts`).
   `--spec=<file>`, `--issue=<n>` and `--next[=<roadmap-issue>]` are

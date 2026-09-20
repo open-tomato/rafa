@@ -25,18 +25,24 @@
  * has to live without it, so a missing review is an answer here, not an
  * exception.
  *
- * ## Absence and malformation are not-ready
+ * ## Absence and malformation are not ready either
  *
- * `.rafa/specs/rafa-20-pr-commands.md` says a missing or malformed block is
- * treated as `not-ready` with the gap "the review block was not
- * returned", and that rule lives HERE rather than in the caller.
- * {@link SpecReviewReading.ready} is the answer the gate acts on and is
- * true for exactly one of the four readings; {@link
- * SpecReviewReading.answer} keeps the four apart for whoever is
- * diagnosing a session rather than gating on it. A caller that switched
- * on the verdict alone would let a truncated session through as if
- * nobody had judged the spec, which is the one failure this gate exists
- * to prevent.
+ * A missing or malformed block is READ as not ready, with the gap "the
+ * review block was not returned", and that rule lives HERE rather than
+ * in the caller. {@link SpecReviewReading.ready} is true for exactly one
+ * of the four readings; {@link SpecReviewReading.answer} keeps the four
+ * apart for whoever is diagnosing a session rather than gating on it. A
+ * caller that switched on the verdict alone would let a truncated
+ * session through as if nobody had judged the spec, which is the one
+ * failure this gate exists to prevent.
+ *
+ * What the ENFORCING half does with each of the four is `./gate.ts`'s,
+ * and the two halves no longer agree by construction: since 2026-09-20
+ * an `absent` or `malformed` reading lets a plan that reads as written
+ * stand, stamped `review: missing`, where an explicit `not-ready`
+ * verdict removes it. So `answer` is what that caller switches on and
+ * `ready` is what it refuses to plan from unweighed; a reading here is
+ * still never ready for one of the last two.
  *
  * For the same reason {@link SpecReviewReading.gaps} is never empty for
  * a reading that is not ready. A `not-ready` verdict that names no

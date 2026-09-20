@@ -113,9 +113,15 @@
  * verdict. One carrying an `absent` or `malformed` review is not,
  * because the session did not finish and what the operator needs is the
  * failure it ended with, not a gate refusal saying the review block was
- * missing. On a plan the planner DID answer, `absent` and `malformed`
- * are enforced as the spec says they are, since a session that ran to
- * the end and judged nothing has judged nothing.
+ * missing.
+ *
+ * On a plan the planner DID answer, an `absent` or `malformed` review
+ * does not refuse it by itself: the gate weighs the plan with
+ * `plan validate`'s reader and answers `unread` for one that reads as
+ * written, which this command records as `review: missing` in the
+ * plan's `rafa:plan` block ({@link recordMissingReview},
+ * `board/review-stamp.ts`) beside the gate's one warning. `board/gate.ts`
+ * holds why a session's silence is no verdict on the spec.
  *
  * `--skip-review` bypasses that gate ALONE, and the plan it keeps
  * records `review: skipped` ({@link recordSkippedReview},
@@ -132,10 +138,10 @@
  * reports a number as unusable; the note in `board/plan-field.ts` holds
  * the measurement.
  *
- * Both records are written AFTER the gate, so a plan a not-ready verdict
- * removed is never stamped, and both are warnings when they cannot be
- * written: the plan is what the operator asked for, and a stamp that
- * refused it would throw away a session already paid for.
+ * Every record is written AFTER the gate, so a plan the gate removed is
+ * never stamped, and each is a warning when it cannot be written: the
+ * plan is what the operator asked for, and a stamp that refused it
+ * would throw away a session already paid for.
  *
  * The project root is a parameter, the root the dispatcher resolved
  * (`src/commands/wrap.ts`): `--spec` resolves against it, `plan.dir` and
@@ -183,7 +189,12 @@ import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { enforceSpecReview, readGateFlags, SKIP_REVIEW_FLAG } from './board/gate.js';
 import { issueFieldLine, stampPlanIssue } from './board/plan-field.js';
 import { resolvePlanSpec } from './board/plan-spec.js';
-import { REVIEW_SKIPPED_LINE, stampReviewSkipped } from './board/review-stamp.js';
+import {
+  REVIEW_MISSING_LINE,
+  REVIEW_SKIPPED_LINE,
+  stampReviewMissing,
+  stampReviewSkipped,
+} from './board/review-stamp.js';
 import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from './board/spec-source.js';
 import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
@@ -499,6 +510,12 @@ function recordSkippedReview(repoRoot: string, planPath: string): void {
   activeOutput().info(`⏭  ${SKIP_REVIEW_FLAG}: the spec was not reviewed, and ${planPath} records ${REVIEW_SKIPPED_LINE}.`);
 }
 
+/** Records `review: missing` in the plan an unread review left standing, and says so. */
+function recordMissingReview(repoRoot: string, planPath: string): void {
+  if (!recordInPlan(repoRoot, planPath, stampReviewMissing, REVIEW_MISSING_LINE)) return;
+  activeOutput().info(`🔍 ${planPath} records ${REVIEW_MISSING_LINE}: the session returned no readable rafa:spec-review block.`);
+}
+
 /** Records the issue a board route planned from in the plan it wrote, and says so. */
 function recordPlanIssue(repoRoot: string, planPath: string, issue: number): void {
   const line = issueFieldLine(issue);
@@ -586,12 +603,13 @@ export default async function plan(
     // On an answer the paths are the planner's own, which are the files
     // it saw; the ones in `gate` are this command's spelling of them,
     // and are all a rejection leaves to go on.
-    await enforceSpecReview({
+    const standing = await enforceSpecReview({
       ...gate,
       planPath: generated.planPath,
       prerequisitesPath: generated.prerequisitesPath ?? gate.prerequisitesPath,
       review: generated.review,
     });
+    if (standing === 'unread') recordMissingReview(repoRoot, generated.planPath);
   }
 
   if (resolved.spec.issue !== null) {

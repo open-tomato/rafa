@@ -14,11 +14,21 @@
  *
  * A gate is the shape of module that passes while wrong most easily,
  * because every case that asserts a refusal is also satisfied by one
- * that refuses EVERYTHING. So the refusal cases sit beside the two
- * readings that must be let through — a ready verdict, and the absent
- * review of a planner that judged nothing — over the same files and the
- * same board, and those two assert that no file was removed and no
- * command sent.
+ * that refuses EVERYTHING. So the refusal cases sit beside the readings
+ * that must be let through — a ready verdict, a planner that judged
+ * nothing, and since 2026-09-20 a review the parser could not read over
+ * a plan that reads as written — over the same files and the same
+ * board, and each of those asserts the standing it answers, that no
+ * file was removed and that no command was sent.
+ *
+ * The four readings a session can leave behind each have their case
+ * here: `ready`, `not-ready`, `absent` and `malformed`, the last two
+ * both over a plan `plan validate` reads without an issue and over one
+ * it does not, which are the two answers an unread review has. A case
+ * that asserted only the exit code of the unreadable-plan refusal would
+ * be satisfied by a gate that refused every unread review, so each
+ * standing case holds the WARNING it wrote and the empty call list
+ * beside the files still on disk.
  *
  * Five mutations of `gate.ts` were driven on 2026-09-19, one at a time
  * over `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the
@@ -28,7 +38,9 @@
  *  - the removal skipped, the mutation this module exists to prevent:
  *    5 fail, the four cases here that assert a file is gone — both
  *    files, the plan alone, the spec off a file and the active-output
- *    one — and the `not-ready` case in `src/plan.test.ts`.
+ *    one — and the `not-ready` case in `src/plan.test.ts`. The
+ *    unreadable-plan case added on 2026-09-20 asserts the same removal
+ *    and was not part of that run.
  *  - the two labels swapped the other way round: 1 fail, the case that
  *    asserts the call.
  *  - `SPEC_NOT_READY_EXIT` at 2: 2 fail, both `src/plan.test.ts` cases
@@ -39,6 +51,21 @@
  *    `--no-comment` case.
  *  - a ready verdict enforced along with the rest: 1 fail, the ready
  *    case.
+ *
+ * Two mutations of the unread branch were driven on 2026-09-20 over
+ * `env -u CLAUDECODE bun test src/board/gate.test.ts src/plan.test.ts
+ * src/board/review-stamp.test.ts
+ * src/tests/readiness-gate-integration.test.ts`, the module restored
+ * from a scratch copy and verified with `shasum -c` after each. 67 pass
+ * either side:
+ *
+ *  - the `plan validate` reading ignored, so every unread review lets
+ *    the plan stand: 65 pass, 2 fail — the unreadable-plan case and the
+ *    no-plan case here.
+ *  - the unread branch dropped, so an unread review is enforced as a
+ *    not-ready verdict was before this change: 61 pass, 6 fail — all
+ *    five cases here and the `missing-review` case in
+ *    `src/plan.test.ts`.
  */
 import type { IssueBoard } from './issue-board.js';
 import type { SpecReviewReading } from './spec-review.js';
@@ -91,6 +118,27 @@ const NOT_READY = reviewOf(
 
 /** A verdict that lets the plan stand. */
 const READY = reviewOf('verdict: ready');
+
+/** A session that said nothing about the spec at all. */
+const ABSENT = parseSpecReview('I wrote the plan and stopped.\n');
+
+/** A session whose block came back unreadable: a body that is no mapping. */
+const MALFORMED = reviewOf('- verdict: ready');
+
+/** A plan `plan validate` reads without an issue, as a session writes one. */
+const PLAN_TEXT = [
+  '# Plan: rafa-20',
+  '',
+  '```rafa:plan',
+  'stub: rafa-20',
+  '```',
+  '',
+  '- [ ] Do the thing',
+  '',
+].join('\n');
+
+/** The same plan with its header block left open: two parser issues. */
+const UNREADABLE_PLAN_TEXT = ['# Plan: rafa-20', '', '```rafa:plan', 'stub: rafa-20', '', '- [ ] Do the thing', ''].join('\n');
 
 /** The lines an enforcement wrote, by level. */
 interface Lines {
@@ -174,6 +222,13 @@ function plantRepo(files: readonly string[] = [PLAN_PATH, PREREQUISITES_PATH]): 
   return root;
 }
 
+/** A repository whose plan file holds `text`, with the prerequisites file beside it. */
+function plantPlanned(text: string): string {
+  const root = plantRepo();
+  writeFileSync(join(root, PLAN_PATH), text, 'utf8');
+  return root;
+}
+
 /** The `CommandExit` a run refused with; fails the case when it let the review through. */
 async function refusalOf(run: Promise<void>): Promise<CommandExit> {
   try {
@@ -203,7 +258,7 @@ describe('enforceSpecReview lets through', () => {
     const { board, calls } = fakeBoard(false);
     const { lines, output } = capture();
 
-    await enforceSpecReview({
+    const standing = await enforceSpecReview({
       review: READY,
       source: 'issue #20',
       repoRoot: root,
@@ -214,6 +269,7 @@ describe('enforceSpecReview lets through', () => {
       output,
     });
 
+    expect(standing).toBe('ready');
     expect(existsSync(join(root, PLAN_PATH))).toBe(true);
     expect(calls).toEqual([]);
     expect(lines).toEqual({ info: [], warn: [] });
@@ -223,7 +279,7 @@ describe('enforceSpecReview lets through', () => {
     const root = plantRepo();
     const { board, calls } = fakeBoard(false);
 
-    await enforceSpecReview({
+    const standing = await enforceSpecReview({
       review: undefined,
       source: 'issue #20',
       repoRoot: root,
@@ -234,6 +290,7 @@ describe('enforceSpecReview lets through', () => {
       output: capture().output,
     });
 
+    expect(standing).toBe('unjudged');
     expect(existsSync(join(root, PLAN_PATH))).toBe(true);
     expect(calls).toEqual([]);
   });
@@ -356,25 +413,133 @@ describe('enforceSpecReview on a not-ready verdict', () => {
     expect(refusal.message).not.toContain(SPEC_READY_LABEL);
   });
 
-  it('refuses an absent review with the gap the parser names, since nobody judged the spec', async () => {
-    const absent = parseSpecReview('I wrote the plan.\n');
+});
+
+describe('enforceSpecReview on a review it could not read', () => {
+  it('lets a plan that reads as written stand on a missing block, with one warning and no board call', async () => {
+    const root = plantPlanned(PLAN_TEXT);
+    const { board, calls } = fakeBoard(false);
     const { lines, output } = capture();
 
-    const refusal = await refusalOf(enforceSpecReview({
-      review: absent,
+    const standing = await enforceSpecReview({
+      review: ABSENT,
       source: 'issue #20',
-      repoRoot: plantRepo([]),
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board },
+      comment: true,
+      output,
+    });
+
+    expect(ABSENT.answer).toBe('absent');
+    expect(standing).toBe('unread');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(true);
+    expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(true);
+    expect(calls).toEqual([]);
+    expect(lines.warn).toEqual([
+      `the session output holds no rafa:spec-review block; ${PLAN_PATH} reads as written, so the plan stands unreviewed`,
+    ]);
+    expect(lines.info).toEqual([]);
+  });
+
+  it('lets one stand on a malformed block the same way, whatever the body held', async () => {
+    const root = plantPlanned(PLAN_TEXT);
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+
+    const standing = await enforceSpecReview({
+      review: MALFORMED,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board },
+      comment: true,
+      output,
+    });
+
+    expect(MALFORMED.answer).toBe('malformed');
+    expect(standing).toBe('unread');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(true);
+    expect(calls).toEqual([]);
+    expect(lines.warn).toHaveLength(1);
+    expect(lines.warn[0]).toContain('not a mapping of verdict and gaps');
+    expect(lines.warn[0]).toContain('so the plan stands unreviewed');
+  });
+
+  it('stands on a file the parser finds no issue in, which is all reading as written says', async () => {
+    // `plantRepo` writes a line of prose, not a plan: the parser reports
+    // nothing about it, so the gate keeps it. What says the file carries
+    // no rafa:plan block is the caller's stamp (`./review-stamp.test.ts`).
+    const root = plantRepo();
+    const { lines, output } = capture();
+
+    const standing = await enforceSpecReview({
+      review: ABSENT,
+      source: SOURCE,
+      repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
       issue: null,
       comment: true,
       output,
+    });
+
+    expect(standing).toBe('unread');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(true);
+    expect(lines.warn).toHaveLength(1);
+  });
+
+  it('removes the files and exits 3 when the plan does not read as written, naming every issue', async () => {
+    const root = plantPlanned(UNREADABLE_PLAN_TEXT);
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+
+    const refusal = await refusalOf(enforceSpecReview({
+      review: ABSENT,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board },
+      comment: true,
+      output,
     }));
 
-    expect(absent.answer).toBe('absent');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(false);
+    expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(false);
+    expect(calls).toEqual([]);
     expect(refusal.exitCode).toBe(SPEC_NOT_READY_EXIT);
-    expect(refusal.message).toContain('the review block was not returned');
+    expect(refusal.message).toContain('issue #20: no plan stands');
+    expect(refusal.message).toContain('the session output holds no rafa:spec-review block');
+    expect(refusal.message).toContain(`${PLAN_PATH}:3: unclosed-block:`);
+    expect(refusal.message).toContain('Plan from the spec again.');
+    expect(lines.info).toEqual([
+      `🗑  Removed ${PLAN_PATH}: no review came back and the plan does not read as written, so no plan stands.`,
+      `🗑  Removed ${PREREQUISITES_PATH}: no review came back and the plan does not read as written, so no plan stands.`,
+    ]);
     expect(lines.warn).toEqual([]);
+  });
+
+  it('refuses a session that wrote no plan at all, naming the path it was told to write', async () => {
+    const { board, calls } = fakeBoard(false);
+    const { output } = capture();
+
+    const refusal = await refusalOf(enforceSpecReview({
+      review: ABSENT,
+      source: 'issue #20',
+      repoRoot: plantRepo([]),
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board },
+      comment: true,
+      output,
+    }));
+
+    expect(refusal.exitCode).toBe(SPEC_NOT_READY_EXIT);
+    expect(refusal.message).toContain(`${PLAN_PATH}: the session wrote no plan there`);
+    expect(calls).toEqual([]);
   });
 });
 

@@ -1,6 +1,7 @@
 /**
- * What `--skip-review` leaves behind: `review: skipped` recorded in the
- * generated plan's `rafa:plan` block.
+ * What the readiness gate leaves behind in a plan it did not refuse:
+ * `review: skipped` for `--skip-review`, and `review: missing` for a
+ * session whose `rafa:spec-review` block could not be read.
  *
  * `--skip-review` bypasses check 3 of the readiness gate — the
  * planner's own first pass over the spec — and ALONE
@@ -10,6 +11,14 @@
  * that way was planned from a spec nobody judged, and the spec says the
  * plan records it, so the next person to open the plan, and every
  * command that parses it, can see which gate it came through.
+ *
+ * `review: missing` records the other way a plan comes through check 3
+ * unjudged: the session ran to the end and returned no readable review
+ * block, and the plan it wrote reads as written, so `./gate.ts` lets it
+ * stand rather than removing it. The two values are kept apart because
+ * the causes are: one is an operator's flag, the other a session that
+ * said nothing, and a plan carrying either was planned from a spec no
+ * review passed.
  *
  * `review` is not one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), so
  * the plan reader keeps it as a `PlanHeaderExtra`: retained, acting on
@@ -27,7 +36,9 @@
  * schema; this value is one lower-case word, and it was measured on bun
  * 1.3.14 on 2026-09-19: `Bun.YAML.parse('stub: a\nreview: skipped\n')`
  * answers `{"stub":"a","review":"skipped"}`, the string, beside the
- * field the plan already carried.
+ * field the plan already carried. `missing` is the same shape of word
+ * and reads back the same way, which `./review-stamp.test.ts` holds
+ * through `parsePlan` for both values.
  *
  * ## What it does to the file
  *
@@ -56,8 +67,14 @@ export const REVIEW_FIELD = 'review';
 /** What the field is set to when check 3 was bypassed. */
 export const REVIEW_SKIPPED = 'skipped';
 
-/** The line the stamp writes, indentation aside. */
+/** What the field is set to when the session returned no readable review. */
+export const REVIEW_MISSING = 'missing';
+
+/** The line `--skip-review` leaves behind, indentation aside. */
 export const REVIEW_SKIPPED_LINE = `${REVIEW_FIELD}: ${REVIEW_SKIPPED}`;
+
+/** The line an unread review leaves behind, indentation aside. */
+export const REVIEW_MISSING_LINE = `${REVIEW_FIELD}: ${REVIEW_MISSING}`;
 
 /** What a stamp did, or what stopped it; `./plan-field.ts` spells the five. */
 export type ReviewStampAnswer = PlanFieldAnswer;
@@ -75,4 +92,16 @@ export type ReviewStamp = PlanFieldStamp;
  */
 export function stampReviewSkipped(plan: string): ReviewStamp {
   return stampPlanField(plan, REVIEW_FIELD, REVIEW_SKIPPED);
+}
+
+/**
+ * The plan with `review: missing` recorded in its `rafa:plan` block.
+ *
+ * What `./gate.ts` answers `unread` for: a session that returned no
+ * readable `rafa:spec-review` block over a plan that reads as written.
+ * Takes the plan as read and answers the text to write, as
+ * {@link stampReviewSkipped} does.
+ */
+export function stampReviewMissing(plan: string): ReviewStamp {
+  return stampPlanField(plan, REVIEW_FIELD, REVIEW_MISSING);
 }
