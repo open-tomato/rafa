@@ -38,6 +38,8 @@ import {
   optionalPrerequisite,
   PR_PROVIDERS,
   PREREQUISITE_KINDS,
+  RELEASE_AUTO,
+  releaseEnabled,
   requiredPrerequisite,
   STORE_BACKENDS,
   subsetOf,
@@ -320,6 +322,49 @@ describe('usdAmount', () => {
 
     expect(valueOf(usdAmount, parsed.a)).toBe(1.5);
     expect(problemsOf(usdAmount, parsed.b)).toEqual([`F: s is "1.50", expected ${USD_EXPECTED}`]);
+  });
+});
+
+describe('releaseEnabled', () => {
+  it('accepts both booleans and auto, each as itself', () => {
+    expect(valueOf(releaseEnabled, true)).toBe(true);
+    expect(valueOf(releaseEnabled, RELEASE_AUTO)).toBe(RELEASE_AUTO);
+  });
+
+  it('reads false as a value rather than as silence, as flag does', () => {
+    expect(releaseEnabled(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+  });
+
+  it.each([
+    ['the string true, which nothing here coerces', 'true', '"true"'],
+    ['a different case of auto', 'Auto', '"Auto"'],
+    ['the number 1', 1, '1'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [true], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(releaseEnabled, raw)).toEqual([
+      `F: s is ${found}, expected true, false or auto`,
+    ]);
+  });
+
+  it.each([['on'], ['off'], ['yes'], ['no']])('refuses %s, which the parser answers as a string', (written) => {
+    // YAML 1.1 spelled these booleans; `Bun.YAML.parse` does not, so each
+    // reaches the reader as its own word. Measured on bun 1.3.14, beside
+    // `true`, which it does answer as the boolean.
+    const parsed = Bun.YAML.parse(`enabled: ${written}\n`) as { enabled: unknown };
+
+    expect(parsed.enabled).toBe(written);
+    expect(problemsOf(releaseEnabled, parsed.enabled)).toEqual([
+      `F: s is "${written}", expected true, false or auto`,
+    ]);
+  });
+
+  it('accepts the word auto a file spells unquoted, and the same word quoted', () => {
+    const parsed = Bun.YAML.parse('a: auto\nb: "auto"\nc: true\n') as Record<string, unknown>;
+
+    expect([parsed.a, parsed.b, parsed.c]).toEqual([RELEASE_AUTO, RELEASE_AUTO, true]);
+    expect([valueOf(releaseEnabled, parsed.a), valueOf(releaseEnabled, parsed.c)])
+      .toEqual([RELEASE_AUTO, true]);
   });
 });
 

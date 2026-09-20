@@ -27,12 +27,13 @@
  * Both are therefore silent on the ordinary merge of a change that
  * touched no version, which is what makes them worth printing at all.
  *
- * ## `rafa release tag` is not a command yet
+ * ## `rafa release tag` is a command, and this still only prints it
  *
- * It is rafa-21's, and the plan records that as debt this stage does
- * not own. The line is printed because the spec asks for it, and it
- * names what the operator does by hand until then. Nothing here runs
- * it: the follow-ups are text.
+ * rafa-21 registered it, and {@link versionTag} is the one string both
+ * this module's predicted tag and `src/commands/release/tag.ts`'s
+ * written tag are built from, so the printed line and the command that
+ * honours it cannot drift. Nothing here runs it even so: the follow-ups
+ * are text an operator reads, and tagging is the operator's call.
  *
  * ## Why the reading is separate from what reads it
  *

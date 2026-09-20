@@ -44,6 +44,17 @@
  * case, the `pr.provider: none` shortcut dropped reddened 1, and the
  * `readRemote` seam dropped reddened 5.
  *
+ * The start-only tier is driven over a plan whose PREREQUISITES file
+ * carries a `[start]` item, with the tracker beside it planted by the
+ * case. Each reading sits beside a control differing in one thing only —
+ * whether the tracker holds a ticked task, or which of the plan and the
+ * tracker holds one. Five mutations of `start/preflight.ts` were driven
+ * against them on 2026-09-20, the file run alone on a baseline of 29 pass
+ * and restored sha256-identical: the tier dropped from the required list
+ * reddened 4 cases, the `isFirstDispatch` reading inverted 4, the tier
+ * moved ahead of the provider's automatic items 1, the skip lines not
+ * printed 3, and the tracker dropped from the skip line 3.
+ *
  * `start()` handing the preflight its settings and its plan, and handing
  * the lines on to each dispatch, is reached by no case here, since
  * `start()` spawns the CLI with no seam. It was read on the same day by
@@ -592,6 +603,169 @@ describe('the automatic items of the pull request provider', () => {
     expect(control.refusal).toBeNull();
     expect(control.probes.length).toBe(2);
     expect(reads).toEqual([controlRoot]);
+  });
+});
+
+/** A PREREQUISITES file whose only item is a probed `[start]` one. */
+const START_PREREQUISITES = [
+  '# Prerequisites',
+  '',
+  '## Starting state [start]',
+  '- [ ] The sibling checkout is clean (`git status --porcelain`)',
+  '',
+].join('\n');
+
+/** The one start-only item {@link START_PREREQUISITES} names. */
+const CLEAN_CHECKOUT = 'The sibling checkout is clean (`git status --porcelain`)';
+
+/** Its probe. */
+const CLEAN_PROBE = 'git status --porcelain';
+
+/** The line a resume names one skipped start-only item with. */
+function skipLine(name: string): string {
+  return `⏭ start-only item tool ${JSON.stringify(name)} was not checked:`
+    + ' it is probed on a first dispatch alone,'
+    + ` and PLAN_TRACKER-${STUB}.md already holds a ticked task`;
+}
+
+/** Writes `content` to the tracker beside the plan under `root`. */
+function plantTracker(root: string, content: string): void {
+  writeFileSync(trackerPathFor(planPathIn(root)), content, 'utf8');
+}
+
+/** A fresh root carrying `prerequisites` for its plan. */
+function rootWithPrerequisites(prerequisites: string): string {
+  const root = freshRoot();
+  writeFileSync(prerequisitesPathIn(root), prerequisites, 'utf8');
+  return root;
+}
+
+describe('the start-only tier of the plan', () => {
+  it('probes it ahead of the configured required tier on a first dispatch, where a tracker holding a ticked task skips it', async () => {
+    const root = rootWithPrerequisites(START_PREREQUISITES);
+    const resumedRoot = rootWithPrerequisites(START_PREREQUISITES);
+    plantTracker(resumedRoot, '# Stage: one\n\n- [x] Already ran\n- [ ] Still to run\n');
+    const settings = settingsOf([BUN], []);
+    const answers = { [CLEAN_PROBE]: answered(0), 'bun --version': answered(0) };
+
+    const first = await drive(root, settings, answers);
+    const resumed = await drive(resumedRoot, settings, answers);
+
+    expect(first.refusal).toBeNull();
+    expect(first.probes).toEqual([`${CLEAN_PROBE} in ${root}`, `bun --version in ${root}`]);
+    expect(storedRows(root).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      `required ${CLEAN_CHECKOUT} pass`,
+      'required bun pass',
+    ]);
+    expect(first.info).toEqual([CHECKING_ONE.replace('1 prerequisite', '2 prerequisite'), '   Preflight passed.']);
+
+    // The resume checks the configured tier alone: one item, one row, and the skip line.
+    expect(resumed.refusal).toBeNull();
+    expect(resumed.probes).toEqual([`bun --version in ${resumedRoot}`]);
+    expect(storedRows(resumedRoot).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      'required bun pass',
+    ]);
+    expect(resumed.info).toEqual([`\n${skipLine(CLEAN_CHECKOUT)}`, CHECKING_ONE, '   Preflight passed.']);
+    expect(resumed.warn).toEqual([]);
+  });
+
+  it('names every skipped item in one line of its own, where the same file on a first dispatch prints none', async () => {
+    const second = 'The branch is fresh (`git rev-parse --abbrev-ref HEAD`)';
+    const prerequisites = START_PREREQUISITES.replace(
+      `- [ ] ${CLEAN_CHECKOUT}\n`,
+      `- [ ] ${CLEAN_CHECKOUT}\n- [ ] ${second}\n`,
+    );
+    const root = rootWithPrerequisites(prerequisites);
+    const controlRoot = rootWithPrerequisites(prerequisites);
+    plantTracker(root, '- [x] Already ran\n');
+    const answers = { [CLEAN_PROBE]: answered(0), 'git rev-parse --abbrev-ref HEAD': answered(0) };
+
+    const resumed = await drive(root, settingsOf([], []), answers);
+    const control = await drive(controlRoot, settingsOf([], []), answers);
+
+    expect(resumed.refusal).toBeNull();
+    expect(resumed.info).toEqual([`\n${skipLine(CLEAN_CHECKOUT)}`, skipLine(second)]);
+    // Nothing skipped is checked, counted, or stored, so no run line and no store at all.
+    expect(resumed.probes).toEqual([]);
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+
+    expect(control.info).toEqual([
+      CHECKING_ONE.replace('1 prerequisite', '2 prerequisite'),
+      '   Preflight passed.',
+    ]);
+    expect(control.probes).toEqual([
+      `${CLEAN_PROBE} in ${controlRoot}`,
+      `git rev-parse --abbrev-ref HEAD in ${controlRoot}`,
+    ]);
+  });
+
+  it('reads the tracker and not the plan, a tracker whose every box is open being a first dispatch still', async () => {
+    const root = rootWithPrerequisites(START_PREREQUISITES);
+    // The plan keeps its boxes open whatever the run has done, and a tick
+    // there is no reading: this one holds one and the tracker holds none.
+    writeFileSync(planPathIn(root), '- [x] The plan was ticked by hand\n- [ ] Write it\n', 'utf8');
+    plantTracker(root, '- [ ] Write it\n- [BLOCKED] Ask again\n');
+    const answers = { [CLEAN_PROBE]: answered(0) };
+
+    const open = await drive(root, settingsOf([], []), answers);
+    // The control differs in one line of the tracker: the task now ticked.
+    plantTracker(root, '- [x] Write it\n- [BLOCKED] Ask again\n');
+    const ticked = await drive(root, settingsOf([], []), answers);
+
+    expect(open.refusal).toBeNull();
+    expect(open.probes).toEqual([`${CLEAN_PROBE} in ${root}`]);
+    expect(open.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
+    expect(ticked.probes).toEqual([]);
+    expect(ticked.info).toEqual([`\n${skipLine(CLEAN_CHECKOUT)}`]);
+  });
+
+  it('keeps the pull request provider automatic items ahead of it, and both ahead of the configured tier', async () => {
+    const root = rootWithPrerequisites(START_PREREQUISITES);
+
+    const run = await drive(root, settingsOf([BUN], []), {
+      ...ghAnswers(DEFAULT_GH_HOST),
+      [CLEAN_PROBE]: answered(0),
+      'bun --version': answered(0),
+    }, { readRemote: () => GITHUB_ORIGIN });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([
+      `${probeOf(ghOnPathItem(DEFAULT_GH_HOST))} in ${root}`,
+      `${probeOf(ghAuthItem(DEFAULT_GH_HOST))} in ${root}`,
+      `${CLEAN_PROBE} in ${root}`,
+      `bun --version in ${root}`,
+    ]);
+    expect(storedRows(root).map((row) => row.item)).toEqual([
+      'gh',
+      `https://${DEFAULT_GH_HOST}`,
+      CLEAN_CHECKOUT,
+      'bun',
+    ]);
+  });
+
+  it('halts on a first dispatch when its probe fails, and lets a resume through with the skip line instead', async () => {
+    const root = rootWithPrerequisites(START_PREREQUISITES);
+    const resumedRoot = rootWithPrerequisites(START_PREREQUISITES);
+    plantTracker(resumedRoot, '# Stage: one\n\n- [x] Already ran\n- [ ] Still to run\n');
+    const settings = settingsOf([], []);
+    const answers = { [CLEAN_PROBE]: answered(1, 'sh: not clean') };
+
+    const first = await drive(root, settings, answers);
+    const resumed = await drive(resumedRoot, settings, answers);
+
+    expect(first.result).toBeNull();
+    expect(first.refusal?.exitCode).toBe(1);
+    expect(first.probes).toEqual([`${CLEAN_PROBE} in ${root}`]);
+    expect(storedRows(root).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      `required ${CLEAN_CHECKOUT} fail`,
+    ]);
+
+    // The resume never runs the failing probe: it is skipped, not checked and failed.
+    expect(resumed.refusal).toBeNull();
+    expect(resumed.probes).toEqual([]);
+    expect(existsSync(sqliteStorePath(resumedRoot))).toBe(false);
+    expect(resumed.info).toEqual([`\n${skipLine(CLEAN_CHECKOUT)}`]);
+    expect(resumed.warn).toEqual([]);
   });
 });
 

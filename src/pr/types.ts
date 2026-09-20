@@ -14,11 +14,15 @@
  *   - Every member answers a promise, because the `gh` adapter spawns a
  *     process for each one. A provider that could answer synchronously
  *     still answers a resolved promise rather than widening the port.
- *   - A pull request that is absent is `null`, never a throw: the
- *     current branch having no open PR is the ordinary first case of
- *     `pr current`, not a failure. A provider that could not be ASKED —
- *     no network, no authentication, a command that did not run — throws,
- *     so an outage never reads as an empty repository.
+ *   - A pull request a READ is looking for and does not find is `null`,
+ *     never a throw: the current branch having no open PR is the
+ *     ordinary first case of `pr current`, not a failure. A provider
+ *     that could not be ASKED — no network, no authentication, a command
+ *     that did not run — throws, so an outage never reads as an empty
+ *     repository. A WRITE is the other way round
+ *     ({@link PullRequests.editBody}): it was handed the pull request to
+ *     act on rather than discovering it, so a number nothing answers for
+ *     throws there.
  *   - The states GitHub spells in its own words are narrowed here
  *     ({@link PullRequestState}, {@link Mergeability}) so a caller
  *     switches on a closed set, while the words that have no closed set
@@ -212,6 +216,21 @@ export interface PullRequests {
   browse: (number: number) => Promise<void>;
   /** Merges the PR, or answers why the provider would not. */
   merge: (number: number, method: MergeMethod) => Promise<MergeOutcome>;
+  /**
+   * Replaces the PR's own body — the description above the
+   * conversation, not a comment under it — and answers nothing.
+   *
+   * The body is written WHOLE, because a provider has no way to append
+   * one: the text to keep is what {@link PullRequests.get} already
+   * answered, and composing the new body out of it is the caller's.
+   *
+   * A pull request that is absent THROWS here, where
+   * {@link PullRequests.get} answers null. A caller writing a body has
+   * already chosen which pull request it is writing to, so a number
+   * nothing answers for is a fault, and an edit that silently wrote
+   * nowhere would lose the sentence it was carrying.
+   */
+  editBody: (number: number, body: string) => Promise<void>;
   /** Every comment on the PR, oldest first. */
   comments: (number: number) => Promise<readonly PullRequestComment[]>;
   /** Posts a comment, answering the comment as posted. */

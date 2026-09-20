@@ -38,31 +38,34 @@ is copied there as well.
 
 ### Tables outside the port
 
-`findings`, `blockers`, `out_of_scope_bugs`, `report_absences`,
-`task_reports`, `preflight` and `dispatches` are SQLite-only and stay out
-of the port's row map. Each arrives as a new `SQLITE_MIGRATIONS` entry, is written
-under the `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
-`effort.sqlite` whatever `store` selects. A writer that can be left with
-nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
-`writeTriage` and `writePreflightChecks` do, so an empty write on a store
-that exists still meets the schema check. `writeReportAbsence` always has
-its one row and opens `withSqliteStore` directly, as `writeTrackerRef`
-does. `writeTaskReport`
-always has its one row too, and passes `writeSqliteStore` a count of
-one, which opens the store as that direct call does; so does
-`writeDispatch` (`store/dispatches.ts`).
+`findings`, `blockers`, `out_of_scope_bugs`, `changes`,
+`report_absences`, `task_reports`, `preflight` and `dispatches` are
+SQLite-only and stay out of the port's row map. Each arrives as a new
+`SQLITE_MIGRATIONS` entry, is written under the `sqliteStorePath` that
+`store/sqlite.ts` exports, and lands in `effort.sqlite` whatever `store`
+selects. A writer that can be left with nothing to insert goes through
+`writeSqliteStore`, as `writeFindings`, `writeTriage`, `writeChanges`
+and `writePreflightChecks` do, so an empty write on a store that exists
+still meets the schema check. `writeReportAbsence` always has its one
+row and opens `withSqliteStore` directly, as `writeTrackerRef` does.
+`writeTaskReport` always has its one row too, and passes
+`writeSqliteStore` a count of one, which opens the store as that direct
+call does; so does `writeDispatch` (`store/dispatches.ts`).
 `readTaskReportTallies` reads that table back for `rafa effort report`,
 under the repo root whatever `store` selects, and opens nothing when the
 file is absent; `readPreflightHalts` reads `preflight` back the same way,
 and `readSessionBudgets` the `dispatches` rows carrying a budget.
 `readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
 `task_reports` and `report_absences` back the same way, for the rough ETA
-of `rafa loop status`.
+of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
+`changes` row under one plan stub, in append order, for a release step to
+render.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
-`reports.test.ts`, `preflight.test.ts` and `dispatches.test.ts`, and the
-filter the version-5 case of `preflight.test.ts` takes the later tables
-out with.
+`reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts` and
+`changes.test.ts`, and the filter the version-5 case of
+`preflight.test.ts` takes the later tables out with, beside the
+version-7 filter of `changes.test.ts`.
 
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
@@ -71,6 +74,22 @@ parser could use and the flags the session was spawned with, whatever
 became of the task, and then the report; a refused dispatch row stores no
 report. No column holds the outcome: `task_reports` and `report_absences`
 hold it under the same session id.
+
+**`changes` is the one report table with no `outcome` column.** A
+change note is about the diff, not about how the session ended, so
+`store/changes.ts` passes `checkDispatch` a null outcome and only the
+dispatch is checked; the session's verdict is in `task_reports` under
+the same session id. Its rows are deduplicated per session by every
+stored field — `level`, `area` and `summary` — as `triage` dedupes, not
+by an artifact.
+
+**`task_reports.outcome` holds `done` or `blocked` and nothing else.**
+`recordTaskReport` (`src/report/record.ts`) writes only that closed-set
+status into the column; a report's free-text `feedback` reaches no
+queryable table at all. To recover what a past task actually said — the
+exit codes it captured, the commands it ran — read `session_id` off its
+`task_reports` row and open the matching
+`~/.claude/projects/<project-slug>/<session-id>.jsonl`.
 
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row
@@ -98,6 +117,14 @@ An inserted row reaches `progress.txt` as the bullet
 `ralph:plan=` stamp in a prompt.** Task and wrap-up prompts carry plan
 text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.
+
+**A branch stub is not a queue id.** `QUEUE_ID` in
+`src/effort/attribution.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
+`q`-prefixed leading token is read as one. A `rafa-<n>` stub carries
+none and resolves by exact match alone, which is why the branch
+`feat/rafa-21` matches no plan called `rafa-21-changelog-and-release`.
+Write queue-id cases with `q`-prefixed stubs, and expect a `rafa-<n>`
+branch stub to fall through to `match: none`.
 
 **`effort collect` attributes by the plan stubs in `plan.dir`**, under
 the repo root and `.rafa/plans` unless a config names another, when its

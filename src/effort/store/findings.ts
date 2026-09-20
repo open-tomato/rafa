@@ -273,19 +273,21 @@ function refusedWrite(subject: string, reason: string): Error {
  * one write. `subject` names the write in the refusal: `findings` here.
  *
  * Exported for the triage writer, so every table one report fills
- * refuses a dispatch by the same rule and in the same words.
+ * refuses a dispatch by the same rule and in the same words. A writer
+ * whose table has no outcome column passes null, and only the dispatch
+ * is checked; `changes.ts` is the one that does.
  */
 export function checkDispatch(
   subject: string,
   dispatch: FindingsDispatch,
-  outcome: FindingOutcome,
+  outcome: FindingOutcome | null,
 ): void {
   const { sessionId, planStub, taskLine } = dispatch;
   if (typeof sessionId !== 'string' || sessionId.length === 0) {
     const reason = `has session id ${describeValue(sessionId)}, not a non-empty string`;
     throw refusedWrite(subject, reason);
   }
-  if (!(FINDING_OUTCOMES as readonly unknown[]).includes(outcome)) {
+  if (outcome !== null && !(FINDING_OUTCOMES as readonly unknown[]).includes(outcome)) {
     const expected = FINDING_OUTCOMES.join(', ');
     const reason = `has outcome ${describeValue(outcome)}, not one of ${expected}`;
     throw refusedWrite(subject, reason);

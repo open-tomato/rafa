@@ -154,6 +154,7 @@ Recognized fields:
 - `stub` — The plan identifier (string, following the `rafa-<n>-<slug>` format). Used to organize findings and dedupe rows across runs.
 - `issue` — Optional GitHub issue number (integer, e.g., `123`). Links the work back to the `open-tomato/rafa` board.
 - `spec` — Optional path to the specification document that guided the plan.
+- `release` — Optional release level for the version bump this plan's pull request ships: `patch`, `minor`, `major` or `none`. Anything else is reported as `unusable-field` and read as if unset. Left out, the level is the highest among the change notes the plan's tasks stored, and `none` when they stored none.
 
 Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
 
@@ -247,6 +248,7 @@ Report fields:
 | `skills_used` | list of strings | Names of skills referenced or applied |
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
 | `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
+| `changes` | list of objects | The changelog for this task's own diff, one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none` |
 
 Finding entry fields:
 
@@ -259,6 +261,14 @@ Finding entry fields:
 | `resolution` | string | no | How to fix or work around it |
 | `artifact` | string | no | Error message, file path, or code snippet that signals the finding |
 | `signal` | string | yes | `loud` (it surfaced as a failure) or `silent` (it passed while wrong) |
+
+Change note entry fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `level` | string | yes | How much of a release the diff is worth: `patch`, `minor`, `major` or `none` |
+| `summary` | string | yes | One line a user of the project would understand, quoted |
+| `area` | string | no | The changelog section the line groups under (e.g., `cli`, `store`) |
 
 Blocker/bug entry fields:
 
@@ -375,18 +385,18 @@ The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, wh
   invariant sweeps), live-seam runs, migrations, and close-out — these
   preserve resumability where a halt is most likely.
 * The RUNNER owns the push, the pull request, the merge with the base,
-  and the wait for CI. After the last task it runs a wrap-up session
-  that promotes findings, compacts `progress.txt`, merges `origin/main`,
-  commits, pushes and opens (or updates) the PR — and then polls that
-  PR's checks, spending repair sessions on a red or conflicting result.
-  So a plan must NOT carry a task that opens a PR, resolves a merge
-  conflict, waits on CI, or compacts `progress.txt`. Two openers race:
-  measured, one run cut a second branch and opened a second PR for a
-  single plan. A close-out task SHOULD still take the mergeability
-  reading (`git merge-tree --write-tree origin/main HEAD`) and assemble
-  the body material — the gate captures, the test plan, the recorded
-  debt — into the plan's close-out notes for that wrap-up session to
-  use.
+  the wait for CI, and the version bump and changelog entry. After the last
+  task it runs a wrap-up session that promotes findings, compacts
+  `progress.txt`, merges `origin/main`, commits, pushes and opens (or
+  updates) the PR — and then polls that PR's checks, spending repair sessions
+  on a red or conflicting result. So a plan must NOT carry a task that opens
+  a PR, resolves a merge conflict, waits on CI, compacts `progress.txt`,
+  or writes a version bump or changelog entry. Two openers race: measured,
+  one run cut a second branch and opened a second PR for a single plan. A
+  close-out task SHOULD still take the mergeability reading (`git merge-tree
+  --write-tree origin/main HEAD`) and assemble the body material — the gate
+  captures, the test plan, the recorded debt — into the plan's close-out
+  notes for that wrap-up session to use.
 
 ---
 
@@ -419,19 +429,24 @@ The wrap-up session always receives `full` regardless of the configured mode.
   ## Credentials [human]
   - [ ] {Credential description}
 
+  ## Initial setup [start]
+  - [ ] {Setup step that applies only to first dispatch}: `{command to verify}`
+
   ## Operator steps after the plan merges [human]
   - [ ] {Step the operator takes once the plan has merged}
 ```
 
 How the file is read:
 - An item is a line opening with `- [ ] `, continued by the indented lines directly below it that open no list item of their own. A ticked `- [x]` item and a `- [BLOCKED]` item are skipped, and nothing inside a fenced code block is read.
-- An item's tag is the `[auto]` or `[human]` written right after its box. Without one it takes its section's tag: a heading carrying `[auto]` tags its section `auto`, and one carrying `[human]` or naming `manual`, `human`, `sign-off` or `team` tags it `human`. A heading's tag reaches the deeper headings under it and ends at the next heading of its own level or shallower. An item under no tagged heading is `human`.
+- An item's tag is the `[auto]`, `[human]`, or `[start]` written right after its box. Without one it takes its section's tag: a heading carrying `[auto]` tags its section `auto`, one carrying `[human]` or naming `manual`, `human`, `sign-off` or `team` tags it `human`, and one carrying `[start]` tags it `start`. A heading's tag reaches the deeper headings under it and ends at the next heading of its own level or shallower. An item under no tagged heading is `human`.
 - An `auto` item's first backticked span is its probe. The item merges as a required prerequisite, the tier whose failure halts a run.
 - A `human` item, and an `auto` item with no backticked span, is a reminder: named to the operator, never probed, and never halting a run.
+- A `start` item's first backticked span is its probe. The item is probed on first dispatch only (skipped on resume), and failure halts a run on first dispatch.
 
 Rules:
 - Only include prerequisites that are genuinely non-automatable (installed services, external credentials, manual env var setup).
 - Tag an item `auto` only when a shell command proves it, and write that command as the item's first backticked span, with nothing quoted before it. The command asks for no input and changes nothing.
+- Tag an item `start` only when a shell command proves it and it should only be checked on the first dispatch of a plan (not on resume). Write the command as the item's first backticked span, with nothing quoted before it.
 - Tag every step for after the plan merges `human`, as the heading above does, so no run ever executes one as a probe.
 - Do not duplicate steps already documented in the repo's contributor docs (README, CONTRIBUTING, and the like).
 - For example: do not mark `bun install` as a prerequisite if it is already documented as a required step for all development work.

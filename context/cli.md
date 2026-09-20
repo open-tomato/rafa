@@ -27,6 +27,7 @@ module's note is the long form.
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
+| `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -45,6 +46,7 @@ module's note is the long form.
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
+| `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
 | `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, and the two install warnings |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -63,7 +65,17 @@ module's note is the long form.
   here` goes red the moment a module gains, drops or renames one import.
   Adding an import to a command module is therefore a two-file change,
   the module and that roster — the sibling of the declared-flag roster
-  `src/commands/index.test.ts` holds.
+  `src/commands/index.test.ts` holds. Its `IMPORT_PATTERN` matches
+  RELATIVE specifiers only, those opening `./` or `../`, so a module's
+  `node:fs` and `node:path` imports are spelled nowhere in the roster and
+  adding one reddens nothing.
+- **Neither roster walks the filesystem.** Both are spelled lists checked
+  against `CORE_REGISTRY`, so a module added under `src/commands/` and not
+  yet registered reddens neither, and a plan can split "add the module"
+  from "register it" across two tasks with the suite green between them.
+  Registration itself reddens exactly three: `OWN_DECLARATIONS` and the
+  roster expectations in `src/commands/index.test.ts`, `COMMAND_MODULES`
+  in `src/index.test.ts`, and the frozen help snapshots.
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
   and `plan validate`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
@@ -73,10 +85,11 @@ module's note is the long form.
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `skill check`, `skill list`,
   `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `init`, `doctor`, `self-update`, `usage` and
+  `instinct show`, `release status`, `release tag`, `init`, `doctor`,
+  `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
-  `module`, `agent`, `skill` and `instinct`: a subject is declared with
-  its first action, never ahead of it.
+  `module`, `agent`, `skill`, `instinct` and `release`: a subject is
+  declared with its first action, never ahead of it.
   `skill index`, `instinct flag` and `instinct promote` are in the
   command tree and are registered by none of it yet, so no roster names
   them.
@@ -117,7 +130,8 @@ module's note is the long form.
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
   `start/wrap-up.ts`,
-  `start/dispatch.ts`, `start/triage.ts`, `adapters/tracker/resolve.ts`,
+  `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
+  `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
@@ -293,7 +307,27 @@ module's note is the long form.
   carries is left to the preflight, which refuses on it. In json mode the
   result's `data` holds the root, its source, the working directory,
   whether the config existed, every path checked with its change, that
-  reading, those vendorable uses, and what the board step came to.
+  reading, those vendorable uses, and what the release step and the
+  board step each came to.
+- **The release step asks once, and only where nobody has answered**
+  (`src/commands/init-release.ts`). `--release` writes
+  `release.enabled: true` and `--no-release` writes `false`, both
+  without asking; a project config that already sets the setting is left
+  exactly as it is; `--yes` and a run with no terminal ask nothing and
+  leave it unset, printing the line naming `rafa init --release`; and
+  otherwise the one question
+  `Bump <versionFile> and add a <changelog> entry with every pull
+  request? [Y/n]` is asked through `init`'s own prompter on stderr, with
+  a line above it for each of the two configured files that is missing.
+  Anything but `n` or `no` is a yes, and an input that ENDED is nobody
+  answering and leaves the setting unset. The answer is written into the
+  `.rafa/config.yaml` this run made by uncommenting that one line and
+  leaving the other three `release` settings commented
+  (`src/release/setting.ts`), and the text is parsed back as that answer
+  before a byte is written. Nothing it comes to refuses `init`: a config
+  it cannot read or edit is a warning. It runs after the scopes and
+  before the board step. `--release=<value>` is refused at the top of
+  the run, while nothing has been written.
 - **The board step runs last, and only where there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
   `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
@@ -329,7 +363,11 @@ module's note is the long form.
   `runStartPreflight` puts them, and a configured `pr.provider: none`
   reads no `origin` at all (`src/pr/preflight-items.ts`). Every item goes
   through `runPreflight` in the project root with the context's
-  environment, an optional failure warned about as `loop start` warns. It generates no run id and writes no
+  environment, an optional failure warned about as `loop start` warns. A
+  plan's start-only `[start]` items are the one set left out: `loop start`
+  probes that tier on a first dispatch alone, off the tracker beside the
+  plan, and this command reads no tracker, so none of them reaches this
+  report. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
   refusal, and 0 otherwise. Then, on a repository whose provider is
@@ -685,8 +723,11 @@ module's note is the long form.
   of every probe, a failed required prerequisite — the two automatic
   items a `gh` pull request provider contributes, `gh` on `PATH` and
   `gh auth status` for `origin`'s host, checked ahead of the configured
-  tiers, included — a PREREQUISITES file that cannot be read, or checks
-  the store refused (`start/preflight.ts`). A record of the plan refuses the
+  tiers, and the plan's `[start]` items, checked between the two on a
+  first dispatch and named in one line each on a resume
+  (`src/preflight/first-dispatch.ts`), included — a PREREQUISITES file
+  that cannot be read, or checks the store refused
+  (`start/preflight.ts`). A record of the plan refuses the
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
   `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1
@@ -826,8 +867,12 @@ module's note is the long form.
 
 ### The registry
 
-It is built from code, so a collision throws when it is built. It
-refuses `help` as a subject, as a top-level command and as an alias's
+It is built from code, so a collision throws when it is built — and
+because it builds silently when nothing collides, a clean build is no
+evidence the check ran. To prove one absent, force one: register a
+deliberately colliding subject and read the named refusal it throws
+(`command registry: subject "releases" is spelled as the plural of
+subject "release"`). It refuses `help` as a subject, as a top-level command and as an alias's
 first word. It also refuses a subject, command or alias declared twice,
 a subject spelled as another's plural, and a top-level command spelled
 as a subject. So is an alias spelled as a top-level command or as a
@@ -993,6 +1038,11 @@ home and the warnings read before the invocation are options.
   expected reading and not a writer that never fired; the control that
   tells them apart is dirtying one snapshot with an extra line and
   re-running the updater, which returns the file to its original sha.
+- **A new SUBJECT moves `rafa.txt` alone.** The root roster is the only
+  one of the three that lists subjects; `rafa-loop.txt` and
+  `rafa-loop-start.txt` render a different subtree and are untouched.
+  Read which files actually differ off `git status`, never off the
+  assumption that all three move together.
 
 ### Describe
 

@@ -53,6 +53,10 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prResolveBudget', 'pr.resolveBudget'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
   ['roadmapIssue', 'roadmap.issue'],
+  ['releaseEnabled', 'release.enabled'],
+  ['releaseVersionFile', 'release.versionFile'],
+  ['releaseChangelog', 'release.changelog'],
+  ['releaseHeading', 'release.heading'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -84,6 +88,7 @@ const TOP = [
   'pr',
   'board',
   'roadmap',
+  'release',
 ];
 
 describe('SETTINGS', () => {
@@ -144,6 +149,7 @@ describe('SECTIONS', () => {
       'plan',
       'pr',
       'prerequisites',
+      'release',
       'roadmap',
       'specs',
       'tracker',
@@ -163,6 +169,10 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('pr.nonesuch')).toEqual([
       'pr',
       ['provider', 'mergeMethod', 'base', 'resolveBudget'],
+    ]);
+    expect(knownKeysAbove('release.bump')).toEqual([
+      'release',
+      ['enabled', 'versionFile', 'changelog', 'heading'],
     ]);
   });
 

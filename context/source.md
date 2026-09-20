@@ -13,6 +13,15 @@ the shapes the lint config forces.
 - **A library module never imports `src/rafa.ts`.** It dispatches on
   `process.argv` when imported; `src/index.ts` explains the rule and
   `index.test.ts` measures it.
+- **A cross-subject helper import is the convention, not a smell.**
+  Shared refusals and readers live in the subject that first needed them
+  rather than in a neutral module: eighteen command modules import
+  `../plan/plan-files.js`, and `src/commands/release/tag.ts` takes
+  `versionTag` from `../pr/merge-followups.js` so two commands cannot
+  spell one tag differently. Reach for the existing helper — a second
+  spelling of a refusal is the real smell, as `release status`'s
+  hand-rolled `Expected no arguments` is beside `plan-files.ts`'s shared
+  `expectNoArgument`, which says `Expected no argument`.
 - **Every `import type` line forms one `import/order` group**
   (`sharedRules.mjs`), in which a sibling path ranks ahead of a parent
   one: `./types.js` before `../../config.js`, the reverse of plain name

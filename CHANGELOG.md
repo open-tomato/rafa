@@ -1,11 +1,22 @@
 # Changelog
 
 One section per released version, newest first, headed
-`## <version> — <date>, <what the release is>`. One line per area a
-user would notice, written from the pull request rather than from the
-commit list. Versions follow semver; a phase is a minor, a fix between
-phases is a patch. Each released version is tagged `v<version>`
-(`v0.1.0` was never tagged; `f9954e2..da0a76c` is its range).
+`## <version> — <date>, <release title>`. The sections are generated
+from change notes in task reports (`changes` field in `rafa:report`):
+the loop inserts raw notes grouped by area, then the wrap-up agent
+rewrites each area into one user-facing line. Versions follow semver;
+a phase is a minor, a fix between phases is a patch. Each released
+version is tagged `v<version>` (`v0.1.0` was never tagged;
+`f9954e2..da0a76c` is its range).
+
+## 0.5.0 — 2026-09-20, rafa-21: changelog and release in the loop
+
+- release: The loop writes the version bump and the changelog entry for every pull request: the base version is read from `origin/main`, the level comes from the plan or its change notes, and the entry is inserted under a fresh heading.
+- report: Task reports carry a `changes` list — one entry per user-visible change, with a level, an optional area and a summary.
+- store: Change notes are stored in a `changes` table in the effort SQLite store, deduplicated per session and readable per plan.
+- cli: New `release` subject: `rafa release status` reads the version, the latest tag, the untagged releases and the pending notes, and `rafa release tag` tags `main` and prints the publish line.
+- preflight: PREREQUISITES items can be tagged `[start]` to be probed on a plan’s first dispatch only, and skipped with a named line on a resume.
+- config: `rafa init` asks for the four `release` settings — `enabled`, `versionFile`, `changelog` and `heading`.
 
 ## 0.4.0 — 2026-09-19, phase 3: pull requests and the board
 

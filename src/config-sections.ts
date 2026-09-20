@@ -212,6 +212,25 @@ export const PR_PROVIDERS = ['gh', 'none'] as const;
 /** One of the two pull request providers. */
 export type PrProvider = (typeof PR_PROVIDERS)[number];
 
+/**
+ * What `release.enabled` takes: a YAML boolean, or `auto`.
+ *
+ * `auto` is a third value and not a spelling of either boolean. It
+ * means "on when both configured files exist", a reading only
+ * `release/enabled.ts` can make, because only it looks at a disk.
+ *
+ * The two explicit answers are the BOOLEANS `true` and `false`, and
+ * not the words `on` and `off`: nothing here is coerced, so a file
+ * spelling `enabled: on` is refused and told what to write instead.
+ * Measured on bun 1.3.14, `Bun.YAML.parse` reads `on`, `off`, `yes`
+ * and `no` as strings and `true`, `True` and `TRUE` as the boolean, so
+ * `on` reaches the reader as the string and never as true.
+ */
+export type ReleaseEnabled = boolean | 'auto';
+
+/** The value of `release.enabled` that defers to the two files. */
+export const RELEASE_AUTO = 'auto';
+
 /** A reading of `value` with nothing wrong. */
 function accepted<T>(value: T): Reading<T> {
   return { value, problems: [], extras: [] };
@@ -306,6 +325,15 @@ export const issueNumber: Reader<number> = (raw, at) => typeof raw === 'number'
   && raw > 0
   ? accepted(raw)
   : refused(at, raw, 'an issue number, a whole number above zero');
+
+/**
+ * Accepts `true`, `false` or `auto`, each as itself. A string spelled
+ * like a boolean is refused; see {@link ReleaseEnabled}.
+ */
+export const releaseEnabled: Reader<ReleaseEnabled> = (raw, at) => typeof raw === 'boolean'
+  || raw === RELEASE_AUTO
+  ? accepted(raw)
+  : refused(at, raw, `true, false or ${RELEASE_AUTO}`);
 
 /**
  * A GitHub account login as the collaborators endpoint takes one in a

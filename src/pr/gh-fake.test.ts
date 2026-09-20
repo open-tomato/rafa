@@ -27,6 +27,14 @@
  * mutation the trust stage cannot afford, since it turns a failed
  * permission lookup into a pass. The remaining two reddened the shapes
  * file alone and are recorded there.
+ *
+ * Three more were driven on 2026-09-20, when the `pr edit` route was
+ * added, one run each over this file, with 46 pass before and after and
+ * `gh-fake.ts` restored byte-identical (sha256) after every one: an edit
+ * that answers ok and stores nothing reddened both body cases, a missing
+ * `--body` read as an empty one reddened the no-body refusal, and
+ * `--title` added to the route's flags reddened the unmodelled-flag
+ * case.
  */
 import type { FakePrGh } from './gh-fake.js';
 
@@ -58,7 +66,7 @@ async function json(fake: FakePrGh, args: readonly string[]): Promise<unknown> {
 
 describe('what the fake refuses', () => {
   it.each([
-    [['pr', 'edit', '7'], 'fake gh: unhandled command pr edit 7\n'],
+    [['pr', 'close', '7'], 'fake gh: unhandled command pr close 7\n'],
     [['pr', 'comment', '7', '--body', 'hi'], 'fake gh: unhandled command pr comment 7 --body hi\n'],
     [['pr', 'create', '--title', 't'], 'fake gh: unhandled command pr create --title t\n'],
     [['run', 'list'], 'fake gh: unhandled command run list\n'],
@@ -96,10 +104,10 @@ describe('what the fake refuses', () => {
   it('records every call it was handed, refused ones included, frozen', async () => {
     const fake = withOnePull();
 
-    await fake.run(['pr', 'edit', '7']);
+    await fake.run(['pr', 'close', '7']);
     await fake.run(VIEW);
 
-    expect(fake.calls()).toEqual([['pr', 'edit', '7'], VIEW]);
+    expect(fake.calls()).toEqual([['pr', 'close', '7'], VIEW]);
     expect(Object.isFrozen(fake.calls()[0])).toBe(true);
   });
 });
@@ -234,6 +242,46 @@ describe('gh pr merge', () => {
     expect(await fake.run(['pr', 'merge', '7', '--merge']))
       .toEqual(failure('Pull request is not mergeable: the base branch policy prohibits the merge.\n'));
     expect(fake.pull(7)).toMatchObject({ state: 'OPEN' });
+  });
+});
+
+describe('gh pr edit', () => {
+  it('replaces the body whole, writing nothing to either stream', async () => {
+    const fake = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, body: 'Closes #20' }));
+    const body = 'Closes #20\n\n## Changelog\n\n- release: patch';
+
+    expect(await fake.run(['pr', 'edit', '7', '--body', body])).toEqual({ ok: true, stdout: '', stderr: '' });
+    expect(await json(fake, ['pr', 'view', '7', '--json', 'body'])).toEqual({ body });
+  });
+
+  it('takes an empty body, which clears the description rather than reading as no body', async () => {
+    const fake = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, body: 'Closes #20' }));
+
+    expect((await fake.run(['pr', 'edit', '7', '--body', ''])).ok).toBe(true);
+    expect(fake.pull(7)?.body).toBe('');
+  });
+
+  it('refuses an edit carrying no --body, before it looks for the pull request', async () => {
+    // The fake holds no pull request 7 here, so a refusal naming the
+    // body is also the reading that the body is checked first.
+    expect(await createFakePrGh().run(['pr', 'edit', '7']))
+      .toEqual(failure('fake gh: pr edit models --body <text> alone, and was handed no body\n'));
+  });
+
+  it('refuses --title, which gh takes and this fake models nothing for', async () => {
+    expect(await withOnePull().run(['pr', 'edit', '7', '--title', 'a new title', '--body', 'x']))
+      .toEqual(failure('fake gh: pr edit does not model flag --title\n'));
+  });
+
+  it('answers the recorded GraphQL failure for a pull request it holds none of, changing no body', async () => {
+    const fake = withOnePull();
+
+    expect(await fake.run(['pr', 'edit', '9', '--body', 'a sentence for the wrong pull request'])).toEqual(
+      failure('GraphQL: Could not resolve to a PullRequest with the number of 9. (repository.pullRequest)\n'),
+    );
+    expect(fake.pull(7)?.body).toBe('');
   });
 });
 

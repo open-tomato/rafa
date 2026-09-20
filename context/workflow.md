@@ -121,3 +121,18 @@ derived: `src/utils/progress.ts` rewrites it whole from the store's `findings`
 rows before every dispatch, so a render over an empty store blanks what a
 session wrote there by hand. The stray `@progress.txt` file has been
 deleted.
+
+### Release
+
+**Versioning and changelog are automated at wrap-up and owned by the loop,
+not by a task.** No plan carries a version-bump or changelog task; the
+loop computes the next version from the plan's declared `release` level or
+its highest change-note level, and rewrites `package.json` and the
+changelog — in loop code, before the wrap-up session is spawned, off a base
+version read with `git show origin/main:<versionFile>` rather than from the
+working tree. The wrap-up agent then polishes the raw notes into one line
+per area and leaves both files unstaged. Loop code verifies that edit,
+restores its own text on any failure, commits `chore: release <version>`
+over those two files alone, pushes, and attaches the entry — or the failure
+sentence — to the PR body. Details at `context/release.md`; config in
+`src/release/setting.ts`.

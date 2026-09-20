@@ -251,7 +251,7 @@ describe('the task reports migration', () => {
     expect(rawQuery<{ name: string }>(root, columns, 'task_reports').map(({ name }) => name))
       .toEqual(COLUMNS);
     expect(tablesOf(root))
-      .toEqual(['blockers', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'preflight', 'report_absences', 'sessions', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'preflight', 'report_absences', 'sessions', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
   });

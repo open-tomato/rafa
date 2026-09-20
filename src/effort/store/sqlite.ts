@@ -37,25 +37,29 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds six tables that are not kinds. Five are filled from task
- * reports: `findings`, `blockers` and `out_of_scope_bugs`, one per list
- * a report carries, `report_absences`, one row per task session whose
- * output held no report to read, and `task_reports`, one row per task
- * session whose output carried one, holding its status. The sixth,
- * `preflight`, holds one row per item a run's preflight checked. The
+ * The file holds eight tables that are not kinds. Six are filled from
+ * task reports: `findings`, `blockers`, `out_of_scope_bugs` and
+ * `changes`, one per list a report carries, `report_absences`, one row
+ * per task session whose output held no report to read, and
+ * `task_reports`, one row per task session whose output carried one,
+ * holding its status. The other two are filled from no report:
+ * `preflight`, one row per item a run's preflight checked, and
+ * `dispatches`, one row per task session the loop spawned. The
  * port's row map names none of them, and nothing in this module reads or
  * writes them. `findings.ts` writes the first, `triage.ts` the next two,
- * `absences.ts` the fourth, `reports.ts` the fifth and `preflight.ts` the
+ * `changes.ts` the fourth, `absences.ts` the fifth, `reports.ts` the
+ * sixth, `preflight.ts` the seventh and `dispatches.ts` the
  * last. `tracker-refs.ts` writes the first as well, setting a filed
  * issue's reference on a row and inserting the row when there is none.
- * `findings.ts`, `triage.ts` and `preflight.ts` write through
- * {@link writeSqliteStore}, as an append does, so a write left with
- * nothing to insert still meets the schema check.
+ * `findings.ts`, `triage.ts`, `changes.ts` and `preflight.ts` write
+ * through {@link writeSqliteStore}, as an append does, so a write left
+ * with nothing to insert still meets the schema check.
  * `absences.ts` always has its one row and opens {@link withSqliteStore}
  * directly, as `tracker-refs.ts` does with the one row it places.
  * `reports.ts` always has its one row too, and passes
  * {@link writeSqliteStore} a count of one, which opens the store as that
- * direct call does. Each table is opened, migrated and closed as every
+ * direct call does, and so does `dispatches.ts`. Each table is opened,
+ * migrated and closed as every
  * kind's table is. Each writer
  * says why its tables have a column per field and their own
  * deduplication keys, where a kind has `row_json` and one key.
@@ -360,6 +364,27 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     flags        TEXT NOT NULL,
     collected_at TEXT NOT NULL
   );
+  `,
+  // Version 8: one row per change note a task report carries, outside the
+  // port's row map. `changes.ts` writes it and says why the entry is its
+  // dedupe key, why `level` and `summary` are NOT NULL, and why no column
+  // holds an outcome.
+  `
+  CREATE TABLE changes (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    level        TEXT NOT NULL
+      CHECK (level IN ('patch', 'minor', 'major', 'none')),
+    area         TEXT CHECK (area <> ''),
+    summary      TEXT NOT NULL CHECK (summary <> ''),
+    collected_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX changes_by_entry
+    ON changes (session_id, level, ifnull(area, ''), summary);
   `,
 ];
 

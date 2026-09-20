@@ -176,6 +176,7 @@ export type {
   PrerequisiteItem,
   PrerequisiteKind,
   PrProvider,
+  ReleaseEnabled,
   StoreBackend,
 } from './config-sections.js';
 export {
@@ -186,6 +187,7 @@ export {
   OUTPUT_MODES,
   PR_PROVIDERS,
   PREREQUISITE_KINDS,
+  RELEASE_AUTO,
   STORE_BACKENDS,
 } from './config-sections.js';
 
@@ -327,6 +329,10 @@ function readLayer(
     prResolveBudget: read('prResolveBudget'),
     boardTrustedAuthors: read('boardTrustedAuthors'),
     roadmapIssue: read('roadmapIssue'),
+    releaseEnabled: read('releaseEnabled'),
+    releaseVersionFile: read('releaseVersionFile'),
+    releaseChangelog: read('releaseChangelog'),
+    releaseHeading: read('releaseHeading'),
   };
   return { layer, problems, extras };
 }

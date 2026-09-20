@@ -214,6 +214,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
     // Starts with; see the note on the PATH warning above.
     expect(run.stdout).toStartWith([
       `${fixture.scratch.repo} (named by --root) is already a rafa project: its .rafa/config.yaml is left as it was.`,
+      'release.enabled is left unset, which reads as auto; run rafa init --release to set it.',
       'Nothing changed.',
       '',
     ].join('\n'));

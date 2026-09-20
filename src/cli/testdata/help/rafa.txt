@@ -15,6 +15,7 @@ Quick start:
   rafa agent vendor tdd-guide
   rafa skill check .claude/skills --project=.
   rafa instinct check .rafa/instincts
+  rafa release status
   rafa init
   rafa doctor
   rafa self-update
@@ -32,6 +33,8 @@ Subjects:
   agent      copy an agent definition into the project; list what a session sees
   skill      check a skills directory; list each tier; demote and backfill it
   instinct   check an instincts directory; list and show its records
+  release    read the release state of the project; tag the release branch's
+             HEAD
 
 Commands:
   init, doctor, self-update, usage, describe

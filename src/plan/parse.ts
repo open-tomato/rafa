@@ -14,6 +14,7 @@
  * stub: my-feature
  * issue: OPT-123
  * spec: .specs/my-feature.md
+ * release: minor
  * ```
  *
  * ```rafa:context
@@ -106,16 +107,29 @@
  * ## The header, measured on bun 1.3.14
  *
  * `Bun.YAML.parse` reads the `rafa:plan` body. A field is usable only
- * as a string holding more than whitespace, and a stub only as one
- * `planStampLine` can stamp. Anything else leaves the field null and is
- * reported as `unusable-field`, because two spellings a plan plausibly
- * writes do not parse to what they say:
+ * as a string holding more than whitespace, a stub only as one
+ * `planStampLine` can stamp, and `release` only as one of
+ * {@link PLAN_RELEASE_LEVELS} exactly as spelled. Anything else leaves
+ * the field null and is reported as `unusable-field`, because two
+ * spellings a plan plausibly writes do not parse to what they say:
  *
  *   - `issue: #42` parses as `issue: null`, since a `#` after a space
  *     opens a YAML comment. Quoted, `"#42"` is the string.
  *   - `issue: 42` and `issue: 042` both parse as the number 42, so a
  *     number is refused rather than turned back into a string that may
  *     not be the one written.
+ *
+ * `release` is the one CLOSED-SET field: it is the version bump the
+ * plan is worth, and a bump has to be one of four words for a caller to
+ * act on it. So `release: Patch` and `release: weekly` are as unusable
+ * as `release: 2`, each reported against the block's opening fence with
+ * the four levels named, rather than carried into the model as text a
+ * later reader would have to refuse again. `none` is the fourth level,
+ * not the absence of one: a plan declaring it says it ships no version
+ * bump, while a plan with no `release` line declares nothing and leaves
+ * the field null. Measured on bun 1.3.14, each of the four levels
+ * parses as the string it spells, `none` included, where `null`,
+ * `Null`, `NULL` and `~` each parse as null.
  *
  * A body that is not YAML throws a `SyntaxError` whose message names no
  * line, and a body that is not a mapping is no header; both are
@@ -148,10 +162,19 @@ export const PLAN_BLOCK_KINDS = ['plan', 'context', 'stage-context'] as const;
 export type PlanBlockKind = (typeof PLAN_BLOCK_KINDS)[number];
 
 /** The fields a `rafa:plan` block answers to. */
-export const PLAN_HEADER_FIELDS = ['stub', 'issue', 'spec'] as const;
+export const PLAN_HEADER_FIELDS = ['stub', 'issue', 'spec', 'release'] as const;
 
-/** One of the three header fields. */
+/** One of the four header fields. */
 export type PlanHeaderField = (typeof PLAN_HEADER_FIELDS)[number];
+
+/**
+ * The version bumps a plan's `release` field answers to, largest last
+ * but for `none`, which is a plan saying it ships no bump at all.
+ */
+export const PLAN_RELEASE_LEVELS = ['patch', 'minor', 'major', 'none'] as const;
+
+/** One of the four release levels a plan can declare. */
+export type PlanReleaseLevel = (typeof PLAN_RELEASE_LEVELS)[number];
 
 /** One header key that names no field. */
 export interface PlanHeaderExtra {
@@ -172,6 +195,13 @@ export interface PlanHeader {
   readonly issue: string | null;
   /** The spec the plan implements, as a path. */
   readonly spec: string | null;
+  /**
+   * The version bump the plan declares, one of
+   * {@link PLAN_RELEASE_LEVELS}, or null for a plan that declares no
+   * `release` at all. `none` is a declaration of its own: it says the
+   * plan ships no bump, where null says the plan said nothing.
+   */
+  readonly release: PlanReleaseLevel | null;
   /** Every key that names no field, retained and acting on nothing. */
   readonly extras: readonly PlanHeaderExtra[];
 }
@@ -319,9 +349,14 @@ function isPlanBlockKind(kind: string): kind is PlanBlockKind {
   return (PLAN_BLOCK_KINDS as readonly string[]).includes(kind);
 }
 
-/** True when `key` names one of the three header fields. */
+/** True when `key` names one of the four header fields. */
 function isHeaderField(key: string): key is PlanHeaderField {
   return (PLAN_HEADER_FIELDS as readonly string[]).includes(key);
+}
+
+/** True when `value` is one of the four release levels, as spelled. */
+function isReleaseLevel(value: string): value is PlanReleaseLevel {
+  return (PLAN_RELEASE_LEVELS as readonly string[]).includes(value);
 }
 
 /** True for a mapping; false for a list, a scalar or null. */
@@ -352,7 +387,7 @@ function planIssue(reason: PlanIssueReason, line: number, text: string): PlanIss
 
 /** A header that says nothing. */
 function emptyHeader(): PlanHeader {
-  return { stub: null, issue: null, spec: null, extras: [] };
+  return { stub: null, issue: null, spec: null, release: null, extras: [] };
 }
 
 /** The line's checkbox and text, or null when it is no task line. */
@@ -511,6 +546,7 @@ function bindBlocks(blocks: readonly RafaBlock[], headings: readonly Heading[]):
 function usableField(field: PlanHeaderField, value: unknown): string | null {
   if (typeof value !== 'string' || value.trim().length === 0) return null;
   if (field === 'stub' && !isStampableStub(value)) return null;
+  if (field === 'release' && !isReleaseLevel(value)) return null;
   return value;
 }
 
@@ -520,12 +556,26 @@ function unusableText(field: PlanHeaderField, value: unknown): string {
   if (value === null) {
     return `${subject} is empty; a value opening with # after a space is a YAML comment unless quoted`;
   }
+  if (field === 'release') {
+    return `${subject} is ${describeValue(value)}, not one of ${PLAN_RELEASE_LEVELS.join(', ')}`;
+  }
   if (typeof value !== 'string') {
     return `${subject} is ${describeValue(value)}, not a string; quote it`;
   }
   if (value.trim().length === 0) return `${subject} is blank`;
   return `${subject} ${JSON.stringify(value)} is no stub a plan stamp can carry `
     + '(letters, digits, ".", "_" and "-")';
+}
+
+/**
+ * The release level among the usable fields, narrowed to the closed set
+ * {@link PlanHeader} holds it as. `usableField` has already refused
+ * every other spelling, so the guard here only tells the type system.
+ */
+function releaseOf(values: ReadonlyMap<PlanHeaderField, string>): PlanReleaseLevel | null {
+  const value = values.get('release');
+  if (value === undefined || !isReleaseLevel(value)) return null;
+  return value;
 }
 
 /** Reads the header fields out of a parsed `rafa:plan` body. */
@@ -548,6 +598,7 @@ function readFields(document: Mapping, line: number): HeaderReading {
     stub: values.get('stub') ?? null,
     issue: values.get('issue') ?? null,
     spec: values.get('spec') ?? null,
+    release: releaseOf(values),
     extras,
   };
   return { header, issues };

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the thirty-nine registered so far wrap a
+ * of each is its command. Five of the forty-one registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -39,7 +39,9 @@
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
  * the six `pr` actions, which read, merge and triage one repository's
  * pull requests through the PullRequests port and share
- * `pr/pr-context.ts`.
+ * `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * read the version file, the changelog and the repository's tags
+ * through `src/release/` and share `release/status.ts`'s readers.
  *
  * ## What is registered
  *
@@ -90,6 +92,15 @@
  *     write, the draft proposals one session per twenty files answers,
  *     and the reviewed rows written and derived over, exiting with the
  *     rows and files it refused.
+ *   - `release status [--plan=<stub>]`, the version the version file
+ *     declares, the latest release tag by semantic version precedence,
+ *     the versions the changelog calls released that carry no tag, and
+ *     the change notes pending for the current plan, writing nothing;
+ *     and `release tag`, the one write of the subject, which puts
+ *     `v<version>` on the release branch's HEAD and prints the push and
+ *     publish lines rather than running them, refusing on another
+ *     branch, on a tag already there, and where the two release files
+ *     disagree.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -106,7 +117,7 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the nine with an action registered: a subject with
+ * The subjects are the ten with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index`,
  * `instinct flag` and `instinct promote` are in the command tree and
  * are not registered, because nothing dispatches them yet.
@@ -149,6 +160,8 @@ import prMerge from './pr/merge.js';
 import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
+import releaseStatus from './release/status.js';
+import releaseTag from './release/tag.js';
 import selfUpdate from './self-update.js';
 import skillBackfill from './skill/backfill.js';
 import skillCheck from './skill/check.js';
@@ -167,6 +180,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list and show its records' },
+  { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
 ]);
 
 /** The core commands, in roster order. */
@@ -205,6 +219,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctCheck,
   instinctList,
   instinctShow,
+  releaseStatus,
+  releaseTag,
   init,
   doctor,
   selfUpdate,
