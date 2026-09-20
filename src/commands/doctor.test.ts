@@ -474,6 +474,55 @@ describe('the preflight it prints', () => {
   });
 });
 
+describe('the plan\'s start-only [start] items', () => {
+  /** A `[start]` probe that fails, as a plan names the state a run begins from. */
+  const START_PROBE = 'echo "sibling checkout unclean" >&2; exit 1';
+
+  /** The PREREQUISITES text of a plan with one failing `[start]` item. */
+  const START_PREREQUISITES = [
+    '# Prerequisites',
+    '',
+    `- [ ] [start] Sibling clean: \`${START_PROBE}\``,
+    '',
+  ].join('\n');
+
+  it('names a failed [start] item of the plan on a first dispatch, beside a control whose tracker already holds a ticked task', async () => {
+    const dispatch = plantWorld();
+    plant(dispatch.root, '.plans/PLAN-start.md', '# Plan\n\n- [ ] A task\n');
+    plant(dispatch.root, '.plans/PREREQUISITES-start.md', START_PREREQUISITES);
+
+    const resume = plantWorld();
+    plant(resume.root, '.plans/PLAN-start.md', '# Plan\n\n- [ ] A task\n');
+    plant(resume.root, '.plans/PREREQUISITES-start.md', START_PREREQUISITES);
+    plant(resume.root, '.plans/PLAN_TRACKER-start.md', '# Plan\n\n- [x] A task\n');
+
+    const first = await doctor(dispatch, ['--plan=.plans/PLAN-start.md']);
+    const resumed = await doctor(resume, ['--plan=.plans/PLAN-start.md']);
+
+    // A first dispatch has no tracker yet, so the plan's [start] item is
+    // probed like any other required item, and its failure halts the run,
+    // naming the item, its probe and its exit code with the stderr line.
+    expect(first.exitCode).toBe(1);
+    expect(first.stderr).toBe([
+      'rafa doctor: preflight halted: 1 required item failed',
+      `  tool "Sibling clean: \`${START_PROBE}\`": probe \`${START_PROBE}\` exited 1: sibling checkout unclean`,
+      'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
+      '',
+    ].join('\n'));
+    expect(lines(first.stdout)).toContain(
+      `  fail    required tool "Sibling clean: \`${START_PROBE}\`", probe \`${START_PROBE}\`, 0 ms`,
+    );
+
+    // The control's tracker already holds a ticked task, so this is a
+    // resume: the same [start] item is not this run's to probe, and its
+    // failing probe never runs, never appears in the report and never
+    // halts.
+    expect(resumed.exitCode).toBe(0);
+    expect(resumed.stderr).toBe('');
+    expect(resumed.stdout).not.toContain('Sibling clean');
+  });
+});
+
 describe('its refusals', () => {
   /** Seams whose runner throws, so a refusal is seen to check nothing. */
   const NO_PROBE: DoctorSeams = {
