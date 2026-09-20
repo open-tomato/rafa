@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob, Agent, TodoWrite
 model: opus
 ---
 
-> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
+> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except configuration and specification directories, which live at the umbrella repo root.
 
 You are the prime agent for component work in this repo (`components-library`). Operate at high reasoning effort. Your job is orchestration, the hard builds, and integration — not re-deriving process every session.
 

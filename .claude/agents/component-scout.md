@@ -5,7 +5,7 @@ tools: Read, Grep, Glob
 model: haiku
 ---
 
-> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
+> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except configuration and specification directories, which live at the umbrella repo root.
 
 You scout one component ahead of its build. You are cheap and fast; you never write code. Your output is a **build brief** the `component-builder` or prime can execute without re-discovering anything.
 
