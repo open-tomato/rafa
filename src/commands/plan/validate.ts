@@ -28,6 +28,13 @@
  * that task's dispatch with exit code 1 before any model call, so a plan
  * carrying one does not run however well it parses.
  *
+ * The tasks checked are the ones the DISPATCHER will reach rather than
+ * the ones the model holds, so a task line a `rafa:*` block the plan
+ * never closed hides is checked as well, against the line it sits on.
+ * Such a line is no task of the model — it is reported as a
+ * `task-in-block` issue, and counted under none of the checkboxes
+ * `tasks` counts — while `findNextTask` dispatches it all the same.
+ *
  * The roster is resolved against the project the dispatcher found from
  * the working directory and the config that resolves there, whose
  * `loop.settingSources` decides whether `~/.claude/agents` is in reach.

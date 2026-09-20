@@ -319,6 +319,37 @@ describe('the agents rafa plan validate checks', () => {
     });
   });
 
+  it('checks the agent of a task line a never-closed fence hides, which the dispatcher would run anyway', async () => {
+    const hidden = [
+      '# Plan: hidden',
+      '',
+      '```rafa:context',
+      'Context the fence never closes.',
+      '',
+      '- [ ] Write the tests  {agent=tdd-guide}',
+      '',
+    ].join('\n');
+    // The control differs in the closing fence alone, which puts the same line outside every block.
+    const closedFence = hidden.replace('Context the fence never closes.', 'Context the fence closes.\n```');
+
+    const run = await validateIn(plantRoutedProject(hidden));
+    const control = await validateIn(plantRoutedProject(closedFence));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toContain(
+      'error: plan.md: agent "tdd-guide" (line 6) resolves under no loaded scope:'
+        + ' no definition under ~/.claude/agents to vendor',
+    );
+    expect(run.stderr).toBe('❌ plan.md: 2 issues, 1 unresolvable agent; the plan does not read as written\n');
+
+    expect(control.exitCode).toBe(1);
+    expect(control.stdout).toContain(
+      'error: plan.md: agent "tdd-guide" (line 7) resolves under no loaded scope:'
+        + ' no definition under ~/.claude/agents to vendor',
+    );
+    expect(control.stderr).toBe('❌ plan.md: 1 unresolvable agent; no session would be dispatched\n');
+  });
+
   it('reads the loop.settingSources of the project config, which can bring the home into reach', async () => {
     const withoutUser = plantRoutedProject('- [ ] Write the tests  {agent=tdd-guide}\n');
     const withUser = plantRoutedProject(

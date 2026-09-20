@@ -35,6 +35,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { findNextTask } from '../utils/tracker.js';
+
 import {
   BUILT_IN_AGENTS,
   BUILT_IN_AGENTS_CLI_VERSION,
@@ -345,6 +347,41 @@ describe('planAgentUses', () => {
     ]);
   });
 
+  it('reads the lines a rafa:* block never closed hides, as the dispatcher reads them', () => {
+    const markdown = [
+      '- [ ] Write the module  {agent=loop-implementer}',
+      '```rafa:context',
+      'Context prose the fence never closes.',
+      '',
+      '- [ ] Write the tests  {agent=tdd-guide}',
+      '- [BLOCKED] Repair the gate  {agent=build-error-resolver}',
+      '',
+    ].join('\n');
+
+    expect(planAgentUses(markdown)).toEqual([
+      { name: 'loop-implementer', lines: [1] },
+      { name: 'tdd-guide', lines: [5] },
+      { name: 'build-error-resolver', lines: [6] },
+    ]);
+    // The dispatcher over the same document: the blocked line the fence hides, at line 6.
+    expect(findNextTask(markdown)).toMatchObject({ task: 'Repair the gate  {agent=build-error-resolver}', lineNum: 5 });
+  });
+
+  it('leaves a line a CLOSED block holds out, the near miss the dispatcher also skips', () => {
+    const markdown = [
+      '- [ ] Write the module  {agent=loop-implementer}',
+      '```rafa:context',
+      'Context prose the fence closes.',
+      '',
+      '- [ ] Write the tests  {agent=tdd-guide}',
+      '```',
+      '',
+    ].join('\n');
+
+    expect(planAgentUses(markdown)).toEqual([{ name: 'loop-implementer', lines: [1] }]);
+    expect(findNextTask(markdown)).toMatchObject({ task: 'Write the module  {agent=loop-implementer}', lineNum: 0 });
+  });
+
   it('answers nothing for a document with no task line at all', () => {
     expect(planAgentUses('# Plan: nothing to do\n')).toEqual([]);
   });
@@ -379,6 +416,28 @@ describe('missingPlanAgents', () => {
     ].join('\n');
 
     expect(missingPlanAgents(markdown, resolveAgentRoster(roots, WITHOUT_USER))).toEqual([]);
+  });
+
+  it('names an agent only a line behind a never-closed fence asks for, with that line', () => {
+    const roots = freshRoots();
+    plantAgent(roots.home, 'tdd-guide');
+    const hidden = [
+      '- [ ] Write the module  {agent=Explore}',
+      '```rafa:context',
+      'Context prose the fence never closes.',
+      '',
+      '- [ ] Write the tests  {agent=tdd-guide}',
+      '',
+    ].join('\n');
+    const closed = hidden.replace('Context prose the fence never closes.', 'Context prose that closes.\n```');
+
+    expect(missingPlanAgents(hidden, resolveAgentRoster(roots, WITHOUT_USER))).toEqual([
+      { name: 'tdd-guide', lines: [5], fix: 'rafa agent vendor tdd-guide' },
+    ]);
+    // The same line one line lower, outside the block the fence now closes: named there too.
+    expect(missingPlanAgents(closed, resolveAgentRoster(roots, WITHOUT_USER))).toEqual([
+      { name: 'tdd-guide', lines: [6], fix: 'rafa agent vendor tdd-guide' },
+    ]);
   });
 
   it('stops naming an agent the sources bring into reach', () => {

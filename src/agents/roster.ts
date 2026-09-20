@@ -86,6 +86,21 @@
  * carries the lines that asked for it, counting from one, as
  * `PlanIssue.line` counts.
  *
+ * The lines read are the ones the DISPATCHER will reach, not the ones
+ * the plan reads as: `PlanModel.hiddenTasks` is read beside
+ * `PlanModel.tasks`, so a task line a `rafa:*` block the document never
+ * closed hides is checked like any other. `findNextTask` dispatches
+ * such a line — an unclosed fence runs to the end of the document,
+ * which is where a plan's remaining tasks sit (`utils/tracker.ts`) — so
+ * a name only it asks for would otherwise stop the run one task in,
+ * with the dispatch exiting 1 before any model call, which is the
+ * failure this module exists to move ahead of the run. A line inside a
+ * block that CLOSES is not read here, because the dispatcher skips it
+ * too. The two lists are merged by line, so a name is reported against
+ * the line that asked for it either way, and the caller names the
+ * document: `start/preflight.ts` the checklist it read, `rafa plan
+ * validate` the file as typed.
+ *
  * Nothing here throws, and nothing here spawns the CLI. An unreadable
  * directory, an unreadable file, a file with no frontmatter and one
  * whose frontmatter carries no usable `name` are each passed over, so a
@@ -325,12 +340,16 @@ export function vendorFixCommand(roster: AgentRoster, name: string): string | nu
  * each with the lines that asked, counting from one, in the order they
  * were first named. Reads a plan and a tracker alike: both are the
  * checklist `parsePlan` reads, and a ticked line is skipped because its
- * dispatch is behind the run rather than ahead of it.
+ * dispatch is behind the run rather than ahead of it. The lines a block
+ * never closed hides are read too, the way `findNextTask` reads them;
+ * see the module note.
  */
 export function planAgentUses(markdown: string): readonly AgentUse[] {
   const lines = new Map<string, number[]>();
+  const model = parsePlan(markdown);
+  const dispatchable = [...model.tasks, ...model.hiddenTasks].sort((a, b) => a.lineNum - b.lineNum);
 
-  for (const task of parsePlan(markdown).tasks) {
+  for (const task of dispatchable) {
     if (task.status === 'done') continue;
 
     const name = task.declaration?.agent ?? null;
