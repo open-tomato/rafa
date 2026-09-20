@@ -564,6 +564,36 @@ describe('a public bug', () => {
   });
 });
 
+describe('bug identity keyed by artifact and tracker file', () => {
+  it('two reports of one defect worded differently under one artifact and one file: the second comments on the issue the first filed', async () => {
+    const f = fixture();
+    await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
+
+    const result = await triage(f, reportWith({
+      feedback: 'Seen again while wiring the loop.',
+      outOfScopeBugs: [bug('Loop wiring loses the last line too', ARTIFACT, false)],
+    }), { dispatch: SECOND });
+
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', problem: null });
+    expect(issueFiles(f.publicDir)).toHaveLength(1);
+  });
+
+  it('control: two different defects that share an artifact string across two tracker files stay two issues', async () => {
+    const f = fixture();
+    const secondTrackerPath = join(f.root, 'PLAN_TRACKER-other.md');
+    writeFileSync(secondTrackerPath, TRACKER_TEXT, 'utf8');
+
+    await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
+
+    const result = await triage(f, reportWith({
+      outOfScopeBugs: [bug('Unrelated crash sharing the same message', ARTIFACT, false)],
+    }), { dispatch: SECOND, trackerPath: secondTrackerPath });
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', foundBy: null });
+    expect(issueFiles(f.publicDir)).toHaveLength(2);
+  });
+});
+
 describe('a security bug', () => {
   /** A finding under the artifact, so a reference write would have a row to attach to. */
   function seedFinding(root: string): void {
