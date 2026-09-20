@@ -366,10 +366,14 @@ module's note is the long form.
   reads no `origin` at all (`src/pr/preflight-items.ts`). Every item goes
   through `runPreflight` in the project root with the context's
   environment, an optional failure warned about as `loop start` warns. A
-  plan's start-only `[start]` items are the one set left out: `loop start`
-  probes that tier on a first dispatch alone, off the tracker beside the
-  plan, and this command reads no tracker, so none of them reaches this
-  report. It generates no run id and writes no
+  plan's start-only `[start]` items are checked between the provider's
+  items and the configured required tier, where `runStartPreflight` puts
+  them, on a FIRST DISPATCH alone: this command reads that one bit the way
+  a run does, `isFirstDispatch` off the `PLAN_TRACKER-<stub>.md` beside
+  the plan (`src/preflight/first-dispatch.ts`), which starts no run and
+  writes nothing. A resume checks none of them, and prints one line
+  saying how many of the plan's it passed over and which tracker decided
+  it. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
   refusal, and 0 otherwise. Then, on a repository whose provider is

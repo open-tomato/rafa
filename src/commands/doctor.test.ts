@@ -59,6 +59,23 @@
  * reddened 8; the fix line dropped, so a board with gaps names no way
  * to fill them, reddened 3.
  *
+ * ## The plan's start-only items
+ *
+ * Their cases plant a plan, the PREREQUISITES file beside it holding one
+ * `[start]` item, and, for a resume, the `PLAN_TRACKER-<stub>.md` beside
+ * them, so the tier is read off a tracker of the case's own. Each sits
+ * beside a control differing in that tracker alone: none at all for a
+ * first dispatch, one whose every box is open for a run that dispatched
+ * nothing that finished, and one holding a ticked task for a resume.
+ *
+ * Three mutations of `src/commands/doctor.ts` were driven against them
+ * on 2026-09-20, the file run alone on a baseline of 32 pass and
+ * restored from a scratch copy verified with `shasum -c`: the
+ * `isFirstDispatch` reading dropped, so every run probes the tier,
+ * reddened 4 cases; the tier dropped from the required list, as it was
+ * before it was wired, reddened 4; and the line a resume prints dropped
+ * reddened 2.
+ *
  * ## Spawned
  *
  * One case runs `bun src/rafa.ts doctor` in two scratch repositories
@@ -478,6 +495,13 @@ describe('the plan\'s start-only [start] items', () => {
   /** A `[start]` probe that fails, as a plan names the state a run begins from. */
   const START_PROBE = 'echo "sibling checkout unclean" >&2; exit 1';
 
+  /**
+   * That item as a line names it: the whole description, the probe
+   * included, through the `JSON.stringify` the runner quotes a name
+   * with, which escapes the quotes the probe itself carries.
+   */
+  const START_ITEM = JSON.stringify(`Sibling clean: \`${START_PROBE}\``);
+
   /** The PREREQUISITES text of a plan with one failing `[start]` item. */
   const START_PREREQUISITES = [
     '# Prerequisites',
@@ -505,12 +529,12 @@ describe('the plan\'s start-only [start] items', () => {
     expect(first.exitCode).toBe(1);
     expect(first.stderr).toBe([
       'rafa doctor: preflight halted: 1 required item failed',
-      `  tool "Sibling clean: \`${START_PROBE}\`": probe \`${START_PROBE}\` exited 1: sibling checkout unclean`,
+      `  tool ${START_ITEM}: probe \`${START_PROBE}\` exited 1: sibling checkout unclean`,
       'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
       '',
     ].join('\n'));
     expect(lines(first.stdout)).toContain(
-      `  fail    required tool "Sibling clean: \`${START_PROBE}\`", probe \`${START_PROBE}\`, 0 ms`,
+      `  fail    required tool ${START_ITEM}, probe \`${START_PROBE}\`, 0 ms`,
     );
 
     // The control's tracker already holds a ticked task, so this is a
@@ -520,6 +544,130 @@ describe('the plan\'s start-only [start] items', () => {
     expect(resumed.exitCode).toBe(0);
     expect(resumed.stderr).toBe('');
     expect(resumed.stdout).not.toContain('Sibling clean');
+  });
+
+  /** A `[start]` probe that passes, for the cases about how the tier is read. */
+  const CLEAN_PROBE = 'exit 0';
+
+  /** The PREREQUISITES text of a plan with one passing `[start]` item. */
+  const CLEAN_PREREQUISITES = [
+    '# Prerequisites',
+    '',
+    `- [ ] [start] The sibling checkout is clean: \`${CLEAN_PROBE}\``,
+    '',
+  ].join('\n');
+
+  /** That item as a check line of a report that probed it. */
+  const CLEAN_LINE = `  pass    required tool "The sibling checkout is clean: \`${CLEAN_PROBE}\`",`
+    + ` probe \`${CLEAN_PROBE}\`, 0 ms`;
+
+  /** The plan every world below holds, as the line names it. */
+  const PLAN_FLAG = '--plan=.plans/PLAN-start.md';
+
+  /** A tracker of that plan holding one ticked task, which makes the next run a resume. */
+  const TICKED_TRACKER = '# Plan\n\n- [x] A task\n';
+
+  /** The head line of such a world, for `checked`. */
+  function planHead(checked: string): string {
+    return `Preflight for .plans/PLAN-start.md, with PREREQUISITES-start.md merged in: ${checked}, no run started.`;
+  }
+
+  /** A world holding that plan and `prerequisites`, with `tracker` beside them when one is given. */
+  function plantPlanWorld(config: readonly string[] = [], tracker: string | null = null): World {
+    const world = plantWorld(config);
+    plant(world.root, '.plans/PLAN-start.md', '# Plan\n\n- [ ] A task\n');
+    plant(world.root, '.plans/PREREQUISITES-start.md', CLEAN_PREREQUISITES);
+    if (tracker !== null) plant(world.root, '.plans/PLAN_TRACKER-start.md', tracker);
+    return world;
+  }
+
+  /** The line a resume writes for the items it passed over. */
+  const SKIPPED_LINE = 'PLAN_TRACKER-start.md already holds a ticked task, so 1 start-only item of the plan'
+    + ' went unchecked: rafa loop start probes that tier on a first dispatch alone.';
+
+  it('names the tracker and how many start-only items a resume passed over, where a first dispatch checks them', async () => {
+    const world = plantPlanWorld();
+    const resume = plantPlanWorld([], TICKED_TRACKER);
+    const untickedTracker = plantPlanWorld([], '# Plan\n\n- [ ] A task\n');
+
+    const first = await doctor(world, [PLAN_FLAG]);
+    const resumed = await doctor(resume, [PLAN_FLAG]);
+    const unticked = await doctor(untickedTracker, [PLAN_FLAG]);
+
+    expect(first.exitCode).toBe(0);
+    expect(lines(first.stdout)).toEqual([
+      VERSION_LINE,
+      planHead('1 item checked'),
+      CLEAN_LINE,
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(world),
+    ]);
+
+    // The control has run before and ticked a task, so the item is not
+    // this run's to probe: it is checked, counted and named nowhere but
+    // the one line saying how many were passed over and what said so.
+    expect(resumed.exitCode).toBe(0);
+    expect(lines(resumed.stdout)).toEqual([
+      VERSION_LINE,
+      planHead('nothing to check'),
+      SKIPPED_LINE,
+      'Preflight passed: rafa loop start would go on to its first session.',
+      aheadLine(resume),
+    ]);
+
+    // A tracker whose every box is open is a run that dispatched nothing
+    // that finished, which is a first dispatch still: the reading is the
+    // tick, not the file being there.
+    expect(lines(unticked.stdout)).toContain(CLEAN_LINE);
+    expect(unticked.stdout).not.toContain('already holds a ticked task');
+  });
+
+  it('checks them between the provider items and the configured required tier, where a resume checks that tier alone', async () => {
+    const world = plantPlanWorld(requiredTool('exit 0'));
+    const resume = plantPlanWorld(requiredTool('exit 0'), TICKED_TRACKER);
+    const seams = ghSeams(() => GITHUB_ORIGIN);
+    const ghLines = [
+      `  pass    required tool "gh", probe \`${probeOf(ghOnPathItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+      `  pass    required service "https://${DEFAULT_GH_HOST}", probe \`${probeOf(ghAuthItem(DEFAULT_GH_HOST))}\`, 0 ms`,
+    ];
+
+    const first = await doctor(world, [PLAN_FLAG], { seams });
+    const resumed = await doctor(resume, [PLAN_FLAG], { seams });
+
+    expect(first.exitCode).toBe(0);
+    expect(lines(first.stdout).slice(1, 6)).toEqual([
+      planHead('4 items checked, 2 of them for the pull request provider'),
+      ...ghLines,
+      CLEAN_LINE,
+      '  pass    required tool "needed", probe `exit 0`, 0 ms',
+    ]);
+    expect(first.stdout).not.toContain('already holds a ticked task');
+    expect(resumed.exitCode).toBe(0);
+    expect(lines(resumed.stdout).slice(1, 5)).toEqual([
+      planHead('3 items checked, 2 of them for the pull request provider'),
+      ...ghLines,
+      '  pass    required tool "needed", probe `exit 0`, 0 ms',
+    ]);
+    expect(lines(resumed.stdout)).toContain(SKIPPED_LINE);
+  });
+
+  it('gives the tier as json data, counting what a resume passed over beside the tracker that decided it', async () => {
+    const world = plantPlanWorld();
+    const resume = plantPlanWorld([], TICKED_TRACKER);
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    const first = await doctor(world, [PLAN_FLAG, '--output=json']);
+    const resumed = await doctor(resume, [PLAN_FLAG, '--output=json']);
+
+    expect(first.exitCode).toBe(0);
+    expect(dataOf(first.stdout)?.startTier).toEqual({ checked: 1, skipped: 0, tracker: null });
+    expect(dataOf(first.stdout)?.checks.map((check) => [check.tier, check.outcome])).toEqual([['required', 'pass']]);
+    expect(resumed.exitCode).toBe(0);
+    expect(dataOf(resumed.stdout)?.startTier).toEqual({ checked: 0, skipped: 1, tracker: 'PLAN_TRACKER-start.md' });
+    expect(dataOf(resumed.stdout)?.checks).toEqual([]);
   });
 });
 
