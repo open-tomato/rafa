@@ -12,6 +12,13 @@
  * runs arrive in phase 6, and `start/run-config.ts` refuses it until
  * then, before anything else is read.
  *
+ * `--create-branch` is read by `src/start.ts` ahead of its branch guard,
+ * and only on `main` or `master`: it answers yes to the question the run
+ * would otherwise ask a terminal (`start/branch.ts`). It is declared
+ * beside `--any-branch` because the two are the pair an operator on the
+ * base chooses between — leave the base, or stay on it deliberately —
+ * and `--any-branch` outranks it.
+ *
  * `--runtime=<path|version>` is read by `start/runtime.ts`, right after
  * that refusal. A `--runtime` typed ahead of the subject is read by the
  * dispatcher into the context's `flags` and left out of its `argv`, the
@@ -37,8 +44,10 @@ const wrapped = wrapPhaseZeroCommand({
     + ' `--plan` it runs `PLAN.md` in `plan.dir`, `.rafa/plans` unless the config names another, or'
     + ' `PLAN.md` at the project root when that one does not exist. Before any session it checks the'
     + ' prerequisites the config and the plan\'s `PREREQUISITES-<stub>.md` name, halting when a required'
-    + ' one fails and naming each failed optional one known-missing in every task prompt. It refuses to'
-    + ' run on `main` or `master`. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
+    + ' one fails and naming each failed optional one known-missing in every task prompt. Started on'
+    + ' `main` or `master` it offers to create the plan\'s `feat/<stub>` from the latest'
+    + ' `origin/<base>` and run there, `--create-branch` answering that without asking, and refuses'
+    + ' the run when the offer is not taken. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
     + ' the plan, the branch, the pid, the start, the state and the running task. It refuses a plan whose'
     + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
     + ' `resume`, `status` and `list` reach the run through that record. A run holds its terminal: until'
@@ -88,6 +97,14 @@ const wrapped = wrapPhaseZeroCommand({
         + ' 0 spends none and still reports the verdict.',
       type: 'number',
       default: DEFAULT_CI_ATTEMPTS,
+    },
+    {
+      name: 'create-branch',
+      description: 'On `main` or `master`, creates `feat/<plan-stub>` from the latest `origin/<base>`'
+        + ' and runs the plan there without asking, or switches to that branch when it already'
+        + ' exists. Refuses rather than move when a tracked file is modified, the fetch fails or the'
+        + ' base has diverged from its remote.',
+      type: 'boolean',
     },
     {
       name: 'any-branch',

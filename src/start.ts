@@ -40,6 +40,20 @@
  * `start` with the run's other words and waited for, and its exit code is
  * this run's.
  *
+ * Ahead of the branch guard, a run started on `main` or `master` is
+ * offered the plan's own branch ({@link resolveRunBranch},
+ * `start/branch.ts`): with a terminal it is asked whether to create
+ * `feat/<plan-stub>` from the latest `origin/<base>` and run there, or
+ * whether to switch to that branch when it already exists, and
+ * `--create-branch` answers yes without asking. A run that moved carries
+ * the new branch into the guard and into the session record below, so
+ * neither reads the base the run started on. Nothing is offered under
+ * `--any-branch`, for a plan whose file names no stub, or with no
+ * terminal and no flag, and the guard then has the last word as it
+ * always did. Every refusal along the way — a modified tracked file, a
+ * fetch that failed, a base that has diverged — is thrown from there as
+ * exit code 1, and leaves the run on its base.
+ *
  * Once the branch guard lets the run through, and before anything else is
  * printed or checked, the run opens its session (`start/session.ts`): it
  * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
@@ -108,6 +122,12 @@
  * --runtime     the installed rafa the run goes on in: a version under
  *               `~/.rafa/runtime/`, or a path to a `cli.js` or its directory
  *               (`start/runtime.ts`).
+ * --create-branch on `main` or `master`, create `feat/<plan-stub>` from the
+ *               latest `origin/<base>` and run there without asking, or
+ *               switch to that branch when it is already there
+ *               (`start/branch.ts`). Read nowhere else.
+ * --any-branch  run where the loop stands, whatever branch that is: no
+ *               offer is made and the guard below checks nothing.
  * --no-ci-wait  finish at the push instead of waiting for CI.
  * --ci-timeout  minutes to wait for checks to settle (default 20).
  * --ci-attempts repair sessions to spend on a red or conflicting PR
@@ -146,7 +166,9 @@
  * never by `process.exit`, so the dispatcher writes the terminal event.
  * A line asking for `-d|--detached`, refused before anything else is
  * read (`start/run-config.ts`), a `--runtime` refused (`start/runtime.ts`),
- * an unusable config, a plan file that does not exist, a default branch,
+ * an unusable config, a plan file that does not exist, a branch offer
+ * that could not be taken (`start/branch.ts`), a default branch the run
+ * stayed on,
  * a session record refusing the run or session records that cannot be
  * read or written, and a preflight that halts (a failed required
  * prerequisite, a PREREQUISITES file that cannot be read, or checks the
@@ -166,6 +188,7 @@
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
+import type { BranchSeams } from './start/branch.js';
 
 import fs from 'fs';
 import { homedir } from 'os';
@@ -176,6 +199,8 @@ import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { resolvePrProvider } from './pr/index.js';
+import { branchNameFor, REMOTE } from './start/branch-decision.js';
+import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './start/branch.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
 import { finishCleanExit } from './start/commit.js';
 import {
@@ -214,8 +239,91 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let interrupted = false;
 
-/** Branches a plan run is refused on. */
+/** Branches a plan run is refused on, and the ones the branch offer is made on. */
 const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
+
+/** The flag that runs the loop where it stands, offering nothing and checking nothing. */
+const ANY_BRANCH_FLAG = '--any-branch';
+
+/** The flag that answers the branch question yes before it is asked. */
+const CREATE_BRANCH_FLAG = '--create-branch';
+
+/** What the refusal calls a plan whose file names no stub. */
+const UNNAMED_PLAN = 'this-plan';
+
+/** What the run knows about its branch when the offer is made. */
+export interface RunBranchRequest {
+  /** The project root git is run in. */
+  readonly repoRoot: string;
+  /** The plan's stub, or null when the plan path gave none. */
+  readonly planStub: string | null;
+  /** The branch the run was started on. */
+  readonly base: string;
+  /** The words of the run's line, which the two branch flags are read from. */
+  readonly args: readonly string[];
+}
+
+/**
+ * The branch the rest of the run reads: the one it was started on, or
+ * the plan's own branch once the offer to leave the base has been made
+ * and taken.
+ *
+ * The offer is only made on a branch {@link DEFAULT_BRANCHES} names,
+ * which is exactly the set {@link guardRunBranch} refuses. Everywhere
+ * else the run is already on a branch of its own and there is nothing to
+ * offer, so no git runs and no question is asked — a run on
+ * `feat/<stub>` costs this function one array lookup.
+ *
+ * On the base, `start/branch.ts` has the whole of it: which question is
+ * asked, what `--create-branch` stands in for, and which refusal a
+ * modified tracked file, a failed fetch or a diverged base throws. Only
+ * a `moved` outcome answers a new branch; `stood-aside` and `declined`
+ * both answer the base, and the guard then refuses or lets it through
+ * exactly as it did before this offer existed.
+ *
+ * The answer is the branch handed to BOTH {@link guardRunBranch} and
+ * `openRunSession`, so a run that moved is guarded on, and records, the
+ * branch it is actually on.
+ */
+export async function resolveRunBranch(
+  request: RunBranchRequest,
+  seams: BranchSeams = DEFAULT_BRANCH_SEAMS,
+): Promise<string> {
+  const { args, base } = request;
+  if (!DEFAULT_BRANCHES.includes(base)) return base;
+
+  const outcome = await offerRunBranch({
+    repoRoot: request.repoRoot,
+    planStub: request.planStub,
+    base,
+    anyBranch: args.includes(ANY_BRANCH_FLAG),
+    createBranch: args.includes(CREATE_BRANCH_FLAG),
+  }, seams);
+
+  return outcome.kind === 'moved'
+    ? outcome.branch
+    : base;
+}
+
+/**
+ * The middle of the refusal: how to get onto the plan's branch. Named
+ * after the plan's stub when there is one, and the `git` line when there
+ * is not; see {@link guardRunBranch}.
+ */
+function branchOffer(planStub: string | null, base: string): readonly string[] {
+  if (planStub === null) {
+    return [
+      `\n   git checkout -b ${branchNameFor(UNNAMED_PLAN)}`,
+      `   ${CREATE_BRANCH_FLAG} names the branch after the plan's stub, as`,
+      '   `PLAN-<stub>.md` spells it, and this plan file spells none.',
+    ];
+  }
+  return [
+    `\n   Pass ${CREATE_BRANCH_FLAG} to create ${branchNameFor(planStub)} from the latest`,
+    `   ${REMOTE}/${base} and run there.`,
+    '   On a terminal the run asks that as a question instead of refusing.',
+  ];
+}
 
 /**
  * Refuses to run a plan on the default branch, and warns on a branch
@@ -232,6 +340,16 @@ const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
  * produced at the time was silence, and a warning in a loop nobody
  * watches is the same silence one line longer. `--any-branch` is the
  * whole of the escape hatch, so an operator who means it says so once.
+ *
+ * What the refusal offers depends on whether the plan's file named a
+ * stub, because that is what `--create-branch` builds the branch name
+ * out of ({@link resolveRunBranch}). With a stub the refusal names the
+ * flag and the branch it would create, since passing it is all the
+ * operator has to do. With none — a plain `PLAN.md` — the flag would
+ * stand aside on the next run too, so the refusal says so and prints the
+ * `git` line instead of naming a flag that could not help. A refusal
+ * naming a flag that does nothing is the failure this branch exists to
+ * avoid.
  *
  * The branch-names-the-plan check is only a WARNING, and deliberately.
  * A branch stub is not a plan stub — measured across eleven
@@ -250,20 +368,19 @@ export function guardRunBranch(
   branch: string,
   args: readonly string[],
 ): void {
-  if (args.includes('--any-branch')) {
-    activeOutput().warn(`\n⚠️  --any-branch: running on \`${branch}\` without the branch check.`);
+  if (args.includes(ANY_BRANCH_FLAG)) {
+    activeOutput().warn(`\n⚠️  ${ANY_BRANCH_FLAG}: running on \`${branch}\` without the branch check.`);
     return;
   }
 
   if (DEFAULT_BRANCHES.includes(branch)) {
-    const name = planStub ?? 'this-plan';
     throw new CommandExit(1, [
       `\n❌ Refusing to run a plan on \`${branch}\`.`,
       '   A plan run needs its own branch: that is what gives it a PR to',
       '   review, and what lets the wrap-up\'s CI stage have something to',
       '   wait on. Run on main and both are silently skipped.',
-      `\n   git checkout -b feat/${name}`,
-      '\n   Pass --any-branch to run here anyway.',
+      ...branchOffer(planStub, branch),
+      `\n   Pass ${ANY_BRANCH_FLAG} to run here anyway.`,
     ].join('\n'));
   }
 
@@ -319,7 +436,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   }
 
   const planStub = planStubFromPath(planPath);
-  const branch = getCurrentBranch();
+  // Ahead of the guard: on `main` or `master` the run offers to create or
+  // switch to `feat/<stub>` and take it (`start/branch.ts`). What it
+  // answers is the branch the guard reads and the branch the session
+  // record below names, so a run that moved is never guarded on, and never
+  // records, the base it started from.
+  const branch = await resolveRunBranch({
+    repoRoot,
+    planStub,
+    base: getCurrentBranch(),
+    args,
+  });
   guardRunBranch(planStub, branch, args);
   setActivePlanStub(planStub);
 
