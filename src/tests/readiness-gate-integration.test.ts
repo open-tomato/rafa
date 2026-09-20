@@ -31,9 +31,12 @@
  * plan and prerequisites files a not-ready run removes sit under this
  * file's own temporary directory.
  */
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { IssueBoard } from '../board/issue-board.js';
+import type { SpecIssue } from '../board/issue.js';
 import type { ReadinessGap } from '../board/readiness.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
+import type { GitRunner } from '../pr/git.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,6 +51,9 @@ import {
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,
 } from '../board/gate.js';
+import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from '../board/issue.js';
+import { specPath } from '../board/naming.js';
+import { resolvePlanSpec } from '../board/plan-spec.js';
 import {
   findReadinessGaps,
   READINESS_REFUSAL_EXIT,
@@ -296,6 +302,73 @@ describe('one planted issue per code gap', () => {
 
   it('plants every template heading, so a gap this suite never breaks is still covered by name', () => {
     expect(SECTIONS.map(([heading]) => heading)).toEqual([...TEMPLATE_HEADINGS]);
+  });
+});
+
+describe('the completeness check reached through plan create itself', () => {
+  /** Where `resolvePlanSpec` writes the snapshot a plan is later generated from — never reached once check 2 refuses. */
+  const SPECS_DIR = 'specs';
+
+  /** A `gh` runner answering `issue view 31` with `body`, labelled `spec:ready` — the label check clears, so the completeness check is the one this suite means to reach. */
+  function ghOver(body: string): GhRunner {
+    return (args): Promise<GhResult> => {
+      if (args[0] === 'issue' && args[1] === 'view' && args[2] === '31') {
+        const issue: SpecIssue = { number: 31, title: 'Issue 31', body, state: 'OPEN', labels: [SPEC_LABEL, SPEC_READY_LABEL] };
+        return Promise.resolve({
+          ok: true,
+          stdout: JSON.stringify({
+            number: issue.number,
+            title: issue.title,
+            body: issue.body,
+            state: issue.state,
+            labels: issue.labels.map((name) => ({ name })),
+          }),
+          stderr: '',
+        });
+      }
+      return Promise.resolve({ ok: false, stdout: '', stderr: `no planted answer for ${args.join(' ')} (${ISSUE_VIEW_FIELDS})` });
+    };
+  }
+
+  /** No branch ever claims the issue; `resolvePlanSpec`'s `--issue` route never asks it. */
+  const noBranches: GitRunner = () => ({ ok: true, stdout: '', stderr: '' });
+
+  /** Runs `resolvePlanSpec` for issue #31 over `body`, in its own root. */
+  function planFrom(root: string, body: string): ReturnType<typeof resolvePlanSpec> {
+    return resolvePlanSpec({
+      request: { kind: 'issue', issue: 31 },
+      refresh: false,
+      dryRun: false,
+      repoRoot: root,
+      specsDir: SPECS_DIR,
+      roadmapIssue: null,
+      findSpec: (spec) => spec,
+      gh: ghOver(body),
+      git: noBranches,
+      output: sinkOutput({}),
+    });
+  }
+
+  it('writes no plan file and refuses naming the heading, over an issue whose "Definition of done" holds no list item — a control over the complete issue reaches the planner instead', async () => {
+    const root = plantRepo([]);
+    const broken = issueBody({ 'Definition of done': 'This is done once the tests pass.' });
+    const snapshot = join(root, specPath(SPECS_DIR, 31, 'Issue 31'));
+
+    const refused = await asyncThrownBy(planFrom(root, broken).then(() => undefined));
+
+    expect(refused.exitCode).toBe(READINESS_REFUSAL_EXIT);
+    expect(refused.message).toContain('"Definition of done" holds no list item');
+    // No spec is snapshotted, so the planner is never handed a spec to
+    // write `.rafa/plans/PLAN-<stub>.md` from — the plan `plan create`
+    // would otherwise write.
+    expect(existsSync(snapshot)).toBe(false);
+    expect(existsSync(join(root, PLAN_PATH))).toBe(false);
+
+    // The control: the same call over the complete issue snapshots the
+    // spec and reaches the planner instead of a refusal.
+    const resolved = await planFrom(root, issueBody());
+    expect(resolved.outcome).toBe('spec');
+    expect(existsSync(snapshot)).toBe(true);
   });
 });
 
