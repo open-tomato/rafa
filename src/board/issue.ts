@@ -5,7 +5,7 @@
  * local notes appended.
  *
  * `plan create --issue=<n>` plans from an issue, and the planner reads a
- * FILE (`.specs/rafa-20-pr-commands.md`). This module is what turns one
+ * FILE (`.rafa/specs/rafa-20-pr-commands.md`). This module is what turns one
  * into the other: it reads the issue, refuses the ones no plan may be
  * written from, and writes the body to
  * `<specs.dir>/rafa-<n>-<slug>.md`, whose name is `./naming.ts`'s.

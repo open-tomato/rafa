@@ -27,7 +27,7 @@
  *
  * ## Absence and malformation are not-ready
  *
- * `.specs/rafa-20-pr-commands.md` says a missing or malformed block is
+ * `.rafa/specs/rafa-20-pr-commands.md` says a missing or malformed block is
  * treated as `not-ready` with the gap "the review block was not
  * returned", and that rule lives HERE rather than in the caller.
  * {@link SpecReviewReading.ready} is the answer the gate acts on and is

@@ -3,7 +3,7 @@
  * issue it is, its body parsed into ordered `#<n>` lines, the readings
  * that call a line done or taken, and the first line that is neither.
  *
- * ORDER lives in one place (`.specs/rafa-20-pr-commands.md`): a pinned
+ * ORDER lives in one place (`.rafa/specs/rafa-20-pr-commands.md`): a pinned
  * issue titled `Roadmap` carrying an ordered task list of `#<n>` lines
  * with a one-line why. `--next` reads that list, walks it from the top,
  * and answers the first line nobody has finished and nobody has
@@ -521,7 +521,7 @@ async function skipOf(line: RoadmapLine, readings: RoadmapReadings): Promise<Roa
  *
  * It never skips AHEAD: a line it cannot pass stops the walk, because
  * stepping over one would reorder the roadmap without anyone saying so
- * (`.specs/rafa-20-pr-commands.md`). The walk is one line at a time on
+ * (`.rafa/specs/rafa-20-pr-commands.md`). The walk is one line at a time on
  * purpose — reading them in parallel would spend a `gh issue view` on
  * every line of a long roadmap to answer a question the first line
  * usually settles.

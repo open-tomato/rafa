@@ -5,7 +5,7 @@
  * Two flags leave a record in the plan they kept. `--skip-review` records
  * `review: skipped` (`./review-stamp.ts`), and a run that planned from an
  * issue records the issue it planned from, which
- * `.specs/rafa-20-pr-commands.md` asks for in so many words: the plan's
+ * `.rafa/specs/rafa-20-pr-commands.md` asks for in so many words: the plan's
  * `rafa:plan` block gets `issue: <n>`. Both write ONE line into a block a
  * session wrote, so the line-placing is here and each field's own meaning
  * stays with the module that owns it.

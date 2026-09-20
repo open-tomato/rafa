@@ -4,7 +4,7 @@
  *
  * `--skip-review` bypasses check 3 of the readiness gate — the
  * planner's own first pass over the spec — and ALONE
- * (`.specs/rafa-20-pr-commands.md`): the label check and the code
+ * (`.rafa/specs/rafa-20-pr-commands.md`): the label check and the code
  * checks still run, and the session still writes its
  * `rafa:spec-review` block, which nothing then acts on. A plan written
  * that way was planned from a spec nobody judged, and the spec says the

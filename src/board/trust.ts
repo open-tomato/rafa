@@ -11,7 +11,7 @@
  * carry out. GitHub lets only the author and the repository's
  * write-holders edit a body, so a trusted AUTHOR is what makes a trusted
  * BODY, and that is the one question this module answers
- * (`.specs/rafa-20-pr-commands.md`).
+ * (`.rafa/specs/rafa-20-pr-commands.md`).
  *
  * ONE function answers it — {@link readAuthorTrust} — and a second
  * reading spelled somewhere else is a second place for the answer to

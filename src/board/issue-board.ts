@@ -5,7 +5,7 @@
  *
  * The gate's not-ready branch posts the planner's gaps as one comment,
  * edits that comment on a rerun, and swaps `spec:ready` for
- * `spec:needs-work` (`.specs/rafa-20-pr-commands.md`). Those are the
+ * `spec:needs-work` (`.rafa/specs/rafa-20-pr-commands.md`). Those are the
  * only board operations it makes, and this is the seam they go through:
  * {@link IssueBoard} is the interface the gate is written against, and
  * {@link createGhIssueBoard} is the one implementation, over the

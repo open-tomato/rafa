@@ -5,7 +5,7 @@
  * beside the spec.
  *
  * Every piece of work on this repository has one issue, and that issue's
- * number is its id everywhere else (`.specs/rafa-20-pr-commands.md`):
+ * number is its id everywhere else (`.rafa/specs/rafa-20-pr-commands.md`):
  *
  * ```text
  * id                  rafa-20

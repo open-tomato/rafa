@@ -3,7 +3,7 @@
  * flags named it: `--spec=<file>`, `--issue=<n>` or `--next`.
  *
  * `plan create` ends in a planner session that reads a FILE
- * (`.specs/rafa-20-pr-commands.md`), and the three flags are three ways
+ * (`.rafa/specs/rafa-20-pr-commands.md`), and the three flags are three ways
  * of naming one. This module is the funnel: it reads the words off the
  * command line, refuses a line naming more than one of them, and
  * answers a spec path with the issue it came from, so everything after
@@ -32,7 +32,7 @@
  * ## Mutual exclusion, and what it costs to get wrong
  *
  * The three flags are mutually exclusive
- * (`.specs/rafa-20-pr-commands.md`). A line naming two is REFUSED
+ * (`.rafa/specs/rafa-20-pr-commands.md`). A line naming two is REFUSED
  * ({@link severalSourcesMessage}) rather than resolved by ranking one
  * over the others, because both readings of `--issue=20 --next` are
  * plausible — plan issue 20, or plan whatever is next — and a run that

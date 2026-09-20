@@ -4,7 +4,7 @@
  * written to the project config.
  *
  * The board is the part of the workflow that does not live in the
- * checkout (`.specs/rafa-20-pr-commands.md`): a spec is an issue, its
+ * checkout (`.rafa/specs/rafa-20-pr-commands.md`): a spec is an issue, its
  * readiness is a label, and the order is a task list in one pinned
  * issue. A repository that has none of that cannot be planned from, and
  * making it by hand is six labels, a template file and an issue body
