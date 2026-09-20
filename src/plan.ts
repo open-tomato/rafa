@@ -92,9 +92,9 @@
  * ## The readiness gate's verdict
  *
  * The plan prompt asks the session to judge the spec BEFORE planning and
- * to open its answer with a `rafa:spec-review` block, which the planner
- * reads once and carries back both on the plan it answers and on what it
- * rejects with (`adapters/planner/claude.ts`). Neither of those acts on
+ * to END its final message with a `rafa:spec-review` block, which the
+ * planner reads once and carries back both on the plan it answers and on
+ * what it rejects with (`adapters/planner/claude.ts`). Neither of those acts on
  * it. This command does, through {@link enforceSpecReview}
  * (`board/gate.ts`): a review that is not ready removes the plan and the
  * prerequisites file when the session wrote them anyway, publishes the

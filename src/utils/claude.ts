@@ -18,7 +18,7 @@
  * `claude` planner, `adapters/planner/claude.ts`, which `plan.ts`
  * makes. Each of the three parses what its session wrote: a task
  * session ends its final message with a `rafa:report` block, a plan
- * session opens its answer with a `rafa:spec-review` one, and a
+ * session ends its final message with a `rafa:spec-review` one, and a
  * proposal session's answer goes through `parseSessionAnswer`.
  * {@link spawnClaude} answers the exit code alone, so a loop holding
  * that session's exit code holds nothing else. A task session's flags are

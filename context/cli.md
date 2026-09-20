@@ -196,7 +196,7 @@ module's note is the long form.
   `plan create` calls it.
 - **`plan create` enforces the planner's own verdict on the spec**
   (`src/plan.ts`, `src/board/gate.ts`). The plan prompt asks the session
-  to open its answer with a `rafa:spec-review` block, the `claude`
+  to end its final message with a `rafa:spec-review` block, the `claude`
   planner reads it once and carries it back both on the plan it answers
   and on its rejections (`src/adapters/planner/claude.ts`), and this
   command is what acts on it. A verdict that is not ready removes
