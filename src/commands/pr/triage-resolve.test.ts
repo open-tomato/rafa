@@ -40,6 +40,15 @@
  *   - **A resolve run that fixed the pull request exits 0.** Its
  *     control is the stop cases: the same command, the same seams, a
  *     different stand-in loop.
+ *   - **The failing job log really reaches a CI plan.** A
+ *     `{FAILING_LOG}` nobody filled would still be a plan, and the
+ *     agent it routes to would read the log itself rather than report
+ *     that it was handed none. The cases read the plan file off disk
+ *     and assert the quoted log lines in it, with three controls: the
+ *     lockfile plan, which asks for no log and must carry none; a log
+ *     longer than the cap, whose earlier lines must be gone and counted;
+ *     and an attempt that leaves a DIFFERENT failing step, whose plan
+ *     must quote the new log and not the old one.
  *
  * `'what --resolve does not run'` below also carries the trust check's
  * remaining legs from `.specs/rafa-20-pr-commands.md`'s "write-holder
@@ -101,9 +110,30 @@ const NOW = '2026-09-19T09:00:00Z';
 /** The Actions run a failing check points at. */
 const RUN_ID = '9006';
 
+/** The one log line a case looks for in a plan, distinctive enough to find. */
+const LINT_RULE_LINE = '  42:7  error  unused is assigned a value but never used  no-unused-vars';
+
 /** The `--log-failed` capture of a lint failure, in the recorded TAB shape. */
 const LINT_LOG = logFailedText('gates', [
   '##[group]Run bunx eslint .',
+  LINT_RULE_LINE,
+  '##[error]Process completed with exit code 1.',
+]);
+
+/** The `--log-failed` capture of a failed install, which is `ci-install`. */
+const INSTALL_LOG = logFailedText('gates', [
+  '##[group]Run bun install --frozen-lockfile',
+  'error: lockfile had changes, but lockfile is frozen',
+  '##[error]Process completed with exit code 1.',
+]);
+
+/** How many padding lines the log longer than any cap carries. */
+const PADDING_LINES = 60;
+
+/** A lint log longer than the cap, so what a plan shows of it is a tail. */
+const LONG_LINT_LOG = logFailedText('gates', [
+  '##[group]Run bunx eslint .',
+  ...Array.from({ length: PADDING_LINES }, (_unused, index) => `src/line-${String(index + 1)}.ts  1:1  error`),
   '##[error]Process completed with exit code 1.',
 ]);
 
@@ -140,6 +170,17 @@ const CONFLICTED_41: FakePullRequestSeed = {
   checks: [],
   mergeable: 'CONFLICTING',
   mergeStateStatus: 'DIRTY',
+};
+
+/** A dependabot pull request whose lint step failed, which is `ci-lint` and simple on a bump. */
+const BUMPED_41: FakePullRequestSeed = {
+  number: 41,
+  title: 'chore(deps): bump bun-types',
+  headRefName: BRANCH,
+  author: { login: 'dependabot[bot]', isBot: true },
+  checks: [FAILING_GATES],
+  mergeable: 'MERGEABLE',
+  mergeStateStatus: 'CLEAN',
 };
 
 /** Every git argv a run sent, and the runner that recorded them. */
@@ -198,6 +239,8 @@ interface CaseOptions {
   readonly reading?: Readonly<Record<string, string>>;
   /** The project config text. {@link GH_CONFIG} when left out. */
   readonly config?: string;
+  /** The `--log-failed` capture the failing run answers. {@link LINT_LOG} when left out. */
+  readonly log?: string;
 }
 
 /** What one dispatched run left behind. */
@@ -217,7 +260,7 @@ interface Ran {
 async function resolved(options: CaseOptions): Promise<Ran> {
   const fake = createFakePrGh({ now: () => NOW });
   for (const seed of options.seeds) fake.plant(seed);
-  fake.plantRun(RUN_ID, LINT_LOG);
+  fake.plantRun(RUN_ID, options.log ?? LINT_LOG);
   for (const login of options.trusted ?? [PULL_AUTHOR, FAKE_COMMENT_AUTHOR]) {
     fake.plantPermission(login, 'admin');
   }
@@ -262,6 +305,11 @@ function gitLines(git: StubGit, name: string): readonly string[] {
 /** The body of the triage comment on pull request 41. */
 function commentBody(fake: FakePrGh): string {
   return fake.pull(41)?.comments.at(-1)?.body ?? '';
+}
+
+/** The text of the plan the run wrote for one attempt, counted from 1. */
+function planText(outcome: Ran, attempt = 1): string {
+  return readFileSync(outcome.loops[attempt - 1]?.planPath ?? '', 'utf8');
 }
 
 /** The attempt that resolves the conflict: a new head, mergeable, and green checks. */
@@ -447,6 +495,70 @@ describe('the order inside one attempt', () => {
     expect(outcome.stdout).toContain('which no pinned plan resolves');
     expect(gitLines(outcome.git, 'worktree').at(-1))
       .toBe(`worktree remove ${resolveWorktreePath(outcome.project.home, 41)}`);
+  });
+});
+
+describe('the failing job log a CI plan carries', () => {
+  it('quotes the log the assessment read into the plan the attempt runs', async () => {
+    const outcome = await resolved({ seeds: [BUMPED_41], trusted: [FAKE_COMMENT_AUTHOR], attempt: fixesIt });
+    const plan = planText(outcome);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(plan).toContain('# Plan: Resolve CI lint failure');
+    expect(plan).toContain('The failing job log, all 3 lines of it.');
+    expect(plan).toContain(`> ${LINT_RULE_LINE}`);
+    expect(plan).not.toContain('{FAILING_LOG}');
+  });
+
+  it('leaves the lockfile plan, which asks for no log, carrying none', async () => {
+    const outcome = await resolved({ seeds: [CONFLICTED_41], attempt: fixesIt });
+    const plan = planText(outcome);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(plan).toContain('# Plan: Resolve lockfile conflict');
+    expect(plan).not.toContain(LINT_RULE_LINE);
+    expect(plan).not.toContain('failing job log');
+  });
+
+  it('shows the tail the excerpt reader caps at, saying how many earlier lines it dropped', async () => {
+    const outcome = await resolved({
+      seeds: [BUMPED_41],
+      trusted: [FAKE_COMMENT_AUTHOR],
+      log: LONG_LINT_LOG,
+      attempt: fixesIt,
+    });
+    const plan = planText(outcome);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(plan).toContain('The last 40 lines of the failing job log, 22 earlier lines omitted of 62 in all.');
+    expect(plan).toContain(`> src/line-${String(PADDING_LINES)}.ts`);
+    expect(plan).not.toContain('src/line-1.ts');
+  });
+
+  it('carries the same log into a second attempt whose re-assessment classified nothing', async () => {
+    const outcome = await resolved({ seeds: [BUMPED_41], trusted: [FAKE_COMMENT_AUTHOR] });
+
+    expect(outcome.exitCode).toBe(3);
+    expect(outcome.loops).toHaveLength(2);
+    expect(planText(outcome, 2)).toContain(`> ${LINT_RULE_LINE}`);
+  });
+
+  it('takes the fresh log when the attempt left a different failing step', async () => {
+    const outcome = await resolved({
+      seeds: [BUMPED_41],
+      trusted: [FAKE_COMMENT_AUTHOR],
+      attempt: (fake, attempt) => {
+        if (attempt > 1) return;
+        fake.plantRun(RUN_ID, INSTALL_LOG);
+        fake.update(41, (pull) => ({ ...pull, headRefOid: '1'.repeat(40) }));
+      },
+    });
+    const second = planText(outcome, 2);
+
+    expect(outcome.loops).toHaveLength(2);
+    expect(outcome.loops[1]?.planPath.endsWith('resolve-ci-install.md')).toBe(true);
+    expect(second).toContain('> error: lockfile had changes, but lockfile is frozen');
+    expect(second).not.toContain(LINT_RULE_LINE);
   });
 });
 

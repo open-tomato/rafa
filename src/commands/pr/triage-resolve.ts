@@ -10,7 +10,8 @@
  *   - `src/pr/worktree.ts` — where the worktree goes, the
  *     cross-repository refusal, and the removal that is never forced.
  *   - `src/pr/plans/load.ts` — the pinned plan for the class, filled
- *     from the triage block and the shared conflict sentence.
+ *     from the triage block, the shared conflict sentence and the
+ *     failing job's log excerpt.
  *   - `src/pr/plans/budget.ts` — `pr.resolveBudget` written into that
  *     plan's task lines, which is how a session is handed
  *     `--max-budget-usd`.
@@ -56,6 +57,34 @@
  * to have pushed nothing: a head that moved with a run still going has
  * pushed, and after a CI wait that ran out of its deadline it is the
  * checks rather than the attempt that are unfinished.
+ *
+ * ## The failing log is filled from the evidence beside the assessment
+ *
+ * The two CI plans carry a `{FAILING_LOG}` slot, and the triage block
+ * they are otherwise filled from does not hold a log: it records the
+ * class, the files and the attempts only (`src/pr/plans/load.ts`). The
+ * log is in the ASSESSMENT's evidence, which this module has in hand:
+ * the run reads it off the reading with `evidenceOf`
+ * (`./triage-report.ts`), and {@link planFor} caps it with
+ * `excerptLines` (`src/pr/triage/follow-up.ts`) — the reader the
+ * FOLLOW-UP PROMPT is capped by, deliberately, so the plan a session
+ * runs and the prompt a person pastes quote the same lines of the same
+ * log rather than two different tails of it. A fill carrying no excerpt still answers the
+ * slot, and the two conflict plans carry no such slot at all, so the
+ * value goes unused there.
+ *
+ * The evidence travels WITH the assessment, as {@link AssessedLog},
+ * and moves only when the re-assessment classified something. That is
+ * the same rule the assessment itself follows — `reading.assessment ??
+ * before` in {@link endOfAttempt} — and it has to be, because the two
+ * are one reading. A fresh class read off a fresh log takes both; an
+ * attempt whose re-assessment classified nothing, the head not having
+ * moved, keeps both, so the next attempt runs the plan for the class
+ * it is still about with the log that class was read from. Taking the
+ * evidence from the latest reading alone would hand that attempt no
+ * log at all, and pinning it to the run's FIRST reading would quote,
+ * after a class change, the log of a failure the plan is no longer
+ * about.
  *
  * ## A class the attempt left unresolvable stops the run
  *
@@ -126,6 +155,8 @@ import type { GitRunner, PullRequestDetail, PullRequests } from '../../pr/index.
 import type { AttemptOutcome, AttemptReading } from '../../pr/triage/attempts.js';
 import type { TriageAssessment } from '../../pr/triage/classify.js';
 import type { TriageBlock } from '../../pr/triage/comment.js';
+import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
+import type { ExcerptReading } from '../../pr/triage/follow-up.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
@@ -135,7 +166,7 @@ import { hasPinnedPlan, loadPinnedPlan } from '../../pr/plans/load.js';
 import { readAttemptRepeat, readAttemptStart, spentAttempts } from '../../pr/triage/attempts.js';
 import { DEPENDENCY_BUMP_AUTHORS } from '../../pr/triage/classes.js';
 import { triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
-import { buildFollowUpPrompt } from '../../pr/triage/follow-up.js';
+import { buildFollowUpPrompt, excerptLines } from '../../pr/triage/follow-up.js';
 import {
   addResolveWorktree,
   crossRepositoryRefusal,
@@ -334,10 +365,30 @@ function closeWorktree(run: ResolveRun, path: string): string {
     : `The worktree at ${path} was left in place: ${removed.said}`;
 }
 
+/** One assessment and the failing job log it was read from; see the module note. */
+interface AssessedLog {
+  /** What the classifier concluded. */
+  readonly assessment: TriageAssessment;
+  /** The log that assessment was read from, or undefined when none was read. */
+  readonly evidence: FailedLogEvidence | undefined;
+}
+
+/**
+ * The excerpt a plan is filled with: the same reading, from the same
+ * reader, a follow-up prompt is capped by. See the module note.
+ */
+function excerptOf(assessed: AssessedLog): ExcerptReading | undefined {
+  return assessed.evidence === undefined
+    ? undefined
+    : excerptLines(assessed.evidence);
+}
+
 /** Fills the pinned plan for one attempt and writes it outside the worktree. */
-function planFor(run: ResolveRun, detail: PullRequestDetail, assessment: TriageAssessment, attempt: number): string {
+function planFor(run: ResolveRun, detail: PullRequestDetail, assessed: AssessedLog, attempt: number): string {
+  const { assessment } = assessed;
   const block = blockOf(detail, assessment, run.now(), attempt);
-  const plan = withTaskBudget(loadPinnedPlan(assessment.triageClass, { block }), run.budgetUsd);
+  const fill = { block, excerpt: excerptOf(assessed) };
+  const plan = withTaskBudget(loadPinnedPlan(assessment.triageClass, fill), run.budgetUsd);
   return writeResolvePlan({
     home: run.home,
     number: run.number,
@@ -373,6 +424,8 @@ interface AttemptEnd {
   readonly outcome: AttemptOutcome;
   /** The assessment a comment and a prompt are written from. */
   readonly assessment: TriageAssessment;
+  /** The log that assessment was read from; see the module note. */
+  readonly evidence: FailedLogEvidence | undefined;
   /** True when the pull request is green; see the module note. */
   readonly green: boolean;
   /** What is said about a run that pushed nothing, or null when it pushed. */
@@ -382,16 +435,20 @@ interface AttemptEnd {
 /** Reads what one attempt ended as, out of the CI wait and a fresh assessment. */
 async function endOfAttempt(
   run: ResolveRun,
-  before: TriageAssessment,
+  before: AssessedLog,
   waited: Awaited<ReturnType<typeof waitForChecks>>,
 ): Promise<AttemptEnd> {
   const reading = await run.reassess();
-  const assessment = reading.assessment ?? before;
-  const green = waited.verdict === 'green' || reading.assessment?.triageClass === 'green';
+  const fresh = reading.assessment;
+  const assessment = fresh ?? before.assessment;
+  const green = waited.verdict === 'green' || fresh?.triageClass === 'green';
   return {
     reading,
     outcome: { triageClass: assessment.triageClass, step: assessment.step },
     assessment,
+    evidence: fresh === null
+      ? before.evidence
+      : evidenceOf(reading),
     green,
     unchanged: reading.rerun.decision === 'already-assessed'
       ? ATTEMPT_OUTCOME_UNCHANGED
@@ -478,6 +535,8 @@ export async function resolvePullRequest(run: ResolveRun): Promise<ResolveResult
 interface AttemptState {
   /** The assessment the next attempt runs the plan of. */
   assessment: TriageAssessment;
+  /** The log that assessment was read from; see the module note. */
+  evidence: FailedLogEvidence | undefined;
   /** The latest reading of the pull request, which the report renders. */
   reading: TriageReading;
   /** What the attempt before this one ended as, or null before the first. */
@@ -516,6 +575,7 @@ async function runAttempts(
   const runLoop = run.runLoop ?? runResolveLoop;
   const state: AttemptState = {
     assessment: first,
+    evidence: evidenceOf(run.reading),
     reading: run.reading,
     previous: null,
     spent: spentAttempts(run.reading.attempts),
@@ -541,7 +601,7 @@ async function runAttempts(
     state.spent = start.attempts;
     await writeResolveComment(run, detail, state.assessment, state.spent, false);
 
-    const planPath = planFor(run, detail, state.assessment, state.spent);
+    const planPath = planFor(run, detail, state, state.spent);
     run.output.info(`   Running ${planPath}`);
     const loop = await runLoop({
       worktree,
@@ -553,10 +613,11 @@ async function runAttempts(
     if (!loop.ok) run.output.warn(`   ${loopProblem(loop)}`);
 
     const waited = await waitForCi(run);
-    const end = await endOfAttempt(run, state.assessment, waited);
+    const end = await endOfAttempt(run, state, waited);
     if (end.unchanged !== null) run.output.warn(`   ${end.unchanged}`);
     state.reading = end.reading;
     state.assessment = end.assessment;
+    state.evidence = end.evidence;
 
     if (end.green) {
       await writeResolveComment(run, detail, state.assessment, state.spent, true);
