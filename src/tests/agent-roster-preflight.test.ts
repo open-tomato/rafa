@@ -203,6 +203,140 @@ function vendoredAgentFile(scratch: Scratch): string {
   return join(scratch.repo, '.claude', 'agents', `${AGENT}.md`);
 }
 
+/**
+ * The agent every case below names; no scratch home in this file
+ * defines it under any name, so it never resolves.
+ */
+const FENCE_AGENT = 'agent-roster-fence-ghost';
+
+/** The stub, and the task line, of the never-closed-fence case. */
+const UNCLOSED_STUB = 'agent-roster-unclosed-context';
+const UNCLOSED_TASK_LINE = `- [ ] Write the tests  {agent=${FENCE_AGENT}}`;
+
+/**
+ * A plan whose `rafa:context` fence is never closed, with the task line
+ * that names {@link FENCE_AGENT} sitting after it, at line 6: `parsePlan`
+ * reads that line as the never-closed block's body (`plan/parse.ts`'s
+ * "Where the two readers disagree" note) and does not carry it into
+ * {@link import('../plan/parse.js').PlanModel.tasks}, while `findNextTask`
+ * dispatches it regardless.
+ */
+const UNCLOSED_PLAN_TEXT = [
+  `# Plan: ${UNCLOSED_STUB}`,
+  '',
+  '```rafa:context',
+  'Context prose the fence never closes.',
+  '',
+  UNCLOSED_TASK_LINE,
+  '',
+].join('\n');
+
+/** The stub, and the task line, of the closed-fence control. */
+const CLOSED_STUB = 'agent-roster-closed-context';
+const CLOSED_TASK_LINE = `- [ ] Write the tests  {agent=${FENCE_AGENT}}`;
+
+/**
+ * The control: the same `rafa:context` block, closed, with the same task
+ * line sitting after it, at line 7, outside every block and therefore
+ * read as an ordinary open task today.
+ */
+const CLOSED_PLAN_TEXT = [
+  `# Plan: ${CLOSED_STUB}`,
+  '',
+  '```rafa:context',
+  'Context prose that closes normally.',
+  '```',
+  '',
+  CLOSED_TASK_LINE,
+  '',
+].join('\n');
+
+/**
+ * Plants one scratch repository holding `planText` as its only plan, no
+ * tracker (so the preflight's tracker-first read falls back to the plan
+ * itself) and a scratch home defining no agent at all, so
+ * {@link FENCE_AGENT} resolves under no loaded scope.
+ */
+function plantFenceScratch(stub: string, planText: string): Scratch {
+  const repo = join(tempRoot, `repo-${stub}`);
+  const bin = join(tempRoot, `bin-${stub}`);
+  const home = join(tempRoot, `home-${stub}`);
+  const calls = join(tempRoot, `calls-${stub}`);
+  for (const dir of [repo, bin, home, calls]) mkdirSync(dir, { recursive: true });
+
+  const claude = join(bin, 'claude');
+  writeFileSync(claude, [
+    '#!/bin/sh',
+    `calls='${calls}'`,
+    'n=$(/bin/cat "$calls/count" 2>/dev/null || echo 0)',
+    'n=$((n + 1))',
+    'echo "$n" > "$calls/count"',
+    '/bin/cat > "$calls/$n.prompt"',
+    'echo "Done, and nothing to report."',
+    'exit 0',
+    '',
+  ].join('\n'), 'utf8');
+  chmodSync(claude, 0o755);
+
+  git(repo, 'init', '-q', '.');
+  git(repo, 'config', 'user.email', 'loop@example.test');
+  git(repo, 'config', 'user.name', 'Rafa Loop');
+  git(repo, 'config', 'commit.gpgsign', 'false');
+  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '--no-verify', '-m', 'seed');
+  git(repo, 'checkout', '-q', '-b', `feat/${stub}`);
+
+  mkdirSync(join(repo, '.plans'), { recursive: true });
+  writeFileSync(join(repo, '.plans', `PLAN-${stub}.md`), planText, 'utf8');
+  plantProjectConfig(repo);
+
+  return {
+    repo,
+    home,
+    calls,
+    claude,
+    path: [bin, GIT_DIR].join(delimiter),
+    planFile: `.plans/PLAN-${stub}.md`,
+  };
+}
+
+describe('the agent roster preflight, over a plan naming an unresolvable agent behind a rafa:* fence', () => {
+  it('refuses loop start before dispatching for the closed-fence control, today', () => {
+    const scratch = plantFenceScratch(CLOSED_STUB, CLOSED_PLAN_TEXT);
+
+    const start = runRafa(scratch, ['loop', 'start', `--plan=${scratch.planFile}`, '--no-ci-wait']);
+
+    expect(start.exitCode).toBe(1);
+    expect(start.stderr).toContain(
+      `❌ Refusing to start: PLAN-${CLOSED_STUB}.md names 1 agent(s) no loaded scope defines`,
+    );
+    expect(start.stderr).toContain(
+      `agent "${FENCE_AGENT}" (line 7) resolves under no loaded scope: no definition under ~/.claude/agents`
+        + ' to vendor',
+    );
+    expect(start.stderr).toContain('Nothing was checked and nothing was dispatched.');
+    expect(callCount(scratch)).toBeNull();
+  });
+
+  it('refuses loop start before dispatching when the naming task line sits after a fence never closed', () => {
+    const scratch = plantFenceScratch(UNCLOSED_STUB, UNCLOSED_PLAN_TEXT);
+
+    const start = runRafa(scratch, ['loop', 'start', `--plan=${scratch.planFile}`, '--no-ci-wait']);
+
+    expect(start.exitCode).toBe(1);
+    expect(start.stderr).toContain(
+      `❌ Refusing to start: PLAN-${UNCLOSED_STUB}.md names 1 agent(s) no loaded scope defines`,
+    );
+    expect(start.stderr).toContain(
+      `agent "${FENCE_AGENT}" (line 6) resolves under no loaded scope: no definition under ~/.claude/agents`
+        + ' to vendor',
+    );
+    expect(start.stderr).toContain('Nothing was checked and nothing was dispatched.');
+    expect(callCount(scratch)).toBeNull();
+  });
+});
+
 describe('the agent roster preflight, end to end over one scratch project and home', () => {
   it(
     'halts loop start naming the agent and dispatching nothing, fails plan validate the same way,'
