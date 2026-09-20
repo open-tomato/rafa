@@ -125,9 +125,13 @@
  *
  *   - `issue: #42` parses as `issue: null`, since a `#` after a space
  *     opens a YAML comment. Quoted, `"#42"` is the string.
- *   - `issue: 42` and `issue: 042` both parse as the number 42, so a
- *     number is refused rather than turned back into a string that may
- *     not be the one written.
+ *   - `issue` is the one field a WHOLE NUMBER is usable in, since a
+ *     tracker issue is plausibly written as one: `issue: 49` and
+ *     `issue: '49'` both read as the string `"49"`. The number is the
+ *     one YAML parsed, not the digits written, so `issue: 042` reads
+ *     as `"42"`; quote a form whose digits matter. Anything not a
+ *     whole number — `issue: 4.5`, a list, a mapping — is still
+ *     refused.
  *
  * `release` is the one CLOSED-SET field: it is the version bump the
  * plan is worth, and a bump has to be one of four words for a caller to
@@ -582,6 +586,11 @@ function bindBlocks(blocks: readonly RafaBlock[], headings: readonly Heading[]):
 
 /** The field's value when it is usable, else null. See the module note. */
 function usableField(field: PlanHeaderField, value: unknown): string | null {
+  if (field === 'issue' && typeof value === 'number') {
+    return Number.isSafeInteger(value)
+      ? String(value)
+      : null;
+  }
   if (typeof value !== 'string' || value.trim().length === 0) return null;
   if (field === 'stub' && !isStampableStub(value)) return null;
   if (field === 'release' && !isReleaseLevel(value)) return null;
@@ -598,7 +607,9 @@ function unusableText(field: PlanHeaderField, value: unknown): string {
     return `${subject} is ${describeValue(value)}, not one of ${PLAN_RELEASE_LEVELS.join(', ')}`;
   }
   if (typeof value !== 'string') {
-    return `${subject} is ${describeValue(value)}, not a string; quote it`;
+    return field === 'issue'
+      ? `${subject} is ${describeValue(value)}, not a string or a whole number; quote it`
+      : `${subject} is ${describeValue(value)}, not a string; quote it`;
   }
   if (value.trim().length === 0) return `${subject} is blank`;
   return `${subject} ${JSON.stringify(value)} is no stub a plan stamp can carry `

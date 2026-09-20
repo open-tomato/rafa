@@ -15,23 +15,21 @@
  * file, and the caller writes what it is handed. So the cases in
  * `./plan-field.test.ts` need no temporary directory.
  *
- * ## The issue is written QUOTED, and it has to be
+ * ## The issue is written QUOTED, and it stays that way
  *
  * `issue` IS one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), and the
- * reader takes it only as a STRING: a number is refused as
- * `unusable-field`, because `issue: 42` and `issue: 042` both parse as
- * the number 42 and a reader that turned one back into a string could
- * hand back a number the plan never wrote. So the stamp writes
- * `issue: "20"`, and `plan validate` reads the plan it stamped without an
- * issue. Measured on bun 1.3.14 on 2026-09-19, and held by the round-trip
- * case in `./plan-field.test.ts` — which is the only thing that can see
- * it, since a bare `issue: 20` reads back as a plausible-looking 42-style
- * number and only `parsePlan` calls it unusable.
+ * reader takes a whole number there as well as a string: `issue: 20`
+ * reads back as `"20"`. It reads the number YAML parsed, not the digits
+ * written, so `issue: 042` reads back as `"42"`. The stamp writes
+ * `issue: "20"` so the digits it wrote are the digits read back whatever
+ * they are, and `plan validate` reads the plan it stamped without an
+ * issue. Measured on bun 1.3.14 on 2026-09-20, and held by the
+ * round-trip case in `./plan-field.test.ts`, whose control is the
+ * leading-zero spelling the quoted line is immune to.
  *
  * A block already carrying `issue: 20` unquoted is REPLACED by the quoted
  * line for the same reason: a session that wrote the field by hand wrote
- * it in the shape the reader refuses, and the stamp is where that is put
- * right.
+ * it in the shape whose digits the reader cannot be trusted to give back.
  *
  * ## What it does to the file
  *

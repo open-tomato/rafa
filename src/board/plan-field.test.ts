@@ -71,16 +71,16 @@ describe('the issue a plan off the board records', () => {
     expect(stamp.note).toContain('line 6');
   });
 
-  it('reads back off the stamped plan as the header field, where a bare number is refused', () => {
+  it('reads back off the stamped plan as the header field, digits and all', () => {
     const stamped = parsePlan(stampPlanIssue(PLAN, 20).text);
-    const bare = parsePlan(PLAN.replace('```\n\n- [ ]', 'issue: 20\n```\n\n- [ ]'));
+    const bare = parsePlan(PLAN.replace('```\n\n- [ ]', 'issue: 042\n```\n\n- [ ]'));
 
     expect(stamped.header.issue).toBe('20');
     expect(stamped.header.extras).toEqual([]);
     expect(stamped.issues).toEqual([]);
-    // The control: the spelling the stamp does not write is the one the reader refuses.
-    expect(bare.header.issue).toBeNull();
-    expect(bare.issues.map((issue) => issue.reason)).toEqual(['unusable-field']);
+    // The control: unquoted, the reader hands back the number YAML parsed, not the digits written.
+    expect(bare.header.issue).toBe('42');
+    expect(parsePlan(stampPlanIssue(PLAN, 42).text).header.issue).toBe('42');
   });
 
   it('replaces a bare number a session wrote by hand with the quoted line', () => {

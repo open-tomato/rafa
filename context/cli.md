@@ -237,8 +237,9 @@ module's note is the long form.
   each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal and stops before
   the first write, on all three routes. The generated plan records
-  `issue: "<n>"` in its `rafa:plan` block, quoted because the plan reader
-  refuses a number there (`src/board/plan-field.ts`), and the gate's
+  `issue: "<n>"` in its `rafa:plan` block, quoted so the digits written
+  survive the plan reader, which reads an unquoted number as the number
+  YAML parsed (`src/board/plan-field.ts`), and the gate's
   comment and label swap go to that issue.
 - **`pr merge` ticks the roadmap after it merges**
   (`src/commands/pr/merge-tick.ts`, `src/board/roadmap-tick.ts`). GitHub

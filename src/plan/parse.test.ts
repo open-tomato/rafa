@@ -425,8 +425,7 @@ describe('the header', () => {
 
   it.each([
     ['an issue opening with # after a space, a YAML comment', 'issue', 'issue: #42', 'issue: "#42"', '#42'],
-    ['an issue written as a number', 'issue', 'issue: 42', 'issue: "42"', '42'],
-    ['an issue with a leading zero, the same number', 'issue', 'issue: 042', 'issue: "042"', '042'],
+    ['an issue written as a fraction', 'issue', 'issue: 4.5', 'issue: "4.5"', '4.5'],
     ['a stub written as a boolean', 'stub', 'stub: true', 'stub: "true"', 'true'],
     ['a spec written as a list', 'spec', 'spec: [a, b]', 'spec: a', 'a'],
     ['a spec written as a mapping', 'spec', 'spec:\n  path: a', 'spec: a', 'a'],
@@ -450,8 +449,31 @@ describe('the header', () => {
     expect(header('issue: #42').issues[0]?.text).toContain('YAML comment unless quoted');
   });
 
+  it('reads an issue written as an unquoted whole number, as the quoted string does', () => {
+    expect(header('issue: 49').header.issue).toBe('49');
+    expect(header('issue: 49').issues).toEqual([]);
+    expect(header('issue: \'49\'').header.issue).toBe('49');
+    expect(header('issue: \'49\'').issues).toEqual([]);
+  });
+
+  it('reads an unquoted issue as the number YAML parsed, not the digits written', () => {
+    expect(header('issue: 042').header.issue).toBe('42');
+    expect(header('issue: 042').issues).toEqual([]);
+    expect(header('issue: \'042\'').header.issue).toBe('042');
+  });
+
+  it('refuses an issue that is no whole number and says so', () => {
+    const model = header('issue: [a, b]');
+    expect(model.header.issue).toBeNull();
+    expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
+    expect(model.issues[0]?.text)
+      .toBe('rafa:plan issue is a list, not a string or a whole number; quote it');
+    expect(header('issue: 4.5').issues[0]?.text)
+      .toBe('rafa:plan issue is 4.5, not a string or a whole number; quote it');
+  });
+
   it('reads the other fields beside an unusable one', () => {
-    const model = header('stub: my-feature', 'issue: 42', 'spec: s.md');
+    const model = header('stub: my-feature', 'issue: true', 'spec: s.md');
     expect(model.header).toEqual({ stub: 'my-feature', issue: null, spec: 's.md', release: null, extras: [] });
     expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
   });
@@ -778,7 +800,7 @@ describe('issues', () => {
       'orphan',
       '```',
       '```rafa:plan',
-      'issue: 42',
+      'issue: true',
       '```',
       '# Stage: one',
       '```rafa:context',
