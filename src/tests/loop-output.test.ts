@@ -69,7 +69,12 @@
  *     the task session's tee and once through the wrap-up, which spawns
  *     through `runClaude`. In text mode there is no step line and no
  *     event, and the bytes of both sessions come out as they were written,
- *     the last line running into the loop's next one.
+ *     the last line running into the loop's next one. Its stand-in also
+ *     writes a tracked file per call ({@link Planting.claudeWork}), so the
+ *     task commits and is ticked: a session that leaves NEITHER a report
+ *     NOR a commit is held instead, and the run would stop there
+ *     (`start/commit.ts`). The commit is what the report absence is
+ *     paired with here, so the missing-report warning still reads.
  *
  * Both session cases run under `--inject=full`, so no injection fallback
  * warning sits among the lines they read.
@@ -261,6 +266,9 @@ const NO_RELEASE_BODY = `   No pull request body carries ${JSON.stringify(NO_REL
 /** The warning a session that wrote no report is stored with, as {@link labelOf} spells it. */
 const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/;
 
+/** The line naming the commit a task's work made, its sha abbreviated. */
+const COMMITTED_LINE = /^info: {3}Committed [0-9a-f]{7} .+$/;
+
 /** How long a case may run, over the kill below. */
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -279,6 +287,12 @@ interface Planting {
   readonly claudeExit?: number;
   /** What the stand-in writes to stdout on every call, byte for byte. Defaults to nothing. */
   readonly claudeStdout?: string;
+  /**
+   * A file, named relative to the repository, the stand-in appends a line
+   * to on every call, so the task's commit finds tracked work. Defaults to
+   * none, which leaves the task nothing to commit.
+   */
+  readonly claudeWork?: string;
 }
 
 /** One planted scratch repository and what a run under it reads. */
@@ -317,10 +331,14 @@ function plant(planting: Planting): Scratch {
   const claudeStdout = join(root, 'claude-stdout.txt');
   writeFileSync(claudeStdout, planting.claudeStdout ?? '', 'utf8');
   const claude = join(bin, 'claude');
+  const work = planting.claudeWork === undefined
+    ? []
+    : [`echo work >> '${join(repo, planting.claudeWork)}'`];
   writeFileSync(claude, [
     '#!/bin/sh',
     'while read -r _line; do :; done',
     `echo called >> '${callLog}'`,
+    ...work,
     `/bin/cat '${claudeStdout}'`,
     `exit ${planting.claudeExit ?? 0}`,
     '',
@@ -602,7 +620,12 @@ describe('a loop start run whose session fails', () => {
 });
 
 describe('a loop start run whose task and wrap-up sessions write to stdout', () => {
-  const planting: Planting = { branch: `feat/${STUB}`, plan: PLAN_OPEN, claudeStdout: SESSION_STDOUT };
+  const planting: Planting = {
+    branch: `feat/${STUB}`,
+    plan: PLAN_OPEN,
+    claudeStdout: SESSION_STDOUT,
+    claudeWork: 'work.txt',
+  };
 
   it('writes one step and each session line as an info event in json mode, every line NDJSON', () => {
     const scratch = plant(planting);
@@ -624,7 +647,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       `info:\n🔄 Executing task: ${TASK}`,
       ...SESSION_LINES,
       `info:✅ Task done: ${TASK}`,
-      'info:   Nothing to commit: the task changed no tracked file.',
+      expect.stringMatching(COMMITTED_LINE),
       expect.stringMatching(NO_REPORT_WARNING),
       'info:\n✅ All tasks completed!',
       `info:${WRAP_UP_STARTING}`,

@@ -14,8 +14,14 @@
  * session is still running, logs the call outside the repository, and
  * then answers a session spawned with `--max-budget-usd` with the exact
  * line Claude Code 2.1.268 was measured writing on its budget
- * (`start/budget.ts`), exiting 1; every other call exits 0 with no
- * output.
+ * (`start/budget.ts`), exiting 1; every other call writes
+ * {@link STAND_IN_REPORT} and exits 0.
+ *
+ * That report is what keeps these tasks ticked. Nothing tracked is
+ * committed here, so a session writing no report either would leave
+ * NEITHER behind, and `finishCleanExit` holds such a task rather than
+ * ticking it (`start/commit.ts`): the run would stop on its first task
+ * and no case below would see its second.
  *
  * ## The cases
  *
@@ -78,6 +84,22 @@ const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-loop-sessions-'))
 afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
 });
+
+/** A fence, kept out of the template literals. */
+const FENCE = '```';
+
+/** The report a stand-in session ends on: `done`, holding nothing back. */
+const STAND_IN_REPORT = [
+  `${FENCE}rafa:report`,
+  'status: done',
+  'feedback: "the stand-in answered"',
+  'findings: []',
+  'skills_used: []',
+  'blockers: []',
+  'out_of_scope_bugs: []',
+  FENCE,
+  '',
+].join('\n');
 
 /** How long the stand-in sleeps per call, in whole seconds: a window for a case to act mid-session. */
 const STAND_IN_DELAY_SECONDS = 2;
@@ -153,10 +175,12 @@ function git(cwd: string, home: string, ...args: string[]): void {
  * Writes the stand-in `claude` into `scratch`'s `bin/`. It drains its
  * prompt, sleeps {@link STAND_IN_DELAY_SECONDS}, logs the call, and, for a
  * session spawned with `--max-budget-usd`, writes the measured budget
- * line and exits 1; every other call exits 0 with no output. See the
- * module note.
+ * line and exits 1; every other call writes {@link STAND_IN_REPORT} and
+ * exits 0. See the module note.
  */
 function plantStandIn(scratch: Scratch): void {
+  const reportPath = join(dirname(scratch.claude), 'report.txt');
+  writeFileSync(reportPath, STAND_IN_REPORT, 'utf8');
   writeFileSync(scratch.claude, [
     '#!/bin/sh',
     'while read -r _line; do :; done',
@@ -168,6 +192,7 @@ function plantStandIn(scratch: Scratch): void {
     '    exit 1',
     '    ;;',
     'esac',
+    `/bin/cat '${reportPath}'`,
     'exit 0',
     '',
   ].join('\n'), 'utf8');
