@@ -14,7 +14,9 @@
  * real git history. Only `currentBranch` is fixed to the branch this
  * file checks out, because the real `getCurrentBranch`
  * (`src/utils/git.ts`) reads `process.cwd()` rather than the scratch
- * repository this suite plants.
+ * repository this suite plants. The two body cases name two seams more,
+ * the provider and the reading that says there is one, for the reason
+ * their own note gives.
  *
  * One scenario: a plan that declares `release: minor` and whose sessions
  * stored two change notes under two different areas. It answers that the
@@ -24,7 +26,7 @@
  * reaches the bare `origin`, and that the new changelog section carries
  * both planted notes' areas above the section that was already there.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner, PrProviderReading } from '../pr/index.js';
 import type { ReleaseSettings } from '../release/prepare.js';
 import type { ReportChange } from '../report/parse.js';
 
@@ -45,6 +47,20 @@ import { sinkOutput } from './output-sinks.js';
 
 /** The branch this suite checks out its release from. */
 const BRANCH = 'feat/scratch-release-e2e';
+
+/**
+ * The provider reading the body cases run under.
+ *
+ * A scratch repository's `origin` is a filesystem path, which reads as
+ * NOT GitHub (`src/pr/provider.ts`), so the default seam would resolve
+ * `none` here and the stage would build no provider at all — which is a
+ * reading about this planting, not about the write these cases measure.
+ * `source: 'config'` is how a repository whose origin says nothing still
+ * gets `gh`, and the remote and host go unread on this path. Whether the
+ * reading itself is right is `src/start/release-stage.test.ts`'s
+ * question.
+ */
+const GH_READING: PrProviderReading = { provider: 'gh', source: 'config', remote: null, host: null };
 
 /** The plan stub the planted notes and the release are attributed to. */
 const PLAN_STUB = 'rafa-99-scratch-release';
@@ -239,7 +255,8 @@ describe('the release stage over a scratch repository', () => {
    * per `release/prepare.ts` — into the pull request body, over a real
    * `gh` fake rather than a hand-stubbed provider, so this suite checks
    * the same read-modify-write `carryIntoBody` performs against a real
-   * one.
+   * one. Two seams are named for these: the provider the write goes
+   * through and the reading that says there is one ({@link GH_READING}).
    */
   it.each([
     [
@@ -300,7 +317,11 @@ describe('the release stage over a scratch repository', () => {
 
     const finish = await finishRelease(
       { repoRoot: scratch.repo, preparation },
-      { currentBranch: () => BRANCH, pulls: () => createGhPullRequests({ gh: fakeGh.run }) },
+      {
+        currentBranch: () => BRANCH,
+        pulls: () => createGhPullRequests({ gh: fakeGh.run }),
+        readProvider: () => GH_READING,
+      },
     );
 
     expect(finish.outcome).toBe('skipped');

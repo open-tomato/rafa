@@ -81,7 +81,17 @@ subject. The PR body gains the entry. The verification is
 `src/start/release-stage.ts`, which `src/start.ts` calls from its wrap-up
 branch.
 
-Level `none` skips all three steps and reports it in the PR body.
+Whether that sentence reaches a body at all is a reading, not an
+assumption: `resolvePrProvider` (`src/pr/provider.ts`) is asked before any
+provider is built, and `src/start.ts` passes it the run's own
+`pr.provider`. A repository that resolves to `none` has no pull request to
+write to, so the stage builds no provider, spawns no `gh`, and prints one
+line naming the sentence that went unwritten and the reading that kept it
+off the board.
+
+Level `none` skips all three steps and reports it in the PR body — or on
+the terminal alone, by the line above, when the provider resolves to
+`none`.
 
 A planted edit outside the new section is caught by step 3's check and
 refused, restored, and reported.

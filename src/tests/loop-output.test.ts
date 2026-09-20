@@ -234,11 +234,12 @@ const PROGRESS_PRESERVED = '\n✅ Progress preserved; PR opened or updated on th
  * No repository here carries a `package.json` or a `CHANGELOG.md`, and
  * `release.enabled` defaults to `auto`, so step 1 writes neither file
  * and answers the skip sentence below; step 3 then reports that same
- * sentence and tries to put it in the pull request body. Every scratch
- * PATH holds the stand-in `claude` and git alone, so `gh` is absent and
- * that write cannot happen — its reason names the run's own temporary
- * directory and whatever the spawn refused with, which is why the last
- * line is read as a pattern and the first two byte for byte.
+ * sentence and says where it did not go. No scratch repository here has
+ * an `origin`, so the provider the stage resolves is `none`
+ * (`src/pr/provider.ts`) and no `gh` is spawned at all — which is what
+ * makes the third line deterministic: it names the reading and the
+ * sentence, not a temporary directory and whatever a spawn refused
+ * with, so all three are read byte for byte.
  */
 const NO_RELEASE_SENTENCE = 'no version bump and no changelog entry: release.enabled is auto and package.json and CHANGELOG.md are not there';
 
@@ -249,12 +250,13 @@ const NO_RELEASE_PREPARED = `\n📦 No release prepared for this pull request: $
 const NO_RELEASE_REPORTED = `\n📦 ${NO_RELEASE_SENTENCE}`;
 
 /**
- * The line saying that sentence reached no pull request body, and why.
- *
- * Unanchored on purpose, so the one pattern reads both the message of a
- * json-mode event and the `error: `-prefixed line text mode writes.
+ * The line saying that sentence reached no pull request body, and why:
+ * an `info` line, because a repository with no GitHub origin writing no
+ * body is the provider reading working and not a fault.
  */
-const NO_RELEASE_BODY = /That line is not in the pull request body: the pull request body could not be written: /;
+const NO_RELEASE_BODY = `   No pull request body carries ${JSON.stringify(NO_RELEASE_SENTENCE)}:`
+  + ' this repository resolves to pr.provider: none, because origin is not set,'
+  + ' so there is no pull request to write it to.';
 
 /** The warning a session that wrote no report is stored with, as {@link labelOf} spells it. */
 const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/;
@@ -492,7 +494,8 @@ describe('loop start with no --plan', () => {
 /**
  * Each line a run with no open task writes, as its level and its
  * message, in order. A message written as a pattern is one carrying
- * something of the run's own; see {@link NO_RELEASE_BODY}.
+ * something of the run's own; every release line is a string, for the
+ * reason the module note gives.
  */
 function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | RegExp])[] {
   const { issues } = parsePlan(PLAN_DONE);
@@ -510,7 +513,7 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
     ['info', NO_RELEASE_PREPARED],
     ['info', PROGRESS_PRESERVED],
     ['info', NO_RELEASE_REPORTED],
-    ['error', NO_RELEASE_BODY],
+    ['info', NO_RELEASE_BODY],
   ];
 }
 
@@ -630,7 +633,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       ...SESSION_LINES,
       `info:${PROGRESS_PRESERVED}`,
       `info:${NO_RELEASE_REPORTED}`,
-      expect.stringMatching(NO_RELEASE_BODY),
+      `info:${NO_RELEASE_BODY}`,
       'result',
     ]);
     expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');

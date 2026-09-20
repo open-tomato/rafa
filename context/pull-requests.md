@@ -32,7 +32,8 @@ two automatic preflight items run before any task is paid for:
    login`
 
 `rafa doctor` prints both checks. With `provider: none` the loop pushes the
-branch, prints the compare URL, skips the CI wait, and says so. No other
+branch, prints the compare URL, skips the CI wait, skips the release
+stage's body write — there being no body — and says so each time. No other
 provider is built; the functions in `src/utils/pr.ts` move behind one
 `PullRequests` interface in `src/pr/` so a second provider is an adapter
 later.
@@ -41,7 +42,8 @@ Every `pr` action without a usable `gh` exits 2 with the same message.
 
 The port carries `comment`, `editComment` and `editBody`. `editBody` is
 rafa-21's: the release stage writes its failure sentence into a pull
-request body the wrap-up session already wrote. The port is NOT in
+request body the wrap-up session already wrote, when the provider that
+stage resolves is `gh`. The port is NOT in
 `PORT_VERSIONS` (`src/adapters/registry.ts` versions tracker, store,
 learning, output and planner only), so adding a method to it bumps no
 version.

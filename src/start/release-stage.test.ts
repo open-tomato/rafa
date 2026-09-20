@@ -18,6 +18,16 @@
  * sequence, once for `add` and once for `commit --only`, and both
  * spellings are read.
  *
+ * The provider is TWO seams and every case stubs both: `readProvider`
+ * answers which provider the repository resolves to, and `pulls` builds
+ * it. A case that stubbed only the second would send the real
+ * `resolvePrProvider` at `/repo` and take whatever `git remote get-url
+ * origin` answered in this checkout, so `stub()` names a reading —
+ * `gh` unless the case says otherwise — and the `none` cases are the
+ * ones that pass their own. Stubbing the pair apart is also what lets a
+ * case measure a `none` repository asking for NO provider, which is a
+ * different claim from one whose provider was asked nothing.
+ *
  * The prepared record every case works from is built here rather than
  * taken from `release/prepare.ts`, so a case pins what the stage does
  * with a record and not what `prepare.ts` makes of a directory. The
@@ -44,6 +54,17 @@
  *   - the commit subject always naming a version, so a project with no
  *     version file commits `chore: release null`: 1 case.
  *   - the plan title's `Plan:` label left on: 1 case.
+ *
+ * Those seven ran before the provider reading existed. Three more were
+ * driven the same way once it did, on 2026-09-20, one run each, 32 pass
+ * either side and the module restored sha256-identical after every one:
+ *
+ *   - the provider gate dropped, so every repository is asked for a
+ *     pull request body whatever it resolves to: 6 cases.
+ *   - the provider BUILT before the reading is taken, which is the
+ *     `gh` spawn a `none` repository must not pay for: 1 case.
+ *   - the unwritten line saying "that line" instead of quoting the
+ *     sentence it names: 2 cases.
  */
 import type { ReleaseStageInput, ReleaseStageSeams } from './release-stage.js';
 import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
@@ -198,6 +219,23 @@ const PROVIDER_GH: PrProviderReading = {
   host: 'github.com',
 };
 
+/** A `none` an operator asked for, over an origin that reads as GitHub. */
+const PROVIDER_NONE_CONFIGURED: PrProviderReading = { ...PROVIDER_GH, provider: 'none', source: 'config' };
+
+/** A `none` an origin decided, that origin being somewhere else. */
+const PROVIDER_NONE_ELSEWHERE: PrProviderReading = {
+  provider: 'none',
+  source: 'remote',
+  remote: 'git@gitlab.com:open-tomato/rafa.git',
+  host: 'gitlab.com',
+};
+
+/** The problem a reading that is not `gh` leaves in the record. */
+function noProvider(because: string): string {
+  return `this repository resolves to pr.provider: none, because ${because},`
+    + ' so there is no pull request to write it to';
+}
+
 /** The pull request the provider answers for the branch. */
 const SUMMARY: PullRequestSummary = {
   number: PR,
@@ -240,6 +278,8 @@ interface Script {
   readonly detail?: PullRequestDetail | null;
   /** What the provider throws instead of answering, if anything. */
   readonly throws?: string;
+  /** Which provider the repository resolves to. Absent, `gh`. */
+  readonly provider?: PrProviderReading;
 }
 
 /** Everything one stubbed run recorded. */
@@ -328,6 +368,10 @@ function stub(script: Script): Recorded {
       return script.push ?? PUSHED;
     },
     pulls: () => pulls,
+    // The reading every case but the provider ones runs under: the stage
+    // asks it before it asks for a provider, so a stub that left it out
+    // would send the real `resolvePrProvider` at `/repo`.
+    readProvider: () => script.provider ?? PROVIDER_GH,
     currentBranch: () => BRANCH,
   };
 
@@ -619,6 +663,77 @@ describe('finishRelease', () => {
     expect(world.bodies).toEqual([`Closes #21\n\n${SKIP_SENTENCE}`]);
   });
 
+  it('prints one line naming the sentence that went unwritten when the provider writes no body', async () => {
+    const world = stub({ provider: PROVIDER_NONE });
+
+    const finish = await finishRelease({ repoRoot: REPO, preparation: SKIPPED }, world.seams);
+
+    // The skip prints the sentence itself first; exactly one line after it
+    // says where that sentence did not go, and quotes it.
+    const named = world.info.filter((line) => line.includes(SKIP_SENTENCE) && line.includes('pr.provider'));
+    expect(named).toEqual([
+      `   No pull request body carries ${JSON.stringify(SKIP_SENTENCE)}: ${noProvider('origin is not set')}.`,
+    ]);
+    expect(finish.body?.problem).toBe(noProvider('origin is not set'));
+    // The setting working is not a fault, so nothing is reported as one.
+    expect(world.error).toEqual([]);
+  });
+
+  it('names pr.provider in the config as what kept the sentence off the pull request', async () => {
+    const world = stub({ provider: PROVIDER_NONE_CONFIGURED });
+
+    const finish = await finishRelease({ repoRoot: REPO, preparation: SKIPPED }, world.seams);
+
+    expect(finish.body?.problem).toBe(noProvider('pr.provider says so'));
+    expect(world.calls).toEqual([]);
+  });
+
+  it('names the origin that decided when no config named the provider', async () => {
+    const world = stub({ provider: PROVIDER_NONE_ELSEWHERE });
+
+    const finish = await finishRelease({ repoRoot: REPO, preparation: SKIPPED }, world.seams);
+
+    expect(finish.body?.problem).toBe(noProvider('origin is git@gitlab.com:open-tomato/rafa.git'));
+    expect(world.calls).toEqual([]);
+  });
+
+  it('asks for no provider at all when the reading is none', async () => {
+    const world = stub({ provider: PROVIDER_NONE });
+
+    const finish = await finishRelease(
+      { repoRoot: REPO, preparation: SKIPPED },
+      { ...world.seams, pulls: () => unreached('pulls') },
+    );
+
+    expect(finish.outcome).toBe('skipped');
+    expect(finish.body?.carried).toBe(false);
+  });
+
+  it('asks for a provider when the reading is gh, which is the control', async () => {
+    const world = stub({});
+
+    await expect(finishRelease(
+      { repoRoot: REPO, preparation: SKIPPED },
+      { ...world.seams, pulls: () => unreached('pulls') },
+    )).rejects.toThrow('unplanned pulls');
+  });
+
+  it('carries an uncommitted release sentence no further than the terminal under a none provider', async () => {
+    const world = stub({ provider: PROVIDER_NONE, git: [OK, OK] });
+
+    const finish = await finishRelease(
+      { repoRoot: REPO, preparation: prepared() },
+      { ...world.seams, verify: () => VERIFIED },
+    );
+
+    expect(finish.outcome).toBe('uncommitted');
+    expect(world.bodies).toEqual([]);
+    expect(world.calls).toEqual([]);
+    // The failure is still reported as one, above the line about the body.
+    expect(world.error[0]).toContain(finish.sentence ?? '');
+    expect(world.info.at(-1)).toContain(`No pull request body carries ${JSON.stringify(finish.sentence ?? '')}`);
+  });
+
   it('puts a refused verification sentence in the body and commits nothing', async () => {
     const world = stub({});
 
@@ -808,6 +923,7 @@ describe('RELEASE_STAGE_SEAMS', () => {
       'pulls',
       'push',
       'readNotes',
+      'readProvider',
       'verify',
     ]);
     expect(RELEASE_STAGE_SEAMS.now()).toBeInstanceOf(Date);
