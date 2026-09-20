@@ -96,12 +96,13 @@
  * planner reads once and carries back both on the plan it answers and on
  * what it rejects with (`adapters/planner/claude.ts`). Neither of those acts on
  * it. This command does, through {@link enforceSpecReview}
- * (`board/gate.ts`): a review that is not ready removes the plan and the
- * prerequisites file when the session wrote them anyway, publishes the
+ * (`board/gate.ts`): a review that is not ready moves the plan and the
+ * prerequisites file into `rejected/` under `plan.dir` when the session
+ * wrote them anyway, publishes the
  * gaps on the issue when there is one, swaps `spec:ready` for
  * `spec:needs-work`, and throws `CommandExit(3)` carrying every gap.
  * `--spec=<file>` has no issue and so no labels to move: that route
- * removes, prints and exits 3. The issue routes fill
+ * moves the files aside, prints and exits 3. The issue routes fill
  * {@link SpecReviewGateOptions.issue} with the number and the board
  * `board/plan-spec.ts` answers beside the spec, so a not-ready verdict
  * on an issue is published where the spec came from.
@@ -138,7 +139,7 @@
  * reports a number as unusable; the note in `board/plan-field.ts` holds
  * the measurement.
  *
- * Every record is written AFTER the gate, so a plan the gate removed is
+ * Every record is written AFTER the gate, so a plan the gate moved aside is
  * never stamped, and each is a warning when it cannot be written: the
  * plan is what the operator asked for, and a stamp that refused it
  * would throw away a session already paid for.

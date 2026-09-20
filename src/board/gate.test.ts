@@ -19,7 +19,7 @@
  * nothing, and since 2026-09-20 a review the parser could not read over
  * a plan that reads as written — over the same files and the same
  * board, and each of those asserts the standing it answers, that no
- * file was removed and that no command was sent.
+ * file was moved and that no command was sent.
  *
  * The four readings a session can leave behind each have their case
  * here: `ready`, `not-ready`, `absent` and `malformed`, the last two
@@ -66,11 +66,18 @@
  *    not-ready verdict was before this change: 61 pass, 6 fail — all
  *    five cases here and the `missing-review` case in
  *    `src/plan.test.ts`.
+ *
+ * One mutation of the move added on 2026-09-20 was driven over
+ * `bun test src/board/gate.test.ts`, the module restored from a scratch
+ * copy and verified with `shasum -c`: the rename swapped back for an
+ * `rmSync`, so the gate deletes as it used to, fails 3 of the 18 cases
+ * here — the byte-for-byte case, the both-files case and the
+ * plan-alone case — where 18 pass with the move in place.
  */
 import type { IssueBoard } from './issue-board.js';
 import type { SpecReviewReading } from './spec-review.js';
 
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -84,6 +91,7 @@ import {
   enforceSpecReview,
   NO_COMMENT_FLAG,
   readGateFlags,
+  rejectedPath,
   SKIP_REVIEW_FLAG,
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,
@@ -315,6 +323,8 @@ describe('enforceSpecReview on a not-ready verdict', () => {
 
     expect(existsSync(join(root, PLAN_PATH))).toBe(false);
     expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(false);
+    expect(existsSync(join(root, rejectedPath(PLAN_PATH)))).toBe(true);
+    expect(existsSync(join(root, rejectedPath(PREREQUISITES_PATH)))).toBe(true);
     expect(calls.map((call) => call[0])).toEqual(['comments', 'comment', 'swapLabels']);
     expect(calls[2]).toEqual(['swapLabels', 20, SPEC_READY_LABEL, SPEC_NEEDS_WORK_LABEL]);
     expect(String(calls[1]?.[2])).toContain('no item says how the merge clean-up is verified');
@@ -324,12 +334,39 @@ describe('enforceSpecReview on a not-ready verdict', () => {
     expect(refusal.message).toContain('"Tasks the plan must carry": the third task does not name what it changes');
     expect(refusal.message).toContain(`label the issue ${SPEC_READY_LABEL} again`);
     expect(lines.info).toEqual([
-      `🗑  Removed ${PLAN_PATH}: the planner judged the spec not ready, so no plan stands.`,
-      `🗑  Removed ${PREREQUISITES_PATH}: the planner judged the spec not ready, so no plan stands.`,
+      `🗃  Moved ${PLAN_PATH} to ${rejectedPath(PLAN_PATH)}: `
+        + 'the planner judged the spec not ready, so no plan stands.',
+      `🗃  Moved ${PREREQUISITES_PATH} to ${rejectedPath(PREREQUISITES_PATH)}: `
+        + 'the planner judged the spec not ready, so no plan stands.',
       '💬 Posted the review comment on issue #20.',
       `🏷  Swapped ${SPEC_READY_LABEL} for ${SPEC_NEEDS_WORK_LABEL} on issue #20.`,
     ]);
     expect(lines.warn).toEqual([]);
+  });
+
+  it('keeps both files byte for byte under rejected/, because a session costs money', async () => {
+    const root = plantRepo([]);
+    const planBytes = 'plan written against a refused review\n';
+    const prerequisiteBytes = 'prerequisites written beside it\n';
+    writeFileSync(join(root, PLAN_PATH), planBytes, 'utf8');
+    writeFileSync(join(root, PREREQUISITES_PATH), prerequisiteBytes, 'utf8');
+
+    await refusalOf(enforceSpecReview({
+      review: NOT_READY,
+      source: SOURCE,
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: null,
+      comment: true,
+      output: capture().output,
+    }));
+
+    expect(rejectedPath(PLAN_PATH)).toBe('.rafa/plans/rejected/PLAN-rafa-20.md');
+    expect(readFileSync(join(root, rejectedPath(PLAN_PATH)), 'utf8')).toBe(planBytes);
+    expect(readFileSync(join(root, rejectedPath(PREREQUISITES_PATH)), 'utf8')).toBe(prerequisiteBytes);
+    expect(existsSync(join(root, PLAN_PATH))).toBe(false);
+    expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(false);
   });
 
   it('edits the marker comment a rerun finds, rather than posting beside it', async () => {
@@ -352,7 +389,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
     expect(lines.info).toContain('💬 Edited the review comment on issue #20.');
   });
 
-  it('removes what the session wrote even when it wrote only the plan', async () => {
+  it('moves what the session wrote aside even when it wrote only the plan', async () => {
     const root = plantRepo([PLAN_PATH]);
     const { lines, output } = capture();
 
@@ -368,7 +405,8 @@ describe('enforceSpecReview on a not-ready verdict', () => {
     }));
 
     expect(existsSync(join(root, PLAN_PATH))).toBe(false);
-    expect(lines.info.filter((line) => line.startsWith('🗑'))).toHaveLength(1);
+    expect(existsSync(join(root, rejectedPath(PLAN_PATH)))).toBe(true);
+    expect(lines.info.filter((line) => line.startsWith('🗃'))).toHaveLength(1);
   });
 
   it('writes no comment under --no-comment, and still swaps the labels', async () => {
@@ -407,7 +445,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
     }));
 
     expect(existsSync(join(root, PLAN_PATH))).toBe(false);
-    expect(lines.info.filter((line) => !line.startsWith('🗑'))).toEqual([]);
+    expect(lines.info.filter((line) => !line.startsWith('🗃'))).toEqual([]);
     expect(refusal.message).toContain(`❌ ${SOURCE} is not ready to plan from`);
     expect(refusal.message).toContain('Close the gaps in the spec, then plan from it again.');
     expect(refusal.message).not.toContain(SPEC_READY_LABEL);
@@ -516,8 +554,10 @@ describe('enforceSpecReview on a review it could not read', () => {
     expect(refusal.message).toContain(`${PLAN_PATH}:3: unclosed-block:`);
     expect(refusal.message).toContain('Plan from the spec again.');
     expect(lines.info).toEqual([
-      `🗑  Removed ${PLAN_PATH}: no review came back and the plan does not read as written, so no plan stands.`,
-      `🗑  Removed ${PREREQUISITES_PATH}: no review came back and the plan does not read as written, so no plan stands.`,
+      `🗃  Moved ${PLAN_PATH} to ${rejectedPath(PLAN_PATH)}: `
+        + 'no review came back and the plan does not read as written, so no plan stands.',
+      `🗃  Moved ${PREREQUISITES_PATH} to ${rejectedPath(PREREQUISITES_PATH)}: `
+        + 'no review came back and the plan does not read as written, so no plan stands.',
     ]);
     expect(lines.warn).toEqual([]);
   });
@@ -606,6 +646,9 @@ describe('enforceSpecReview writes through the active output', () => {
     }));
     setActiveOutput(null);
 
-    expect(lines).toEqual([`🗑  Removed ${PLAN_PATH}: the planner judged the spec not ready, so no plan stands.`]);
+    expect(lines).toEqual([
+      `🗃  Moved ${PLAN_PATH} to ${rejectedPath(PLAN_PATH)}: `
+        + 'the planner judged the spec not ready, so no plan stands.',
+    ]);
   });
 });

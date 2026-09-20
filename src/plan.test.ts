@@ -570,7 +570,7 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('removes the plan and the prerequisites written against a not-ready review, and exits 3', () => {
+  it('moves the plan and the prerequisites written against a not-ready review aside, and exits 3', () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'not-ready', ['--spec=spec.md', '--no-progress']);
@@ -578,8 +578,11 @@ describe('rafa plan through the adapter registry', () => {
     expect(run.exitCode).toBe(3);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md'))).toBe(false);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'PREREQUISITES-spec.md'))).toBe(false);
-    expect(run.stdout).toContain('🗑  Removed .rafa/plans/PLAN-spec.md');
-    expect(run.stdout).toContain('🗑  Removed .rafa/plans/PREREQUISITES-spec.md');
+    expect(run.stdout).toContain('🗃  Moved .rafa/plans/PLAN-spec.md to .rafa/plans/rejected/PLAN-spec.md');
+    expect(run.stdout).toContain(
+      '🗃  Moved .rafa/plans/PREREQUISITES-spec.md to .rafa/plans/rejected/PREREQUISITES-spec.md',
+    );
+    expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'rejected', 'PLAN-spec.md'))).toBe(true);
     expect(run.stdout).not.toContain('Plan ready');
     expect(run.stderr).toContain('❌ spec.md is not ready to plan from');
     expect(run.stderr).toContain('"Definition of done": no item says how the merge clean-up is verified');
