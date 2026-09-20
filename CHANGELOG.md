@@ -1,11 +1,13 @@
 # Changelog
 
 One section per released version, newest first, headed
-`## <version> — <date>, <what the release is>`. One line per area a
-user would notice, written from the pull request rather than from the
-commit list. Versions follow semver; a phase is a minor, a fix between
-phases is a patch. Each released version is tagged `v<version>`
-(`v0.1.0` was never tagged; `f9954e2..da0a76c` is its range).
+`## <version> — <date>, <release title>`. The sections are generated
+from change notes in task reports (`changes` field in `rafa:report`):
+the loop inserts raw notes grouped by area, then the wrap-up agent
+rewrites each area into one user-facing line. Versions follow semver;
+a phase is a minor, a fix between phases is a patch. Each released
+version is tagged `v<version>` (`v0.1.0` was never tagged;
+`f9954e2..da0a76c` is its range).
 
 ## 0.4.0 — 2026-09-19, phase 3: pull requests and the board
 
