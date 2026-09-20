@@ -106,6 +106,15 @@ module's note is the long form.
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
+- **`loop start --create-branch` creates the feature branch when on main or
+  master** (`start/run-config.ts`): when the working directory is checked
+  out on `main` or `master`, the flag creates `feat/<stub>` from the latest
+  `origin/<base>`, where `<base>` is the tracking branch of the default
+  branch, instead of printing a checkout instruction. Without the flag, the
+  loop prints the command to run. The flag is read from the parsed line and
+  handed into `start`, which resolves the plan from `.rafa/plans/` unless
+  `plan.dir` in the config names another directory, then uses that plan's
+  stub to name the new branch.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`

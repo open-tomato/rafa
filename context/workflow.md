@@ -93,6 +93,17 @@ whose ID appears as `rafa-<n>`.
 The slug summarizes what the user gets, using two to four words joined
 by hyphens.
 
+### Branch creation with loop start
+
+**`loop start --create-branch` creates the feature branch automatically**
+when run on `main` or `master`, instead of printing a checkout instruction.
+The branch is created as `feat/<stub>` from the latest `origin/<base>`,
+where `<base>` is the tracking branch of the default branch. This feature
+requires `--create-branch` to be explicit, preserving the safety of the
+existing print-only behavior when the flag is absent. Use it alongside
+`--plan=<path>` or the default plan under `plan.dir`, the default being
+`.rafa/plans/` unless the config `plan.dir` names another.
+
 **The order of all work lives in ONE place: the pinned "Roadmap" issue**
 on the `open-tomato/rafa` board. The word "phase" and its letters are
 retired; merged work keeps its old file names and a table in the Roadmap
