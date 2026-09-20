@@ -46,7 +46,7 @@
  *   - the plan title's `Plan:` label left on: 1 case.
  */
 import type { ReleaseStageInput, ReleaseStageSeams } from './release-stage.js';
-import type { GitResult, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
+import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
 import type { ChangelogEntry, ChangelogNote } from '../release/changelog.js';
 import type {
   ReleaseFileEdit,
@@ -181,6 +181,21 @@ const REFUSED: ReleaseRefused = {
     { path: 'CHANGELOG.md', restored: true, problem: null },
     { path: 'package.json', restored: true, problem: null },
   ],
+};
+
+/**
+ * What `resolvePrProvider` answers for a repository with no GitHub
+ * origin: the resolution the stage must read before it reaches for
+ * `gh` at all. See `src/pr/provider.ts`.
+ */
+const PROVIDER_NONE: PrProviderReading = { provider: 'none', source: 'remote', remote: null, host: null };
+
+/** What that same reading answers for a GitHub origin, the control beside it. */
+const PROVIDER_GH: PrProviderReading = {
+  provider: 'gh',
+  source: 'remote',
+  remote: 'git@github.com:open-tomato/rafa.git',
+  host: 'github.com',
 };
 
 /** The pull request the provider answers for the branch. */
@@ -572,6 +587,36 @@ describe('finishRelease', () => {
     expect(finish.body).toEqual({ number: PR, carried: true, already: false, problem: null });
     expect(world.bodies).toEqual([`Closes #21\n\n${SKIP_SENTENCE}`]);
     expect(world.git).toEqual([]);
+  });
+
+  it('reaches no pull request and sends no gh command when the resolved provider is none', async () => {
+    const world = stub({});
+
+    const finish = await finishRelease(
+      { repoRoot: REPO, preparation: SKIPPED },
+      { ...world.seams, readProvider: () => PROVIDER_NONE } as Partial<ReleaseStageSeams>,
+    );
+
+    expect(finish.outcome).toBe('skipped');
+    expect(finish.sentence).toBe(SKIP_SENTENCE);
+    expect(finish.body?.carried).toBe(false);
+    expect(finish.body?.problem).not.toBeNull();
+    expect(world.calls).toEqual([]);
+    expect(world.bodies).toEqual([]);
+  });
+
+  it('writes the sentence into the pull request body when the provider resolves to gh, which is the control', async () => {
+    const world = stub({});
+
+    const finish = await finishRelease(
+      { repoRoot: REPO, preparation: SKIPPED },
+      { ...world.seams, readProvider: () => PROVIDER_GH } as Partial<ReleaseStageSeams>,
+    );
+
+    expect(finish.outcome).toBe('skipped');
+    expect(finish.body).toEqual({ number: PR, carried: true, already: false, problem: null });
+    expect(world.calls).toEqual(['findOpen', `get ${PR}`, `editBody ${PR}`]);
+    expect(world.bodies).toEqual([`Closes #21\n\n${SKIP_SENTENCE}`]);
   });
 
   it('puts a refused verification sentence in the body and commits nothing', async () => {
