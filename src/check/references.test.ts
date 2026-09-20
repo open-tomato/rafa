@@ -63,6 +63,22 @@
  * each: dropping the foreign check from `readCommand` reddened 6
  * cases, keeping the check but dropping only the LINE instead of the
  * fence reddened 2, and reading a heredoc body as evidence reddened 1.
+ *
+ * ## The single-segment route, and its leg
+ *
+ * `reads a single-segment extensioned token as a route, not a foreign
+ * path` holds `/openapi.json` and `/swagger.json` in one body with the
+ * two controls the rule must not reach: a multi-segment
+ * `/workspace/project/config.yaml`, still `foreign-path`, and
+ * `/Users/someone/openapi.json`, still `home-path`. The case beside it
+ * holds the other boundary, that a single segment naming a root
+ * (`/tmp`, `/Users`) is no route and stays a reference.
+ *
+ * One mutation was driven on 2026-09-20 and the module restored
+ * sha256-identical after it: putting back the first-segment-only test,
+ * so that an extension alone made a token a path, reddened 1 case —
+ * the route one, with `/openapi.json` and `/swagger.json` back among
+ * the reported texts.
  */
 import type { BodyReference, ReferenceIssue, ReferenceIssueCode } from './references.js';
 
@@ -682,6 +698,31 @@ describe('locality', () => {
     ));
 
     expect(references).toEqual([]);
+  });
+
+  it('reads a single-segment extensioned token as a route, not a foreign path', () => {
+    const found = checkReferences(
+      body(
+        span('/openapi.json'),
+        span('/swagger.json'),
+        span('/workspace/project/config.yaml'),
+        span('/Users/someone/openapi.json'),
+      ),
+      { projectRoot: null, skillDir: null, pathDirs: [] },
+    );
+
+    expect(textsOf(found.references, 'path')).toEqual([
+      '/workspace/project/config.yaml',
+      '/Users/someone/openapi.json',
+    ]);
+    expect(codesOf(found.issues)).toEqual(['foreign-path', 'home-path']);
+  });
+
+  it('keeps judging a single-segment token that names a root, which no route does', () => {
+    const references = collectReferences(body(span('/tmp'), span('/Users')));
+
+    expect(textsOf(references, 'path')).toEqual(['/tmp', '/Users']);
+    expect(verdict('/tmp')).toBe(null);
   });
 
   it('resolves an absolute path inside the project instead of judging where it lives', () => {

@@ -396,26 +396,31 @@ export function isProjectPath(token: string): boolean {
 /**
  * Whether `token` is an absolute path the locality rule judges.
  *
- * Beyond the shape every path needs, an absolute token has to look
- * like a FILE path and not like an HTTP route: its first segment is a
- * root this module already has a verdict for ({@link KNOWN_ROOTS}),
- * or it carries an extension, and in neither case does it open with a
- * `//` or a dot segment. That rule was written against a false
- * positive rather than a guess: over the corpus this module's note
- * describes, the shape-only test it replaces reported `/health`,
- * `/api/markets`, `/login`, `/.claude` and the `//` of a comment
- * marker as absolute paths outside the project — 109 hits, against 5
- * here, and the 5 that remain are `/openapi.json`, `/swagger.json`
- * and one docker path. What the rule gives up is the extensionless
- * directory under an unknown root: `/workspace/project` in a body is
- * no longer judged at all.
+ * Beyond the shape every path needs, an absolute token has to look like a
+ * FILE path and not like an HTTP route: its first segment is a root this
+ * module has a verdict for ({@link KNOWN_ROOTS}), or it carries an extension
+ * AND a second segment, and neither opens with a `//` or a dot segment. The
+ * shape-only test the extension half replaced read `/health`,
+ * `/api/markets`, `/login`, `/.claude` and a comment marker's `//` as paths
+ * outside the project — 109 hits against 5 on 2026-09-18; the second-segment
+ * half is about those 5: a route a server answers (`/openapi.json`) is one
+ * segment long and no machine's layout. Unjudged now: `/workspace/project`,
+ * `/probe.json`.
+ *
+ * Measured 2026-09-20 over the same 146-body corpus the fence rule above
+ * measures: 327 path references, 63 of them absolute, 0 `home-path` and 0
+ * `foreign-path` issues, all four the same BEFORE this half and AFTER, every
+ * absolute token there under a system root. Planting
+ * `/srv/data/payload.json` beside `/openapi.json` in every body lifts that 0
+ * to 146, the route still 0.
  */
 function isAbsoluteReference(token: string): boolean {
   if (!token.startsWith('/') || token === '/' || token.includes('//')) return false;
   if (SCHEME.test(token) || NOT_A_PATH.test(token)) return false;
 
-  const first = token.split('/')[1] ?? '';
+  const [first = '', second] = token.split('/').slice(1);
   if (first.startsWith('.')) return false;
+  if (second === undefined) return KNOWN_ROOTS.includes(token);
   return KNOWN_ROOTS.includes(`/${first}`) || EXTENSION.test(token);
 }
 
