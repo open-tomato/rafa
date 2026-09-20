@@ -154,8 +154,7 @@ Recognized fields:
 - `stub` — The plan identifier (string, following the `rafa-<n>-<slug>` format). Used to organize findings and dedupe rows across runs.
 - `issue` — Optional GitHub issue number (integer, e.g., `123`). Links the work back to the `open-tomato/rafa` board.
 - `spec` — Optional path to the specification document that guided the plan.
-- `changes` — Optional one-line summary of the change for the changelog, written at the user level (e.g., "Add pull-request merge commands").
-- `release:` — Optional release level for the plan's overall change: `major`, `minor`, or `patch`.
+- `release` — Optional release level for the version bump this plan's pull request ships: `patch`, `minor`, `major` or `none`. Anything else is reported as `unusable-field` and read as if unset. Left out, the level is the highest among the change notes the plan's tasks stored, and `none` when they stored none.
 
 Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
 
@@ -249,8 +248,7 @@ Report fields:
 | `skills_used` | list of strings | Names of skills referenced or applied |
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
 | `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
-| `changes` | string | One-line summary of the change for the changelog, written at the user level (e.g., "Add pull-request merge commands") |
-| `release:` | string | The release level for this change: `major`, `minor`, or `patch` |
+| `changes` | list of objects | The changelog for this task's own diff, one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none` |
 
 Finding entry fields:
 
@@ -263,6 +261,14 @@ Finding entry fields:
 | `resolution` | string | no | How to fix or work around it |
 | `artifact` | string | no | Error message, file path, or code snippet that signals the finding |
 | `signal` | string | yes | `loud` (it surfaced as a failure) or `silent` (it passed while wrong) |
+
+Change note entry fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `level` | string | yes | How much of a release the diff is worth: `patch`, `minor`, `major` or `none` |
+| `summary` | string | yes | One line a user of the project would understand, quoted |
+| `area` | string | no | The changelog section the line groups under (e.g., `cli`, `store`) |
 
 Blocker/bug entry fields:
 

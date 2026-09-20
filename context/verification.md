@@ -49,15 +49,20 @@ does not own — which one case does, below.
 `src/tests/parity-differential.test.ts` runs the collector twice, once
 per backend, over `~/.claude/projects/-Users-marcos-projects-agentic-research`,
 and the sibling runs its own loop: a session appending to its `.jsonl`
-between the two collections changes `sizeBytes` and `modifiedAt`, and
-`holds every session row byte-identical between backends, keyed by
-session id` fails on those two fields alone. Measured 2026-09-18 at
-`12e6d17`: the full suite 4799 pass, 1 skip, 1 fail, that case, and the
-file alone 3 pass, 1 fail, the same case. So a single red count is not
-yet a reading about the change. Separate the two by re-running that file
-and diffing the two payloads the failure prints — a difference confined to
-`sizeBytes` and `modifiedAt` is the race, and any other field is a real
-parity failure. Do NOT reach for a stash-and-re-run to prove it
+between the two collections changes the row, and `holds every session
+row byte-identical between backends, keyed by session id` fails.
+Measured 2026-09-18 at `12e6d17`: the full suite 4799 pass, 1 skip, 1
+fail, that case, and the file alone 3 pass, 1 fail, the same case. So a
+single red count is not yet a reading about the change.
+
+The fields the race moves are NOT confined to `sizeBytes` and
+`modifiedAt`, as this paragraph read until 2026-09-20: one run during
+rafa-21 differed in `lineCount`, `recordCount`, `recordTypeCounts`,
+`usage` and `lastTimestamp` with those two EQUAL, which a two-field rule
+would have misread as a real parity failure. Separate race from failure
+by re-running the file instead: the race does not survive a re-run
+against a sibling that has since gone quiet, while a real parity failure
+reproduces every time. Do NOT reach for a stash-and-re-run to prove it
 pre-existing: that is a second full suite against a moving input.
 
 **Inside a Claude Code session, `bun test` names failures only.** The
@@ -83,12 +88,39 @@ bare `'vitest'` import with its own runner, so a file never ported off
 vitest passes `bun test`; only `lint`'s `import/no-unresolved` reports
 it. Grep `from 'vitest'` to find one.
 
+**A read-and-record task produces no commit, so the SHA it cites is an
+older one.** A task whose whole deliverable is a reading — the gate
+captures, the mergeability check, the close-out notes — changes no tracked
+file, and the loop commits nothing for it. The SHA to cite beside such a
+reading is the most recent commit that DID change a tracked file, carried
+forward unchanged through every no-diff task after it, and `HEAD` is
+exactly that.
+
+**A clean mergeability reading needs a liveness control.**
+`git merge-tree --write-tree origin/main HEAD` exits 0 and prints one tree
+hash when the merge is clean — which is indistinguishable from a command
+that never really looked. Prove it fires in the same session: in a scratch
+`git worktree`, branch two throwaway commits off one base, each editing the
+same file differently, and run the same command on them. Exit 1, a
+`CONFLICT (content):` line and the three numbered index stages are the
+positive control. Use a worktree so the real tree and branch are never
+touched, and clean up with `git worktree remove --force` and `git branch -D`.
+
 **Every gate's capture is a snapshot that ages.** A gate run at commit A
 answers what the code held at A, which is a different reading from what
 the code holds at commit B. Where a close-out or a PR body cites a gate
 capture, record the commit SHA that produced it — one line showing commit,
 exit code, and gate name is what lets a reader verify the capture against
 the repo's history rather than taking it on trust.
+
+**`toMatchObject` mutates the object it received.** Measured under
+bun 1.3.14, this repo's pinned runtime: after one
+`expect(x).toMatchObject({ message: expect.stringContaining('...') })`,
+`x.message` IS the matcher, so a second assertion on the same object fails
+however right it is, and prints `"message": StringContaining` as the value
+it received. Never assert twice on one object with `toMatchObject`. Narrow
+the variant with a helper that throws on the wrong one, then assert the
+field with `toBe` or `toContain`.
 
 **No gate can read a file that does not exist on disk.** A file deleted
 from the worktree but still staged in the index passes `git ls-files`

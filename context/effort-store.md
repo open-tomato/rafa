@@ -83,6 +83,14 @@ the same session id. Its rows are deduplicated per session by every
 stored field — `level`, `area` and `summary` — as `triage` dedupes, not
 by an artifact.
 
+**`task_reports.outcome` holds `done` or `blocked` and nothing else.**
+`recordTaskReport` (`src/report/record.ts`) writes only that closed-set
+status into the column; a report's free-text `feedback` reaches no
+queryable table at all. To recover what a past task actually said — the
+exit codes it captured, the commands it ran — read `session_id` off its
+`task_reports` row and open the matching
+`~/.claude/projects/<project-slug>/<session-id>.jsonl`.
+
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row
 per check keyed by `(run_id, position)`, since a run can check one item
@@ -109,6 +117,14 @@ An inserted row reaches `progress.txt` as the bullet
 `ralph:plan=` stamp in a prompt.** Task and wrap-up prompts carry plan
 text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.
+
+**A branch stub is not a queue id.** `QUEUE_ID` in
+`src/effort/attribution.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
+`q`-prefixed leading token is read as one. A `rafa-<n>` stub carries
+none and resolves by exact match alone, which is why the branch
+`feat/rafa-21` matches no plan called `rafa-21-changelog-and-release`.
+Write queue-id cases with `q`-prefixed stubs, and expect a `rafa-<n>`
+branch stub to fall through to `match: none`.
 
 **`effort collect` attributes by the plan stubs in `plan.dir`**, under
 the repo root and `.rafa/plans` unless a config names another, when its

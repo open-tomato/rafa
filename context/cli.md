@@ -65,7 +65,17 @@ module's note is the long form.
   here` goes red the moment a module gains, drops or renames one import.
   Adding an import to a command module is therefore a two-file change,
   the module and that roster — the sibling of the declared-flag roster
-  `src/commands/index.test.ts` holds.
+  `src/commands/index.test.ts` holds. Its `IMPORT_PATTERN` matches
+  RELATIVE specifiers only, those opening `./` or `../`, so a module's
+  `node:fs` and `node:path` imports are spelled nowhere in the roster and
+  adding one reddens nothing.
+- **Neither roster walks the filesystem.** Both are spelled lists checked
+  against `CORE_REGISTRY`, so a module added under `src/commands/` and not
+  yet registered reddens neither, and a plan can split "add the module"
+  from "register it" across two tasks with the suite green between them.
+  Registration itself reddens exactly three: `OWN_DECLARATIONS` and the
+  roster expectations in `src/commands/index.test.ts`, `COMMAND_MODULES`
+  in `src/index.test.ts`, and the frozen help snapshots.
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
   and `plan validate`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
@@ -857,8 +867,12 @@ module's note is the long form.
 
 ### The registry
 
-It is built from code, so a collision throws when it is built. It
-refuses `help` as a subject, as a top-level command and as an alias's
+It is built from code, so a collision throws when it is built — and
+because it builds silently when nothing collides, a clean build is no
+evidence the check ran. To prove one absent, force one: register a
+deliberately colliding subject and read the named refusal it throws
+(`command registry: subject "releases" is spelled as the plural of
+subject "release"`). It refuses `help` as a subject, as a top-level command and as an alias's
 first word. It also refuses a subject, command or alias declared twice,
 a subject spelled as another's plural, and a top-level command spelled
 as a subject. So is an alias spelled as a top-level command or as a
@@ -1024,6 +1038,11 @@ home and the warnings read before the invocation are options.
   expected reading and not a writer that never fired; the control that
   tells them apart is dirtying one snapshot with an extra line and
   re-running the updater, which returns the file to its original sha.
+- **A new SUBJECT moves `rafa.txt` alone.** The root roster is the only
+  one of the three that lists subjects; `rafa-loop.txt` and
+  `rafa-loop-start.txt` render a different subtree and are untouched.
+  Read which files actually differ off `git status`, never off the
+  assumption that all three move together.
 
 ### Describe
 

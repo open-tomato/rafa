@@ -39,6 +39,20 @@ later.
 
 Every `pr` action without a usable `gh` exits 2 with the same message.
 
+The port carries `comment`, `editComment` and `editBody`. `editBody` is
+rafa-21's: the release stage writes its failure sentence into a pull
+request body the wrap-up session already wrote. The port is NOT in
+`PORT_VERSIONS` (`src/adapters/registry.ts` versions tracker, store,
+learning, output and planner only), so adding a method to it bumps no
+version.
+
+**For a test that needs a real provider and no network, build one over
+the fake `gh`.** `createFakePrGh()` — imported from `../pr/gh-fake.js`,
+never from the barrel — plus `createGhPullRequests({ gh: fake.run })`
+gives a genuine `PullRequests` implementation backed by an in-memory `gh`,
+so a read-modify-write such as the release stage's body edit runs
+unmocked. Register the route row the call needs on the fake.
+
 ### The merge flow
 
 1. Refuse on a dirty working tree, on a PR that is not green or not
