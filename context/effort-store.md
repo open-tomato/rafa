@@ -101,15 +101,18 @@ and writes nothing for a run with no item to check. `rafa doctor` checks
 the same items and writes no row.
 
 **`findings` has two writers.** `store/tracker-refs.ts` keeps a filed
-issue's reference in the row the dispatch's session holds under the
-bug's artifact: it sets `tracker_ref` on that session's finding, or
-inserts a row holding only the dispatch, the artifact and the reference,
-and keeps a reference already there. `readTrackerRef` answers the oldest
-reference stored under an artifact, in any session. Write a report's
-findings before its references: a finding written after a reference
-under the same session and artifact is skipped as that row's duplicate.
-An inserted row reaches `progress.txt` as the bullet
-`- artifact: <artifact>`.
+issue's reference in the row the dispatch's session holds under the text
+its caller keys the recurrence by: it sets `tracker_ref` on that
+session's row for the key, or inserts a row holding only the dispatch,
+the key and the reference, and keeps a reference already there.
+`readTrackerRef` answers the oldest reference stored under a key, in any
+session. `triage/triage.ts` keys by the bug's artifact WITH the tracker
+file it was reported against, so its rows carry that key rather than a
+bare artifact and never land on a report's finding. A caller that does
+key by a bare artifact writes a report's findings first: a finding
+written after a reference under the same session and artifact is skipped
+as that row's duplicate. An inserted row reaches `progress.txt` as the
+bullet `- artifact: <key>`.
 
 ### Attribution
 

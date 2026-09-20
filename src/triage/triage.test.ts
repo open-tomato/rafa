@@ -42,6 +42,13 @@
  * problem case added for it alone (1 of 32). A blank variable named as a
  * secret was not run on the first grid, its string matching two places;
  * spelled to match one, it reddened the unset, empty or blank case (1).
+ *
+ * That grid was driven against the module as it keyed a bug on its
+ * artifact alone. The lookup now keys on the artifact with the tracker
+ * file it was reported against, so the grid's counts are of the earlier
+ * module and no line of it was re-measured here; the cases under `bug
+ * identity keyed by artifact and tracker file` are the readings for the
+ * key itself.
  */
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
 import type { FindingsDispatch } from '../effort/store/findings.js';
@@ -71,6 +78,7 @@ import { findNextTask } from '../utils/tracker.js';
 
 import {
   blockerTextOf,
+  bugKeyOf,
   createPrivateTriageTracker,
   issueTitle,
   namedSecrets,
@@ -110,6 +118,12 @@ const FIRST: FindingsDispatch = { sessionId: 'session-1', planStub: 'demo', task
 const SECOND: FindingsDispatch = { sessionId: 'session-2', planStub: 'demo', taskLine: 'Wire the loop' };
 
 const ARTIFACT = 'TypeError: lines.at(-1) is undefined';
+
+/** The tracker file every fixture writes the plan's task lines into. */
+const TRACKER_FILE = 'PLAN_TRACKER-demo.md';
+
+/** The key {@link ARTIFACT} reported against that file is looked up under. */
+const KEY = bugKeyOf(TRACKER_FILE, ARTIFACT);
 
 /** One call a spied tracker received. */
 type TrackerCall = readonly [method: string, argument: unknown];
@@ -174,7 +188,7 @@ function fixture(overrides: Partial<Pick<Tracker, 'create' | 'find' | 'comment'>
   const root = join(tempBase, `root-${rootCount}`);
   rootCount += 1;
   mkdirSync(root, { recursive: true });
-  const trackerPath = join(root, 'PLAN_TRACKER-demo.md');
+  const trackerPath = join(root, TRACKER_FILE);
   writeFileSync(trackerPath, TRACKER_TEXT, 'utf8');
   const publicDir = localIssuesDir(root);
   return {
@@ -238,6 +252,22 @@ function onlyIssue(dir: string): ReturnType<typeof parseLocalIssue> & { readonly
   expect(files.map(({ name }) => name)).toEqual(['1.md']);
   const contents = files[0]!.contents;
   return { ...parseLocalIssue(contents), contents };
+}
+
+/** Every findings row, oldest first: what it is keyed by and its reference. */
+function findingRows(root: string): { artifact: string | null; tracker_ref: string | null }[] {
+  const path = sqliteStorePath(root);
+  if (!existsSync(path)) return [];
+  const db = new Database(path, { readonly: true });
+  try {
+    return db
+      .query<{ artifact: string | null; tracker_ref: string | null }, []>(
+        'SELECT artifact, tracker_ref FROM findings ORDER BY seq',
+      )
+      .all();
+  } finally {
+    db.close();
+  }
 }
 
 /** A findings row holding a reference, as the table holds it. */
@@ -392,7 +422,7 @@ describe('a public bug', () => {
 
     const issue = onlyIssue(f.publicDir);
     expect(methodsOf(f.publicSpy)).toEqual(['find', 'create']);
-    expect(f.publicSpy.calls[0]![1]).toEqual({ text: ARTIFACT, type: 'bug' });
+    expect(f.publicSpy.calls[0]![1]).toEqual({ text: KEY, type: 'bug' });
     expect(issue.draft).toEqual({
       opt: 0,
       title: 'Parser drops the last line',
@@ -400,6 +430,7 @@ describe('a public bug', () => {
         'An out-of-scope bug a rafa task session reported. The loop filed it and dispatches no task for it: a plan that wants it fixed declares a task.',
         `## What\n\n${fence('Parser drops the last line')}`,
         `## Artifact\n\n${fence(ARTIFACT)}`,
+        `## Recurrence key\n\n${fence(KEY)}`,
         `## Plan\n\n${fence('demo')}`,
         `## Task\n\n${fence('Wire the loop')}`,
         `## Feedback\n\n${fence('Built the module; the hook refused the commit.')}`,
@@ -421,8 +452,10 @@ describe('a public bug', () => {
       stored: 'inserted',
       problem: null,
     }]);
-    expect(refRows(f.root)).toEqual([{ session_id: 'session-1', artifact: ARTIFACT, tracker_ref: JSON.stringify(ref) }]);
-    expect(readTrackerRef(f.root, ARTIFACT)).toEqual(ref);
+    expect(refRows(f.root)).toEqual([{ session_id: 'session-1', artifact: KEY, tracker_ref: JSON.stringify(ref) }]);
+    expect(readTrackerRef(f.root, KEY)).toEqual(ref);
+    // Control: the artifact alone keys nothing, so another file's bug reads no reference.
+    expect(readTrackerRef(f.root, ARTIFACT)).toBeNull();
     expect(f.privateSpy.calls).toEqual([]);
     expect(existsSync(f.privateDir)).toBe(false);
   });
@@ -444,26 +477,48 @@ describe('a public bug', () => {
     expect(issue.comments[0]!.startsWith(`${CLOCK()}: Reported again by a rafa task session.`)).toBe(true);
     expect(issue.comments[0]).toContain(fence('Last line lost again'));
     expect(issue.comments[0]).toContain(fence('Seen again while wiring the loop.'));
+    // The comment carries the key, so an issue filed before this rafa gains one.
+    expect(issue.comments[0]).toContain(`## Recurrence key\n\n${fence(KEY)}`);
     expect(refRows(f.root).map((row) => row.session_id)).toEqual(['session-1']);
   });
 
-  it('is commented on an issue the tracker already holds when no reference is stored, which it then stores', async () => {
+  it('is commented on an issue the tracker holds under its key when no reference is stored, which it then stores', async () => {
     const f = fixture();
     const held = await createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK })
-      .create({ opt: 0, title: 'Filed by hand', body: `Seen: ${ARTIFACT}\n`, type: 'bug', module: 'x', priority: null, project: null, blockedBy: [] });
+      .create({
+        opt: 0,
+        title: 'Filed from another checkout',
+        body: `## Recurrence key\n\n${fence(KEY)}\n`,
+        type: 'bug',
+        module: 'x',
+        priority: null,
+        project: null,
+        blockedBy: [],
+      });
 
     const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
 
     expect(methodsOf(f.publicSpy)).toEqual(['find', 'comment']);
     expect(result.bugs[0]).toMatchObject({ action: 'commented', ref: held, foundBy: 'find', stored: 'inserted' });
     expect(onlyIssue(f.publicDir).comments).toHaveLength(1);
-    expect(readTrackerRef(f.root, ARTIFACT)).toEqual(held);
+    expect(readTrackerRef(f.root, KEY)).toEqual(held);
+  });
+
+  it('is filed beside an issue that quotes its artifact under no key of its own', async () => {
+    const f = fixture();
+    await createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK })
+      .create({ opt: 0, title: 'Filed by hand', body: `Seen: ${ARTIFACT}\n`, type: 'bug', module: 'x', priority: null, project: null, blockedBy: [] });
+
+    const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', foundBy: null });
+    expect(issueFiles(f.publicDir).map(({ name }) => name)).toEqual(['1.md', '2.md']);
   });
 
   it('passes over a stored reference of another kind and asks the tracker', async () => {
     const f = fixture();
     const github: IssueRef = { opt: 0, kind: 'github', externalId: '7', url: 'https://github.com/o/r/issues/7' };
-    writeTrackerRef(f.root, { dispatch: SECOND, outcome: 'blocked', artifact: ARTIFACT, ref: github });
+    writeTrackerRef(f.root, { dispatch: SECOND, outcome: 'blocked', artifact: KEY, ref: github });
 
     const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
 
@@ -535,7 +590,7 @@ describe('a public bug', () => {
       ['filed', null],
     ]);
     expect(onlyIssue(f.publicDir).draft.title).toBe('Second bug');
-    expect(refRows(f.root).map((row) => row.artifact)).toEqual(['artifact two']);
+    expect(refRows(f.root).map((row) => row.artifact)).toEqual([bugKeyOf(TRACKER_FILE, 'artifact two')]);
   });
 
   it('filed with a reference the store refuses stays filed and names the refusal', async () => {
@@ -576,6 +631,26 @@ describe('bug identity keyed by artifact and tracker file', () => {
 
     expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', problem: null });
     expect(issueFiles(f.publicDir)).toHaveLength(1);
+  });
+
+  it('keeps its reference in a row of its own, beside the finding the report stored under the artifact', async () => {
+    const f = fixture();
+    writeFindings(f.root, {
+      dispatch: FIRST,
+      outcome: 'blocked',
+      findings: [{
+        trigger: 'when parsing', kind: 'gotcha', what: 'lines lost', cause: null, resolution: null,
+        artifact: ARTIFACT, signal: 'loud', extras: [],
+      }],
+    });
+
+    const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', stored: 'inserted', problem: null });
+    expect(findingRows(f.root).map((row) => [row.artifact, row.tracker_ref === null])).toEqual([
+      [ARTIFACT, true],
+      [KEY, false],
+    ]);
   });
 
   it('control: two different defects that share an artifact string across two tracker files stay two issues', async () => {
@@ -627,7 +702,7 @@ describe('a security bug', () => {
     expect(onlyIssue(join(f.root, PRIVATE_TRIAGE_DIR)).draft.title).toBe('Token printed to the log');
     expect(existsSync(f.publicDir)).toBe(false);
     expect(refRows(f.root)).toEqual([]);
-    expect(readTrackerRef(f.root, ARTIFACT)).toBeNull();
+    expect(readTrackerRef(f.root, KEY)).toBeNull();
 
     // Control: the same bug unflagged reaches the public spy and the store.
     await triage(f, reportWith({ outOfScopeBugs: [bug('Token printed to the log', ARTIFACT, false)] }));
@@ -720,7 +795,8 @@ describe('named secrets in what is filed', () => {
     expect(issue.draft.body).toContain(fence('auth header [redacted: GITHUB_TOKEN]'));
     expect(issue.draft.body).toContain(fence('Migrate [redacted: DB_URL]'));
     expect(issue.draft.body).toContain(fence('Connected with [redacted: DB_URL]; the push printed [redacted: GITHUB_TOKEN].'));
-    expect(f.publicSpy.calls[0]).toEqual(['find', { text: 'auth header [redacted: GITHUB_TOKEN]', type: 'bug' }]);
+    expect(f.publicSpy.calls[0])
+      .toEqual(['find', { text: bugKeyOf(TRACKER_FILE, 'auth header [redacted: GITHUB_TOKEN]'), type: 'bug' }]);
     expect(JSON.stringify(f.publicSpy.calls)).not.toContain(TOKEN);
   });
 
@@ -735,7 +811,7 @@ describe('named secrets in what is filed', () => {
     expect(contents).toContain(DB);
   });
 
-  it('are absent from a recurrence comment, which the stored reference under the raw artifact still finds', async () => {
+  it('are absent from a recurrence comment, which the reference under the unredacted key still finds', async () => {
     const f = fixture();
     const { report, dispatch } = leakyOptions();
     await triage(f, report, { dispatch, secrets: SECRETS });
