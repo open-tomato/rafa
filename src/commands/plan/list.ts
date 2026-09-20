@@ -1,14 +1,15 @@
 /**
- * `rafa plan list`: every plan under `.plans/`, with how far the loop has
- * got through each.
+ * `rafa plan list`: every plan under the configured plans directory, with
+ * how far the loop has got through each.
  *
  * ## What is listed
  *
- * Each file in `.plans/` at the git root named `PLAN-<stub>.md` whose stub
- * a plan stamp can carry (`plan-files.ts`), in stub order. A tracker is
- * never listed on its own, nor is a bare `PLAN.md`, which has no stub for
- * `rafa plan show` to name, nor anything that is not a file. With no
- * `.plans/` the list is empty, which is no refusal.
+ * Each file in the configured plans directory at the git root named
+ * `PLAN-<stub>.md` whose stub a plan stamp can carry (`plan-files.ts`), in
+ * stub order. A tracker is never listed on its own, nor is a bare
+ * `PLAN.md`, which has no stub for `rafa plan show` to name, nor anything
+ * that is not a file. With no plans directory the list is empty, which is
+ * no refusal.
  *
  * A plan's tasks are counted from its tracker, `PLAN_TRACKER-<stub>.md`,
  * when there is one, since that is the copy the loop ticks, and from the
@@ -22,9 +23,10 @@
  * directory read, and `plans`, each with its `stub`, its `plan` and
  * `tracker` paths, absolute and `tracker` null without one, its task
  * counts under `tasks`, and its number of `issues`. In text mode it writes
- * `Plans in .plans/:` and one row per plan, the stubs padded to one
- * column, then the counts, `no tracker` for a plan with none and the
- * issues when there are any; or `No plans in .plans/.` alone.
+ * the header naming the directory, then one row per plan, the stubs padded
+ * to one column, then the counts, `no tracker` for a plan with none and the
+ * issues when there are any; or the header naming the directory with no
+ * plans listed.
  *
  * The command declares no argument and no flag, and refuses a line
  * handing it an argument with exit code 1.
@@ -66,7 +68,7 @@ export interface PlanListing {
   readonly issues: number;
 }
 
-/** Every plan under a repository's `.plans/`. */
+/** Every plan under the configured plans directory. */
 export interface PlanList {
   /** The directory read, absolute. */
   readonly dir: string;
@@ -88,7 +90,7 @@ function listing(dir: string, stub: string): PlanListing {
   return { stub, plan, tracker, tasks: countTasks(counted.tasks), issues: planModel.issues.length };
 }
 
-/** Every plan under `.plans/` in the repository at `root`; see the module note. */
+/** Every plan in the configured plans directory at repository `root`; see the module note. */
 export function listPlans(root: string): PlanList {
   const dir = join(root, PLANS_DIR);
   if (!existsSync(dir)) return { dir, plans: [] };
@@ -122,13 +124,13 @@ export function createPlanListCommand(findRepoRoot: RepoRootFinder = getRepoRoot
     name: 'plan list',
     subject: 'plan',
     action: 'list',
-    summary: 'list the plans under .plans/, with the tasks done in each',
-    description: 'Lists each `PLAN-<stub>.md` under `.plans/` at the git root, in stub order, with its'
-      + ' tasks counted by checkbox: from its tracker, `PLAN_TRACKER-<stub>.md`, once there is one, and'
-      + ' from the plan itself before then. A plan with no tracker is marked `no tracker`, and a plan'
-      + ' the plan parser did not read as written shows how many issues `rafa plan validate` reports'
-      + ' for it. With `--output=json` the list is the data of the terminal result event, each path'
-      + ' absolute.',
+    summary: 'list the plans, with the tasks done in each',
+    description: 'Lists each `PLAN-<stub>.md` in the configured plans directory at the git root, in stub'
+      + ' order, with its tasks counted by checkbox: from its tracker, `PLAN_TRACKER-<stub>.md`, once'
+      + ' there is one, and from the plan itself before then. A plan with no tracker is marked `no'
+      + ' tracker`, and a plan the plan parser did not read as written shows how many issues `rafa plan'
+      + ' validate` reports for it. With `--output=json` the list is the data of the terminal result'
+      + ' event, each path absolute.',
     args: [],
     flags: [],
     examples: [

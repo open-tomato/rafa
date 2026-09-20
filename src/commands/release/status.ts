@@ -8,10 +8,10 @@
  * The loop writes a version and a changelog entry with every pull
  * request (`src/start/release-stage.ts`), and stops there: the merge
  * commit is not its to tag, so the tag and the publish are an operator
- * step (`.specs/rafa-21-changelog-and-release.md`, its step 4). This
- * action is the readout that step is taken from, and it WRITES
- * NOTHING: every git command it sends is a read, no file is opened for
- * writing, and no network is reached.
+ * step (from the changelog and release spec, its step 4). This action is
+ * the readout that step is taken from, and it WRITES NOTHING: every git
+ * command it sends is a read, no file is opened for writing, and no
+ * network is reached.
  *
  * ## Why a released version is one the changelog names
  *

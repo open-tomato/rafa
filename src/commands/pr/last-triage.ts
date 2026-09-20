@@ -3,7 +3,7 @@
  *
  * `rafa pr show` ends with "the last triage", and a triage leaves
  * exactly one comment per pull request, its history in that comment's
- * own edits (`.specs/rafa-20-pr-commands.md`). The comment is found by
+ * own edits (per the PR commands spec). The comment is found by
  * the marker {@link TRIAGE_MARKER} its body opens with, and what it says
  * in machine-readable form is a fenced `rafa:triage` block:
  *

@@ -1,7 +1,7 @@
 /**
  * `rafa self-update`: builds the rafa checkout it runs in and installs it
- * as the global rafa, as `bun run snapshot` does. "Runtime" in
- * `.specs/phase-1-installable.md`.
+ * as the global rafa, as `bun run snapshot` does. See the phase 1
+ * installable spec for "Runtime".
  *
  * A top-level command, its action spelled as its subject, so it sits
  * directly under `src/commands/`. It wraps no phase 0 command. It runs

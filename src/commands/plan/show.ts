@@ -1,15 +1,15 @@
 /**
- * `rafa plan show <stub>`: one plan under `.plans/` as `parsePlan` reads
- * it, or with `--tracker` the loop's copy of it.
+ * `rafa plan show <stub>`: one plan in the configured plans directory as
+ * `parsePlan` reads it, or with `--tracker` the loop's copy of it.
  *
  * ## What is read
  *
- * `PLAN-<stub>.md` in `.plans/` at the git root, or with `--tracker`
- * `PLAN_TRACKER-<stub>.md` beside it: the copy `rafa loop start` makes
- * when it first runs the plan, and ticks as tasks finish. A stub no plan
- * stamp can carry is refused before any file is looked for, so the file
- * named never leaves `.plans/` (`plan-files.ts`). A stub naming no file is
- * refused too, both with exit code 1.
+ * `PLAN-<stub>.md` in the configured plans directory at the git root, or
+ * with `--tracker` `PLAN_TRACKER-<stub>.md` beside it: the copy `rafa loop
+ * start` makes when it first runs the plan, and ticks as tasks finish. A
+ * stub no plan stamp can carry is refused before any file is looked for, so
+ * the file named never leaves the configured directory (`plan-files.ts`). A
+ * stub naming no file is refused too, both with exit code 1.
  *
  * ## `--tracker` is typed after the stub
  *
@@ -112,9 +112,9 @@ function missingText(stub: string, tracker: boolean, relative: string): string {
 }
 
 /**
- * The plan `stub` names under `.plans/` in the repository at `root`, or
- * its tracker; a refusal with exit code 1 for a stub no plan stamp can
- * carry and for one naming no file. See the module note.
+ * The plan `stub` names in the configured plans directory at repository
+ * `root`, or its tracker; a refusal with exit code 1 for a stub no plan
+ * stamp can carry and for one naming no file. See the module note.
  */
 export function showPlan(root: string, stub: string, tracker: boolean): ShownPlan {
   if (!isStampableStub(stub)) {
@@ -178,16 +178,16 @@ export function createPlanShowCommand(findRepoRoot: RepoRootFinder = getRepoRoot
     subject: 'plan',
     action: 'show',
     summary: 'show one plan, or its tracker, stage by stage',
-    description: 'Reads `.plans/PLAN-<stub>.md` at the git root with the plan parser and prints its stub,'
-      + ' the issue and spec its rafa:plan block names, and its tasks counted by checkbox, then each'
-      + ' task under its stage heading and every issue the parser reported. With `--tracker` it reads'
-      + ' `PLAN_TRACKER-<stub>.md` instead, the copy the loop ticks as tasks finish. Type `--tracker`'
-      + ' after the stub: typed before it, the stub is read as the value of the flag and refused. With'
+    description: 'Reads a plan file at the git root with the plan parser and prints its stub, the issue'
+      + ' and spec its rafa:plan block names, and its tasks counted by checkbox, then each task under'
+      + ' its stage heading and every issue the parser reported. With `--tracker` it reads the loop'
+      + ' tracker copy instead, which the loop ticks as tasks finish. Type `--tracker` after the stub:'
+      + ' typed before it, the stub is read as the value of the flag and refused. With'
       + ' `--output=json` the plan is the data of the terminal result event.',
     args: [
       {
         name: 'stub',
-        description: 'The plan stub, which names `.plans/PLAN-<stub>.md`.',
+        description: 'The plan stub, which names the corresponding plan file.',
         type: 'string',
         required: true,
       },
@@ -195,14 +195,14 @@ export function createPlanShowCommand(findRepoRoot: RepoRootFinder = getRepoRoot
     flags: [
       {
         name: 'tracker',
-        description: 'Reads `PLAN_TRACKER-<stub>.md`, the copy the loop ticks, instead of the plan.',
+        description: 'Reads the loop tracker copy instead of the plan, which it ticks as tasks finish.',
         type: 'boolean',
       },
     ],
     examples: [
       {
         cmd: 'rafa plan show my-feature',
-        note: 'Prints .plans/PLAN-my-feature.md stage by stage.',
+        note: 'Prints the plan stage by stage.',
       },
       {
         cmd: 'rafa plan show my-feature --tracker --output=json',

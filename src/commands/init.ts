@@ -1,8 +1,8 @@
 /**
  * `rafa init`: sets up a rafa project. Steps 1 to 4 of `rafa init` under
- * "Scope resolution" in `.specs/phase-1-installable.md`, with the
- * `.gitignore` entry of "Tracking (Q29)" and the `PATH` check the spec's
- * "Ports" section gives `init`.
+ * "Scope resolution" in the phase 1 installable spec, with the `.gitignore`
+ * entry of "Tracking (Q29)" and the `PATH` check from the spec's "Ports"
+ * section for `init`.
  *
  * A top-level command, its action spelled as its subject, so it sits
  * directly under `src/commands/`. It wraps no phase 0 command, and it

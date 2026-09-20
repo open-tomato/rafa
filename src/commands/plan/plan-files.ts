@@ -6,15 +6,15 @@
  *
  * ## Where plans sit
  *
- * `list` and `show` read {@link PLANS_DIR}, `.plans/` under the git root.
- * `rafa plan create` writes `PLAN-<stub>.md`, and `rafa loop start` looks
- * for its default plan, in `plan.dir` under the project root the
- * dispatcher resolves, `.rafa/plans` unless a config names another, so
- * these two read where those write only while `plan.dir` is `.plans` and
- * the project root is the git toplevel. The loop keeps its copy of a plan
- * beside it as `PLAN_TRACKER-<stub>.md` (`utils/tracker.ts`) and ticks
- * that copy as tasks finish. These two do not read `plan.dir` yet, and
- * read the directory the phase 0 commands used.
+ * `list` and `show` read {@link PLANS_DIR}, the configured plans directory
+ * under the git root. `rafa plan create` writes `PLAN-<stub>.md`, and
+ * `rafa loop start` looks for its default plan, in `plan.dir` under the
+ * project root the dispatcher resolves, with `.rafa/plans` as the default
+ * unless a config names another. These two read where those write only
+ * when `plan.dir` is `.plans` and the project root is the git toplevel.
+ * The loop keeps its copy of a plan beside it as `PLAN_TRACKER-<stub>.md`
+ * (`utils/tracker.ts`) and ticks that copy as tasks finish. These two do
+ * not read `plan.dir` yet, and read the directory the phase 0 commands used.
  *
  * A stub is one a plan stamp can carry (`utils/plan-stamp.ts`): one or
  * more letters, digits, `.`, `_` and `-`. It holds no slash, so a file

@@ -4,12 +4,12 @@
  * with every pull request, the one question it asks, and the line it
  * prints for what came of it.
  *
- * `.specs/rafa-21-changelog-and-release.md` ends its config section
- * with "`rafa init` asks once", and this is that question. What it
- * decides is one setting, `release.enabled`, written into the project's
- * `.rafa/config.yaml` through `src/release/setting.ts`; the other three
- * `release` settings stay commented at their defaults, where an
- * operator can read them and set them by hand.
+ * The changelog and release spec ends its config section with "`rafa init`
+ * asks once", and this is that question. What it decides is one setting,
+ * `release.enabled`, written into the project's `.rafa/config.yaml` through
+ * `src/release/setting.ts`; the other three `release` settings stay
+ * commented at their defaults, where an operator can read them and set them
+ * by hand.
  *
  * ## Asked once, and only when nobody has answered already
  *

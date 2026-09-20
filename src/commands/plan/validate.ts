@@ -190,11 +190,11 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
     flags: [],
     examples: [
       {
-        cmd: 'rafa plan validate .plans/PLAN-my-feature.md',
+        cmd: 'rafa plan validate .rafa/plans/PLAN-my-feature.md',
         note: 'Prints one line when the plan reads as written, or one error line per issue and exits 1.',
       },
       {
-        cmd: 'rafa plan validate .plans/PLAN-my-feature.md --output=json',
+        cmd: 'rafa plan validate .rafa/plans/PLAN-my-feature.md --output=json',
         note: 'Writes a start event, an error log event per issue, then a result event.',
       },
     ],

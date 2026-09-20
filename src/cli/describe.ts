@@ -2,14 +2,13 @@
  * The roster rafa gives a program: `describe`'s schema 2 document, built
  * from the dispatcher's registry with the actions modules provide.
  *
- * `.specs/cli-surface.md` asks for one roster "for people, agents and the
- * TUI, built from the dispatcher's registry (not a second one), including
- * module-provided actions". {@link describeRegistry} builds it. It reads
- * the registry and the version it is handed and nothing else, as
- * `help.ts` does, so every command the document names is one the same
- * registry dispatches. `rafa describe` hands it the registry its own line
- * was routed through (`RafaContext.registry`), which holds every module
- * the invocation mounted.
+ * The CLI surface spec asks for one roster "for people, agents and the TUI,
+ * built from the dispatcher's registry (not a second one), including
+ * module-provided actions". {@link describeRegistry} builds it. It reads the
+ * registry and the version it is handed and nothing else, as `help.ts` does,
+ * so every command the document names is one the same registry dispatches.
+ * `rafa describe` hands it the registry its own line was routed through
+ * (`RafaContext.registry`), which holds every module the invocation mounted.
  *
  * ## The document
  *

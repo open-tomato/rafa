@@ -7,8 +7,8 @@
  * template, the pinned Roadmap issue and `roadmap.issue` — and reports
  * each part as created, present or refused. This module is the half
  * that decides whether that runs, and it is where the flags, the
- * question and the printed shape of a report live
- * (`.specs/rafa-20-pr-commands.md`, "`rafa init` sets up the board").
+ * question and the printed shape of a report live (from the PR commands
+ * spec: "`rafa init` sets up the board").
  *
  * ## Asked once, and only where there is a board to set up
  *

@@ -53,14 +53,14 @@
  *
  * GitHub closes an issue the merged pull request says `Closes #<n>` for
  * and does not tick the `- [ ] #<n>` box naming it on the roadmap, so
- * this command ticks it (`.specs/rafa-20-pr-commands.md`). The rule and
- * the two `gh` calls are `src/board/roadmap-tick.ts`'s and the decision
- * to make them at all is `./merge-tick.ts`'s; what is decided HERE is
- * WHEN, and it is straight after the provider merged, before the
- * clean-up. The clean-up is local git and can fail, and a tick behind it
- * would be the one piece of the merge that a failed `git pull` silently
- * dropped — where the board write has nothing to do with this checkout
- * and is as true then as it is after.
+ * this command ticks it (per the PR commands spec). The rule and the two
+ * `gh` calls are `src/board/roadmap-tick.ts`'s and the decision to make
+ * them at all is `./merge-tick.ts`'s; what is decided HERE is WHEN, and
+ * it is straight after the provider merged, before the clean-up. The
+ * clean-up is local git and can fail, and a tick behind it would be the
+ * one piece of the merge that a failed `git pull` silently dropped —
+ * where the board write has nothing to do with this checkout and is as
+ * true then as it is after.
  *
  * Nothing it comes to fails the command, so a roadmap that cannot be
  * read, an edit that would not land and a pull request closing no issue

@@ -6,9 +6,8 @@
  * `src/board/trust.ts` answers WHETHER a login is trusted — the one
  * permission reading, the `board.trustedAuthors` allow-list, and the
  * failed lookup that is a refusal rather than a pass. This module is
- * what the triage command DOES with that answer, which the spec spells
- * differently for each of its two readings
- * (`.specs/rafa-20-pr-commands.md`):
+ * what the triage command DOES with that answer, which the PR commands
+ * spec spells differently for each of its two readings:
  *
  *   - A `rafa:pr-triage` marker comment from an untrusted author is
  *     IGNORED and REPORTED, never refused. A stranger can comment on a

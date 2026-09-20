@@ -2,8 +2,8 @@
  * `rafa doctor`: the preflight `rafa loop start` runs before its first
  * session, checked and printed with no run started, beside two warnings
  * about the install: an effort store left under `.ralph/effort/`, and
- * `~/.rafa/bin` not on `PATH` ahead of `~/.bun/bin`. "Preflight" and
- * "Ports" in `.specs/phase-1-installable.md`.
+ * `~/.rafa/bin` not on `PATH` ahead of `~/.bun/bin`. See the phase 1
+ * installable spec for "Preflight" and "Ports".
  *
  * A top-level command, its action spelled as its subject, so it sits
  * directly under `src/commands/`. It wraps no phase 0 command. It runs

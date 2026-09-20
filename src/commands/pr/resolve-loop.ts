@@ -3,13 +3,12 @@
  * pinned plan written outside the worktree, and the ordinary
  * `rafa loop start` spawned inside it.
  *
- * The spec resolves a simple pull request by running a pinned plan
- * "by the ordinary loop, so commits, reports and effort rows are the
- * usual ones" (`.specs/rafa-20-pr-commands.md`). That is taken
- * literally here: the plan is a file on disk and the loop is this same
- * rafa, spawned as `rafa loop start --plan=<file>` with the worktree as
- * its working directory. Nothing about the sessions it spawns is
- * special-cased — the budget rides in on the plan's own `budget=`
+ * The PR commands spec resolves a simple pull request by running a pinned
+ * plan "by the ordinary loop, so commits, reports and effort rows are the
+ * usual ones". That is taken literally here: the plan is a file on disk and
+ * the loop is this same rafa, spawned as `rafa loop start --plan=<file>`
+ * with the worktree as its working directory. Nothing about the sessions it
+ * spawns is special-cased — the budget rides in on the plan's own `budget=`
  * declarations (`src/pr/plans/budget.ts`), and the agent routing is the
  * plan's own.
  *
