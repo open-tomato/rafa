@@ -27,12 +27,14 @@
  * both planted notes' areas above the section that was already there.
  */
 import type { GitRunner, PrProviderReading } from '../pr/index.js';
-import type { ReleaseSettings } from '../release/prepare.js';
+import type { ReleasePreparation, ReleaseSettings } from '../release/prepare.js';
 import type { ReportChange } from '../report/parse.js';
+import type { ReleaseFinish } from '../start/release-stage.js';
 
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -180,6 +182,118 @@ function plantScratchRelease(name: string, notes: readonly ReportChange[] = NOTE
   }
 
   return { repo, origin, git };
+}
+
+/**
+ * Plants a `gh` first on `PATH`: an executable that appends the
+ * arguments of every invocation to a file, one line per call, and exits
+ * nonzero regardless of what it was asked. Every real caller of `gh` in
+ * this repository — `createGhRunner`, `./gh.ts`'s module note — spawns
+ * the bare name and lets it resolve on `PATH`, so this is the one lever
+ * that tells whether the release stage's `none` gate reached for `gh`
+ * at all, rather than reaching for it and having it fail.
+ */
+function plantGhStub(name: string): { readonly binDir: string; readonly recordFile: string } {
+  const binDir = join(tempBase, `${name}-bin`);
+  const recordFile = join(tempBase, `${name}-gh-calls.log`);
+  mkdirSync(binDir, { recursive: true });
+  const script = join(binDir, 'gh');
+  writeFileSync(script, ['#!/bin/sh', `echo "$@" >> '${recordFile}'`, 'exit 7', ''].join('\n'), 'utf8');
+  chmodSync(script, 0o755);
+  return { binDir, recordFile };
+}
+
+/** `path`'s non-blank lines, or none at all when nothing was ever written there. */
+function linesAt(path: string): readonly string[] {
+  try {
+    return readFileSync(path, 'utf8').split('\n')
+      .filter((line) => line !== '');
+  } catch {
+    return [];
+  }
+}
+
+/** A plan declaring `release: none`, the simplest way to reach the provider gate. */
+const DECLARES_NONE_PLAN = [
+  `# Plan: ${TITLE}`,
+  '',
+  '```rafa:plan',
+  `stub: ${PLAN_STUB}`,
+  'issue: "99"',
+  'release: none',
+  '```',
+  '',
+  '- [x] Ship a scratch release end to end',
+].join('\n');
+
+/** The two system directories `/usr/bin` and `/bin` sit under, joined for `PATH`. */
+const SYSTEM_PATH = ['/usr/bin', '/bin'].join(delimiter);
+
+/**
+ * The real modules the subprocess script below imports into, computed
+ * from this file's own URL rather than from `process.cwd()`, since the
+ * script it writes sits outside this repository's own tree.
+ */
+const RELEASE_STAGE_MODULE = fileURLToPath(new URL('../start/release-stage.ts', import.meta.url));
+const OUTPUT_ACTIVE_MODULE = fileURLToPath(new URL('../adapters/output/active.ts', import.meta.url));
+const OUTPUT_SINKS_MODULE = fileURLToPath(new URL('./output-sinks.ts', import.meta.url));
+
+/**
+ * A standalone script that calls the real `finishRelease` and prints the
+ * `ReleaseFinish` it answered as its only line of stdout, reading
+ * `repoRoot`, the preparation, the branch and the provider reading off
+ * its own argv. Written once under {@link tempBase}, since its content
+ * never varies between the two cases that spawn it.
+ */
+const RUNNER_SCRIPT = join(tempBase, 'gh-stub-runner.ts');
+writeFileSync(RUNNER_SCRIPT, [
+  `import { finishRelease } from ${JSON.stringify(RELEASE_STAGE_MODULE)};`,
+  `import { setActiveOutput } from ${JSON.stringify(OUTPUT_ACTIVE_MODULE)};`,
+  `import { sinkOutput } from ${JSON.stringify(OUTPUT_SINKS_MODULE)};`,
+  '',
+  'const [repoRoot, preparationJson, branch, providerJson] = process.argv.slice(2);',
+  'setActiveOutput(sinkOutput({}));',
+  'const preparation = JSON.parse(preparationJson);',
+  'const provider = JSON.parse(providerJson);',
+  '',
+  'const finish = await finishRelease(',
+  '  { repoRoot, preparation },',
+  '  { currentBranch: () => branch, readProvider: () => provider },',
+  ');',
+  '',
+  'process.stdout.write(JSON.stringify(finish));',
+  '',
+].join('\n'), 'utf8');
+
+/**
+ * Runs {@link RUNNER_SCRIPT} in a FRESH process over `preparation`,
+ * `branch` and `provider`, with `path` as its whole `PATH`.
+ *
+ * A fresh process, and not this file's own, because a spawned `gh`
+ * resolves against the environment ITS OWN process started with:
+ * mutating `process.env.PATH` after this process has already started
+ * changes nothing about what a later `Bun.spawn(['gh', …])` resolves the
+ * name to, measured on bun 1.3.14 — the child keeps the `PATH` this
+ * process was born with, whatever `process.env.PATH` reads by the time
+ * of the call. Handing `env` explicitly to the SPAWN of that child,
+ * rather than to a mutation of this one, is what actually lands a `PATH`
+ * a nested `gh` spawn honours.
+ */
+function runFinishInSubprocess(
+  repoRoot: string,
+  preparation: ReleasePreparation,
+  branch: string,
+  provider: PrProviderReading,
+  path: string,
+): ReleaseFinish {
+  const run = Bun.spawnSync(
+    [process.execPath, RUNNER_SCRIPT, repoRoot, JSON.stringify(preparation), branch, JSON.stringify(provider)],
+    { env: { PATH: path, HOME: tempBase } },
+  );
+  if (!run.success) {
+    throw new Error(`the subprocess exited ${String(run.exitCode)}: ${run.stderr.toString()}`);
+  }
+  return JSON.parse(run.stdout.toString()) as ReleaseFinish;
 }
 
 describe('the release stage over a scratch repository', () => {
@@ -338,5 +452,74 @@ describe('the release stage over a scratch repository', () => {
     // The sentence reached the real pull request body, under what was there.
     const pull = fakeGh.pull(42);
     expect(pull?.body).toBe(`What this pull request does.\n\n${sentence}`);
+  });
+});
+
+/**
+ * The provider gate (`src/start/release-stage.ts`'s module note, "Which
+ * provider is asked") against a REAL `gh`, rather than the scripted or
+ * faked one every other case in this file drives it through: a `gh`
+ * stub first on the `PATH` a FRESH process is born with, over
+ * {@link runFinishInSubprocess}. A `none` reading is read BEFORE the
+ * provider is built, so a repository resolving to `none` must spawn no
+ * `gh` at all — a claim a fully stubbed `pulls` cannot make, since it
+ * never reaches for the real spawn in the first place. {@link plantGhStub}
+ * is what lets this file measure that against the one thing `gh` could
+ * actually do: get invoked.
+ *
+ * Both cases run the same skipped preparation — a plan declaring
+ * `release: none`, prepared once here in this process — through the
+ * subprocess script's `finishRelease`, over the real `ghPullRequestsIn`
+ * default and the stub's bin directory first on that child's `PATH`.
+ */
+describe('the release stage provider gate against a real gh stub first on PATH', () => {
+  it('spawns no gh at all when the resolved provider is none', () => {
+    const scratch = plantScratchRelease('gh-path-stub-none', []);
+    setActiveOutput(sinkOutput({}));
+    const stub = plantGhStub('none');
+    const reading: PrProviderReading = { provider: 'none', source: 'config', remote: null, host: null };
+
+    const preparation = prepareReleaseStage(
+      { repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: DECLARES_NONE_PLAN },
+      { now: () => new Date('2026-09-20T09:00:00Z') },
+    );
+    if (preparation === null || preparation.kind !== 'skipped') {
+      throw new Error(`expected a skipped release, got ${JSON.stringify(preparation)}`);
+    }
+
+    const path = [stub.binDir, SYSTEM_PATH].join(delimiter);
+    const finish = runFinishInSubprocess(scratch.repo, preparation, BRANCH, reading, path);
+
+    expect(finish.outcome).toBe('skipped');
+    expect(finish.body?.carried).toBe(false);
+    expect(finish.body?.problem).toContain('pr.provider: none');
+    // The stub recorded no invocation at all: the gate never reached for it.
+    expect(linesAt(stub.recordFile)).toEqual([]);
+  });
+
+  it('sends the stub exactly one invocation when the resolved provider is gh, which is the control', () => {
+    const scratch = plantScratchRelease('gh-path-stub-gh', []);
+    setActiveOutput(sinkOutput({}));
+    const stub = plantGhStub('gh');
+    const reading: PrProviderReading = { provider: 'gh', source: 'config', remote: null, host: null };
+
+    const preparation = prepareReleaseStage(
+      { repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: DECLARES_NONE_PLAN },
+      { now: () => new Date('2026-09-20T09:00:00Z') },
+    );
+    if (preparation === null || preparation.kind !== 'skipped') {
+      throw new Error(`expected a skipped release, got ${JSON.stringify(preparation)}`);
+    }
+
+    const path = [stub.binDir, SYSTEM_PATH].join(delimiter);
+    const finish = runFinishInSubprocess(scratch.repo, preparation, BRANCH, reading, path);
+
+    expect(finish.outcome).toBe('skipped');
+    // The real gh failed, so the sentence reached no body — but it was
+    // asked, unlike the `none` case above.
+    expect(finish.body?.carried).toBe(false);
+    expect(finish.body?.problem).toContain('could not be written');
+    expect(linesAt(stub.recordFile)).toHaveLength(1);
+    expect(linesAt(stub.recordFile)[0]).toContain('list');
   });
 });
