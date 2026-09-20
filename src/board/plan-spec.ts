@@ -33,37 +33,57 @@
  * no case here reaches GitHub, spawns `gh` or `git`, or reads the
  * configuration `gh` keeps under the home.
  *
- * ## Which checks run, and which do not yet
+ * ## Which checks run, and which one does not yet
  *
  * The readiness gate is four checks, cheapest first
- * (`.specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is the two
- * this stage wires, in the spec's order, and both are refusals that exit
- * {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
+ * (`.specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is the
+ * three this stage wires, in the spec's order, and each is a refusal
+ * that exits {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
  *
  *  1. the `spec:ready` label (`./readiness.ts`), a person's decision;
  *  2. the leak refusal (`./leak.ts`), the half of check 2 that keeps a
- *     home path or a credential out of a prompt and off the disk.
+ *     home path or a credential out of a prompt and off the disk;
+ *  3. the completeness gaps (`requireCompleteSpec` in `./readiness.ts`),
+ *     the other half of check 2: every template heading present and
+ *     non-empty, "Tasks the plan must carry" and "Definition of done"
+ *     each holding a list item, and no placeholder left in the text.
  *
- * Two are deliberately not here, and neither is forgotten:
+ * ONE is deliberately not here, and it is not forgotten. Check 0, the
+ * author's trust (`./trust.ts`), needs the issue's author, and
+ * `ISSUE_VIEW_FIELDS` does not ask for it (`./issue.ts` records why the
+ * field list is the spec's own). Wiring it is a widening of that read,
+ * not a line here, so an issue body check 0 would have caught still
+ * reaches the planner, which judges the spec itself as check 3 and
+ * refuses it there (`./gate.ts`). The cost is a session, not a wrong
+ * plan.
  *
- *  - Check 0, the author's trust (`./trust.ts`), needs the issue's
- *    author, and `ISSUE_VIEW_FIELDS` does not ask for it (`./issue.ts`
- *    records why the field list is the spec's own). Wiring it is a
- *    widening of that read, not a line here.
- *  - The rest of check 2, the completeness gaps over every template
- *    heading (`requireCompleteSpec`), which would REFUSE a body the
- *    template predates. What is wired instead is the half the spec
- *    asks for by name: the two list headings, "Tasks the plan must
- *    carry" and "Definition of done", WARNED about and never refused
- *    ({@link warnOnThinListSections}). The plan is written from those
- *    items, so a thin one costs a worse plan and a session, and a
- *    refusal would stop every spec opened before
- *    `src/board/templates/spec.md` existed.
+ * ## What the completeness refusal costs
  *
- * So an issue body check 0 would have caught, and one whose other four
- * headings are thin, still reaches the planner, which judges the spec
- * itself as check 3 and refuses it there (`./gate.ts`). The cost is a
- * session, not a wrong plan.
+ * Check 2's completeness half was written and left unwired, and this
+ * note argued for leaving it that way. What ran in its place was a
+ * WARNING over the two headings a plan is written from, printed and
+ * never refused. Both are gone: the spec decided the refusal, and the
+ * warning could not have survived beside it anyway, since every gap
+ * `findListSectionGaps` names is a gap `requireCompleteSpec` refuses
+ * and a warning printed after a refusal reaches no output.
+ * `./readiness.ts` keeps the warning pair with its own cases and no
+ * caller.
+ *
+ * The argument for leaving it unwired was a real cost, and wiring it
+ * does not make that cost go away — it decides to pay it. An issue
+ * opened before `src/board/templates/spec.md` carries none of the six
+ * headings, so it is refused on its first reading, with all six named
+ * missing in one sentence, nothing snapshotted and nothing planned.
+ * The remedy is the refusal's own last clause, fill each gap and
+ * rerun, which for such a body means pasting the template over it and
+ * filling it in once, by hand. `--next` STOPS at a line that refuses
+ * rather than skipping ahead (`./spec-source.ts`), so one unmigrated
+ * issue on the roadmap holds up the walk until somebody edits it.
+ *
+ * That is the trade the spec took. A body nobody has migrated costs an
+ * edit; every body that HAS been migrated stops costing a planner
+ * session to discover it was thin, because this refusal is free and
+ * check 3 is a session.
  *
  * ## The gate's issue
  *
@@ -87,7 +107,7 @@ import { createGitRunner } from '../pr/git.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
-import { findListSectionGaps, listSectionWarning, requireSpecReadyLabel } from './readiness.js';
+import { requireCompleteSpec, requireSpecReadyLabel } from './readiness.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
 import { resolveSpecSource } from './spec-source.js';
 
@@ -100,36 +120,27 @@ export function issueSource(issue: number): string {
 }
 
 /**
- * Warns, once, when either of the two headings the plan is written from
- * is missing, empty or holds no list item, naming each of them
- * (`./readiness.ts`). A body carrying both prints nothing.
- *
- * It runs AFTER the two refusals and before the snapshot, so a body
- * that is about to be refused is not also commented on, and a warning
- * changes neither what is written nor the exit code: `plan create`
- * carries on and the planner judges the spec as check 3.
- */
-export function warnOnThinListSections(issue: SpecIssue, output: Output): void {
-  const gaps = findListSectionGaps(issue.body);
-  if (gaps.length === 0) return;
-  output.warn(listSectionWarning(issueSource(issue.number), gaps));
-}
-
-/**
  * The checks that run on an issue as read, before a byte of it is
- * written: the `spec:ready` label, then the leak refusal, then the thin
- * list sections warned about. Throws
+ * written: the `spec:ready` label, then the leak refusal, then the
+ * completeness gaps over every template heading. Throws
  * `CommandExit({@link BOARD_REFUSAL_EXIT}, ...)` at the first that
- * refuses; the module note holds which checks are here and which are
- * not.
+ * refuses; the module note holds which checks are here, which one is
+ * not, and what the completeness refusal costs.
+ *
+ * The order is the spec's, and it is also what keeps a leak out of a
+ * refusal sentence: nothing is read off the body until a person has
+ * marked the issue ready, and the completeness refusal QUOTES headings
+ * taken from the body, so it must not run over a body `requireNoLeak`
+ * has not cleared first. `./plan-spec.test.ts` measures both orderings.
  *
  * Answers a promise because that is what {@link resolveSpecSource} takes
  * for the seam, and not because anything here waits.
  */
-export function inspectSpecIssue(issue: SpecIssue, output?: Output): Promise<void> {
+export function inspectSpecIssue(issue: SpecIssue): Promise<void> {
+  const source = issueSource(issue.number);
   requireSpecReadyLabel(issue.number, issue.labels);
-  requireNoLeak(issueSource(issue.number), issue.body);
-  warnOnThinListSections(issue, output ?? activeOutput());
+  requireNoLeak(source, issue.body);
+  requireCompleteSpec(source, issue.body);
   return Promise.resolve();
 }
 
@@ -192,7 +203,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     specsDir: options.specsDir,
     findSpec: options.findSpec,
     issues: createGhSpecIssueReader({ gh }),
-    inspect: (issue: SpecIssue) => inspectSpecIssue(issue, output),
+    inspect: inspectSpecIssue,
     roadmap: {
       configured: options.roadmapIssue,
       search: createGhRoadmapSearch({ gh }),

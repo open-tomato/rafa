@@ -126,6 +126,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { specPath } from './board/naming.js';
 import { buildPlanPrompt, readPlanFormat } from './plan.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
+import { completeSpecBody } from './tests/spec-bodies.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */
 const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -133,8 +134,18 @@ const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
 /** The spec every scratch repository holds at `spec.md`. */
 const SPEC = '# Spec: a command probe\n\nNothing to build.\n';
 
-/** The issue the stand-in `gh` answers `issue view` with; the one board read a case here makes. */
-const ISSUE = { number: 20, title: 'The board routes', body: '# Spec: the board routes\n\nNothing to build.\n' };
+/**
+ * The issue the stand-in `gh` answers `issue view` with; the one board
+ * read a case here makes. Its body fills every template heading
+ * (`./tests/spec-bodies.ts`) because the board route refuses an issue
+ * with a readiness gap before it snapshots one, and what this case is
+ * about is the snapshot.
+ */
+const ISSUE = {
+  number: 20,
+  title: 'The board routes',
+  body: completeSpecBody('Spec: the board routes', 'Nothing to build.'),
+};
 
 /** The spec content the fixture hands the context's builder. */
 const FIXTURE_SPEC = 'the spec as the fixture hands it to the builder\n';

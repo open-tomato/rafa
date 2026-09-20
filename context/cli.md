@@ -255,21 +255,23 @@ module's note is the long form.
   resolved, a board that will not take the edit and a pull request
   closing no issue are a warning or a silence. `--output=json` carries it
   as `roadmapTick`, null when the pull request closes nothing.
-- **Two of the readiness gate's checks run on a board route**
-  (`src/board/plan-spec.ts`): the `spec:ready` label and the leak
-  refusal, in that order, both exit 2 and both before the body is
-  snapshotted, so `--next` STOPS at a line that is not ready rather than
-  skipping it. After them, and changing neither what is written nor the
-  exit code, it WARNS when "Tasks the plan must carry" or "Definition of
-  done" is missing, empty or holds no list item, naming each
-  (`findListSectionGaps` and `listSectionWarning` in
-  `src/board/readiness.ts`): the plan is written from those items, and a
-  refusal there would stop every spec opened before the template. Check
-  0, the author's trust, needs an `author` the read does not ask for,
-  and the completeness gaps over the other four headings
-  (`requireCompleteSpec`) are refusals a body the template predates
-  would not survive; until each lands, an issue they would have caught
-  reaches the planner, which judges it as check 3.
+- **Three of the readiness gate's checks run on a board route**
+  (`src/board/plan-spec.ts`): the `spec:ready` label, the leak refusal
+  and the completeness gaps (`requireCompleteSpec` in
+  `src/board/readiness.ts`), in that order, each exit 2 and each before
+  the body is snapshotted, so `--next` STOPS at a line that is not ready
+  rather than skipping it. The completeness refusal names every template
+  heading that is missing or empty, either of "Tasks the plan must
+  carry" and "Definition of done" holding no list item, and every
+  placeholder left in the text, in one sentence. It costs an issue
+  opened before `src/board/templates/spec.md` a hand edit, since such a
+  body carries none of the six headings and is refused whole; the module
+  note in `src/board/plan-spec.ts` holds that trade. The WARNING that
+  ran in its place is gone, and `findListSectionGaps` and
+  `listSectionWarning` now have no caller outside their own tests. Check
+  0, the author's trust, still needs an `author` the read does not ask
+  for; until it lands, an issue it would have caught reaches the
+  planner, which judges it as check 3.
 - **The spec issue template is `src/board/templates/spec.md`**, a
   package asset the build copies to `dist/templates/` and `rafa init
   --board` writes to `.github/ISSUE_TEMPLATE/spec.md`. Its front matter

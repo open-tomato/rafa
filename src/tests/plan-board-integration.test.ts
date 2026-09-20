@@ -88,6 +88,7 @@ import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
+import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's directory, `src/tests/`, one level under the modules the probe imports. */
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -163,7 +164,14 @@ function git(args: readonly string[], cwd: string): void {
   }
 }
 
-/** A planted issue, every field filled in unless `over` says otherwise. */
+/**
+ * A planted issue, every field filled in unless `over` says otherwise.
+ * The default body is EMPTY, which the readiness gate refuses whole
+ * (`src/board/plan-spec.ts`): an issue a case means `plan create` to
+ * plan FROM carries {@link completeSpecBody} instead, and the ones left
+ * empty are the roadmap itself and the lines the walk skips, neither of
+ * which is ever inspected.
+ */
 function issueOf(over: Partial<SpecIssue> & { readonly number: number }): SpecIssue {
   return {
     title: `Issue ${String(over.number)}`,
@@ -318,7 +326,7 @@ describe('plan create --next, walked end to end over one stubbed gh', () => {
   const CLOSED = issueOf({ number: 11, state: 'CLOSED' });
   const BRANCH_CLAIMED = issueOf({ number: 22 });
   const PR_CLAIMED = issueOf({ number: 23 });
-  const PICKED_BODY = '# The board routes\n\nRead the board, snapshot the issue, and plan from it.\n';
+  const PICKED_BODY = completeSpecBody('The board routes', 'Read the board, snapshot the issue, and plan from it.');
   const PICKED = issueOf({
     number: 20,
     title: 'The board routes',
@@ -446,13 +454,13 @@ describe('each refusal plan create --issue meets on the board', () => {
     const scratch = plantScratch('');
     const title = 'Steady title';
     writeGhStub(join(scratch.root, 'bin'), {
-      issues: [issueOf({ number: 42, title, body: 'first body\n', labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
+      issues: [issueOf({ number: 42, title, body: completeSpecBody(title, 'first body'), labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
     });
     const first = runPlan(scratch, 'first', ['--issue=42', '--no-progress']);
     expect(first.exitCode).toBe(0);
 
     writeGhStub(join(scratch.root, 'bin'), {
-      issues: [issueOf({ number: 42, title, body: 'a different body\n', labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
+      issues: [issueOf({ number: 42, title, body: completeSpecBody(title, 'a different body'), labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
     });
     const second = runPlan(scratch, 'second', ['--issue=42', '--no-progress']);
 
@@ -463,7 +471,7 @@ describe('each refusal plan create --issue meets on the board', () => {
   it('refuses an issue whose snapshot name collides with its own local notes file', () => {
     const scratch = plantScratch('');
     writeGhStub(join(scratch.root, 'bin'), {
-      issues: [issueOf({ number: 43, title: 'Notes', labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
+      issues: [issueOf({ number: 43, title: 'Notes', body: completeSpecBody('Notes'), labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
     });
 
     const run = runPlan(scratch, 'collision', ['--issue=43', '--no-progress']);
@@ -556,8 +564,8 @@ describe('the tick pr merge writes, read back by the very walk plan create --nex
     return sharedBoard(
       issueOf({ number: ROADMAP_NUMBER, title: 'Roadmap', body: ROADMAP_BODY }),
       [
-        issueOf({ number: 20, title: 'Plans from the board', labels: [SPEC_LABEL, SPEC_READY_LABEL], body: '# Plans from the board\n\nA spec.\n' }),
-        issueOf({ number: 33, title: 'The board setup', labels: [SPEC_LABEL, SPEC_READY_LABEL], body: '# The board setup\n\nAnother spec.\n' }),
+        issueOf({ number: 20, title: 'Plans from the board', labels: [SPEC_LABEL, SPEC_READY_LABEL], body: completeSpecBody('Plans from the board', 'A spec.') }),
+        issueOf({ number: 33, title: 'The board setup', labels: [SPEC_LABEL, SPEC_READY_LABEL], body: completeSpecBody('The board setup', 'Another spec.') }),
       ],
     );
   }

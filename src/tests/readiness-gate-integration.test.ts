@@ -8,8 +8,8 @@
  * with a mutation record proving each catches the failure it exists
  * for. This file drives none of that again. It exists because the gate
  * is three modules a caller composes — `plan create` wires the label
- * check and check 3 together over `src/board/plan-spec.ts`, and the
- * completeness check waits for the spec template — and a suite that only
+ * check, the completeness check and check 3 together over
+ * `src/board/plan-spec.ts` — and a suite that only
  * ever calls each alone would not catch the seam BETWEEN them: a gap
  * shape `findReadinessGaps` answers that `enforceSpecReview` does not
  * know how to post, or a `SpecReviewReading` `parseSpecReview` answers

@@ -1,16 +1,17 @@
 /**
  * Tests for the board side of `plan create` (`src/board/plan-spec.ts`):
- * the seams it builds, the two checks it runs on an issue as read, the
- * warning it prints about the two headings a plan is written from, and
- * the gate issue it answers beside the spec.
+ * the seams it builds, the three checks it runs on an issue as read in
+ * the order it runs them, and the gate issue it answers beside the
+ * spec.
  *
  * `./spec-source.test.ts` drives the routes themselves over planted
  * readers, and this file drives none of that again. It exists for the
  * WIRING, which nothing else can see: that the issue arrives through
  * `gh issue view` with the field list `./issue.ts` declares, that the
- * roadmap walk reaches `gh pr list` and `git`, that the label check and
- * the leak refusal run BEFORE a snapshot is written, and that the spec
- * route asks `gh` nothing at all.
+ * roadmap walk reaches `gh pr list` and `git`, that the three checks
+ * run BEFORE a snapshot is written and in the order that decides which
+ * sentence a body failing two of them is refused with, and that the
+ * spec route asks `gh` nothing at all.
  *
  * Every case plants a `gh` runner and a `git` runner of its own, so
  * nothing spawns and no case reaches GitHub or reads the configuration
@@ -19,6 +20,12 @@
  * resolution that reached a real `.rafa/specs` would find nothing and
  * redden.
  *
+ * Every planted issue carries {@link completeBody}, the shared filled
+ * body of `../tests/spec-bodies.ts`, because `requireCompleteSpec` is
+ * wired into `inspectSpecIssue` and an issue carrying less is refused
+ * before the wiring a case is about is ever reached. A case that means
+ * to break one thing says which body it plants instead.
+ *
  * ## What passes while wrong
  *
  * A check that ran AFTER the write would refuse with the same exit code
@@ -26,32 +33,24 @@
  * each refusal case asserts the snapshot is absent, beside a control in
  * which the same call writes it.
  *
- * One mutation was driven on 2026-09-19, the module restored from a
- * scratch copy and verified with `shasum -c`: the `inspect` seam left
- * unfilled, so the checks never run, left 6 pass and 2 fail against 8
- * pass either side — the label refusal and the leak refusal, and nothing
- * else, since no other case turns on them. That run is the file as it
- * stood before the warning group was added, which turns on the same
- * seam and would redden with them.
+ * Two mutations were driven on 2026-09-20, the module restored from a
+ * scratch copy and verified with `shasum -c` each time, against 12 pass
+ * and 0 fail either side:
  *
- * ## The warning, and how it could pass while wrong
- *
- * The warning is a LINE and nothing else: it changes no exit code, no
- * file and no answer, so a wiring that dropped it would redden nothing
- * unless a case read the output. The three cases below do — one holding
- * both headings named, one control over a body carrying both, and one
- * over an issue a refusal already stopped — and every other case in
- * this file plants the silent output, whose planted bodies carry
- * neither heading and would otherwise each print one.
- *
- * Driven on 2026-09-19, the module restored from a scratch copy and
- * verified with `shasum -c`: the `warnOnThinListSections` call dropped
- * from `inspectSpecIssue` left 9 pass and 2 fail against 11 pass, the
- * two cases that read a warning and nothing else.
+ *  - the `inspect` seam left unfilled in `resolvePlanSpec`, so no check
+ *    runs on a resolution at all: 7 pass and 5 fail, every case that
+ *    reaches a refusal THROUGH a route — the label one, the leak one
+ *    and all three completeness ones. The two cases that call
+ *    `inspectSpecIssue` directly stay green, which is the point of
+ *    having both kinds.
+ *  - the `requireCompleteSpec` call alone dropped from
+ *    `inspectSpecIssue`: 8 pass and 4 fail, the completeness group and
+ *    the ordering case whose control reaches the completeness sentence,
+ *    and nothing else — which is what says the other eight do not lean
+ *    on the new check.
  */
 import type { SpecIssue } from './issue.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -62,12 +61,13 @@ import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
+import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
 import { specPath } from './naming.js';
 import { BOARD_REFUSAL_EXIT, inspectSpecIssue, resolvePlanSpec } from './plan-spec.js';
-import { SPEC_READY_LABEL, specReadyRefusalMessage } from './readiness.js';
+import { SPEC_READY_LABEL, specReadyRefusalMessage, TEMPLATE_HEADINGS } from './readiness.js';
 import { PR_LIST_FIELDS } from './roadmap.js';
 
 /** Where snapshots go, as a project configures it. */
@@ -94,12 +94,22 @@ afterAll(() => {
   for (const made of roots) rmSync(made, { recursive: true, force: true });
 });
 
-/** A planted issue: the five fields, labelled ready unless a case says otherwise. */
+/** The filled body a planted issue carries; `../tests/spec-bodies.ts` holds why it is shared. */
+function completeBody(number: number): string {
+  return completeSpecBody(`Issue ${String(number)}`);
+}
+
+/** The body an issue opened before `src/board/templates/spec.md` carries: no heading the template names. */
+function templatelessBody(number: number): string {
+  return `# Issue ${String(number)}\n\nThe body.\n`;
+}
+
+/** A planted issue: the five fields, labelled ready and complete unless a case says otherwise. */
 function issueOf(number: number, fields: Partial<SpecIssue> = {}): SpecIssue {
   return {
     number,
     title: `Issue ${String(number)}`,
-    body: `# Issue ${String(number)}\n\nThe body.\n`,
+    body: completeBody(number),
     state: 'OPEN',
     labels: [SPEC_LABEL, SPEC_READY_LABEL],
     ...fields,
@@ -153,31 +163,6 @@ interface PlanSpecFields {
   readonly refresh?: boolean;
   readonly dryRun?: boolean;
   readonly roadmapIssue?: number | null;
-  /** Where the lines go, for a case reading them; the silent one otherwise. */
-  readonly output?: Output;
-}
-
-/** An output keeping every warning, for the cases that read one. */
-function warningSink(): { output: Output; warnings: () => readonly string[] } {
-  let warnings: readonly string[] = [];
-  const output = sinkOutput({ warn: (message) => { warnings = [...warnings, message]; } });
-  return { output, warnings: () => warnings };
-}
-
-/** A body carrying both list headings with an item under each. */
-function plannableBody(number: number): string {
-  return [
-    `# Issue ${String(number)}`,
-    '',
-    '## Tasks the plan must carry',
-    '',
-    '- add the module',
-    '',
-    '## Definition of done',
-    '',
-    '- bun test is green',
-    '',
-  ].join('\n');
 }
 
 /** What {@link resolvePlanSpec} is asked for one planted board. */
@@ -197,7 +182,7 @@ function ask(
     findSpec: (spec) => spec,
     gh,
     git,
-    output: fields.output ?? OUTPUT,
+    output: OUTPUT,
   });
 }
 
@@ -229,7 +214,7 @@ describe('the spec an issue is planned from', () => {
     if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
     expect(resolved.spec).toMatchObject({ kind: 'issue', issue: 20, path: snapshotAt(20), source: 'issue #20' });
     expect(resolved.gate?.number).toBe(20);
-    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe('# Issue 20\n\nThe body.\n');
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(completeBody(20));
   });
 
   it('asks gh nothing on the spec route, and answers no gate issue for it', async () => {
@@ -261,7 +246,7 @@ describe('the spec an issue is planned from', () => {
   });
 
   it('refuses a body carrying a home path, leaving no copy of it on disk', async () => {
-    const leaking = issueOf(20, { body: '# Issue 20\n\nRun it in /Users/ada/checkouts/rafa.\n' });
+    const leaking = issueOf(20, { body: `${completeBody(20)}\nRun it in /Users/ada/checkouts/rafa.\n` });
     const board = plantedGh([leaking]);
     const git = plantedGit();
 
@@ -305,54 +290,74 @@ describe('the spec the roadmap picks', () => {
   });
 });
 
-describe('the checks one issue passes', () => {
-  it('weighs the label before the leak, so an unready leaking issue is named unready', async () => {
-    const both = issueOf(20, { labels: [SPEC_LABEL], body: 'Run it in /Users/ada/checkouts/rafa.\n' });
+describe('the checks one issue passes, in the order they run', () => {
+  it('weighs the label first, so an issue failing all three is named unready', async () => {
+    const all = issueOf(20, { labels: [SPEC_LABEL], body: 'Run it in /Users/ada/checkouts/rafa.\n' });
 
-    const refused = await refusal(() => inspectSpecIssue(both, OUTPUT));
+    const refused = await refusal(() => inspectSpecIssue(all));
 
     expect(refused.message).toBe(specReadyRefusalMessage(20));
   });
 
-  it('lets an issue that is labelled and carries no leak through', async () => {
-    await expect(inspectSpecIssue(issueOf(20), OUTPUT)).resolves.toBeUndefined();
+  it('weighs the leak before the completeness gaps, so a labelled leaking body is named for the leak', async () => {
+    const leaking = issueOf(20, { body: 'Run it in /Users/ada/checkouts/rafa.\n' });
+
+    const refused = await refusal(() => inspectSpecIssue(leaking));
+
+    expect(refused.exitCode).toBe(LEAK_REFUSAL_EXIT);
+    expect(refused.message).toContain('issue #20 names a machine path or a credential');
+    // The control: the same body with the path taken out reaches the
+    // completeness check, which names the headings it does not carry.
+    const clean = issueOf(20, { body: 'Run it in the checkout.\n' });
+    expect((await refusal(() => inspectSpecIssue(clean))).message)
+      .toContain('issue #20 is not ready to plan from');
+  });
+
+  it('lets an issue that is labelled, leaks nothing and fills the template through', async () => {
+    await expect(inspectSpecIssue(issueOf(20))).resolves.toBeUndefined();
   });
 });
 
-describe('the warning about the two headings a plan is written from', () => {
-  it('names both when the body carries neither, and says nothing when it carries both', async () => {
-    const thin = warningSink();
-    await inspectSpecIssue(issueOf(20), thin.output);
+describe('the completeness refusal', () => {
+  it('refuses an issue the template predates, naming every heading, before anything is written', async () => {
+    const board = plantedGh([issueOf(20, { body: templatelessBody(20) })]);
+    const git = plantedGit();
 
-    expect(thin.warnings()).toHaveLength(1);
-    expect(thin.warnings()[0]).toContain('issue #20');
-    expect(thin.warnings()[0]).toContain('"Tasks the plan must carry" is missing');
-    expect(thin.warnings()[0]).toContain('"Definition of done" is missing');
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, git.git));
 
-    // The control: the same call over a body carrying both warns about nothing.
-    const filled = warningSink();
-    await inspectSpecIssue(issueOf(20, { body: plannableBody(20) }), filled.output);
-    expect(filled.warnings()).toEqual([]);
-  });
-
-  it('is printed on the issue route, and changes neither the snapshot nor the answer', async () => {
-    const heard = warningSink();
-    const board = plantedGh([issueOf(20)]);
-
-    const resolved = await ask({ kind: 'issue', issue: 20 }, board.gh, plantedGit().git, { output: heard.output });
-
-    expect(heard.warnings()).toHaveLength(1);
-    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
-    expect(resolved.spec.issue).toBe(20);
+    expect(refused.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(refused.message).toContain('issue #20 is not ready to plan from');
+    for (const heading of TEMPLATE_HEADINGS) expect(refused.message).toContain(`"${heading}" is missing`);
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+    // The control: the same call over the filled body writes the snapshot.
+    await ask({ kind: 'issue', issue: 20 }, plantedGh([issueOf(20)]).gh, git.git);
     expect(existsSync(join(root, snapshotAt(20)))).toBe(true);
   });
 
-  it('is not printed over an issue a refusal already stopped', async () => {
-    const heard = warningSink();
-    const board = plantedGh([issueOf(20, { labels: [SPEC_LABEL] })]);
+  it('refuses a body filling every heading whose "Definition of done" holds no list item', async () => {
+    const filled = completeBody(20);
+    const heading = '## Definition of done';
+    const prose = `${filled.slice(0, filled.indexOf(heading))}${heading}\n\nThis is done once the tests pass.\n`;
+    const board = plantedGh([issueOf(20, { body: prose })]);
 
-    await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, plantedGit().git, { output: heard.output }));
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, plantedGit().git));
 
-    expect(heard.warnings()).toEqual([]);
+    expect(refused.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(refused.message).toContain('"Definition of done" holds no list item');
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('stops the --next walk at a line whose issue is incomplete, rather than skipping ahead', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: ROADMAP_BODY, labels: [] }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20, { body: templatelessBody(20) }),
+    ]);
+
+    const refused = await refusal(() => ask({ kind: 'next', roadmap: null }, board.gh, plantedGit().git, { roadmapIssue: ROADMAP }));
+
+    expect(refused.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(refused.message).toContain('issue #20 is not ready to plan from');
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
   });
 });

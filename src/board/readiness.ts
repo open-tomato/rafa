@@ -77,11 +77,15 @@
  * Those two are also read on their own, through
  * {@link findListSectionGaps} and {@link listSectionWarning}: the spec
  * asks `plan create --issue` to WARN, naming them, when either is
- * missing, and `./plan-spec.ts` is the caller that prints it. A warning
- * rather than a refusal because the two are what a plan is written from
- * and a thin one costs a worse plan, not a wrong run — and because
- * every spec opened before the template existed would otherwise stop at
- * the gate.
+ * missing. NOTHING CALLS THAT PAIR TODAY. `./plan-spec.ts` printed the
+ * warning until {@link requireCompleteSpec} was wired into its
+ * `inspectSpecIssue`, and every gap the warning names is one the
+ * refusal now throws on, so a warning after it would reach no output
+ * and a warning before it would comment on a body about to be refused.
+ * The pair stays because the reading is the spec's own and costs
+ * nothing to keep; `./readiness.test.ts` is its only caller, and
+ * `src/board/plan-spec.ts`'s note holds what the refusal costs a body
+ * written before the template.
  *
  * ## Placeholders, and the documentation problem
  *
