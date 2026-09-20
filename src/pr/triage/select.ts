@@ -7,7 +7,7 @@
  * neither free nor silent (a conflict read, a run listing and a log tail
  * per failing job, then a comment written or edited on the pull
  * request). So the spec gives the bare form a selection rule
- * (`.specs/rafa-20-pr-commands.md`), and this module is that rule:
+ * (`.rafa/specs/rafa-20-pr-commands.md`), and this module is that rule:
  *
  *   1. A pull request open on the CURRENT branch is the answer, whatever
  *      colour it is. Someone standing on a branch asking for a triage is

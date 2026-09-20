@@ -40,7 +40,7 @@
  * ## How a dependency bump is recognised
  *
  * Two readings, either one enough
- * (`.specs/rafa-20-pr-commands.md`): the author is one of
+ * (`.rafa/specs/rafa-20-pr-commands.md`): the author is one of
  * {@link DEPENDENCY_BUMP_AUTHORS} — both of dependabot's login
  * spellings, the app path `gh` itself writes and the bracketed one the
  * payloads carry — or the title opens

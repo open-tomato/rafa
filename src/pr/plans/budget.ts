@@ -4,7 +4,7 @@
  * as the `budget=` declaration the loop already reads.
  *
  * The spec gives each resolve run `--max-budget-usd` from
- * `pr.resolveBudget` (`.specs/rafa-20-pr-commands.md`), and the loop
+ * `pr.resolveBudget` (`.rafa/specs/rafa-20-pr-commands.md`), and the loop
  * has exactly one way of passing that flag to a session: a task line's
  * trailing declaration block, whose `budget=<usd>` becomes
  * `--max-budget-usd <usd>` on the spawn (`src/utils/declaration.ts`).

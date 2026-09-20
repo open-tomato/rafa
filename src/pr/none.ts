@@ -9,7 +9,7 @@
  * poll. The spec's answer is not "do nothing": the work still has to
  * leave the machine, so the branch is pushed here and the compare URL
  * printed, and the CI wait is skipped and said to be skipped
- * (`.specs/rafa-20-pr-commands.md`, section 1).
+ * (`.rafa/specs/rafa-20-pr-commands.md`, section 1).
  *
  * ## Why the push lives here and not in `utils/git.ts`
  *

@@ -4,7 +4,7 @@
  *
  * `rafa pr triage --resolve` does not ask a model how to clear a
  * mechanical failure; it runs a plan that already says how
- * (`.specs/rafa-20-pr-commands.md`). One plan ships per SIMPLE triage
+ * (`.rafa/specs/rafa-20-pr-commands.md`). One plan ships per SIMPLE triage
  * class, beside this module in `src/pr/plans/`, and the ORDINARY loop
  * runs it, so its commits, its reports and its effort rows are the
  * usual ones. This module is the seam between the two: it answers the

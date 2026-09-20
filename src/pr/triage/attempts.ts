@@ -6,7 +6,7 @@
  * about that loop ends on its own: a plan that cannot fix the failure
  * produces the same red pull request every time, and the run after it
  * starts from the same place. So the spec gives the loop two ways out
- * and no third (`.specs/rafa-20-pr-commands.md`): `attempts` in the
+ * and no third (`.rafa/specs/rafa-20-pr-commands.md`): `attempts` in the
  * triage block, raised before each run and stopped at `--max-attempts`,
  * and a run that ends with the SAME class and the SAME failing step as
  * the run before it. Both live here, and nothing else does — this

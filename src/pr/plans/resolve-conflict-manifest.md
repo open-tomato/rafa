@@ -4,7 +4,7 @@
 ```rafa:plan
 stub: resolve-conflict-manifest
 issue: "20"
-spec: .specs/rafa-20-pr-commands.md
+spec: .rafa/specs/rafa-20-pr-commands.md
 ```
 
 ```rafa:context
