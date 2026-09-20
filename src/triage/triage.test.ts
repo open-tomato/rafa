@@ -765,6 +765,48 @@ describe('a security bug', () => {
   });
 });
 
+describe('a machine-scoped bug', () => {
+  /**
+   * #17's artifact: a linker failure against an Xcode Command Line Tools
+   * SDK installed on the machine the session ran on, not against rafa.
+   */
+  const LINKER_ARTIFACT = 'ld: tapi error: malformed file: '
+    + '\'/Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk/usr/lib/libSystem.tbd\' '
+    + '(missing \'TBD_OBJC_CONSTRAINT\' token)';
+
+  it('naming a linker failure against an installed SDK is neither filed nor searched for, and kept'
+    + ' machine-scoped, beside a rafa bug in the same report that is still filed', async () => {
+    const f = fixture();
+    const report = reportWith({
+      outOfScopeBugs: [
+        bug('Build fails linking against the installed SDK', LINKER_ARTIFACT, false),
+        bug('Parser drops the last line', ARTIFACT, false),
+      ],
+    });
+
+    const result = await triage(f, report);
+
+    // The machine-scoped bug: no tracker call of any kind, and never filed.
+    expect(result.bugs[0]).toMatchObject({
+      index: 0,
+      channel: 'machine',
+      ref: null,
+      foundBy: null,
+      stored: null,
+    });
+    expect(result.bugs[0]!.action).not.toBe('filed');
+
+    // Control: the rafa bug beside it is still filed to the public tracker.
+    expect(result.bugs[1]).toMatchObject({ index: 1, channel: 'public', action: 'filed', stored: 'inserted' });
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'create']);
+    expect(f.publicSpy.calls[0]![1]).toEqual({ text: KEY, type: 'bug' });
+    expect(f.privateSpy.calls).toEqual([]);
+    expect(issueFiles(f.publicDir)).toHaveLength(1);
+    expect(onlyIssue(f.publicDir).draft.title).toBe('Parser drops the last line');
+    expect(refRows(f.root)).toHaveLength(1);
+  });
+});
+
 describe('named secrets in what is filed', () => {
   const TOKEN = 'ghp_s3cretT0kenValue';
   const DB = 'postgres://app:hunter2@db.internal/app';
