@@ -40,10 +40,13 @@ ESLint exits nonzero on lint violations, and the test runner exits nonzero
 when any test fails.
 
 **A green gate is a zero exit code.** Capture the exit code beside the
-gate name, not a word from the output. The test runner writes pass/fail
-counts after all tests complete, and its order is deterministic, so two
-runs of the same tree move only where a case reads an input the tree
-does not own — which one case does, below.
+gate name, not a word from the output. Redirect the gate to a file and
+read `$?` rather than piping it into `tail`: through a pipe the code read
+is `tail`'s, and `${PIPESTATUS[0]}` prints empty here because zsh spells
+that array `$pipestatus` and indexes it from 1. The test runner writes
+pass/fail counts after all tests complete, and its order is
+deterministic, so two runs of the same tree move only where a case reads
+an input the tree does not own — which one case does, below.
 
 **One case reads a frozen copy of session logs.**
 `src/tests/parity-differential.test.ts` runs the collector twice, once
@@ -65,6 +68,15 @@ by re-running the file instead: the race does not survive a re-run
 against a sibling that has since gone quiet, while a real parity failure
 reproduces every time. Do NOT reach for a stash-and-re-run to prove it
 pre-existing: that is a second full suite against a moving input.
+
+**One suite prints a model refusal on a clean run.**
+`src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
+`Sorry, this request could not be completed.` and exits 3, and a second
+that answers a `proposals:` YAML block; the planted binary's stdout is
+not captured away from the suite's own, so both land in the log of a run
+that exited 0. Scanning such a log for trouble finds prose that reads
+like a failed session. Read the counts and the exit code, never the
+prose around them.
 
 **Inside a Claude Code session, `bun test` names failures only.** The
 session sets `CLAUDECODE`, and with it set the runner prints no `(pass)`

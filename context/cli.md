@@ -173,12 +173,21 @@ module's note is the long form.
   writes no table line. `plan create`, `effort collect` and
   `usage` write each line as a `log` event of its level and give no
   result.
-- **The plan readers start no session.** `plan list` and `plan show` read
-  the plans directory under the project root. `plan create` writes and
-  `loop start` finds its default plan in `plan.dir` under the project
+- **The plan readers start no session, and read the wrong directory.**
+  `plan list` and `plan show` join a hardcoded `.plans` — `PLANS_DIR` in
+  `src/commands/plan/plan-files.ts` — onto the git root. `plan create`
+  writes and `loop start` find their plan in `plan.dir` under the project
   root, `.rafa/plans` unless a config names another, and `effort collect`
   attributes sessions by the plan stubs there, so the readers read where
-  those write (`src/commands/plan/plan-files.ts`).
+  those write only while `plan.dir` is `.plans` and the project root is
+  the git toplevel. This repository stopped being that at rafa-49:
+  `rafa plan list` here exits 0 reporting no plans in the directory it
+  still names, over the eight plans sitting under `.rafa/plans`. That is
+  outstanding debt, and the fix wires both commands onto the resolved
+  `plan.dir` the dispatcher already computes. The sweep guard in
+  `src/tests/default-plan-dirs.test.ts` does not catch it: its forbidden
+  tokens carry a trailing slash, and `PLANS_DIR` spells the directory
+  without one.
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
