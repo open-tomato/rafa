@@ -17,7 +17,7 @@
  *
  * ## The schema
  *
- * The block under "Config schema" in `.specs/phase-1-installable.md` is
+ * The block under "Config schema" in `.rafa/specs/phase-1-installable.md` is
  * the schema and its defaults. Each {@link RafaConfig} field names the
  * file key it holds, and {@link CONFIG_DEFAULTS} spells each default.
  * A field joins section and key in camel case where the key needs its
@@ -47,7 +47,7 @@
  *
  * ## The `pr` section
  *
- * `.specs/rafa-20-pr-commands.md` spells it `pr: { provider: gh | none,
+ * `.rafa/specs/rafa-20-pr-commands.md` spells it `pr: { provider: gh | none,
  * mergeMethod: squash | merge | rebase, base: <default branch> }`, and
  * names `pr.resolveBudget` as what a `triage --resolve` session's
  * `--max-budget-usd` comes from. Four readings it leaves to this module:
@@ -80,7 +80,7 @@
  *
  * ## The `board` section
  *
- * `.specs/rafa-20-pr-commands.md` names `board.trustedAuthors` as the
+ * `.rafa/specs/rafa-20-pr-commands.md` names `board.trustedAuthors` as the
  * allow-list beside the permission reading `src/board/trust.ts` makes:
  * text off the board reaches an agent's prompt, so its author must hold
  * write access on the repository or be listed here. Two readings it
@@ -101,7 +101,7 @@
  *
  * ## The `roadmap` section
  *
- * `.specs/rafa-20-pr-commands.md` has `plan create --next` read its
+ * `.rafa/specs/rafa-20-pr-commands.md` has `plan create --next` read its
  * order off "the roadmap issue named by `roadmap.issue` in config, else
  * the pinned issue titled Roadmap". Two readings it leaves here:
  *
@@ -118,7 +118,7 @@
  *
  * ## The `release` section
  *
- * `.specs/rafa-21-changelog-and-release.md` spells it `release: {
+ * `.rafa/specs/rafa-21-changelog-and-release.md` spells it `release: {
  * enabled: auto, versionFile: package.json, changelog: CHANGELOG.md,
  * heading: "## {version} — {date}, {title}" }`, and those four values
  * are the defaults here. Four readings it leaves to this module:

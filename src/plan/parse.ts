@@ -13,7 +13,7 @@
  * ```rafa:plan
  * stub: my-feature
  * issue: OPT-123
- * spec: .specs/my-feature.md
+ * spec: .rafa/specs/my-feature.md
  * release: minor
  * ```
  *

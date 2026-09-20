@@ -2,7 +2,7 @@
  * The worktree fork helper: a new git worktree for a task to run in,
  * `bun install --frozen-lockfile` in it when the root holds a `bun.lock`,
  * then the fork's own preflight, in the order "Preflight" in
- * `.specs/phase-1-installable.md` fixes.
+ * `.rafa/specs/phase-1-installable.md` fixes.
  *
  * The loop forks no worktree in phase 1: it runs one thread until phase
  * 6, so nothing calls {@link forkWorktree} yet. It ships now so the order

@@ -6,8 +6,8 @@
  * directory `rafa plan create` writes plans into, when that file exists,
  * and `PLAN.md` at the project root otherwise, where a hand-written plan
  * sits. `plan.dir` is the value the config resolves: relative to the
- * project root, or absolute. A `.plans/PLAN.md` is read only when
- * `plan.dir` names `.plans`.
+ * project root, or absolute. A `.rafa/plans/PLAN.md` is read only when
+ * `plan.dir` names `.rafa/plans`.
  *
  * `--plan` resolves against the project root whatever `plan.dir` says, so
  * a plan named on the line is found where it was named. A bare `--plan=`

@@ -2,7 +2,7 @@
  * The `.gitignore` entry for a project's `.rafa/` directory, written
  * from the three `tracking` flags, and the notice printed when
  * `tracking.all` leaves that directory unignored: "Tracking (Q29)" in
- * `.specs/phase-1-installable.md`.
+ * `.rafa/specs/phase-1-installable.md`.
  *
  * {@link trackingEntry} answers the pattern lines for a set of flags,
  * {@link withTrackingBlock} puts them into a `.gitignore`'s text, and

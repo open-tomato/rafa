@@ -60,7 +60,7 @@
  * naming both paths. So `--spec=my-feature.md` reads
  * `.rafa/specs/my-feature.md` in a project whose root holds no
  * `my-feature.md`, and a path written from the root, such as
- * `.specs/my-feature.md`, reads as it did before `specs.dir` was read. An
+ * `.rafa/specs/my-feature.md`, reads as it did before `specs.dir` was read. An
  * absolute `--spec` has the one candidate. The planner is handed the
  * candidate found, as the port documents a spec path: repository-relative
  * or absolute.

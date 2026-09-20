@@ -186,7 +186,7 @@ function holdsAfterCommit(holds: readonly string[], silent: boolean): readonly s
  *
  * `nothing-to-commit` marks the line exactly as `committed` does, unless
  * the session reported nothing either. A task whose whole output is a
- * `.plans/` edit, a `progress.txt` append or a `/tmp` capture changes no
+ * `.rafa/plans/` edit, a `progress.txt` append or a `/tmp` capture changes no
  * tracked file and has still done what it was asked, and its report says
  * so; blocking it would stall a plan on its most ordinary shape. See
  * `utils/commit.ts` for the rest of that reasoning.

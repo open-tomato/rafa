@@ -4,7 +4,7 @@
  * after it returns.
  *
  * The spec splits one release three ways
- * (`.specs/rafa-21-changelog-and-release.md`, step 3 of its design):
+ * (`.rafa/specs/rafa-21-changelog-and-release.md`, step 3 of its design):
  * the LOOP writes the version and the raw notes, the SESSION rewrites
  * the prose, and the LOOP then verifies, commits and pushes. Only the
  * middle third is a prompt (`./wrap-up.ts`), and this module is the two

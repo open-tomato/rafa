@@ -3,7 +3,7 @@
  * each manifest validated, each adapter registered, and each command
  * entry handed to the dispatcher to mount under `module/<name>`.
  *
- * `.specs/modules-and-addons.md` lists what core carries from phase 1 so
+ * `.rafa/specs/modules-and-addons.md` lists what core carries from phase 1 so
  * phase 7 adds modules without touching core's shape: an adapter registry
  * populated "from enabled modules", the `module/<name>` mount point, and
  * the `modules:` and `allowList:` keys. Phase 1 has no `module install`

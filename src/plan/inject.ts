@@ -4,7 +4,7 @@
  * Before modes, the loop handed every task session the WHOLE plan, and
  * the spec records what that cost on one plan: 19,808 tokens a task
  * over 36 task sessions, about 713k tokens
- * (`.specs/rafa-agent-loop-package.md`, Q6). `plan.inject` chooses how
+ * (`.rafa/specs/rafa-agent-loop-package.md`, Q6). `plan.inject` chooses how
  * much of it a task receives instead, and {@link renderInjection}
  * renders each choice:
  *

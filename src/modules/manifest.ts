@@ -2,7 +2,7 @@
  * The `rafa` manifest a module's `package.json` carries, its schema, and
  * {@link validateManifest}, which reads one and names every failure.
  *
- * `.specs/modules-and-addons.md` gives the manifest under "Module
+ * `.rafa/specs/modules-and-addons.md` gives the manifest under "Module
  * manifest" and makes its check the first step of "Validation at install
  * and enable": the schema, `manifestVersion`, `requires.rafa` against the
  * running version, and the port versions, each with a named failure and

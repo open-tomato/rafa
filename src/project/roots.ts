@@ -1,7 +1,7 @@
 /**
  * Where `rafa init` offers to put a project, and where it refuses to:
  * steps 1 to 3 of `rafa init` under "Scope resolution" in
- * `.specs/phase-1-installable.md`.
+ * `.rafa/specs/phase-1-installable.md`.
  *
  * {@link rootCandidates} answers one or two candidates for a start
  * directory, in the order `init` offers them:

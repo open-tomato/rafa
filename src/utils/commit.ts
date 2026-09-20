@@ -13,7 +13,7 @@
  *
  *   - `committed` — something was staged and the commit stuck.
  *   - `nothing-to-commit` — the task legitimately changed no tracked
- *     file. A plan task that only WRITES to `.plans/`, `.specs/` or
+ *     file. A plan task that only WRITES to `.rafa/plans/`, `.rafa/specs/` or
  *     `progress.txt` has exactly that shape, all three being
  *     gitignored, and so does a measurement task whose whole output
  *     is a `/tmp` capture. That is a success, not a failure, and a

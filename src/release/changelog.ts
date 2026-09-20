@@ -4,7 +4,7 @@
  * changelog the two get inserted.
  *
  * The spec's step 1 ends by asking for the entry
- * (`.specs/rafa-21-changelog-and-release.md`):
+ * (`.rafa/specs/rafa-21-changelog-and-release.md`):
  *
  * ```text
  * renderReleaseHeading(template, values)  → '## 0.5.0 — 2026-09-20, ...'

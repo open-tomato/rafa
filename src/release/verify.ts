@@ -4,7 +4,7 @@
  * any refusal both files go back to the bytes step 1 wrote.
  *
  * The spec's step 3 is three readings and a restore
- * (`.specs/rafa-21-changelog-and-release.md`): "verify the heading and
+ * (`.rafa/specs/rafa-21-changelog-and-release.md`): "verify the heading and
  * version are still there and match, that no other section changed,
  * and that the version file parses; on failure restore step 1's text
  * and say so in the PR body". This module is those three readings and

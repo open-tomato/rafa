@@ -4,7 +4,7 @@
  * without disturbing a byte around it.
  *
  * Three steps of the spec's step 1 live here, in the order the wrap-up
- * runs them (`.specs/rafa-21-changelog-and-release.md`):
+ * runs them (`.rafa/specs/rafa-21-changelog-and-release.md`):
  *
  * ```text
  * readBaseVersion(git, versionFile)  → the version on origin/main

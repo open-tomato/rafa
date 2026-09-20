@@ -2,7 +2,7 @@
  * Taking one project root for `rafa init`: the first candidate, a path
  * named on the command line, or an answer typed at a prompt listing the
  * candidates. Step 4 of `rafa init` under "Scope resolution" in
- * `.specs/phase-1-installable.md`: "present the candidates for selection
+ * `.rafa/specs/phase-1-installable.md`: "present the candidates for selection
  * or free typing".
  *
  * `roots.ts` answers the candidates and each refusal; this module reads a
