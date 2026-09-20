@@ -64,6 +64,7 @@ interface StoredBlocker {
 /** An out-of-scope bugs row as the table holds it. */
 interface StoredBug extends StoredBlocker {
   security: number | null;
+  scope: string | null;
 }
 
 /** Each table's columns, in order. */
@@ -90,6 +91,7 @@ const COLUMNS: Readonly<Record<TriageTableName, readonly string[]>> = {
     'security',
     'outcome',
     'collected_at',
+    'scope',
   ],
 };
 
@@ -399,6 +401,7 @@ describe('writeTriage rows', () => {
         artifact: 'Unexpected end of JSON input',
         security: 1,
         ...written,
+        scope: 'rafa',
       },
       {
         seq: 2,
@@ -408,6 +411,7 @@ describe('writeTriage rows', () => {
         artifact: null,
         security: 0,
         ...written,
+        scope: 'rafa',
       },
       {
         seq: 3,
@@ -417,6 +421,7 @@ describe('writeTriage rows', () => {
         artifact: 'Unexpected end of JSON input',
         security: null,
         ...written,
+        scope: 'rafa',
       },
     ]);
   });
