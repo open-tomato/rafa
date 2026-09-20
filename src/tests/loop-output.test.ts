@@ -498,6 +498,7 @@ describe('loop start with no --plan', () => {
   }, RUN_TIMEOUT);
 
   it('reads no .plans/PLAN.md under the default plan.dir, refusing the PLAN.md at the root as missing', () => {
+    // Deliberate custom-directory fixture: plants `.plans/PLAN.md` to verify it is ignored when `plan.dir` is default.
     const scratch = plant({ branch: 'main', plan: null });
     mkdirSync(join(scratch.repo, '.plans'));
     writeFileSync(join(scratch.repo, '.plans', 'PLAN.md'), PLAN_OPEN, 'utf8');

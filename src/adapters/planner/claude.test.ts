@@ -360,6 +360,7 @@ describe('a claude planner rejecting', () => {
   });
 
   it('neither refuses nor reads a plan of the same stub left in .plans when made with another directory', async () => {
+    // Deliberate custom-directory fixture: plants `.plans/` to verify it is ignored when planner uses `.rafa/plans/`.
     const root = freshRoot();
     mkdirSync(join(root, '.plans'));
     writeFileSync(join(root, '.plans', 'PLAN-probe.md'), 'a phase 0 plan\n', 'utf8');

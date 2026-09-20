@@ -63,6 +63,7 @@ describe('resolvePlanPath with no --plan', () => {
   });
 
   it('reads a .plans/PLAN.md only when plan.dir names .plans', () => {
+    // Deliberate custom-directory fixture: passes `.plans` as custom `plan.dir` to verify it is read correctly.
     const root = rootWithPlans('.plans');
 
     expect(resolvePlanPath(root, DEFAULT_PLAN_DIR, undefined)).toBe(join(root, 'PLAN.md'));

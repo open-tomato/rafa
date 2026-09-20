@@ -391,6 +391,7 @@ describe('rafa plan through the adapter registry', () => {
   }, 30_000);
 
   it('hands the planner the plan.dir a config names, and names the plan in it', () => {
+    // Deliberate custom-directory fixture: configures `plan.dir` to `.plans` to verify the planner reads the custom setting.
     const scratch = plantScratch();
     plantProjectConfig(scratch.repo, 'version: 1\nplan:\n  dir: .plans\n');
 
@@ -595,6 +596,7 @@ describe('rafa plan through the adapter registry', () => {
   }, 30_000);
 
   it('asks the planner for a plan when a plan of the stub sits in .plans and plan.dir is left at its default', () => {
+    // Deliberate custom-directory fixture: plants `.plans/` to verify it is ignored when `plan.dir` is at its default `.rafa/plans`.
     const scratch = plantScratch();
     mkdirSync(join(scratch.repo, '.plans'));
     writeFileSync(join(scratch.repo, '.plans', 'PLAN-spec.md'), 'a phase 0 plan\n', 'utf8');
