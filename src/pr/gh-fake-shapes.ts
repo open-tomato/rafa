@@ -86,10 +86,15 @@
  *     `<login> is not a user`.
  *
  * NOT recorded, because reading one would write to a repository: what
- * `gh pr merge`, a comment POST and a comment PATCH write when they
- * succeed, and what any of them writes when it fails. So the fake writes
- * NOTHING on a successful merge, and a caller reads that outcome from the
- * exit code alone; a merge refusal is planted by the case that wants one.
+ * `gh pr merge`, `gh pr edit`, a comment POST and a comment PATCH write
+ * when they succeed, and what any of them writes when it fails. So the
+ * fake writes NOTHING on a successful merge or body edit, and a caller
+ * reads that outcome from the exit code alone; a merge refusal is
+ * planted by the case that wants one. `gh pr edit --help`, read on
+ * 2026-09-20 off the same 2.100.0, carries `-b, --body string` as "Set
+ * the new body" and says the pull request's URL is printed to stdout —
+ * help text, not a run, which is why the fake writes no URL and nothing
+ * in `./gh.ts` reads one.
  *
  * Where a `gh api` payload is answered, the fake writes the recorded keys
  * this plan's adapter reads and leaves the rest of GitHub's payload out:

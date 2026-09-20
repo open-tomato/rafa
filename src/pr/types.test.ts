@@ -44,6 +44,23 @@
  *   - `failedLog` dropped from the port: both omission refusals, and
  *     the adapter probe, whose literal then carries a member the port
  *     does not declare.
+ *
+ * Two more were driven on 2026-09-20, when `editBody` was added, with 24
+ * pass either side and the module restored byte-identical after each.
+ * Both reddened five cases, and the lists are the runs and not the
+ * prediction:
+ *
+ *   - `editBody` dropped from the port: the adapter probe and every
+ *     probe whose literal then carries a member the port does not
+ *     declare — the two older omission refusals and the
+ *     detail-answering one — plus the `editBody` omission refusal
+ *     itself, which compiles clean once there is nothing to omit.
+ *   - `editBody` retyped to answer a `PullRequestDetail`: the
+ *     detail-answering refusal, which is the reading, and the four
+ *     probes carrying the conforming `editBody` — an `async () => {}`
+ *     — which no longer conforms, so the adapter probe stops compiling
+ *     clean and the narrowed-merge and two omission refusals each draw
+ *     a diagnostic beside the one they are held to.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -98,6 +115,7 @@ const MEMBERS: readonly Member[] = [
       '  }),',
     ],
   },
+  { name: 'editBody', lines: ['  editBody: async (_n: number, _body: string) => {},'] },
   { name: 'comments', lines: ['  comments: async (_n: number) => [comment],'] },
   { name: 'comment', lines: ['  comment: async (_n: number, _body: string) => comment,'] },
   { name: 'editComment', lines: ['  editComment: async (_id: string, _body: string) => comment,'] },
@@ -220,6 +238,25 @@ const REFUSALS: readonly Refusal[] = [
     source: probeSource(...adapterSource({ omit: 'failedLog' })),
     code: 2741,
     names: '\'failedLog\'',
+  },
+  {
+    title: 'an adapter with no editBody',
+    file: 'omits-edit-body.ts',
+    source: probeSource(...adapterSource({ omit: 'editBody' })),
+    code: 2741,
+    names: '\'editBody\'',
+  },
+  {
+    title: 'an adapter whose editBody answers the edited pull request',
+    file: 'edit-body-answers-detail.ts',
+    source: probeSource(...adapterSource({
+      rewrite: { name: 'editBody', lines: ['  editBody: async (_n: number, _body: string) => detail,'] },
+    })),
+    code: 2322,
+    // The diagnostic names the two promise types rather than the member,
+    // which is the reading: a provider cannot quietly answer a record
+    // where the port promises nothing.
+    names: 'Type \'Promise<PullRequestDetail>\' is not assignable to type \'Promise<void>\'',
   },
   {
     title: 'an adapter whose merge takes one method only',

@@ -52,6 +52,20 @@
  *     request then appearing in the answer.
  *   - a comment's `updatedAt` filled from `created_at`: the edit case
  *     alone.
+ *
+ * Three more were driven on 2026-09-20, when `editBody` was added, one
+ * run each over this file, with 59 pass before and after and the module
+ * restored byte-identical (sha256) after every one:
+ *
+ *   - the pull request number check dropped from `editBody`: its three
+ *     number refusals alone, each of which also holds that nothing was
+ *     sent.
+ *   - `editBody` reading no exit code, so a failed edit answers as a
+ *     done one: both of its throwing cases, the missing pull request and
+ *     the outage.
+ *   - `editBody` sending `--title` where `--body` goes: its three cases
+ *     that reach the fake, which refuses a flag the `pr edit` route
+ *     models nothing for.
  */
 import type { FakePrGh } from './gh-fake.js';
 import type { PullRequests } from './types.js';
@@ -313,6 +327,63 @@ describe('merge', () => {
 
     await expect(pr.merge(7, 'ff' as 'squash')).rejects.toThrow(
       'gh pull requests: merge refused method "ff", expected one of: squash, merge, rebase',
+    );
+    expect(fake.calls()).toEqual([]);
+  });
+});
+
+describe('editBody', () => {
+  /** A body with the shapes a release note carries: blank lines, a list, backticks. */
+  const BODY = 'Closes #20\n\n## Changelog\n\n- release: `patch`\n';
+
+  it('sends the body as one argument and answers nothing, the read after it seeing it', async () => {
+    const { fake, pr } = withOnePull();
+
+    expect(await pr.editBody(7, BODY)).toBeUndefined();
+
+    expect(fake.calls()[0]).toEqual(['pr', 'edit', '7', '--body', BODY]);
+    expect((await pr.get(7))?.body).toBe(BODY);
+  });
+
+  it('writes an empty body, which clears the description', async () => {
+    const { fake, pr } = withOnePull();
+
+    await pr.editBody(7, '');
+
+    expect(fake.calls()[0]).toEqual(['pr', 'edit', '7', '--body', '']);
+    expect(fake.pull(7)?.body).toBe('');
+  });
+
+  it('throws for a pull request that does not exist, where get answers null', async () => {
+    const { fake, pr } = withOnePull();
+
+    await expect(pr.editBody(9, BODY)).rejects.toThrow(
+      'gh pull requests: gh pr edit 9 --body <body> failed: GraphQL: Could not resolve to a PullRequest',
+    );
+    // The control on the throw: `get` reads the same absence as null,
+    // and the body of the pull request that does exist is untouched.
+    expect(await pr.get(9)).toBeNull();
+    expect(fake.pull(7)?.body).toBe('Closes #20');
+  });
+
+  it('throws what gh wrote on a failure that is not about the pull request', async () => {
+    await expect(answering(OUTAGE).editBody(7, BODY)).rejects.toThrow(
+      'gh pull requests: gh pr edit 7 --body <body> failed: error connecting to api.github.com',
+    );
+  });
+
+  it.each([0, -1, 1.5])('refuses the pull request number %p before any command is sent', async (number) => {
+    const { fake, pr } = withOnePull();
+
+    await expect(pr.editBody(number, BODY)).rejects.toThrow('gh pull requests: editBody refused pull request number');
+    expect(fake.calls()).toEqual([]);
+  });
+
+  it('refuses a body that is not a string, sending nothing', async () => {
+    const { fake, pr } = withOnePull();
+
+    await expect(pr.editBody(7, null as unknown as string)).rejects.toThrow(
+      'gh pull requests: editBody refused a body null, expected a string',
     );
     expect(fake.calls()).toEqual([]);
   });

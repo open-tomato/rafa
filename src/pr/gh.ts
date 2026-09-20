@@ -58,6 +58,16 @@
  *     for a marker in a PR's own comments, and a PR with more than a
  *     page of them is not a case this plan builds for; a stage that
  *     needs the rest adds the flag and the fake models it then.
+ *   - **A body edit goes through `gh pr edit`, and nothing reads what it
+ *     wrote.** `gh pr edit --help` on 2.100.0 carries `-b, --body
+ *     string` as "Set the new body" and says the pull request's URL is
+ *     printed to stdout; what a successful edit actually writes was not
+ *     recorded, a write being the one thing `./gh-fake-shapes.ts` could
+ *     not read off a repository. So `editBody` reads the exit code
+ *     alone, as `merge` does, and answers nothing. The body travels as
+ *     ONE argument after `--body`, never interpolated into a command
+ *     line: the runner spawns `gh` with an argument list, so a body
+ *     holding newlines, quotes or backticks reaches GitHub as written.
  *
  * ## What is refused, and what is narrowed
  *
@@ -316,8 +326,12 @@ function textArgument(value: string, member: string, what: string, whole: boolea
   return value;
 }
 
-/** The body `member` was handed. Throws when it is not a string. */
-function commentBody(value: string, member: string): string {
+/**
+ * The body `member` was handed, a comment's or a pull request's own.
+ * Throws when it is not a string; an empty one is a body, and clears
+ * whatever was there.
+ */
+function bodyText(value: string, member: string): string {
   if (typeof value !== 'string') {
     throw new TypeError(`${PREFIX}: ${member} refused a body ${describeValue(value)}, expected a string`);
   }
@@ -422,6 +436,14 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       return { merged: result.ok, detail: detailOf(result, command) };
     },
 
+    editBody: async (number: number, body: string): Promise<void> => {
+      const target = pullNumber(number, 'editBody');
+      const text = bodyText(body, 'editBody');
+      const command = `gh pr edit ${target} --body <body>`;
+      // Nothing reads what the edit wrote; see the module note.
+      await succeed(['pr', 'edit', target, '--body', text], command);
+    },
+
     comments: async (number: number): Promise<readonly PullRequestComment[]> => {
       const path = commentsPath(pullNumber(number, 'comments'));
       const command = `gh api ${path}`;
@@ -432,7 +454,7 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
 
     comment: async (number: number, body: string): Promise<PullRequestComment> => {
       const path = commentsPath(pullNumber(number, 'comment'));
-      const text = commentBody(body, 'comment');
+      const text = bodyText(body, 'comment');
       const command = `gh api -X POST ${path}`;
       const stdout = await succeed(['api', path, '-X', 'POST', '-f', `body=${text}`], command);
       return readComment(parseJson(stdout, command), command, 'the comment');
@@ -440,7 +462,7 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
 
     editComment: async (id: string, body: string): Promise<PullRequestComment> => {
       const path = commentPath(textArgument(id, 'editComment', 'comment id', true));
-      const text = commentBody(body, 'editComment');
+      const text = bodyText(body, 'editComment');
       const command = `gh api -X PATCH ${path}`;
       const stdout = await succeed(['api', path, '-X', 'PATCH', '-f', `body=${text}`], command);
       return readComment(parseJson(stdout, command), command, 'the comment');

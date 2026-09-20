@@ -29,6 +29,7 @@
  * | `pr view <n> --web [--repo]` | `browse` |
  * | `pr checks <n> --json <fields> [--repo]` | `checks` |
  * | `pr merge <n> --squash or --merge or --rebase [--repo]` | `merge` |
+ * | `pr edit <n> --body <text> [--repo]` | `editBody` |
  * | `run view <id> --log-failed [--repo]` | `failedLog` |
  * | `api repos/<repo>/issues/<n>/comments [-X POST -f body=]` | `comments`, `comment` |
  * | `api repos/<repo>/issues/comments/<id> -X PATCH -f body=` | `editComment` |
@@ -61,7 +62,11 @@
  * one, so a case can plant what a person, CI or dependabot could have
  * done on GitHub. A merge fails only where a case plants the refusal
  * ({@link FakePrGh.refuseMerge}), since what `gh pr merge` writes when it
- * fails could not be recorded without writing to a repository.
+ * fails could not be recorded without writing to a repository. A body
+ * edit is that kind of write too: it replaces the stored body, which
+ * every later `pr view --json body` then answers, and writes nothing to
+ * either stream, because what `gh pr edit` writes was not recorded
+ * either.
  */
 import type { FakePrComment, FakePullRequest, FakePullRequestSeed } from './gh-fake-shapes.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -176,6 +181,7 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['pr view', { values: ['--json', '--repo'], switches: ['--web'], positionals: 1 }],
   ['pr checks', { values: ['--json', '--repo'], switches: [], positionals: 1 }],
   ['pr merge', { values: ['--repo'], switches: MERGE_SWITCHES, positionals: 1 }],
+  ['pr edit', { values: ['--body', '--repo'], switches: [], positionals: 1 }],
   ['run view', { values: ['--repo'], switches: ['--log-failed'], positionals: 1 }],
   ['api', { values: ['-X', '-f'], switches: [], positionals: 1 }],
 ]);
@@ -356,6 +362,18 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     return ok();
   };
 
+  const handlePrEdit = (parsed: ParsedCommand): GhResult => {
+    const refused = repoProblem(parsed);
+    if (refused !== null) return refused;
+    const body = flagValue(parsed, '--body');
+    if (body === undefined) return failed('fake gh: pr edit models --body <text> alone, and was handed no body\n');
+    const pull = namedPull(parsed.positionals[0] ?? '');
+    if (isResult(pull)) return pull;
+    // The body is replaced whole, and nothing is written: see the module note.
+    store({ ...pull, body });
+    return ok();
+  };
+
   const handleRunView = (parsed: ParsedCommand): GhResult => {
     const refused = repoProblem(parsed);
     if (refused !== null) return refused;
@@ -449,6 +467,7 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     ['pr view', handlePrView],
     ['pr checks', handlePrChecks],
     ['pr merge', handlePrMerge],
+    ['pr edit', handlePrEdit],
     ['run view', handleRunView],
     ['api', handleApi],
   ]);
