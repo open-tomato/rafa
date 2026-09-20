@@ -382,7 +382,7 @@ describe('rafa plan through the adapter registry', () => {
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
-    expect(run.stdout).toContain('▶ Execute with: bun src/rafa.ts start --plan=.rafa/plans/PLAN-spec.md\n');
+    expect(run.stdout).toContain('▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md\n');
     expect(run.stdout).not.toContain('Prerequisites detected');
     expect(run.stdout).not.toContain('Including findings');
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
@@ -641,7 +641,7 @@ describe('rafa plan create in json mode', () => {
       'info:📝 Generating .rafa/plans/PLAN-spec.md from spec.md...',
       'info:\n✅ Plan ready: .rafa/plans/PLAN-spec.md',
       'info:⚠️  Prerequisites detected: complete .rafa/plans/PREREQUISITES-spec.md before starting the loop.',
-      'info:▶ Execute with: bun src/rafa.ts start --plan=.rafa/plans/PLAN-spec.md',
+      'info:▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md',
       'result',
     ]);
     expect(existsSync(scratch.spawned)).toBe(false);
