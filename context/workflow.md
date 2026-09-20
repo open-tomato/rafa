@@ -121,3 +121,14 @@ derived: `src/utils/progress.ts` rewrites it whole from the store's `findings`
 rows before every dispatch, so a render over an empty store blanks what a
 session wrote there by hand. The stray `@progress.txt` file has been
 deleted.
+
+### Release
+
+**Versioning and changelog are automated at wrap-up and owned by the loop,
+not by a task.** No plan carries a version-bump or changelog task; the
+loop computes the next version from the plan's highest change-note level,
+rewrites `package.json` and the changelog heading at plan merge, and the
+wrap-up agent polishes the raw notes into one line per area. On success,
+the wrap-up commits `chore: release <version>` and attaches the changelog
+entry to the PR body. Details at `context/release.md`; config in
+`src/release/setting.ts`.
