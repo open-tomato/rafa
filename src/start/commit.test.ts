@@ -325,6 +325,28 @@ describe('finishCleanExit', () => {
     expect(silent.finished).toMatchObject({ outcome: 'done', holds: [] });
   });
 
+  it('holds a clean exit that wrote no report and changed no tracked file, rather than ticking it', () => {
+    const nothing: CommitAttempt = { ...COMMITTED, outcome: 'nothing-to-commit', sha: null };
+
+    // The signature the spec calls a held task: no report, no commit.
+    const silentAndEmpty = settle('Done, and nothing to report.', nothing);
+
+    expect(silentAndEmpty.line).toBe(`- [BLOCKED] ${FIRST_TASK}`);
+    expect(silentAndEmpty.finished.outcome).toBe('blocked');
+
+    // The control: a report present, but nothing changed, stays ticked.
+    const reportedAndEmpty = settle(CLEAN, nothing);
+
+    expect(reportedAndEmpty.line).toBe(`- [x] ${FIRST_TASK}`);
+    expect(reportedAndEmpty.finished.outcome).toBe('done');
+
+    // The control: a file changed, but no report, stays ticked.
+    const silentAndChanged = settle('Done, and nothing to report.', COMMITTED);
+
+    expect(silentAndChanged.line).toBe(`- [x] ${FIRST_TASK}`);
+    expect(silentAndChanged.finished.outcome).toBe('done');
+  });
+
   it('tells the operator what held the task, and that its work was committed', () => {
     settle(DONE_WITH_BLOCKER, COMMITTED);
 
