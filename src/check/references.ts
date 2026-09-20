@@ -80,6 +80,23 @@
  * `pathDirs`; a first word holding a separator (`./scripts/run.sh`)
  * is a PATH, and is checked as one.
  *
+ * ## A fence holding another language carries no command at all
+ *
+ * One line `shell-lines.ts` answers as another language's code makes
+ * the WHOLE fence foreign ({@link FenceReader.foreign}): every
+ * reference already read out of it is dropped, and every later line
+ * of it is passed over. Evidence is taken only from a line this
+ * module would have READ as a command, so a heredoc body is never
+ * evidence and the `python3 -c` line opening one still names its
+ * tool. Measured on 2026-09-20 over the 146 `SKILL.md` bodies of this
+ * repository's `.claude/skills`, of `~/.claude/skills` and of the
+ * sibling checkout's tier, read with no project root and this
+ * machine's `PATH`: 492 tool references and 25 tool issues BEFORE the
+ * rule, the same 492 and 25 AFTER, because NO fence of that corpus is
+ * read as foreign at all. `shell-lines.ts` carries why the unit is
+ * the fence rather than the line, and what those 25 and the 15 lines
+ * it does flag there are.
+ *
  * ## Locality
  *
  * An absolute path inside the project or inside the skill's own
@@ -129,7 +146,7 @@ import { delimiter, isAbsolute, relative, resolve } from 'node:path';
 
 import { AGNOSTIC_STACK } from '../schema/stack.js';
 
-import { commandOf, continuesLine, heredocTerminator, isShellFence, toolOf } from './shell-lines.js';
+import { commandOf, continuesLine, heredocTerminator, isForeignCodeLine, isShellFence, toolOf } from './shell-lines.js';
 
 /** The info strings of a fence that names files without being code. */
 export const TEXT_FENCE_LANGUAGES: readonly string[] = ['text', 'txt', 'plain', 'plaintext'];
@@ -450,6 +467,13 @@ interface FenceReader {
   terminator: string | null;
   /** Whether the previous command line continues into this one. */
   continued: boolean;
+  /**
+   * Whether a line this fence would have read as a command was
+   * another language's code, which makes the WHOLE fence foreign.
+   */
+  foreign: boolean;
+  /** What this fence has named so far, held until it closes. */
+  readonly found: BodyReference[];
 }
 
 /**
@@ -481,14 +505,13 @@ function reference(
 }
 
 /** Reads one command line of a shell fence for its tool and its paths. */
-function readCommand(
-  reader: FenceReader,
-  line: string,
-  number: number,
-  found: BodyReference[],
-): void {
+function readCommand(reader: FenceReader, line: string, number: number): void {
   const command = commandOf(line, reader.info);
   if (command === null) return;
+  if (isForeignCodeLine(command)) {
+    reader.foreign = true;
+    return;
+  }
 
   const terminator = heredocTerminator(command);
   if (terminator !== null) {
@@ -497,35 +520,46 @@ function readCommand(
 
   if (!reader.continued) {
     const tool = toolOf(command);
-    if (tool !== null) found.push(reference('tool', tool, number, 'fence'));
+    if (tool !== null) reader.found.push(reference('tool', tool, number, 'fence'));
   }
   reader.continued = continuesLine(command);
 
   for (const token of pathTokens(command)) {
-    found.push(reference('path', token, number, 'fence'));
+    reader.found.push(reference('path', token, number, 'fence'));
   }
 }
 
 /** Reads one line of a fenced block. */
-function readFenceLine(
-  reader: FenceReader,
-  line: string,
-  number: number,
-  found: BodyReference[],
-): void {
+function readFenceLine(reader: FenceReader, line: string, number: number): void {
+  if (reader.foreign) return;
+
   if (reader.terminator !== null) {
     if (line.trim() === reader.terminator) reader.terminator = null;
     return;
   }
 
   if (isShellFence(reader.info)) {
-    readCommand(reader, line, number, found);
+    readCommand(reader, line, number);
     return;
   }
 
   for (const token of pathTokens(line)) {
-    found.push(reference('path', token, number, 'fence'));
+    reader.found.push(reference('path', token, number, 'fence'));
   }
+}
+
+/** The reader a fence's opening line opens, having named nothing. */
+function openFence(open: RegExpExecArray): FenceReader {
+  const run = open[1] ?? '';
+  return {
+    info: fenceInfo(open[2] ?? ''),
+    delimiter: run[0] ?? '`',
+    length: run.length,
+    terminator: null,
+    continued: false,
+    foreign: false,
+    found: [],
+  };
 }
 
 /**
@@ -539,31 +573,33 @@ export function collectReferences(body: string): readonly BodyReference[] {
   const found: BodyReference[] = [];
   let reader: FenceReader | null = null;
 
-  body.split('\n').forEach((line, index) => {
+  for (const [index, line] of body.split('\n').entries()) {
     const number = index + 1;
     if (reader === null) {
       const open = FENCE_OPEN.exec(line);
-      if (open) {
-        const info = fenceInfo(open[2] ?? '');
-        const run = open[1] ?? '';
-        reader = { info, delimiter: run[0] ?? '`', length: run.length, terminator: null, continued: false };
-        return;
+      if (open !== null) {
+        reader = openFence(open);
+        continue;
       }
       for (const span of codeSpans(line)) {
         for (const token of pathTokens(span)) {
           found.push(reference('path', token, number, 'code-span'));
         }
       }
-      return;
+      continue;
     }
 
     if (closesFence(line, reader)) {
+      if (!reader.foreign) found.push(...reader.found);
       reader = null;
-      return;
+      continue;
     }
-    if (namesFiles(reader.info)) readFenceLine(reader, line, number, found);
-  });
+    if (namesFiles(reader.info)) readFenceLine(reader, line, number);
+  }
 
+  // A fence the body never closes still names what it named, so the
+  // last reader is flushed rather than dropped.
+  if (reader !== null && !reader.foreign) found.push(...reader.found);
   return found;
 }
 

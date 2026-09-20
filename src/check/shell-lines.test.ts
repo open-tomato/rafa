@@ -19,15 +19,15 @@
  * any of those words foreign would have made the checker blind to
  * every `if`, `for` and `export` line in the corpus.
  *
- * ## The unwired reading
+ * ## The reading the caller refuses with
  *
- * `isForeignCodeLine` is not called by `commandOf` and is not called
- * by `check/references.ts` either, which is this module's note's own
- * claim. The last case holds it: the JavaScript line that the rule
- * answers foreign is STILL answered as a command by `commandOf`, and
- * its first word is still answered as the tool `const` by `toolOf`.
- * That case is what the task wiring the rule in has to change, and it
- * is the reading that says this move changed no behaviour.
+ * `isForeignCodeLine` is not called by `commandOf`, and wiring it
+ * into `check/references.ts` did not change that: the last case holds
+ * the split. The JavaScript line the rule answers foreign is STILL
+ * answered as a command by `commandOf` and as the tool `const` by
+ * `toolOf`; what the caller does with the three answers together is
+ * where the fence is refused, and `check/references.test.ts` is where
+ * that refusal is measured.
  *
  * ## The mutation legs
  *
@@ -200,7 +200,7 @@ describe('isForeignCodeLine, on a comment opening the line', () => {
   });
 });
 
-describe('the reading nothing is wired to yet', () => {
+describe('the reading the caller refuses a whole fence with', () => {
   it('still answers the JavaScript line as a command naming the tool const', () => {
     const line = 'const ready = true;';
 

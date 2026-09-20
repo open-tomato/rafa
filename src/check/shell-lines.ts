@@ -59,21 +59,41 @@
  * `SKILL.md` bodies holding 1_357 shell-fence lines. The three rules
  * together flag 15 of those lines, in 8 bodies: 11 by keyword
  * (`const`, `import`, `from`), 3 by spaced assignment (`block = ...`,
- * `line = ...`, `logger = ...`) and 1 by comment marker. Fourteen of
- * the 15 are lines whose first word the tool rule looks up today, so
- * they are the false `missing-tool` reports themselves and not a
- * neighbouring reading; every one of the 15 was read by hand and every
- * one is Python or JavaScript in a fence labelled for a shell. No line
- * naming a real command was flagged.
+ * `line = ...`, `logger = ...`) and 1 by comment marker. Every one of
+ * the 15 was read by hand and every one is Python or JavaScript in a
+ * fence labelled for a shell. No line naming a real command was
+ * flagged.
  *
- * ## Nothing here is wired yet
+ * Re-measured on 2026-09-20 when the reading was wired in: ALL 15 sit
+ * inside a heredoc body (`cat <<'PY'`, `<< EOF`), which `references.ts`
+ * passes over already, and NONE of them produces a reference there —
+ * 0 of the 15 outside a heredoc. The sentence this paragraph replaces
+ * said fourteen of them were the false `missing-tool` reports
+ * themselves, which the re-run refutes: what the corpus holds is the
+ * SHAPE of the false positive and not one report of it. The report
+ * the rule stops is pinned by fixture instead, in
+ * `src/tests/checker-fixtures.test.ts`.
  *
- * {@link isForeignCodeLine} is not called by {@link commandOf}, and
- * `references.ts` does not call it either: this module is the reading,
- * and the task after the one that added it is what changes what the
- * checker does with it. The three functions moved out of
- * `references.ts` ({@link commandOf}, {@link toolOf},
- * {@link isShellFence}) answer byte for byte what they answered there.
+ * ## What `references.ts` does with it
+ *
+ * One line {@link isForeignCodeLine} answers true for makes the WHOLE
+ * fence foreign there: it contributes no tool and no path, and what it
+ * already contributed is dropped. The unit is the fence because the
+ * evidence is — a `bash` fence holding a JavaScript sample carries
+ * lines no rule here flags (`});`, a bare call, a string argument) for
+ * every line it does, and reading those as commands is the same false
+ * report under another line number. Evidence is taken only from a line
+ * `references.ts` would have READ as a command, so a heredoc body is
+ * never evidence and the `python3 -c` line that opens one still names
+ * its tool. What that costs is named: one line of a REAL shell fence
+ * shaped like {@link SPACED_ASSIGNMENT} takes the whole fence's tools
+ * out of the check, and no corpus line does that today.
+ *
+ * {@link commandOf} is unchanged by the wiring: it still answers a
+ * JavaScript line as the command it looks like, and the caller is what
+ * refuses it. The three functions moved out of `references.ts`
+ * ({@link commandOf}, {@link toolOf}, {@link isShellFence}) answer byte
+ * for byte what they answered there.
  */
 
 /** The fence info strings whose blocks hold shell command lines. */

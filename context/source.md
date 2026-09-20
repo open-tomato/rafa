@@ -39,9 +39,11 @@ already near the cap; a module that has to grow puts the new concern in
 a new file, and a note that has outgrown its module can move to the
 `context/` page that owns the subject. That module is no longer the
 example in the present tense: the shell-fence line reading moved to
-`src/check/shell-lines.ts`, leaving `references.ts` at 759 lines and
-NO non-test file under `src/` over the cap, the nearest being
-`src/effort/collect.ts` at 798.
+`src/check/shell-lines.ts`, leaving `references.ts` at 759 lines, and
+wiring that reading back in as a whole-fence rule took it to 795. NO
+non-test file under `src/` is over the cap; the nearest is
+`src/effort/collect.ts` at 798, with `src/demote/classify.ts` and
+`src/check/references.ts` both at 795 behind it.
 
 **The cap is a rule about modules, not about their tests.** At `b2bebfe`
 exactly one non-test file under `src/` is over it, `src/check/references.ts`

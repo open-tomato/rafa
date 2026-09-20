@@ -44,6 +44,25 @@
  * `missing-tool-off-stack` a failure reddened 3 cases across this file
  * and `run.test.ts`, and dropping the `agnostic` exception from
  * {@link isOffStack} — so every non-empty list demoted — reddened 5.
+ *
+ * ## The foreign fence, and the three legs under it
+ *
+ * `a shell fence holding another language` is the rule that a fence
+ * holding another language's code carries no command at all, and each
+ * of its cases pairs the fence that is dropped with a real shell fence
+ * beside it that is still read: the JavaScript fence next to a
+ * `kept --flag` one, the foreign `./gone.js` next to the same path in
+ * a shell line, and the `const` that is no longer reported next to a
+ * `nosuchtool` that still is. The heredoc case is the control in the
+ * other direction — a `cat <<EOF` whose body is Python still names
+ * `cat` — because that shape is the whole of what the corpus holds
+ * (`check/references.ts`'s note has the counts).
+ *
+ * Three mutations of `check/references.ts` were driven against this
+ * file on 2026-09-20 and the module restored sha256-identical after
+ * each: dropping the foreign check from `readCommand` reddened 6
+ * cases, keeping the check but dropping only the LINE instead of the
+ * fence reddened 2, and reading a heredoc body as evidence reddened 1.
  */
 import type { BodyReference, ReferenceIssue, ReferenceIssueCode } from './references.js';
 
@@ -323,6 +342,80 @@ describe('a shell fence', () => {
     const references = collectReferences(body(...fence('text', 'nosuchtool --flag')));
 
     expect(textsOf(references, 'tool')).toEqual([]);
+  });
+});
+
+describe('a shell fence holding another language', () => {
+  it('reads a fence whose line is another language as carrying no command, and the one beside it as carrying one', () => {
+    const references = collectReferences(body(
+      ...fence('bash', 'const ready = true;'),
+      ...fence('bash', 'kept --flag'),
+    ));
+
+    expect(textsOf(references, 'tool')).toEqual(['kept']);
+  });
+
+  it('drops the tool it read before the foreign line, because the unit is the fence and not the line', () => {
+    const references = collectReferences(body(...fence(
+      'bash',
+      'dropped --flag',
+      'const ready = true;',
+      'also-dropped --flag',
+    )));
+
+    expect(textsOf(references, 'tool')).toEqual([]);
+  });
+
+  it('reads no path out of a foreign fence, and reads the same path out of the shell fence beside it', () => {
+    const foreign = collectReferences(body(...fence('bash', 'const config = "./gone.js";')));
+    const shell = collectReferences(body(...fence('bash', 'cat ./gone.js')));
+
+    expect(textsOf(foreign, 'path')).toEqual([]);
+    expect(textsOf(shell, 'path')).toEqual(['./gone.js']);
+  });
+
+  it('keeps the tool of a command line whose heredoc body is another language', () => {
+    const references = collectReferences(body(...fence(
+      'bash',
+      'cat <<EOF > out.py',
+      'import sys',
+      'EOF',
+      'after --flag',
+    )));
+
+    expect(textsOf(references, 'tool')).toEqual(['cat', 'after']);
+  });
+
+  it('names the tool of a fence the body never closes, and nothing of a foreign one', () => {
+    const shell = collectReferences(body(`${FENCE}bash`, 'kept --flag'));
+    const foreign = collectReferences(body(`${FENCE}bash`, 'const ready = true;', 'kept --flag'));
+
+    expect(textsOf(shell, 'tool')).toEqual(['kept']);
+    expect(textsOf(foreign, 'tool')).toEqual([]);
+  });
+
+  it('stops reporting the missing tool of a foreign fence, and still reports the one beside it', () => {
+    const found = checkReferences(
+      body(...fence('bash', 'const ready = true;'), ...fence('bash', 'nosuchtool --flag')),
+      { projectRoot: null, skillDir: null, pathDirs: [] },
+    );
+
+    expect(codesOf(found.issues)).toEqual(['missing-tool']);
+    expect(found.issues[0]?.message).toContain('nosuchtool');
+  });
+
+  it('stops reporting the project path of a foreign fence, and still reports the one beside it', () => {
+    const root = plant({ 'project/src/there.ts': 'x' });
+    const found = checkReferences(
+      body(
+        ...fence('bash', 'const gone = "./src/foreign-gone.ts";'),
+        ...fence('bash', './src/shell-gone.ts --once'),
+      ),
+      { projectRoot: join(root, 'project'), skillDir: null, pathDirs: [] },
+    );
+
+    expect(codesOf(found.issues)).toEqual(['unresolved-path']);
+    expect(found.issues[0]?.message).toContain('./src/shell-gone.ts');
   });
 });
 
