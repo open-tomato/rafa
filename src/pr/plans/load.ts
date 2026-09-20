@@ -64,8 +64,10 @@
  *
  * A value handed for a slot the template does not carry is silently
  * unused, which is what lets one value map serve all four plans: only
- * the two conflict plans carry `{CONFLICT_SENTENCE}`, and the two CI
- * plans carry no slot at all and come back byte-identical.
+ * the two conflict plans carry `{CONFLICT_SENTENCE}` and
+ * `{CONFLICT_FILES}`, and only the two CI plans carry `{FAILING_LOG}`.
+ * Every fill answers all three, and each plan takes the ones its own
+ * text asks for.
  *
  * ## Filled from the triage block, and from ONE conflict sentence
  *
@@ -99,9 +101,45 @@
  * shipped one — a fill test asserting the default text would pass on a
  * module that inlined its own copy of it, because the two strings would
  * be equal. Nothing in the product passes it.
+ *
+ * ## The failing log, which the triage block does not hold
+ *
+ * `{FAILING_LOG}` is the one slot with no answer in the comment. The
+ * `rafa:triage` block records the class, the files and the attempts and
+ * never the log; the excerpt lives in the assessment's evidence
+ * (`../triage/evidence.ts`), which the caller has in hand at the moment
+ * it resolves. So {@link PinnedPlanFill} takes an {@link ExcerptReading}
+ * — what `excerptLines` (`../triage/follow-up.ts`) answers, the same
+ * reader the follow-up prompt is capped by — and a fill without one
+ * still answers the slot, with {@link NO_FAILING_LOG} telling the agent
+ * to go and read the log itself rather than with an empty fence that
+ * would read as a job that logged nothing.
+ *
+ * Two things are done to that excerpt here, and both are about where it
+ * lands:
+ *
+ *   - It is capped AGAIN, at {@link FAILING_LOG_EXCERPT_LINES}, the
+ *     same count and for the same reason `../triage/follow-up.ts` gives
+ *     for re-capping: this text goes in the plan's `rafa:context` block,
+ *     which `src/plan/inject.ts` renders into EVERY task session of the
+ *     resolve run, so an uncapped excerpt is paid for once per TASK
+ *     rather than once per resolve. The two omission counts are added,
+ *     as they are there.
+ *   - Every line is QUOTED with a `>` rather than fenced. A log line is
+ *     untrusted text arriving inside a fenced block, and a bare
+ *     three-backtick line in it CLOSES the `rafa:context` fence early
+ *     (`src/plan/blocks.ts` takes any fence at least as long as the
+ *     opening one), spilling the rest of the log into the document as
+ *     markdown, where a `- [ ] ` line is read as a TASK. A fence one
+ *     backtick longer, the trick `../triage/follow-up.ts` uses, does not
+ *     help INSIDE a fence for exactly that reason. A `>` prefix cannot
+ *     close a fence, cannot match `parsePlan`'s task patterns — they are
+ *     anchored at the start of the line — and survives the injection,
+ *     where the context body is rendered as prose and not as a fence.
  */
 import type { TriageClass } from '../triage/classes.js';
 import type { TriageBlock } from '../triage/comment.js';
+import type { ExcerptReading } from '../triage/follow-up.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -109,6 +147,7 @@ import { fileURLToPath } from 'node:url';
 
 import { MECHANICAL_CONFLICT_SENTENCE } from '../conflict-sentence.js';
 import { DEPENDENCY_BUMP_SIMPLE_CLASSES, SIMPLE_TRIAGE_CLASSES } from '../triage/classes.js';
+import { excerptCaption, FOLLOW_UP_EXCERPT_LINES } from '../triage/follow-up.js';
 
 /** This module's own directory, the default both lookups start from. */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
@@ -213,6 +252,25 @@ export const CONFLICT_FILES_SLOT = 'CONFLICT_FILES';
  */
 export const NO_CONFLICT_FILES = 'the paths `git status` reports as conflicted';
 
+/** The slot the two CI plans carry the failing job's log excerpt in. */
+export const FAILING_LOG_SLOT = 'FAILING_LOG';
+
+/**
+ * How many excerpt lines a filled plan shows, counted from the END: the
+ * same cap `../triage/follow-up.ts` shows a prompt with, so no reader of
+ * one triage sees lines another was denied. See the module note.
+ */
+export const FAILING_LOG_EXCERPT_LINES = FOLLOW_UP_EXCERPT_LINES;
+
+/**
+ * What stands in for the excerpt when the fill carried none; see the
+ * module note on the failing log.
+ */
+export const NO_FAILING_LOG
+  = 'No failing-job log was carried into this plan. Read it yourself with'
+    + ' `gh run view <run-id> --log-failed` before changing anything, and say that'
+    + ' the excerpt was missing rather than guessing what failed.';
+
 /**
  * A template with every `{SLOT}` replaced by its value.
  *
@@ -251,6 +309,13 @@ export interface PinnedPlanFill {
    * tests; see the module note.
    */
   readonly conflictSentence?: string | undefined;
+  /**
+   * The failing job's log as the caller already read and capped it —
+   * the reading `excerptLines` (`../triage/follow-up.ts`) answers.
+   * Omitted when the triage read no failing log at all; see the module
+   * note on the failing log.
+   */
+  readonly excerpt?: ExcerptReading | undefined;
 }
 
 /** The conflicting paths as a plan spells them: each in backticks, comma-joined. */
@@ -259,17 +324,41 @@ function conflictFiles(files: readonly string[] | null): string {
   return files.map((file) => `\`${file}\``).join(', ');
 }
 
+/** One log line as a plan quotes it: inert markdown, whatever the line holds. */
+function quotedLogLine(line: string): string {
+  return line === ''
+    ? '>'
+    : `> ${line}`;
+}
+
 /**
- * The slot values one fill answers, keyed by slot name.
+ * The excerpt as a plan spells it: the caption the follow-up prompt
+ * uses, then the lines quoted. Capped again here; see the module note.
+ */
+function failingLog(excerpt: ExcerptReading | undefined): string {
+  if (excerpt === undefined || excerpt.lines.length === 0) return NO_FAILING_LOG;
+  const dropped = Math.max(0, excerpt.lines.length - FAILING_LOG_EXCERPT_LINES);
+  const capped: ExcerptReading = {
+    lines: excerpt.lines.slice(dropped),
+    omitted: excerpt.omitted + dropped,
+    total: excerpt.total,
+  };
+  return `${excerptCaption(capped)}\n\n${capped.lines.map(quotedLogLine).join('\n')}`;
+}
+
+/**
+ * The slot values one fill answers, keyed by slot name: every slot any
+ * shipped plan carries, whichever plan the fill is for.
  *
- * Exported beside {@link fillPinnedPlan} so a caller with more to
- * substitute than a triage block holds — a CI log excerpt, say — spreads
- * these and adds its own rather than threading it through here.
+ * Exported beside {@link fillPinnedPlan} so a caller with something to
+ * substitute that no shipped plan asks for spreads these and adds its
+ * own rather than widening {@link PinnedPlanFill} for it.
  */
 export function pinnedPlanValues(fill: PinnedPlanFill): Record<string, string> {
   return {
     [CONFLICT_SENTENCE_SLOT]: fill.conflictSentence ?? MECHANICAL_CONFLICT_SENTENCE,
     [CONFLICT_FILES_SLOT]: conflictFiles(fill.block.files),
+    [FAILING_LOG_SLOT]: failingLog(fill.excerpt),
   };
 }
 
