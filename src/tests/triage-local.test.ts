@@ -12,7 +12,10 @@
  * wiring into `loop start`. Neither carries a written blocker on to
  * `buildTaskPrompt` (`start/dispatch.ts`), the function that puts the
  * text in front of a session on the task's next dispatch, so this file
- * closes that one gap rather than repeating either suite's grid.
+ * closes that one gap rather than repeating either suite's grid. One
+ * more case drives a machine-scoped bug beside a rafa one through the
+ * same real `local` adapter, the spy proving the public tracker was
+ * never asked about the first while the second is filed as normal.
  *
  * Every root, tracker file and issue directory sits under one temporary
  * directory this file creates and removes; no case writes under the
@@ -281,6 +284,49 @@ describe('a security bug over the local adapter', () => {
     expect(f.publicSpy.calls).toEqual([]);
     expect(issueNames(f.privateDir)).toEqual(['1.md']);
     expect(existsSync(f.publicDir)).toBe(false);
+  });
+});
+
+describe('a machine-scoped bug over the local adapter', () => {
+  /**
+   * #17's artifact: a linker failure against an Xcode Command Line Tools
+   * SDK installed on the machine the session ran on, not against rafa.
+   * `src/triage/machine-fault.test.ts` and `src/triage/triage.test.ts`
+   * already exercise the reading and its routing over spied trackers;
+   * this case is the same pairing over the real `local` adapter.
+   */
+  const TOOLCHAIN_ARTIFACT = 'ld: tapi error: malformed file: '
+    + '\'/Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk/usr/lib/libSystem.tbd\' '
+    + '(missing \'TBD_OBJC_CONSTRAINT\' token)';
+
+  it('reaches no tracker for the toolchain failure while filing exactly one issue for the rafa bug'
+    + ' beside it', async () => {
+    const f = fixture();
+    const report = reportWith({
+      outOfScopeBugs: [
+        bug('Build fails linking against the installed SDK', TOOLCHAIN_ARTIFACT, false),
+        bug('Parser drops the last line', ARTIFACT, false),
+      ],
+    });
+
+    const result = await triage(f, report, FIRST);
+
+    expect(result.bugs[0]).toMatchObject({ index: 0, channel: 'machine', action: 'skipped', ref: null });
+    expect(result.bugs[1]).toMatchObject({ index: 1, channel: 'public', action: 'filed' });
+
+    // The spy proves the public tracker was never asked about the toolchain
+    // failure: every call it recorded is for the rafa bug, and there are
+    // exactly the two calls that bug's filing takes.
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'create']);
+    for (const [, argument] of f.publicSpy.calls) {
+      expect(JSON.stringify(argument)).not.toContain('tapi error');
+      expect(JSON.stringify(argument)).not.toContain('MacOSX14.4.sdk');
+    }
+
+    // Exactly one issue is filed, for the rafa bug.
+    expect(issueNames(f.publicDir)).toEqual(['1.md']);
+    expect(onlyIssue(f.publicDir)).toContain('Parser drops the last line');
+    expect(onlyIssue(f.publicDir)).not.toContain('tapi error');
   });
 });
 
