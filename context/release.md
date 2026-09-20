@@ -1,8 +1,9 @@
 ## Release
 
 Versioning and changelog automation at wrap-up instead of by hand-written
-task. Spec is `.specs/rafa-21-changelog-and-release.md`; this page holds the
-structure and the flow. Where the two differ, the spec wins.
+task. A specs directory holds the specification for changelog and release;
+this page holds the structure and the flow. Where the two differ, the spec
+wins.
 
 ### Change-note path from report to table
 

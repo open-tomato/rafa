@@ -3,7 +3,7 @@
 How a line reaches a command under `src/cli/`: `RafaCommand`, the
 registry, routing, module command entries, the dispatcher, help and
 `describe`.
-`.specs/cli-surface.md` owns the command tree, the aliases, the help
+A specs directory owns the command tree, the aliases, the help
 levels and `describe`; this page holds what the code does. Each
 module's note is the long form.
 
@@ -31,7 +31,7 @@ module's note is the long form.
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: the plans directory, the task counts, an issue as a line and the argument refusals |
 | `src/commands/issue/issue-tracker.ts` | what the five `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; and `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class |
@@ -165,12 +165,11 @@ module's note is the long form.
   `usage` write each line as a `log` event of its level and give no
   result.
 - **The plan readers start no session.** `plan list` and `plan show` read
-  `.plans/` under the git root. `plan create` writes and `loop start`
-  finds its default plan in `plan.dir` under the project root,
-  `.rafa/plans` unless a config names another, and `effort collect`
+  the plans directory under the project root. `plan create` writes and
+  `loop start` finds its default plan in `plan.dir` under the project
+  root, `.rafa/plans` unless a config names another, and `effort collect`
   attributes sessions by the plan stubs there, so the readers read where
-  those write only while `plan.dir` is `.plans` and the project root is
-  the git toplevel (`src/commands/plan/plan-files.ts`).
+  those write (`src/commands/plan/plan-files.ts`).
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.

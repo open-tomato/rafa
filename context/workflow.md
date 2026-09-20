@@ -83,7 +83,7 @@ whose ID appears as `rafa-<n>`.
 
 | Artifact | Pattern | Example |
 |---|---|---|
-| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Specification file | `.rafa/specs/rafa-<n>-<slug>.md` | `.rafa/specs/rafa-20-pr-commands.md` |
 | Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
 | `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
@@ -100,7 +100,7 @@ issue maps them.
 
 ### Files beside the tree
 
-**`.plans/` and `.specs/` are gitignored**, so they live only in the
+**`.rafa/plans/` and `.rafa/specs/` are gitignored**, so they live only in the
 checkout that wrote them. A sweep over tracked files never reaches a plan
 or a spec, and nothing reviews their text: leave a plan's or a spec's
 illustrative text, and a test quoting it verbatim, alone when a sweep

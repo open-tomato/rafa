@@ -21,7 +21,7 @@ is actually the PR's head.
 | Gate | Runs | Files it can open |
 |---|---|---|
 | `bun run check-types` | TypeScript compiler | `src/`, `scripts/` and root `*.ts`/`*.mjs`, with every `**/*.test.ts` excluded |
-| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `dist/`, `.claude/`, `.plans/`, `.specs/`, `.tmp/` and `.docs/` |
+| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `dist/`, `.claude/`, `.rafa/`, `.tmp/` and `.docs/` |
 | `bun run test` | Bun's native test runner | Every `*.test.ts` outside `node_modules/` and dot-directories, `scripts/` included |
 
 One more gate runs at `git commit` rather than before the PR.
@@ -72,8 +72,7 @@ line and no name for a file without a failure; the counts and the exit
 code do not change. `env -u CLAUDECODE bun test` prints every case.
 
 **`check-types` never reads a test file.** `tsconfig.json` excludes
-`**/*.test.ts` (the `.specs/test-type-checking.md` its comment cites does
-not exist), and `bun test` strips types without checking them, so a type
+`**/*.test.ts`, and `bun test` strips types without checking them, so a type
 error in a test is green on every gate. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`,
 never `tsconfig.base.json`, which leaves `module` unset and fails

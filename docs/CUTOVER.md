@@ -85,7 +85,7 @@ the loop works end-to-end:
 
 ```bash
 bun run ralph start \
-  --plan=.plans/PLAN-cutover-test.md \
+  --plan=.rafa/plans/PLAN-cutover-test.md \
   --inject=full
 ```
 
@@ -116,7 +116,7 @@ Run the same plan with stage injection:
 
 ```bash
 bun run ralph start \
-  --plan=.plans/PLAN-cutover-test.md \
+  --plan=.rafa/plans/PLAN-cutover-test.md \
   --inject=stage
 ```
 
@@ -273,18 +273,15 @@ After the cutover commit is merged and the rollback is documented:
 
    ```bash
    bun run ralph start \
-     --plan=.plans/PLAN-post-cutover-smoke-test.md
+     --plan=.rafa/plans/PLAN-post-cutover-smoke-test.md
    ```
 
 3. **Check that the store is being populated:**
 
    ```bash
-   sqlite3 .ralph/effort/effort.sqlite \
+   sqlite3 .rafa/effort/effort.sqlite \
      "SELECT COUNT(*) FROM sessions;"
    ```
-
-   (After phase 1 upgrades, this path will change to `.rafa/effort/effort.sqlite`.
-   The migration is a one-time rename of the directory; see the notes above.)
 
 
 ## Success Criteria
@@ -332,7 +329,7 @@ If the parity test fails:
 
 1. Verify both backends are reading the same session logs
 2. Check that migrations have been applied to both stores
-3. Review `.plans/CLOSEOUT-phase-0-*.md` for known issues
+3. Review the CLOSEOUT plans for phase 0 for known issues
 
 ### Rollback Needed
 
@@ -350,12 +347,11 @@ you have one linked at `~/.rafa/bin/rafa`.
 
 ## Notes
 
-- The sibling's `.ralph/` directory stores effort data under this cutover
-  until phase 1 moves the store. When you upgrade to a phase 1 build,
-  rename `.ralph/` to `.rafa/` and the loop will migrate seamlessly:
-  a phase 1 rafa built from that move on writes and reads `.rafa/effort/`
-  and reads nothing under `.ralph/effort/`. The migration is a one-time
-  rename; no data is lost.
+- The sibling's effort data stores under `.rafa/` as of this release. If
+  upgrading from a version that used `.ralph/`, rename that directory to
+  `.rafa/` and the loop will migrate seamlessly: rafa built from that
+  point on writes and reads `.rafa/effort/`. The migration is a
+  one-time rename; no data is lost.
 - This cutover does not link the package — the global `~/.rafa/bin/rafa`
   snapshot is already installed by `bun run snapshot`. Do not use
   `bun link` or `bun pm ls`. Phase 1 will replace the development
