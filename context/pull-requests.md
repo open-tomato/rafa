@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Six actions read and control pull requests:
+Seven actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -17,9 +17,24 @@ Six actions read and control pull requests:
 - `pr merge [<n>] [--yes] [--method=squash|merge|rebase]` — merge the PR
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
+- `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
 
-`<n>` defaults to the open PR of the current branch. All actions carry
-summary, examples, `outputs: [text, json]` and help snapshots.
+`<n>` defaults to the open PR of the current branch. Every action carries a
+summary, examples and `outputs: [text, json]`; each one in the core roster
+carries help snapshots too.
+
+`pr wait` composes `waitForChecks` (`src/pr/checks.ts`) over the provider's
+`checks` and is READ-ONLY: no repair session, no comment, no label, no
+merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those, and
+the deadline and the poll interval are that gate's own constants. Green
+exits 0; red exits 1; a pull request with NO checks at all exits 1 too, and
+is answered at once rather than waited out, since a PR that does not merge
+cleanly schedules no run and no amount of waiting makes one; the deadline
+passing with checks still running exits 3. A green wait writes its report
+through the output, and every other ending carries it as the message of its
+exit, because the dispatcher drops a command's payload when it ends
+non-zero. The clock and the wait between polls are seams, so its tests
+spend no real second.
 
 ### The provider and preflight
 
