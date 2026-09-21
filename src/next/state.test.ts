@@ -1,8 +1,9 @@
 /**
  * Tests for the state table (`./state.ts`): the one state each reading
  * answers, the action and the two lines it carries, the order that
- * settles a reading two rows would both take, and what the answer costs
- * when an early row settles it.
+ * settles a reading two rows would both take, the two pre-conditions
+ * that stop the table, and what the answer costs when an early row
+ * settles it.
  *
  * `./readings.test.ts` drives the readings themselves — what a failed
  * fetch answers, what a detached HEAD answers, which sources are asked
@@ -26,6 +27,13 @@
  * 10 over 11 and 11 over 12, and the finished plan whose pull request
  * was merged in the browser, which is row 12 read off a plan branch.
  *
+ * Each pre-condition is driven the same way: the modified tree beside
+ * the same situation with a clean one, which answers row 9; the tree
+ * holding untracked files alone beside the same two paths written as
+ * tracked ones; and the unusable provider beside a provider that
+ * answers no pull request, which is row 12. Both are held to asking
+ * NOTHING they did not need, by the call log of the double.
+ *
  * ## What passes while wrong
  *
  * Three mutations of `state.ts` were driven on 2026-09-21, one at a
@@ -48,6 +56,21 @@
  *    order of `NEXT_STATES`. Both rows propose `resume`, so what the
  *    mutant changes is the sentence the person reads and not the
  *    action — which is exactly what the two readings differ in.
+ *
+ * Two more were driven the same way on 2026-09-21, over the 110 pass
+ * and 0 fail this file and `./readings.test.ts` answer together:
+ *
+ *  - the tree pre-condition moved BEHIND the table, read only once a
+ *    row had matched and still winning over it: 108 pass and 2 fail,
+ *    the tree read ahead of the unusable provider, and the problems
+ *    case, which sees the roadmap walk the mutant paid for. Every
+ *    ordering case still passes, because the tree still wins wherever a
+ *    row answers — what the mutant really changes is the cost and the
+ *    two pre-conditions' own order, so those are the cases that hold it.
+ *  - the provider pre-condition read ahead of the whole table rather
+ *    than ahead of rows 5, 6 and 7: 108 pass and 2 fail, both the cases
+ *    that count what a running loop asks the double. Every answer is
+ *    unchanged; the `gh` call is what the mutant spends.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { BlockedLine } from '../board/blocked-line.js';
@@ -63,7 +86,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { plansDirAt } from '../commands/plan/plan-files.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
-import { NEXT_STATES, readNextState } from './state.js';
+import { isPrecondition, NEXT_PRECONDITIONS, NEXT_STATES, readNextState } from './state.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-state-')));
@@ -118,6 +141,8 @@ interface PlantedPull {
 interface Situation {
   /** The branch at the project root. */
   readonly branch: string;
+  /** What `git status --porcelain` wrote, one line per entry. */
+  readonly tree: readonly string[];
   /** What `git rev-list --left-right --count` wrote. */
   readonly standing: string;
   /** The refs this clone holds. */
@@ -139,6 +164,7 @@ interface Situation {
 /** A situation on the base branch with an exhausted roadmap: the last row. */
 const NOTHING: Situation = {
   branch: BASE,
+  tree: [],
   standing: '0\t0\n',
   refs: [],
   runs: [],
@@ -219,6 +245,7 @@ function sourcesFor(over: Partial<Situation> = {}): NextSources {
   const situation: Situation = { ...NOTHING, ...over };
   const answers: Readonly<Record<string, GitResult>> = {
     'rev-parse --abbrev-ref HEAD': said(`${situation.branch}\n`),
+    'status --porcelain': said(situation.tree.map((entry) => `${entry}\n`).join('')),
     [`rev-list --left-right --count ${BASE}...origin/${BASE}`]: said(situation.standing),
     'for-each-ref --format=%(refname) refs/heads refs/remotes': said(situation.refs.join('\n')),
   };
@@ -568,6 +595,131 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
 
     expect(state.id).toBe('nothing-left');
     expect(state.reading).toBe('`scratch` is no plan branch, and it has no open pull request');
+  });
+});
+
+/** The state a situation answers, read over a provider of the case's own. */
+function stateOver(over: Partial<Situation>, pulls: PullRequests): ReturnType<typeof readNextState> {
+  return readNextState({ ...sourcesFor(over), pulls });
+}
+
+/** What a provider that could not be reached says. */
+const UNREACHABLE = 'gh: could not connect to api.github.com';
+
+describe('the two pre-conditions, ahead of the table', () => {
+  it('holds the two in the spec order, and tells one from a row of the table', () => {
+    expect(NEXT_PRECONDITIONS).toEqual(['tree-modified', 'pulls-unusable']);
+    expect(NEXT_PRECONDITIONS.every((id) => isPrecondition(id))).toBe(true);
+    expect(NEXT_STATES.some((id) => isPrecondition(id))).toBe(false);
+  });
+
+  it('reads a modified tree ahead of the row that answers without it', async () => {
+    const both = await stateOf({ ...ROW['issue-ready'], tree: [' M src/next/state.ts'] });
+    const alone = await stateOf(ROW['issue-ready']);
+
+    expect([both.id, alone.id]).toEqual(['tree-modified', 'issue-ready']);
+  });
+
+  it('names the changed files, proposes prose and carries nothing to run', async () => {
+    const state = await stateOf({ tree: ['M  src/next/state.ts', ' M src/next/readings.ts'] });
+
+    expect(state.action).toBe('none');
+    expect(state.reading).toBe(
+      'the working tree has changes to 2 tracked files: `src/next/state.ts`, `src/next/readings.ts`',
+    );
+    expect(state.proposal).toBe('commit or set aside your changes; rafa will not touch them');
+  });
+
+  it('names no tool in either line, so the choice is left to the person', async () => {
+    const state = await stateOf({ tree: [' M src/next/state.ts'] });
+    const both = `${state.reading}\n${state.proposal}`;
+
+    expect(both).not.toContain('git');
+    expect(both).not.toContain('stash');
+    expect(both).not.toMatch(/`rafa \w/);
+  });
+
+  it('names one file as one, and counts the files past the fifth', async () => {
+    const one = await stateOf({ tree: [' M a.ts'] });
+    const many = await stateOf({ tree: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((name) => ` M ${name}.ts`) });
+
+    expect(one.reading).toBe('the working tree has changes to 1 tracked file: `a.ts`');
+    expect(many.reading).toBe(
+      'the working tree has changes to 7 tracked files: `a.ts`, `b.ts`, `c.ts`, `d.ts`, `e.ts` and 2 more',
+    );
+  });
+
+  it('is no pre-condition at all when the tree holds untracked files alone', async () => {
+    const untracked = await stateOf({ ...ROW['issue-ready'], tree: ['?? notes.md'] });
+    const tracked = await stateOf({ ...ROW['issue-ready'], tree: [' M notes.md'] });
+
+    expect([untracked.id, tracked.id]).toEqual(['issue-ready', 'tree-modified']);
+  });
+
+  it('reads an unusable provider ahead of the pull request rows, and the table without it', async () => {
+    const throwing = createPullRequestsDouble({ findOpen: () => Promise.reject(new Error(UNREACHABLE)) });
+    const both = await stateOver({ branch: PLAN_BRANCH }, throwing.pulls);
+    const alone = await stateOf({ branch: PLAN_BRANCH });
+
+    expect([both.id, alone.id]).toEqual(['pulls-unusable', 'nothing-left']);
+    expect(throwing.sent()).toEqual([`findOpen ${PLAN_BRANCH}`]);
+  });
+
+  it('names the provider, what it said and `rafa doctor`, with nothing to run', async () => {
+    const throwing = createPullRequestsDouble({ findOpen: () => Promise.reject(new Error(UNREACHABLE)) });
+    const state = await stateOver({ branch: PLAN_BRANCH }, throwing.pulls);
+
+    expect(state.action).toBe('none');
+    expect(state.reading).toBe(`the \`gh\` pull request provider could not be asked: ${UNREACHABLE}`);
+    expect(state.proposal).toBe('run `rafa doctor` to see what the provider needs, then read the state again');
+  });
+
+  it('writes one line of reading when the provider threw several', async () => {
+    const throwing = createPullRequestsDouble({
+      findOpen: () => Promise.reject(new Error('gh: HTTP 401\n  run gh auth login\n')),
+    });
+    const state = await stateOver({ branch: PLAN_BRANCH }, throwing.pulls);
+
+    expect(state.reading).not.toContain('\n');
+    expect(state.reading).toContain('gh: HTTP 401 run gh auth login');
+  });
+
+  it('takes a throw from the checks read too, not the search alone', async () => {
+    const pull: PlantedPull = { verdict: 'green', mergeable: 'mergeable' };
+    const throwing = createPullRequestsDouble({
+      findOpen: () => Promise.resolve(summary(pull)),
+      get: () => Promise.resolve(detail(pull)),
+      checks: () => Promise.reject(new Error(UNREACHABLE)),
+    });
+    const state = await stateOver({ branch: PLAN_BRANCH }, throwing.pulls);
+
+    expect(state.id).toBe('pulls-unusable');
+    expect(state.reading).toContain(UNREACHABLE);
+  });
+
+  it('settles a running loop without ever asking the provider it could not use', async () => {
+    const throwing = createPullRequestsDouble({ findOpen: () => Promise.reject(new Error(UNREACHABLE)) });
+    const state = await stateOver({ runs: [record()] }, throwing.pulls);
+
+    expect(state.id).toBe('loop-running');
+    expect(throwing.sent()).toEqual([]);
+  });
+
+  it('reports the modified tree ahead of the unusable provider', async () => {
+    const throwing = createPullRequestsDouble({ findOpen: () => Promise.reject(new Error(UNREACHABLE)) });
+    const state = await stateOver({ branch: PLAN_BRANCH, tree: [' M src/next/state.ts'] }, throwing.pulls);
+
+    expect(state.id).toBe('tree-modified');
+    expect(throwing.sent()).toEqual([]);
+  });
+
+  it('carries the problems of the readings it made beside a pre-condition', async () => {
+    const state = await stateOf({
+      tree: [' M src/next/state.ts'],
+      roadmap: { roadmap: 31, line: null, passed: 0, problems: ['the branches on origin could not be read'] },
+    });
+
+    expect([state.id, state.problems.length]).toEqual(['tree-modified', 0]);
   });
 });
 

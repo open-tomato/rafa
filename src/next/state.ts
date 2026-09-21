@@ -10,6 +10,40 @@
  * shell line or writes anything — the command layer does all four,
  * which is what keeps every refusal an action carries the action's own.
  *
+ * ## The two pre-conditions, ahead of the table
+ *
+ * Before any row answers, two conditions stop the table and are
+ * reported in its place, each with what the PERSON does about it
+ * rather than an action rafa runs. Both answer `none`, so a caller
+ * prints the two lines and has nothing to offer.
+ *
+ *  - {@link NEXT_PRECONDITIONS}`[0]`, `tree-modified`: the working tree
+ *    has changes to tracked files. Every action the table can propose
+ *    switches branches, pulls, merges or hands the checkout to a model
+ *    session, and each of those loses or conflicts those changes. The
+ *    reading NAMES the files and the proposal is prose only — "commit
+ *    or set aside your changes; rafa will not touch them" — with no
+ *    command in it, because the choice between committing them,
+ *    stashing them and moving them elsewhere is the person's and rafa
+ *    does not make it. An untracked file is not one of these: nothing
+ *    rafa runs loses one (`trackedChanges` in
+ *    `src/start/branch-decision.ts`).
+ *  - {@link NEXT_PRECONDITIONS}`[1]`, `pulls-unusable`: the pull
+ *    request provider could not be ASKED — no network, no
+ *    authentication, a `gh` that did not run. The port answers null for
+ *    a pull request that is not there and throws when it could not look
+ *    (`src/pr/types.ts`), so a throw is this condition and never an
+ *    empty repository. The proposal names `rafa doctor`, which is the
+ *    command that reports what the provider needs.
+ *
+ * The tree is read ahead of EVERY row, since one `git status
+ * --porcelain` asks nothing of the network. The provider is read where
+ * the table would read it, ahead of rows 5, 6 and 7 and not before:
+ * asking it earlier would spend a `gh` call on a state rows 1 to 4
+ * settle without one, and a provider nobody asked is a provider nobody
+ * can report on. So a running loop is still row 1 with the provider
+ * unusable beside it, and it says so without ever finding out.
+ *
  * ## The table
  *
  * | # | {@link NextStateId} | Action | Matches |
@@ -76,10 +110,11 @@
  * ## What it reads, and what it never spends
  *
  * `./readings.ts` holds the readings and the order they are asked in:
- * each is made at most once per answer and only when a row asks for it,
- * so the provider is reached from row 5 on and the board from row 9 on.
- * A reading that failed is carried out as {@link NextState.problems}
- * rather than thrown, and the caller prints those beside the answer.
+ * each is made at most once per answer and only when it is asked for,
+ * so the working tree is read once ahead of the table, the provider is
+ * reached from row 5 on and the board from row 9 on. A reading that
+ * failed is carried out as {@link NextState.problems} rather than
+ * thrown, and the caller prints those beside the answer.
  */
 import type { NextSources, NextWorld, OpenPull } from './readings.js';
 
@@ -88,12 +123,16 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { planLabel } from '../commands/loop/loop-sessions.js';
 import { plural } from '../commands/plan/plan-files.js';
+import { messageOf } from '../config-sections.js';
 import { hasDiverged } from '../start/branch-decision.js';
 
 import { branchLabel, onBase, openWorld } from './readings.js';
 
 /** What a defect this module raises opens with. */
 const PREFIX = 'rafa next';
+
+/** How many changed files the tree pre-condition names before eliding. */
+const MAX_NAMED_FILES = 5;
 
 /**
  * The action a state proposes, as `--yes` names one and
@@ -127,10 +166,34 @@ export type NextStateId =
   | 'issue-not-ready'
   | 'nothing-left';
 
+/**
+ * The two conditions reported ahead of the table, which stop it; the
+ * module note holds what each matches and what it says.
+ */
+export type NextPreconditionId = 'tree-modified' | 'pulls-unusable';
+
+/**
+ * The two pre-conditions, in the order they are read. Frozen, and taken
+ * by the caller rather than spelled again, the way {@link NEXT_STATES}
+ * is taken off the table.
+ */
+export const NEXT_PRECONDITIONS: readonly NextPreconditionId[] = Object.freeze([
+  'tree-modified',
+  'pulls-unusable',
+] as const);
+
+/** What one answer is about: a row of the table, or a pre-condition ahead of it. */
+export type NextAnswerId = NextStateId | NextPreconditionId;
+
+/** Whether an answer is one of the two pre-conditions rather than a row. */
+export function isPrecondition(id: NextAnswerId): id is NextPreconditionId {
+  return (NEXT_PRECONDITIONS as readonly string[]).includes(id);
+}
+
 /** The one state a reading answers. */
 export interface NextState {
-  /** The row that answered. */
-  readonly id: NextStateId;
+  /** The row that answered, or the pre-condition that stopped the table. */
+  readonly id: NextAnswerId;
   /** What to run, or `none` when the state carries nothing to run. */
   readonly action: NextActionId;
   /** What is true, one line, no full stop: the sentence `rafa next` prints first. */
@@ -149,9 +212,9 @@ export interface NextState {
   readonly problems: readonly string[];
 }
 
-/** What a row answers with; the nulls and the problems are filled in around it. */
+/** What a row or a pre-condition answers with; the nulls and the problems are filled in around it. */
 interface RowAnswer {
-  readonly id: NextStateId;
+  readonly id: NextAnswerId;
   readonly action: NextActionId;
   readonly reading: string;
   readonly proposal: string;
@@ -159,6 +222,59 @@ interface RowAnswer {
   readonly issue?: number;
   readonly planStub?: string | null;
   readonly planPath?: string;
+}
+
+/** The changed files a pre-condition names, capped and quoted. */
+function nameFiles(paths: readonly string[]): string {
+  const shown = paths.slice(0, MAX_NAMED_FILES).map((path) => `\`${path}\``);
+  const hidden = paths.length - shown.length;
+  return hidden > 0
+    ? `${shown.join(', ')} and ${hidden} more`
+    : shown.join(', ');
+}
+
+/**
+ * A sentence on one line: every run of whitespace a space. What a
+ * provider threw can be several lines, and a reading is one.
+ */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Pre-condition 1: the working tree has changes to tracked files. Prose
+ * only, and no tool named; see the module note.
+ */
+function readTreeModified(world: NextWorld): RowAnswer | null {
+  const paths = world.tracked();
+  if (paths.length === 0) return null;
+
+  return {
+    id: 'tree-modified',
+    action: 'none',
+    reading: `the working tree has changes to ${plural(paths.length, 'tracked file')}: ${nameFiles(paths)}`,
+    proposal: 'commit or set aside your changes; rafa will not touch them',
+  };
+}
+
+/**
+ * Pre-condition 2: the provider could not be asked. Answered by ASKING
+ * it — the one reading that tells a provider that is unusable from a
+ * repository that simply has no pull request — so it is read where the
+ * table would read the provider and not before; see the module note.
+ */
+async function readPullsUnusable(world: NextWorld): Promise<RowAnswer | null> {
+  try {
+    await world.openPull();
+    return null;
+  } catch (error) {
+    return {
+      id: 'pulls-unusable',
+      action: 'none',
+      reading: `the \`${world.sources.pulls.kind}\` pull request provider could not be asked: ${oneLine(messageOf(error))}`,
+      proposal: 'run `rafa doctor` to see what the provider needs, then read the state again',
+    };
+  }
 }
 
 /** A pull request as a sentence names it. */
@@ -392,6 +508,8 @@ type NextRowReader = (world: NextWorld) => RowAnswer | null | Promise<RowAnswer 
 interface NextRow {
   readonly id: NextStateId;
   readonly read: NextRowReader;
+  /** True for a row that reads the provider, which the pre-condition is checked ahead of. */
+  readonly pulls?: true;
 }
 
 /** The twelve rows, in the spec's order; the first that answers wins. */
@@ -400,9 +518,9 @@ const ROWS: readonly NextRow[] = Object.freeze([
   { id: 'base-behind', read: readBaseBehind },
   { id: 'tracker-blocked', read: readTrackerBlocked },
   { id: 'tracker-open', read: readTrackerOpen },
-  { id: 'pr-pending', read: readPrPending },
-  { id: 'pr-red', read: readPrRed },
-  { id: 'pr-green', read: readPrGreen },
+  { id: 'pr-pending', read: readPrPending, pulls: true },
+  { id: 'pr-red', read: readPrRed, pulls: true },
+  { id: 'pr-green', read: readPrGreen, pulls: true },
   { id: 'plan-unstarted', read: readPlanUnstarted },
   { id: 'issue-ready', read: readIssueReady },
   { id: 'issue-blocked', read: readIssueBlocked },
@@ -437,15 +555,27 @@ function answer(row: RowAnswer, problems: readonly string[]): NextState {
  * first that answers winning, with every reading that failed carried
  * beside it.
  *
+ * The two pre-conditions come first: the working tree ahead of every
+ * row, the provider ahead of the three rows that read it. Either one
+ * answers in the table's place, carrying `none` to run.
+ *
  * A row asks only the readings it needs and each of them at most once,
  * so a state an early row settles costs nothing a later one would have
- * spent. See the module note for the order and for the four rows read
- * wider than the spec's prose.
+ * spent. See the module note for the order, for the two pre-conditions
+ * and for the four rows read wider than the spec's prose.
  */
 export async function readNextState(sources: NextSources): Promise<NextState> {
   const world = openWorld(sources);
 
+  const modified = readTreeModified(world);
+  if (modified !== null) return answer(modified, world.problems());
+
   for (const row of ROWS) {
+    if (row.pulls === true) {
+      const unusable = await readPullsUnusable(world);
+      if (unusable !== null) return answer(unusable, world.problems());
+    }
+
     const found = await row.read(world);
     if (found !== null) return answer(found, world.problems());
   }

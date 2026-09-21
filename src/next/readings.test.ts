@@ -31,6 +31,10 @@
  * - The "board is not asked off the base" case is paired with the same
  *   world on the base, which asks it three times. A world that never
  *   asked the board would pass the first half alone.
+ * - The working tree that holds untracked files alone, which answers no
+ *   path, is paired with the same two paths written as tracked ones,
+ *   which answers both. A reading that dropped every line would pass
+ *   the first half alone.
  *
  * ## What passes while wrong
  *
@@ -48,6 +52,15 @@
  *    so `feat/<stub>-two` claims `<stub>`: 90 pass and 1 fail, the case
  *    that plants the longer name. Every other ref planted is the exact
  *    branch, and none of them notices.
+ *
+ * One more was driven the same way on 2026-09-21, over the 110 pass and
+ * 0 fail this file and `./state.test.ts` answer together:
+ *
+ *  - the tracked filter dropped from {@link readTracked}, so an
+ *    untracked file counts as a change: 108 pass and 2 fail, the
+ *    untracked case here and the pre-condition case that plants `??`
+ *    in `./state.test.ts`. Every other tree planted is tracked, and
+ *    none of them notices.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { RoadmapLine } from '../board/roadmap.js';
@@ -65,6 +78,7 @@ import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
   branchLabel,
+  changedPaths,
   hasBranch,
   hasRun,
   once,
@@ -76,6 +90,7 @@ import {
   readPlans,
   readRefs,
   readStanding,
+  readTracked,
 } from './readings.js';
 
 /** A temporary directory of this file's own. */
@@ -410,6 +425,49 @@ describe('the plans directory', () => {
   });
 });
 
+describe('the tracked paths the working tree has changes to', () => {
+  it('names the path of every tracked line, staged and unstaged alike', () => {
+    const kept = notes();
+    const git = gitOf({ 'status --porcelain': said('M  src/next/state.ts\n M src/next/readings.ts\n') });
+
+    expect(readTracked(sourcesOf({ git: git.git }), kept.note))
+      .toEqual(['src/next/state.ts', 'src/next/readings.ts']);
+    expect(git.ran()).toEqual(['status --porcelain']);
+    expect(kept.held()).toEqual([]);
+  });
+
+  it('leaves an untracked path out, and answers the same two paths once they are tracked', () => {
+    const kept = notes();
+    const untracked = gitOf({ 'status --porcelain': said('?? notes.md\n?? scratch/\n') });
+    const tracked = gitOf({ 'status --porcelain': said(' M notes.md\nA  scratch/\n') });
+
+    expect(readTracked(sourcesOf({ git: untracked.git }), kept.note)).toEqual([]);
+    expect(readTracked(sourcesOf({ git: tracked.git }), kept.note)).toEqual(['notes.md', 'scratch/']);
+    expect(kept.held()).toEqual([]);
+  });
+
+  it('answers a clean tree as no path at all', () => {
+    const kept = notes();
+
+    expect(readTracked(sourcesOf({ git: gitOf({ 'status --porcelain': said('') }).git }), kept.note)).toEqual([]);
+    expect(kept.held()).toEqual([]);
+  });
+
+  it('answers no path with a problem when git refused', () => {
+    const kept = notes();
+    const git = gitOf({ 'status --porcelain': refused('fatal: not a git repository') });
+
+    expect(readTracked(sourcesOf({ git: git.git }), kept.note)).toEqual([]);
+    expect(kept.held()).toHaveLength(1);
+    expect(kept.held()[0]).toContain('fatal: not a git repository');
+  });
+
+  it('keeps git\'s own quoting and writes a rename as the pair git wrote', () => {
+    expect(changedPaths(['A  "src/a b.ts"', 'R  src/old.ts -> src/new.ts']))
+      .toEqual(['"src/a b.ts"', 'src/old.ts -> src/new.ts']);
+  });
+});
+
 describe('the open pull request of a branch', () => {
   it('asks the provider nothing when there is no branch to ask about', async () => {
     const kept = notes();
@@ -523,6 +581,14 @@ describe('the world one answer is read over', () => {
     expect(runs).toBe(1);
     expect(git.ran().filter((call) => call.startsWith('rev-parse'))).toHaveLength(1);
     expect(git.ran().filter((call) => call.startsWith('for-each-ref'))).toHaveLength(1);
+  });
+
+  it('reads the working tree once, however often it is asked', () => {
+    const git = gitOf({ 'status --porcelain': said(' M src/next/state.ts\n') });
+    const world = openWorld(sourcesOf({ git: git.git }));
+
+    expect([world.tracked(), world.tracked()]).toEqual([['src/next/state.ts'], ['src/next/state.ts']]);
+    expect(git.ran()).toEqual(['status --porcelain']);
   });
 
   it('asks the board nothing off the base branch', async () => {

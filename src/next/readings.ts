@@ -13,14 +13,21 @@
  * `./readings.test.ts` and `./state.test.ts` off GitHub and off the
  * network.
  *
- * ## Each reading is made at most once, and only when a row asks
+ * ## Each reading is made at most once, and only when it is asked for
  *
  * {@link openWorld} answers a {@link NextWorld} of functions, every one
  * of them memoised ({@link once}). The table is ordered, so a state an
  * early row settles never spends what a later one would have: a loop
- * that is running is answered out of `.rafa/runs/` alone, with no `git`,
- * no provider and no board asked at all. The provider is reached from
- * row 5 on, and the board from row 9 on.
+ * that is running is answered out of `.rafa/runs/` and
+ * {@link NextWorld.tracked} alone, with no provider and no board asked
+ * at all. The provider is reached from row 5 on, and the board from row
+ * 9 on.
+ *
+ * {@link NextWorld.tracked} is the one reading the table does not own:
+ * `./state.ts` makes it ahead of every row, for the pre-condition that
+ * stops the table on a working tree with changes to tracked files. It
+ * is one `git status --porcelain` at the project root, which asks
+ * nothing of the network.
  *
  * The board is asked from the BASE BRANCH alone, because every row that
  * reads it names the base. So `rafa next` on a plan branch spends no
@@ -64,11 +71,14 @@ import { isLive } from '../commands/loop/loop-sessions.js';
 import { listPlans } from '../commands/plan/list.js';
 import { planFileName } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
-import { gitSaid } from '../pr/index.js';
-import { BRANCH_PREFIX, parseBaseStanding, REMOTE } from '../start/branch-decision.js';
+import { gitSaid, parseWorkingTree } from '../pr/index.js';
+import { BRANCH_PREFIX, parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';
 
 /** The branch `git rev-parse --abbrev-ref HEAD` answers on a detached HEAD. */
 const DETACHED = 'HEAD';
+
+/** Where the path starts in a `git status --porcelain` line; see {@link changedPaths}. */
+const PORCELAIN_PATH_AT = 3;
 
 /** What one walk of the roadmap answered. */
 export interface NextRoadmapReading {
@@ -150,6 +160,8 @@ export interface NextWorld {
   readonly liveRun: () => SessionRecord | null;
   /** How the base stands against its remote, or null when that could not be read. */
   readonly standing: () => BaseStanding | null;
+  /** The tracked paths the working tree has changes to, in git's order. */
+  readonly tracked: () => readonly string[];
   /** The plan the branch is named after, or null when the branch names none. */
   readonly branchPlan: () => PlanListing | null;
   /** The first plan with no run and no branch, or null when every plan has one. */
@@ -217,6 +229,35 @@ export function readStanding(sources: NextSources, remote: string, note: Note): 
   return standing;
 }
 
+/**
+ * The paths of the porcelain lines, git's own words kept.
+ *
+ * A porcelain line is two status characters, a space and the path, so
+ * the path is what follows the first three characters. Nothing else is
+ * interpreted: a path git quoted stays quoted, and a rename stays the
+ * `old -> new` pair git wrote, because the pre-condition that prints
+ * these names the files rather than re-rendering them.
+ */
+export function changedPaths(entries: readonly string[]): readonly string[] {
+  return Object.freeze(entries.map((entry) => entry.slice(PORCELAIN_PATH_AT).trim()));
+}
+
+/**
+ * The tracked paths the working tree has changes to, staged and
+ * unstaged alike, or none with a problem noted. An untracked path is
+ * left out, the way `treeRefusal` leaves one out: nothing rafa runs
+ * loses an untracked file.
+ */
+export function readTracked(sources: NextSources, note: Note): readonly string[] {
+  const result = sources.git(['status', '--porcelain']);
+  if (!result.ok) {
+    note(`the working tree could not be read, so whether it holds changes to tracked files is unknown: ${gitSaid(result)}`);
+    return Object.freeze([]);
+  }
+
+  return changedPaths(trackedChanges(parseWorkingTree(result.stdout)));
+}
+
 /** Every branch ref this clone and the remote hold, each half that failed noted. */
 export function readRefs(sources: NextSources, remote: string, note: Note): readonly string[] {
   const scan = scanClaimBranches(sources.git, remote);
@@ -227,7 +268,8 @@ export function readRefs(sources: NextSources, remote: string, note: Note): read
 /** Every plan under the plans directory, or none with a problem noted. */
 export function readPlans(sources: NextSources, note: Note): readonly PlanListing[] {
   try {
-    return listPlans(sources.plans).plans;
+    const listing = listPlans(sources.plans);
+    return listing.plans;
   } catch (error) {
     note(`the plans under ${sources.plans.label}/ could not be read: ${messageOf(error)}`);
     return [];
@@ -299,6 +341,7 @@ export function openWorld(sources: NextSources): NextWorld {
     branch,
     liveRun: once(() => runs().find((record) => isLive(record)) ?? null),
     standing: once(() => readStanding(sources, remote, note)),
+    tracked: once(() => readTracked(sources, note)),
     branchPlan: once(() => readBranchPlan(branch(), plans())),
     unstartedPlan: once(() => plans()
       .find((plan) => !hasRun(runs(), plan.stub) && !hasBranch(refs(), plan.stub)) ?? null),
