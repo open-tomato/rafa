@@ -15,6 +15,10 @@
  * no git runs and no real repository is read. The tracker planted for
  * `alpha` holds an issue its plan does not, and ticks its plan does not,
  * so a listing counting from the wrong file differs from the one held.
+ * One case dispatches `plan show` too, over the same planted project
+ * whose config sets no `plan.dir`: it lists the default directory, then
+ * shows one of the stubs the listing named, proving the two commands
+ * read the one directory in agreement rather than each its own.
  *
  * The spawned case runs `bun src/rafa.ts plan list` from a subdirectory
  * of a scratch git repository whose plans sit under the default
@@ -35,6 +39,7 @@ import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } 
 
 import planListCommand, { listPlans, renderPlanList } from './list.js';
 import { plansDirAt } from './plan-files.js';
+import planShowCommand, { renderShownPlan, showPlan } from './show.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-list-')));
@@ -184,6 +189,20 @@ describe('rafa plan list, dispatched', () => {
     const run = await dispatchInProject(['plan', 'list'], SUBJECTS, [planListCommand], project);
 
     expect(run).toEqual({ exitCode: 0, stdout: `${expectedRows(DEFAULT_DIR).join('\n')}\n`, stderr: '' });
+  });
+
+  it('shows one of the plans it just listed by stub, both commands reading the same default directory', async () => {
+    const project = freshProject();
+    plantPlans(project.root, DEFAULT_DIR);
+    const commands = [planListCommand, planShowCommand];
+
+    const listed = await dispatchInProject(['plan', 'list'], SUBJECTS, commands, project);
+    expect(listed).toEqual({ exitCode: 0, stdout: `${expectedRows(DEFAULT_DIR).join('\n')}\n`, stderr: '' });
+
+    const plans = plansDirAt(project.root, DEFAULT_DIR);
+    const expectedShown = renderShownPlan(showPlan(plans, 'alpha', false), DEFAULT_DIR);
+    const shown = await dispatchInProject(['plan', 'show', 'alpha'], SUBJECTS, commands, project);
+    expect(shown).toEqual({ exitCode: 0, stdout: `${expectedShown.join('\n')}\n`, stderr: '' });
   });
 
   it('reads the directory plan.dir names, where the default directory holds nothing', async () => {
