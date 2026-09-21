@@ -104,6 +104,16 @@
  * the same reading over the issues a merged pull request unblocks
  * without going through a second copy of the question or the write.
  *
+ * {@link UnblockOptions.naming} is the half of that seam the line has
+ * no spelling for. A merge knows which issues it CLOSED and not which
+ * issues wait on them, so it asks for the listing `--all` asks for and
+ * keeps the issues whose line names one of the closed ones. Doing it
+ * here rather than in the caller costs one `gh issue list` for the
+ * whole run: filtering outside would mean reading each candidate back
+ * with a `gh issue view` of its own, which is what {@link
+ * UnblockOptions.issues} does for a line that names numbers and nobody
+ * has read a body for yet.
+ *
  * ## Nothing here spawns
  *
  * GitHub arrives through the {@link GhRunner} seam, the terminal and
@@ -195,6 +205,12 @@ export interface UnblockOptions {
   readonly gh: GhRunner;
   /** The issues to consider, or null for every open issue labelled `spec:blocked`. */
   readonly issues: readonly number[] | null;
+  /**
+   * With `issues` null, only the listed issues whose `Blocked by:` line
+   * names one of these; every listed one when left out. Ignored where
+   * `issues` names the issues itself. See the module note.
+   */
+  readonly naming?: readonly number[];
   /** Asks the one question per issue, or null when there is nobody to ask. */
   readonly ask: UnblockAsk | null;
   /** Takes the label off. Made over `gh` when left out. */
@@ -353,13 +369,22 @@ function outcome(
   });
 }
 
-/** Every open issue labelled `spec:blocked`, with its body, in the order the board listed them. */
-async function considerListed(gh: GhRunner): Promise<readonly Considered[]> {
+/**
+ * Every open issue labelled `spec:blocked`, with its body, in the order
+ * the board listed them, kept to those whose line names one of
+ * `naming` when there is one. See the module note for why the filter
+ * sits here.
+ */
+async function considerListed(gh: GhRunner, naming: readonly number[] | undefined): Promise<readonly Considered[]> {
   const rows = await rowsOf(gh, BLOCKED_ARGS, BLOCKED_COMMAND);
-  return rows.map((row, index) => {
+  const listed = rows.map((row, index) => {
     const where = `issue ${String(index)}`;
     return { issue: rowNumber(row, BLOCKED_COMMAND, where), body: rowBody(row, BLOCKED_COMMAND, where), settled: null };
   });
+  if (naming === undefined) return listed;
+
+  const wanted = new Set(naming);
+  return listed.filter((row) => readBlockedBy(row.issue, row.body).blockers.some((id) => wanted.has(id)));
 }
 
 /** The issues a line named, read one at a time; a read that failed settles its own issue. */
@@ -483,7 +508,7 @@ export async function runUnblock(options: UnblockOptions): Promise<UnblockReport
   let considered: readonly Considered[];
   try {
     considered = issues === null
-      ? await considerListed(gh)
+      ? await considerListed(gh, options.naming)
       : await considerNamed(readIssue, issues);
   } catch (error) {
     return Object.freeze({ issues: [], problem: messageOf(error), unchecked: null });
@@ -615,6 +640,16 @@ export async function unblockIssues(context: RafaContext, seams: UnblockSeams): 
 const WARNED: ReadonlySet<UnblockStatus> = new Set<UnblockStatus>(['fault', 'failed']);
 
 /**
+ * True when one issue's outcome is something an operator has to fix:
+ * a `Blocked by:` line this refuses to guess at, or a reading or a
+ * write that failed. The merge-time run warns on exactly these, so a
+ * line is never at `warn` here and at `info` there.
+ */
+export function isUnblockFailure(status: UnblockStatus): boolean {
+  return WARNED.has(status);
+}
+
+/**
  * Writes what a report came to as lines a person reads. A report with
  * no outcome is a `--all` run over a board with no open blocked issue:
  * a line naming an issue answers for it however that issue read.
@@ -625,7 +660,7 @@ function writeReport(context: RafaContext, report: UnblockReport): void {
     return;
   }
   for (const issue of report.issues) {
-    if (WARNED.has(issue.status)) {
+    if (isUnblockFailure(issue.status)) {
       context.output.warn(issue.message);
       continue;
     }

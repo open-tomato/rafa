@@ -41,6 +41,7 @@ module's note is the long form.
 | `src/commands/pr/resolve-loop.ts` | one `--resolve` attempt's loop: the filled plan written under `~/.rafa/resolve/pr-<n>/attempt-<k>`, outside the worktree so the loop's own commit cannot push it, and `rafa loop start --plan=<file> --no-ci-wait` spawned in the worktree with its stdout forwarded a line at a time |
 | `src/commands/pr/triage-report.ts` | the one pure renderer of a triage: the head line, the re-run sentence, the class with its evidence or the stored triage, what was written, and the follow-up prompt whole |
 | `src/commands/pr/merge-tick.ts` | what `pr merge` decides about the roadmap tick: the issues the merged pull request closes, the roadmap issue `roadmap.issue` names or the search finds, and every failure on the way turned into a warning |
+| `src/commands/pr/merge-unblock.ts` | the unblock reading `pr merge` ends with: the open `spec:blocked` issues whose `Blocked by:` line names an issue the merged pull request closes, run through `runUnblock`, with every failure turned into a warning naming the reading |
 | `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa release tag` while the version on the base carries no `v<version>` tag, and `bun run snapshot` while the project declares that script and the version is not installed under the home |
 | `src/commands/pr/pr-context.ts` | what the six `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
@@ -280,6 +281,20 @@ module's note is the long form.
   resolved, a board that will not take the edit and a pull request
   closing no issue are a warning or a silence. `--output=json` carries it
   as `roadmapTick`, null when the pull request closes nothing.
+- **`pr merge` ends with the unblock reading**
+  (`src/commands/pr/merge-unblock.ts`), over every open issue labelled
+  `spec:blocked` whose `Blocked by:` line names an issue the merged pull
+  request closes. It is `rafa issue unblock`'s own `runUnblock`, so the
+  question, the state of each blocker and the one `removeLabel` are
+  spelled once. It runs LAST, after the clean-up and the follow-ups,
+  because it asks and a question among the step lines would interleave
+  with them; a clean-up step that failed therefore never reaches it.
+  `--yes` does not answer that question — it is declared as merging
+  without asking — and without a terminal nothing is asked and nothing
+  is written. Every failure is a warning naming the reading and none of
+  them changes the exit code, since the merge has already happened.
+  `--output=json` carries the report as `unblocked`, null when the pull
+  request closes nothing.
 - **Three of the readiness gate's four checks run on a board route**
   (`src/board/plan-spec.ts`): the author's trust (`src/board/trust.ts`),
   the `spec:ready` label, then the leak refusal and the completeness

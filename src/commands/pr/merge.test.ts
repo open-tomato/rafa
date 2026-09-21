@@ -2,7 +2,8 @@
  * Tests for `rafa pr merge` (`merge.ts`): what it refuses before it
  * asks anything, the question and the two ways past it, the merge it
  * sends, each clean-up step it runs, what a failed step leaves, and the
- * follow-ups, and the roadmap tick it writes after the merge.
+ * follow-ups, the roadmap tick it writes after the merge, and the
+ * unblock reading it ends with.
  *
  * Every case dispatches the real command from a project of its own
  * beside a home of its own under this file's temporary directory
@@ -42,6 +43,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
@@ -168,30 +170,58 @@ const ROADMAP_BODY = '- [ ] #20 plans from the board\n- [ ] #33 the board setup\
 /** A config naming the GitHub CLI and the roadmap issue. */
 const ROADMAP_CONFIG = `${GH_CONFIG}roadmap:\n  issue: ${ROADMAP_ISSUE}\n`;
 
+/** The blocked-issue listing the unblock reading sends, as the log spells it. */
+const BLOCKED_LISTING = `issue list --state open --label ${SPEC_BLOCKED_LABEL} --limit 100 --json number,body`;
+
+/** What a case's board holds for the unblock reading, beside the roadmap. */
+interface BoardIssues {
+  /** The open issues labelled `spec:blocked`, each number to its body. */
+  readonly blocked?: Readonly<Record<string, string>>;
+  /** Every issue the board holds with its state, each number to it. */
+  readonly states?: Readonly<Record<string, 'OPEN' | 'CLOSED'>>;
+}
+
 /** A `gh` runner over one planted roadmap issue, and the log of every command it was handed. */
 interface FakeGh {
   readonly gh: (root: string) => GhRunner;
   /** Each command, in order, the arguments joined by a space. */
   readonly ran: () => readonly string[];
+  /** `#<n> <label>` per label removal the unblock reading wrote. */
+  readonly removed: () => readonly string[];
 }
 
 /**
- * A runner serving the roadmap read and write, storing what a PATCH
- * sends. `broken` fails every call, which is how a board that will not
- * take the tick is driven.
+ * A runner serving the roadmap read and write, the two listings the
+ * unblock reading sends and the one removal it writes, storing what a
+ * PATCH sends. `broken` fails every call, which is how a board that
+ * will not take the tick is driven.
  */
-function fakeGh(broken = false): FakeGh {
+function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
   const ran: string[] = [];
+  const removed: string[] = [];
   let stored = ROADMAP_BODY;
+  const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
+
   const gh: GhRunner = (args) => {
     ran.push(args.join(' '));
     if (broken) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
+    if (args.slice(0, 2).join(' ') === 'issue edit') {
+      removed.push(`#${args[2] ?? ''} ${args[4] ?? ''}`);
+      return ok('');
+    }
+    if (args.includes('--label')) {
+      const rows = Object.entries(board.blocked ?? {}).map(([number, text]) => ({ number: Number(number), body: text }));
+      return ok(JSON.stringify(rows));
+    }
+    if (args.includes('all')) {
+      const rows = Object.entries(board.states ?? {}).map(([number, state]) => ({ number: Number(number), state }));
+      return ok(JSON.stringify(rows));
+    }
     const sent = args.find((arg) => arg.startsWith('body='));
     if (sent !== undefined) stored = sent.slice('body='.length);
-    const answered: GhResult = { ok: true, stdout: JSON.stringify({ number: ROADMAP_ISSUE, body: stored }), stderr: '' };
-    return Promise.resolve(answered);
+    return ok(JSON.stringify({ number: ROADMAP_ISSUE, body: stored }));
   };
-  return { gh: () => gh, ran: () => [...ran] };
+  return { gh: () => gh, ran: () => [...ran], removed: () => [...removed] };
 }
 
 /** A prompter answering `answer` once, then nothing, and recording each question. */
@@ -231,12 +261,14 @@ interface CaseOptions {
   readonly terminal?: boolean;
   /** True for a board that fails every call the roadmap tick makes. */
   readonly brokenBoard?: boolean;
+  /** What the board holds for the unblock reading; nothing blocked when it is left out. */
+  readonly board?: BoardIssues;
 }
 
 /** Seams over `pulls` for a project, with the git and prompter controls. */
 function caseSeams(pulls: PullRequests, project: PlantedProject, options: CaseOptions = {}): CaseSeams {
   const git = fakeGit(project.root, options.git ?? {});
-  const gh = fakeGh(options.brokenBoard ?? false);
+  const gh = fakeGh(options.brokenBoard ?? false, options.board ?? {});
   const prompter = stubPrompter(Object.hasOwn(options, 'answer')
     ? options.answer ?? null
     : 'y');
@@ -657,6 +689,7 @@ describe('the roadmap tick', () => {
     expect(seams.gh.ran()).toEqual([
       `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
+      BLOCKED_LISTING,
     ]);
     expect(lines).toContain(`Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`);
   });
@@ -678,9 +711,115 @@ describe('the roadmap tick', () => {
     const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
 
     expect(run.exitCode).toBe(0);
-    expect(seams.gh.ran()).toHaveLength(2);
+    expect(seams.gh.ran()).toEqual([
+      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      BLOCKED_LISTING,
+    ]);
     expect(lines.some((line) => line.startsWith('warn: ') && line.includes('was not ticked'))).toBe(true);
     expect(stub.sent()).toContain('merge 41 squash');
+  });
+});
+
+describe('the unblock reading it ends with', () => {
+  /** A board where #12 waits on the issue this merge closes, and that issue is closed. */
+  const WAITING: BoardIssues = {
+    blocked: { 12: 'Blocked by: #20\n' },
+    states: { 12: 'OPEN', 20: 'CLOSED' },
+  };
+
+  /** A board where #12 waits on #20 and on a #26 the board still holds open. */
+  const HALF: BoardIssues = {
+    blocked: { 12: 'Blocked by: #20 #26\n' },
+    states: { 12: 'OPEN', 20: 'CLOSED', 26: 'OPEN' },
+  };
+
+  it('spends no board call at all on a pull request whose body closes no issue', async () => {
+    const stub = stubPulls();
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([]);
+    expect(seams.gh.removed()).toEqual([]);
+  });
+
+  it('asks about the issue waiting on what this merge closed, and takes the label off on a yes', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.asked()).toEqual([`#12 was blocked by #20, all closed. Remove ${SPEC_BLOCKED_LABEL}? [y/N] `]);
+    expect(seams.gh.removed()).toEqual([`#12 ${SPEC_BLOCKED_LABEL}`]);
+    expect(lines).toContain(`Removed ${SPEC_BLOCKED_LABEL} from #12`);
+  });
+
+  it('names the blocker still open over the same merge, asking nothing and removing nothing', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: HALF });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect([seams.asked(), seams.gh.removed()]).toEqual([[], []]);
+    expect(lines).toContain(`#12 is blocked by #26 (open), so ${SPEC_BLOCKED_LABEL} stays`);
+  });
+
+  it('runs last, after the clean-up has reported and the follow-ups are named', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    plantPackage(project, `{"version": "${VERSION}"}`);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING });
+    const { lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    // Each index is asserted present before it is ordered, so no missing line reads as an order.
+    const at = (line: string): number => {
+      const found = lines.indexOf(line);
+      if (found < 0) throw new Error(`the run wrote no "${line}" line: ${lines.join(' | ')}`);
+      return found;
+    };
+
+    expect(at(`Removed ${SPEC_BLOCKED_LABEL} from #12`)).toBeGreaterThan(at('Follow-ups:'));
+    expect(at('Follow-ups:')).toBeGreaterThan(at('prune deleted remote branches: done'));
+  });
+
+  it('is never reached by a clean-up step that failed, which leaves the label alone', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, {
+      board: WAITING,
+      git: { [`switch ${BASE}`]: failed('fatal: no such branch') },
+    });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(seams.gh.ran()).not.toContain(BLOCKED_LISTING);
+    expect([seams.asked(), seams.gh.removed()]).toEqual([[], []]);
+  });
+
+  it('asks nothing and removes nothing under --yes where there is no terminal', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING, terminal: false });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect([seams.asked(), seams.gh.removed()]).toEqual([[], []]);
+    expect(lines.some((line) => line.includes('Run rafa issue unblock 12'))).toBe(true);
+  });
+
+  it('warns rather than failing the merge when the board will not take the removal', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING, brokenBoard: true });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(stub.sent()).toContain('merge 41 squash');
+    expect(lines.some((line) => line.startsWith('warn: the blocked-issue reading'))).toBe(true);
   });
 });
 
@@ -704,7 +843,19 @@ describe('json mode', () => {
       'prune-remotes',
     ]);
     expect((data['followUps'] as { id: string }[]).map((followUp) => followUp.id)).toEqual(['release-tag']);
-    expect(data['roadmapTick']).toBeNull();
+    expect([data['roadmapTick'], data['unblocked']]).toEqual([null, null]);
+  });
+
+  it('carries what the unblock reading came to for a pull request that closes an issue', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, {
+      board: { blocked: { 12: 'Blocked by: #20\n' }, states: { 12: 'OPEN', 20: 'CLOSED' } },
+    });
+    const { events } = await ran(seams.seams, project, ['41', '--yes', '--output=json']);
+    const unblocked = dataOf(events)['unblocked'] as { issues: { issue: number; status: string }[] };
+
+    expect(unblocked.issues.map((issue) => [issue.issue, issue.status])).toEqual([[12, 'removed']]);
   });
 
   it('carries what the roadmap tick came to for a pull request that closes an issue', async () => {

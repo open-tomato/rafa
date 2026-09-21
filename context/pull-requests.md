@@ -83,6 +83,13 @@ unmocked. Register the route row the call needs on the fake.
    it still exists, `git fetch --prune`.
 4. Tick the roadmap, print what is ready and the two follow-ups when they
    apply: `rafa release tag` and `bun run snapshot`.
+5. Last, run the unblock reading over every open issue labelled
+   `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
+   asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
+   about each one whose blockers have all closed and removing the label on a
+   yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
+   `runUnblock`). `--yes` does not answer that question, and every failure of
+   it is a warning rather than an exit code.
 
 A failure after the merge never undoes it; it prints the remaining steps as
 commands.

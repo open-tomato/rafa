@@ -42,7 +42,7 @@ import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 
-import { createIssueUnblockCommand, runUnblock, unblockQuestion, UNBLOCK_USAGE } from './unblock.js';
+import { createIssueUnblockCommand, isUnblockFailure, runUnblock, unblockQuestion, UNBLOCK_USAGE } from './unblock.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-issue-unblock-')));
@@ -438,6 +438,112 @@ describe('--all, over every open blocked issue', () => {
     expect(report.issues).toEqual([]);
     expect(report.problem).toBe('board unblock: gh issue list --state open --label spec:blocked'
       + ' --limit 100 --json number,body failed: gh: not logged in');
+  });
+});
+
+describe('naming, the filter the merge-time run passes', () => {
+  /** A board carrying three blocked issues, one per blocker, and both blockers closed. */
+  function threeBlocked(): ReturnType<typeof fakeGh> {
+    return fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        13: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #26') },
+        14: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24 #26') },
+        24: { state: 'CLOSED' },
+        26: { state: 'CLOSED' },
+      },
+    });
+  }
+
+  it('keeps the listed issues whose line names one of them, and drops the rest', async () => {
+    const gh = threeBlocked();
+    const ask = scriptedAsk([true, true]);
+    const board = recordingBoard();
+
+    const report = await runUnblock({
+      gh: gh.run,
+      issues: null,
+      naming: [24],
+      ask: ask.ask,
+      board: board.board,
+    });
+
+    expect(report.issues.map((issue) => issue.issue)).toEqual([12, 14]);
+    expect(board.removed()).toEqual(['#12 spec:blocked', '#14 spec:blocked']);
+  });
+
+  it('keeps every listed issue when it is left out, which is the control for the filter', async () => {
+    const gh = threeBlocked();
+    const board = recordingBoard();
+
+    const report = await runUnblock({ gh: gh.run, issues: null, ask: null, board: board.board });
+
+    expect(report.issues.map((issue) => issue.issue)).toEqual([12, 13, 14]);
+  });
+
+  it('costs one listing and asks nothing when no listed line names one of them', async () => {
+    const gh = threeBlocked();
+    const ask = scriptedAsk([true]);
+
+    const report = await runUnblock({
+      gh: gh.run,
+      issues: null,
+      naming: [99],
+      ask: ask.ask,
+      board: recordingBoard().board,
+    });
+
+    expect(report).toEqual({ issues: [], problem: null, unchecked: null });
+    expect(gh.routes()).toEqual(['issue list']);
+    expect(ask.asked()).toEqual([]);
+  });
+
+  it('keeps a line naming itself beside one of them, so the fault is reported and never guessed at', async () => {
+    const gh = fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #12 #24') },
+        24: { state: 'CLOSED' },
+      },
+    });
+    const board = recordingBoard();
+
+    const report = await runUnblock({
+      gh: gh.run,
+      issues: null,
+      naming: [24],
+      ask: scriptedAsk([true]).ask,
+      board: board.board,
+    });
+
+    expect(report.issues.map((issue) => issue.status)).toEqual(['fault']);
+    expect(board.removed()).toEqual([]);
+  });
+
+  it('is ignored where the line named the issues itself', async () => {
+    const gh = threeBlocked();
+    const board = recordingBoard();
+
+    const report = await runUnblock({
+      gh: gh.run,
+      issues: [13],
+      naming: [24],
+      ask: scriptedAsk([true]).ask,
+      board: board.board,
+    });
+
+    expect(report.issues.map((issue) => [issue.issue, issue.status])).toEqual([[13, 'removed']]);
+  });
+});
+
+describe('isUnblockFailure', () => {
+  it('is true for the two statuses an operator has something to fix about', () => {
+    expect([isUnblockFailure('fault'), isUnblockFailure('failed')]).toEqual([true, true]);
+  });
+
+  it('is false for every status that is an ordinary outcome', () => {
+    const ordinary = ['removed', 'declined', 'unasked', 'waiting', 'not-blocked'] as const;
+
+    expect(ordinary.map((status) => isUnblockFailure(status))).toEqual([false, false, false, false, false]);
   });
 });
 

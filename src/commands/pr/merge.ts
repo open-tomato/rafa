@@ -66,6 +66,29 @@
  * read, an edit that would not land and a pull request closing no issue
  * all leave the merge reported exactly as it happened.
  *
+ * ## The unblock reading, and why it is last
+ *
+ * A merge that closes an issue can be the thing that clears another
+ * issue's blocker, so the command ends by running the reading `rafa
+ * issue unblock` runs, over every open issue whose `Blocked by:` line
+ * names an issue this pull request closes (`./merge-unblock.ts`, per
+ * the spec). Like the tick, nothing it comes to changes the exit code.
+ *
+ * Unlike the tick it runs LAST, after the clean-up and the follow-ups,
+ * for two reasons. It ASKS, and a question in the middle of the
+ * clean-up would interleave with the step lines an operator is reading
+ * to see whether their branches are gone. And where a step FAILED the
+ * command is already exiting 1 with the remaining commands to paste, so
+ * a question about somebody else's label on top of that is noise; the
+ * label is no worse for staying on, and `rafa issue unblock` clears it
+ * whenever the operator gets to it.
+ *
+ * `--yes` does NOT answer that question. It is declared as merging
+ * without asking, and a flag that also took labels off the board would
+ * write something its own description does not name; without a terminal
+ * the reading asks nothing and writes nothing, as it does under `rafa
+ * issue unblock`.
+ *
  * ## The remote branch, and which remote
  *
  * Whether the remote branch is still there is read AFTER the merge, by
@@ -103,6 +126,7 @@ import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ChecksVerdict, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { Prompter } from '../../project/root-choice.js';
+import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -127,6 +151,7 @@ import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
 import { tickRoadmapAfterMerge } from './merge-tick.js';
+import { unblockAfterMerge } from './merge-unblock.js';
 import {
   lineRefusal,
   onProvider,
@@ -199,6 +224,8 @@ export interface PrMergeResult {
   readonly followUps: readonly FollowUp[];
   /** What the roadmap tick came to, or null when the pull request closes no issue. */
   readonly roadmapTick: RoadmapTickResult | null;
+  /** What the unblock reading came to, or null when the pull request closes no issue. */
+  readonly unblocked: UnblockReport | null;
 }
 
 /** A refusal of this action with exit code 1. */
@@ -270,13 +297,21 @@ function requireTerminal(seams: MergeSeams, summary: string): void {
   ]);
 }
 
+/** An answer to a question spelled `[y/N]`: yes for `y` or `yes`, however it is cased and padded. */
+function isYes(answer: string | null): boolean {
+  return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
+}
+
+/** Opens the prompter a question is asked through; the system's own when the seams name none. */
+function prompterOf(seams: MergeSeams): () => Prompter {
+  return seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
+}
+
 /** Whether the operator answered the question with yes. */
 async function confirmed(seams: MergeSeams): Promise<boolean> {
-  const open = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
-  const prompter = open();
+  const prompter = prompterOf(seams)();
   try {
-    const answer = await prompter.ask('Merge? [y/N] ');
-    return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
+    return isYes(await prompter.ask('Merge? [y/N] '));
   } finally {
     prompter.close();
   }
@@ -312,6 +347,56 @@ function followUpsFor(pr: PrContext, git: GitRunner): readonly FollowUp[] {
   });
 }
 
+/** The `gh` runner the board reads and writes after the merge go through, at the project root. */
+function openGh(pr: PrContext, seams: MergeSeams): GhRunner {
+  return (seams.gh ?? ((root: string) => createGhRunner({ cwd: root })))(pr.project.root);
+}
+
+/**
+ * Asks one unblock question through a prompter of its own, or null
+ * where there is no terminal to ask on. Opened per question rather
+ * than per run, as {@link confirmed} opens one, so a merge that
+ * unblocks nothing opens none.
+ */
+function unblockAsk(seams: MergeSeams): UnblockAsk | null {
+  const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
+  if (!isTerminal()) return null;
+
+  const open = prompterOf(seams);
+  return async (question: string): Promise<boolean> => {
+    const prompter = open();
+    try {
+      return isYes(await prompter.ask(question));
+    } finally {
+      prompter.close();
+    }
+  };
+}
+
+/**
+ * Runs the unblock reading over the issues this merge closed and
+ * prints what it came to; see the module note. Every failure is a
+ * warning and nothing else.
+ */
+async function reportUnblock(
+  context: RafaContext,
+  pr: PrContext,
+  seams: MergeSeams,
+  detail: PullRequestDetail,
+): Promise<UnblockReport | null> {
+  return unblockAfterMerge({
+    body: detail.body,
+    gh: openGh(pr, seams),
+    ask: unblockAsk(seams),
+    info: (message: string): void => {
+      context.output.info(message);
+    },
+    warn: (message: string): void => {
+      context.output.warn(message);
+    },
+  });
+}
+
 /**
  * Ticks the roadmap for the merge that just went through and prints the
  * one line it came to; see the module note. A tick that could not be
@@ -329,7 +414,7 @@ async function reportTick(
   const tick = await tickRoadmapAfterMerge({
     body: detail.body,
     configured: pr.roadmapIssue,
-    gh: (seams.gh ?? ((root: string) => createGhRunner({ cwd: root })))(pr.project.root),
+    gh: openGh(pr, seams),
     warn,
   });
   if (tick === null) return null;
@@ -419,6 +504,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     steps: [],
     followUps: [],
     roadmapTick: null,
+    unblocked: null,
   };
   if (!yes && !await confirmed(seams)) {
     context.output.info('Nothing was merged.');
@@ -443,8 +529,18 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     context.output.info('Follow-ups:');
     for (const followUp of followUps) context.output.info(`${INDENT}${followUp.command} — ${followUp.why}`);
   }
+  const unblocked = await reportUnblock(context, pr, seams, detail);
 
-  return { ...answered, merged: true, declined: false, detail: outcome.detail, steps, followUps, roadmapTick };
+  return {
+    ...answered,
+    merged: true,
+    declined: false,
+    detail: outcome.detail,
+    steps,
+    followUps,
+    roadmapTick,
+    unblocked,
+  };
 }
 
 /** The command, reaching the provider, git and the terminal through `seams`; see the module note. */
@@ -462,9 +558,12 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' and without a terminal and without `--yes` it refuses. A step that fails never undoes the merge: it'
       + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
       + ' every issue the pull request closes on the roadmap issue, warning rather than failing when that write'
-      + ' does not land. With `--output=json` the pull request, the method, the steps that ran, the follow-ups and'
-      + ' the roadmap tick are the data of the terminal result event. Refuses with exit code 2 where `pr.provider`'
-      + ' is not `gh`.',
+      + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'
+      + ' request closes, asking whether to remove `spec:blocked` from each one whose blockers have all closed;'
+      + ' `--yes` does not answer that question, and every failure of that reading is a warning. With'
+      + ' `--output=json` the pull request, the method, the steps that ran, the follow-ups, the roadmap tick and'
+      + ' the unblock reading are the data of the terminal result event. Refuses with exit code 2 where'
+      + ' `pr.provider` is not `gh`.',
     args: [
       {
         name: 'n',
