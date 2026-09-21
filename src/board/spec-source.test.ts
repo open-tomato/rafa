@@ -149,6 +149,7 @@ function issueOf(number: number, fields: Partial<SpecIssue> = {}): SpecIssue {
     body: `## What you get\n\nThe body of issue ${String(number)}.\n`,
     state: 'OPEN',
     labels: [SPEC_LABEL],
+    author: 'octocat',
     ...fields,
   };
 }

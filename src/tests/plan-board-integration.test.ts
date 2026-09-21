@@ -178,6 +178,7 @@ function issueOf(over: Partial<SpecIssue> & { readonly number: number }): SpecIs
     body: '',
     state: 'OPEN',
     labels: [],
+    author: 'octocat',
     ...over,
   };
 }

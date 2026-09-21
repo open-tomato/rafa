@@ -188,15 +188,14 @@ author, and the pull request's author for `pr triage --resolve`.
 
 **The `plan create` routes do NOT ask it.** Check 0 below is specified and
 unwired: `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check,
-the leak refusal and the completeness refusal only, and
-`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
-does not fetch `author`, so nothing on that route holds a login to read at
-all. An issue an outsider opened and a member labelled `spec:ready` is
+the leak refusal and the completeness refusal only. The LOGIN is there —
+`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS` fetches `author` and every issue
+read carries it as `SpecIssue.author` — and nothing asks about it. An issue
+an outsider opened and a member labelled `spec:ready` is
 therefore snapshotted and planned from, and the label — which only a
 write-holder can add — is the whole of what stands between it and a plan.
-Wiring it is one widening of that field list, `author` threaded through
-`SpecIssue`, and `readAuthorTrust`/`requireTrustedAuthor` called from
-`inspectSpecIssue` ahead of the label check. Until that lands, read any
+What wiring it now takes is `readAuthorTrust`/`requireTrustedAuthor` called
+from `inspectSpecIssue` ahead of the label check. Until that lands, read any
 sentence here about `--issue` or `--next` trust as the specification and
 not as the code. The `rafa:spec-review` comment reader spends no trust
 reading BY DESIGN, which is a different thing from this gap:

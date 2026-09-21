@@ -49,13 +49,13 @@
  *     each holding a list item, and no placeholder left in the text.
  *
  * ONE is deliberately not here, and it is not forgotten. Check 0, the
- * author's trust (`./trust.ts`), needs the issue's author, and
- * `ISSUE_VIEW_FIELDS` does not ask for it (`./issue.ts` records why the
- * field list is the spec's own). Wiring it is a widening of that read,
- * not a line here, so an issue body check 0 would have caught still
- * reaches the planner, which judges the spec itself as check 3 and
- * refuses it there (`./gate.ts`). The cost is a session, not a wrong
- * plan.
+ * author's trust (`./trust.ts`), needs the issue's author, and the read
+ * now carries it: `ISSUE_VIEW_FIELDS` asks for `author` and every issue
+ * holds the login as {@link SpecIssue.author} (`./issue.ts`). What is
+ * still missing is the call, so an issue body check 0 would have caught
+ * still reaches the planner, which judges the spec itself as check 3
+ * and refuses it there (`./gate.ts`). The cost is a session, not a
+ * wrong plan.
  *
  * ## What the completeness refusal costs
  *

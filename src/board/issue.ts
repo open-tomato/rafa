@@ -28,23 +28,33 @@
  *
  * ## The read
  *
- * `gh issue view <n> --json number,title,body,state,labels`, the spec's
- * own command and its own field list. The payload is checked by hand
- * rather than cast, as the tracker adapter checks its own, and a field
- * that is not the shape read here fails the command naming what came
- * back.
+ * `gh issue view <n> --json number,title,body,state,labels,author`, the
+ * spec's own command and its own field list with `author` added to it.
+ * The payload is checked by hand rather than cast, as the tracker
+ * adapter checks its own, and a field that is not the shape read here
+ * fails the command naming what came back.
  *
- * Two things that field list does NOT carry are worth naming, because a
- * reader expecting them would find them missing:
+ * `author` is the one the trust check reads — check 0 of the readiness
+ * gate, which asks whether the login behind a body may reach an agent's
+ * prompt (`./trust.ts`). GitHub answers it as a mapping,
+ * `{"id","is_bot","login","name"}` for a person, read on 2026-09-21
+ * from `gh issue view 1 --repo cli/cli --json author` with `gh`
+ * 2.100.0; only the login is kept, as {@link SpecIssue.author}.
  *
- *  - `author`, which the trust check (check 0 of the readiness gate)
- *    reads. Nothing here can supply it, so the caller that runs the
- *    trust check reads the login itself. `plan create` composes the
- *    label check, the leak refusal and the completeness refusal, and
- *    NOT check 0 (`./plan-spec.ts`), so the list is still the spec's
- *    own; widening
- *    it is a one-word change to {@link ISSUE_VIEW_FIELDS}, left to the
- *    task that wires the trust check in rather than guessed at here.
+ * It is also the one field a payload may leave out without failing the
+ * command. A payload naming no `author`, or naming one that is not a
+ * mapping carrying a string `login`, reads as the EMPTY login, the way
+ * `./issue-board.ts` reads a comment's, rather than as a refusal. That
+ * is safe because the empty login is not trust: it names no account, so
+ * the permission lookup the trust check spends on it cannot come back
+ * `admin`, `maintain` or `write`, and what the caller gets is a refusal
+ * either way. Refusing here instead would turn a shape GitHub changed
+ * into a command that cannot run at all, which is a worse answer than
+ * one refused check.
+ *
+ * One thing the field list still does NOT carry is worth naming,
+ * because a reader expecting it would find it missing:
+ *
  *  - `url`, which is how the tracker adapter tells an issue from a pull
  *    request: `gh issue view` answers a pull request's number too, and
  *    only the URL says which it was. Without it, an open pull request
@@ -136,8 +146,8 @@ import { notesPath, specPath } from './naming.js';
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board issue';
 
-/** The fields the read asks for; the spec's own list, and the module note holds what is not in it. */
-export const ISSUE_VIEW_FIELDS = 'number,title,body,state,labels';
+/** The fields the read asks for; the spec's five and `author`, and the module note holds what is not in it. */
+export const ISSUE_VIEW_FIELDS = 'number,title,body,state,labels,author';
 
 /** The label an issue must carry to be planned from. */
 export const SPEC_LABEL = 'type:spec';
@@ -155,7 +165,7 @@ export { REFRESH_FLAG };
 /** The heading the local notes are appended under. */
 export const LOCAL_NOTES_HEADING = '## Local notes';
 
-/** An issue as this module reads it: the five fields and nothing else. */
+/** An issue as this module reads it: the six fields and nothing else. */
 export interface SpecIssue {
   /** The issue number, as the payload answered it. */
   readonly number: number;
@@ -167,6 +177,12 @@ export interface SpecIssue {
   readonly state: 'OPEN' | 'CLOSED';
   /** Every label on the issue, by name, in the order they came back. */
   readonly labels: readonly string[];
+  /**
+   * The login that opened the issue, which the trust check weighs, or
+   * the empty string when the payload named none; see the module note
+   * for why an unnamed author is read and not refused.
+   */
+  readonly author: string;
 }
 
 /** One issue read by number; the seam a caller plants a fake behind. */
@@ -207,6 +223,16 @@ function labelNames(value: unknown): readonly string[] | null {
     : null;
 }
 
+/** The login on a payload's `author`, or the empty string when it names none. */
+function authorLogin(value: unknown): string {
+  const login = isMapping(value)
+    ? value['login']
+    : null;
+  return typeof login === 'string'
+    ? login
+    : '';
+}
+
 /** The first thing wrong with the payload of a read of issue `number`, or null. */
 function viewProblem(payload: unknown, number: number): string | null {
   if (!isMapping(payload)) return `${describeValue(payload)}, expected a mapping`;
@@ -236,14 +262,22 @@ function readViewedIssue(stdout: string, number: number, command: string): SpecI
   const problem = viewProblem(payload, number);
   if (problem !== null) throw new Error(`${PREFIX}: ${command} answered ${problem}`);
 
-  // Every field was checked above.
-  const checked = payload as { title: string; body: string; state: 'OPEN' | 'CLOSED'; labels: unknown };
+  // Every field but the author was checked above; that one is read
+  // rather than checked, as the module note records.
+  const checked = payload as {
+    title: string;
+    body: string;
+    state: 'OPEN' | 'CLOSED';
+    labels: unknown;
+    author: unknown;
+  };
   return {
     number,
     title: checked.title,
     body: checked.body,
     state: checked.state,
     labels: labelNames(checked.labels) ?? [],
+    author: authorLogin(checked.author),
   };
 }
 

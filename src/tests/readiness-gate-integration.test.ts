@@ -314,7 +314,7 @@ describe('the completeness check reached through plan create itself', () => {
   function ghOver(body: string): GhRunner {
     return (args): Promise<GhResult> => {
       if (args[0] === 'issue' && args[1] === 'view' && args[2] === '31') {
-        const issue: SpecIssue = { number: 31, title: 'Issue 31', body, state: 'OPEN', labels: [SPEC_LABEL, SPEC_READY_LABEL] };
+        const issue: SpecIssue = { number: 31, title: 'Issue 31', body, state: 'OPEN', labels: [SPEC_LABEL, SPEC_READY_LABEL], author: 'octocat' };
         return Promise.resolve({
           ok: true,
           stdout: JSON.stringify({

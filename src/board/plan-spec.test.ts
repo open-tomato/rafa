@@ -112,6 +112,7 @@ function issueOf(number: number, fields: Partial<SpecIssue> = {}): SpecIssue {
     body: completeBody(number),
     state: 'OPEN',
     labels: [SPEC_LABEL, SPEC_READY_LABEL],
+    author: 'octocat',
     ...fields,
   };
 }
