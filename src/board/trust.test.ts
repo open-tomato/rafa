@@ -58,13 +58,30 @@
  *  - `TRUST_REFUSAL_EXIT` at 1 rather than 2: 2 fail, both
  *    `requireTrustedAuthor` refusals.
  *
+ * The board entry point added later — `readBoardTrust`, `ghBoardTrust`
+ * and `requireTrustedBoardAuthor` — brings this file to 47, and its 12
+ * cases were driven the same way on 2026-09-21, one mutation at a time,
+ * `trust.ts` restored from a scratch copy and verified with `shasum -c`
+ * after each. 47 pass either side:
+ *
+ *  - `readBoardTrust` passing an empty allow-list on, so the list is
+ *    never consulted: 3 fail, the two listed-login cases and the one
+ *    holding the entry point equal to the rule behind it.
+ *  - `requireTrustedBoardAuthor` never calling the refusal: 4 fail,
+ *    every case that expects a `CommandExit`.
+ *  - the item's kind hardcoded to `issue` in the refusal it builds:
+ *    1 fail, the pull request case, which is why that case is written
+ *    with a kind the other refusals do not use.
+ *  - `ghBoardTrust` dropping the allow-list it was made with: 1 fail,
+ *    the case asserting a listed login spends no `gh` command.
+ *
  * One mutation of the reader behind the setting was driven the same way
  * against `config-sections.test.ts` and this file's own config case:
  * `isGitHubLogin` accepting any non-whitespace string reddened 8 cases
  * there, including the `board.trustedAuthors` refusal in
  * `config.test.ts`.
  */
-import type { PermissionReading, Permissions, TrustReading } from './trust.js';
+import type { BoardTrust, PermissionReading, Permissions, TrustReading } from './trust.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
@@ -74,8 +91,11 @@ import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {
   createGhPermissions,
+  ghBoardTrust,
   readAuthorTrust,
+  readBoardTrust,
   requireTrustedAuthor,
+  requireTrustedBoardAuthor,
   TRUSTED_PERMISSIONS,
   trustRefusalClause,
   trustRefusalMessage,
@@ -141,6 +161,14 @@ function trustOf(
   trustedAuthors: readonly string[] = [],
 ): Promise<TrustReading> {
   return readAuthorTrust({ login, permissions, trustedAuthors });
+}
+
+/** What a refusal calls the repository in every case below. */
+const REPO = 'open-tomato/rafa';
+
+/** A board trust over `permissions`, with `trustedAuthors` listed. */
+function boardTrustOf(permissions: Permissions, trustedAuthors: readonly string[] = []): BoardTrust {
+  return { permissions, trustedAuthors, repo: REPO };
 }
 
 describe('createGhPermissions', () => {
@@ -465,5 +493,186 @@ describe('requireTrustedAuthor', () => {
     expect(thrown).toBeInstanceOf(CommandExit);
     expect((thrown as CommandExit).exitCode).toBe(2);
     expect((thrown as CommandExit).message).toBe(trustRefusalMessage(ISSUE, reading));
+  });
+});
+
+describe('readBoardTrust', () => {
+  it('asks the allow-list first and spends no lookup on a listed login', async () => {
+    const counting = countingPermissions((login) => ({
+      login,
+      permission: 'read',
+      roleName: 'read',
+      detail: '',
+    }));
+    const trust = boardTrustOf(counting.permissions, ['dependabot[bot]']);
+
+    const listed = await readBoardTrust(trust, 'dependabot[bot]');
+    // The control: a login the list does not name is still asked about
+    // over the same trust, and the lookup's answer stands.
+    const unlisted = await readBoardTrust(trust, 'mallory');
+
+    expect(listed.trusted).toBe(true);
+    expect(listed.source).toBe('allow-list');
+    expect(unlisted.trusted).toBe(false);
+    expect(unlisted.refusal).toBe('no-write-access');
+    expect(counting.asked()).toEqual(['mallory']);
+  });
+
+  it('trusts a write-holder and refuses an outsider read through the same trust', async () => {
+    const trust = boardTrustOf((login) => Promise.resolve({
+      login,
+      permission: login === 'octocat'
+        ? 'write'
+        : 'read',
+      roleName: null,
+      detail: '',
+    }));
+
+    const holder = await readBoardTrust(trust, 'octocat');
+    const outsider = await readBoardTrust(trust, 'mallory');
+
+    expect(holder.trusted).toBe(true);
+    expect(holder.source).toBe('permission');
+    expect(outsider.trusted).toBe(false);
+  });
+
+  it('refuses a failed lookup rather than passing it, carrying what went wrong', async () => {
+    const trust = boardTrustOf(failing('gh: not logged in'));
+    // The control: the same entry point over a lookup that answers
+    // trusts, so the refusal is the failure and not the reader.
+    const answering_ = boardTrustOf(answering('admin'));
+
+    const refused = await readBoardTrust(trust, 'octocat');
+    const trusted = await readBoardTrust(answering_, 'octocat');
+
+    expect(refused.trusted).toBe(false);
+    expect(refused.refusal).toBe('lookup-failed');
+    expect(refused.permission?.detail).toBe('gh: not logged in');
+    expect(trusted.trusted).toBe(true);
+  });
+
+  it('answers exactly what the rule behind it answers, so the two cannot drift apart', async () => {
+    const trust = boardTrustOf(answering('read'), ['hubot']);
+
+    const entry = await readBoardTrust(trust, 'mallory');
+    const rule = await readAuthorTrust({
+      login: 'mallory',
+      permissions: trust.permissions,
+      trustedAuthors: trust.trustedAuthors,
+    });
+
+    expect(entry).toEqual(rule);
+  });
+});
+
+describe('ghBoardTrust', () => {
+  it('reads a login through one gh api command at the collaborators path', async () => {
+    const fake = createFakePrGh();
+    fake.plantPermission('octocat', 'admin');
+    const trust = ghBoardTrust({ gh: fake.run, trustedAuthors: [], repo: REPO });
+
+    const reading = await readBoardTrust(trust, 'octocat');
+
+    expect(fake.calls()).toEqual([['api', PATH]]);
+    expect(reading.trusted).toBe(true);
+    expect(reading.source).toBe('permission');
+    expect(trust.repo).toBe(REPO);
+  });
+
+  it('spends no gh command at all on a login the allow-list names', async () => {
+    const fake = createFakePrGh();
+    fake.plantPermission('octocat', 'admin');
+    const listed = ghBoardTrust({ gh: fake.run, trustedAuthors: ['rafa-bot'], repo: REPO });
+
+    const bot = await readBoardTrust(listed, 'rafa-bot');
+    // The control: a login the list does not name does reach `gh`
+    // through the same trust.
+    const holder = await readBoardTrust(listed, 'octocat');
+
+    expect(bot.trusted).toBe(true);
+    expect(bot.source).toBe('allow-list');
+    expect(holder.source).toBe('permission');
+    expect(fake.calls()).toEqual([['api', PATH]]);
+  });
+
+  it('makes no lookup until it is asked for one', () => {
+    const fake = createFakePrGh();
+
+    ghBoardTrust({ gh: fake.run, trustedAuthors: [], repo: REPO });
+
+    expect(fake.calls()).toEqual([]);
+  });
+});
+
+describe('requireTrustedBoardAuthor', () => {
+  it('lets a write-holder through and answers the reading behind the pass', async () => {
+    const trust = boardTrustOf(answering('write'));
+
+    const reading = await requireTrustedBoardAuthor({ kind: 'issue', number: 12 }, trust, 'octocat');
+
+    expect(reading.trusted).toBe(true);
+    expect(reading.permission?.permission).toBe('write');
+  });
+
+  it('refuses an outsider with exit 2 and the sentence, naming the item and the trust repository', async () => {
+    const trust = boardTrustOf(answering('read'));
+
+    let thrown: unknown;
+    try {
+      await requireTrustedBoardAuthor({ kind: 'issue', number: 12 }, trust, 'mallory');
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CommandExit);
+    expect((thrown as CommandExit).exitCode).toBe(2);
+    expect((thrown as CommandExit).message).toBe(
+      'issue #12 was opened by mallory, who has no write access to open-tomato/rafa;'
+        + ' a member must open the spec',
+    );
+  });
+
+  it('names a pull request as itself, so the item the caller spells reaches the sentence', async () => {
+    const trust = boardTrustOf(answering('read'));
+
+    const refusal = await requireTrustedBoardAuthor({ kind: 'pull request', number: 33 }, trust, 'mallory')
+      .then(() => null, (error: unknown) => error);
+
+    expect((refusal as CommandExit).message).toBe(
+      'pull request #33 was opened by mallory, who has no write access to open-tomato/rafa;'
+        + ' a member must open the pull request',
+    );
+  });
+
+  it('refuses a failed lookup with its own sentence rather than claiming no access', async () => {
+    const trust = boardTrustOf(failing('gh api ... failed: HTTP 403'));
+
+    const refusal = await requireTrustedBoardAuthor({ kind: 'issue', number: 12 }, trust, 'mallory')
+      .then(() => null, (error: unknown) => error);
+
+    expect((refusal as CommandExit).exitCode).toBe(2);
+    expect((refusal as CommandExit).message).toBe(
+      'issue #12 was opened by mallory, whose write access to open-tomato/rafa could not be read'
+        + ' (gh api ... failed: HTTP 403); a member must open the spec',
+    );
+  });
+
+  it('refuses before the caller reads anything, and passes a listed login with no lookup spent', async () => {
+    const counting = countingPermissions((login) => ({
+      login,
+      permission: 'read',
+      roleName: 'read',
+      detail: '',
+    }));
+    const trust = boardTrustOf(counting.permissions, ['rafa-bot']);
+
+    const listed = await requireTrustedBoardAuthor({ kind: 'issue', number: 7 }, trust, 'rafa-bot');
+    // The control: the same trust refuses the login the list omits.
+    const refused = await requireTrustedBoardAuthor({ kind: 'issue', number: 7 }, trust, 'mallory')
+      .then(() => null, (error: unknown) => error);
+
+    expect(listed.trusted).toBe(true);
+    expect(refused).toBeInstanceOf(CommandExit);
+    expect(counting.asked()).toEqual(['mallory']);
   });
 });

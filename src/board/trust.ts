@@ -13,24 +13,60 @@
  * BODY, and that is the one question this module answers
  * (`.rafa/specs/rafa-20-pr-commands.md`).
  *
- * ONE function answers it — {@link readAuthorTrust} — and a second
- * reading spelled somewhere else is a second place for the answer to
- * drift, with the one it would drift towards being a pass. So every
- * caller comes here.
+ * ONE rule answers it — {@link readAuthorTrust}, the allow-list and
+ * then the permission reading — and a second reading spelled somewhere
+ * else is a second place for the answer to drift, with the one it would
+ * drift towards being a pass. So every caller comes here.
  *
- * TWO callers exist today, both in `src/commands/pr/triage-trust.ts`:
- * the `rafa:pr-triage` marker-comment reader, and `pr triage --resolve`
- * on the pull request's own author. The spec also asks for the check on
- * `plan create --issue` and `plan create --next`, and NEITHER is wired:
- * `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check,
- * the leak refusal and the completeness refusal only. What that route
- * lacks is the CALL and no longer the login: `src/board/issue.ts`'s
- * `ISSUE_VIEW_FIELDS` fetches `author`, and every issue it reads
- * carries the login as `SpecIssue.author`.
- * Both modules record the gap; `context/pull-requests.md` carries what
- * closing it costs. The `rafa:spec-review` reader is NOT a missing
- * caller — it spends no trust reading by design, because nothing reads
- * its comment back into a prompt (`src/board/review-comment.ts`).
+ * A board reader asks it through {@link readBoardTrust}, the one entry
+ * point over a {@link BoardTrust}: the lookup, the allow-list and the
+ * repository label in one value, so a reader cannot hold half the
+ * question. {@link requireTrustedBoardAuthor} is that reading with the
+ * refusal on the end, for the callers that refuse rather than ignore.
+ * Both are {@link readAuthorTrust} and add no rule of their own.
+ *
+ * ## The callers
+ *
+ * TWO are wired today, both in `src/commands/pr/triage-trust.ts` and
+ * both on {@link readAuthorTrust} directly, carrying their own
+ * `TriageTrust`: the `rafa:pr-triage` marker-comment reader, and
+ * `pr triage --resolve` on the pull request's own author.
+ *
+ * THREE more are what {@link readBoardTrust} was added for, and NONE of
+ * them is wired yet — each is a task of its own, and until it lands the
+ * route it names runs the checks it ran before:
+ *
+ *  - `plan create --issue`, in `src/board/plan-spec.ts`'s
+ *    `inspectSpecIssue`, which today runs the label check, the leak
+ *    refusal and the completeness refusal only. What it lacks is the
+ *    CALL and no longer the login: `src/board/issue.ts`'s
+ *    `ISSUE_VIEW_FIELDS` fetches `author`, and every issue it reads
+ *    carries the login as `SpecIssue.author`.
+ *  - `plan create --next`, on the Roadmap issue and on the issue the
+ *    roadmap walk picks (`src/plan.ts`), which are two bodies a prompt
+ *    is written from and neither is checked.
+ *  - the `rafa:spec-review` marker comment (`./review-comment.ts`),
+ *    whose reader is filtered by author rather than refused.
+ *
+ * `context/pull-requests.md` carries what closing them costs.
+ *
+ * ## What a planted spec-review comment can take
+ *
+ * The spec-review reader is a caller for a DIFFERENT reason from the
+ * other two, and this note said for a while that it was no caller at
+ * all. Nothing in that comment is read back into a prompt —
+ * `findSpecReviewComment` takes a comment's id and nothing else — so no
+ * text of a stranger's reaches a session through it, and that much is
+ * still true.
+ *
+ * What a planted marker comment CAN take is the EDIT. The gate keeps
+ * one spec-review comment per issue and edits the newest marked one, so
+ * a comment somebody else marked is the one it would PATCH. GitHub
+ * refuses an edit of another account's comment, so the outcome is not a
+ * changed verdict but a LOST REPORT: the gap list the author needed is
+ * never posted, run after run, and what a person sees on the issue is
+ * whatever the planted comment says. That is worth a lookup, and the
+ * reading the filter spends is this module's.
  *
  * ## The reading
  *
@@ -102,9 +138,10 @@
  *
  * ## The refusal
  *
- * `CommandExit(2, ...)` from {@link requireTrustedAuthor}, thrown before
- * the body is read any further or snapshotted, and its sentence is
- * {@link trustRefusalMessage}'s. Exit 2 is the spec's own code for it.
+ * `CommandExit(2, ...)` from {@link requireTrustedAuthor} — or from
+ * {@link requireTrustedBoardAuthor}, which is that call after the
+ * reading — thrown before the body is read any further or snapshotted,
+ * and its sentence is {@link trustRefusalMessage}'s. Exit 2 is the spec's own code for it.
  * The message names the item, the login, the repository and what the
  * operator must do, because the dispatcher drops a nonzero exit's
  * payload and anything the operator has to read belongs in the message.
@@ -188,12 +225,20 @@ export interface TrustReading {
 /** What a refusal calls the thing the login opened. */
 export type BoardItemKind = 'issue' | 'pull request';
 
-/** The board item a refusal names. */
-export interface BoardItem {
+/**
+ * The board item a refusal names, without the repository: what a caller
+ * holding a {@link BoardTrust} has to spell, since the trust already
+ * carries the label.
+ */
+export interface BoardItemRef {
   /** What the number names. */
   readonly kind: BoardItemKind;
   /** Its number on the board. */
   readonly number: number;
+}
+
+/** The board item a refusal names. */
+export interface BoardItem extends BoardItemRef {
   /** The repository, as the refusal spells it: `owner/name`. */
   readonly repo: string;
 }
@@ -212,6 +257,38 @@ export interface AuthorTrustOptions {
 export interface GhPermissionsOptions {
   /** Runs the one `gh api` command the lookup sends. */
   readonly gh: GhRunner;
+}
+
+/**
+ * What a board caller reads trust through, for one repository: the two
+ * answers {@link readBoardTrust} asks in order, and the label a refusal
+ * spells. The three travel together because a caller holding the
+ * lookup without the allow-list would refuse the bot the list exists
+ * for, and one holding both without the label could not name the
+ * repository its refusal is about.
+ *
+ * `src/commands/pr/triage-trust.ts` declares its own `TriageTrust` of
+ * the same three fields; the shapes are not shared because the triage
+ * one is what the PR command passes around, and this one is what a
+ * board reader is handed.
+ */
+export interface BoardTrust {
+  /** The permission lookup; {@link ghBoardTrust} makes the `gh` one. */
+  readonly permissions: Permissions;
+  /** `board.trustedAuthors`: the logins trusted without a lookup. */
+  readonly trustedAuthors: readonly string[];
+  /** What a refusal calls the repository: `owner/name`. */
+  readonly repo: string;
+}
+
+/** What {@link ghBoardTrust} is made with. */
+export interface GhBoardTrustOptions {
+  /** Runs the one `gh api` command a lookup sends. */
+  readonly gh: GhRunner;
+  /** `board.trustedAuthors` as the configuration resolved it. */
+  readonly trustedAuthors: readonly string[];
+  /** What a refusal calls the repository: `owner/name`. */
+  readonly repo: string;
 }
 
 /** What the operator must do, per item; see the module note. */
@@ -334,6 +411,59 @@ export async function readAuthorTrust(options: AuthorTrustOptions): Promise<Trus
       : 'no-write-access',
     permission,
   };
+}
+
+/**
+ * A board trust over one `gh` runner: the permission lookup
+ * {@link createGhPermissions} makes, the allow-list and the repository
+ * label, bundled for the readers that take one.
+ *
+ * Makes no lookup and spawns nothing — `createGhRunner` answers a
+ * function, and the first `gh api` is sent when a login is asked about.
+ */
+export function ghBoardTrust(options: GhBoardTrustOptions): BoardTrust {
+  return {
+    permissions: createGhPermissions({ gh: options.gh }),
+    trustedAuthors: options.trustedAuthors,
+    repo: options.repo,
+  };
+}
+
+/**
+ * THE entry point for a board reader: whether board text `login` wrote
+ * may reach a prompt, over `trust`'s allow-list and then its permission
+ * reading.
+ *
+ * The rule is {@link readAuthorTrust}'s and is spelled once; this is
+ * that call over a {@link BoardTrust}, so no board reader assembles the
+ * two answers itself and none of them can assemble half of them.
+ */
+export function readBoardTrust(trust: BoardTrust, login: string): Promise<TrustReading> {
+  return readAuthorTrust({
+    login,
+    permissions: trust.permissions,
+    trustedAuthors: trust.trustedAuthors,
+  });
+}
+
+/**
+ * The same reading, refused: lets a trusted `login` through and throws
+ * `CommandExit(2, {@link trustRefusalMessage})` for an untrusted one,
+ * naming `item` in `trust`'s repository.
+ *
+ * Called before the body is read any further or snapshotted, so a
+ * refused read leaves nothing of the untrusted text behind. A caller
+ * that IGNORES rather than refuses — the marker-comment readers — calls
+ * {@link readBoardTrust} and reads the answer itself.
+ */
+export async function requireTrustedBoardAuthor(
+  item: BoardItemRef,
+  trust: BoardTrust,
+  login: string,
+): Promise<TrustReading> {
+  const reading = await readBoardTrust(trust, login);
+  requireTrustedAuthor({ kind: item.kind, number: item.number, repo: trust.repo }, reading);
+  return reading;
 }
 
 /**

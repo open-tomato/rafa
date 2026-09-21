@@ -194,8 +194,10 @@ read carries it as `SpecIssue.author` — and nothing asks about it. An issue
 an outsider opened and a member labelled `spec:ready` is
 therefore snapshotted and planned from, and the label — which only a
 write-holder can add — is the whole of what stands between it and a plan.
-What wiring it now takes is `readAuthorTrust`/`requireTrustedAuthor` called
-from `inspectSpecIssue` ahead of the label check. Until that lands, read any
+What wiring it now takes is `requireTrustedBoardAuthor` — the board entry
+point in `src/board/trust.ts`, over a `BoardTrust` of the lookup, the
+allow-list and the repo label — called from `inspectSpecIssue` ahead of the
+label check. Until that lands, read any
 sentence here about `--issue` or `--next` trust as the specification and
 not as the code. The `rafa:spec-review` comment reader spends no trust
 reading BY DESIGN, which is a different thing from this gap:
