@@ -57,8 +57,9 @@ on.
 ## Install
 
 The package is `@open-tomato/rafa` on npm (`publishConfig` names
-`https://registry.npmjs.org/`, and `npm publish` builds first through
-`prepack`). It installs globally under either package manager:
+`https://registry.npmjs.org/` for the scope as well as in general, so a
+machine that maps `@open-tomato` to another registry still publishes
+there, and `npm publish` builds first through `prepack`). It installs globally under either package manager:
 
 ```bash
 npm i -g @open-tomato/rafa

@@ -1,11 +1,12 @@
 {
   "name": "@open-tomato/rafa",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Alpha. Runs a plan through the ralph loop: one Claude Code session per task, one commit per task, then a pull request and a CI wait.",
   "private": false,
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "@open-tomato:registry": "https://registry.npmjs.org/"
   },
   "repository": {
     "type": "git",
