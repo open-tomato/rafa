@@ -60,9 +60,10 @@
  *
  * `sync`, row 2, is not here. Fast-forwarding the base is not a
  * registered command: it runs through the `GitRunner` seam of
- * `src/pr/git.ts`, and the spec's table says so. {@link actionInvocation}
- * answers null for it, as it does for `none`, and {@link runAction}
- * refuses it as the caller's mistake.
+ * `src/pr/git.ts`, and the spec's table says so. `./sync.ts` holds that
+ * step and its refusals. {@link actionInvocation} answers null for it,
+ * as it does for `none`, and {@link runAction} refuses it as the
+ * caller's mistake.
  *
  * ## The context an action runs with
  *
