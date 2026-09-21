@@ -32,24 +32,23 @@
  * `TriageTrust`: the `rafa:pr-triage` marker-comment reader, and
  * `pr triage --resolve` on the pull request's own author.
  *
- * A THIRD is what {@link readBoardTrust} was added for and is wired:
- * `plan create`, in `src/board/plan-spec.ts`'s `inspectSpecIssue`,
- * which runs {@link requireTrustedBoardAuthor} over the issue's
- * `author` ahead of the label check, the leak refusal and the
- * completeness refusal, so an untrusted body is refused before a byte
- * of it is snapshotted. BOTH `plan create` routes reach it — the
- * issue `--issue=<n>` names, and the line a `--next` walk picks.
+ * A THIRD and a FOURTH are what {@link readBoardTrust} was added for,
+ * and both are wired, in `src/board/plan-spec.ts`. `inspectSpecIssue`
+ * runs {@link requireTrustedBoardAuthor} over the issue's `author`
+ * ahead of the label check, the leak refusal and the completeness
+ * refusal, so an untrusted body is refused before a byte of it is
+ * snapshotted. `inspectRoadmapIssue` runs the same refusal over the
+ * ROADMAP issue `plan create --next` reads its order off, before a
+ * line is parsed out of it. Between them, every body a `plan create`
+ * run reads is checked: the issue `--issue=<n>` names, the roadmap a
+ * `--next` walk reads, and the line that walk picks.
  *
- * TWO are still unwired, each a task of its own, and until one lands
- * the route it names runs the checks it ran before:
+ * ONE is still unwired, a task of its own, and until it lands the
+ * route it names runs the checks it ran before: the `rafa:spec-review`
+ * marker comment (`./review-comment.ts`), whose reader is filtered by
+ * author rather than refused.
  *
- *  - the ROADMAP issue's own body, which `plan create --next` reads to
- *    pick a line (`src/plan.ts`, `./roadmap.ts`). The line it picks is
- *    checked; the roadmap that named it is not.
- *  - the `rafa:spec-review` marker comment (`./review-comment.ts`),
- *    whose reader is filtered by author rather than refused.
- *
- * `context/pull-requests.md` carries what closing them costs.
+ * `context/pull-requests.md` carries what closing it costs.
  *
  * ## What a planted spec-review comment can take
  *

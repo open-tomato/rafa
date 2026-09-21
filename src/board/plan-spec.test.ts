@@ -1,18 +1,19 @@
 /**
  * Tests for the board side of `plan create` (`src/board/plan-spec.ts`):
  * the seams it builds, the four checks it runs on an issue as read in
- * the order it runs them, and the gate issue it answers beside the
- * spec.
+ * the order it runs them, the one it runs on the ROADMAP a `--next`
+ * walk reads, and the gate issue it answers beside the spec.
  *
  * `./spec-source.test.ts` drives the routes themselves over planted
  * readers, and this file drives none of that again. It exists for the
  * WIRING, which nothing else can see: that the issue arrives through
  * `gh issue view` with the field list `./issue.ts` declares, that the
  * roadmap walk reaches `gh pr list` and `git`, that the author's trust
- * is read through `gh api` at the collaborators path, that the checks
- * run BEFORE a snapshot is written and in the order that decides which
- * sentence an issue failing several of them is refused with, and that
- * the spec route asks `gh` nothing at all.
+ * is read through `gh api` at the collaborators path — on the roadmap
+ * as well as on the line it names — that the checks run BEFORE a
+ * snapshot is written and in the order that decides which sentence an
+ * issue failing several of them is refused with, and that the spec
+ * route asks `gh` nothing at all.
  *
  * Every case plants a `gh` runner and a `git` runner of its own, so
  * nothing spawns and no case reaches GitHub or reads the configuration
@@ -87,6 +88,44 @@
  *    planted board answers no permission for that login.
  *  - `boardRepoLabel`'s fallback dropped, so a checkout with no origin
  *    answers the empty string: 20 pass and 1 fail, the fallback case.
+ *
+ * ## The roadmap's own author
+ *
+ * Check 0 runs on the ROADMAP issue too, through `inspectRoadmapIssue`
+ * and the seam `./spec-source.ts` declares for it, and the three cases
+ * it brings bring this file to 24. Two of them are the pair the trust
+ * cases are always written in — the outsider beside the write-holder
+ * control that writes the snapshot — and the third is the failed
+ * lookup, which plants a board answering 404 to EVERY login and so
+ * asserts the sentence names the roadmap's number rather than the
+ * line's: a refusal naming the line would read the same way and mean
+ * the roadmap was walked before anybody asked.
+ *
+ * Five mutations were driven on 2026-09-21, one at a time, over
+ * `env -u CLAUDECODE bun test src/board/`, each module restored from a
+ * scratch copy and verified with `shasum -c`. The counts below are that
+ * whole run's, 430 pass and 0 fail either side, because two of the five
+ * are mutations of `./spec-source.ts`:
+ *
+ *  - `inspectRoadmap` dropped from the roadmap seams `resolvePlanSpec`
+ *    hands over: 426 pass and 4 fail, the four `--next` cases here that
+ *    read an author. Every case in `./spec-source.test.ts` stays green,
+ *    since each plants a seam of its own — which is the split between
+ *    the two files working as intended.
+ *  - the `inspectRoadmap` CALL dropped from `./spec-source.ts`'s walk:
+ *    424 pass and 6 fail, those four and the two there.
+ *  - the same call moved BELOW the branch scan: 426 pass and 4 fail,
+ *    the two recorded-order cases here and the two there. The refusal
+ *    is unchanged by that move and the snapshot is still absent, so
+ *    only a case that records WHAT WAS ASKED can see it.
+ *  - `memoisePermissions` keyed by a constant rather than by the login,
+ *    so the roadmap's reading answers every body after it: 429 pass and
+ *    1 fail, the case that plants a trusted roadmap above an outsider's
+ *    line. That is the one shape where the memo would let board text
+ *    through, and nothing else here notices.
+ *  - `options.trustedAuthors` replaced with `[]` on the way to
+ *    `ghBoardTrust`, driven again now the roadmap has a case of its
+ *    own: 428 pass and 2 fail, the two allow-list cases.
  */
 import type { SpecIssue } from './issue.js';
 import type { BoardTrust } from './trust.js';
@@ -406,19 +445,21 @@ describe('the spec the roadmap picks', () => {
 
     const resolved = await ask({ kind: 'next', roadmap: null }, board.gh, git.git, { roadmapIssue: ROADMAP });
 
-    // The order is the measured one: the roadmap body, the line it picks,
-    // and the open pull requests last, asked only once a line needs the reading.
+    // The order is the measured one: the roadmap body, check 0 on the
+    // login that opened it, the line it picks, and the open pull
+    // requests last, asked only once a line needs the reading. ONE
+    // lookup answers both bodies here, since one login opened both.
     expect(board.sent()).toEqual([
       `issue view ${String(ROADMAP)} --json ${ISSUE_VIEW_FIELDS}`,
+      permissionCommand('octocat'),
       `issue view 20 --json ${ISSUE_VIEW_FIELDS}`,
       `pr list --state open --json ${PR_LIST_FIELDS} --limit 100`,
-      permissionCommand('octocat'),
     ]);
-    // The label is read ONCE for the walk, however many issues it reads.
+    // The label is read ONCE for the walk, however many issues it checks.
     expect(git.sent()).toEqual([
+      ORIGIN_COMMAND,
       'for-each-ref --format=%(refname) refs/heads refs/remotes',
       'ls-remote --heads origin',
-      ORIGIN_COMMAND,
     ]);
     if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
     expect(resolved.spec).toMatchObject({ kind: 'next', issue: 20, path: snapshotAt(20) });
@@ -436,7 +477,84 @@ describe('the spec the roadmap picks', () => {
 
     expect(refused.exitCode).toBe(TRUST_REFUSAL_EXIT);
     expect(refused.message).toContain('issue #20 was opened by outsider');
+    // TWO lookups, one per login: the memo is keyed by the login, and
+    // one that answered the roadmap's reading to every body after it
+    // would let this line through on the write-holder who opened the
+    // roadmap above it.
+    expect(board.sent().filter((sent) => sent.startsWith('api '))).toEqual([
+      permissionCommand('octocat'),
+      permissionCommand('outsider'),
+    ]);
     expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('refuses a roadmap an outsider opened, before a line of it is walked', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: ROADMAP_BODY, labels: [], author: 'outsider' }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20),
+    ], { octocat: 'admin', outsider: 'read' });
+    const git = plantedGit();
+
+    const refused = await refusal(() => ask({ kind: 'next', roadmap: null }, board.gh, git.git, { roadmapIssue: ROADMAP }));
+
+    expect(refused.exitCode).toBe(TRUST_REFUSAL_EXIT);
+    expect(refused.message)
+      .toBe(`issue #${String(ROADMAP)} was opened by outsider, who has no write access to ${REPO}; a member must open the spec`);
+    // No line of the planted roadmap was read, and neither taken
+    // reading was spent on one.
+    expect(board.sent()).toEqual([
+      `issue view ${String(ROADMAP)} --json ${ISSUE_VIEW_FIELDS}`,
+      permissionCommand('outsider'),
+    ]);
+    expect(git.sent()).toEqual([ORIGIN_COMMAND]);
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+    // The control: the same walk over a roadmap a write-holder opened
+    // reaches the line it names and writes that snapshot.
+    const held = plantedGh([
+      issueOf(ROADMAP, { body: ROADMAP_BODY, labels: [] }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20),
+    ]);
+    await ask({ kind: 'next', roadmap: null }, held.gh, plantedGit().git, { roadmapIssue: ROADMAP });
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(true);
+  });
+
+  it('refuses a roadmap whose author the lookup could not be made for, without walking it', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: ROADMAP_BODY, labels: [], author: 'ghost' }),
+      issueOf(20),
+    ], {});
+
+    const refused = await refusal(() => ask({ kind: 'next', roadmap: null }, board.gh, plantedGit().git, { roadmapIssue: ROADMAP }));
+
+    expect(refused.exitCode).toBe(TRUST_REFUSAL_EXIT);
+    // The ROADMAP is what it names: every lookup this board answers is
+    // a 404, so a refusal naming the line below would read the same
+    // way and mean the roadmap was walked before anyone asked.
+    expect(refused.message).toContain(`issue #${String(ROADMAP)} was opened by ghost`);
+    expect(refused.message).toContain(`whose write access to ${REPO} could not be read`);
+    expect(refused.message).toContain('gh: Not Found (HTTP 404)');
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('spends no lookup on a roadmap board.trustedAuthors names, and none on the line it opened', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: ROADMAP_BODY, labels: [], author: 'rafa-bot' }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20, { author: 'rafa-bot' }),
+    ], {});
+
+    const resolved = await ask(
+      { kind: 'next', roadmap: null },
+      board.gh,
+      plantedGit().git,
+      { roadmapIssue: ROADMAP, trustedAuthors: ['rafa-bot'] },
+    );
+
+    expect(board.sent().filter((sent) => sent.startsWith('api '))).toEqual([]);
+    expect(resolved.outcome).toBe('spec');
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(true);
   });
 
   it('writes nothing under --dry-run, and answers the reason it stopped', async () => {

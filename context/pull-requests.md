@@ -182,23 +182,29 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. THREE routes ask the question. Two are
+someone allowed to change the repo. FOUR routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
-the pull request's author for `pr triage --resolve`. The third is
-`plan create`'s, through `requireTrustedBoardAuthor` — the board entry point
-in `src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list
-and the repo label — called from `src/board/plan-spec.ts`'s
-`inspectSpecIssue` ahead of the label check, the leak refusal and the
-completeness refusal. The login it asks about is `SpecIssue.author`, which
-`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS` fetches. BOTH plan routes reach
-it: the issue `--issue=<n>` names, and the line a `--next` walk picks.
+the pull request's author for `pr triage --resolve`. The other two are
+`plan create`'s, both through `requireTrustedBoardAuthor` — the board entry
+point in `src/board/trust.ts`, over a `BoardTrust` of the lookup, the
+allow-list and the repo label. `src/board/plan-spec.ts`'s
+`inspectSpecIssue` calls it ahead of the label check, the leak refusal and
+the completeness refusal, and its `inspectRoadmapIssue` calls it on the
+ROADMAP issue a `--next` walk reads its order off, before a line is parsed
+out of that body and before either taken reading is spent. The login both
+ask about is `SpecIssue.author`, which `src/board/issue.ts`'s
+`ISSUE_VIEW_FIELDS` fetches.
 
-**One body a `--next` run reads is still unchecked**: the ROADMAP issue's
-own, which is read to pick a line (`src/board/roadmap.ts`) and never passes
-through `inspectSpecIssue`. The `rafa:spec-review` comment reader spends no
-trust reading BY DESIGN, which is a different thing from that gap:
-`src/board/review-comment.ts` holds why, and it is that nothing ever reads
-that comment back into a prompt.
+**Every body a `plan create` run reads is checked**: the issue `--issue=<n>`
+names, the roadmap a `--next` walk reads, and the line that walk picks. The
+roadmap runs check 0 alone — it carries no `spec:ready` label and fills no
+template, and what a planted line in it takes is the ORDER, not a prompt.
+Its refusal is the shared sentence, so it names the roadmap as `issue #<n>`
+and closes with the issue remedy, "a member must open the spec"; a remedy of
+its own would mean a third `BoardItemKind` in `src/board/trust.ts`. The
+`rafa:spec-review` comment reader spends no trust reading BY DESIGN, and
+that is the one call site left: `src/board/review-comment.ts` holds why, and
+it is that nothing ever reads that comment back into a prompt.
 
 The repository a plan refusal names is a LABEL read from `origin` through
 the `git` seam (`boardRepoLabel`), never an input to the lookup: `gh`
@@ -226,8 +232,11 @@ Four checks, cheapest first; any one failing writes no plan file:
 
 0. Trust (section above): the issue's author must hold write access or be
    listed, checked before the body is read any further or snapshotted. It
-   costs one `gh api` per issue read, spent ahead of the free checks, and
-   none at all for a login in `board.trustedAuthors`.
+   costs one `gh api` per LOGIN a run checks, spent ahead of the free
+   checks, and none at all for a login in `board.trustedAuthors`. A
+   `--next` run checks two authors, the roadmap's and the picked line's,
+   and the lookup is memoised for the length of one resolution, so one
+   person who opened both costs one call.
 1. Label (a person's decision): the issue carries `spec:ready`. Without it:
    "issue #<n> is not marked spec:ready", exit 2. `plan create --next` STOPS
    at a next line that is not ready and says so; it never skips ahead.

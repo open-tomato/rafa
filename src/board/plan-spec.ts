@@ -69,10 +69,10 @@
  *
  * It is also the only one that ASKS something: one
  * `gh api repos/{owner}/{repo}/collaborators/<login>/permission` per
- * issue read, spent before the free checks rather than after, so an
- * unlabelled issue now costs a lookup it did not cost before. A login
- * in `board.trustedAuthors` spends none (`./trust.ts`), and `--spec`
- * spends none because it reads no issue.
+ * LOGIN a run checks, spent before the free checks rather than after,
+ * so an unlabelled issue now costs a lookup it did not cost before. A
+ * login in `board.trustedAuthors` spends none (`./trust.ts`), and
+ * `--spec` spends none because it reads no issue.
  *
  * The check needs a login, and the read carries one:
  * `ISSUE_VIEW_FIELDS` asks for `author` and every issue holds it as
@@ -80,13 +80,28 @@
  * reads as the empty login, which is no account and therefore no
  * trust, so it is refused as a failed lookup rather than passed.
  *
- * Both `plan create` routes run it, because both reach an issue body
- * through {@link inspectSpecIssue}: `--issue=<n>` on the issue named,
- * and `--next` on the line the roadmap walk picks. The ROADMAP issue's
- * own body is a third body a `--next` run reads, and it is NOT checked
- * here: the walk reads it to pick a line (`./spec-source.ts`,
- * `./roadmap.ts`) and hands it to no `inspect`. `./trust.ts`'s note
- * holds that gap beside the other one left.
+ * ## The bodies a run reads, and the checks each one gets
+ *
+ * `--issue=<n>` reads ONE body, the issue named, and
+ * {@link inspectSpecIssue} checks it. `--next` reads TWO: the ROADMAP,
+ * whose lines decide the order, and the issue the line it picks names.
+ * Both are checked, through two seams `./spec-source.ts` declares —
+ * `inspect` for the line, {@link inspectRoadmapIssue} for the roadmap
+ * — and neither body is parsed, quoted or snapshotted before its
+ * author has been read.
+ *
+ * The roadmap is checked for what it can TAKE, which is not what a
+ * spec issue can take: nothing of it reaches a prompt and nothing of
+ * it is written down, but a line planted in it points the next session
+ * at an issue of the planter's choosing, ahead of everything the
+ * roadmap's owner put there. So it runs check 0 and only check 0 — it
+ * carries no `spec:ready` label and fills no template heading, and
+ * running the other two over it would refuse every roadmap there is.
+ *
+ * A `--next` run therefore checks two authors, usually the same
+ * person, and spends ONE lookup for a login however many bodies it
+ * wrote: the lookup is memoised for the length of one resolution
+ * ({@link memoisePermissions}).
  *
  * ## The repository a refusal names
  *
@@ -97,12 +112,12 @@
  * {@link boardRepoLabel} and falling back to {@link UNNAMED_REPO}.
  *
  * The label is read when an issue is, not on every run:
- * {@link resolvePlanSpec} builds the trust inside the seam it hands
+ * {@link resolvePlanSpec} builds the trust inside the seams it hands
  * over, so `--spec=<file>` spends no `git remote get-url origin` for a
- * sentence it will never print. One resolution inspects one issue —
- * the `--next` walk reads several and inspects only the line it picks
- * (`./spec-source.ts`) — so that is one label read per run, which
- * `./plan-spec.test.ts` counts on both routes.
+ * sentence it will never print. The trust is built ONCE for a
+ * resolution and shared by both seams, so a `--next` run that checks
+ * the roadmap and then the line it picks still reads the label once,
+ * which `./plan-spec.test.ts` counts on both routes.
  *
  * ## What the completeness refusal costs
  *
@@ -143,7 +158,7 @@
 import type { GateIssue } from './gate.js';
 import type { SpecIssue } from './issue.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
-import type { BoardTrust } from './trust.js';
+import type { BoardTrust, PermissionReading, Permissions } from './trust.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
@@ -215,6 +230,52 @@ export async function inspectSpecIssue(issue: SpecIssue, trust: BoardTrust): Pro
   requireCompleteSpec(source, issue.body);
 }
 
+/**
+ * The one check that runs on the ROADMAP issue as read, before a line
+ * is parsed out of its body: check 0, its author's trust over `trust`.
+ * Throws `CommandExit({@link BOARD_REFUSAL_EXIT}, ...)` when the login
+ * that opened it is trusted with nothing, so a `--next` run over a
+ * planted roadmap walks no line of it.
+ *
+ * It is check 0 ALONE, and the module note holds why: a roadmap is not
+ * a spec, so the label, the leak and the completeness refusals would
+ * refuse every roadmap there is, while the order it carries is exactly
+ * what a planted line would take.
+ *
+ * The refusal is the one {@link requireTrustedBoardAuthor} spells, so
+ * it names the roadmap as `issue #<n>` and ends with the remedy the
+ * issue kind carries, "a member must open the spec" (`./trust.ts`).
+ * The claim about access is the half an operator acts on and it is
+ * exact; the remedy names the spec on a route that refused the
+ * roadmap, and giving the roadmap one of its own means a third
+ * `BoardItemKind`, which is `./trust.ts`'s to add rather than this
+ * module's to spell a second way.
+ */
+export async function inspectRoadmapIssue(issue: SpecIssue, trust: BoardTrust): Promise<void> {
+  await requireTrustedBoardAuthor({ kind: 'issue', number: issue.number }, trust, issue.author);
+}
+
+/**
+ * `permissions` reading each login at most once, for the length of one
+ * resolution: a `--next` run checks two authors, the roadmap's and the
+ * picked line's, and they are usually one person whose access cannot
+ * change between two calls made a moment apart.
+ *
+ * The memo does not outlive the call, so no run is answered from
+ * another run's reading, and it is keyed by the login as the board
+ * spelled it: a reading answers about the login it was handed, and a
+ * refusal names it, so a memo folding `Octocat` into `octocat` would
+ * name an account the issue does not.
+ */
+function memoisePermissions(permissions: Permissions): Permissions {
+  const read = new Map<string, Promise<PermissionReading>>();
+  return (login: string): Promise<PermissionReading> => {
+    const taken = read.get(login) ?? permissions(login);
+    read.set(login, taken);
+    return taken;
+  };
+}
+
 /** What {@link resolvePlanSpec} is asked. */
 export interface PlanSpecOptions {
   /** The source the command line named, as `readSpecSourceFlags` read it. */
@@ -258,10 +319,10 @@ export type PlanSpecResolution =
  *
  * Throws the `CommandExit` of every refusal the routes carry: exit 1 for
  * the words typed (`./spec-source.ts`) and exit
- * {@link BOARD_REFUSAL_EXIT} for the board's own state — an issue whose
- * author is trusted with nothing, a closed or unlabelled issue, a
- * leaking body, an incomplete body, a snapshot that differs with no
- * `--refresh`, a roadmap that cannot be resolved.
+ * {@link BOARD_REFUSAL_EXIT} for the board's own state — an issue or a
+ * roadmap whose author is trusted with nothing, a closed or unlabelled
+ * issue, a leaking body, an incomplete body, a snapshot that differs
+ * with no `--refresh`, a roadmap that cannot be resolved.
  */
 export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpecResolution> {
   const { repoRoot } = options;
@@ -270,12 +331,21 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
   const output = options.output ?? activeOutput();
   // Made when an issue is read and not before: `--spec=<file>` reads
   // none, and the label is a `git remote get-url origin` that route
-  // must not spend. See the module note.
-  const trust = (): BoardTrust => ghBoardTrust({
-    gh,
-    trustedAuthors: options.trustedAuthors,
-    repo: boardRepoLabel(git),
-  });
+  // must not spend. Made ONCE, because a `--next` run checks two
+  // authors and neither the label nor a login's access changes between
+  // them. See the module note.
+  let board: BoardTrust | null = null;
+  const trust = (): BoardTrust => {
+    if (board === null) {
+      const made = ghBoardTrust({
+        gh,
+        trustedAuthors: options.trustedAuthors,
+        repo: boardRepoLabel(git),
+      });
+      board = Object.freeze({ ...made, permissions: memoisePermissions(made.permissions) });
+    }
+    return board;
+  };
 
   const resolution = await resolveSpecSource({
     request: options.request,
@@ -291,6 +361,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
       search: createGhRoadmapSearch({ gh }),
       git,
       pullRequests: createGhOpenPullRequests({ gh }),
+      inspectRoadmap: (issue) => inspectRoadmapIssue(issue, trust()),
     },
     output,
   });

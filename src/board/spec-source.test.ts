@@ -43,6 +43,28 @@
  * refuses the pick is planted, and the case asserts the refusal names
  * the pick and that the line below it was never read.
  *
+ * ## The roadmap's own checks
+ *
+ * `inspectRoadmap` is the second checks seam, run on the roadmap as
+ * read (`spec-source.ts`), and the same two shapes pass for the wrong
+ * reason: a seam called too LATE refuses with the same sentence and
+ * writes nothing either, and one never called at all changes no pick.
+ * So the two cases for it record what was IN HAND at the moment it ran
+ * — the numbers the reader had been asked, and the `git` commands sent
+ * — and the refusing one asserts that no line was read, no branch
+ * scanned, and that the only line printed is the header.
+ *
+ * Two mutations of `spec-source.ts` were driven on 2026-09-21, one at
+ * a time, over `env -u CLAUDECODE bun test src/board/`, the module
+ * restored from a scratch copy and verified with `shasum -c` each
+ * time. 430 pass and 0 fail either side, and the counts are that whole
+ * run's, since `./plan-spec.test.ts` drives the same seam wired:
+ *
+ *  - the `inspectRoadmap` call dropped: 424 pass and 6 fail, these two
+ *    and four there.
+ *  - the call moved BELOW the branch scan: 426 pass and 4 fail, these
+ *    two and two there.
+ *
  * ## Mutations driven
  *
  * Eleven mutations of `spec-source.ts` were driven on 2026-09-19, one
@@ -193,6 +215,18 @@ function plantedGit(local: string, remote: GitResult = { ok: true, stdout: '', s
   return (args) => (args[0] === 'for-each-ref'
     ? { ok: true, stdout: local, stderr: '' }
     : remote);
+}
+
+/** A git runner answering no branch either side, keeping every command it was sent. */
+function countingGit(): { git: GitRunner; sent: () => readonly string[] } {
+  let sent: readonly string[] = [];
+  return {
+    git: (args) => {
+      sent = [...sent, args.join(' ')];
+      return { ok: true, stdout: '', stderr: '' };
+    },
+    sent: () => sent,
+  };
 }
 
 /** A lister answering the planted open pull requests. */
@@ -692,6 +726,62 @@ describe('resolveSpecSource over --next', () => {
     expect(refused.message).toBe('issue #20 is not marked spec:ready');
     expect(issues.asked()).toEqual([ROADMAP, 20]);
     expect(exists(snapshotAt(33))).toBe(false);
+  });
+
+  it('hands the roadmap as read to its own checks, before a line is walked or a branch scanned', async () => {
+    const issues = plantedIssues(boardIssues());
+    const git = countingGit();
+    let checked: number | null = null;
+    let askedWhenChecked: readonly number[] = [];
+    let sentWhenChecked: readonly string[] = [];
+
+    const resolution = await nextRun({
+      issues,
+      seams: {
+        git: git.git,
+        inspectRoadmap: (issue) => {
+          checked = issue.number;
+          askedWhenChecked = issues.asked();
+          sentWhenChecked = git.sent();
+          return Promise.resolve();
+        },
+      },
+    });
+
+    // What was in hand when the check ran: the roadmap, read once, and
+    // nothing else — no line of its body, and neither branch read.
+    expect(checked).toBe(ROADMAP);
+    expect(askedWhenChecked).toEqual([ROADMAP]);
+    expect(sentWhenChecked).toEqual([]);
+    expect(specOf(resolution).issue).toBe(20);
+  });
+
+  it('stops a run whose roadmap the checks refuse, reading no line of it and printing none', async () => {
+    const { lines, output } = capture();
+    const issues = plantedIssues(boardIssues());
+    const git = countingGit();
+
+    const refused = await refusal(() => nextRun({
+      issues,
+      output,
+      seams: {
+        git: git.git,
+        inspectRoadmap: (issue) => Promise.reject(new CommandExit(
+          ISSUE_REFUSAL_EXIT,
+          `issue #${String(issue.number)} was opened by an outsider`,
+        )),
+      },
+    }));
+
+    expect(refused.message).toBe(`issue #${String(ROADMAP)} was opened by an outsider`);
+    expect(issues.asked()).toEqual([ROADMAP]);
+    expect(git.sent()).toEqual([]);
+    expect(lines.info).toEqual([roadmapHeaderLine(ROADMAP)]);
+    expect(exists(snapshotAt(20))).toBe(false);
+    // The control: the same run, with the roadmap checks passing, walks
+    // to the pick and writes its snapshot.
+    await nextRun({ seams: { git: git.git } });
+    expect(exists(snapshotAt(20))).toBe(true);
   });
 
   it('reads the roadmap --next names over the one config configured', async () => {

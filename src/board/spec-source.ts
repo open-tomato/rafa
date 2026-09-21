@@ -66,6 +66,27 @@
  * nothing here catches it to try the line below. Skipping ahead would
  * reorder the roadmap with nobody saying so.
  *
+ * ## The roadmap's own body, and why it has a seam of its own
+ *
+ * `inspect` runs on the line the walk PICKS. The roadmap is a second
+ * body the `--next` route reads, and it is board text as much as the
+ * spec is: what its lines decide is the ORDER, so whoever can write it
+ * can point the next session at an issue of their choosing.
+ *
+ * It goes through {@link RoadmapSeams.inspectRoadmap} rather than
+ * through `inspect`, because the two bodies are asked different
+ * questions. The roadmap carries no `spec:ready` label, fills no spec
+ * template and is never snapshotted, so the checks `inspect` composes
+ * would refuse every roadmap there is; what is left to ask about it is
+ * its AUTHOR, and that is the caller's to compose too
+ * (`./plan-spec.ts`).
+ *
+ * It is called on the issue as READ and before a line is parsed out of
+ * it, which is also before the branch scan and the pull request list
+ * are spent: a roadmap whose author the caller refuses costs the read
+ * that found the author and nothing else, and no line of it reaches
+ * the walk, the output or a snapshot.
+ *
  * ## One read per issue
  *
  * The `--next` walk asks `isClosed` about every line it passes and
@@ -290,6 +311,8 @@ export interface RoadmapSeams {
   readonly remote?: string;
   /** Lists the open pull requests the other taken reading is read from. */
   readonly pullRequests: OpenPullRequestLister;
+  /** The checks that run on the roadmap issue as read, before a line is parsed out of it. */
+  readonly inspectRoadmap?: (issue: SpecIssue) => Promise<void>;
 }
 
 /** What {@link resolveSpecSource} is asked. */
@@ -404,6 +427,11 @@ async function pickRoadmapIssue(
   });
   output.info(roadmapHeaderLine(roadmap));
 
+  // The roadmap as read, checked before a line is parsed out of it and
+  // before either taken reading is spent. See the module note.
+  const read = await issues(roadmap);
+  await seams.inspectRoadmap?.(read);
+
   const branches = scanClaimBranches(seams.git, seams.remote);
   branches.problems.forEach((problem) => output.warn(problem));
 
@@ -412,7 +440,7 @@ async function pickRoadmapIssue(
     branches,
     pullRequests: seams.pullRequests,
   });
-  const pick = await pickNextRoadmapLine(parseRoadmapBody((await issues(roadmap)).body), readings);
+  const pick = await pickNextRoadmapLine(parseRoadmapBody(read.body), readings);
   pick.skipped.forEach((skip) => output.info(skipLine(skip)));
 
   if (pick.line === null) {

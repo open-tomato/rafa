@@ -296,7 +296,10 @@ module's note is the long form.
   `gh api repos/{owner}/{repo}/collaborators/<login>/permission` on the
   issue's `author`, or none at all for a login in
   `board.trustedAuthors`. A failed lookup is a refusal, and the
-  repository a refusal names is read from `origin` through `git`.
+  repository a refusal names is read from `origin` through `git`. Check
+  0 runs on the ROADMAP issue too, through `inspectRoadmapIssue` and
+  before a line is parsed out of its body, so a `--next` run checks two
+  authors and spends one lookup per login.
 - **The spec issue template is `src/board/templates/spec.md`**, a
   package asset the build copies to `dist/templates/` and `rafa init
   --board` writes to `.github/ISSUE_TEMPLATE/spec.md`. Its front matter

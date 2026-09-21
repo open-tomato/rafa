@@ -83,9 +83,9 @@
  * rejection's message. An unusable config, a line naming no spec source
  * or several, a spec that does not exist and a plan already there each
  * throw exit code 1 with the whole refusal as the message; a board
- * refusal — an issue whose author is trusted with nothing, a closed or
- * unlabelled issue, a leaking body, a snapshot that differs with no
- * `--refresh` — throws exit code 2, and a spec the
+ * refusal — an issue or a roadmap whose author is trusted with nothing,
+ * a closed or unlabelled issue, a leaking body, a snapshot that differs
+ * with no `--refresh` — throws exit code 2, and a spec the
  * planner judged not ready throws exit code 3 with every gap in it. Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
