@@ -173,21 +173,21 @@ module's note is the long form.
   writes no table line. `plan create`, `effort collect` and
   `usage` write each line as a `log` event of its level and give no
   result.
-- **The plan readers start no session, and read the wrong directory.**
-  `plan list` and `plan show` join a hardcoded `.plans` — `PLANS_DIR` in
-  `src/commands/plan/plan-files.ts` — onto the git root. `plan create`
-  writes and `loop start` find their plan in `plan.dir` under the project
-  root, `.rafa/plans` unless a config names another, and `effort collect`
-  attributes sessions by the plan stubs there, so the readers read where
-  those write only while `plan.dir` is `.plans` and the project root is
-  the git toplevel. This repository stopped being that at rafa-49:
-  `rafa plan list` here exits 0 reporting no plans in the directory it
-  still names, over the eight plans sitting under `.rafa/plans`. That is
-  outstanding debt, and the fix wires both commands onto the resolved
-  `plan.dir` the dispatcher already computes. The sweep guard in
-  `src/tests/default-plan-dirs.test.ts` does not catch it: its forbidden
-  tokens carry a trailing slash, and `PLANS_DIR` spells the directory
-  without one.
+- **The plan readers start no session, and read the configured
+  directory.** `plan list` and `plan show` read the directory
+  `resolvePlansDir` (`src/commands/plan/plan-files.ts`) answers:
+  `plan.dir` of the config that resolves for the project, resolved
+  against the project root the dispatcher found, `.rafa/plans` unless a
+  config names another. That is where `plan create` writes and where
+  `loop start` looks for its default plan, and the directory whose plan
+  stubs `effort collect` attributes sessions by, so the readers and the
+  writers are on one directory whatever `plan.dir` is set to. A config
+  `loadConfig` refuses is refused with exit code 1, and a line handing
+  the wrong number of arguments is refused before the config is read.
+  The sweep guard in `src/tests/default-plan-dirs.test.ts` still spells
+  its forbidden tokens with a trailing slash, so the slashless spelling
+  of either swept directory passes it in a tracked file; widening those
+  tokens is a separate change.
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
