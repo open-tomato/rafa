@@ -47,7 +47,8 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, and the two install warnings |
+| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, and the two install warnings |
+| `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
@@ -419,15 +420,30 @@ module's note is the long form.
   the board this run did not find.` The provider is the one reading the
   automatic items resolved, so `pr.provider: none` opens no runner and
   prints no row; nothing on the board is written, a row never changes
-  the exit code, and a halt prints its rows before the refusal. After
+  the exit code, and a halt prints its rows before the refusal. Through
+  that same runner it then reads the blocked issues
+  (`src/commands/doctor-blocked.ts`): one
+  `gh issue list --state open --label spec:blocked --limit 100 --json number,body`,
+  and, only when a `Blocked by:` line actually named ids, one
+  `gh issue list --state all --limit 500 --json number` for the board's
+  own numbers. Under `Blocked issues:` it names every labelled issue
+  whose line is missing, names no issue, names itself, or names an id
+  the board has no issue for, each with what an author does about it
+  (`src/board/blocked.ts`); a board whose lines all read is one line
+  counting them, and a board carrying no such issue prints nothing at
+  all. An id is called unknown only when the whole board was read: a
+  numbers listing that failed or came back full leaves every id
+  unchecked and says so in a line of its own. That reading writes
+  nothing and never changes the exit code either. After
   the report, whatever the preflight did,
   it warns when `.ralph/effort/` holds a store file and `.rafa/effort/`
   none (`src/effort/store/legacy.ts`), and when `~/.rafa/bin` is not
   ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text
   mode says so in an `info` line when the order holds. In json mode a
   preflight that did not halt gives the checks, the `known-missing:`
-  lines, the reminders, both readings and those rows as the result's
-  `data`, the rows null for a project with no GitHub board, and a
+  lines, the reminders, both readings, those rows and those blocked
+  issues as the result's `data`, the rows and the issues null for a
+  project with no GitHub board, and a
   halt gives the `command_exit` error and no `data`.
 - **`self-update` installs the checkout it runs in**
   (`src/commands/self-update.ts`), as `bun run snapshot` does: both call
