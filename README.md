@@ -80,6 +80,8 @@ the next one, so you rarely have to remember it.
    design, what can go wrong, the tasks the plan must carry, and how you
    will know it is done. Either a file, `.rafa/specs/my-feature.md`, or
    an issue opened from the "Spec" template and labelled `spec:ready`.
+   [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md) has the
+   template and a prompt for drafting one.
 
 3. **Turn the spec into a plan.** One Claude Code session reads the spec
    and the repository and writes a checklist the loop can parse:
@@ -156,6 +158,40 @@ it.
 Every command has help at three levels (`rafa --help`,
 `rafa loop --help`, `rafa loop start --help`), and
 `rafa describe --output=json` is the same roster for a tool or an agent.
+
+## Specs, issues and the roadmap
+
+You can plan from a local file and never touch a board. When you want
+the queue, the specs and their history in one shared place, rafa works
+from GitHub Issues:
+
+- **A spec is an issue**, opened from a template with six headings (what
+  you get, starting position, design, what can go wrong, tasks,
+  definition of done). `rafa init --board` sets up the template, the
+  labels and a pinned "Roadmap" issue.
+- **The roadmap is one ordered task list** in that pinned issue.
+  `rafa plan create --next` takes the first line that is neither done
+  nor already being worked on, and stops rather than skipping ahead when
+  that issue is not ready. `rafa plan create --issue=<n>` plans from one
+  issue directly.
+- **A few labels carry the state**: `type:spec`, `spec:ready` (a person
+  says a plan may be made from it), `spec:needs-work` (details pending,
+  or the planner's review found gaps and listed them), and `type:bug`
+  with `needs-triage` for what a run files on its own.
+- **Safety, in short.** An issue's text ends up in an agent's prompt, so
+  rafa plans only from an issue whose author can write to the
+  repository, that a maintainer has labelled `spec:ready`, that is
+  complete, and that holds no local path or token. Comments are never
+  read into a plan, rafa never applies `spec:ready` by itself, and
+  machine-specific failures a run meets stay off your public tracker.
+- **Other trackers.** GitHub Issues is what works today. Linear support
+  is being ported from the project rafa grew out of, as an optional
+  add-on in a later version. For anything else, open or upvote a request
+  in [the issues](https://github.com/open-tomato/rafa/issues).
+
+The full guide, with the spec template explained, a prompt for drafting
+a spec and every gate in order, is
+[docs/specs-and-roadmap.md](docs/specs-and-roadmap.md).
 
 ## From a checkout
 
