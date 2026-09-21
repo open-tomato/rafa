@@ -14,7 +14,12 @@
  *
  * The dispatched cases drive the real command through the dispatcher,
  * over a planted project, a git runner answering by argv, the pull
- * request double and a scripted prompter. What only they can see is the
+ * request double and a scripted prompter. Every one of them names
+ * `isTerminal` rather than leaving it to the system's own, because
+ * without a terminal and without `--yes` the command behaves as
+ * `--dry-run`: left out, the suite would read `process.stdin.isTTY`,
+ * and the same case would act under a terminal and run nothing through
+ * a pipe. What only they can see is the
  * WIRING: that the line is read before anything else, that the fast
  * forward of `sync` really is spawned through the git seam, that the
  * report is the data of the one result event in json mode, and that an
@@ -37,6 +42,16 @@
  *    does run.
  *  - The dispatched `sync` is read as the argv git was handed beside the
  *    same state under `--dry-run`, which must hand it nothing.
+ *  - The no-terminal run, which must hand git nothing, is read beside
+ *    the same seams with `--yes=sync`, which must fast-forward: without
+ *    that control a command that ran nothing at all would pass the
+ *    first.
+ *
+ * The `--resolve` case is dispatched rather than driven, and the `pr
+ * triage` it runs carries the REAL command's declarations with its
+ * `run` alone replaced. That is what makes "no `--resolve`" a reading
+ * of the flags the parser filled rather than of a word list:
+ * `src/next/actions.test.ts` already holds the words themselves.
  *
  * ## What passes while wrong
  *
@@ -79,13 +94,31 @@
  * an ending with NO data at all, because the report the chain then gave
  * was the second result the dispatcher refuses.
  *
+ * Three more were driven the same way on 2026-09-22, against the 197
+ * pass and 0 fail the scope answers with the no-terminal cases in it:
+ *
+ *  - the `no-terminal` branch dropped from {@link dryRunOf}, so a run
+ *    with no terminal asks anyway: 195 pass and 2 fail, the reading
+ *    case and the dispatched no-terminal case. The chain case passes
+ *    either way, because it is handed the reason rather than reading
+ *    it, which is why the dispatched case is here beside it.
+ *  - the ceiling ignored in {@link dryRunOf}, so `--yes` with no
+ *    terminal runs nothing: 194 pass and 3 fail, the reading case, the
+ *    `--yes=sync` control and the `--resolve` case, both of which run
+ *    under `--yes` with no terminal.
+ *  - `--resolve` added to the words `triage` runs with in
+ *    `src/next/actions.ts`: 194 pass and 3 fail, the dispatched
+ *    `--resolve` case here and the table and `--resolve` cases of
+ *    `src/next/actions.test.ts`.
+ *
  * Those totals are what the scope answered on the day each mutation was
- * driven. It answers 192 pass and 0 fail now: the `--yes` reading moved
- * to `src/next/ceiling.ts` and took its cases with it, and the exit-2
- * refusals it makes are dispatched here.
+ * driven. It answers 197 pass and 0 fail now: the `--yes` reading moved
+ * to `src/next/ceiling.ts` and took its cases with it, the exit-2
+ * refusals it makes are dispatched here, and the no-terminal run is
+ * read as a chain case, a reading case and two dispatched ones.
  */
-import type { NextChainOptions, NextChainReport } from './next.js';
-import type { RafaCommand } from '../cli/command.js';
+import type { NextChainOptions, NextChainReport, NextDryRun } from './next.js';
+import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
@@ -98,7 +131,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
-import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
+import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -107,6 +140,7 @@ import {
   actionOutput,
   createNextCommand,
   DRY_RUN_FLAG,
+  dryRunOf,
   MAX_ACTIONS,
   NEXT_USAGE,
   nextQuestion,
@@ -115,6 +149,7 @@ import {
   runNextChain,
   stateLine,
 } from './next.js';
+import prTriage from './pr/triage.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-command-')));
@@ -229,7 +264,8 @@ interface Script {
   readonly answer?: boolean;
   /** The ids that may run unasked. */
   readonly ceiling?: NextCeiling;
-  readonly dryRun?: boolean;
+  /** Why the run prints the two lines and stops, or null for one that acts. */
+  readonly dryRun?: NextDryRun | null;
 }
 
 /** Runs the chain over `script`, recording everything it did. */
@@ -256,7 +292,7 @@ async function drive(script: Script): Promise<Driven> {
       return Promise.resolve(script.answer ?? true);
     },
     ceiling: script.ceiling ?? null,
-    dryRun: script.dryRun ?? false,
+    dryRun: script.dryRun ?? null,
     info: (line: string) => lines.push(line),
     warn: (line: string) => warnings.push(line),
   };
@@ -342,7 +378,7 @@ describe('the chain', () => {
           return Promise.resolve(true);
         },
         ceiling: null,
-        dryRun: false,
+        dryRun: null,
         info: () => undefined,
         warn: () => undefined,
       });
@@ -377,12 +413,22 @@ describe('the chain', () => {
   });
 
   it('prints the two lines and stops under --dry-run, asking nothing and running nothing', async () => {
-    const driven = await drive({ states: [STATES.green, STATES.nothing], dryRun: true });
+    const driven = await drive({ states: [STATES.green, STATES.nothing], dryRun: 'flag' });
 
     expect([driven.asked, driven.ran, driven.reads]).toEqual([[], [], 1]);
     expect(driven.report.stop).toBe('dry-run');
     expect(driven.lines.at(-1)).toBe(`⏹ --${DRY_RUN_FLAG}: nothing ran.`);
     expect(driven.report.steps.map((step) => [step.state, step.command])).toEqual([['pr-green', `pr merge ${PR} --${YES_FLAG}`]]);
+  });
+
+  it('stops the same way with no terminal, saying so rather than naming a flag nobody typed', async () => {
+    const driven = await drive({ states: [STATES.green, STATES.nothing], dryRun: 'no-terminal' });
+
+    expect([driven.asked, driven.ran, driven.reads]).toEqual([[], [], 1]);
+    expect(driven.report.stop).toBe('dry-run');
+    expect(driven.lines.at(-2)).toBe(`\u{1F449} merge #${PR} into \`${BASE}\` — rafa pr merge ${PR} --${YES_FLAG}`);
+    expect(driven.lines.at(-1)).toBe('⏹ There is no terminal to answer on, so nothing ran; run rafa next where'
+      + ` you can answer, or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`);
   });
 
   it('runs an action the ceiling names with no question put', async () => {
@@ -453,6 +499,19 @@ describe('the chain', () => {
 });
 
 describe('the line', () => {
+  it('reads a run with no terminal and no --yes as a dry run, and one with either as a run that acts', () => {
+    const read = [
+      dryRunOf(false, null, true),
+      dryRunOf(false, null, false),
+      dryRunOf(false, ['sync'], false),
+      dryRunOf(false, [], false),
+      dryRunOf(true, null, true),
+      dryRunOf(true, ['sync'], false),
+    ];
+
+    expect(read).toEqual([null, 'no-terminal', null, null, 'flag', 'flag']);
+  });
+
   it('reads --dry-run bare, negated, written out and left out', () => {
     const read = [{}, { [DRY_RUN_FLAG]: true }, { [DRY_RUN_FLAG]: false }, { [DRY_RUN_FLAG]: 'true' }, { [DRY_RUN_FLAG]: 'false' }]
       .map((flags) => readDryRun(flags));
@@ -585,6 +644,28 @@ const DETAIL: PullRequestDetail = Object.freeze({
   labels: [],
 });
 
+/** What one call of the `pr triage` double was handed. */
+interface TriageCall {
+  readonly args: readonly string[];
+  readonly flags: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * A `pr triage` carrying the REAL command's declarations, its `run`
+ * alone replaced by a recorder. The declarations are what make the
+ * `--resolve` reading worth anything: the flag is read against the spec
+ * that declares it, so a line passing it would show up as `true` here.
+ */
+function recordingTriage(seen: TriageCall[]): RafaCommand {
+  return Object.freeze({
+    ...prTriage,
+    run: (context: RafaContext) => {
+      seen.push({ args: context.args.map((word) => String(word)), flags: { ...context.flags } });
+      return Promise.resolve();
+    },
+  });
+}
+
 /** A `pr wait` that gives a result of its own, as the real one does in json mode. */
 function recordingWait(ran: string[]): RafaCommand {
   return {
@@ -610,6 +691,7 @@ describe('the command, dispatched', () => {
     const git = fakeGit(2);
     const asked: string[] = [];
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => 'git@github.com:open-tomato/rafa.git',
       openGit: () => git.git,
       openGh: () => emptyRoadmapGh(),
@@ -634,6 +716,7 @@ describe('the command, dispatched', () => {
     const git = fakeGit(2);
     const asked: string[] = [];
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => 'git@github.com:open-tomato/rafa.git',
       openGit: () => git.git,
       openGh: () => emptyRoadmapGh(),
@@ -652,6 +735,7 @@ describe('the command, dispatched', () => {
   it('opens no prompter and spawns no merge under --dry-run', async () => {
     const git = fakeGit(2);
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => 'git@github.com:open-tomato/rafa.git',
       openGit: () => git.git,
       openGh: () => emptyRoadmapGh(),
@@ -673,9 +757,86 @@ describe('the command, dispatched', () => {
     expect(run.exitCode).toBe(0);
   });
 
+  it('prints the two lines and stops with no terminal and no --yes, opening no prompter and merging nothing', async () => {
+    const git = fakeGit(2);
+    const command = createNextCommand({
+      isTerminal: () => false,
+      readRemote: () => 'git@github.com:open-tomato/rafa.git',
+      openGit: () => git.git,
+      openGh: () => emptyRoadmapGh(),
+      pullRequests: () => createPullRequestsDouble({ findOpen: () => Promise.resolve(null) }).pulls,
+      openPrompter: () => {
+        throw new Error('a run with no terminal opened a prompter');
+      },
+    });
+
+    const run = await dispatchInProject(['next'], [], [command], plantProject());
+
+    expect(git.calls().filter((line) => line.startsWith('merge'))).toEqual([]);
+    expect(run.stdout).toBe([
+      `\u{1F4CD} \`${BASE}\` is 2 commits behind \`origin/${BASE}\`.`,
+      `\u{1F449} fast-forward \`${BASE}\` to \`origin/${BASE}\``,
+      '⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
+        + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`,
+      '',
+    ].join('\n'));
+    expect(run.exitCode).toBe(0);
+  });
+
+  it('runs the step a --yes allows with no terminal at all, which is the control beside it', async () => {
+    const git = fakeGit(2);
+    const command = createNextCommand({
+      isTerminal: () => false,
+      readRemote: () => 'git@github.com:open-tomato/rafa.git',
+      openGit: () => git.git,
+      openGh: () => emptyRoadmapGh(),
+      pullRequests: () => createPullRequestsDouble({ findOpen: () => Promise.resolve(null) }).pulls,
+      openPrompter: () => {
+        throw new Error('a chain under --yes opened a prompter');
+      },
+    });
+
+    const run = await dispatchInProject(['next', `--${YES_FLAG}=sync`], [], [command], plantProject());
+
+    expect(git.calls()).toContain(`merge --ff-only origin/${BASE}`);
+    expect(run.stdout).not.toContain('no terminal to answer on');
+    expect(run.exitCode).toBe(0);
+  });
+
+  it('hands pr triage the number alone where --yes runs it unasked, so no --resolve is spent', async () => {
+    const seen: { readonly args: readonly string[]; readonly flags: Record<string, unknown> }[] = [];
+    const git = fakeGit(0, PLAN_BRANCH);
+    const command = createNextCommand({
+      isTerminal: () => false,
+      readRemote: () => 'git@github.com:open-tomato/rafa.git',
+      openGit: () => git.git,
+      openGh: () => emptyRoadmapGh(),
+      pullRequests: () => createPullRequestsDouble({
+        findOpen: () => Promise.resolve(SUMMARY),
+        get: () => Promise.resolve(DETAIL),
+        checks: () => Promise.resolve({ rows: [], verdict: 'red' }),
+      }).pulls,
+      openPrompter: () => {
+        throw new Error('a chain under --yes opened a prompter');
+      },
+    });
+
+    const run = await dispatchInProject(
+      ['next', `--${YES_FLAG}=triage`],
+      [{ name: 'pr', summary: 'pull requests' }],
+      [command, recordingTriage(seen)],
+      plantProject(),
+    );
+
+    expect(seen.map((call) => call.args)).toEqual([[String(PR)]]);
+    expect(seen[0]?.flags.resolve).toBeUndefined();
+    expect(run.exitCode).toBe(0);
+  });
+
   it('refuses a line handing it a word, reading no config and spawning nothing', async () => {
     const git = fakeGit(0);
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => {
         throw new Error('the refused line resolved a provider');
       },
@@ -695,6 +856,7 @@ describe('the command, dispatched', () => {
   it('ends with exit 2 for a --yes naming ready and for one naming no id, reading nothing either time', async () => {
     const git = fakeGit(0);
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => {
         throw new Error('a refused --yes resolved a provider');
       },
@@ -718,6 +880,7 @@ describe('the command, dispatched', () => {
   it('gives the steps and why it stopped as the data of the one result event in json mode', async () => {
     const git = fakeGit(0);
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => 'git@github.com:open-tomato/rafa.git',
       openGit: () => git.git,
       openGh: () => emptyRoadmapGh(),
@@ -742,6 +905,7 @@ describe('the command, dispatched', () => {
     const ran: string[] = [];
     const git = fakeGit(0, PLAN_BRANCH);
     const command = createNextCommand({
+      isTerminal: () => true,
       readRemote: () => 'git@github.com:open-tomato/rafa.git',
       openGit: () => git.git,
       openGh: () => emptyRoadmapGh(),
