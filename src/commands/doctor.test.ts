@@ -312,7 +312,7 @@ function bareBoardLines(): string[] {
     `  missing  ${SPEC_TEMPLATE_PATH}: the repository carries no spec issue template`,
     `  missing  ${ROADMAP_ROW_NAME}: no open issue is titled ${ROADMAP_TITLE}`,
     `  missing  ${ROADMAP_SETTING}: the project config names no roadmap issue`,
-    `Run ${BOARD_FIX} to set up 9 parts of the board this run did not find.`,
+    `Run ${BOARD_FIX} to set up 10 parts of the board this run did not find.`,
   ];
 }
 
@@ -996,9 +996,9 @@ describe('the board rows', () => {
     const control = await doctor(ready, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => setUp.run) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-12)).toEqual([...bareBoardLines(), aheadLine(bare)]);
+    expect(lines(run.stdout).slice(-13)).toEqual([...bareBoardLines(), aheadLine(bare)]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-11)).toEqual([
+    expect(lines(control.stdout).slice(-12)).toEqual([
       BOARD_HEADING,
       ...BOARD_LABELS.map((label) => `  present  label ${label.name}`),
       `  present  ${SPEC_TEMPLATE_PATH}`,
@@ -1075,7 +1075,7 @@ describe('the board rows', () => {
     const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [MISSING_TOOL_PROBE]: failed }) });
 
     expect(run.exitCode).toBe(1);
-    expect(lines(run.stdout).slice(-12)).toEqual([...bareBoardLines(), aheadLine(world)]);
+    expect(lines(run.stdout).slice(-13)).toEqual([...bareBoardLines(), aheadLine(world)]);
     expect(run.stderr).toContain('rafa loop start would halt here, before any session.');
   });
 });

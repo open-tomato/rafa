@@ -60,7 +60,7 @@
  * ## The board rows
  *
  * A repository that resolves to `pr.provider: gh` also gets one row per
- * part of the GitHub board `rafa init --board` makes — the six labels,
+ * part of the GitHub board `rafa init --board` makes — the seven labels,
  * the spec issue template, the Roadmap issue and `roadmap.issue` — each
  * read through {@link readBoardStatus} (`board/status.ts`) as present,
  * missing or, for a reading that failed, unknown. A run with any row
@@ -669,7 +669,7 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
       + ' not on PATH ahead of `~/.bun/bin`; a warning never changes the exit code. On a repository whose'
       + ' provider is `gh` it also reads the GitHub board `rafa init --board` sets up and prints one row per'
-      + ' part — the six labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
+      + ' part — the seven labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
       + ' missing, or unknown for a reading that failed, naming `rafa init --board` as the fix; it writes'
       + ' nothing to the board and a row never changes the exit code. With `--output=json` the'
       + ' checks, both readings and those rows are the data of the terminal result event, unless a required'
