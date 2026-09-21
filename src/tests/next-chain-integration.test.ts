@@ -1,8 +1,11 @@
 /**
  * A scratch-repository suite driving `rafa next` end to end, over a real
- * git repository with a bare remote standing in for GitHub: from a green
- * open pull request, through its merge, the next plan and a started
- * loop, in one chain.
+ * git repository with a bare remote standing in for GitHub: from the
+ * same green open pull request, every case here runs one `rafa next`
+ * invocation of its own — the full chain to a started loop, a `--yes`
+ * ceiling that stops short of it at each of the three costly steps, the
+ * `ready` list refused before anything is read, and `--dry-run` at each
+ * stage the chain passes through.
  *
  * `src/commands/next.test.ts` drives the chain's own logic over scripted
  * states and fakes, and `src/commands/pr/merge-driven.test.ts` drives
@@ -57,9 +60,13 @@
  * `pr merge` and `plan create` are the real registered commands, run
  * exactly as `rafa next`'s own action table would call them
  * (`src/next/actions.ts`); only their seams and, for `plan create`, the
- * planner adapter are replaced. A `--yes=merge,plan,start` ceiling lets
- * the chain run all three unasked, so the one thing left to answer is
- * the order the doubles recorded them in.
+ * planner adapter are replaced. The probe reads the words `rafa next`
+ * runs with off its OWN `argv`, past the record path, rather than
+ * hard-coding one ceiling: every case below is the same probe, spawned
+ * with different words after `next`, so a `--yes` ceiling naming enough
+ * of `merge`, `sync`, `plan` and `start` lets the chain run that far
+ * unasked, and the one thing left to answer is the order the doubles
+ * recorded them in and where the chain stopped.
  */
 import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 
@@ -74,6 +81,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { SPEC_LABEL } from '../board/issue.js';
 import { planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
+import { DRY_RUN_FLAG } from '../commands/next.js';
+import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { completeSpecBody } from './spec-bodies.js';
@@ -247,9 +256,10 @@ function writeStandInClaude(bin: string): void {
 /**
  * The probe: one program that composes `rafa next`, a real `pr merge`
  * and `plan create`, and a `loop start` double, over the doubles the
- * module note describes, and runs `rafa next --yes=merge,plan,start`
- * once. Every ending — a clean run or a throw — writes the shared
- * `events` log to `recordPath`, its first command-line argument.
+ * module note describes, and runs `rafa next` once with the words
+ * {@link runProbe} hands it, its own `argv` past the record path. Every
+ * ending — a clean run or a throw — writes the shared `events` log to
+ * `recordPath`, its first command-line argument.
  */
 function buildProbe(): string {
   return [
@@ -268,7 +278,7 @@ function buildProbe(): string {
     `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
     `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, 'utils', 'plan-stamp.ts'))};`,
     '',
-    'const [recordPath] = process.argv.slice(2);',
+    'const [recordPath, ...nextArgv] = process.argv.slice(2);',
     'const events = [];',
     '',
     `const BASE = ${JSON.stringify(BASE)};`,
@@ -320,7 +330,7 @@ function buildProbe(): string {
     '  openGit: wrapGit,',
     '  pullRequests: () => prDouble.pulls,',
     '  openPrompter: () => {',
-    '    throw new Error("rafa next should run unasked under --yes=merge,plan,start");',
+    '    throw new Error("rafa next opened a prompter: every case this suite drives either runs unasked or stops before asking");',
     '  },',
     '});',
     '',
@@ -378,7 +388,7 @@ function buildProbe(): string {
     '',
     'let outcome = { ok: false };',
     'try {',
-    '  const result = await dispatch(["next", "--yes=merge,plan,start"], { registry: commands });',
+    '  const result = await dispatch(["next", ...nextArgv], { registry: commands });',
     '  outcome = { ok: result.exitCode === 0, exitCode: result.exitCode, result: result.result };',
     '} catch (error) {',
     '  outcome = { ok: false, error: String((error && error.message) || error) };',
@@ -464,22 +474,66 @@ function positionsOf(haystack: readonly string[], needles: readonly string[]): r
   return needles.map((needle) => haystack.indexOf(needle));
 }
 
+/** One spawn of the probe: the shared event log and how the chain ended, plus what it printed. */
+interface ProbeRun {
+  readonly record: ProbeRecord;
+  /** What a person reading a terminal would see: the state, proposal and stop lines this invocation wrote. */
+  readonly stdout: string;
+  /** The one line a refusal writes, for the cases that never reach the chain at all. */
+  readonly stderr: string;
+}
+
+/**
+ * Spawns the probe over `scratch` with `words` — everything `rafa next`
+ * reads past its own name, `--yes=merge,plan` or `--dry-run` among them
+ * — and reads back its record and console text. `name` tells two runs
+ * against the same scratch apart, since each writes its own record file
+ * rather than one call's overwriting the other's before it is read.
+ */
+function runProbe(scratch: Scratch, words: readonly string[], name = 'record.json'): ProbeRun {
+  const recordPath = join(scratch.root, name);
+  const proc = Bun.spawnSync([process.execPath, scratch.probe, recordPath, ...words], {
+    cwd: scratch.work,
+    env: { PATH: scratch.path, HOME: scratch.home, GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
+  });
+  const stdout = proc.stdout.toString();
+  const stderr = proc.stderr.toString();
+  if (proc.exitCode !== 0 || !existsSync(recordPath)) {
+    throw new Error(`the probe exited ${String(proc.exitCode)}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
+  }
+  const record = JSON.parse(readFileSync(recordPath, 'utf8')) as ProbeRecord;
+  return { record, stdout, stderr };
+}
+
+/** What a run that changes nothing must leave exactly as it found it. */
+interface RepoSnapshot {
+  /** The branch, or detached commit, the work tree sits on. */
+  readonly head: string;
+  /** Whether {@link OLD_BRANCH} still exists in the work tree. */
+  readonly oldBranchLocal: boolean;
+  /** Whether {@link OLD_BRANCH} still exists on the bare remote. */
+  readonly oldBranchRemote: boolean;
+  /** Whether {@link NEW_BRANCH} has been cut in the work tree. */
+  readonly newBranchLocal: boolean;
+  /** Whether the plan {@link NEW_STUB} names has been written. */
+  readonly planExists: boolean;
+}
+
+/** Reads off real git and the filesystem what {@link RepoSnapshot} names, never off a probe's own log. */
+function snapshotOf(scratch: Scratch): RepoSnapshot {
+  return {
+    head: git(scratch.work, scratch.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout,
+    oldBranchLocal: git(scratch.work, scratch.home, 'branch', '--list', OLD_BRANCH).stdout !== '',
+    oldBranchRemote: git(join(scratch.root, 'origin.git'), scratch.home, 'show-ref', '--verify', `refs/heads/${OLD_BRANCH}`).ok,
+    newBranchLocal: git(scratch.work, scratch.home, 'branch', '--list', NEW_BRANCH).stdout !== '',
+    planExists: existsSync(join(scratch.work, '.rafa', 'plans', `PLAN-${NEW_STUB}.md`)),
+  };
+}
+
 describe('rafa next, over a real repository from a green pull request to a started loop', () => {
   it('records the merge, the base checkout and pull, both branch deletions, the plan creation, the branch creation from the pulled base and the loop start, in that order', () => {
     const scratch = plantScratch();
-    const recordPath = join(scratch.root, 'record.json');
-
-    const proc = Bun.spawnSync([process.execPath, scratch.probe, recordPath], {
-      cwd: scratch.work,
-      env: { PATH: scratch.path, HOME: scratch.home, GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
-    });
-
-    if (proc.exitCode !== 0 || !existsSync(recordPath)) {
-      throw new Error(
-        `the probe exited ${String(proc.exitCode)}\nstdout:\n${proc.stdout.toString()}\nstderr:\n${proc.stderr.toString()}`,
-      );
-    }
-    const record = JSON.parse(readFileSync(recordPath, 'utf8')) as ProbeRecord;
+    const { record } = runProbe(scratch, ['--yes=merge,plan,start']);
 
     if (!record.outcome.ok) {
       throw new Error(`the chain did not end cleanly: ${JSON.stringify(record.outcome)}`);
@@ -512,5 +566,172 @@ describe('rafa next, over a real repository from a green pull request to a start
     expect(git(scratch.work, scratch.home, 'rev-parse', NEW_BRANCH).stdout)
       .toBe(git(scratch.work, scratch.home, 'rev-parse', `origin/${BASE}`).stdout);
     expect(existsSync(join(scratch.work, '.rafa', 'plans', `PLAN-${NEW_STUB}.md`))).toBe(true);
+  }, 30_000);
+});
+
+describe('rafa next --yes, over the same repository, at each ceiling this suite names', () => {
+  it('prints the merge proposal and merges nothing under bare --yes, which allows sync, wait, unblock and plan but not merge', () => {
+    const scratch = plantScratch();
+    const before = snapshotOf(scratch);
+
+    const { record, stdout } = runProbe(scratch, ['--yes']);
+
+    if (!record.outcome.ok) {
+      throw new Error(`bare --yes did not end cleanly: ${JSON.stringify(record.outcome)}`);
+    }
+    // Nothing the merge, the plan or the loop would have logged ran.
+    expect(record.events.includes('merge')).toBe(false);
+    expect(record.events.includes('plan create')).toBe(false);
+    expect(record.events.includes('loop start')).toBe(false);
+
+    expect(stdout).toContain(`👉 merge #${PR_NUMBER} into \`${BASE}\``);
+    expect(stdout).toContain(`--${YES_FLAG} allows ${BARE_YES_ACTIONS.join(', ')}, and this step is merge, so nothing ran`);
+
+    expect(snapshotOf(scratch)).toEqual(before);
+  }, 30_000);
+
+  it('merges and creates the next plan, then stops before starting the loop under --yes=merge,sync,plan', () => {
+    const scratch = plantScratch();
+    const { record, stdout } = runProbe(scratch, ['--yes=merge,sync,plan']);
+
+    if (!record.outcome.ok) {
+      throw new Error(`the chain did not end cleanly: ${JSON.stringify(record.outcome)}`);
+    }
+
+    // The merge and its clean-up, then the plan, land in this order;
+    // `sync` is allowed too but never asked for, since the base this
+    // scratch pulls to is never behind its own remote.
+    const markers = [
+      'merge',
+      `git switch ${BASE}`,
+      'git pull --ff-only',
+      `git branch -D ${OLD_BRANCH}`,
+      `git push origin --delete ${OLD_BRANCH}`,
+      'plan create',
+    ];
+    const positions = positionsOf(record.events, markers);
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+
+    // The loop is `start`, which this ceiling leaves out: nothing of its
+    // own ran, and the branch it would have cut was never cut.
+    expect(record.events.includes('loop start')).toBe(false);
+    expect(record.events.some((event) => event.startsWith(`git switch -c ${NEW_BRANCH}`))).toBe(false);
+    expect(stdout).toContain(`start the loop on \`${NEW_STUB}\`, creating its branch`);
+
+    expect(git(scratch.work, scratch.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout).toBe(BASE);
+    expect(existsSync(join(scratch.work, '.rafa', 'plans', `PLAN-${NEW_STUB}.md`))).toBe(true);
+  }, 30_000);
+
+  it('runs the full chain to a started loop under --yes=merge,sync,plan,start', () => {
+    const scratch = plantScratch();
+    const { record } = runProbe(scratch, ['--yes=merge,sync,plan,start']);
+
+    if (!record.outcome.ok) {
+      throw new Error(`the chain did not end cleanly: ${JSON.stringify(record.outcome)}`);
+    }
+
+    const markers = [
+      'merge',
+      `git switch ${BASE}`,
+      'git pull --ff-only',
+      `git branch -D ${OLD_BRANCH}`,
+      `git push origin --delete ${OLD_BRANCH}`,
+      'plan create',
+      `git switch -c ${NEW_BRANCH}`,
+      'loop start',
+    ];
+    const positions = positionsOf(record.events, markers);
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+    expect(new Set(positions).size).toBe(positions.length);
+
+    expect(git(scratch.work, scratch.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout).toBe(NEW_BRANCH);
+    expect(git(scratch.work, scratch.home, 'branch', '--list', OLD_BRANCH).stdout).toBe('');
+    expect(git(join(scratch.root, 'origin.git'), scratch.home, 'show-ref', '--verify', `refs/heads/${OLD_BRANCH}`).ok).toBe(false);
+    expect(existsSync(join(scratch.work, '.rafa', 'plans', `PLAN-${NEW_STUB}.md`))).toBe(true);
+  }, 30_000);
+
+  it('refuses --yes=ready with exit code 2, reading and changing nothing', () => {
+    const scratch = plantScratch();
+    const before = snapshotOf(scratch);
+
+    const { record, stderr } = runProbe(scratch, ['--yes=ready']);
+
+    expect(record.outcome.ok).toBe(false);
+    expect(record.outcome.exitCode).toBe(CEILING_REFUSAL_EXIT);
+    // Refused before the sources are even opened: no git call at all, real or read-only.
+    expect(record.events).toEqual([]);
+    expect(stderr).toContain('which no list runs unasked');
+
+    expect(snapshotOf(scratch)).toEqual(before);
+  }, 30_000);
+});
+
+/**
+ * One stage the chain above passes through: `advance` is the `--yes`
+ * list {@link runProbe} runs first to reach it, or null for the
+ * pristine start, `readingContains` and `proposalContains` are
+ * substrings of the two lines a fresh `rafa next` reads there, and
+ * `expected` is what the repository looks like once it has, which a
+ * `--dry-run` run afterward must leave exactly as found.
+ */
+type DryRunStage = readonly [
+  name: string,
+  advance: readonly string[] | null,
+  readingContains: string,
+  proposalContains: string,
+  expected: RepoSnapshot,
+];
+
+const DRY_RUN_STAGES: readonly DryRunStage[] = [
+  [
+    'a green pull request, before anything has merged',
+    null,
+    `#${PR_NUMBER} is open on \`${OLD_BRANCH}\`, green and merges into \`${BASE}\``,
+    `merge #${PR_NUMBER} into \`${BASE}\``,
+    { head: OLD_BRANCH, oldBranchLocal: true, oldBranchRemote: true, newBranchLocal: false, planExists: false },
+  ],
+  [
+    'the next plan, after the pull request has merged',
+    ['--yes=merge'],
+    `#${NEXT_ISSUE} is next on the roadmap and carries`,
+    `create the plan for #${NEXT_ISSUE}`,
+    { head: BASE, oldBranchLocal: false, oldBranchRemote: false, newBranchLocal: false, planExists: false },
+  ],
+  [
+    'the loop, after the plan has been created',
+    ['--yes=merge,plan'],
+    `\`${NEW_STUB}\` is planned, with no run and no branch`,
+    `start the loop on \`${NEW_STUB}\`, creating its branch`,
+    { head: BASE, oldBranchLocal: false, oldBranchRemote: false, newBranchLocal: false, planExists: true },
+  ],
+];
+
+describe('rafa next --dry-run, over the same repository, at every stage the chain passes through', () => {
+  it.each(DRY_RUN_STAGES)('prints the two lines for %s, and changes nothing', (_name, advance, readingContains, proposalContains, expected) => {
+    const scratch = plantScratch();
+    if (advance !== null) {
+      const setup = runProbe(scratch, advance, 'advance.json');
+      if (!setup.record.outcome.ok) {
+        throw new Error(`the fixture did not reach that stage: ${JSON.stringify(setup.record.outcome)}`);
+      }
+    }
+    expect(snapshotOf(scratch)).toEqual(expected);
+
+    const { record, stdout } = runProbe(scratch, ['--dry-run'], 'dry-run.json');
+
+    if (!record.outcome.ok) {
+      throw new Error(`--dry-run did not end cleanly: ${JSON.stringify(record.outcome)}`);
+    }
+    // Every git call the read made was read-only: nothing the merge, the
+    // plan or the loop would have logged is among them.
+    expect(record.events.every((event) => event.startsWith('git '))).toBe(true);
+
+    expect(stdout).toContain(readingContains);
+    expect(stdout).toContain(proposalContains);
+    expect(stdout).toContain(`⏹ --${DRY_RUN_FLAG}: nothing ran.`);
+
+    expect(snapshotOf(scratch)).toEqual(expected);
   }, 30_000);
 });
