@@ -416,6 +416,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/loop/status.js', [
     ['../../config-sections.js', ['messageOf']],
+    ['../../utils/tracker.js', ['splitBlockerComment']],
     ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
     ['./loop-sessions.js', [
       'estimateEta',
