@@ -57,6 +57,106 @@ runtime dependency — `dependencies`, `peerDependencies` and
 beyond the package itself. The binary and every export run under bun,
 which `engines` names: see [Runtime](#runtime) below.
 
+## How to use it
+
+The cycle is always the same five steps, and most commands end by naming
+the next one, so you rarely have to remember it.
+
+1. **Set the project up, once.** In the repository you want to work on:
+
+   ```bash
+   rafa init
+   rafa doctor
+   ```
+
+   `init` writes `.rafa/config.yaml`, keeps `.rafa/` out of git, and on a
+   GitHub repository offers to set up the board (labels, the spec issue
+   template, a pinned Roadmap issue). `doctor` runs every check
+   `loop start` runs before its first session, and starts nothing: the
+   prerequisites your config and the plan name, `gh` and its login when
+   the repository is on GitHub, and the install itself.
+
+2. **Write a spec.** A spec says what you get, where things stand, the
+   design, what can go wrong, the tasks the plan must carry, and how you
+   will know it is done. Either a file, `.rafa/specs/my-feature.md`, or
+   an issue opened from the "Spec" template and labelled `spec:ready`.
+
+3. **Turn the spec into a plan.** One Claude Code session reads the spec
+   and the repository and writes a checklist the loop can parse:
+
+   ```bash
+   rafa plan create --spec=.rafa/specs/my-feature.md
+   rafa plan create --issue=42        # the spec is issue #42's body
+   rafa plan create --next            # the first undone line of the Roadmap issue
+   rafa plan show my-feature          # read it before you run it
+   ```
+
+   The plan lands in `.rafa/plans/PLAN-<stub>.md`, with a
+   `PREREQUISITES-<stub>.md` beside it when something has to be true
+   before the run. Read both. A plan is plain markdown: edit a task, drop
+   one, add one.
+
+4. **Run it.**
+
+   ```bash
+   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
+   ```
+
+   On `main` it offers to create `feat/<stub>` from the latest base and
+   run there. Then, per task: one Claude Code session, the task's report
+   stored, one commit. A task that reports `blocked` is marked and the
+   run stops with the reason; fix what it names and start again, and the
+   blocked task goes first. After the last task a wrap-up session syncs
+   with the base, bumps the version and the changelog when the project
+   has them, pushes, opens the pull request and waits for CI, spending
+   repair sessions on a red one.
+
+   From another terminal: `rafa loop status`, `rafa loop pause` (after the
+   running task), `rafa loop stop` (now).
+
+5. **Land it and look at what it cost.**
+
+   ```bash
+   rafa pr current        # number, title, checks, URL
+   rafa pr triage         # why is it red, and is the fix simple
+   rafa pr merge          # asks y/N, merges, switches to the base, pulls, deletes both branches
+   rafa release tag       # tag the merged version
+   rafa effort collect && rafa effort report
+   ```
+
+   Then step 2 again, or `rafa plan create --next`.
+
+### Which agents and skills are involved
+
+A task line may end with a declaration, for example
+`{agent=tdd-guide effort=medium}`. The planner writes it; you can change
+it.
+
+- `agent=` routes the task to a Claude Code subagent. The planner picks
+  by the task's SHAPE: implementation, tests, prose, a red build, a
+  review. This repository's own roster is in `.claude/agents/` and its
+  routing table in `context/workflow.md`; yours is whatever your project
+  holds.
+- Sessions load the project's agents and skills only
+  (`--setting-sources project,local`), which keeps each turn smaller and
+  makes a run behave the same on every machine. So an agent that exists
+  only in `~/.claude/agents` is invisible to a run: `rafa agent list`
+  shows what a run sees, `rafa agent vendor <name>` copies one in, and
+  `loop start` refuses a plan that names an agent it cannot resolve,
+  before any session is paid for.
+- The plan format itself is a skill, `dev-planner`, shipped inside the
+  package and used when the project has none of its own.
+- `rafa skill check .claude/skills --project=.` refuses a skill an agent
+  could not follow (a path that does not resolve, a missing field)
+  before it costs a task.
+- `model=`, `effort=`, `tools=` and `budget=` on a task line set the
+  session's model, reasoning effort, tool list and spending cap when no
+  agent decides them.
+
+Every command has help at three levels (`rafa --help`,
+`rafa loop --help`, `rafa loop start --help`), and
+`rafa describe --output=json` is the same roster for a tool or an agent.
+
 ## From a checkout
 
 To install dependencies:
@@ -170,19 +270,36 @@ built. A box is ticked by the change that finishes the feature.
 
 ## Attribution
 
-The agent task loop at the core of this project draws on several key sources:
+rafa stands on other people's work and on earlier work of ours.
+[NOTICE](NOTICE) carries the licences; this is the story.
 
-- **Loop implementation**: Imported from
-  [`marcostomatti/template-agentic-research`](https://github.com/marcostomatti/template-agentic-research),
-  which provides the structured task runner and plan/report parsing layer.
-- **Ralph method**: The core agent orchestration pattern originates from
-  [`open-tomato/open-tomato`](https://github.com/open-tomato/open-tomato).
-- **Instinct model**: the instinct record (trigger, action, confidence,
+- **The Ralph technique.** Running an agent in a plain loop, one fresh
+  session per step over a plan kept on disk, is the "Ralph" technique
+  described by Geoffrey Huntley in
+  [Ralph Wiggum as a "software engineer"](https://ghuntley.com/ralph/).
+  The name "ralph loop" in this project is a nod to it. What rafa adds
+  around the loop (plans with declared routing, structured task reports,
+  preflight, effort records, the pull request and CI stage) is ours; the
+  idea of the loop is not.
+- **Open Tomato.** rafa's first loop, its issue-tracker port, its CLI
+  event format and the learning design below come from projects in the
+  [open-tomato](https://github.com/open-tomato) organisation. Most of
+  them are not public yet; this section will link the specific
+  repositories as they are published.
+- **Loop implementation.** The code rafa started from was imported from
+  [`marcostomatti/template-agentic-research`](https://github.com/marcostomatti/template-agentic-research)
+  (Apache-2.0), where the loop had grown its plan and report parsers,
+  effort collection and tracker.
+- **Instinct model.** The instinct record (trigger, action, confidence,
   evidence, scope) is adapted from the `continuous-learning-v2` skill of
   [`affaan-m/everything-claude-code`](https://github.com/affaan-m/everything-claude-code)
   by Affaan Mustafa (MIT).
-- **Sync protocol**: The session state and artifact synchronization design is drawn from
-  open-tomato's hive-learning pattern.
+- **Shared learning (coming).** The design for merging what separate
+  runs learn (one record per lesson, a rule for conflicting lessons,
+  promotion on recurrence) follows Open Tomato's hive-learning design.
+  In rafa it is partly built: lessons are recorded per project today, and
+  sharing them across runs, projects and machines is on the
+  [Roadmap](#roadmap) and not available yet.
 
 ## License
 

@@ -14,13 +14,13 @@ rafa would not exist in this shape without it.
    parsers, the effort collection and the tracker) was imported from
    its `tools/ralph` directory and has been developed here since.
 
-2. open-tomato
-   https://github.com/open-tomato/open-tomato
+2. Open Tomato
+   https://github.com/open-tomato
    Copyright Marcos Tomatti and the open-tomato contributors. Licensed
    under the MIT License.
-   The ralph method of running a plan one session per task originates
-   there, as do the Tracker port's shape, the CLI event format and the
-   hive-learning design that rafa's learning port follows.
+   rafa's first loop, the Tracker port's shape, the CLI event format and
+   the hive-learning design that rafa's learning port follows come from
+   projects of that organisation, most of which are not public yet.
 
 3. everything-claude-code, the `continuous-learning-v2` skill
    https://github.com/affaan-m/everything-claude-code
@@ -49,6 +49,11 @@ The MIT License, under which works 2 and 3 are made available:
    LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
    WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The loop itself, one fresh agent session per step over a plan kept on
+disk, is the "Ralph" technique described by Geoffrey Huntley
+(https://ghuntley.com/ralph/). It is an idea and carries no licence;
+it is named here because the project is named after it.
 
 rafa drives Claude Code, a product of Anthropic, PBC. rafa is not
 affiliated with or endorsed by Anthropic.
