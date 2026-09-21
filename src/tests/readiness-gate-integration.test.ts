@@ -187,6 +187,10 @@ function fakeBoard(): { board: IssueBoard; calls: BoardCall[] } {
       calls.push(['swapLabels', issue, removed, added]);
       return Promise.resolve();
     },
+    removeLabel: (issue, label) => {
+      calls.push(['removeLabel', issue, label]);
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }

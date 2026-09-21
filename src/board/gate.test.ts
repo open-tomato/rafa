@@ -220,6 +220,10 @@ function fakeBoard(marker: boolean, faults: BoardFaults = {}): { board: IssueBoa
         ? Promise.resolve()
         : Promise.reject(new Error(faults.labels));
     },
+    removeLabel: (issue, label) => {
+      calls.push(['removeLabel', issue, label]);
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }
