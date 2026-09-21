@@ -16,7 +16,7 @@
  * a remote branch GitHub already deleted. Each of those is a REPORTED
  * step, not an exception: the merge has already happened by then and
  * the operator is owed the list of what is left
- * (`.specs/rafa-20-pr-commands.md`). So the runner answers
+ * (`.rafa/specs/rafa-20-pr-commands.md`). So the runner answers
  * {@link GitResult} for every outcome, including a git it could not
  * spawn, and the caller decides which of them is a refusal. This is the
  * shape `GhRunner` already has (`src/adapters/tracker/github.ts`).

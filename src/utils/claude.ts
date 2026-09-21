@@ -18,7 +18,7 @@
  * `claude` planner, `adapters/planner/claude.ts`, which `plan.ts`
  * makes. Each of the three parses what its session wrote: a task
  * session ends its final message with a `rafa:report` block, a plan
- * session opens its answer with a `rafa:spec-review` one, and a
+ * session ends its final message with a `rafa:spec-review` one, and a
  * proposal session's answer goes through `parseSessionAnswer`.
  * {@link spawnClaude} answers the exit code alone, so a loop holding
  * that session's exit code holds nothing else. A task session's flags are
@@ -51,7 +51,7 @@
  * Every session, through either door, is spawned with
  * {@link SETTING_SOURCES_FLAG} naming the run's `loop.settingSources`
  * (`config.ts`), `project,local` unless a config names others. Finding
- * 3 of `.specs/phase-1-installable.md` measured the user scope at about
+ * 3 of `.rafa/specs/phase-1-installable.md` measured the user scope at about
  * 14,900 tokens of a 58,989-token turn. The sources are a REQUIRED
  * parameter of {@link claudeArgs} and of both doors. A default here
  * would be a second one beside `CONFIG_DEFAULTS`, and a caller that

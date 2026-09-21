@@ -162,8 +162,8 @@ config there unless it is handed both `store` and `plansDir`.** A case
 pointing `repoRoot` at the live sibling appends to the sibling's own
 `.rafa/effort/` unless it also passes a `store` opened under a temp root,
 or uses a temp `repoRoot` with `plansDir` and `readCommits` supplied. The
-parity suites pass the sibling's `.plans/` as `plansDir` beside the store,
-so they attribute by the sibling's roster and read no config.
+parity suites pass the sibling's plans directory as `plansDir` beside the
+store, so they attribute by the sibling's roster and read no config.
 
 **Compare the two backends' rows by `JSON.stringify(row)`, paired by key
 rather than by position.** `toEqual` ignores field order, and

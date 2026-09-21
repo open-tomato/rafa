@@ -5,7 +5,7 @@
  *
  * The spec gives ONE spec-review comment per issue, marked
  * `<!-- rafa:spec-review v1 -->` and edited on a rerun
- * (`.specs/rafa-20-pr-commands.md`), the rule `src/pr/triage/comment.ts`
+ * (`.rafa/specs/rafa-20-pr-commands.md`), the rule `src/pr/triage/comment.ts`
  * keeps for the triage comment on a pull request. The two are separate
  * modules because they mark different things and carry different
  * bodies: a triage comment is also a STORE, whose `rafa:triage` block

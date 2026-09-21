@@ -4,7 +4,7 @@
  * wrote or the one sentence saying why it wrote nothing.
  *
  * The four modules beside this one are each one reading
- * (`.specs/rafa-21-changelog-and-release.md`, step 3's first item):
+ * (`.rafa/specs/rafa-21-changelog-and-release.md`, step 3's first item):
  * `./enabled.ts` says whether the release runs here, `./level.ts` what
  * bump the plan is worth, `./version.ts` what `origin/main` holds and
  * what the level makes of it, and `./changelog.ts` what the entry says

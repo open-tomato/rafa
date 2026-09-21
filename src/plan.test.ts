@@ -51,7 +51,7 @@
  *
  * ## The readiness gate's cases
  *
- * Four outcomes drive the verdict `src/plan.ts` acts on. `not-ready`
+ * Five outcomes drive the verdict `src/plan.ts` acts on. `not-ready`
  * writes BOTH files and answers a review that judged the spec not
  * ready, which is the one thing the gate cannot take the session's word
  * for: the case holds both files gone and the command exited 3, and the
@@ -62,6 +62,13 @@
  * `absent-review` is the control that keeps the gate off a session that
  * FAILED: its review is `absent`, which is not ready either, and the
  * command must still end with the session's own exit code and message.
+ * `missing-review` is the same absent reading on a session that
+ * ANSWERED: the plan reads as written, so the command must exit 0, keep
+ * it, warn exactly ONCE and record `review: missing`. That case counts
+ * the warn lines rather than looking for one, because the reading it
+ * holds is "the operator is told once", which a second warning would
+ * break while every substring assertion still passed.
+ *
  * The gaps are read out of a real `rafa:spec-review` block through
  * `parseSpecReview`, so no case asserts against a reading the parser
  * does not produce.
@@ -95,6 +102,13 @@
  * `src/commands/index.test.ts` instead, which is where that pairing is
  * held.
  *
+ * One mutation of `plan.ts` was driven on 2026-09-20 over
+ * `env -u CLAUDECODE bun test src/board/gate.test.ts src/plan.test.ts`,
+ * the module restored from a scratch copy and verified with
+ * `shasum -c`: the `recordMissingReview` call dropped left 41 pass and
+ * 1 fail against 42 pass either side — the `missing-review` case, the
+ * only one that reads a plan an unread review left standing.
+ *
  * One mutation of `plan.ts` was driven on 2026-09-19 over
  * `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the module
  * restored from a scratch copy and verified with `shasum -c`:
@@ -124,7 +138,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from './board/naming.js';
-import { buildPlanPrompt, readPlanFormat } from './plan.js';
+import { buildPlanPrompt, readPlanFormat, runBranchLine } from './plan.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
 
@@ -235,6 +249,11 @@ const PROBE = [
   '      }',
   '      if (outcome === "not-ready-rejection") {',
   '        throw new ClaudePlannerError("The session finished but " + planPath + " was not created.", 1, review);',
+  '      }',
+  '      if (outcome === "missing-review") {',
+  '        mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
+  `        writeFileSync(join(context.repoRoot, planPath), ${JSON.stringify(WRITTEN_PLAN)});`,
+  '        return { planPath, prerequisitesPath: null, review: parseSpecReview("I wrote the plan and stopped.") };',
   '      }',
   '      if (outcome === "plan-written") {',
   '        mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
@@ -366,6 +385,26 @@ function expectedPrompt(progress: string | undefined, planDir: string = DEFAULT_
   return buildPlanPrompt(template, readPlanFormat(SRC_DIR), FIXTURE_SPEC, 'spec', planDir, progress);
 }
 
+/** The branch line the fixture's plan path earns, as both output cases read it. */
+const BRANCH_LINE = '   Runs on feat/spec — started from the base branch, the run offers to create it.';
+
+describe('the branch line printed under the Execute with hint', () => {
+  it('names feat/ and the stub the plan path carries', () => {
+    expect(runBranchLine('.rafa/plans/PLAN-rafa-49.md')).toBe(
+      '   Runs on feat/rafa-49 — started from the base branch, the run offers to create it.',
+    );
+  });
+
+  it('reads the stub off the file name, not the directory holding it', () => {
+    expect(runBranchLine('/tmp/some-repo/.plans/PLAN-my-feature.md'))
+      .toBe(runBranchLine('PLAN-my-feature.md'));
+  });
+
+  it('answers null for a plan whose name carries no stub, which loop start would name no branch for', () => {
+    expect(runBranchLine('.rafa/plans/PLAN.md')).toBe(null);
+  });
+});
+
 describe('rafa plan through the adapter registry', () => {
   it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', () => {
     const scratch = plantScratch();
@@ -382,7 +421,9 @@ describe('rafa plan through the adapter registry', () => {
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
-    expect(run.stdout).toContain('▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md\n');
+    expect(run.stdout).toContain(
+      `▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md\n${BRANCH_LINE}\n`,
+    );
     expect(run.stdout).not.toContain('Prerequisites detected');
     expect(run.stdout).not.toContain('Including findings');
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
@@ -391,6 +432,7 @@ describe('rafa plan through the adapter registry', () => {
   }, 30_000);
 
   it('hands the planner the plan.dir a config names, and names the plan in it', () => {
+    // Deliberate custom-directory fixture: configures `plan.dir` to `.plans` to verify the planner reads the custom setting.
     const scratch = plantScratch();
     plantProjectConfig(scratch.repo, 'version: 1\nplan:\n  dir: .plans\n');
 
@@ -528,7 +570,7 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('removes the plan and the prerequisites written against a not-ready review, and exits 3', () => {
+  it('moves the plan and the prerequisites written against a not-ready review aside, and exits 3', () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'not-ready', ['--spec=spec.md', '--no-progress']);
@@ -536,8 +578,11 @@ describe('rafa plan through the adapter registry', () => {
     expect(run.exitCode).toBe(3);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md'))).toBe(false);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'PREREQUISITES-spec.md'))).toBe(false);
-    expect(run.stdout).toContain('🗑  Removed .rafa/plans/PLAN-spec.md');
-    expect(run.stdout).toContain('🗑  Removed .rafa/plans/PREREQUISITES-spec.md');
+    expect(run.stdout).toContain('🗃  Moved .rafa/plans/PLAN-spec.md to .rafa/plans/rejected/PLAN-spec.md');
+    expect(run.stdout).toContain(
+      '🗃  Moved .rafa/plans/PREREQUISITES-spec.md to .rafa/plans/rejected/PREREQUISITES-spec.md',
+    );
+    expect(existsSync(join(scratch.repo, '.rafa', 'plans', 'rejected', 'PLAN-spec.md'))).toBe(true);
     expect(run.stdout).not.toContain('Plan ready');
     expect(run.stderr).toContain('❌ spec.md is not ready to plan from');
     expect(run.stderr).toContain('"Definition of done": no item says how the merge clean-up is verified');
@@ -563,6 +608,28 @@ describe('rafa plan through the adapter registry', () => {
     expect(run.exitCode).toBe(7);
     expect(run.stderr).toContain('\n❌ Plan generation failed (exit 7).\n');
     expect(run.stderr).not.toContain('not ready to plan from');
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('keeps a plan whose session returned no review block, recording review: missing and warning once', () => {
+    const scratch = plantScratch();
+
+    const run = runPlan(scratch, 'missing-review', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    const plan = join(scratch.repo, '.rafa', 'plans', 'PLAN-spec.md');
+    expect(readFileSync(plan, 'utf8')).toContain('stub: spec\nreview: missing\n```');
+    expect(run.stdout).toContain(
+      'warn: the session output holds no rafa:spec-review block;'
+        + ' .rafa/plans/PLAN-spec.md reads as written, so the plan stands unreviewed',
+    );
+    expect(run.stdout.match(/^warn: /gmu)).toHaveLength(1);
+    expect(run.stdout).toContain(
+      '🔍 .rafa/plans/PLAN-spec.md records review: missing:'
+        + ' the session returned no readable rafa:spec-review block.',
+    );
+    expect(run.stdout).toContain('✅ Plan ready: .rafa/plans/PLAN-spec.md');
+    expect(run.stdout).not.toContain('not ready to plan from');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
@@ -595,6 +662,7 @@ describe('rafa plan through the adapter registry', () => {
   }, 30_000);
 
   it('asks the planner for a plan when a plan of the stub sits in .plans and plan.dir is left at its default', () => {
+    // Deliberate custom-directory fixture: plants `.plans/` to verify it is ignored when `plan.dir` is at its default `.rafa/plans`.
     const scratch = plantScratch();
     mkdirSync(join(scratch.repo, '.plans'));
     writeFileSync(join(scratch.repo, '.plans', 'PLAN-spec.md'), 'a phase 0 plan\n', 'utf8');
@@ -642,6 +710,7 @@ describe('rafa plan create in json mode', () => {
       'info:\n✅ Plan ready: .rafa/plans/PLAN-spec.md',
       'info:⚠️  Prerequisites detected: complete .rafa/plans/PREREQUISITES-spec.md before starting the loop.',
       'info:▶ Execute with: rafa loop start --plan=.rafa/plans/PLAN-spec.md',
+      `info:${BRANCH_LINE}`,
       'result',
     ]);
     expect(existsSync(scratch.spawned)).toBe(false);

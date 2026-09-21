@@ -21,7 +21,7 @@ is actually the PR's head.
 | Gate | Runs | Files it can open |
 |---|---|---|
 | `bun run check-types` | TypeScript compiler | `src/`, `scripts/` and root `*.ts`/`*.mjs`, with every `**/*.test.ts` excluded |
-| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `dist/`, `.claude/`, `.plans/`, `.specs/`, `.tmp/` and `.docs/` |
+| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `dist/`, `.claude/`, `.rafa/`, `.tmp/` and `.docs/` |
 | `bun run test` | Bun's native test runner | Every `*.test.ts` outside `node_modules/` and dot-directories, `scripts/` included |
 
 One more gate runs at `git commit` rather than before the PR.
@@ -40,10 +40,13 @@ ESLint exits nonzero on lint violations, and the test runner exits nonzero
 when any test fails.
 
 **A green gate is a zero exit code.** Capture the exit code beside the
-gate name, not a word from the output. The test runner writes pass/fail
-counts after all tests complete, and its order is deterministic, so two
-runs of the same tree move only where a case reads an input the tree
-does not own — which one case does, below.
+gate name, not a word from the output. Redirect the gate to a file and
+read `$?` rather than piping it into `tail`: through a pipe the code read
+is `tail`'s, and `${PIPESTATUS[0]}` prints empty here because zsh spells
+that array `$pipestatus` and indexes it from 1. The test runner writes
+pass/fail counts after all tests complete, and its order is
+deterministic, so two runs of the same tree move only where a case reads
+an input the tree does not own — which one case does, below.
 
 **One case reads a frozen copy of session logs.**
 `src/tests/parity-differential.test.ts` runs the collector twice, once
@@ -66,14 +69,22 @@ against a sibling that has since gone quiet, while a real parity failure
 reproduces every time. Do NOT reach for a stash-and-re-run to prove it
 pre-existing: that is a second full suite against a moving input.
 
+**One suite prints a model refusal on a clean run.**
+`src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
+`Sorry, this request could not be completed.` and exits 3, and a second
+that answers a `proposals:` YAML block; the planted binary's stdout is
+not captured away from the suite's own, so both land in the log of a run
+that exited 0. Scanning such a log for trouble finds prose that reads
+like a failed session. Read the counts and the exit code, never the
+prose around them.
+
 **Inside a Claude Code session, `bun test` names failures only.** The
 session sets `CLAUDECODE`, and with it set the runner prints no `(pass)`
 line and no name for a file without a failure; the counts and the exit
 code do not change. `env -u CLAUDECODE bun test` prints every case.
 
 **`check-types` never reads a test file.** `tsconfig.json` excludes
-`**/*.test.ts` (the `.specs/test-type-checking.md` its comment cites does
-not exist), and `bun test` strips types without checking them, so a type
+`**/*.test.ts`, and `bun test` strips types without checking them, so a type
 error in a test is green on every gate. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`,
 never `tsconfig.base.json`, which leaves `module` unset and fails

@@ -3,11 +3,11 @@
  * clean-up are done, and the reading that decides whether either
  * applies.
  *
- * The spec asks the command to "print what is ready, and the two
- * follow-ups when they apply: `rafa release tag` and `bun run
- * snapshot`" (`.specs/rafa-20-pr-commands.md`). "When they apply" is
- * the whole of this module, and both follow-ups turn on the same fact:
- * the VERSION that is now on the base branch.
+ * The PR commands spec asks the command to "print what is ready, and the
+ * two follow-ups when they apply: `rafa release tag` and `bun run
+ * snapshot`". "When they apply" is the whole of this module, and both
+ * follow-ups turn on the same fact: the VERSION that is now on the base
+ * branch.
  *
  *   - `rafa release tag` applies while that version carries no tag. The
  *     tag spelling is {@link versionTag}, `v<version>`, which is the

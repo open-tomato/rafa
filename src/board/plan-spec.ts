@@ -8,7 +8,7 @@
  * board, which readings answer "taken", which checks a route runs and
  * what the readiness gate then publishes on. That is this module, and
  * `plan create` is its one caller
- * (`.specs/rafa-20-pr-commands.md`, `context/cli.md`).
+ * (`.rafa/specs/rafa-20-pr-commands.md`, `context/cli.md`).
  *
  * ```text
  * plan.ts   readSpecSourceFlags(argv)      the words
@@ -36,7 +36,7 @@
  * ## Which checks run, and which one does not yet
  *
  * The readiness gate is four checks, cheapest first
- * (`.specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is the
+ * (`.rafa/specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is the
  * three this stage wires, in the spec's order, and each is a refusal
  * that exits {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
  *

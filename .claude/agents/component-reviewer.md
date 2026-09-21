@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: opus
 ---
 
-> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
+> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except configuration and specification directories, which live at the umbrella repo root.
 
 You review built and ported components and reference pages adversarially, at high reasoning effort. The visual-regression suite already covers pixels; **your job is everything it cannot see.** Apply the built-in `code-reviewer` methodology (severity-ranked findings with `file:line`, no file edits) with the focus below.
 

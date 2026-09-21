@@ -415,6 +415,7 @@ describe('installRuntime forced replaces the version directory whole', () => {
 
 describe('where installRuntime looks for trackers', () => {
   it('looks in the plan.dir the project config names, and not in the default beside it', () => {
+    // Deliberate custom-directory fixture: plants `.plans/` and configures `plan.dir` to verify custom directory is used.
     const world = plantWorld();
     writeFile(world.repoRoot, '.plans/PLAN_TRACKER-a.md', ['- [ ] an open task in .plans']);
 

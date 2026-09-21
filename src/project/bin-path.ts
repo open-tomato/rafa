@@ -1,7 +1,7 @@
 /**
  * Whether `~/.rafa/bin` comes ahead of `~/.bun/bin` on a `PATH`: the
  * check `rafa init` and `rafa doctor` warn by, from "Ports" in
- * `.specs/phase-1-installable.md`. The spec moves rafa's snapshot bin
+ * `.rafa/specs/phase-1-installable.md`. The spec moves rafa's snapshot bin
  * out of bun's global bin directory into `~/.rafa/bin`, and a `rafa` in
  * `~/.bun/bin` found first on the `PATH` would run instead of it: on
  * 2026-09-14 `bun link` overwrote `~/.bun/bin/rafa` with no message.

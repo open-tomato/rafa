@@ -6,7 +6,7 @@
  *
  * GitHub closes an issue a merged pull request says `Closes #<n>` for,
  * and it does NOT tick the `- [ ] #<n>` box that names that issue on the
- * roadmap (`.specs/rafa-20-pr-commands.md`). `plan create --next` reads
+ * roadmap (`.rafa/specs/rafa-20-pr-commands.md`). `plan create --next` reads
  * a ticked box as done, so a roadmap nobody ticks stays correct only
  * because the second done reading — the issue being closed — costs a
  * `gh issue view` per line. Ticking is what keeps the cheap reading
@@ -64,7 +64,7 @@
  * A write that failed, and a write whose answer is not what was sent,
  * are both retried ONCE, and the retry re-reads the body first so the
  * second tick is computed over whatever is there now
- * (`.specs/rafa-20-pr-commands.md`). Three things follow from
+ * (`.rafa/specs/rafa-20-pr-commands.md`). Three things follow from
  * re-reading rather than re-sending:
  *
  *   - A body somebody else ticked in between comes back

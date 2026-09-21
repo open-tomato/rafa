@@ -2,7 +2,7 @@
  * The help rafa prints, at three levels, rendered from the `RafaCommand`
  * declarations of the dispatcher's registry.
  *
- * `.specs/cli-surface.md` asks for one renderer for all three levels, fed
+ * The CLI surface spec asks for one renderer for all three levels, fed
  * from `RafaCommand` and tested with snapshots. {@link renderHelp} is that
  * renderer, and `src/rafa.ts` hands it to `dispatch`. It reads the
  * request and the registry it is handed and nothing else: no roster of

@@ -1,7 +1,6 @@
 /**
- * Tests for the `--skip-review` stamp (`src/board/review-stamp.ts`):
- * where the line lands, what it replaces, and which plans it leaves
- * alone.
+ * Tests for the two review stamps (`src/board/review-stamp.ts`): where
+ * the line lands, what it replaces, and which plans it leaves alone.
  *
  * Every case is a pure call over a literal plan; nothing here touches a
  * file. The assertions are on the WHOLE text rather than on a substring
@@ -13,7 +12,16 @@
  * The round trip is asserted too, through `parsePlan`: the field is not
  * one of `PLAN_HEADER_FIELDS`, so what the reader must do with it is
  * keep it as an extra, and a stamp the reader refused would be a record
- * nothing can read.
+ * nothing can read. Both values are round-tripped, `skipped` and the
+ * `missing` the gate's unread reading leaves behind, because each is
+ * written bare and the reader has to hand back the word and not a
+ * retyped value.
+ *
+ * `stampReviewMissing`'s own cases are the ones where it must differ
+ * from `stampReviewSkipped` — the value it writes, and the value it
+ * replaces — rather than the whole file over again: both go through
+ * `stampPlanField`, whose placing is held by the cases above and by
+ * `./plan-field.test.ts`.
  *
  * One mutation of `review-stamp.ts` was driven on 2026-09-19 over
  * `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the module
@@ -28,7 +36,12 @@ import { describe, expect, it } from 'bun:test';
 
 import { parsePlan } from '../plan/parse.js';
 
-import { REVIEW_SKIPPED_LINE, stampReviewSkipped } from './review-stamp.js';
+import {
+  REVIEW_MISSING_LINE,
+  REVIEW_SKIPPED_LINE,
+  stampReviewMissing,
+  stampReviewSkipped,
+} from './review-stamp.js';
 
 /** A plan document holding `lines`, each on its own line. */
 function doc(...lines: readonly string[]): string {
@@ -136,5 +149,51 @@ describe('stampReviewSkipped', () => {
       'stub: second',
       '```',
     ));
+  });
+});
+
+describe('stampReviewMissing', () => {
+  it('writes the missing line where the skipped stamp writes its own', () => {
+    const stamp = stampReviewMissing(PLAN);
+
+    expect(stamp.answer).toBe('inserted');
+    expect(stamp.text).toBe(doc(
+      '# Plan: rafa-20',
+      '',
+      '```rafa:plan',
+      'stub: rafa-20',
+      'spec: .specs/rafa-20.md',
+      REVIEW_MISSING_LINE,
+      '```',
+      '',
+      '- [ ] Do the thing',
+    ));
+    expect(REVIEW_MISSING_LINE).toBe('review: missing');
+  });
+
+  it('records a word the plan reader hands back as written, beside the fields it reads', () => {
+    const model = parsePlan(stampReviewMissing(PLAN).text);
+
+    expect(model.header.stub).toBe('rafa-20');
+    expect(model.header.extras).toEqual([{ key: 'review', value: 'missing' }]);
+    expect(model.issues).toEqual([]);
+  });
+
+  it('replaces a review the block already carries, the skipped one included', () => {
+    const skipped = stampReviewSkipped(PLAN).text;
+
+    const stamp = stampReviewMissing(skipped);
+
+    expect(stamp.answer).toBe('replaced');
+    expect(stamp.text).toBe(stampReviewMissing(PLAN).text);
+  });
+
+  it('records nothing in the plan a session wrote with no rafa:plan block, which is what the gate warns on', () => {
+    const headerless = 'written anyway\n';
+
+    const stamp = stampReviewMissing(headerless);
+
+    expect(stamp).toMatchObject({ answer: 'no-block', recorded: false, text: headerless });
+    expect(stamp.note).toContain('no rafa:plan block');
   });
 });

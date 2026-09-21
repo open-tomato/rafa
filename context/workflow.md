@@ -83,7 +83,7 @@ whose ID appears as `rafa-<n>`.
 
 | Artifact | Pattern | Example |
 |---|---|---|
-| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Specification file | `.rafa/specs/rafa-<n>-<slug>.md` | `.rafa/specs/rafa-20-pr-commands.md` |
 | Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
 | `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
@@ -93,6 +93,17 @@ whose ID appears as `rafa-<n>`.
 The slug summarizes what the user gets, using two to four words joined
 by hyphens.
 
+### Branch creation with loop start
+
+**`loop start --create-branch` creates the feature branch automatically**
+when run on `main` or `master`, instead of printing a checkout instruction.
+The branch is created as `feat/<stub>` from the latest `origin/<base>`,
+where `<base>` is the tracking branch of the default branch. This feature
+requires `--create-branch` to be explicit, preserving the safety of the
+existing print-only behavior when the flag is absent. Use it alongside
+`--plan=<path>` or the default plan under `plan.dir`, the default being
+`.rafa/plans/` unless the config `plan.dir` names another.
+
 **The order of all work lives in ONE place: the pinned "Roadmap" issue**
 on the `open-tomato/rafa` board. The word "phase" and its letters are
 retired; merged work keeps its old file names and a table in the Roadmap
@@ -100,7 +111,7 @@ issue maps them.
 
 ### Files beside the tree
 
-**`.plans/` and `.specs/` are gitignored**, so they live only in the
+**`.rafa/plans/` and `.rafa/specs/` are gitignored**, so they live only in the
 checkout that wrote them. A sweep over tracked files never reaches a plan
 or a spec, and nothing reviews their text: leave a plan's or a spec's
 illustrative text, and a test quoting it verbatim, alone when a sweep

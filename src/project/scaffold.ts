@@ -1,7 +1,7 @@
 /**
  * The files and directories `rafa init` writes for a project scope and a
  * user scope: step 4 of `rafa init` and the scope table under "Scope
- * resolution" in `.specs/phase-1-installable.md`.
+ * resolution" in `.rafa/specs/phase-1-installable.md`.
  *
  * {@link writeProjectScope} writes `<root>/.rafa/`, its `config.yaml` and
  * the project tree, and {@link writeUserScope} writes `<home>/.rafa/`, its

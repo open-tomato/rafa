@@ -2,8 +2,8 @@
  * `rafa doctor`: the preflight `rafa loop start` runs before its first
  * session, checked and printed with no run started, beside two warnings
  * about the install: an effort store left under `.ralph/effort/`, and
- * `~/.rafa/bin` not on `PATH` ahead of `~/.bun/bin`. "Preflight" and
- * "Ports" in `.specs/phase-1-installable.md`.
+ * `~/.rafa/bin` not on `PATH` ahead of `~/.bun/bin`. See the phase 1
+ * installable spec for "Preflight" and "Ports".
  *
  * A top-level command, its action spelled as its subject, so it sits
  * directly under `src/commands/`. It wraps no phase 0 command. It runs
@@ -86,9 +86,9 @@
  * `rafa effort report` lists the halts of `loop start` runs alone. It
  * writes nothing to the board either: the rows are read.
  *
- * ## The two warnings
+ * ## The three warnings
  *
- * Both are read before the preflight and written after it, whatever it
+ * Each is read before the preflight and written after it, whatever it
  * did, a refusal included:
  *
  *   - `readLegacyStore` (`effort/store/legacy.ts`): `.ralph/effort/` under
@@ -98,6 +98,12 @@
  *     project's home is not on the invocation's `PATH` ahead of
  *     `~/.bun/bin`. When it is, text mode says so in an `info` line, so a
  *     person confirming the order reads an answer rather than a silence.
+ *   - `readPreInitDirs` (`project/pre-init-dirs.ts`): `plan.dir` or
+ *     `specs.dir` still names the top-level directory rafa used before it
+ *     had defaults of its own. A project resolving to the defaults is
+ *     warned about in neither mode, so it reads no line at all. The
+ *     config this reads is loaded on its own and its problems are left to
+ *     the preflight, which refuses a config `loadConfig` will not give.
  *
  * A warning never changes the exit code.
  *
@@ -152,6 +158,7 @@ import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
 import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
 import type { BinPathReading } from '../project/bin-path.js';
+import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { basename, relative, resolve, sep } from 'node:path';
@@ -170,6 +177,7 @@ import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import { loadPlanPrerequisites, mergePlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
 import { readBinPath } from '../project/bin-path.js';
+import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
@@ -245,14 +253,18 @@ export interface DoctorResult {
   readonly binPath: BinPathReading;
   /** Which store files each effort directory holds; null when they could not be checked. */
   readonly legacyStore: LegacyStoreReading | null;
+  /** Which of `plan.dir` and `specs.dir` still name a pre-init directory; null for a config that could not be loaded. */
+  readonly preInitDirs: PreInitDirsReading | null;
   /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
   readonly board: BoardStatus | null;
 }
 
-/** The two readings about the install, read before the preflight. */
+/** The three readings about the install, read before the preflight. */
 interface InstallReadings {
   readonly binPath: BinPathReading;
   readonly legacyStore: LegacyStoreReading | null;
+  /** Which of `plan.dir` and `specs.dir` still name a pre-init directory; null for a config that could not be loaded. */
+  readonly preInitDirs: PreInitDirsReading | null;
   /** Why the effort directories could not be checked, as a warning; null when they were. */
   readonly storeProblem: string | null;
 }
@@ -420,22 +432,40 @@ async function checkBoard(preflight: DoctorPreflight, seams: DoctorSeams): Promi
   return readBoardStatus({ gh: openGh(root), root });
 }
 
-/** Both readings about the install; a store that cannot be checked is a warning, not a failure. */
+/**
+ * Which of `plan.dir` and `specs.dir` still name a pre-init directory,
+ * or null for a config that cannot be loaded, which the preflight
+ * refuses on its own. The config is loaded a second time here, before
+ * the preflight loads it, with the warnings dropped so a person reads
+ * each of them once: `resolvedConfig` writes them.
+ */
+function readPreInit(project: ProjectFound): PreInitDirsReading | null {
+  try {
+    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+    return readPreInitDirs(config);
+  } catch {
+    return null;
+  }
+}
+
+/** Every reading about the install; a store that cannot be checked is a warning, not a failure. */
 function readInstall(context: RafaContext, project: ProjectFound): InstallReadings {
   const binPath = readBinPath(context.env['PATH'], project.home);
+  const preInitDirs = readPreInit(project);
   try {
-    return { binPath, legacyStore: readLegacyStore(project.root), storeProblem: null };
+    return { binPath, legacyStore: readLegacyStore(project.root), preInitDirs, storeProblem: null };
   } catch (error) {
     const storeProblem = `rafa doctor: the effort store directories could not be checked: ${messageOf(error)}`;
-    return { binPath, legacyStore: null, storeProblem };
+    return { binPath, legacyStore: null, preInitDirs, storeProblem };
   }
 }
 
 /** Writes each warning the readings carry, and in text mode the line saying the `PATH` order holds. */
 function writeInstall(context: RafaContext, install: InstallReadings): void {
-  const { binPath, legacyStore, storeProblem } = install;
+  const { binPath, legacyStore, preInitDirs, storeProblem } = install;
   if (storeProblem !== null) context.output.warn(storeProblem);
   if (legacyStore !== null && legacyStore.warning !== null) context.output.warn(legacyStore.warning);
+  if (preInitDirs !== null && preInitDirs.warning !== null) context.output.warn(preInitDirs.warning);
   if (binPath.warning !== null) {
     context.output.warn(binPath.warning);
     return;
@@ -587,6 +617,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, board: B
     reminders: preflight.reminders,
     binPath: install.binPath,
     legacyStore: install.legacyStore,
+    preInitDirs: install.preInitDirs,
     board,
   };
 }

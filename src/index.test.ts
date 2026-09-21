@@ -640,6 +640,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../preflight/prerequisites-md.js', ['loadPlanPrerequisites', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
     ['../preflight/run.js', ['PROBE_TIMEOUT_MS', 'runPreflight']],
     ['../project/bin-path.js', ['readBinPath']],
+    ['../project/pre-init-dirs.js', ['readPreInitDirs']],
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../utils/tracker.js', ['trackerPathFor']],
     ['./init-board.js', ['BOARD_FIX', 'BOARD_HEADING']],

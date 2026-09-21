@@ -2,7 +2,7 @@
  * Where a rafa command stands: its PROJECT scope, found by walking up
  * from a directory to the first one holding `.rafa/config.yaml`, and
  * its USER scope under the home directory. These are the two scopes of
- * "Scope resolution" in `.specs/phase-1-installable.md`.
+ * "Scope resolution" in `.rafa/specs/phase-1-installable.md`.
  *
  * {@link resolveScope} answers one of two shapes. Inside a project it
  * answers the project root and both scopes' paths, and that answer is

@@ -2,9 +2,9 @@
  * The command rafa's dispatcher routes to: `RafaCommand`, the context it
  * runs with, and `CommandExit`, the one way it refuses.
  *
- * `.specs/cli-surface.md` declares `RafaCommand` as a superset of
- * `cli-core`'s `CliCommand`, so a `cli-core` command still loads. The
- * superset is spelled here over the copy in `./core/types.ts`.
+ * The CLI surface spec declares `RafaCommand` as a superset of `cli-core`'s
+ * `CliCommand`, so a `cli-core` command still loads. The superset is spelled
+ * here over the copy in `./core/types.ts`.
  *
  * ## Routing keys
  *

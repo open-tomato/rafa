@@ -12,7 +12,7 @@ stack:
   - typescript
 ---
 
-> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
+> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, the plans directory, and the specs directory, which live at the umbrella repo root.
 
 # React Query via components-library/cache
 

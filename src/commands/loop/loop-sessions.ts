@@ -3,7 +3,7 @@
  * session records they read, the session a line picks, a session's tasks
  * and rough ETA, a session written as a line, and their refusals.
  *
- * `.specs/cli-surface.md`, "Sessions": every `loop start` writes its
+ * From the CLI surface spec, "Sessions": every `loop start` writes its
  * record to `.rafa/runs/<session-id>.json` (`loop/sessions.ts`), and these
  * commands reach a run through that record alone. Single-thread is the
  * only mode until phase 6, so a plan runs in one session at a time.

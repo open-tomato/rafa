@@ -5,7 +5,7 @@
  * non-empty, the two list sections holding an item, and no placeholder
  * left in the text.
  *
- * `.specs/rafa-20-pr-commands.md` orders the gate's four checks cheapest
+ * `.rafa/specs/rafa-20-pr-commands.md` orders the gate's four checks cheapest
  * first, and these are checks 1 and 2. Check 0 is the author's trust
  * (`./trust.ts`), check 2 also carries the leak refusal (`./leak.ts`),
  * and check 3 is the planner's own first pass over the spec. This module
@@ -584,7 +584,7 @@ export function findListSectionGaps(body: string): readonly ReadinessGap[] {
  * A warning and not a refusal, which is the whole of the difference
  * between this and {@link readinessRefusalMessage}: the spec asks
  * `plan create --issue` to warn, naming them
- * (`.specs/rafa-20-pr-commands.md`), and a run that refused here would
+ * (`.rafa/specs/rafa-20-pr-commands.md`), and a run that refused here would
  * stop every spec written before the template existed.
  *
  * Throws a `TypeError` for an empty list, as the refusals do: there is

@@ -16,7 +16,7 @@ stack:
   - agnostic
 ---
 
-> Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, `.plans/`, `.specs/`, and `tools/`, which live at the umbrella repo root.
+> Scope: file paths in this document are relative to `packages/service/` (the `@ar/service` package), except `.claude/`, the plans directory, the specs directory, and `tools/`, which live at the umbrella repo root.
 
 # API Skill
 

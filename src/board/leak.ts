@@ -5,7 +5,7 @@
  *
  * Issues on this repository are public, and `plan create --issue` turns
  * an issue body into the spec a planner session reads
- * (`.specs/rafa-20-pr-commands.md`). A body is therefore written by
+ * (`.rafa/specs/rafa-20-pr-commands.md`). A body is therefore written by
  * someone at a machine and read by everyone: a path under a home
  * directory names its author and their filesystem layout, and a token
  * pasted into a repro is a credential published to the internet. The

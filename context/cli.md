@@ -3,7 +3,7 @@
 How a line reaches a command under `src/cli/`: `RafaCommand`, the
 registry, routing, module command entries, the dispatcher, help and
 `describe`.
-`.specs/cli-surface.md` owns the command tree, the aliases, the help
+A specs directory owns the command tree, the aliases, the help
 levels and `describe`; this page holds what the code does. Each
 module's note is the long form.
 
@@ -31,7 +31,7 @@ module's note is the long form.
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: `.plans/`, the task counts, an issue as a line and the argument refusals |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: the plans directory, the task counts, an issue as a line and the argument refusals |
 | `src/commands/issue/issue-tracker.ts` | what the five `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; and `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class |
@@ -106,6 +106,15 @@ module's note is the long form.
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
+- **`loop start --create-branch` creates the feature branch when on main or
+  master** (`start/run-config.ts`): when the working directory is checked
+  out on `main` or `master`, the flag creates `feat/<stub>` from the latest
+  `origin/<base>`, where `<base>` is the tracking branch of the default
+  branch, instead of printing a checkout instruction. Without the flag, the
+  loop prints the command to run. The flag is read from the parsed line and
+  handed into `start`, which resolves the plan from `.rafa/plans/` unless
+  `plan.dir` in the config names another directory, then uses that plan's
+  stub to name the new branch.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
@@ -164,13 +173,21 @@ module's note is the long form.
   writes no table line. `plan create`, `effort collect` and
   `usage` write each line as a `log` event of its level and give no
   result.
-- **The plan readers start no session.** `plan list` and `plan show` read
-  `.plans/` under the git root. `plan create` writes and `loop start`
-  finds its default plan in `plan.dir` under the project root,
-  `.rafa/plans` unless a config names another, and `effort collect`
+- **The plan readers start no session, and read the wrong directory.**
+  `plan list` and `plan show` join a hardcoded `.plans` — `PLANS_DIR` in
+  `src/commands/plan/plan-files.ts` — onto the git root. `plan create`
+  writes and `loop start` find their plan in `plan.dir` under the project
+  root, `.rafa/plans` unless a config names another, and `effort collect`
   attributes sessions by the plan stubs there, so the readers read where
   those write only while `plan.dir` is `.plans` and the project root is
-  the git toplevel (`src/commands/plan/plan-files.ts`).
+  the git toplevel. This repository stopped being that at rafa-49:
+  `rafa plan list` here exits 0 reporting no plans in the directory it
+  still names, over the eight plans sitting under `.rafa/plans`. That is
+  outstanding debt, and the fix wires both commands onto the resolved
+  `plan.dir` the dispatcher already computes. The sweep guard in
+  `src/tests/default-plan-dirs.test.ts` does not catch it: its forbidden
+  tokens carry a trailing slash, and `PLANS_DIR` spells the directory
+  without one.
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
   `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
@@ -197,10 +214,10 @@ module's note is the long form.
   `plan create` calls it.
 - **`plan create` enforces the planner's own verdict on the spec**
   (`src/plan.ts`, `src/board/gate.ts`). The plan prompt asks the session
-  to open its answer with a `rafa:spec-review` block, the `claude`
+  to end its final message with a `rafa:spec-review` block, the `claude`
   planner reads it once and carries it back both on the plan it answers
   and on its rejections (`src/adapters/planner/claude.ts`), and this
-  command is what acts on it. A verdict that is not ready removes
+  command is what acts on it. An explicit `verdict: not-ready` removes
   `PLAN-<stub>.md` and `PREREQUISITES-<stub>.md` when the session wrote
   them anyway, posts the gaps as one `<!-- rafa:spec-review v1 -->`
   comment on the issue, edited on a rerun
@@ -209,14 +226,18 @@ module's note is the long form.
   3 with every gap in the message. A comment or a label swap that fails
   is a warning and changes neither the other write nor the exit code.
   `--spec` names no issue, so that route removes, prints and exits 3. An
-  `absent` or `malformed` review is not ready either, except on a
-  rejection, where the session's own failure is what the command ends
-  with. `--skip-review` bypasses that gate alone and records
-  `review: skipped` in the plan's `rafa:plan` block
-  (`src/board/review-stamp.ts`), where the plan reader keeps it as a
-  header extra; `--no-comment` keeps the gaps off the board and moves the
-  labels anyway. Both flags are read in `src/board/gate.ts` and declared
-  on `src/commands/plan/create.ts` beside the board flags.
+  `absent` or `malformed` review is NOT that verdict: on a rejection the
+  session's own failure is what the command ends with, and on a plan the
+  planner answered the gate weighs the plan itself with `plan validate`'s
+  reader — one that reads as written stands, with one warning, nothing
+  removed and no board write, and records `review: missing` in its
+  `rafa:plan` block, while one that does not is removed and exits 3 with
+  every parser issue named and still nothing posted. `--skip-review`
+  bypasses that gate alone and records `review: skipped` in the same
+  block (`src/board/review-stamp.ts`), where the plan reader keeps either
+  word as a header extra; `--no-comment` keeps the gaps off the board and
+  moves the labels anyway. Both flags are read in `src/board/gate.ts` and
+  declared on `src/commands/plan/create.ts` beside the board flags.
 - **`plan create` plans from a file, an issue or the roadmap**
   (`src/board/spec-source.ts`, `src/board/plan-spec.ts`).
   `--spec=<file>`, `--issue=<n>` and `--next[=<roadmap-issue>]` are
@@ -234,8 +255,9 @@ module's note is the long form.
   each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal and stops before
   the first write, on all three routes. The generated plan records
-  `issue: "<n>"` in its `rafa:plan` block, quoted because the plan reader
-  refuses a number there (`src/board/plan-field.ts`), and the gate's
+  `issue: "<n>"` in its `rafa:plan` block, quoted so the digits written
+  survive the plan reader, which reads an unquoted number as the number
+  YAML parsed (`src/board/plan-field.ts`), and the gate's
   comment and label swap go to that issue.
 - **`pr merge` ticks the roadmap after it merges**
   (`src/commands/pr/merge-tick.ts`, `src/board/roadmap-tick.ts`). GitHub

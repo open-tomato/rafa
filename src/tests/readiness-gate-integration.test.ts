@@ -23,12 +23,12 @@
  *   3. `parseSpecReview` — the planner session's own answer, read off a
  *      planted session output, one per reading
  *   4. `enforceSpecReview` — what a `not-ready` reading (or `--skip-review`
- *      bypassing it) does to a plan a session wrote anyway: removed,
- *      commented on, its labels swapped
+ *      bypassing it) does to a plan a session wrote anyway: moved into
+ *      `rejected/`, commented on, its labels swapped
  *
  * No case here reaches GitHub or spawns `gh` or `claude`: the board is
  * a fake recording its calls, exactly as `gate.test.ts`'s is, and the
- * plan and prerequisites files a not-ready run removes sit under this
+ * plan and prerequisites files a not-ready run moves aside sit under this
  * file's own temporary directory.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -47,6 +47,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   enforceSpecReview,
   readGateFlags,
+  rejectedPath,
   SKIP_REVIEW_FLAG,
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,
@@ -398,7 +399,7 @@ describe('the parser\'s four answers', () => {
 });
 
 describe('a not-ready verdict on a plan the session wrote anyway', () => {
-  it('removes the plan and the prerequisites, posts the comment and swaps the labels', async () => {
+  it('moves the plan and the prerequisites aside, posts the comment and swaps the labels', async () => {
     const root = plantRepo([PLAN_PATH, PREREQUISITES_PATH]);
     const { board, calls } = fakeBoard();
     const { lines, output } = capture();
@@ -425,8 +426,10 @@ describe('a not-ready verdict on a plan the session wrote anyway', () => {
     expect(calls[2]).toEqual(['swapLabels', 31, SPEC_READY_LABEL, SPEC_NEEDS_WORK_LABEL]);
 
     expect(lines.info).toEqual([
-      `🗑  Removed ${PLAN_PATH}: the planner judged the spec not ready, so no plan stands.`,
-      `🗑  Removed ${PREREQUISITES_PATH}: the planner judged the spec not ready, so no plan stands.`,
+      `🗃  Moved ${PLAN_PATH} to ${rejectedPath(PLAN_PATH)}: `
+        + 'the planner judged the spec not ready, so no plan stands.',
+      `🗃  Moved ${PREREQUISITES_PATH} to ${rejectedPath(PREREQUISITES_PATH)}: `
+        + 'the planner judged the spec not ready, so no plan stands.',
       '💬 Posted the review comment on issue #31.',
       `🏷  Swapped ${SPEC_READY_LABEL} for ${SPEC_NEEDS_WORK_LABEL} on issue #31.`,
     ]);

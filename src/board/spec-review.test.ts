@@ -4,8 +4,11 @@
  * of several is read, how the verdict is matched, and what becomes of a
  * gap that cannot be read.
  *
- * The parser is pure: a string in, a reading out. No case plants a
- * seam, opens a file, reaches a home directory or spawns a session.
+ * The parser is pure: a string in, a reading out. One case reaches
+ * outside it — the drift guard reads `src/plan-prompt.md`, because
+ * WHICH block is read is only right while the prompt asks for the block
+ * where this parser looks for it. No case plants a seam, reaches a home
+ * directory or spawns a session.
  *
  * A gate like this passes for the wrong reason in two opposite ways,
  * and both have a case here:
@@ -20,11 +23,11 @@
  *    acts on and the answer is only what an operator reads.
  *
  * Thirteen mutations of `spec-review.ts` were driven against this file
- * on 2026-09-19, one at a time, the module restored from a scratch copy
- * and verified with `shasum -c` after each. 20 pass either side, and
- * each count below is that run's own:
+ * on 2026-09-20, one at a time, the module restored from a scratch copy
+ * and verified by `shasum` after each. 24 pass either side, and each
+ * count below is that run's own:
  *
- *  - `parseSpecReview` answering a ready reading for every input: 17
+ *  - `parseSpecReview` answering a ready reading for every input: 18
  *    fail.
  *  - `unreadable` answering `ready: true`, so a session that returned
  *    nothing readable plans anyway: 4 fail, the four cases that assert
@@ -46,8 +49,9 @@
  *    and read differently in a log.
  *  - the verdict normalisation dropped for an exact match: 1 fail, the
  *    dressed verdict.
- *  - the LAST `rafa:spec-review` block read instead of the first: 1
- *    fail, the output with a second block quoting the format.
+ *  - the FIRST `rafa:spec-review` block read instead of the last: 2
+ *    fail, the output whose real review follows a quoted format and the
+ *    one whose second block revises the first.
  *  - `readGaps` answering an empty list always: 6 fail.
  *  - the {@link UNNAMED_GAP} fallback dropped, so a not-ready verdict
  *    can carry nothing to post: 2 fail.
@@ -56,7 +60,15 @@
  *    {@link REVIEW_HEADING}: 1 fail.
  *  - every issue's `field` renamed, standing for an issue recorded in
  *    the wrong place: 3 fail.
+ *
+ * The drift guard is not one of those thirteen: no mutation of the
+ * module can redden it, since what it reads is the prompt. Its control
+ * is the case beside it, which rewrites the prompt's ask back to the
+ * opening one this parser was written for before 2026-09-20 and asserts
+ * the guard answers false.
  */
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'bun:test';
 
 import {
@@ -76,6 +88,25 @@ function outputWith(body: string): string {
 
 /** The output of a session that judged the spec ready; every case breaks this one. */
 const readyOutput = outputWith('verdict: ready\ngaps: []');
+
+/** The plan prompt as shipped, read for the ask this parser depends on. */
+const PLAN_PROMPT = readFileSync(new URL('../plan-prompt.md', import.meta.url), 'utf8');
+
+/** The fence the prompt names the block by. */
+const SPEC_REVIEW_FENCE = 'rafa:spec-review';
+
+/** The clause placing the block at the end of the session's final message. */
+const ASK_AT_END = 'END of your final message as a';
+
+/** The sentence spelling out that nothing follows the block. */
+const ASK_IS_LAST = 'The block is the LAST thing you write';
+
+/** True when `prompt` asks for the review block at the end of the final message. */
+function asksForTheBlockLast(prompt: string): boolean {
+  return prompt.includes(SPEC_REVIEW_FENCE)
+    && prompt.includes(ASK_AT_END)
+    && prompt.includes(ASK_IS_LAST);
+}
 
 /** Every gap of `output` as `<heading>: <what>`, in the order it answers them. */
 function gapsIn(output: string): readonly string[] {
@@ -114,10 +145,20 @@ describe('a ready verdict', () => {
     expect(parseSpecReview(outputWith('verdict: "NOT READY"')).answer).toBe('not-ready');
   });
 
-  it('is read from the FIRST block, not a later one quoting the format', () => {
-    const quoted = `${readyOutput}\n\`\`\`rafa:spec-review\nverdict: not-ready\n\`\`\`\n`;
+  it('is read from the LAST block, not an earlier one quoting the format', () => {
+    const drafted = '```rafa:spec-review\nverdict: not-ready\n```\n\n'
+      + 'That was the format; here is the review.\n\n'
+      + readyOutput;
 
-    expect(parseSpecReview(quoted).answer).toBe('ready');
+    expect(parseSpecReview(drafted).answer).toBe('ready');
+  });
+
+  it('gives way to a not-ready block written after it, which the session meant', () => {
+    const revised = `${readyOutput}\n\`\`\`rafa:spec-review\nverdict: not-ready\n\`\`\`\n`;
+    const reading = parseSpecReview(revised);
+
+    expect(reading.answer).toBe('not-ready');
+    expect(reading.ready).toBe(false);
   });
 
   it('carries whatever gaps a ready verdict still names, without refusing it', () => {
@@ -266,5 +307,23 @@ describe('a malformed block', () => {
     expect(reading.ready).toBe(false);
     expect(reading.block?.closed).toBe(false);
     expect(reading.text).toContain('is never closed');
+  });
+});
+
+describe('the drift guard between the prompt and this parser', () => {
+  it('finds the plan prompt asking for the block at the END of the final message', () => {
+    expect(asksForTheBlockLast(PLAN_PROMPT)).toBe(true);
+  });
+
+  it('proves that guard fails on a prompt asking for the block first', () => {
+    const opening = PLAN_PROMPT.replace(ASK_AT_END, 'open your answer with a')
+      .replace(ASK_IS_LAST, 'The block is the FIRST thing you write');
+
+    expect(asksForTheBlockLast(opening)).toBe(false);
+    expect(opening).toContain(SPEC_REVIEW_FENCE);
+  });
+
+  it('finds no ask left in the prompt for a block that opens the answer', () => {
+    expect(PLAN_PROMPT).not.toContain('open your answer with');
   });
 });

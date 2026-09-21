@@ -16,7 +16,7 @@
  *    — a merge that should NOT happen — is the one hardest to plant.
  *  - The steps the command runs and the steps a failure prints for the
  *    operator to paste are the SAME list. A failure after the merge
- *    never undoes the merge (`.specs/rafa-20-pr-commands.md`); it
+ *    never undoes the merge (`.rafa/specs/rafa-20-pr-commands.md`); it
  *    reports what is left, and {@link remainingFrom} over the same
  *    array is how that stays true to what ran. Nothing here reverts,
  *    resets or force-pushes, and no step's argv writes history.

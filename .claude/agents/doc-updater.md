@@ -22,13 +22,13 @@ here — the root map is the whole map.
   the figures your edit moved, and read each hit for whether it ROUTES
   somewhere or merely POINTS: a pointer survives a move, a routing rule
   does not.
-- **`.plans/` and `.specs/` are gitignored on purpose** and never move
+- **`.rafa/plans/` and `.rafa/specs/` are gitignored on purpose** and never move
   into a tracked path; they carry pre-patch security content and origin
   paths. A task editing only those, or `progress.txt`, legitimately
   stages nothing, so report the empty commit set rather than
   manufacturing a tracked change. The law runs the other way too: where
   a measurement makes a sentence in a TRACKED file over-broad, recording
-  it only in `.specs/` leaves the repo asserting the opposite to the
+  it only in `.rafa/specs/` leaves the repo asserting the opposite to the
   next reader. Qualify the tracked claim in the same commit.
 - **Wrap width is a per-FILE measurement, never a house number.** No
   prettier runs anywhere and ESLint does not reflow prose, so every wrap

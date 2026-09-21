@@ -4,7 +4,7 @@
  *
  * The loop edits the code it runs from, so a plan in a rafa checkout runs
  * from an installed copy and never from the checkout's `src/`
- * (`.specs/rafa-roadmap.md`). `start()` hands its words to
+ * (`.rafa/specs/rafa-roadmap.md`). `start()` hands its words to
  * {@link runFromSelectedRuntime} right after the detached refusal and
  * before anything else is read, so a run that goes elsewhere loads no
  * config, waits for no `--start-at` and writes no session record here:

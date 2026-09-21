@@ -6,7 +6,7 @@
  * `bun build` bundles what static imports reach, and core's roster is a
  * static list for that reason. A module's command entry lives outside
  * the bundle, so it is imported at run time, and this is where that
- * happens. `.specs/cli-surface.md` fixes the rule: an import failure is
+ * happens. The CLI surface spec fixes the rule: an import failure is
  * logged at warn level with the file path, and nothing disappears
  * silently. open-tomato's autoload swallowed a broken command file with
  * an empty `catch`, and the command vanished from the roster.
@@ -14,7 +14,7 @@
  * ## The unit is the file
  *
  * Each entry names a module and one absolute file, whose default export
- * is the module's `RafaCommand[]` (`.specs/modules-and-addons.md`, under
+ * is the module's `RafaCommand[]` (from the modules and addons spec, under
  * `commands.entry`). A file is mounted whole or skipped whole, with one
  * warning, and the entries after it still load. It is skipped when:
  *

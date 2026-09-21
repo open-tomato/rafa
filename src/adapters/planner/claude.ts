@@ -67,9 +67,9 @@
  * ## The review the session rides back on
  *
  * The plan prompt asks the session to judge the spec before planning and
- * to open its answer with a `rafa:spec-review` block, which is check 3
- * of the readiness gate. That block is in the session's OUTPUT and
- * nowhere else, which is why this adapter spawns through the capturing
+ * to end its final message with a `rafa:spec-review` block, which is
+ * check 3 of the readiness gate. That block is in the session's OUTPUT
+ * and nowhere else, which is why this adapter spawns through the capturing
  * door: {@link spawnClaude} answers an exit code alone, and a planner
  * holding that exit code holds nothing the gate can read. The operator
  * still sees the session as it runs, through the tee in

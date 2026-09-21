@@ -4,7 +4,7 @@
  * `rafa:triage` block read back out of it.
  *
  * The spec gives ONE triage comment per pull request, with its history
- * in that comment's own edits (`.specs/rafa-20-pr-commands.md`). That
+ * in that comment's own edits (`.rafa/specs/rafa-20-pr-commands.md`). That
  * makes the comment a small STORE and not only a report: the re-run
  * readings the plan builds next compare the stored `head` against the
  * pull request's to decide whether to assess again, and `--resolve`

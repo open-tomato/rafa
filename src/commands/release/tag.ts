@@ -6,9 +6,9 @@
  *
  * The loop writes a version and a changelog entry with every pull
  * request and stops there (`src/start/release-stage.ts`): the merge
- * commit is not its to tag. This action is the operator step the spec
- * puts after the merge (`.specs/rafa-21-changelog-and-release.md`, its
- * step 4), and `rafa pr merge` already names it as a follow-up
+ * commit is not its to tag. This action is the operator step the
+ * changelog and release spec puts after the merge (its step 4), and
+ * `rafa pr merge` already names it as a follow-up
  * (`src/commands/pr/merge-followups.ts`).
  *
  * One git command here writes — `git tag <tag> HEAD` — and it is the

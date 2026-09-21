@@ -1,7 +1,7 @@
 /**
  * Tests for `rafa doctor` (`doctor.ts`): the preflight it checks and
  * prints for the config and a plan, the exit code a failed required item
- * gives, that it starts no run and stores no row, its refusals, the two
+ * gives, that it starts no run and stores no row, its refusals, the three
  * warnings beside the report, the `rafa <version>` line text mode opens
  * with, the GitHub board rows and the fix they name, json mode, and the
  * registered command spawned.
@@ -115,6 +115,7 @@ import {
   ghOnPathItem,
 } from '../pr/preflight-items.js';
 import { readBinPath } from '../project/bin-path.js';
+import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readPlanFlag } from './doctor.js';
@@ -800,10 +801,27 @@ describe('the warnings beside the report', () => {
     expect(lines(ahead.stdout).at(-1)).toBe(aheadLine(world));
     expect(ahead.stdout).not.toContain('warn: ');
   });
+
+  it('warns for a project whose plan.dir and specs.dir still name the pre-init directories, and not for one on the defaults', async () => {
+    const overriding = plantWorld(['plan:', '  dir: .plans', 'specs:', '  dir: .specs']);
+    const defaulting = plantWorld();
+    const warning = readPreInitDirs({ planDir: '.plans', specsDir: '.specs' }).warning;
+
+    const warned = await doctor(overriding);
+    const quiet = await doctor(defaulting);
+
+    expect(warning).not.toBeNull();
+    expect(warned.exitCode).toBe(0);
+    expect(lines(warned.stdout).at(-2)).toBe(`warn: ${warning}`);
+    expect(lines(warned.stdout).at(-1)).toBe(aheadLine(overriding));
+    expect(quiet.exitCode).toBe(0);
+    expect(quiet.stdout).not.toContain('before it had defaults of its own');
+    expect(quiet.stdout).not.toContain('warn: ');
+  });
 });
 
 describe('json mode', () => {
-  it('gives the checks and both readings as the result data, each warning as a log event, and no text line', async () => {
+  it('gives the checks and every install reading as the result data, each warning as a log event, and no text line', async () => {
     const world = plantWorld([
       ...requiredTool('exit 0'),
       '  optional:',
@@ -829,6 +847,7 @@ describe('json mode', () => {
       reminders: [],
       binPath: { state: 'missing', rafaBin: world.rafaBin },
       legacyStore: { legacyFiles: ['sessions.ndjson'], storeFiles: [] },
+      preInitDirs: { found: [], warning: null },
     });
     expect(result?.data?.checks.map((check) => [check.tier, check.item.name, check.outcome])).toEqual([
       ['required', 'needed', 'pass'],

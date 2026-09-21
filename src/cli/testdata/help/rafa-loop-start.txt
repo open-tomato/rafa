@@ -4,7 +4,7 @@ rafa loop start — run a plan task by task, then wrap up, open the PR and wait
 Usage:
   rafa loop start [--plan=<string>] [--start-at=<string>] [--inject=<string>]
     [--runtime=<string>] [--no-ci-wait] [--ci-timeout=<number>]
-    [--ci-attempts=<number>] [--any-branch] [-d|--detached]
+    [--ci-attempts=<number>] [--create-branch] [--any-branch] [-d|--detached]
 
 Description:
   Walks the tracker of a plan one task at a time, each in a Claude Code session
@@ -16,41 +16,49 @@ Description:
   the project root when that one does not exist. Before any session it checks
   the prerequisites the config and the plan's `PREREQUISITES-<stub>.md` name,
   halting when a required one fails and naming each failed optional one
-  known-missing in every task prompt. It refuses to run on `main` or `master`.
-  Each run writes its session record to `.rafa/runs/<session-id>.json`: the
-  plan, the branch, the pid, the start, the state and the running task. It
-  refuses a plan whose record names another branch, and a plan a session is
-  still running. `rafa loop stop`, `pause`, `resume`, `status` and `list` reach
-  the run through that record. A run holds its terminal: until phase 6 it
-  refuses `--detached`. With `--runtime` the whole run goes on in that installed
-  rafa, never in a `src/` directory.
+  known-missing in every task prompt. Started on `main` or `master` it offers to
+  create the plan's `feat/<stub>` from the latest `origin/<base>` and run there,
+  `--create-branch` answering that without asking, and refuses the run when the
+  offer is not taken. Each run writes its session record to
+  `.rafa/runs/<session-id>.json`: the plan, the branch, the pid, the start, the
+  state and the running task. It refuses a plan whose record names another
+  branch, and a plan a session is still running. `rafa loop stop`, `pause`,
+  `resume`, `status` and `list` reach the run through that record. A run holds
+  its terminal: until phase 6 it refuses `--detached`. With `--runtime` the
+  whole run goes on in that installed rafa, never in a `src/` directory.
 
 Flags:
-  --plan           string
+  --plan            string
       The plan to run, relative to the project root. `PLAN-<stub>.md` is tracked
       in `PLAN_TRACKER-<stub>.md` beside it.
-  --start-at       string
+  --start-at        string
       Waits until this local time of day, as `HH:MM`, before the first task.
-  --inject         string
+  --inject          string
       How much of the plan each task session is handed: `full`, `stage` or
       `task`. Outranks `plan.inject` in `.rafa/config.yaml`. The wrap-up is
       handed the whole plan.
-  --runtime        string
+  --runtime         string
       The installed rafa the run goes on in: a version under `~/.rafa/runtime/`,
       or a path against the working directory to a `cli.js` or the directory
       holding it. Refused inside the `src/` of the working directory or the
       project root. Typed after `loop start`.
-  --ci-wait        boolean, default true
+  --ci-wait         boolean, default true
       Waits on the checks of the PR once it is pushed; `--no-ci-wait` finishes
       at the push.
-  --ci-timeout     number, default 20
+  --ci-timeout      number, default 20
       Minutes to wait for the checks to settle.
-  --ci-attempts    number, default 2
+  --ci-attempts     number, default 2
       Repair sessions to spend on a red or conflicting PR before escalating; 0
       spends none and still reports the verdict.
-  --any-branch     boolean
+  --create-branch   boolean
+      On `main` or `master`, creates `feat/<plan-stub>` from the latest
+      `origin/<base>` and runs the plan there without asking, or switches to
+      that branch when it already exists. Refuses rather than move when a
+      tracked file is modified, the fetch fails or the base has diverged from
+      its remote.
+  --any-branch      boolean
       Runs on `main` or `master`, which the loop otherwise refuses.
-  -d, --detached   boolean
+  -d, --detached    boolean
       Runs the loop in the background. Refused until phase 6, before anything is
       read: until then a run holds the terminal it starts in.
 
@@ -61,6 +69,9 @@ Examples:
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md --start-at=23:00 --inject=task --no-ci-wait
       Starts at 23:00, hands each task session the plan context and its own task
       line, and finishes at the push.
+  rafa loop start --plan=.rafa/plans/PLAN-my-feature.md --create-branch
+      Run from `main`, creates `feat/my-feature` from the latest `origin/main`
+      without asking, and runs the plan there.
 
 Outputs:
   text, json

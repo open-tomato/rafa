@@ -59,12 +59,12 @@
  * A prerequisite item names exactly one of `tool`, `env`, `service` or
  * `lsp`, may carry a `probe`, and on the optional tier a `reason`. That
  * is the shape of the block under "Config schema" in
- * `.specs/phase-1-installable.md`. A `reason` on a required item is a
+ * `.rafa/specs/phase-1-installable.md`. A `reason` on a required item is a
  * key that tier does not read, so it is retained and warned about.
  *
  * A module source names exactly one of `npm`, `github` or `path`, and a
  * `github` source may carry a `ref`: the source shapes of the registry
- * example in `.specs/modules-and-addons.md`, which `modules:` lists
+ * example in `.rafa/specs/modules-and-addons.md`, which `modules:` lists
  * "by source". This module accepts all three. Whether a source kind can
  * be loaded is the module loader's answer, not the config's.
  *

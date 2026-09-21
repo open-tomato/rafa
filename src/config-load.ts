@@ -12,7 +12,7 @@
  *
  * The PROJECT's `.rafa/config.yaml` sits under the repo root and the
  * USER scope's under the home directory, the two scopes of
- * `.specs/phase-1-installable.md`. {@link loadConfig} reads both and
+ * `.rafa/specs/phase-1-installable.md`. {@link loadConfig} reads both and
  * hands them to `resolveConfig`, which ranks the project's over the
  * user's key by key: a project file naming `store` leaves every other
  * setting to the user's file, and the user's leaves what it does not

@@ -2,7 +2,7 @@
  * The session records of `loop start`: one JSON file per run under
  * `<root>/.rafa/runs/`, named by the session's id.
  *
- * `.specs/cli-surface.md`, "Sessions": `loop stop`, `pause`, `resume`,
+ * `.rafa/specs/cli-surface.md`, "Sessions": `loop stop`, `pause`, `resume`,
  * `status` and `list` act on a run through its record, so every
  * `loop start` writes `.rafa/runs/<session-id>.json`. This module reads,
  * judges and writes those files, and prints nothing. `start/session.ts`

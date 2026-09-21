@@ -9,7 +9,7 @@ ID appears as `rafa-<n>`.
 
 | Artifact | Pattern | Example |
 | --- | --- | --- |
-| Specification file | `.specs/rafa-<n>-<slug>.md` | `.specs/rafa-20-pr-commands.md` |
+| Specification file | `.rafa/specs/rafa-<n>-<slug>.md` | `.rafa/specs/rafa-20-pr-commands.md` |
 | Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
 | `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
@@ -20,10 +20,12 @@ The slug summarizes what the user gets, using two to four words joined by
 hyphens. The order of work lives in ONE place: the pinned "Roadmap" issue
 on the `open-tomato/rafa` board.
 
-* Before planning, review the spec as written: open your answer with a
-  `rafa:spec-review` block carrying `verdict: ready` or `verdict: not-ready`,
-  with empty `gaps:` for ready, or a list of `{heading, what}` gaps for
-  not-ready — only continue planning after a ready verdict.
+* Before planning, review the spec as written, and report that review at the
+  END of your final message as a `rafa:spec-review` block carrying
+  `verdict: ready` or `verdict: not-ready`, with empty `gaps:` for ready, or a
+  list of `{heading, what}` gaps for not-ready — only continue planning after
+  you have judged the spec ready. The block is the LAST thing you write: end
+  the final message with it, after the summary, and write nothing after it.
 * Inspect each definition-of-done item: can it be shown by running a command
   or demonstrating a UI interaction, or is it worded too broadly for a reader
   to measure?
@@ -33,8 +35,8 @@ on the `open-tomato/rafa` board.
 * Inspect the headers the spec names: are they the ones the dev-planner
   format requires, and does each hold actual content or only placeholders?
 * If any inspection finds a gap, write its heading as it appears in the spec,
-  the `what` explaining the gap clearly, and list them all under `gaps:`
-  before the plan.
+  the `what` explaining the gap clearly, and list them all under `gaps:` in
+  that closing block.
 
 Create a plan based on the spec at the end of this prompt, following the
 dev-planner format specification that precedes it. Produce the required

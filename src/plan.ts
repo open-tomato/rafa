@@ -20,6 +20,9 @@
  *
  *   rafa loop start --plan=.rafa/plans/PLAN-<stub>.md
  *
+ * and the hint that line is printed in names the branch that run will
+ * be on, `feat/<stub>`; see {@link runBranchLine}.
+ *
  * ## What the command keeps, and what the adapter does
  *
  * The command checks its command line (the config, the spec source,
@@ -60,7 +63,7 @@
  * naming both paths. So `--spec=my-feature.md` reads
  * `.rafa/specs/my-feature.md` in a project whose root holds no
  * `my-feature.md`, and a path written from the root, such as
- * `.specs/my-feature.md`, reads as it did before `specs.dir` was read. An
+ * `.rafa/specs/my-feature.md`, reads as it did before `specs.dir` was read. An
  * absolute `--spec` has the one candidate. The planner is handed the
  * candidate found, as the port documents a spec path: repository-relative
  * or absolute.
@@ -89,16 +92,17 @@
  * ## The readiness gate's verdict
  *
  * The plan prompt asks the session to judge the spec BEFORE planning and
- * to open its answer with a `rafa:spec-review` block, which the planner
- * reads once and carries back both on the plan it answers and on what it
- * rejects with (`adapters/planner/claude.ts`). Neither of those acts on
+ * to END its final message with a `rafa:spec-review` block, which the
+ * planner reads once and carries back both on the plan it answers and on
+ * what it rejects with (`adapters/planner/claude.ts`). Neither of those acts on
  * it. This command does, through {@link enforceSpecReview}
- * (`board/gate.ts`): a review that is not ready removes the plan and the
- * prerequisites file when the session wrote them anyway, publishes the
+ * (`board/gate.ts`): a review that is not ready moves the plan and the
+ * prerequisites file into `rejected/` under `plan.dir` when the session
+ * wrote them anyway, publishes the
  * gaps on the issue when there is one, swaps `spec:ready` for
  * `spec:needs-work`, and throws `CommandExit(3)` carrying every gap.
  * `--spec=<file>` has no issue and so no labels to move: that route
- * removes, prints and exits 3. The issue routes fill
+ * moves the files aside, prints and exits 3. The issue routes fill
  * {@link SpecReviewGateOptions.issue} with the number and the board
  * `board/plan-spec.ts` answers beside the spec, so a not-ready verdict
  * on an issue is published where the spec came from.
@@ -110,9 +114,15 @@
  * verdict. One carrying an `absent` or `malformed` review is not,
  * because the session did not finish and what the operator needs is the
  * failure it ended with, not a gate refusal saying the review block was
- * missing. On a plan the planner DID answer, `absent` and `malformed`
- * are enforced as the spec says they are, since a session that ran to
- * the end and judged nothing has judged nothing.
+ * missing.
+ *
+ * On a plan the planner DID answer, an `absent` or `malformed` review
+ * does not refuse it by itself: the gate weighs the plan with
+ * `plan validate`'s reader and answers `unread` for one that reads as
+ * written, which this command records as `review: missing` in the
+ * plan's `rafa:plan` block ({@link recordMissingReview},
+ * `board/review-stamp.ts`) beside the gate's one warning. `board/gate.ts`
+ * holds why a session's silence is no verdict on the spec.
  *
  * `--skip-review` bypasses that gate ALONE, and the plan it keeps
  * records `review: skipped` ({@link recordSkippedReview},
@@ -129,10 +139,10 @@
  * reports a number as unusable; the note in `board/plan-field.ts` holds
  * the measurement.
  *
- * Both records are written AFTER the gate, so a plan a not-ready verdict
- * removed is never stamped, and both are warnings when they cannot be
- * written: the plan is what the operator asked for, and a stamp that
- * refused it would throw away a session already paid for.
+ * Every record is written AFTER the gate, so a plan the gate moved aside is
+ * never stamped, and each is a warning when it cannot be written: the
+ * plan is what the operator asked for, and a stamp that refused it
+ * would throw away a session already paid for.
  *
  * The project root is a parameter, the root the dispatcher resolved
  * (`src/commands/wrap.ts`): `--spec` resolves against it, `plan.dir` and
@@ -180,13 +190,20 @@ import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { enforceSpecReview, readGateFlags, SKIP_REVIEW_FLAG } from './board/gate.js';
 import { issueFieldLine, stampPlanIssue } from './board/plan-field.js';
 import { resolvePlanSpec } from './board/plan-spec.js';
-import { REVIEW_SKIPPED_LINE, stampReviewSkipped } from './board/review-stamp.js';
+import {
+  REVIEW_MISSING_LINE,
+  REVIEW_SKIPPED_LINE,
+  stampReviewMissing,
+  stampReviewSkipped,
+} from './board/review-stamp.js';
 import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from './board/spec-source.js';
 import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
+import { branchNameFor } from './start/branch-decision.js';
 import { checkUsage } from './utils/claude.js';
+import { planStubFromPath } from './utils/plan-stamp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -321,6 +338,27 @@ export function buildPlanPrompt(
 /** Derives the plan stub from a spec path: specs/my-feature.md → my-feature. */
 export function stubFromSpecPath(specPath: string): string {
   return path.basename(specPath).replace(/\.md$/, '');
+}
+
+/**
+ * The branch `rafa loop start` will run this plan on, as a line printed
+ * under the `Execute with` hint — or null when there is none to name.
+ *
+ * The stub is read back off the plan the planner wrote, with
+ * {@link planStubFromPath}, rather than off the `--stub` this command
+ * resolved: the path is the adapter's own, and `loop start` derives the
+ * branch from that same path, so what is printed here is the name the
+ * run will build. A plan whose name carries no stub (`PLAN.md`) answers
+ * null, because `loop start` would name no branch for it either and a
+ * `feat/` with nothing after it is not a name to print.
+ *
+ * Exported for tests.
+ */
+export function runBranchLine(planPath: string): string | null {
+  const stub = planStubFromPath(planPath);
+  return stub === null
+    ? null
+    : `   Runs on ${branchNameFor(stub)} — started from the base branch, the run offers to create it.`;
 }
 
 /**
@@ -473,6 +511,12 @@ function recordSkippedReview(repoRoot: string, planPath: string): void {
   activeOutput().info(`⏭  ${SKIP_REVIEW_FLAG}: the spec was not reviewed, and ${planPath} records ${REVIEW_SKIPPED_LINE}.`);
 }
 
+/** Records `review: missing` in the plan an unread review left standing, and says so. */
+function recordMissingReview(repoRoot: string, planPath: string): void {
+  if (!recordInPlan(repoRoot, planPath, stampReviewMissing, REVIEW_MISSING_LINE)) return;
+  activeOutput().info(`🔍 ${planPath} records ${REVIEW_MISSING_LINE}: the session returned no readable rafa:spec-review block.`);
+}
+
 /** Records the issue a board route planned from in the plan it wrote, and says so. */
 function recordPlanIssue(repoRoot: string, planPath: string, issue: number): void {
   const line = issueFieldLine(issue);
@@ -560,12 +604,13 @@ export default async function plan(
     // On an answer the paths are the planner's own, which are the files
     // it saw; the ones in `gate` are this command's spelling of them,
     // and are all a rejection leaves to go on.
-    await enforceSpecReview({
+    const standing = await enforceSpecReview({
       ...gate,
       planPath: generated.planPath,
       prerequisitesPath: generated.prerequisitesPath ?? gate.prerequisitesPath,
       review: generated.review,
     });
+    if (standing === 'unread') recordMissingReview(repoRoot, generated.planPath);
   }
 
   if (resolved.spec.issue !== null) {
@@ -577,4 +622,8 @@ export default async function plan(
     activeOutput().info(`⚠️  Prerequisites detected: complete ${generated.prerequisitesPath} before starting the loop.`);
   }
   activeOutput().info(`▶ Execute with: rafa loop start --plan=${generated.planPath}`);
+  const branchLine = runBranchLine(generated.planPath);
+  if (branchLine !== null) {
+    activeOutput().info(branchLine);
+  }
 }

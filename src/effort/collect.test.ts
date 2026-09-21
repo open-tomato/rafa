@@ -1135,6 +1135,7 @@ describe('the store a run goes through', () => {
   });
 
   it('reads the roster in .rafa/plans and not the one in .plans when plan.dir is left at its default', async () => {
+    // Deliberate custom-directory fixture: plants `.plans/` to verify it is ignored when `plan.dir` defaults to `.rafa/plans`.
     const tree = makeTree(['s1']);
     writeConfig(tree.root, 'store: ndjson\n');
     mkdirSync(join(tree.root, '.plans'));

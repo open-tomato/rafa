@@ -44,7 +44,17 @@
  * names with `/bin/cat`, and exits with the code its planting names.
  *
  *   - **The three refusals**: an unusable config, a plan file that does
- *     not exist and the `main` branch. In text mode each writes its
+ *     not exist and the `main` branch. The `main` case is spawned with no
+ *     terminal on standard input and no `--create-branch`, so the branch
+ *     offer ahead of the guard stands aside (`start/branch.ts`) and the
+ *     guard refuses as it always did, its text now naming the flag that
+ *     would have made the branch. A fourth case passes that flag and
+ *     reads the OFFER's own refusal instead, which is how the wiring
+ *     ahead of the guard is measured from outside: no scratch repository
+ *     here has an `origin`, so the fetch the create route opens with
+ *     fails, and the two lines that refusal opens with are matched while
+ *     what git said about the missing remote is not. In text mode each
+ *     of the three writes its
  *     refusal to stderr as one message and nothing to stdout, the bytes
  *     the loop printed through `console.error` line by line before it
  *     threw instead. In json mode stdout holds the start event and one
@@ -450,7 +460,9 @@ const REFUSALS: readonly (readonly [string, RefusalCase])[] = [
       '   A plan run needs its own branch: that is what gives it a PR to',
       '   review, and what lets the wrap-up\'s CI stage have something to',
       '   wait on. Run on main and both are silently skipped.',
-      `\n   git checkout -b feat/${STUB}`,
+      `\n   Pass --create-branch to create feat/${STUB} from the latest`,
+      '   origin/main and run there.',
+      '   On a terminal the run asks that as a question instead of refusing.',
       '\n   Pass --any-branch to run here anyway.',
     ].join('\n'),
   }],
@@ -481,6 +493,26 @@ describe('loop start refusing', () => {
 
     expect([existsSync(textScratch.callLog), existsSync(jsonScratch.callLog)]).toEqual([false, false]);
   }, RUN_TIMEOUT);
+
+  it('reaches the branch offer ahead of the guard under --create-branch', () => {
+    // The wiring in `src/start.ts`: with the flag a run on `main` no
+    // longer refuses for being there, it tries to leave. No scratch
+    // repository here has an `origin`, so the fetch fails and the
+    // OFFER's own refusal comes out — which is the proof the offer ran.
+    // What git said about the missing remote follows and is not matched.
+    const scratch = plant({ branch: 'main', plan: PLAN_OPEN });
+
+    const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait', '--create-branch']);
+
+    expect(run.exitCode).toBe(1);
+    // The offer's opening line, written before its first step runs.
+    expect(run.stdout).toBe(`\n🌿 Creating feat/${STUB} from the latest origin/main.\n`);
+    expect(run.stderr.split('\n').slice(0, 2)).toEqual([
+      '',
+      `❌ Refusing to create feat/${STUB} from a stale origin/main: fetch origin main failed.`,
+    ]);
+    expect(existsSync(scratch.callLog)).toBe(false);
+  }, RUN_TIMEOUT);
 });
 
 describe('loop start with no --plan', () => {
@@ -498,6 +530,7 @@ describe('loop start with no --plan', () => {
   }, RUN_TIMEOUT);
 
   it('reads no .plans/PLAN.md under the default plan.dir, refusing the PLAN.md at the root as missing', () => {
+    // Deliberate custom-directory fixture: plants `.plans/PLAN.md` to verify it is ignored when `plan.dir` is default.
     const scratch = plant({ branch: 'main', plan: null });
     mkdirSync(join(scratch.repo, '.plans'));
     writeFileSync(join(scratch.repo, '.plans', 'PLAN.md'), PLAN_OPEN, 'utf8');

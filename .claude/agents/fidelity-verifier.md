@@ -5,7 +5,7 @@ tools: Read, Bash, Grep, Glob
 model: haiku
 ---
 
-> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except `.claude/`, `.plans/`, and `.specs/`, which live at the umbrella repo root.
+> Scope: file paths in this document are relative to `packages/ui/` (the `@ar/ui` package), except configuration and specification directories, which live at the umbrella repo root.
 
 You run the verification gates and report results. You are cheap and mechanical; you do not fix code or resolve design questions — you enforce the order, classify outcomes, and escalate anything ambiguous to the prime.
 

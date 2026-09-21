@@ -8,7 +8,7 @@
  * that in the operator checkout would mean switching its branch out from
  * under whatever is uncommitted there, so the spec gives the run a
  * worktree of its own and removes it on success
- * (`.specs/rafa-20-pr-commands.md`). Three things follow, and they are
+ * (`.rafa/specs/rafa-20-pr-commands.md`). Three things follow, and they are
  * the whole of this module:
  *
  *   - **Where the worktree goes.** {@link resolveWorktreePath} is the

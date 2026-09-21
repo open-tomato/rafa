@@ -499,6 +499,7 @@ describe('writeSpecSnapshot', () => {
   });
 
   it('writes under an absolute specs.dir as it does under a relative one', () => {
+    // Deliberate custom-directory fixture: passes absolute custom `specs.dir` path to verify correct handling.
     const absolute = join(root, 'elsewhere', 'specs');
 
     const written = writeSpecSnapshot({

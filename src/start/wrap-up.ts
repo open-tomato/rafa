@@ -62,7 +62,7 @@ import { withStamp } from './stamp.js';
  * attempted at all — a wrap-up run outside the release stage, which
  * then gets no release bullet of any kind. The spec's step 2 is the
  * whole of what those bullets ask for
- * (`.specs/rafa-21-changelog-and-release.md`): "rewrite the raw lines
+ * (`.rafa/specs/rafa-21-changelog-and-release.md`): "rewrite the raw lines
  * under that heading into one line per area, touching nothing else in
  * the file". {@link releaseBullets} holds why each of them is worded
  * the way it is.
@@ -117,7 +117,7 @@ function pullRequestStep(branch: string, openPullRequest: number | null): string
  * no preparation was attempted.
  *
  * The spec splits the release three ways
- * (`.specs/rafa-21-changelog-and-release.md`, its step 3 list): the
+ * (`.rafa/specs/rafa-21-changelog-and-release.md`, its step 3 list): the
  * loop writes the version and the raw notes, the SESSION rewrites the
  * prose, and the loop then verifies, commits and pushes. Only the
  * middle third is a prompt, so only the middle third is here. Each

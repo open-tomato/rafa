@@ -9,6 +9,15 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.6.0 — 2026-09-20, rafa keeps its own plans and specs where it tells every project to
+
+- plans and specs: This repository now keeps its own plans and specs where rafa tells every project to keep them, under `.rafa/plans` and `.rafa/specs`: the two config overrides naming the pre-default directories are gone, and every agent file, skill, context page, doc comment, prompt and root document was swept onto the defaults, with a regression test that fails if a tracked file outside the test suite names the old paths again.
+- doctor: `rafa doctor` tells a project that still points `plan.dir` or `specs.dir` at the directories rafa used before it had defaults of its own that a default exists, as a warning that leaves the exit code alone, and json mode carries the reading in its result data.
+- loop start: Started on `main` or `master`, `rafa loop start` now offers to create the plan's own branch, `feat/<stub>`, from the latest `origin/<base>` and run there: it refuses while a tracked file is modified, fetches, fast-forwards the base and refuses rather than branch from a diverged or unfetchable one, and switches to `feat/<stub>` instead when that branch already exists locally or on the remote. `--create-branch` takes the offer without asking, `--any-branch` still runs where it is, and the refusal a run without either meets names the flag instead of printing a `git checkout -b` line to copy.
+- plan create: The plan session is asked for its `rafa:spec-review` block at the end of its final message, where a `-p` session can actually write one, and the last block is read rather than the first. A plan whose session returned no readable block now stands, stamped `review: missing`, when `plan validate` passes; only an explicit `not-ready` verdict posts the review comment and swaps `spec:ready` for `spec:needs-work`; and a plan the readiness gate does refuse is moved to `rejected/` under the plans directory, with its prerequisites, instead of being deleted. `rafa plan create` also names the branch the run will use beside its `Execute with` hint.
+- plan parsing: A plan may write its issue as a bare number, `issue: 49`, as well as quoted.
+- docs: `rafa loop start --help` shows an example using `--create-branch`, the `loop start` rows of `context/cli.md` and the branch section of `context/workflow.md` record branch creation, and the README roadmap ticks starting a plan from the main branch and letting rafa make the branch.
+
 ## 0.5.1 — 2026-09-20, rafa-22 — sweep the untriaged bugs filed by loop runs
 
 - plan create: `rafa plan create` refuses an issue whose body does not fill the spec template, naming every heading that is missing, empty or itemless, before it writes a plan file.

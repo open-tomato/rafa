@@ -3,10 +3,9 @@
  * beside them, their aliases, and the modules mounted under
  * `module/<name>`.
  *
- * `.specs/cli-surface.md` builds help and `describe` from "the
- * dispatcher's registry (not a second one)", so this one value answers
- * all three: the dispatcher routes through it, and the two rosters read
- * it.
+ * The CLI surface spec builds help and `describe` from "the dispatcher's
+ * registry (not a second one)", so this one value answers all three: the
+ * dispatcher routes through it, and the two rosters read it.
  *
  * ## What a registry holds
  *

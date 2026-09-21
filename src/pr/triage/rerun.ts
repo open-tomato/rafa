@@ -8,7 +8,7 @@
  * assessment edits the one triage comment, so an assessment that had
  * nothing new to say would rewrite the comment a person is in the
  * middle of reading. So the spec gives four readings for a re-run
- * (`.specs/rafa-20-pr-commands.md`), and this module is them:
+ * (`.rafa/specs/rafa-20-pr-commands.md`), and this module is them:
  *
  *   1. `already-assessed` — a stored triage whose `head` is the pull
  *      request's head. Print "already assessed at <time>", show the

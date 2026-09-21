@@ -44,7 +44,7 @@ report both.
 
 ## Boundaries
 
-- `.plans/` and `.specs/` are gitignored on purpose and never move into a
+- `.rafa/plans/` and `.rafa/specs/` are gitignored on purpose and never move into a
   tracked path.
 - Never commit, never push, never open a pull request, never merge. The
   loop owns all four. Once this session exits cleanly it runs

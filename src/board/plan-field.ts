@@ -2,35 +2,34 @@
  * One field recorded in a generated plan's `rafa:plan` block: the
  * mechanism, and the `issue: <n>` a plan written from the board carries.
  *
- * Two flags leave a record in the plan they kept. `--skip-review` records
- * `review: skipped` (`./review-stamp.ts`), and a run that planned from an
- * issue records the issue it planned from, which
- * `.specs/rafa-20-pr-commands.md` asks for in so many words: the plan's
- * `rafa:plan` block gets `issue: <n>`. Both write ONE line into a block a
- * session wrote, so the line-placing is here and each field's own meaning
- * stays with the module that owns it.
+ * Three records land in a plan the gate kept. `--skip-review` records
+ * `review: skipped` and a session whose review block could not be read
+ * records `review: missing`, both `./review-stamp.ts`'s; and a run that
+ * planned from an issue records the issue it planned from, which
+ * `.rafa/specs/rafa-20-pr-commands.md` asks for in so many words: the plan's
+ * `rafa:plan` block gets `issue: <n>`. All three write ONE line into a
+ * block a session wrote, so the line-placing is here and each field's own
+ * meaning stays with the module that owns it.
  *
  * Every function here is pure over the plan as text: nothing opens a
  * file, and the caller writes what it is handed. So the cases in
  * `./plan-field.test.ts` need no temporary directory.
  *
- * ## The issue is written QUOTED, and it has to be
+ * ## The issue is written QUOTED, and it stays that way
  *
  * `issue` IS one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), and the
- * reader takes it only as a STRING: a number is refused as
- * `unusable-field`, because `issue: 42` and `issue: 042` both parse as
- * the number 42 and a reader that turned one back into a string could
- * hand back a number the plan never wrote. So the stamp writes
- * `issue: "20"`, and `plan validate` reads the plan it stamped without an
- * issue. Measured on bun 1.3.14 on 2026-09-19, and held by the round-trip
- * case in `./plan-field.test.ts` — which is the only thing that can see
- * it, since a bare `issue: 20` reads back as a plausible-looking 42-style
- * number and only `parsePlan` calls it unusable.
+ * reader takes a whole number there as well as a string: `issue: 20`
+ * reads back as `"20"`. It reads the number YAML parsed, not the digits
+ * written, so `issue: 042` reads back as `"42"`. The stamp writes
+ * `issue: "20"` so the digits it wrote are the digits read back whatever
+ * they are, and `plan validate` reads the plan it stamped without an
+ * issue. Measured on bun 1.3.14 on 2026-09-20, and held by the
+ * round-trip case in `./plan-field.test.ts`, whose control is the
+ * leading-zero spelling the quoted line is immune to.
  *
  * A block already carrying `issue: 20` unquoted is REPLACED by the quoted
  * line for the same reason: a session that wrote the field by hand wrote
- * it in the shape the reader refuses, and the stamp is where that is put
- * right.
+ * it in the shape whose digits the reader cannot be trusted to give back.
  *
  * ## What it does to the file
  *

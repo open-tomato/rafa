@@ -3,7 +3,7 @@
  * the six labels, the spec issue template, the Roadmap issue and
  * `roadmap.issue`, each present or missing. `rafa doctor` prints these
  * rows and names `rafa init --board` as the fix
- * (`.specs/rafa-20-pr-commands.md`, "`rafa init` sets up the board").
+ * (`.rafa/specs/rafa-20-pr-commands.md`, "`rafa init` sets up the board").
  *
  * `./setup.ts` is the half that MAKES those parts, and this module is
  * the half that only looks. They are separate because a checker that

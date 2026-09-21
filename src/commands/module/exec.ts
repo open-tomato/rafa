@@ -2,7 +2,7 @@
  * `rafa module exec <module> <action>`: the action through which a
  * module's commands are reached.
  *
- * `.specs/modules-and-addons.md` puts a module's actions under
+ * The modules and addons spec puts a module's actions under
  * `rafa module exec <name> <action>`, mounted by the dispatcher under
  * `module/<name>`. This command declares `exec`, so the router reads on
  * past it (`src/cli/route.ts`): the next word names a mount and the word
