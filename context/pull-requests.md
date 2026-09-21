@@ -182,7 +182,7 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. FOUR routes ask the question. Two are
+someone allowed to change the repo. FIVE routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
 the pull request's author for `pr triage --resolve`. The other two are
 `plan create`'s, both through `requireTrustedBoardAuthor` — the board entry
@@ -201,10 +201,19 @@ roadmap runs check 0 alone — it carries no `spec:ready` label and fills no
 template, and what a planted line in it takes is the ORDER, not a prompt.
 Its refusal is the shared sentence, so it names the roadmap as `issue #<n>`
 and closes with the issue remedy, "a member must open the spec"; a remedy of
-its own would mean a third `BoardItemKind` in `src/board/trust.ts`. The
-`rafa:spec-review` comment reader spends no trust reading BY DESIGN, and
-that is the one call site left: `src/board/review-comment.ts` holds why, and
-it is that nothing ever reads that comment back into a prompt.
+its own would mean a third `BoardItemKind` in `src/board/trust.ts`.
+
+The FIFTH is the `rafa:spec-review` comment
+(`src/board/review-comment.ts`), and it IGNORES rather than refuses.
+Nothing in that comment is ever read back into a prompt, so what a planted
+one would take is the EDIT: the gate keeps one comment per issue, GitHub
+refuses an edit of another account's comment, and the gap list would be lost
+run after run. So `readTrustedSpecReviewComment` walks the issue's marker
+comments newest first over `readBoardTrust` and edits the first one a
+trusted account wrote; the refused ones are reported by id and author
+through the gate's warnings and left alone, and the gaps go in a comment
+posted beside them. The trust is the one check 0 already built, carried on
+`GateIssue` beside the number and the board.
 
 The repository a plan refusal names is a LABEL read from `origin` through
 the `git` seam (`boardRepoLabel`), never an input to the lookup: `gh`

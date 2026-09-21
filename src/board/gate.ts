@@ -109,6 +109,7 @@
  */
 import type { IssueBoard } from './issue-board.js';
 import type { SpecReviewGap, SpecReviewReading } from './spec-review.js';
+import type { BoardTrust } from './trust.js';
 import type { Output } from '../ports/index.js';
 
 import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
@@ -130,6 +131,12 @@ export interface GateIssue {
   readonly number: number;
   /** The board the comment and the label swap go through. */
   readonly board: IssueBoard;
+  /**
+   * What the author of a marker comment already on the issue is read
+   * through, so the gate never edits one a stranger planted
+   * (`./review-comment.ts`).
+   */
+  readonly trust: BoardTrust;
 }
 
 /** What {@link enforceSpecReview} is asked. */
@@ -378,7 +385,9 @@ async function publishGaps(
       issue: issue.number,
       body: specReviewCommentBody(gaps),
       board: issue.board,
+      trust: issue.trust,
     });
+    for (const passed of write.ignored) output.warn(passed.reason);
     output.info(`💬 ${write.action === 'posted'
       ? 'Posted'
       : 'Edited'} the review comment on issue #${String(issue.number)}.`);

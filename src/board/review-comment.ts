@@ -1,7 +1,8 @@
 /**
  * The spec-review comment: the one comment the readiness gate leaves on
  * an issue whose spec is not ready to plan from, the edit that replaces
- * it on a rerun, and the body both are made of.
+ * it on a rerun, the trust reading that decides which comment that edit
+ * may touch, and the body both writes are made of.
  *
  * The spec gives ONE spec-review comment per issue, marked
  * `<!-- rafa:spec-review v1 -->` and edited on a rerun
@@ -11,31 +12,58 @@
  * bodies: a triage comment is also a STORE, whose `rafa:triage` block
  * the next run reads back, and this one is a REPORT and nothing else.
  *
- * ## Nothing in this comment is ever read back
+ * ## The trust reading buys the EDIT, not the text
  *
- * {@link findSpecReviewComment} takes a comment's ID and nothing else.
- * The gaps are re-derived from the planner's own review on every run, so
- * a comment somebody edited in between changes no verdict, supplies no
- * prompt and moves no label. That is why no trust reading
- * (`./trust.ts`) is spent here, where `pr triage` spends one on the
- * marker comment it reads its stored head and its follow-up prompt out
- * of: text that reaches a prompt must come from an account that may
- * change the repository, and text nobody reads cannot reach one.
+ * Nothing in this comment is ever read back into a prompt.
+ * {@link readTrustedSpecReviewComment} takes a comment's ID and its
+ * AUTHOR and nothing else; the gaps are re-derived from the planner's
+ * own review on every run, so a comment somebody edited in between
+ * changes no verdict and supplies no prompt. That is what the other
+ * two marker-comment readers spend a trust reading for
+ * (`src/commands/pr/triage-trust.ts`), and it is why this module said
+ * for a while that it needed none.
  *
- * The one thing a planted marker comment can do is take the edit: the
- * gate would PATCH it rather than post beside it. GitHub refuses an edit
- * of another account's comment, and the gate reports a failed write and
- * keeps its verdict, so the worst case is a gap list that did not get
- * posted and said so.
+ * What a planted marker comment CAN take is the EDIT. The gate keeps
+ * one spec-review comment per issue and edits the newest marked one, so
+ * a comment a stranger marked is the one it would PATCH. GitHub refuses
+ * an edit of another account's comment, so the outcome is not a changed
+ * verdict but a LOST REPORT: the gap list the author needed is never
+ * posted, run after run, and what a person reading the issue finds is
+ * whatever the planted comment says. A write that fails is only a
+ * warning here (`./gate.ts`), so nothing downstream would notice.
  *
- * ## The newest marker comment is the one edited
+ * So the author is read through `./trust.ts` — the allow-list, then the
+ * one permission lookup, with a failed lookup refused rather than
+ * passed — and a marker comment whose author that reading refuses is
+ * IGNORED: passed over, reported by its id and its author
+ * ({@link ignoredReviewCommentMessage}), and left exactly as it is. The
+ * gate then edits rafa's own comment if there is one under it, and
+ * otherwise POSTS BESIDE the planted one, which is the report landing
+ * where a person will read it.
+ *
+ * Ignored and never refused, the rule
+ * `src/commands/pr/triage-trust.ts` keeps for the triage marker comment
+ * and for the same reason: anyone at all can comment on a public issue,
+ * and a gate that exited over one would hand a stranger a way to stop
+ * rafa reviewing specs on that repository at all.
+ *
+ * ## The newest TRUSTED marker comment is the one edited
  *
  * A body written by an older rafa, or a marker that ended up on the
- * issue twice, leaves more than one. The newest is the one a reader
- * would scroll to, so it is the one replaced; the older ones are left as
- * they are rather than deleted, because deleting a person's comment is
- * not a thing a gate should do and the marker cannot prove rafa wrote
- * it.
+ * issue twice, leaves more than one. The walk is newest first and
+ * answers the FIRST trusted one, so a comment planted after rafa's own
+ * does not hide it: the alternative — reading the newest marker comment
+ * and posting beside it when its author is refused — would let one
+ * planted comment turn every rerun into a new comment, and the issue
+ * would collect one gap list per run.
+ *
+ * Older trusted markers are left as they are rather than deleted,
+ * because deleting a person's comment is not a thing a gate should do
+ * and the marker cannot prove rafa wrote it.
+ *
+ * One lookup per LOGIN and not per comment: the readings are memoised
+ * for the walk, so an issue carrying six marker comments from one
+ * account spends one `gh api`.
  *
  * ## The body
  *
@@ -51,13 +79,19 @@
  * gaps and writes nothing, and that is the gate's decision
  * (`./gate.ts`). Nothing here posts, either, until
  * {@link writeSpecReviewComment} is called with a board
- * (`./issue-board.ts`).
+ * (`./issue-board.ts`) and the trust the gate's issue carries.
  */
 import type { BoardComment, IssueBoard } from './issue-board.js';
 import type { SpecReviewGap } from './spec-review.js';
+import type { BoardTrust, TrustReading } from './trust.js';
+
+import { readBoardTrust, trustRefusalClause } from './trust.js';
 
 /** The HTML comment a rafa spec-review comment carries, and is found by. */
 export const SPEC_REVIEW_MARKER = '<!-- rafa:spec-review v1 -->';
+
+/** What a report calls an ignored comment, which is the marker without its HTML. */
+export const SPEC_REVIEW_COMMENT_NAME = 'rafa:spec-review';
 
 /** What a gap's sentence has every run of whitespace collapsed to. */
 const ONE_LINE = /\s+/gu;
@@ -71,12 +105,32 @@ const COMMENT_HISTORY = 'This comment is edited in place each time the spec is r
 /** Whether a write posted a new comment or edited the one that was there. */
 export type SpecReviewCommentAction = 'posted' | 'edited';
 
+/** One marker comment the trust reading refused, and why. */
+export interface IgnoredSpecReviewComment {
+  /** The comment's REST id, so a report can be matched to a comment. */
+  readonly id: string;
+  /** The login that wrote it. */
+  readonly author: string;
+  /** The whole sentence reporting it; see {@link ignoredReviewCommentMessage}. */
+  readonly reason: string;
+}
+
+/** The marker comment a rerun may edit, and the ones it passed over. */
+export interface TrustedSpecReviewComment {
+  /** The newest marker comment from a trusted author, or null when there is none. */
+  readonly comment: BoardComment | null;
+  /** Every newer marker comment that was ignored, newest first. */
+  readonly ignored: readonly IgnoredSpecReviewComment[];
+}
+
 /** What {@link writeSpecReviewComment} did. */
 export interface SpecReviewCommentWrite {
   /** Which of the two writes it made. */
   readonly action: SpecReviewCommentAction;
   /** The comment as the board answered it. */
   readonly comment: BoardComment;
+  /** The marker comments the trust reading refused, newest first. */
+  readonly ignored: readonly IgnoredSpecReviewComment[];
 }
 
 /** What {@link writeSpecReviewComment} is asked. */
@@ -87,11 +141,8 @@ export interface WriteSpecReviewCommentOptions {
   readonly body: string;
   /** The board the write goes through. */
   readonly board: IssueBoard;
-  /**
-   * The marker comment already there, when the caller has read the
-   * comments itself. The board is asked for them when this is left out.
-   */
-  readonly existing?: BoardComment | null;
+  /** What the author of a marker comment is read through; see the module note. */
+  readonly trust: BoardTrust;
 }
 
 /** `count` of `noun`, pluralised the only way this noun needs. */
@@ -135,29 +186,90 @@ export function specReviewCommentBody(gaps: readonly SpecReviewGap[]): string {
 }
 
 /**
- * The newest comment carrying {@link SPEC_REVIEW_MARKER}, or null when
- * none does. `comments` is taken in the board's order, oldest first.
+ * Every comment carrying {@link SPEC_REVIEW_MARKER}, NEWEST first.
+ * `comments` is taken in the board's order, oldest first.
  */
-export function findSpecReviewComment(comments: readonly BoardComment[]): BoardComment | null {
-  return [...comments].reverse().find((comment) => comment.body.includes(SPEC_REVIEW_MARKER)) ?? null;
+export function specReviewComments(comments: readonly BoardComment[]): readonly BoardComment[] {
+  return [...comments].reverse().filter((comment) => comment.body.includes(SPEC_REVIEW_MARKER));
 }
 
 /**
- * Writes the spec-review comment: an EDIT of the marker comment already
- * on the issue, or a new comment when there is none.
+ * The sentence one ignored marker comment is reported with: which
+ * comment, who wrote it, what GitHub said about their access, and that
+ * it was left alone.
+ *
+ * The claim about access is `trustRefusalClause`'s, so this sentence and
+ * the refusals `plan create` exits 2 with cannot come to disagree about
+ * what a reading means.
+ *
+ * Throws a `TypeError` for a trusted reading, as the clause does: a
+ * trusted comment is the one that gets edited and has nothing to report.
+ */
+export function ignoredReviewCommentMessage(
+  comment: BoardComment,
+  reading: TrustReading,
+  repo: string,
+): string {
+  const who = `was written by ${reading.login}, ${trustRefusalClause(repo, reading)}`;
+  return `the ${SPEC_REVIEW_COMMENT_NAME} comment ${comment.id} ${who};`
+    + ' it was left alone and the gaps went in a comment of their own';
+}
+
+/**
+ * The newest marker comment written by an author trusted with board
+ * text, and every newer one that was passed over on the way to it.
+ *
+ * Answers a reading rather than throwing: an untrusted marker comment is
+ * ignored and reported, never refused. See the module note for what a
+ * planted one would take and why the walk does not stop at the first
+ * untrusted comment.
+ */
+export async function readTrustedSpecReviewComment(
+  comments: readonly BoardComment[],
+  trust: BoardTrust,
+): Promise<TrustedSpecReviewComment> {
+  const trustOf = memoisedTrust(trust);
+  const ignored: IgnoredSpecReviewComment[] = [];
+  for (const comment of specReviewComments(comments)) {
+    const reading = await trustOf(comment.author);
+    if (reading.trusted) return { comment, ignored };
+    ignored.push({
+      id: comment.id,
+      author: comment.author,
+      reason: ignoredReviewCommentMessage(comment, reading, trust.repo),
+    });
+  }
+  return { comment: null, ignored };
+}
+
+/**
+ * Writes the spec-review comment: an EDIT of the newest marker comment
+ * on the issue whose author is trusted, or a new comment when there is
+ * none.
  *
  * One comment per issue with its history in its edits is the spec's
- * rule, so this never posts beside a marker comment it found.
+ * rule, so this never posts beside a marker comment it may edit. It
+ * does post beside one it may NOT, and names it in the write's
+ * `ignored`, for the caller to report.
  */
 export async function writeSpecReviewComment(
   options: WriteSpecReviewCommentOptions,
 ): Promise<SpecReviewCommentWrite> {
-  const { body, issue, board } = options;
-  const existing = options.existing === undefined
-    ? findSpecReviewComment(await board.comments(issue))
-    : options.existing;
+  const { body, issue, board, trust } = options;
+  const found = await readTrustedSpecReviewComment(await board.comments(issue), trust);
+  const { comment: existing, ignored } = found;
   if (existing === null) {
-    return { action: 'posted', comment: await board.comment(issue, body) };
+    return { action: 'posted', comment: await board.comment(issue, body), ignored };
   }
-  return { action: 'edited', comment: await board.editComment(existing.id, body) };
+  return { action: 'edited', comment: await board.editComment(existing.id, body), ignored };
+}
+
+/** A trust reading per login, memoised for one walk; see the module note. */
+function memoisedTrust(trust: BoardTrust): (login: string) => Promise<TrustReading> {
+  const read = new Map<string, Promise<TrustReading>>();
+  return (login: string): Promise<TrustReading> => {
+    const taken = read.get(login) ?? readBoardTrust(trust, login);
+    read.set(login, taken);
+    return taken;
+  };
 }

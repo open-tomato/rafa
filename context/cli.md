@@ -220,7 +220,9 @@ module's note is the long form.
   command is what acts on it. An explicit `verdict: not-ready` removes
   `PLAN-<stub>.md` and `PREREQUISITES-<stub>.md` when the session wrote
   them anyway, posts the gaps as one `<!-- rafa:spec-review v1 -->`
-  comment on the issue, edited on a rerun
+  comment on the issue, edited on a rerun unless the marker comment it
+  found was written by an author the trust reading refuses, in which case
+  it is reported, left alone and posted beside
   (`src/board/review-comment.ts`), swaps `spec:ready` for
   `spec:needs-work` over `src/board/issue-board.ts`, and throws exit code
   3 with every gap in the message. A comment or a label swap that fails

@@ -76,6 +76,7 @@
  */
 import type { IssueBoard } from './issue-board.js';
 import type { SpecReviewReading } from './spec-review.js';
+import type { BoardTrust } from './trust.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -99,6 +100,20 @@ import {
 import { SPEC_READY_LABEL } from './readiness.js';
 import { SPEC_REVIEW_MARKER } from './review-comment.js';
 import { parseSpecReview } from './spec-review.js';
+
+/**
+ * The trust the gate's issue carries, allow-listing the account every
+ * fake marker comment here is written by. Its lookup THROWS, so a case
+ * that reached one would fail rather than pass quietly: an allow-list
+ * hit spends none (`./trust.ts`).
+ */
+const TRUSTING: BoardTrust = {
+  permissions: () => {
+    throw new Error('the gate spent a permission lookup on an allow-listed author');
+  },
+  trustedAuthors: ['rafa-bot'],
+  repo: 'open-tomato/rafa',
+};
 
 /** The plan path every case names, as a planner names one. */
 const PLAN_PATH = '.rafa/plans/PLAN-rafa-20.md';
@@ -272,7 +287,7 @@ describe('enforceSpecReview lets through', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     });
@@ -293,7 +308,7 @@ describe('enforceSpecReview lets through', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output: capture().output,
     });
@@ -316,7 +331,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -379,7 +394,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -399,7 +414,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board: fakeBoard(false).board },
+      issue: { number: 20, board: fakeBoard(false).board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -419,7 +434,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: false,
       output,
     }));
@@ -465,7 +480,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     });
@@ -492,7 +507,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     });
@@ -540,7 +555,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -572,7 +587,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -594,7 +609,7 @@ describe('enforceSpecReview when a board write fails', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -614,7 +629,7 @@ describe('enforceSpecReview when a board write fails', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));

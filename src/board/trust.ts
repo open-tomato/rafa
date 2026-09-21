@@ -43,21 +43,24 @@
  * run reads is checked: the issue `--issue=<n>` names, the roadmap a
  * `--next` walk reads, and the line that walk picks.
  *
- * ONE is still unwired, a task of its own, and until it lands the
- * route it names runs the checks it ran before: the `rafa:spec-review`
- * marker comment (`./review-comment.ts`), whose reader is filtered by
- * author rather than refused.
+ * A FIFTH is the `rafa:spec-review` marker comment
+ * (`./review-comment.ts`), and it is the one caller that IGNORES rather
+ * than refuses on the board side: `readTrustedSpecReviewComment` walks
+ * the issue's marker comments newest first over {@link readBoardTrust}
+ * and edits the first one a trusted account wrote, so a comment this
+ * reading refuses is passed over, reported and left alone, and the
+ * readiness gate posts its gaps beside it.
  *
- * `context/pull-requests.md` carries what closing it costs.
+ * `context/pull-requests.md` carries the roster.
  *
  * ## What a planted spec-review comment can take
  *
  * The spec-review reader is a caller for a DIFFERENT reason from the
- * other two, and this note said for a while that it was no caller at
+ * other four, and this note said for a while that it was no caller at
  * all. Nothing in that comment is read back into a prompt —
- * `findSpecReviewComment` takes a comment's id and nothing else — so no
- * text of a stranger's reaches a session through it, and that much is
- * still true.
+ * `readTrustedSpecReviewComment` takes a comment's id and its author
+ * and nothing else — so no text of a stranger's reaches a session
+ * through it, and that much is still true.
  *
  * What a planted marker comment CAN take is the EDIT. The gate keeps
  * one spec-review comment per issue and edits the newest marked one, so
@@ -66,7 +69,9 @@
  * changed verdict but a LOST REPORT: the gap list the author needed is
  * never posted, run after run, and what a person sees on the issue is
  * whatever the planted comment says. That is worth a lookup, and the
- * reading the filter spends is this module's.
+ * reading the filter spends is this module's. `./review-comment.ts`
+ * carries the rest of that argument and what the filter does with the
+ * answer.
  *
  * ## The reading
  *

@@ -150,10 +150,16 @@
  * ## The gate's issue
  *
  * A not-ready verdict posts its gaps on the issue and swaps its labels,
- * and `./gate.ts` takes that as a {@link GateIssue}: the number and the
- * board to write through. Only the issue routes have one, so this module
- * answers it beside the spec — null under `--spec=<file>`, which has no
- * labels to move and nothing to comment on.
+ * and `./gate.ts` takes that as a {@link GateIssue}: the number, the
+ * board to write through, and the TRUST, which the gate spends on the
+ * author of a `rafa:spec-review` marker comment already on the issue so
+ * it never edits one a stranger planted (`./review-comment.ts`). It is
+ * the same trust check 0 was read through, already built and already
+ * memoised, because an issue route has read an issue by then.
+ *
+ * Only the issue routes have a gate issue, so this module answers it
+ * beside the spec — null under `--spec=<file>`, which has no labels to
+ * move and nothing to comment on.
  */
 import type { GateIssue } from './gate.js';
 import type { SpecIssue } from './issue.js';
@@ -376,6 +382,6 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     spec,
     gate: spec.issue === null
       ? null
-      : Object.freeze({ number: spec.issue, board: createGhIssueBoard({ gh }) }),
+      : Object.freeze({ number: spec.issue, board: createGhIssueBoard({ gh }), trust: trust() }),
   });
 }

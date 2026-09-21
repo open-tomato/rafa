@@ -1,35 +1,47 @@
 /**
  * Tests for the spec-review comment (`src/board/review-comment.ts`):
- * the body a gap list makes, which comment a rerun edits, and the two
- * writes.
+ * the body a gap list makes, which marker comment a rerun may edit once
+ * its author has been read through `./trust.ts`, and the two writes.
  *
  * The board is a fake holding comments in memory and recording every
- * call, so no case spawns `gh`. The body is a pure function and is
- * driven from literals.
+ * call, and the trust is a fake permission lookup counting the logins it
+ * was asked about, so no case spawns `gh`. The body is a pure function
+ * and is driven from literals.
  *
- * The one reading that could pass while wrong is the edit: a writer
- * that posted every time would satisfy every case asserting a comment
- * came back. So each write case asserts the CALL the board took, not
- * only the comment it answered, and the edit case asserts that no
- * second comment was posted.
+ * Two readings here could pass while wrong, and each has a case that
+ * would have caught it:
+ *
+ *   - The EDIT. A writer that posted every time would satisfy every case
+ *     asserting a comment came back, so each write case asserts the CALL
+ *     the board took and the edit case asserts that no second comment
+ *     was posted.
+ *   - The IGNORING. A reader that spent the trust reading and then
+ *     edited the comment anyway would answer the same `ignored` list, so
+ *     the planted-comment case asserts that the board was asked to
+ *     `comment` and never to `editComment` on the planted id.
  *
  * One mutation of `review-comment.ts` was driven on 2026-09-19 over
  * `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the module
  * restored from a scratch copy and verified with `shasum -c`: a writer
  * that posts whatever it found left 194 pass and 3 fail against 197
- * pass either side — the edit case and the pre-read case here, and the
- * rerun case in `gate.test.ts`.
+ * pass either side — the edit case here and the rerun case in
+ * `gate.test.ts`. A second was driven on 2026-09-21 for the trust
+ * filter, and is recorded beside the case it reddened.
  */
 import type { BoardComment, IssueBoard } from './issue-board.js';
 import type { SpecReviewGap } from './spec-review.js';
+import type { BoardTrust, PermissionReading, TrustReading } from './trust.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
   COMMENT_REMEDY,
-  findSpecReviewComment,
+  ignoredReviewCommentMessage,
+  readTrustedSpecReviewComment,
+  SPEC_REVIEW_COMMENT_NAME,
   SPEC_REVIEW_MARKER,
   specReviewCommentBody,
+  specReviewComments,
   writeSpecReviewComment,
 } from './review-comment.js';
 
@@ -38,6 +50,12 @@ const GAPS: readonly SpecReviewGap[] = [
   { heading: 'Definition of done', what: 'no item says how the merge clean-up is verified' },
   { heading: 'Tasks the plan must carry', what: 'the third task does not name what it changes' },
 ];
+
+/** What a refusal calls the repository in these cases. */
+const REPO = 'open-tomato/rafa';
+
+/** What a failed lookup wrote, as a reading carries it. */
+const LOOKUP_FAILURE = 'gh api repos/{owner}/{repo}/collaborators/octocat/permission failed: HTTP 401';
 
 /** One call the fake board took. */
 interface BoardCall {
@@ -68,6 +86,42 @@ function fakeBoard(held: readonly BoardComment[] = []): { board: IssueBoard; cal
     },
   };
   return { board, calls };
+}
+
+/** What the fake lookup answers for one login: a permission, or a failure. */
+function readingFor(login: string, answer: string | null): PermissionReading {
+  return answer === null
+    ? { login, permission: null, roleName: null, detail: LOOKUP_FAILURE }
+    : { login, permission: answer, roleName: answer, detail: '' };
+}
+
+/**
+ * A trust whose lookup answers `access` per login — `null` for a lookup
+ * that failed, `read` for a login it does not name — counting every
+ * login it was asked about.
+ */
+function fakeTrust(
+  access: ReadonlyMap<string, string | null>,
+  trustedAuthors: readonly string[] = [],
+): { trust: BoardTrust; looked: readonly string[] } {
+  const looked: string[] = [];
+  const trust: BoardTrust = {
+    permissions: (login) => {
+      looked.push(login);
+      const answer = access.has(login)
+        ? access.get(login) ?? null
+        : 'read';
+      return Promise.resolve(readingFor(login, answer));
+    },
+    trustedAuthors,
+    repo: REPO,
+  };
+  return { trust, looked };
+}
+
+/** A marker comment by `author`, as the board answers one. */
+function marker(id: string, author: string): BoardComment {
+  return { id, body: `${SPEC_REVIEW_MARKER}\ngaps from ${author}`, author };
 }
 
 describe('specReviewCommentBody', () => {
@@ -101,53 +155,161 @@ describe('specReviewCommentBody', () => {
   });
 });
 
-describe('findSpecReviewComment', () => {
-  it('answers the newest marker comment, and null when none carries the marker', () => {
-    const older: BoardComment = { id: '1', body: `${SPEC_REVIEW_MARKER}\nold gaps`, author: 'rafa-bot' };
+describe('specReviewComments', () => {
+  it('answers the marker comments newest first, and none of the others', () => {
+    const older = marker('1', 'rafa-bot');
     const plain: BoardComment = { id: '2', body: 'a person replying', author: 'octocat' };
-    const newer: BoardComment = { id: '3', body: `${SPEC_REVIEW_MARKER}\nnew gaps`, author: 'rafa-bot' };
+    const newer = marker('3', 'rafa-bot');
 
-    expect(findSpecReviewComment([older, plain, newer])).toBe(newer);
-    expect(findSpecReviewComment([plain])).toBeNull();
-    expect(findSpecReviewComment([])).toBeNull();
+    expect(specReviewComments([older, plain, newer])).toEqual([newer, older]);
+    expect(specReviewComments([plain])).toEqual([]);
+    expect(specReviewComments([])).toEqual([]);
+  });
+});
+
+describe('ignoredReviewCommentMessage', () => {
+  it('names the comment, its author and what GitHub said about their access', async () => {
+    const { trust } = fakeTrust(new Map([['octocat', 'read']]));
+    const found = await readTrustedSpecReviewComment([marker('7', 'octocat')], trust);
+    const [ignored] = found.ignored;
+
+    expect(ignored?.reason).toBe(
+      `the ${SPEC_REVIEW_COMMENT_NAME} comment 7 was written by octocat,`
+        + ` who has no write access to ${REPO};`
+        + ' it was left alone and the gaps went in a comment of their own',
+    );
+  });
+
+  it('refuses to report a trusted reading, which has nothing to report', () => {
+    const reading: TrustReading = {
+      login: 'maintainer',
+      trusted: true,
+      source: 'allow-list',
+      refusal: null,
+      permission: null,
+    };
+
+    expect(() => ignoredReviewCommentMessage(marker('7', 'maintainer'), reading, REPO)).toThrow(TypeError);
+  });
+});
+
+describe('readTrustedSpecReviewComment', () => {
+  it('answers the newest marker comment when a write-holder wrote it', async () => {
+    const { trust, looked } = fakeTrust(new Map([['rafa-bot', 'write']]));
+    const newest = marker('3', 'rafa-bot');
+
+    const found = await readTrustedSpecReviewComment([marker('1', 'rafa-bot'), newest], trust);
+
+    expect(found).toEqual({ comment: newest, ignored: [] });
+    expect(looked).toEqual(['rafa-bot']);
+  });
+
+  it('spends no lookup on a login in board.trustedAuthors', async () => {
+    const { trust, looked } = fakeTrust(new Map(), ['Rafa-Bot']);
+
+    const found = await readTrustedSpecReviewComment([marker('3', 'rafa-bot')], trust);
+
+    expect(found.comment?.id).toBe('3');
+    expect(looked).toEqual([]);
+  });
+
+  it('passes over a planted marker comment and answers rafa own one under it', async () => {
+    const { trust } = fakeTrust(new Map([['rafa-bot', 'write'], ['stranger', 'read']]));
+    const ours = marker('1', 'rafa-bot');
+
+    const found = await readTrustedSpecReviewComment([ours, marker('2', 'stranger')], trust);
+
+    expect(found.comment).toBe(ours);
+    expect(found.ignored.map((passed) => passed.id)).toEqual(['2']);
+    expect(found.ignored[0]?.author).toBe('stranger');
+  });
+
+  it('answers no comment when every marker comment is one the reading refuses', async () => {
+    const { trust } = fakeTrust(new Map([['stranger', 'read']]));
+
+    const found = await readTrustedSpecReviewComment([marker('1', 'stranger'), marker('2', 'stranger')], trust);
+
+    expect(found.comment).toBeNull();
+    expect(found.ignored.map((passed) => passed.id)).toEqual(['2', '1']);
+  });
+
+  it('ignores a comment whose lookup failed, and says so rather than naming access', async () => {
+    const { trust } = fakeTrust(new Map([['octocat', null]]));
+
+    const found = await readTrustedSpecReviewComment([marker('1', 'octocat')], trust);
+
+    expect(found.comment).toBeNull();
+    expect(found.ignored[0]?.reason).toContain(`could not be read (${LOOKUP_FAILURE})`);
+    expect(found.ignored[0]?.reason).not.toContain('has no write access');
+  });
+
+  it('spends one lookup per login, not one per comment', async () => {
+    const { trust, looked } = fakeTrust(new Map([['stranger', 'read']]));
+
+    await readTrustedSpecReviewComment(
+      [marker('1', 'stranger'), marker('2', 'stranger'), marker('3', 'stranger')],
+      trust,
+    );
+
+    expect(looked).toEqual(['stranger']);
   });
 });
 
 describe('writeSpecReviewComment', () => {
   it('posts one comment when the issue carries no marker comment', async () => {
     const { board, calls } = fakeBoard([{ id: '1', body: 'a person replying', author: 'octocat' }]);
+    const { trust } = fakeTrust(new Map());
 
-    const write = await writeSpecReviewComment({ issue: 7, body: 'the gaps', board });
+    const write = await writeSpecReviewComment({ issue: 7, body: 'the gaps', board, trust });
 
     expect(write.action).toBe('posted');
+    expect(write.ignored).toEqual([]);
     expect(calls).toEqual([
       { member: 'comments', args: [7] },
       { member: 'comment', args: [7, 'the gaps'] },
     ]);
   });
 
-  it('edits the marker comment that is there, and posts nothing beside it', async () => {
-    const marker: BoardComment = { id: '42', body: `${SPEC_REVIEW_MARKER}\nold gaps`, author: 'rafa-bot' };
-    const { board, calls } = fakeBoard([marker]);
+  it('edits the trusted marker comment that is there, and posts nothing beside it', async () => {
+    const { board, calls } = fakeBoard([marker('42', 'rafa-bot')]);
+    const { trust } = fakeTrust(new Map([['rafa-bot', 'admin']]));
 
-    const write = await writeSpecReviewComment({ issue: 7, body: 'the new gaps', board });
+    const write = await writeSpecReviewComment({ issue: 7, body: 'the new gaps', board, trust });
 
-    expect(write).toEqual({ action: 'edited', comment: { id: '42', body: 'the new gaps', author: 'rafa-bot' } });
+    expect(write).toEqual({
+      action: 'edited',
+      comment: { id: '42', body: 'the new gaps', author: 'rafa-bot' },
+      ignored: [],
+    });
     expect(calls).toEqual([
       { member: 'comments', args: [7] },
       { member: 'editComment', args: ['42', 'the new gaps'] },
     ]);
   });
 
-  it('spends no read when the caller has already found the comment, or found none', async () => {
-    const marker: BoardComment = { id: '42', body: SPEC_REVIEW_MARKER, author: 'rafa-bot' };
-    const found = fakeBoard();
-    const none = fakeBoard();
+  /**
+   * The mutation driven on 2026-09-21 over `bun test src/board/`, the
+   * module restored from a scratch copy and verified with `shasum -c`:
+   * `readTrustedSpecReviewComment` made to answer
+   * `specReviewComments(comments)[0] ?? null` with an empty `ignored`,
+   * which is the reader as it stood before the trust filter. 431 pass
+   * and 7 fail against 438 pass and 0 fail either side — this case,
+   * every case in the `readTrustedSpecReviewComment` block but the
+   * allow-list one, and the message case. This one is the reading that
+   * would otherwise have passed while wrong: the mutant EDITS the
+   * planted comment 42 where a post beside it is asserted.
+   */
+  it('posts beside a marker comment the reading refuses, and never edits it', async () => {
+    const { board, calls } = fakeBoard([marker('42', 'stranger')]);
+    const { trust } = fakeTrust(new Map([['stranger', 'read']]));
 
-    await writeSpecReviewComment({ issue: 7, body: 'x', board: found.board, existing: marker });
-    await writeSpecReviewComment({ issue: 7, body: 'x', board: none.board, existing: null });
+    const write = await writeSpecReviewComment({ issue: 7, body: 'the gaps', board, trust });
 
-    expect(found.calls).toEqual([{ member: 'editComment', args: ['42', 'x'] }]);
-    expect(none.calls).toEqual([{ member: 'comment', args: [7, 'x'] }]);
+    expect(write.action).toBe('posted');
+    expect(write.ignored.map((passed) => passed.id)).toEqual(['42']);
+    expect(calls).toEqual([
+      { member: 'comments', args: [7] },
+      { member: 'comment', args: [7, 'the gaps'] },
+    ]);
   });
 });
