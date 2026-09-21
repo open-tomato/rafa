@@ -509,7 +509,10 @@ export function specReadyRefusalMessage(issue: number): string {
  * label.
  *
  * Called before the body is read any further, so nothing is spent on an
- * issue nobody has marked ready. `plan create --next` asks
+ * issue nobody has marked ready — unless the caller has an offer to make
+ * first, which `src/board/plan-spec.ts` does when `plan create` has a
+ * terminal to ask on: then this is what refuses an issue the offer left
+ * unmarked, with the same sentence. `plan create --next` asks
  * {@link hasSpecReadyLabel} instead and STOPS at the line rather than
  * skipping it, which is the caller's decision and not this module's.
  */

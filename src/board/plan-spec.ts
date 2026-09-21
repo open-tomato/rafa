@@ -44,7 +44,10 @@
  *  0. the author's TRUST (`./trust.ts`): whether the login that opened
  *     the issue holds write access to the repository, or is listed in
  *     `board.trustedAuthors`. A failed lookup is a refusal too;
- *  1. the `spec:ready` label (`./readiness.ts`), a person's decision;
+ *  1. the `spec:ready` label (`./readiness.ts`), a person's decision.
+ *     An issue carrying none is OFFERED `issue ready` when the run
+ *     was handed an offer to make ({@link PlanSpecOptions.offerReady}),
+ *     and refused as it always was when it was not; see below;
  *  2. the code reading of the body, in two halves and the leak half
  *     first: the leak refusal (`./leak.ts`), which keeps a home path
  *     or a credential out of a prompt and off the disk, and then the
@@ -102,6 +105,33 @@
  * person, and spends ONE lookup for a login however many bodies it
  * wrote: the lookup is memoised for the length of one resolution
  * ({@link memoisePermissions}).
+ *
+ * ## The offer check 1 makes
+ *
+ * An issue nobody has marked `spec:ready` used to end the run with one
+ * sentence, and the operator's next move was a second command over the
+ * same issue. {@link PlanSpecOptions.offerReady} is that move offered
+ * where the refusal stood: `src/commands/plan/ready-offer.ts` fills the
+ * seam with `rafa issue ready`'s own run, so the author and the body
+ * are checked again, the two readings are printed, and
+ * `Mark #<n> spec:ready? [y/N]` is put through the line prompter. A yes
+ * labels the issue and the resolution goes on to the leak and
+ * completeness checks and the snapshot; a no throws the refusal check 1
+ * always threw.
+ *
+ * The offer is a SEAM and it is optional, so this module keeps its old
+ * behaviour wherever there is nothing to fill it with. Two runs fill it
+ * with nothing on purpose: one with no terminal to ask on, which the
+ * wiring answers null for before this module is reached, and one under
+ * `--dry-run`, which writes nothing and a label swap is a write. Both
+ * are refused with the sentence they were refused with before.
+ *
+ * The LEAK refusal runs BEFORE the offer, which the check order above
+ * does not otherwise ask for: the offer reads the body for its gaps and
+ * quotes headings off it, which is exactly what `requireNoLeak` clears
+ * a body for. So an unlabelled body carrying a home path is refused for
+ * the leak when there is an offer and for the label when there is not,
+ * and `./plan-spec.test.ts` measures both.
  *
  * ## The repository a refusal names
  *
@@ -177,7 +207,7 @@ import { normalizeRemote } from '../schema/project-id.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
-import { requireCompleteSpec, requireSpecReadyLabel } from './readiness.js';
+import { hasSpecReadyLabel, requireCompleteSpec, requireSpecReadyLabel } from './readiness.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
 import { resolveSpecSource } from './spec-source.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from './trust.js';
@@ -212,6 +242,53 @@ export function boardRepoLabel(git: GitRunner): string {
     : normalized;
 }
 
+/** What an offer is handed: the issue check 1 found unlabelled, and what it takes to mark it. */
+export interface ReadyOfferRequest {
+  /** The issue as read, whose author check 0 has already trusted. */
+  readonly issue: SpecIssue;
+  /** Runs `gh`, in the repository the board belongs to. */
+  readonly gh: GhRunner;
+  /** The permission lookup, the allow-list and the repository label, already memoised. */
+  readonly trust: BoardTrust;
+  /** Where the offer's own lines go. */
+  readonly output: Output;
+}
+
+/**
+ * Offers `rafa issue ready` on an issue check 1 found unlabelled, and
+ * answers whether it now carries the label.
+ *
+ * Filled by `src/commands/plan/ready-offer.ts`, which is where the
+ * terminal, the prompter and the label swap live; nothing in this
+ * module asks a question or writes to the board.
+ */
+export type ReadyOffer = (request: ReadyOfferRequest) => Promise<boolean>;
+
+/** The offer as {@link inspectSpecIssue} takes it, everything but the issue bound. */
+export type BoundReadyOffer = (issue: SpecIssue) => Promise<boolean>;
+
+/**
+ * Check 1: an issue carrying `spec:ready` passes, and one carrying none
+ * is refused with {@link requireSpecReadyLabel}'s own sentence unless
+ * `offer` marks it.
+ *
+ * The offer is made after the LEAK refusal and nowhere else in this
+ * module is: it reads the body for its gaps and quotes headings off it,
+ * so the body must be cleared before it is made. A run with no offer
+ * reads no byte of the body here, as it never did. The module note
+ * holds why the offer exists and which runs are handed none.
+ */
+async function passReadyLabel(issue: SpecIssue, offer: BoundReadyOffer | undefined): Promise<void> {
+  if (hasSpecReadyLabel(issue.labels)) return;
+  if (offer !== undefined) {
+    requireNoLeak(issueSource(issue.number), issue.body);
+    if (await offer(issue)) return;
+  }
+  // Nothing marked it ready — neither the person who opened it nor the
+  // offer, where one was made — so check 1 refuses it as it always did.
+  requireSpecReadyLabel(issue.number, issue.labels);
+}
+
 /**
  * The checks that run on an issue as read, before a byte of it is
  * written: the author's trust over `trust`, then the `spec:ready`
@@ -227,11 +304,19 @@ export function boardRepoLabel(git: GitRunner): string {
  * issue ready, and the completeness refusal QUOTES headings taken from
  * the body, so it must not run over a body `requireNoLeak` has not
  * cleared first. `./plan-spec.test.ts` measures all three orderings.
+ *
+ * `offer` is the one check 1 makes on an issue carrying no label
+ * ({@link passReadyLabel}); left out, the label check refuses as it
+ * always did and no byte of the body is read before it.
  */
-export async function inspectSpecIssue(issue: SpecIssue, trust: BoardTrust): Promise<void> {
+export async function inspectSpecIssue(
+  issue: SpecIssue,
+  trust: BoardTrust,
+  offer?: BoundReadyOffer,
+): Promise<void> {
   const source = issueSource(issue.number);
   await requireTrustedBoardAuthor({ kind: 'issue', number: issue.number }, trust, issue.author);
-  requireSpecReadyLabel(issue.number, issue.labels);
+  await passReadyLabel(issue, offer);
   requireNoLeak(source, issue.body);
   requireCompleteSpec(source, issue.body);
 }
@@ -300,6 +385,12 @@ export interface PlanSpecOptions {
   readonly trustedAuthors: readonly string[];
   /** Where `--spec` looks for its file; `src/plan.ts`'s own candidate rule. */
   readonly findSpec: (spec: string) => string;
+  /**
+   * Offers `issue ready` on an issue check 1 found unlabelled; null, or
+   * left out, for a run that refuses one as it always did. Never called
+   * under `--dry-run`, which writes nothing.
+   */
+  readonly offerReady?: ReadyOffer | null;
   /** Runs `gh`; one made for the project root when left out. */
   readonly gh?: GhRunner;
   /** Runs `git`; one made for the project root when left out. */
@@ -353,6 +444,14 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     return board;
   };
 
+  // The offer check 1 makes, with everything but the issue bound. A
+  // `--dry-run` run is handed none: its contract is that it writes
+  // nothing, and the label swap behind the question is a write.
+  const offerReady = options.offerReady ?? null;
+  const offer = offerReady === null || options.dryRun
+    ? undefined
+    : (issue: SpecIssue): Promise<boolean> => offerReady({ issue, gh, trust: trust(), output });
+
   const resolution = await resolveSpecSource({
     request: options.request,
     refresh: options.refresh,
@@ -361,7 +460,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     specsDir: options.specsDir,
     findSpec: options.findSpec,
     issues: createGhSpecIssueReader({ gh }),
-    inspect: (issue) => inspectSpecIssue(issue, trust()),
+    inspect: (issue) => inspectSpecIssue(issue, trust(), offer),
     roadmap: {
       configured: options.roadmapIssue,
       search: createGhRoadmapSearch({ gh }),

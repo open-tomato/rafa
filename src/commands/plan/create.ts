@@ -102,7 +102,8 @@ export default wrapPhaseZeroCommand({
     {
       cmd: 'rafa plan create --issue=20',
       note: 'Snapshots the body of issue 20 to .rafa/specs/rafa-20-<slug>.md and plans from it, recording'
-        + ' issue: "20" in the plan. Refuses an issue that is closed, unlabelled or not marked spec:ready.',
+        + ' issue: "20" in the plan. Refuses an issue that is closed or unlabelled; one that is not marked'
+        + ' spec:ready is offered the label where there is a terminal, and refused where there is not.',
     },
     {
       cmd: 'rafa plan create --next --dry-run',

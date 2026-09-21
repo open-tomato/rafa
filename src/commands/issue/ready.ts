@@ -30,6 +30,17 @@
  * and refusing the whole command would make it fail inside a script
  * over a label a person has to choose to add.
  *
+ * ## The other place this run is made
+ *
+ * {@link runIssueReady} is also what `plan create --issue` and
+ * `plan create --next` offer an operator when the issue they were
+ * pointed at carries no `spec:ready` label and there is a terminal to
+ * ask on: `../plan/ready-offer.ts` fills the offer seam of
+ * `src/board/plan-spec.ts` with it, handing over the issue that route
+ * already read so no second `gh issue view` is spent. Nothing here
+ * knows about that caller; it hands over `readIssue` and reads the
+ * report, and a run with no terminal keeps the refusal it always had.
+ *
  * ## The order, and what each check costs
  *
  * Three readings, in this order, and the first that refuses ends the
@@ -309,8 +320,15 @@ export interface ReadySeams {
 /** The seams the registered command runs with: the system's own, every one. */
 export const DEFAULT_READY_SEAMS: ReadySeams = Object.freeze({});
 
-/** The prompter the one question goes through, opened to ask it and closed by `close`. */
-function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () => void } {
+/**
+ * The prompter the one question goes through, opened to ask it and
+ * closed by `close`. Nothing is opened by a run that never asks.
+ *
+ * Exported for `../plan/ready-offer.ts`, which puts this command's
+ * question inside a `plan create` run and must open and close the
+ * terminal the same way rather than spelling the pair a second time.
+ */
+export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () => void } {
   let prompter: Prompter | null = null;
   return {
     ask: async (question: string): Promise<boolean> => {

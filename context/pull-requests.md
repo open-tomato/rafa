@@ -259,6 +259,18 @@ Four checks, cheapest first; any one failing writes no plan file:
 1. Label (a person's decision): the issue carries `spec:ready`. Without it:
    "issue #<n> is not marked spec:ready", exit 2. `plan create --next` STOPS
    at a next line that is not ready and says so; it never skips ahead.
+   Where there is a TERMINAL, both board routes OFFER the label instead of
+   stopping there: `src/commands/plan/ready-offer.ts` puts
+   `rafa issue ready`'s own run — its two readings, its
+   `Mark #<n> spec:ready? [y/N]` question and its one label swap — inside
+   check 1, over the issue the route has already read, so no second
+   `gh issue view` is spent. A yes labels the issue and the run goes on to
+   the leak and completeness checks and the snapshot; a no throws the
+   refusal above. Two runs are offered nothing and keep that refusal
+   exactly: one with no terminal to ask on, read once when the command
+   starts, and one under `--dry-run`, which writes nothing and the swap is
+   a write. The leak refusal runs before the offer, since the offer quotes
+   headings off the body.
 2. Code: BOTH halves are wired and both refuse, the leak first. The leak
    refusal is `src/board/leak.ts`. The heading-completeness half is
    `requireCompleteSpec` (`src/board/readiness.ts`) — every template

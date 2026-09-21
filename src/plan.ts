@@ -52,6 +52,15 @@
  * the command at 0 before any session is paid for, which is why the
  * resolution is the first thing after the config.
  *
+ * An issue the board routes read that carries no `spec:ready` label is
+ * OFFERED the label rather than refused outright, when there is a
+ * terminal to ask on: `commands/plan/ready-offer.ts` puts
+ * `rafa issue ready`'s own run — its readings, its question and its one
+ * label swap — where check 1's refusal stood, and the resolution goes on
+ * only after a yes. A run with no terminal, and a `--dry-run` run, are
+ * handed no offer and keep that refusal exactly
+ * (`board/plan-spec.ts`).
+ *
  * The board routes resolve BEFORE the plan-already-there refusal,
  * because the stub is read off the snapshot's name and there is no name
  * until the issue has been read. So `--issue` against a stub already
@@ -199,6 +208,7 @@ import {
 } from './board/review-stamp.js';
 import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from './board/spec-source.js';
 import { CommandExit } from './cli/command.js';
+import { createPlanReadyOffer } from './commands/plan/ready-offer.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
@@ -546,6 +556,7 @@ export default async function plan(
     roadmapIssue,
     trustedAuthors: boardTrustedAuthors,
     findSpec: (spec) => findSpec(repoRoot, spec, specsDir),
+    offerReady: createPlanReadyOffer(),
   });
   // `--dry-run` and a roadmap with nothing left have both said their
   // piece already; the run is over and no session is paid for.

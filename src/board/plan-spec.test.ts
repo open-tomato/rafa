@@ -89,6 +89,39 @@
  *  - `boardRepoLabel`'s fallback dropped, so a checkout with no origin
  *    answers the empty string: 20 pass and 1 fail, the fallback case.
  *
+ * ## The offer check 1 makes
+ *
+ * The six cases the offer brings take this file to 30, and each drives
+ * the seam with a planted answer rather than a real run: what is
+ * measured here is WHERE the offer is called and what the resolution
+ * does with each answer, and `../commands/plan/ready-offer.test.ts`
+ * drives the run behind it. The two route cases are written as pairs
+ * over one planted board, the same unlabelled issue offered a yes and
+ * then a no, so "the snapshot is there" is held against "the snapshot
+ * is absent and the sentence is check 1's own".
+ *
+ * Four mutations were driven on 2026-09-21, one at a time, over
+ * `env -u CLAUDECODE bun test src/board/plan-spec.test.ts
+ * src/commands/plan/ready-offer.test.ts`, the module restored from a
+ * scratch copy and verified with `shasum -c` each time, against 38 pass
+ * and 0 fail either side:
+ *
+ *  - the offer left off the `inspectSpecIssue` call in
+ *    `resolvePlanSpec`, so the seam is built and never handed over: 35
+ *    pass and 3 fail, the two route cases and the `--dry-run` case,
+ *    whose control is an offer that must be reached. The two cases that
+ *    call `inspectSpecIssue` directly stay green, which is again the
+ *    point of having both kinds.
+ *  - the `--dry-run` guard dropped, so a dry run offers a label swap it
+ *    must not write: 37 pass and 1 fail, the `--dry-run` case alone.
+ *  - the offer made BEFORE the leak refusal rather than after it: 37
+ *    pass and 1 fail, the leaking-body case alone. Every other case
+ *    plants a body with no path in it, so only that one can see the
+ *    order.
+ *  - a declined offer let through rather than refused: 36 pass and 2
+ *    fail, the `no` half of each route pair, which then reaches the
+ *    snapshot instead of check 1's sentence.
+ *
  * ## The roadmap's own author
  *
  * Check 0 runs on the ROADMAP issue too, through `inspectRoadmapIssue`
@@ -128,6 +161,7 @@
  *    own: 428 pass and 2 fail, the two allow-list cases.
  */
 import type { SpecIssue } from './issue.js';
+import type { ReadyOffer } from './plan-spec.js';
 import type { BoardTrust } from './trust.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '../pr/git.js';
@@ -302,7 +336,30 @@ interface PlanSpecFields {
   readonly dryRun?: boolean;
   readonly roadmapIssue?: number | null;
   readonly trustedAuthors?: readonly string[];
+  readonly offerReady?: ReadyOffer | null;
 }
+
+/**
+ * An offer answering one thing, keeping the issues it was made over.
+ *
+ * It writes nothing and asks nothing: the run behind a real offer is
+ * `../commands/plan/ready-offer.ts`'s, with its own cases, and what
+ * these cases are about is WHERE the seam is called and what the
+ * resolution does with each answer.
+ */
+function plantedOffer(marked: boolean): { offer: ReadyOffer; taken: () => readonly number[] } {
+  const taken: number[] = [];
+  const offer: ReadyOffer = (request) => {
+    taken.push(request.issue.number);
+    return Promise.resolve(marked);
+  };
+  return { offer, taken: () => taken };
+}
+
+/** An offer no case may reach. */
+const UNREACHED_OFFER: ReadyOffer = (request) => {
+  throw new Error(`the resolution offered issue #${String(request.issue.number)} a label it must not be offered`);
+};
 
 /** What {@link resolvePlanSpec} is asked for one planted board. */
 function ask(
@@ -320,6 +377,7 @@ function ask(
     roadmapIssue: fields.roadmapIssue ?? null,
     trustedAuthors: fields.trustedAuthors ?? [],
     findSpec: (spec) => spec,
+    offerReady: fields.offerReady ?? null,
     gh,
     git,
     output: OUTPUT,
@@ -667,6 +725,101 @@ describe('the completeness refusal', () => {
     expect(refused.exitCode).toBe(BOARD_REFUSAL_EXIT);
     expect(refused.message).toContain('issue #20 is not ready to plan from');
     expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+});
+
+describe('the offer check 1 makes on an unlabelled issue', () => {
+  it('plans from an issue the offer marked, through --issue, and refuses the same one it did not', async () => {
+    const unlabelled = (): SpecIssue => issueOf(20, { labels: [SPEC_LABEL] });
+    const yes = plantedOffer(true);
+    const no = plantedOffer(false);
+
+    const marked = await ask({ kind: 'issue', issue: 20 }, plantedGh([unlabelled()]).gh, plantedGit().git, { offerReady: yes.offer });
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(true);
+    rmSync(join(root, snapshotAt(20)));
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, plantedGh([unlabelled()]).gh, plantedGit().git, { offerReady: no.offer }));
+
+    expect(marked.outcome).toBe('spec');
+    expect(yes.taken()).toEqual([20]);
+    // A no is check 1 refusing, with the sentence and the exit code it
+    // always carried, and nothing written.
+    expect(no.taken()).toEqual([20]);
+    expect(refused.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(refused.message).toBe(specReadyRefusalMessage(20));
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('plans from a roadmap line the offer marked, through --next, and refuses the same line it did not', async () => {
+    const planted = (): readonly SpecIssue[] => [
+      issueOf(ROADMAP, { body: ROADMAP_BODY, labels: [] }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20, { labels: [SPEC_LABEL] }),
+    ];
+    const yes = plantedOffer(true);
+    const no = plantedOffer(false);
+    const fields = { roadmapIssue: ROADMAP };
+
+    const marked = await ask({ kind: 'next', roadmap: null }, plantedGh(planted()).gh, plantedGit().git, { ...fields, offerReady: yes.offer });
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(true);
+    rmSync(join(root, snapshotAt(20)));
+    const refused = await refusal(() => ask({ kind: 'next', roadmap: null }, plantedGh(planted()).gh, plantedGit().git, { ...fields, offerReady: no.offer }));
+
+    if (marked.outcome !== 'spec') throw new Error(`the resolution stopped: ${marked.reason}`);
+    expect(marked.spec).toMatchObject({ kind: 'next', issue: 20 });
+    // The ROADMAP is never offered anything: it carries no spec:ready
+    // label and fills no template, and check 1 is not run over it.
+    expect(yes.taken()).toEqual([20]);
+    expect(no.taken()).toEqual([20]);
+    expect(refused.message).toBe(specReadyRefusalMessage(20));
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('offers nothing under --dry-run, which writes nothing, and keeps the refusal', async () => {
+    const board = plantedGh([issueOf(20, { labels: [SPEC_LABEL] })]);
+
+    const refused = await refusal(() => ask(
+      { kind: 'issue', issue: 20 },
+      board.gh,
+      plantedGit().git,
+      { dryRun: true, offerReady: UNREACHED_OFFER },
+    ));
+
+    expect(refused.message).toBe(specReadyRefusalMessage(20));
+    // The control: the same offer over the same issue without
+    // `--dry-run` IS reached, so the case above is the flag and not an
+    // offer the resolution never makes.
+    const taken = plantedOffer(true);
+    await ask({ kind: 'issue', issue: 20 }, plantedGh([issueOf(20, { labels: [SPEC_LABEL] })]).gh, plantedGit().git, { offerReady: taken.offer });
+    expect(taken.taken()).toEqual([20]);
+  });
+
+  it('offers nothing on an issue an outsider opened, which check 0 refuses first', async () => {
+    const board = plantedGh([issueOf(20, { labels: [SPEC_LABEL], author: 'outsider' })], { octocat: 'admin', outsider: 'read' });
+
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, plantedGit().git, { offerReady: UNREACHED_OFFER }));
+
+    expect(refused.exitCode).toBe(TRUST_REFUSAL_EXIT);
+    expect(refused.message).toContain('issue #20 was opened by outsider');
+  });
+
+  it('offers nothing on a leaking body, and names the leak where a run with no offer names the label', async () => {
+    const leaking = (): SpecIssue => issueOf(20, { labels: [SPEC_LABEL], body: 'Run it in /Users/ada/checkouts/rafa.\n' });
+
+    const offered = await refusal(() => inspectSpecIssue(leaking(), TRUSTED, UNREACHED_OFFER));
+    const unoffered = await refusal(() => inspectSpecIssue(leaking(), TRUSTED));
+
+    // The offer reads the body for its gaps and quotes headings off it,
+    // so the leak refusal clears the body before one is made.
+    expect(offered.exitCode).toBe(LEAK_REFUSAL_EXIT);
+    expect(offered.message).toContain('issue #20 names a machine path or a credential');
+    expect(offered.message).not.toContain('/Users/ada');
+    // A run with no offer reads no byte of the body at check 1, as it
+    // never did.
+    expect(unoffered.message).toBe(specReadyRefusalMessage(20));
+  });
+
+  it('reads no label off an issue that already carries one, and offers it nothing', async () => {
+    await expect(inspectSpecIssue(issueOf(20), TRUSTED, UNREACHED_OFFER)).resolves.toBeUndefined();
   });
 });
 
