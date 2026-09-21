@@ -65,6 +65,37 @@
  *  - the call moved BELOW the branch scan: 426 pass and 4 fail, these
  *    two and two there.
  *
+ * ## The blocked line, and the three endings that plan nothing
+ *
+ * A `--next` pick whose issue carries `spec:blocked` with a blocker
+ * still open is offered past rather than planned (`spec-source.ts`),
+ * and three of its four endings write nothing — a no, no offer at all,
+ * and no line under it worth offering. Each of those looks like the
+ * others from the outside, so each case asserts the SENTENCE it ends
+ * with as well as the stop, and the ones that could have written assert
+ * that no snapshot is there.
+ *
+ * The blocked reading itself is held by a pair: the same board with
+ * #24 open and with #24 closed. The closed half plans the blocked line
+ * ITSELF and prints no blocked line at all, which is what holds "the
+ * label alone does not block" against a reading that called every
+ * labelled issue blocked.
+ *
+ * Two mutations of `spec-source.ts` were driven on 2026-09-21, one at
+ * a time, over `env -u CLAUDECODE bun test
+ * src/board/blocked-line.test.ts src/board/spec-source.test.ts
+ * src/board/plan-spec.test.ts`, the module restored from a scratch copy
+ * and verified with `shasum -c` each time, against 96 pass and 0 fail
+ * either side:
+ *
+ *  - the blocked reading ignored, so every pick is planned: 86 pass and
+ *    10 fail, all eight blocked cases here and both in
+ *    `./plan-spec.test.ts`.
+ *  - the offer's ANSWER ignored, so a no plans the alternative anyway:
+ *    93 pass and 3 fail — the case that answers no here and the two
+ *    there. Only a case that answers no can see it, which is why every
+ *    yes case is paired with one.
+ *
  * ## Mutations driven
  *
  * Eleven mutations of `spec-source.ts` were driven on 2026-09-19, one
@@ -92,6 +123,7 @@
  *    snapshotted: 3 fail.
  *  - `--dry-run` ignored on the `--spec` route: 1 fail.
  */
+import type { AlternativeOfferRequest } from './blocked-line.js';
 import type { SpecIssue } from './issue.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { RoadmapSeams, SpecSourceResolution } from './spec-source.js';
@@ -108,6 +140,14 @@ import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
+  blockedLineSentence,
+  declinedMessage,
+  noAlternativeMessage,
+  notReadySentence,
+  unaskedMessage,
+} from './blocked-line.js';
+import { SPEC_BLOCKED_LABEL } from './blocked.js';
+import {
   closedIssueMessage,
   ISSUE_REFUSAL_EXIT,
   missingSpecLabelMessage,
@@ -115,8 +155,11 @@ import {
   SPEC_LABEL,
 } from './issue.js';
 import { specPath } from './naming.js';
+import { SPEC_READY_LABEL } from './readiness.js';
 import { exhaustedMessage, ROADMAP_SETTING, ROADMAP_TITLE } from './roadmap.js';
 import {
+  alternativeLine,
+  blockedPickLine,
   describeIssue,
   DRY_RUN_FLAG,
   dryRunLine,
@@ -126,6 +169,7 @@ import {
   noSourceMessage,
   notAnIssueMessage,
   pickLine,
+  passedLine,
   readSpecSourceFlags,
   resolveSpecSource,
   roadmapHeaderLine,
@@ -829,5 +873,210 @@ describe('resolveSpecSource over --next', () => {
     });
 
     await expect(failing).rejects.toThrow(TypeError);
+  });
+});
+
+/** The roadmap a blocked-line case reads: three open lines, the first blocked. */
+const BLOCKED_ROADMAP = [
+  '## Next, in order',
+  '',
+  '- [ ] #20 pull request commands',
+  '- [ ] #33 the board setup',
+  '- [ ] #34 naming and close-out',
+].join('\n');
+
+/** A body carrying the `Blocked by:` field, under a template heading. */
+function blockedBody(...ids: readonly number[]): string {
+  const named = ids.map((id) => `#${String(id)}`).join(' ');
+  return `## What you get\n\nThe commands.\n\nBlocked by: ${named}\n`;
+}
+
+/**
+ * The board a blocked-line case reads: #20 labelled `spec:blocked` and
+ * waiting on #24, with #33 and #34 ready under it.
+ */
+function blockedBoard(fields: Partial<Record<number, Partial<SpecIssue>>> = {}): readonly SpecIssue[] {
+  const ready = (number: number): SpecIssue => issueOf(number, {
+    labels: [SPEC_LABEL, SPEC_READY_LABEL],
+    ...fields[number],
+  });
+  return [
+    issueOf(ROADMAP, { title: ROADMAP_TITLE, body: BLOCKED_ROADMAP, labels: [] }),
+    issueOf(20, {
+      labels: [SPEC_LABEL, SPEC_READY_LABEL, SPEC_BLOCKED_LABEL],
+      body: blockedBody(24),
+      ...fields[20],
+    }),
+    issueOf(24, { labels: [SPEC_LABEL], ...fields[24] }),
+    ready(33),
+    ready(34),
+  ];
+}
+
+/** The blocked reading a case asserts against: #20, waiting on an open #24. */
+function blockedOf(open: readonly number[] = [24], unread: readonly number[] = []): {
+  issue: number;
+  blockers: readonly number[];
+  open: readonly number[];
+  unread: readonly number[];
+  fault: string | null;
+} {
+  return { issue: 20, blockers: [...open, ...unread], open, unread, fault: null };
+}
+
+/** An offer answering `planned`, keeping every request it was handed. */
+function plantedOffer(planned: boolean): {
+  offer: (request: AlternativeOfferRequest) => Promise<boolean>;
+  taken: () => readonly AlternativeOfferRequest[];
+} {
+  let taken: readonly AlternativeOfferRequest[] = [];
+  return {
+    offer: (request) => {
+      taken = [...taken, request];
+      return Promise.resolve(planned);
+    },
+    taken: () => taken,
+  };
+}
+
+describe('resolveSpecSource over --next on a blocked line', () => {
+  it('names the open blocker, offers the line under it and plans that one on a yes', async () => {
+    const { lines, output } = capture();
+    const issues = plantedIssues(blockedBoard());
+    const planted = plantedOffer(true);
+
+    const resolution = await nextRun({ issues, output, seams: { offerAlternative: planted.offer } });
+
+    expect(specOf(resolution)).toEqual({ path: snapshotAt(33), issue: 33, source: 'issue #33' });
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      pickLine({ issue: 20, ticked: false, why: 'pull request commands', lineNumber: 3 }),
+      blockedPickLine(blockedOf()),
+      alternativeLine({ issue: 33, ticked: false, why: 'the board setup', lineNumber: 4 }),
+    ]);
+    expect(blockedLineSentence(blockedOf())).toBe('#20 is blocked by #24 (open)');
+    // The blocked reading costs the blocker's state and nothing else:
+    // #20 was read by the walk, and #34 is never reached.
+    expect(issues.asked()).toEqual([ROADMAP, 20, 24, 33]);
+    expect(exists(snapshotAt(33))).toBe(true);
+    expect(exists(snapshotAt(20))).toBe(false);
+  });
+
+  it('hands the offer the blocked reading and the line it names, and asks once', async () => {
+    const planted = plantedOffer(true);
+
+    await nextRun({ issues: plantedIssues(blockedBoard()), seams: { offerAlternative: planted.offer } });
+
+    expect(planted.taken()).toHaveLength(1);
+    expect(planted.taken()[0]?.blocked.open).toEqual([24]);
+    expect(planted.taken()[0]?.blocked.issue).toBe(20);
+    expect(planted.taken()[0]?.line.issue).toBe(33);
+  });
+
+  it('plans nothing when the answer is not yes, and says so', async () => {
+    const { lines, output } = capture();
+    const planted = plantedOffer(false);
+
+    const resolution = await nextRun({
+      issues: plantedIssues(blockedBoard()),
+      output,
+      seams: { offerAlternative: planted.offer },
+    });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(lines.info.at(-1)).toBe(declinedMessage(33));
+    expect(exists(snapshotAt(33))).toBe(false);
+    expect(exists(snapshotAt(20))).toBe(false);
+  });
+
+  it('plans nothing and names both ways forward for a run handed no offer', async () => {
+    const { lines, output } = capture();
+
+    const resolution = await nextRun({ issues: plantedIssues(blockedBoard()), output });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(lines.info.slice(-2)).toEqual([
+      alternativeLine({ issue: 33, ticked: false, why: 'the board setup', lineNumber: 4 }),
+      unaskedMessage(20, 33),
+    ]);
+    expect(exists(snapshotAt(33))).toBe(false);
+  });
+
+  it('plans the blocked line itself, with no blocked line printed, once every blocker has closed', async () => {
+    const { lines, output } = capture();
+    const cleared = blockedBoard({ 24: { state: 'CLOSED' } });
+
+    const resolution = await nextRun({
+      issues: plantedIssues(cleared),
+      output,
+      seams: { offerAlternative: plantedOffer(true).offer },
+    });
+
+    expect(specOf(resolution).issue).toBe(20);
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      pickLine({ issue: 20, ticked: false, why: 'pull request commands', lineNumber: 3 }),
+    ]);
+    expect(exists(snapshotAt(20))).toBe(true);
+  });
+
+  it('holds the line when a blocker cannot be read at all, naming it as unread', async () => {
+    const { lines, output } = capture();
+    const missing = blockedBoard({ 20: { body: blockedBody(26) } });
+
+    const resolution = await nextRun({ issues: plantedIssues(missing), output });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(lines.info).toContain(blockedPickLine(blockedOf([], [26])));
+  });
+
+  it('passes over a line that is not ready on the way to the one it offers', async () => {
+    const { lines, output } = capture();
+    const unready = blockedBoard({ 33: { labels: [SPEC_LABEL] } });
+    const planted = plantedOffer(true);
+
+    const resolution = await nextRun({
+      issues: plantedIssues(unready),
+      output,
+      seams: { offerAlternative: planted.offer },
+    });
+
+    expect(specOf(resolution).issue).toBe(34);
+    expect(lines.info).toContain(passedLine({
+      line: { issue: 33, ticked: false, why: 'the board setup', lineNumber: 4 },
+      reason: 'not-ready',
+      sentence: notReadySentence(33),
+    }));
+  });
+
+  it('stops with nothing to offer when every line under the blocked one is passed over', async () => {
+    const { lines, output } = capture();
+    const none = blockedBoard({ 33: { labels: [SPEC_LABEL] }, 34: { labels: [SPEC_LABEL] } });
+
+    const resolution = await nextRun({
+      issues: plantedIssues(none),
+      output,
+      seams: { offerAlternative: plantedOffer(true).offer },
+    });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(lines.info.at(-1)).toBe(noAlternativeMessage(20));
+    expect(exists(snapshotAt(33))).toBe(false);
+  });
+
+  it('runs the picked issue checks on the line the offer named, and not on the blocked one', async () => {
+    let checked: readonly number[] = [];
+    const planted = plantedOffer(true);
+
+    await nextRun({
+      issues: plantedIssues(blockedBoard()),
+      inspect: (issue) => {
+        checked = [...checked, issue.number];
+        return Promise.resolve();
+      },
+      seams: { offerAlternative: planted.offer },
+    });
+
+    expect(checked).toEqual([33]);
   });
 });

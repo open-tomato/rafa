@@ -160,6 +160,7 @@
  *    `ghBoardTrust`, driven again now the roadmap has a case of its
  *    own: 428 pass and 2 fail, the two allow-list cases.
  */
+import type { AlternativeOffer } from './blocked-line.js';
 import type { SpecIssue } from './issue.js';
 import type { ReadyOffer } from './plan-spec.js';
 import type { BoardTrust } from './trust.js';
@@ -176,6 +177,7 @@ import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
+import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
 import { specPath } from './naming.js';
@@ -337,6 +339,7 @@ interface PlanSpecFields {
   readonly roadmapIssue?: number | null;
   readonly trustedAuthors?: readonly string[];
   readonly offerReady?: ReadyOffer | null;
+  readonly offerAlternative?: AlternativeOffer | null;
 }
 
 /**
@@ -378,6 +381,7 @@ function ask(
     trustedAuthors: fields.trustedAuthors ?? [],
     findSpec: (spec) => spec,
     offerReady: fields.offerReady ?? null,
+    offerAlternative: fields.offerAlternative ?? null,
     gh,
     git,
     output: OUTPUT,
@@ -839,5 +843,58 @@ describe('the repository a trust refusal names', () => {
 
     expect(boardRepoLabel(noRemote)).toBe(UNNAMED_REPO);
     expect(boardRepoLabel(empty)).toBe(UNNAMED_REPO);
+  });
+});
+
+describe('the offer --next makes past a blocked line', () => {
+  /** A roadmap whose first undone line is blocked, with a ready line under it. */
+  const BLOCKED_ROADMAP = ['- [ ] #20 — the pull request commands', '- [ ] #33 — the board setup'].join('\n');
+
+  /** The board those two lines are read off: #20 waiting on an open #24. */
+  function blockedBoard(): readonly SpecIssue[] {
+    return [
+      issueOf(ROADMAP, { body: BLOCKED_ROADMAP, labels: [] }),
+      issueOf(20, {
+        labels: [SPEC_LABEL, SPEC_READY_LABEL, SPEC_BLOCKED_LABEL],
+        body: `${completeBody(20)}\nBlocked by: #24\n`,
+      }),
+      issueOf(24, { labels: [SPEC_LABEL] }),
+      issueOf(33),
+    ];
+  }
+
+  it('plans the line a yes named, and stops without a snapshot on a no', async () => {
+    const fields = { roadmapIssue: ROADMAP };
+    const yes: AlternativeOffer = () => Promise.resolve(true);
+    const no: AlternativeOffer = () => Promise.resolve(false);
+
+    const planned = await ask({ kind: 'next', roadmap: null }, plantedGh(blockedBoard()).gh, plantedGit().git, { ...fields, offerAlternative: yes });
+    const stopped = await ask({ kind: 'next', roadmap: null }, plantedGh(blockedBoard()).gh, plantedGit().git, { ...fields, offerAlternative: no });
+
+    if (planned.outcome !== 'spec') throw new Error(`the resolution stopped: ${planned.reason}`);
+    expect(planned.spec).toMatchObject({ kind: 'next', issue: 33 });
+    expect(existsSync(join(root, snapshotAt(33)))).toBe(true);
+    // The no plans nothing at all, and the blocked line is not planned
+    // in its place either.
+    expect(stopped).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('offers nothing under --dry-run, which writes nothing, where a run without it is offered', async () => {
+    const unreached: AlternativeOffer = () => {
+      throw new Error('a --dry-run resolution asked whether to plan, which is a write');
+    };
+    let asked = 0;
+    const counted: AlternativeOffer = () => {
+      asked += 1;
+      return Promise.resolve(false);
+    };
+
+    const dry = await ask({ kind: 'next', roadmap: null }, plantedGh(blockedBoard()).gh, plantedGit().git, { roadmapIssue: ROADMAP, dryRun: true, offerAlternative: unreached });
+    await ask({ kind: 'next', roadmap: null }, plantedGh(blockedBoard()).gh, plantedGit().git, { roadmapIssue: ROADMAP, offerAlternative: counted });
+
+    expect(dry).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(asked).toBe(1);
+    expect(existsSync(join(root, snapshotAt(33)))).toBe(false);
   });
 });

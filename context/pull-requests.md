@@ -347,6 +347,23 @@ records `review: skipped`.
   why ("#20 taken: PR #33 open"), and exits 0 with a message when nothing is
   left. `--dry-run` prints the pick and stops.
 
+  A pick that is BLOCKED is the one line the walk offers its way past.
+  Its issue carries `spec:blocked` and its `Blocked by:` line names a
+  blocker the board still holds open, or one whose state this run could
+  not read (`src/board/blocked-line.ts`). Such a line is neither planned
+  nor stepped over silently: the run says `#57 is blocked by #24 (open)`,
+  walks on for the first line under it that is ready, not blocked and not
+  taken, names that one and asks `Plan #58 instead? [y/N]` through
+  `src/commands/plan/blocked-offer.ts`. Only a yes plans it. A no, a run
+  with no terminal to ask on, a `--dry-run` run and a roadmap with no such
+  line under the blocked one each plan nothing and say which, all four
+  exiting 0. READY there is the `spec:ready` label, which the ordinary
+  walk does not ask for: the pick is offered the label where it is
+  missing, while this one is named for a single yes and must need no
+  second question. An issue labelled `spec:blocked` whose line is missing
+  or unreadable counts as blocked and is REPORTED with the fault sentence
+  `rafa doctor` and `issue unblock` print, never guessed at.
+
 Both routes are mutually exclusive with `--spec` and with each other.
 
 Ticking: `pr merge` ticks the PR's `Closes #<n>` line in the roadmap issue

@@ -133,6 +133,23 @@
  * the leak when there is an offer and for the label when there is not,
  * and `./plan-spec.test.ts` measures both.
  *
+ * ## The blocked line `--next` offers its way past
+ *
+ * {@link PlanSpecOptions.offerAlternative} is the second question a
+ * `plan create` run can put, and it is filled the same way check 1's is:
+ * `src/commands/plan/blocked-offer.ts` reads the terminal once and
+ * answers null where there is none, and this module hands the seam on
+ * only when the run may write. A `--next` walk whose pick carries
+ * `spec:blocked` with a blocker still open names what it waits on, finds
+ * the first line under it that is ready, not blocked and not taken, and
+ * plans that one only on a yes (`./spec-source.ts`, `./blocked-line.ts`).
+ *
+ * The question asks about the ROADMAP's order rather than about a
+ * label, so no board write stands behind it and no trust reading is
+ * spent on it: the issue it names is checked exactly as a typed
+ * `--issue=<n>` would be, by {@link inspectSpecIssue}, once the answer
+ * is yes.
+ *
  * ## The repository a refusal names
  *
  * A trust refusal names the repository, and `gh` is never told which
@@ -191,6 +208,7 @@
  * beside the spec — null under `--spec=<file>`, which has no labels to
  * move and nothing to comment on.
  */
+import type { AlternativeOffer } from './blocked-line.js';
 import type { GateIssue } from './gate.js';
 import type { SpecIssue } from './issue.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
@@ -391,6 +409,12 @@ export interface PlanSpecOptions {
    * under `--dry-run`, which writes nothing.
    */
   readonly offerReady?: ReadyOffer | null;
+  /**
+   * Asks whether to plan the line `--next` offers in place of a blocked
+   * one; null, or left out, for a run that plans nothing and says so.
+   * Never called under `--dry-run`, for the same reason.
+   */
+  readonly offerAlternative?: AlternativeOffer | null;
   /** Runs `gh`; one made for the project root when left out. */
   readonly gh?: GhRunner;
   /** Runs `git`; one made for the project root when left out. */
@@ -452,6 +476,14 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     ? undefined
     : (issue: SpecIssue): Promise<boolean> => offerReady({ issue, gh, trust: trust(), output });
 
+  // The question `--next` asks about a blocked line, under the same two
+  // rules: a run with nobody to ask is handed none, and a `--dry-run`
+  // run is handed none because a yes would plan, which is a write.
+  const offerAlternative = options.offerAlternative ?? null;
+  const alternative = offerAlternative === null || options.dryRun
+    ? undefined
+    : offerAlternative;
+
   const resolution = await resolveSpecSource({
     request: options.request,
     refresh: options.refresh,
@@ -467,6 +499,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
       git,
       pullRequests: createGhOpenPullRequests({ gh }),
       inspectRoadmap: (issue) => inspectRoadmapIssue(issue, trust()),
+      offerAlternative: alternative,
     },
     output,
   });

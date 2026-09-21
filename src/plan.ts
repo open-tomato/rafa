@@ -61,6 +61,17 @@
  * handed no offer and keep that refusal exactly
  * (`board/plan-spec.ts`).
  *
+ * A `--next` run whose next line is BLOCKED — its issue labelled
+ * `spec:blocked` with a blocker still open — plans neither that line nor
+ * the one under it silently: it names what the line waits on,
+ * `#57 is blocked by #24 (open)`, offers by number the first line under
+ * it that is ready, not blocked and not taken, and plans that one only
+ * on a yes (`commands/plan/blocked-offer.ts`, `board/blocked-line.ts`).
+ * A run with no terminal and a `--dry-run` run are handed no offer,
+ * print what a run could plan instead, and plan nothing. Every one of
+ * those endings exits 0: the roadmap is in the state it is in, and no
+ * command failed.
+ *
  * The board routes resolve BEFORE the plan-already-there refusal,
  * because the stub is read off the snapshot's name and there is no name
  * until the issue has been read. So `--issue` against a stub already
@@ -208,6 +219,7 @@ import {
 } from './board/review-stamp.js';
 import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from './board/spec-source.js';
 import { CommandExit } from './cli/command.js';
+import { createPlanBlockedOffer } from './commands/plan/blocked-offer.js';
 import { createPlanReadyOffer } from './commands/plan/ready-offer.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
@@ -557,9 +569,11 @@ export default async function plan(
     trustedAuthors: boardTrustedAuthors,
     findSpec: (spec) => findSpec(repoRoot, spec, specsDir),
     offerReady: createPlanReadyOffer(),
+    offerAlternative: createPlanBlockedOffer(),
   });
-  // `--dry-run` and a roadmap with nothing left have both said their
-  // piece already; the run is over and no session is paid for.
+  // `--dry-run`, a roadmap with nothing left and a blocked next line
+  // nobody said yes past have each said their piece already; the run is
+  // over and no session is paid for.
   if (resolved.outcome === 'stopped') return;
 
   const specRequest = resolved.spec.path;
