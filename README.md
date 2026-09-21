@@ -1,11 +1,47 @@
 # rafa
 
+Run a plan through the ralph loop: one Claude Code session per task, one
+commit per task, then a pull request and a wait for CI, from one
+terminal.
+
+> **Alpha.** rafa is built with rafa, in the open, and it is not
+> finished: commands, files and defaults still change between versions,
+> and the [Roadmap](#roadmap) below says what is and is not there yet.
+> Feedback and bug reports are welcome at
+> [github.com/open-tomato/rafa/issues](https://github.com/open-tomato/rafa/issues/new/choose);
+> the order things are being built in is the pinned
+> [Roadmap issue](https://github.com/open-tomato/rafa/issues/31).
+
+## Before you run it
+
+Read this once; rafa also says it the first time you start a run.
+
+- **Every Claude Code session rafa starts runs with
+  `--dangerously-skip-permissions`.** That is what lets a plan run
+  unattended, and it means a task can edit, delete and run anything your
+  user account can, without asking. There is no switch for it yet.
+- **A run acts under your accounts.** It commits, pushes its branch,
+  opens a pull request with `gh`, waits for CI, and may file the
+  blockers and unrelated bugs it meets as issues on the project's
+  tracker.
+- **It spends your Claude usage**, one session per task plus the plan
+  and the wrap-up. `budget=` on a task caps that task.
+- So run it in a repository, on a branch and on a machine where all of
+  that is acceptable: a container or a disposable checkout is a good
+  first home. Nothing here is a sandbox.
+
+On a terminal, `rafa loop start` and `rafa plan create` print these
+notices and ask `Continue? [y] yes  [d] yes, and do not show this again
+[N] cancel`. Answering `d` records it in `~/.rafa/notices.json`
+(`{"dismissed": ["alpha", "danger"]}`); delete the file to see them
+again. Without a terminal they are printed as warnings and the run goes
+on.
+
 ## Install
 
-The package is `@open-tomato/rafa`, published to npm from this
-repository by an operator running `npm publish` with their own
-credentials. Once it is on the registry, it installs globally under
-either package manager:
+The package is `@open-tomato/rafa` on npm (`publishConfig` names
+`https://registry.npmjs.org/`, and `npm publish` builds first through
+`prepack`). It installs globally under either package manager:
 
 ```bash
 npm i -g @open-tomato/rafa
@@ -141,7 +177,15 @@ The agent task loop at the core of this project draws on several key sources:
   which provides the structured task runner and plan/report parsing layer.
 - **Ralph method**: The core agent orchestration pattern originates from
   [`open-tomato/open-tomato`](https://github.com/open-tomato/open-tomato).
-- **Instinct model**: Task routing and priority logic adapted from
-  [`continuous-learning-v2`](https://github.com/affaan-m/continuous-learning-v2) by affaan-m.
+- **Instinct model**: the instinct record (trigger, action, confidence,
+  evidence, scope) is adapted from the `continuous-learning-v2` skill of
+  [`affaan-m/everything-claude-code`](https://github.com/affaan-m/everything-claude-code)
+  by Affaan Mustafa (MIT).
 - **Sync protocol**: The session state and artifact synchronization design is drawn from
   open-tomato's hive-learning pattern.
+
+## License
+
+Apache-2.0; see [LICENSE](LICENSE). [NOTICE](NOTICE) names the works
+rafa builds on and their licences. rafa drives Claude Code and is not
+affiliated with or endorsed by Anthropic.

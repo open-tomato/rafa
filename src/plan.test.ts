@@ -138,6 +138,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from './board/naming.js';
+import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import { buildPlanPrompt, readPlanFormat, runBranchLine } from './plan.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
@@ -311,6 +312,10 @@ function plantScratch(): Scratch {
   const bin = join(root, 'bin');
   const home = join(root, 'home');
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
+  // The standing notices have their own suite (`notices/notices.test.ts`);
+  // these runs read a HOME that dismissed them, so each case reads the
+  // command's own lines.
+  writeDismissed(home, NOTICE_IDS);
 
   const spawned = join(root, 'spawned');
   const claude = join(bin, 'claude');

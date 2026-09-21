@@ -149,6 +149,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CONFIG_DEFAULTS } from '../config.js';
+import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { parsePlan } from '../plan/index.js';
 
 import { plantProjectConfig } from './cli-capture.js';
@@ -303,6 +304,13 @@ interface Planting {
    * none, which leaves the task nothing to commit.
    */
   readonly claudeWork?: string;
+  /**
+   * Whether the scratch HOME still owes the standing notices
+   * (`src/notices/notices.ts`). Defaults to dismissed, so every other
+   * case reads the run's own lines and nothing else; `pending` is the one
+   * case that reads the notices.
+   */
+  readonly notices?: 'pending';
 }
 
 /** One planted scratch repository and what a run under it reads. */
@@ -336,6 +344,7 @@ function plant(planting: Planting): Scratch {
   const bin = join(root, 'bin');
   const home = join(root, 'home');
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
+  if (planting.notices !== 'pending') writeDismissed(home, NOTICE_IDS);
 
   const callLog = join(root, 'calls.log');
   const claudeStdout = join(root, 'claude-stdout.txt');
@@ -619,6 +628,24 @@ describe('a loop start run with no open task', () => {
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
     expect(run.stdout.split('\n')).toEqual([...expected, '']);
+  }, RUN_TIMEOUT);
+
+  it('warns of the alpha and the skip-permissions notices first when the HOME has dismissed neither, and runs on', () => {
+    const scratch = plant({ branch: STUB, plan: PLAN_DONE, notices: 'pending' });
+
+    const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait']);
+    const lines = run.stdout.split('\n');
+    // The guard's branch warning comes before the notices, so the line
+    // read for "the run went on" is the first one after the guard.
+    const firstRunLine = lines.find((line) => line.startsWith('🧭 Task sessions are handed the plan')) ?? '';
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('is alpha software');
+    expect(run.stdout).toContain('--dangerously-skip-permissions');
+    // No terminal, so nothing was asked and the run went on: its own
+    // first line is there, after the notices.
+    expect(firstRunLine).not.toBe('');
+    expect(lines.indexOf(firstRunLine)).toBeGreaterThan(lines.findIndex((line) => line.includes('--dangerously-skip-permissions')));
   }, RUN_TIMEOUT);
 });
 

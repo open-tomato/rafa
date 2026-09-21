@@ -1,0 +1,20 @@
+{
+  "name": "@opentomato/rafa",
+  "version": "0.0.1",
+  "description": "Placeholder. The package is @open-tomato/rafa (with a hyphen): npm i -g @open-tomato/rafa",
+  "license": "Apache-2.0",
+  "author": "Marcos Tomatti <marcos@opentomato.io>",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-tomato/rafa.git",
+    "directory": "stubs/opentomato-rafa"
+  },
+  "homepage": "https://github.com/open-tomato/rafa#readme",
+  "files": [
+    "README.md"
+  ]
+}

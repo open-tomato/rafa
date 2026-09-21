@@ -9,6 +9,13 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.7.0 — 2026-09-21, ready to publish: licence, notices, npm
+
+- Notices: `loop start` and `plan create` print an alpha notice and the `--dangerously-skip-permissions` notice, ask once on a terminal (`y`, `d` to stop showing them, anything else cancels), and warn without one; dismissals live in `~/.rafa/notices.json`.
+- Licence: `LICENSE` (Apache-2.0) and `NOTICE`, naming template-agentic-research, open-tomato and everything-claude-code's `continuous-learning-v2`; the README's instinct-model link, which pointed at a repository that does not exist, now points at the real one.
+- Package: `publishConfig.registry` names npmjs, `prepack` builds before every pack or publish, `NOTICE` ships, and `description`, `repository`, `homepage`, `bugs` and `keywords` are filled in.
+- README: an alpha banner with feedback links and a "Before you run it" section.
+
 ## 0.6.0 — 2026-09-20, rafa keeps its own plans and specs where it tells every project to
 
 - plans and specs: This repository now keeps its own plans and specs where rafa tells every project to keep them, under `.rafa/plans` and `.rafa/specs`: the two config overrides naming the pre-default directories are gone, and every agent file, skill, context page, doc comment, prompt and root document was swept onto the defaults, with a regression test that fails if a tracked file outside the test suite names the old paths again.
