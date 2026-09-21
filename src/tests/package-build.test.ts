@@ -274,12 +274,23 @@ const EXPORTS = {
 /** What the manifest publishes: the build, and the NOTICE the licence asks to travel with it (npm adds LICENSE and README by itself). */
 const FILES = ['dist', 'NOTICE'];
 
+/** The public registry. */
+const NPMJS = 'https://registry.npmjs.org/';
+
 /**
  * How the manifest publishes: a scoped name needs the access spelled
- * out, and the registry is named because a machine's npm config may map
- * the scope to a private registry, which outranks `--registry`.
+ * out, and the registry is named TWICE. A machine's npm config may map
+ * the scope to a private registry (`@open-tomato:registry=...`), and for
+ * a scoped package npm reads the scope's registry ahead of the general
+ * one, so `registry` alone is ignored. Measured 2026-09-21 with
+ * `npm publish --dry-run`: with `registry` only, "Publishing to" named
+ * the private registry; with the scoped key beside it, npmjs.
  */
-const PUBLISH_CONFIG = { access: 'public', registry: 'https://registry.npmjs.org/' };
+const PUBLISH_CONFIG = {
+  access: 'public',
+  registry: NPMJS,
+  '@open-tomato:registry': NPMJS,
+};
 
 /** The engine the build targets, and the only one the manifest names. */
 const ENGINES = { bun: '>=1.3.14' };

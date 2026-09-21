@@ -9,6 +9,10 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.7.1 — 2026-09-21, publish to npmjs from any machine
+
+- Package: `publishConfig` names npmjs under `@open-tomato:registry` too. With `registry` alone, a machine whose npm config maps the scope to a private registry still published there, because npm reads a scope's registry first.
+
 ## 0.7.0 — 2026-09-21, ready to publish: licence, notices, npm
 
 - Notices: `loop start` and `plan create` print an alpha notice and the `--dangerously-skip-permissions` notice, ask once on a terminal (`y`, `d` to stop showing them, anything else cancels), and warn without one; dismissals live in `~/.rafa/notices.json`.
