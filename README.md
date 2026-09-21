@@ -4,6 +4,23 @@ Run a plan through the ralph loop: one Claude Code session per task, one
 commit per task, then a pull request and a wait for CI, from one
 terminal.
 
+What guides it:
+
+- **Tools before judgement.** Whatever code can decide, code decides: the
+  next task, the branch, the version, whether a pull request is green.
+  The agent is asked for the work itself and little else, which leaves
+  less to chance.
+- **Repeatable wherever it can be.** The steps around the agent are
+  scripts with tests, each run once and in a fixed order, so everything
+  that is not the agent's own writing comes out the same on a second
+  run, on another machine and after a resume.
+- **Your tools, not ours.** rafa drives what you already use (git, the
+  GitHub CLI, GitHub Issues) instead of rebuilding it, and keeps each of
+  those behind a small interface. Swapping one is meant to be an add-on,
+  not a migration: other issue trackers are on the way, starting with
+  Linear, and support for coding agents beyond Claude Code is being
+  specified.
+
 > **Alpha.** rafa is built with rafa, in the open, and it is not
 > finished: commands, files and defaults still change between versions,
 > and the [Roadmap](#roadmap) below says what is and is not there yet.
