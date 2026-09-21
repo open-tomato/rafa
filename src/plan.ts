@@ -201,6 +201,7 @@ import { CommandExit } from './cli/command.js';
 import { loadConfig } from './config-load.js';
 import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
+import { requireNoticesAnswered } from './notices/run.js';
 import { branchNameFor } from './start/branch-decision.js';
 import { checkUsage } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
@@ -594,6 +595,10 @@ export default async function plan(
     issue: resolved.gate,
     comment: flags.comment,
   };
+
+  // The planner is a session too: the same notices `loop start` shows
+  // (`notices/notices.ts`), ahead of the one call that costs money.
+  await requireNoticesAnswered();
 
   activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
   const generated = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);

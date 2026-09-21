@@ -198,6 +198,7 @@ import { fileURLToPath } from 'url';
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
+import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
 import { branchNameFor, REMOTE } from './start/branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './start/branch.js';
@@ -448,6 +449,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     args,
   });
   guardRunBranch(planStub, branch, args);
+
+  // Past the guard, so a run that is refused says only why, and ahead of
+  // the session record and every session: the alpha and the
+  // skip-permissions notices, until the person dismisses them
+  // (`notices/notices.ts`). A cancel here leaves the run on the branch the
+  // offer above may have created, with nothing run on it.
+  await requireNoticesAnswered();
   setActivePlanStub(planStub);
 
   // Refuses a second run of the plan before anything else is printed or

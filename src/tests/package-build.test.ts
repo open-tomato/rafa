@@ -271,11 +271,15 @@ const EXPORTS = {
   './ports': './dist/ports/index.js',
 };
 
-/** What the manifest publishes. */
-const FILES = ['dist'];
+/** What the manifest publishes: the build, and the NOTICE the licence asks to travel with it (npm adds LICENSE and README by itself). */
+const FILES = ['dist', 'NOTICE'];
 
-/** How the manifest publishes: a scoped name needs the access spelled out. */
-const PUBLISH_CONFIG = { access: 'public' };
+/**
+ * How the manifest publishes: a scoped name needs the access spelled
+ * out, and the registry is named because a machine's npm config may map
+ * the scope to a private registry, which outranks `--registry`.
+ */
+const PUBLISH_CONFIG = { access: 'public', registry: 'https://registry.npmjs.org/' };
 
 /** The engine the build targets, and the only one the manifest names. */
 const ENGINES = { bun: '>=1.3.14' };
