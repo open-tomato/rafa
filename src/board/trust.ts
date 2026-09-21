@@ -43,7 +43,15 @@
  * run reads is checked: the issue `--issue=<n>` names, the roadmap a
  * `--next` walk reads, and the line that walk picks.
  *
- * A FIFTH is the `rafa:spec-review` marker comment
+ * A FIFTH is `rafa issue ready <n>`
+ * (`src/commands/issue/ready.ts`), the command that ADDS the
+ * `spec:ready` label check 1 waits on. It runs
+ * {@link requireTrustedBoardAuthor} over the issue's `author` before
+ * the completeness check and before the question it puts, so an
+ * outsider's issue is refused without an operator being asked anything
+ * and without a heading off that body reaching a printed sentence.
+ *
+ * A SIXTH is the `rafa:spec-review` marker comment
  * (`./review-comment.ts`), and it is the one caller that IGNORES rather
  * than refuses on the board side: `readTrustedSpecReviewComment` walks
  * the issue's marker comments newest first over {@link readBoardTrust}
@@ -56,7 +64,7 @@
  * ## What a planted spec-review comment can take
  *
  * The spec-review reader is a caller for a DIFFERENT reason from the
- * other four, and this note said for a while that it was no caller at
+ * other five, and this note said for a while that it was no caller at
  * all. Nothing in that comment is read back into a prompt —
  * `readTrustedSpecReviewComment` takes a comment's id and its author
  * and nothing else — so no text of a stranger's reaches a session

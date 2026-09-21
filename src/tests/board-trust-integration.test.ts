@@ -1,13 +1,18 @@
 /**
- * An integration suite over the four call sites `src/board/trust.ts`
- * REFUSES through: `inspectSpecIssue` and `inspectRoadmapIssue`
- * (`src/board/plan-spec.ts`), and `readTrustedTriageComment` and
- * `requireTrustedResolveAuthor` (`src/commands/pr/triage-trust.ts`).
- * `./trust.ts`'s own module note numbers them the THIRD, the FOURTH and
- * the TWO already in `triage-trust.ts`. The FIFTH caller — the
- * `rafa:spec-review` marker filter in `./review-comment.ts` — IGNORES
- * rather than refuses and answers none of the four scenarios below, so
- * it stays `./review-comment.test.ts`'s alone.
+ * An integration suite over four of the five call sites
+ * `src/board/trust.ts` REFUSES through: `inspectSpecIssue` and
+ * `inspectRoadmapIssue` (`src/board/plan-spec.ts`), and
+ * `readTrustedTriageComment` and `requireTrustedResolveAuthor`
+ * (`src/commands/pr/triage-trust.ts`). `./trust.ts`'s own module note
+ * numbers them the THIRD, the FOURTH and the TWO already in
+ * `triage-trust.ts`. The fifth refusing site is `rafa issue ready`
+ * (`src/commands/issue/ready.ts`), which refuses through
+ * `requireTrustedBoardAuthor` as the two plan sites do; no scenario
+ * below drives it, and `src/commands/issue/ready.test.ts` holds its
+ * cases. The caller that IGNORES rather than refuses — the
+ * `rafa:spec-review` marker filter in `./review-comment.ts` — answers
+ * none of the four scenarios below either, so it stays
+ * `./review-comment.test.ts`'s alone.
  *
  * `./trust.test.ts` measures `readAuthorTrust` itself, and each
  * caller's own file measures what it does with a reading, but every

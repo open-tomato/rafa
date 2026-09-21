@@ -4,6 +4,13 @@
  * names there, the words and flags each reads off its line, and the
  * refusal of an adapter call that rejects.
  *
+ * `issue unblock` and `issue ready` reach no tracker: the board is
+ * GitHub's own for both. `issue unblock` takes {@link lineRefusal}
+ * alone, and `issue ready` takes it beside the project the dispatcher
+ * resolved ({@link issueProject}) and the config reader
+ * ({@link issueSubjectConfig}), which is where its
+ * `board.trustedAuthors` comes from.
+ *
  * ## The tracker, through the chain
  *
  * An action reads its line first. Then it resolves the config as
@@ -168,16 +175,23 @@ export function readChoiceFlag<T extends string>(
 }
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
-function projectOf(context: RafaContext): ProjectFound {
+export function issueProject(context: RafaContext): ProjectFound {
   if (context.project === null) throw new Error('rafa issue runs inside a project, and was handed none');
   return context.project;
 }
 
-/** The chain's two settings as the config resolves for the project, refusing a config `loadConfig` refuses. */
-function chainConfig(
-  project: ProjectFound,
-  warn: (message: string) => void,
-): Pick<RafaConfig, 'trackerDefault' | 'trackerFallback'> {
+/**
+ * The config as it resolves for the project, refusing one `loadConfig`
+ * refuses with exit code 1 and one line per problem, and writing every
+ * warning it raises through `warn`.
+ *
+ * The whole config and not the chain's two settings, because the
+ * subject's actions read different keys off it: the five tracker
+ * actions take `tracker.default` and `tracker.fallback`, and
+ * `./ready.ts` takes `board.trustedAuthors`. One reader is what keeps
+ * the refusal spelled once for the subject.
+ */
+export function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
   try {
     return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
   } catch (error) {
@@ -192,11 +206,11 @@ function chainConfig(
  * a config refused and a chain landing nowhere. See the module note.
  */
 export async function resolveIssueTracker(context: RafaContext, seams: IssueSeams): Promise<IssueTracker> {
-  const project = projectOf(context);
+  const project = issueProject(context);
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = chainConfig(project, warn);
+  const config = issueSubjectConfig(project, warn);
 
   let resolution: TrackerResolution;
   try {

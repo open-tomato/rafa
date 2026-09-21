@@ -189,17 +189,20 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. FIVE routes ask the question. Two are
+someone allowed to change the repo. SIX routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
-the pull request's author for `pr triage --resolve`. The other two are
-`plan create`'s, both through `requireTrustedBoardAuthor` — the board entry
-point in `src/board/trust.ts`, over a `BoardTrust` of the lookup, the
-allow-list and the repo label. `src/board/plan-spec.ts`'s
+the pull request's author for `pr triage --resolve`. Three are
+`requireTrustedBoardAuthor`'s — the board entry point in
+`src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
+the repo label. Two of those are `plan create`'s: `src/board/plan-spec.ts`'s
 `inspectSpecIssue` calls it ahead of the label check, the leak refusal and
 the completeness refusal, and its `inspectRoadmapIssue` calls it on the
 ROADMAP issue a `--next` walk reads its order off, before a line is parsed
-out of that body and before either taken reading is spent. The login both
-ask about is `SpecIssue.author`, which `src/board/issue.ts`'s
+out of that body and before either taken reading is spent. The third is
+`rafa issue ready <n>` (`src/commands/issue/ready.ts`), which calls it
+before the completeness check and before its own question, so an outsider's
+issue is refused with exit 2 and nobody is asked anything. The login all
+three ask about is `SpecIssue.author`, which `src/board/issue.ts`'s
 `ISSUE_VIEW_FIELDS` fetches.
 
 **Every body a `plan create` run reads is checked**: the issue `--issue=<n>`
@@ -210,7 +213,7 @@ Its refusal is the shared sentence, so it names the roadmap as `issue #<n>`
 and closes with the issue remedy, "a member must open the spec"; a remedy of
 its own would mean a third `BoardItemKind` in `src/board/trust.ts`.
 
-The FIFTH is the `rafa:spec-review` comment
+The SIXTH is the `rafa:spec-review` comment
 (`src/board/review-comment.ts`), and it IGNORES rather than refuses.
 Nothing in that comment is ever read back into a prompt, so what a planted
 one would take is the EDIT: the gate keeps one comment per issue, GitHub
