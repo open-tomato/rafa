@@ -22,10 +22,19 @@
  * the earlier row must win, and once with the earlier row's reading
  * taken away, which the later row must then answer. A table that
  * answered the earlier row unconditionally would pass the first half of
- * each pair and fail the second. The pairs are 1 over 2, 1 over 4, 3
- * over 4, 4 over 5, 5 over 6, 6 over 7, 7 over 8, 8 over 9, 10 over 9,
- * 10 over 11 and 11 over 12, and the finished plan whose pull request
- * was merged in the browser, which is row 12 read off a plan branch.
+ * each pair and fail the second. The pairs are 1 over 2, 1 over 4, 4
+ * over 2, 3 over 4, 4 over 5, 5 over 6, 6 over 7, 7 over 8, 8 over 9, 10
+ * over 9, 10 over 11, 11 over 12 and 12 over 8, and the finished plan
+ * whose pull request was merged in the browser, which is row 12 read
+ * off a plan branch. `4 over 2` and `12 over 8` are the same shape as
+ * `10 over 9`: rows 2 and 8 each carry their own base-branch conjunct
+ * inline rather than through a reading `./readings.test.ts` already
+ * covers, so a plan branch never answers `sync` or `start` for a base
+ * that is behind or a plan that is unstarted somewhere else, no matter
+ * how true the rest of the row's reading is off the base branch. Rows 9,
+ * 10 and 11 need no such pair: their own base-branch conjunct lives once
+ * in `picked()` (`./readings.ts`), and `./readings.test.ts` already
+ * holds it to asking the board nothing off the base branch.
  *
  * Each pre-condition is driven the same way: the modified tree beside
  * the same situation with a clean one, which answers row 9; the tree
@@ -71,6 +80,24 @@
  *    than ahead of rows 5, 6 and 7: 108 pass and 2 fail, both the cases
  *    that count what a running loop asks the double. Every answer is
  *    unchanged; the `gh` call is what the mutant spends.
+ *
+ * Two more were driven the same way on 2026-09-21 and 2026-09-22, one at
+ * a time, over `env -u CLAUDECODE bun test src/next/` with the `4 over
+ * 2` and `12 over 8` pairs below in place, each restored from a scratch
+ * copy and verified with `shasum -c` before the next:
+ *
+ *  - row 2's own base-branch conjunct dropped, so a plan branch whose
+ *    base happens to sit behind its remote answers `sync`: 139 pass and
+ *    0 fail before, 138 pass and 1 fail after, the `4 over 2` pair
+ *    alone. Before that pair existed the same mutant passed every case
+ *    in the file, because nothing ever planted a plan branch beside a
+ *    behind base at once.
+ *  - row 8's own base-branch conjunct dropped, so an unstarted plan
+ *    answers `start` off the base branch, wherever one happens to sit
+ *    unstarted: 140 pass and 0 fail before, 139 pass and 1 fail after,
+ *    the `12 over 8` pair alone. Every other case either plants no
+ *    unstarted plan at all or is already on the base when it plants one,
+ *    so none of them notices row 8 firing where row 12 should.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { BlockedLine } from '../board/blocked-line.js';
@@ -507,6 +534,13 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
     expect([both.id, alone.id]).toEqual(['loop-running', 'tracker-open']);
   });
 
+  it('reads open tasks on a plan branch as row 4 with the base behind it, and row 2 once the branch is the base itself', async () => {
+    const both = await stateOf({ branch: PLAN_BRANCH, plans: { [STUB]: { plan: OPEN_PLAN } }, standing: '0\t2\n' });
+    const alone = await stateOf(ROW['base-behind']);
+
+    expect([both.id, alone.id]).toEqual(['tracker-open', 'base-behind']);
+  });
+
   it('reads a checklist holding a blocked task and an open one as row 3, and row 4 without the blocked one', async () => {
     const both = await stateOf(ROW['tracker-blocked']);
     const alone = await stateOf({ branch: PLAN_BRANCH, plans: { [STUB]: { plan: OPEN_PLAN, tracker: OPEN_PLAN } } });
@@ -595,6 +629,14 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
 
     expect(state.id).toBe('nothing-left');
     expect(state.reading).toBe('`scratch` is no plan branch, and it has no open pull request');
+  });
+
+  it('reads a branch that is no plan branch at all as row 12 even with an unstarted plan waiting, and row 8 once the branch is the base itself', async () => {
+    const plans = { [STUB]: { plan: OPEN_PLAN } };
+    const both = await stateOf({ branch: 'scratch', plans });
+    const alone = await stateOf({ plans });
+
+    expect([both.id, alone.id]).toEqual(['nothing-left', 'plan-unstarted']);
   });
 });
 
