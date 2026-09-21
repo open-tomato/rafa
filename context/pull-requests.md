@@ -182,27 +182,28 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. TWO routes ask the question today, both
-through `src/commands/pr/triage-trust.ts`: the triage marker comment's
-author, and the pull request's author for `pr triage --resolve`.
+someone allowed to change the repo. THREE routes ask the question. Two are
+`src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
+the pull request's author for `pr triage --resolve`. The third is
+`plan create`'s, through `requireTrustedBoardAuthor` — the board entry point
+in `src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list
+and the repo label — called from `src/board/plan-spec.ts`'s
+`inspectSpecIssue` ahead of the label check, the leak refusal and the
+completeness refusal. The login it asks about is `SpecIssue.author`, which
+`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS` fetches. BOTH plan routes reach
+it: the issue `--issue=<n>` names, and the line a `--next` walk picks.
 
-**The `plan create` routes do NOT ask it.** Check 0 below is specified and
-unwired: `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check,
-the leak refusal and the completeness refusal only. The LOGIN is there —
-`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS` fetches `author` and every issue
-read carries it as `SpecIssue.author` — and nothing asks about it. An issue
-an outsider opened and a member labelled `spec:ready` is
-therefore snapshotted and planned from, and the label — which only a
-write-holder can add — is the whole of what stands between it and a plan.
-What wiring it now takes is `requireTrustedBoardAuthor` — the board entry
-point in `src/board/trust.ts`, over a `BoardTrust` of the lookup, the
-allow-list and the repo label — called from `inspectSpecIssue` ahead of the
-label check. Until that lands, read any
-sentence here about `--issue` or `--next` trust as the specification and
-not as the code. The `rafa:spec-review` comment reader spends no trust
-reading BY DESIGN, which is a different thing from this gap:
+**One body a `--next` run reads is still unchecked**: the ROADMAP issue's
+own, which is read to pick a line (`src/board/roadmap.ts`) and never passes
+through `inspectSpecIssue`. The `rafa:spec-review` comment reader spends no
+trust reading BY DESIGN, which is a different thing from that gap:
 `src/board/review-comment.ts` holds why, and it is that nothing ever reads
 that comment back into a prompt.
+
+The repository a plan refusal names is a LABEL read from `origin` through
+the `git` seam (`boardRepoLabel`), never an input to the lookup: `gh`
+resolves the repository from the directory it runs in. It is read on the
+first issue a run reads, so `--spec=<file>` spends no `git` for it.
 
 The issue's AUTHOR must hold `admin`, `maintain` or `write` on the
 repository (`gh api repos/{owner}/{repo}/collaborators/{login}/permission`),
@@ -224,9 +225,9 @@ follow-up prompt.
 Four checks, cheapest first; any one failing writes no plan file:
 
 0. Trust (section above): the issue's author must hold write access or be
-   listed, checked before the body is snapshotted. NOT WIRED on either
-   `plan create` route — the section above names the gap and what closing
-   it costs.
+   listed, checked before the body is read any further or snapshotted. It
+   costs one `gh api` per issue read, spent ahead of the free checks, and
+   none at all for a login in `board.trustedAuthors`.
 1. Label (a person's decision): the issue carries `spec:ready`. Without it:
    "issue #<n> is not marked spec:ready", exit 2. `plan create --next` STOPS
    at a next line that is not ready and says so; it never skips ahead.
@@ -288,10 +289,10 @@ records `review: skipped`.
 
 - `plan create --issue=<n>` — the spec is issue `<n>`'s body, snapshotted to
   `<specs.dir>/rafa-<n>-<slug>.md` (slug from the title). Fetch the issue
-  (`gh issue view <n> --json number,title,body,state,labels`), refuse a
-  closed issue or one without `type:spec`, and run the readiness checks
-  that are wired — the `spec:ready` label, the leak refusal, the thin-list
-  warning and the planner's own review — per check 0 and check 2 above. An
+  (`gh issue view <n> --json number,title,body,state,labels,author`), refuse
+  a closed issue or one without `type:spec`, and run the readiness checks —
+  the author's trust, the `spec:ready` label, the leak refusal, the
+  completeness refusal and the planner's own review. An
   existing snapshot that differs is refused without `--refresh`. A local
   file `<specs.dir>/rafa-<n>-notes.md`, when present, is appended
   under "Local notes": machine paths and private hosts live there and never

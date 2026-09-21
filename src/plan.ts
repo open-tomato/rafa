@@ -83,8 +83,9 @@
  * rejection's message. An unusable config, a line naming no spec source
  * or several, a spec that does not exist and a plan already there each
  * throw exit code 1 with the whole refusal as the message; a board
- * refusal — a closed or unlabelled issue, a leaking body, a snapshot
- * that differs with no `--refresh` — throws exit code 2, and a spec the
+ * refusal — an issue whose author is trusted with nothing, a closed or
+ * unlabelled issue, a leaking body, a snapshot that differs with no
+ * `--refresh` — throws exit code 2, and a spec the
  * planner judged not ready throws exit code 3 with every gap in it. Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
@@ -530,7 +531,7 @@ export default async function plan(
   repoRoot: string,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
-  const { settingSources, planDir, specsDir, roadmapIssue } = resolvePlanConfig(repoRoot, homedir());
+  const { settingSources, planDir, specsDir, roadmapIssue, boardTrustedAuthors } = resolvePlanConfig(repoRoot, homedir());
   const flags = readGateFlags(args);
 
   const source = readSpecSourceFlags(args);
@@ -543,6 +544,7 @@ export default async function plan(
     repoRoot,
     specsDir,
     roadmapIssue,
+    trustedAuthors: boardTrustedAuthors,
     findSpec: (spec) => findSpec(repoRoot, spec, specsDir),
   });
   // `--dry-run` and a roadmap with nothing left have both said their

@@ -323,6 +323,7 @@ describe('the completeness check reached through plan create itself', () => {
             body: issue.body,
             state: issue.state,
             labels: issue.labels.map((name) => ({ name })),
+            author: { login: issue.author },
           }),
           stderr: '',
         });
@@ -343,6 +344,11 @@ describe('the completeness check reached through plan create itself', () => {
       repoRoot: root,
       specsDir: SPECS_DIR,
       roadmapIssue: null,
+      // Check 0 runs ahead of check 2 (`src/board/plan-spec.ts`), and
+      // this suite is check 2's: the allow-list clears the author
+      // without a permission lookup, so the planted `gh` answers the
+      // one read the case is about and refuses every other command.
+      trustedAuthors: ['octocat'],
       findSpec: (spec) => spec,
       gh: ghOver(body),
       git: noBranches,

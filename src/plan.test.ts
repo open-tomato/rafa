@@ -150,16 +150,19 @@ const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
 const SPEC = '# Spec: a command probe\n\nNothing to build.\n';
 
 /**
- * The issue the stand-in `gh` answers `issue view` with; the one board
- * read a case here makes. Its body fills every template heading
- * (`./tests/spec-bodies.ts`) because the board route refuses an issue
- * with a readiness gap before it snapshots one, and what this case is
- * about is the snapshot.
+ * The issue the stand-in `gh` answers `issue view` with; the first of
+ * the two board reads a case here makes, the other being the permission
+ * lookup on its {@link ISSUE.author}. Its body fills every template
+ * heading (`./tests/spec-bodies.ts`) and its author holds write access
+ * on the stand-in, because the board route refuses an issue with an
+ * untrusted author or a readiness gap before it snapshots one, and what
+ * this case is about is the snapshot.
  */
 const ISSUE = {
   number: 20,
   title: 'The board routes',
   body: completeSpecBody('Spec: the board routes', 'Nothing to build.'),
+  author: 'octocat',
 };
 
 /** The spec content the fixture hands the context's builder. */
@@ -322,8 +325,10 @@ function plantScratch(): Scratch {
   writeFileSync(claude, ['#!/bin/sh', `: > '${spawned}'`, 'exit 97', ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
 
-  // The one board read `--issue` makes, answered by a stand-in: no case
-  // here reaches GitHub, and a second read would exit 1 naming its words.
+  // The two board reads `--issue` makes, answered by a stand-in: the
+  // issue, and check 0's permission lookup on the author who opened it
+  // (`src/board/plan-spec.ts`). No case here reaches GitHub, and a
+  // third read would exit 1 naming its words.
   const gh = join(bin, 'gh');
   writeFileSync(gh, [
     '#!/bin/sh',
@@ -334,7 +339,12 @@ function plantScratch(): Scratch {
       body: ISSUE.body,
       state: 'OPEN',
       labels: [{ name: 'type:spec' }, { name: 'spec:ready' }],
+      author: { login: ISSUE.author },
     })}'`,
+    '  exit 0',
+    'fi',
+    `if [ "$1" = "api" ] && [ "$2" = "repos/{owner}/{repo}/collaborators/${ISSUE.author}/permission" ]; then`,
+    `  printf '%s' '${JSON.stringify({ permission: 'admin', role_name: 'admin' })}'`,
     '  exit 0',
     'fi',
     'echo "the stand-in gh was asked $*" >&2',

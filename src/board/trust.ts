@@ -27,24 +27,25 @@
  *
  * ## The callers
  *
- * TWO are wired today, both in `src/commands/pr/triage-trust.ts` and
- * both on {@link readAuthorTrust} directly, carrying their own
+ * TWO are in `src/commands/pr/triage-trust.ts`, both on
+ * {@link readAuthorTrust} directly and carrying their own
  * `TriageTrust`: the `rafa:pr-triage` marker-comment reader, and
  * `pr triage --resolve` on the pull request's own author.
  *
- * THREE more are what {@link readBoardTrust} was added for, and NONE of
- * them is wired yet — each is a task of its own, and until it lands the
- * route it names runs the checks it ran before:
+ * A THIRD is what {@link readBoardTrust} was added for and is wired:
+ * `plan create`, in `src/board/plan-spec.ts`'s `inspectSpecIssue`,
+ * which runs {@link requireTrustedBoardAuthor} over the issue's
+ * `author` ahead of the label check, the leak refusal and the
+ * completeness refusal, so an untrusted body is refused before a byte
+ * of it is snapshotted. BOTH `plan create` routes reach it — the
+ * issue `--issue=<n>` names, and the line a `--next` walk picks.
  *
- *  - `plan create --issue`, in `src/board/plan-spec.ts`'s
- *    `inspectSpecIssue`, which today runs the label check, the leak
- *    refusal and the completeness refusal only. What it lacks is the
- *    CALL and no longer the login: `src/board/issue.ts`'s
- *    `ISSUE_VIEW_FIELDS` fetches `author`, and every issue it reads
- *    carries the login as `SpecIssue.author`.
- *  - `plan create --next`, on the Roadmap issue and on the issue the
- *    roadmap walk picks (`src/plan.ts`), which are two bodies a prompt
- *    is written from and neither is checked.
+ * TWO are still unwired, each a task of its own, and until one lands
+ * the route it names runs the checks it ran before:
+ *
+ *  - the ROADMAP issue's own body, which `plan create --next` reads to
+ *    pick a line (`src/plan.ts`, `./roadmap.ts`). The line it picks is
+ *    checked; the roadmap that named it is not.
  *  - the `rafa:spec-review` marker comment (`./review-comment.ts`),
  *    whose reader is filtered by author rather than refused.
  *

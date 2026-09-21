@@ -33,29 +33,76 @@
  * no case here reaches GitHub, spawns `gh` or `git`, or reads the
  * configuration `gh` keeps under the home.
  *
- * ## Which checks run, and which one does not yet
+ * ## Which checks run, in the order they run
  *
  * The readiness gate is four checks, cheapest first
- * (`.rafa/specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is the
- * three this stage wires, in the spec's order, and each is a refusal
- * that exits {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
+ * (`.rafa/specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is
+ * the three of them that run before a planner session is paid for, in
+ * the spec's order, and each is a refusal that exits
+ * {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
  *
+ *  0. the author's TRUST (`./trust.ts`): whether the login that opened
+ *     the issue holds write access to the repository, or is listed in
+ *     `board.trustedAuthors`. A failed lookup is a refusal too;
  *  1. the `spec:ready` label (`./readiness.ts`), a person's decision;
- *  2. the leak refusal (`./leak.ts`), the half of check 2 that keeps a
- *     home path or a credential out of a prompt and off the disk;
- *  3. the completeness gaps (`requireCompleteSpec` in `./readiness.ts`),
- *     the other half of check 2: every template heading present and
- *     non-empty, "Tasks the plan must carry" and "Definition of done"
- *     each holding a list item, and no placeholder left in the text.
+ *  2. the code reading of the body, in two halves and the leak half
+ *     first: the leak refusal (`./leak.ts`), which keeps a home path
+ *     or a credential out of a prompt and off the disk, and then the
+ *     completeness gaps (`requireCompleteSpec` in `./readiness.ts`) —
+ *     every template heading present and non-empty, "Tasks the plan
+ *     must carry" and "Definition of done" each holding a list item,
+ *     and no placeholder left in the text.
  *
- * ONE is deliberately not here, and it is not forgotten. Check 0, the
- * author's trust (`./trust.ts`), needs the issue's author, and the read
- * now carries it: `ISSUE_VIEW_FIELDS` asks for `author` and every issue
- * holds the login as {@link SpecIssue.author} (`./issue.ts`). What is
- * still missing is the call, so an issue body check 0 would have caught
- * still reaches the planner, which judges the spec itself as check 3
- * and refuses it there (`./gate.ts`). The cost is a session, not a
- * wrong plan.
+ * Check 3, the planner's own pass over the spec, is a session and is
+ * `./gate.ts`'s.
+ *
+ * ## Why trust runs first, and what it costs
+ *
+ * Check 0 is the only one of the three whose subject is the AUTHOR
+ * rather than the body, and the spec puts it first because a body
+ * nobody trusts should not be read, quoted in a refusal, or written
+ * down at all: the label refusal names only a number, but the
+ * completeness refusal quotes headings off the body, and the snapshot
+ * is the body. Running it ahead of the label is what makes "nothing of
+ * an untrusted body reaches the disk" a fact about the order and not a
+ * hope.
+ *
+ * It is also the only one that ASKS something: one
+ * `gh api repos/{owner}/{repo}/collaborators/<login>/permission` per
+ * issue read, spent before the free checks rather than after, so an
+ * unlabelled issue now costs a lookup it did not cost before. A login
+ * in `board.trustedAuthors` spends none (`./trust.ts`), and `--spec`
+ * spends none because it reads no issue.
+ *
+ * The check needs a login, and the read carries one:
+ * `ISSUE_VIEW_FIELDS` asks for `author` and every issue holds it as
+ * {@link SpecIssue.author} (`./issue.ts`). A payload naming no author
+ * reads as the empty login, which is no account and therefore no
+ * trust, so it is refused as a failed lookup rather than passed.
+ *
+ * Both `plan create` routes run it, because both reach an issue body
+ * through {@link inspectSpecIssue}: `--issue=<n>` on the issue named,
+ * and `--next` on the line the roadmap walk picks. The ROADMAP issue's
+ * own body is a third body a `--next` run reads, and it is NOT checked
+ * here: the walk reads it to pick a line (`./spec-source.ts`,
+ * `./roadmap.ts`) and hands it to no `inspect`. `./trust.ts`'s note
+ * holds that gap beside the other one left.
+ *
+ * ## The repository a refusal names
+ *
+ * A trust refusal names the repository, and `gh` is never told which
+ * one it is working on — it resolves that from the directory it runs
+ * in, the rule `./trust.ts` keeps for the path it builds. So the name
+ * is a LABEL, read from `origin` through the `git` seam by
+ * {@link boardRepoLabel} and falling back to {@link UNNAMED_REPO}.
+ *
+ * The label is read when an issue is, not on every run:
+ * {@link resolvePlanSpec} builds the trust inside the seam it hands
+ * over, so `--spec=<file>` spends no `git remote get-url origin` for a
+ * sentence it will never print. One resolution inspects one issue —
+ * the `--next` walk reads several and inspects only the line it picks
+ * (`./spec-source.ts`) — so that is one label read per run, which
+ * `./plan-spec.test.ts` counts on both routes.
  *
  * ## What the completeness refusal costs
  *
@@ -96,6 +143,7 @@
 import type { GateIssue } from './gate.js';
 import type { SpecIssue } from './issue.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
+import type { BoardTrust } from './trust.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
@@ -103,6 +151,7 @@ import type { GitRunner } from '../pr/git.js';
 import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGitRunner } from '../pr/git.js';
+import { normalizeRemote } from '../schema/project-id.js';
 
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
@@ -110,6 +159,7 @@ import { requireNoLeak } from './leak.js';
 import { requireCompleteSpec, requireSpecReadyLabel } from './readiness.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
 import { resolveSpecSource } from './spec-source.js';
+import { ghBoardTrust, requireTrustedBoardAuthor } from './trust.js';
 
 /** The exit code every board refusal this module composes carries; the spec's own. */
 export const BOARD_REFUSAL_EXIT = 2;
@@ -119,29 +169,50 @@ export function issueSource(issue: number): string {
   return `issue #${String(issue)}`;
 }
 
+/** What a trust refusal calls a repository `origin` names none of. */
+export const UNNAMED_REPO = 'this repository';
+
+/**
+ * What a trust refusal calls the repository: `origin` normalised as
+ * `host/owner/name`, or {@link UNNAMED_REPO} when `git` answers no
+ * remote, no repository or nothing at all.
+ *
+ * Read through the `git` seam rather than `gitRemoteUrl`, so a case in
+ * `./plan-spec.test.ts` spawns nothing for it. The module note holds
+ * why the repository is a label here and never an input to the lookup.
+ */
+export function boardRepoLabel(git: GitRunner): string {
+  const result = git(['remote', 'get-url', 'origin']);
+  const normalized = result.ok
+    ? normalizeRemote(result.stdout.trim())
+    : '';
+  return normalized === ''
+    ? UNNAMED_REPO
+    : normalized;
+}
+
 /**
  * The checks that run on an issue as read, before a byte of it is
- * written: the `spec:ready` label, then the leak refusal, then the
- * completeness gaps over every template heading. Throws
+ * written: the author's trust over `trust`, then the `spec:ready`
+ * label, then the leak refusal, then the completeness gaps over every
+ * template heading. Throws
  * `CommandExit({@link BOARD_REFUSAL_EXIT}, ...)` at the first that
- * refuses; the module note holds which checks are here, which one is
- * not, and what the completeness refusal costs.
+ * refuses; the module note holds which checks are here, why the trust
+ * one is first and what the completeness refusal costs.
  *
- * The order is the spec's, and it is also what keeps a leak out of a
- * refusal sentence: nothing is read off the body until a person has
- * marked the issue ready, and the completeness refusal QUOTES headings
- * taken from the body, so it must not run over a body `requireNoLeak`
- * has not cleared first. `./plan-spec.test.ts` measures both orderings.
- *
- * Answers a promise because that is what {@link resolveSpecSource} takes
- * for the seam, and not because anything here waits.
+ * The order is the spec's, and it is also what keeps a body out of a
+ * refusal sentence it should never have reached: nothing is read off
+ * the body until its author is trusted and a person has marked the
+ * issue ready, and the completeness refusal QUOTES headings taken from
+ * the body, so it must not run over a body `requireNoLeak` has not
+ * cleared first. `./plan-spec.test.ts` measures all three orderings.
  */
-export function inspectSpecIssue(issue: SpecIssue): Promise<void> {
+export async function inspectSpecIssue(issue: SpecIssue, trust: BoardTrust): Promise<void> {
   const source = issueSource(issue.number);
+  await requireTrustedBoardAuthor({ kind: 'issue', number: issue.number }, trust, issue.author);
   requireSpecReadyLabel(issue.number, issue.labels);
   requireNoLeak(source, issue.body);
   requireCompleteSpec(source, issue.body);
-  return Promise.resolve();
 }
 
 /** What {@link resolvePlanSpec} is asked. */
@@ -158,6 +229,8 @@ export interface PlanSpecOptions {
   readonly specsDir: string;
   /** `roadmap.issue` as config resolved it, or null for the titled issue. */
   readonly roadmapIssue: number | null;
+  /** `board.trustedAuthors` as config resolved it; check 0's allow-list. */
+  readonly trustedAuthors: readonly string[];
   /** Where `--spec` looks for its file; `src/plan.ts`'s own candidate rule. */
   readonly findSpec: (spec: string) => string;
   /** Runs `gh`; one made for the project root when left out. */
@@ -185,8 +258,9 @@ export type PlanSpecResolution =
  *
  * Throws the `CommandExit` of every refusal the routes carry: exit 1 for
  * the words typed (`./spec-source.ts`) and exit
- * {@link BOARD_REFUSAL_EXIT} for the board's own state — a closed or
- * unlabelled issue, a leaking body, a snapshot that differs with no
+ * {@link BOARD_REFUSAL_EXIT} for the board's own state — an issue whose
+ * author is trusted with nothing, a closed or unlabelled issue, a
+ * leaking body, an incomplete body, a snapshot that differs with no
  * `--refresh`, a roadmap that cannot be resolved.
  */
 export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpecResolution> {
@@ -194,6 +268,14 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
   const gh = options.gh ?? createGhRunner({ cwd: repoRoot });
   const git = options.git ?? createGitRunner(repoRoot);
   const output = options.output ?? activeOutput();
+  // Made when an issue is read and not before: `--spec=<file>` reads
+  // none, and the label is a `git remote get-url origin` that route
+  // must not spend. See the module note.
+  const trust = (): BoardTrust => ghBoardTrust({
+    gh,
+    trustedAuthors: options.trustedAuthors,
+    repo: boardRepoLabel(git),
+  });
 
   const resolution = await resolveSpecSource({
     request: options.request,
@@ -203,7 +285,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     specsDir: options.specsDir,
     findSpec: options.findSpec,
     issues: createGhSpecIssueReader({ gh }),
-    inspect: inspectSpecIssue,
+    inspect: (issue) => inspectSpecIssue(issue, trust()),
     roadmap: {
       configured: options.roadmapIssue,
       search: createGhRoadmapSearch({ gh }),

@@ -277,23 +277,26 @@ module's note is the long form.
   resolved, a board that will not take the edit and a pull request
   closing no issue are a warning or a silence. `--output=json` carries it
   as `roadmapTick`, null when the pull request closes nothing.
-- **Three of the readiness gate's checks run on a board route**
-  (`src/board/plan-spec.ts`): the `spec:ready` label, the leak refusal
-  and the completeness gaps (`requireCompleteSpec` in
-  `src/board/readiness.ts`), in that order, each exit 2 and each before
-  the body is snapshotted, so `--next` STOPS at a line that is not ready
-  rather than skipping it. The completeness refusal names every template
-  heading that is missing or empty, either of "Tasks the plan must
-  carry" and "Definition of done" holding no list item, and every
-  placeholder left in the text, in one sentence. It costs an issue
+- **Three of the readiness gate's four checks run on a board route**
+  (`src/board/plan-spec.ts`): the author's trust (`src/board/trust.ts`),
+  the `spec:ready` label, then the leak refusal and the completeness
+  gaps (`requireCompleteSpec` in `src/board/readiness.ts`), in that
+  order, each exit 2 and each before the body is snapshotted, so
+  `--next` STOPS at a line that is not ready rather than skipping it.
+  The completeness refusal names every template heading that is missing
+  or empty, either of "Tasks the plan must carry" and "Definition of
+  done" holding no list item, and every placeholder left in the text,
+  in one sentence. It costs an issue
   opened before `src/board/templates/spec.md` a hand edit, since such a
   body carries none of the six headings and is refused whole; the module
   note in `src/board/plan-spec.ts` holds that trade. The WARNING that
   ran in its place is gone, and `findListSectionGaps` and
   `listSectionWarning` now have no caller outside their own tests. Check
-  0, the author's trust, still needs an `author` the read does not ask
-  for; until it lands, an issue it would have caught reaches the
-  planner, which judges it as check 3.
+  0 runs first and is the one that ASKS something: one
+  `gh api repos/{owner}/{repo}/collaborators/<login>/permission` on the
+  issue's `author`, or none at all for a login in
+  `board.trustedAuthors`. A failed lookup is a refusal, and the
+  repository a refusal names is read from `origin` through `git`.
 - **The spec issue template is `src/board/templates/spec.md`**, a
   package asset the build copies to `dist/templates/` and `rafa init
   --board` writes to `.github/ISSUE_TEMPLATE/spec.md`. Its front matter
