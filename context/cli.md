@@ -148,6 +148,7 @@ module's note is the long form.
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
+  `commands/plan/plan-record.ts`,
   `src/usage.ts`, `effort/collect.ts` and `effort/report.ts`, and for
   every command `loadConfig`'s default warning sink in
   `src/config-load.ts`. `console.log`'s and `console.info`'s lines go at
@@ -217,7 +218,7 @@ module's note is the long form.
   stand-in `claude` first on the PATH and finds it never called, where
   `plan create` calls it.
 - **`plan create` enforces the planner's own verdict on the spec**
-  (`src/plan.ts`, `src/board/gate.ts`). The plan prompt asks the session
+  (`src/commands/plan/review-gate.ts`, `src/board/gate.ts`). The plan prompt asks the session
   to end its final message with a `rafa:spec-review` block, the `claude`
   planner reads it once and carries it back both on the plan it answers
   and on its rejections (`src/adapters/planner/claude.ts`), and this
@@ -240,12 +241,14 @@ module's note is the long form.
   `rafa:plan` block, while one that does not is removed and exits 3 with
   every parser issue named and still nothing posted. `--skip-review`
   bypasses that gate alone and records `review: skipped` in the same
-  block (`src/board/review-stamp.ts`), where the plan reader keeps either
+  block (`src/commands/plan/plan-record.ts`,
+  `src/board/review-stamp.ts`), where the plan reader keeps either
   word as a header extra; `--no-comment` keeps the gaps off the board and
   moves the labels anyway. Both flags are read in `src/board/gate.ts` and
   declared on `src/commands/plan/create.ts` beside the board flags.
 - **`plan create` plans from a file, an issue or the roadmap**
-  (`src/board/spec-source.ts`, `src/board/plan-spec.ts`).
+  (`src/commands/plan/spec-route.ts`, `src/board/spec-source.ts`,
+  `src/board/plan-spec.ts`).
   `--spec=<file>`, `--issue=<n>` and `--next[=<roadmap-issue>]` are
   mutually exclusive, and a line naming two, or none, is refused with
   exit code 1 — the second with the command's usage and

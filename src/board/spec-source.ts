@@ -376,7 +376,7 @@ export interface SpecSourceOptions {
   readonly repoRoot: string;
   /** Where snapshots live, as `specs.dir` resolved it. */
   readonly specsDir: string;
-  /** Where `--spec` looks for its file; `src/plan.ts`'s own candidate rule. */
+  /** Where `--spec` looks for its file; `src/commands/plan/spec-route.ts`'s own candidate rule. */
   readonly findSpec: (spec: string) => string;
   /** Reads one issue by number; memoised for the length of the call. */
   readonly issues: SpecIssueReader;

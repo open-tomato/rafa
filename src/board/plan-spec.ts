@@ -3,15 +3,16 @@
  * needs, built for one project, and the checks that run between an issue
  * being read and its body being written down.
  *
- * `src/plan.ts` reads the command line and runs the planner session.
- * What it must not also carry is the wiring: which runner reads the
+ * `src/plan.ts` builds the prompt and runs the planner session, and
+ * `src/commands/plan/spec-route.ts` is the route it resolves through.
+ * What neither must also carry is the wiring: which runner reads the
  * board, which readings answer "taken", which checks a route runs and
  * what the readiness gate then publishes on. That is this module, and
- * `plan create` is its one caller
+ * `spec-route.ts` is its one caller
  * (`.rafa/specs/rafa-20-pr-commands.md`, `context/cli.md`).
  *
  * ```text
- * plan.ts   readSpecSourceFlags(argv)      the words
+ * spec-route.ts   readSpecSourceFlags(argv)      the words
  *    │
  *    └─► resolvePlanSpec                   the seams, and the checks
  *           └─► resolveSpecSource          the route (./spec-source.ts)
@@ -401,7 +402,7 @@ export interface PlanSpecOptions {
   readonly roadmapIssue: number | null;
   /** `board.trustedAuthors` as config resolved it; check 0's allow-list. */
   readonly trustedAuthors: readonly string[];
-  /** Where `--spec` looks for its file; `src/plan.ts`'s own candidate rule. */
+  /** Where `--spec` looks for its file; `src/commands/plan/spec-route.ts`'s own candidate rule. */
   readonly findSpec: (spec: string) => string;
   /**
    * Offers `issue ready` on an issue check 1 found unlabelled; null, or

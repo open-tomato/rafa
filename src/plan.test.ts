@@ -94,6 +94,19 @@
  * `warn`, and the usage refusal thrown with no message, each reddened its
  * json case alone.
  *
+ * ## The mutation record below predates one split
+ *
+ * Every mutation named here was driven while `src/plan.ts` still carried
+ * the board routes, the gate wiring and the records. Three of those
+ * pieces have since moved, each with its own suite:
+ * `rejectedReview`, `generateOrExit` and the `recordMissingReview` call
+ * to `src/commands/plan/review-gate.ts`, the three records to
+ * `src/commands/plan/plan-record.ts`, and the route resolution with the
+ * `--spec` candidate rule to `src/commands/plan/spec-route.ts`. The
+ * `recordPlanIssue` call is still this module's. A rerun of one of those
+ * mutations therefore edits the module that now holds it, and the cases
+ * it reddens here are the ones named below.
+ *
  * One mutation of `plan.ts` was driven on 2026-09-19 over this file, the
  * module restored from a scratch copy and verified with `shasum -c`: the
  * `recordPlanIssue` call dropped left 20 pass and 1 fail against 21 pass

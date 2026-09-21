@@ -27,8 +27,8 @@
  * file the session wrote. A plan the parser reads as written stands:
  * one warning ({@link unreadReviewWarning}), no comment, no label
  * change, nothing moved, and `unread` answered so the caller records
- * `review: missing` in its `rafa:plan` block (`src/plan.ts`,
- * `./review-stamp.ts`). Removal, the comment and the label swap are an
+ * `review: missing` in its `rafa:plan` block
+ * (`src/commands/plan/plan-record.ts`, `./review-stamp.ts`). Removal, the comment and the label swap are an
  * explicit `verdict: not-ready`'s alone.
  *
  * The AGENT half of `rafa plan validate` is not run here. It resolves a
@@ -42,7 +42,8 @@
  * more: a file holding no `rafa:plan` block at all reports none either
  * and stands here (`./gate.test.ts`), and it is the caller's
  * `review: missing` stamp that then finds no block to record in and
- * warns, keeping the plan (`./review-stamp.test.ts`, `src/plan.ts`).
+ * warns, keeping the plan (`./review-stamp.test.ts`,
+ * `src/commands/plan/plan-record.ts`).
  *
  * A plan that does NOT read as written cannot stand either, and no
  * session judged the spec, so nothing is published for it: the two
@@ -433,8 +434,8 @@ async function swapLabels(issue: GateIssue, output: Output): Promise<void> {
  * `CommandExit({@link SPEC_NOT_READY_EXIT}, {@link specNotReadyMessage})`.
  *
  * Which rejections of the planner carry a reading worth enforcing is
- * the caller's decision, not this module's; `src/plan.ts` records the
- * one it makes.
+ * the caller's decision, not this module's;
+ * `src/commands/plan/review-gate.ts` records the one it makes.
  */
 export async function enforceSpecReview(options: SpecReviewGateOptions): Promise<SpecReviewStanding> {
   const { review, issue } = options;

@@ -30,8 +30,9 @@
  * The first half spawns `bun src/rafa.ts plan create` in a scratch git
  * repository, exactly as `src/plan.test.ts` does and for the same
  * reason: the board routes build their own `gh` and `git` runners
- * (`src/board/plan-spec.ts`) unless the caller hands one over, and
- * `src/plan.ts` hands none over, so only a real process with a stand-in
+ * (`src/board/plan-spec.ts`) unless the caller hands one over, and the
+ * route the command resolves through (`src/commands/plan/spec-route.ts`)
+ * hands none over, so only a real process with a stand-in
  * `gh` first on its PATH drives them without reaching GitHub. The
  * planner is a fixture resolved through a registry handed to the
  * command in place of core's, as `src/plan.test.ts`'s is; unlike that
