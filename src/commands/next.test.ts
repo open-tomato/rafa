@@ -55,9 +55,12 @@
  *  - the loop-started stop dropped, so the chain reads on after `loop
  *    start`: 178 pass and 1 fail, the loop case alone, which counts the
  *    reads rather than the lines.
- *  - `ALWAYS_ASKED` dropped from {@link allowedUnasked}, so a
- *    `--yes` list naming `ready` marks an issue ready unasked: 177 pass
- *    and 2 fail, the `ready` pair and the reading case beside it.
+ *  - `ALWAYS_ASKED` dropped from `allowedUnasked`, so a `--yes` list
+ *    naming `ready` marks an issue ready unasked: 177 pass and 2 fail,
+ *    the `ready` pair and the reading case beside it. That guard and
+ *    the reading it is asked through have since moved to
+ *    `src/next/ceiling.ts`, where `ceiling.test.ts` drives the same
+ *    mutation and the `--yes` cases this file no longer holds.
  *  - the question asked and its answer ignored, every step run: 176
  *    pass and 3 fail, the no case, the dispatched no case and the
  *    problems case, which answers no to end its chain.
@@ -75,9 +78,15 @@
  * the case that counts the result events — and what it reads there is
  * an ending with NO data at all, because the report the chain then gave
  * was the second result the dispatcher refuses.
+ *
+ * Those totals are what the scope answered on the day each mutation was
+ * driven. It answers 192 pass and 0 fail now: the `--yes` reading moved
+ * to `src/next/ceiling.ts` and took its cases with it, and the exit-2
+ * refusals it makes are dispatched here.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
 import type { RafaCommand } from '../cli/command.js';
+import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { Prompter } from '../project/root-choice.js';
@@ -89,14 +98,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
+import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   actionOutput,
-  allowedUnasked,
-  BARE_YES_ACTIONS,
   createNextCommand,
   DRY_RUN_FLAG,
   MAX_ACTIONS,
@@ -104,10 +112,8 @@ import {
   nextQuestion,
   proposalLine,
   readDryRun,
-  readYesCeiling,
   runNextChain,
   stateLine,
-  YES_FLAG,
 } from './next.js';
 
 /** A temporary directory of this file's own. */
@@ -222,7 +228,7 @@ interface Script {
   /** What the question is answered with. */
   readonly answer?: boolean;
   /** The ids that may run unasked. */
-  readonly ceiling?: readonly string[] | null;
+  readonly ceiling?: NextCeiling;
   readonly dryRun?: boolean;
 }
 
@@ -468,26 +474,6 @@ describe('the line', () => {
     expect(refused?.exitCode).toBe(1);
     expect(refused?.message).toBe(`❌ --${DRY_RUN_FLAG} takes no value, and read "sync" as one\nUsage: ${NEXT_USAGE}`);
   });
-
-  it('reads bare --yes as the four that neither merge, nor start a loop, nor push', () => {
-    expect(readYesCeiling({ [YES_FLAG]: true })).toEqual(['sync', 'wait', 'unblock', 'plan']);
-    expect(BARE_YES_ACTIONS).toEqual(['sync', 'wait', 'unblock', 'plan']);
-  });
-
-  it('reads a comma list, dropping the padding and the empty entries, and names nothing without the flag', () => {
-    expect(readYesCeiling({ [YES_FLAG]: 'merge, sync ,,plan' })).toEqual(['merge', 'sync', 'plan']);
-    expect(readYesCeiling({})).toBeNull();
-    expect(readYesCeiling({ [YES_FLAG]: false })).toBeNull();
-  });
-
-  it('allows an action a ceiling names, none where no ceiling was given, and never ready', () => {
-    expect([
-      allowedUnasked('merge', ['merge']),
-      allowedUnasked('merge', ['sync']),
-      allowedUnasked('merge', null),
-      allowedUnasked('ready', ['ready']),
-    ]).toEqual([true, false, false, false]);
-  });
 });
 
 /** How many projects the dispatched cases have planted. */
@@ -703,6 +689,29 @@ describe('the command, dispatched', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toBe(`❌ Expected no argument, got 1: merge\nUsage: ${NEXT_USAGE}\n`);
+    expect(git.calls()).toEqual([]);
+  });
+
+  it('ends with exit 2 for a --yes naming ready and for one naming no id, reading nothing either time', async () => {
+    const git = fakeGit(0);
+    const command = createNextCommand({
+      readRemote: () => {
+        throw new Error('a refused --yes resolved a provider');
+      },
+      openGit: () => git.git,
+      openPrompter: () => {
+        throw new Error('a refused --yes opened a prompter');
+      },
+    });
+    const project = plantProject();
+
+    const ready = await dispatchInProject(['next', `--${YES_FLAG}=ready`], [], [command], project);
+    const unknown = await dispatchInProject(['next', `--${YES_FLAG}=mrege`], [], [command], project);
+
+    expect([ready.exitCode, unknown.exitCode]).toEqual([CEILING_REFUSAL_EXIT, CEILING_REFUSAL_EXIT]);
+    expect(ready.stderr).toContain('which no list runs unasked');
+    expect(ready.stderr).toContain(`Usage: ${NEXT_USAGE}`);
+    expect(unknown.stderr).toContain('which is no step of rafa next');
     expect(git.calls()).toEqual([]);
   });
 

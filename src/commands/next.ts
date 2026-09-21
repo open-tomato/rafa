@@ -8,9 +8,10 @@
  * proposes and the two sentences it is said in, `readings.ts` is what
  * that table is read over and `sources.ts` composes those readings for
  * a real project, `actions.ts` maps an action id onto the registered
- * command that does it, and `sync.ts` holds the one action that runs
- * none. This module owns the loop, the question and the exit code, and
- * it is the only one of the six that prints anything.
+ * command that does it, `sync.ts` holds the one action that runs none,
+ * and `ceiling.ts` reads `--yes` as how far a run may go by itself.
+ * This module owns the loop, the question and the exit code, and it is
+ * the only one of the seven that prints anything.
  *
  * ## One turn of the chain
  *
@@ -65,17 +66,18 @@
  *
  * ## `--yes` is a risk ceiling
  *
- * Without it every action is asked about. With it none is: the ids it
- * names may run unasked, and the chain STOPS at the first action it does
- * not name, with that action's proposal already printed, so the person
- * reads what is left to do and decides. Bare, it names
- * {@link BARE_YES_ACTIONS} — the four that neither merge, nor start a
- * loop, nor push — so a chain from a green pull request prints the merge
- * proposal and merges nothing.
+ * Without it every action is asked about. With it none of the ids it
+ * names is: they may run unasked, and the chain STOPS at the first
+ * action the list leaves out, with that action's proposal already
+ * printed, so the person reads what is left to do and decides. That
+ * stop is `unasked`, and it is the only one of the endings this module
+ * reaches with a state it could have run.
  *
- * `ready` is never run unasked, whatever the list names: marking an
- * issue ready is a claim about a spec that a person makes, and `issue
- * ready` itself declares no flag that skips its question.
+ * Which ids a list may name — the eight, the four bare `--yes` allows,
+ * and the two lists refused with exit code 2, one naming `ready` and
+ * one naming a word that is no action id — is `src/next/ceiling.ts`,
+ * read here through {@link readYesCeiling} before any source is opened
+ * and asked through {@link allowedUnasked} once a state has answered.
  *
  * ## What it asks through, and what it never spawns
  *
@@ -101,11 +103,13 @@
  * 0 for every ending above, a pre-condition included: `rafa next` is a
  * guide, and a chain the person stopped is not a command that failed. 1
  * for a line it refuses and for a `sync` that would not fast-forward, 2
- * for a repository whose `pr.provider` is not `gh`, and whatever an
- * action threw for an action that failed.
+ * for a `--yes` list `src/next/ceiling.ts` refuses and for a repository
+ * whose `pr.provider` is not `gh`, and whatever an action threw for an
+ * action that failed.
  */
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { NextInvocation } from '../next/actions.js';
+import type { NextCeiling } from '../next/ceiling.js';
 import type { NextSources } from '../next/readings.js';
 import type { NextSourceSeams } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
@@ -113,7 +117,8 @@ import type { Output } from '../ports/index.js';
 import type { Prompter } from '../project/root-choice.js';
 
 import { CommandExit } from '../cli/command.js';
-import { actionInvocation, NEXT_COMMAND_ACTIONS, runAction } from '../next/actions.js';
+import { actionInvocation, runAction } from '../next/actions.js';
+import { allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { openNextSources } from '../next/sources.js';
 import { readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
@@ -129,9 +134,6 @@ export const NEXT_USAGE = 'rafa next [--dry-run] [--yes[=<action ids>]]';
 /** The flag that prints the two lines and stops. */
 export const DRY_RUN_FLAG = 'dry-run';
 
-/** The flag that names the actions which may run unasked. */
-export const YES_FLAG = 'yes';
-
 /** The mark the state line opens with. */
 const STATE_MARK = '📍';
 
@@ -143,12 +145,6 @@ const STOP_MARK = '⏹';
 
 /** How many actions may run in one chain; see the module note. */
 export const MAX_ACTIONS = 12;
-
-/** The action ids bare `--yes` allows: the four that neither merge, nor start a loop, nor push. */
-export const BARE_YES_ACTIONS: readonly string[] = Object.freeze(['sync', 'wait', 'unblock', 'plan']);
-
-/** The action no list runs unasked, whatever it names; see the module note. */
-const ALWAYS_ASKED: NextActionId = 'ready';
 
 /** The actions that hand the checkout to a loop, after which the chain stops. */
 const LOOP_ACTIONS: readonly NextActionId[] = Object.freeze(['start', 'resume']);
@@ -197,7 +193,7 @@ export interface NextChainOptions {
   /** Puts one question and answers whether it was said yes to. */
   readonly ask: NextAsk;
   /** The action ids that may run unasked, as `--yes` named them, or null when every one is asked about. */
-  readonly ceiling: readonly string[] | null;
+  readonly ceiling: NextCeiling;
   /** True under `--dry-run`: the two lines and no question. */
   readonly dryRun: boolean;
   /** Where the lines go. */
@@ -234,21 +230,15 @@ export function nextQuestion(state: NextState): string {
   return `${capitalised(state.proposal)}? [y/N] `;
 }
 
-/** Whether `action` may run with no question put; see the module note. */
-export function allowedUnasked(action: NextActionId, ceiling: readonly string[] | null): boolean {
-  if (ceiling === null || action === ALWAYS_ASKED) return false;
-  return ceiling.includes(action);
-}
-
 /** The ids a ceiling names, as a sentence lists them. */
-function namedIds(ceiling: readonly string[]): string {
+function namedIds(ceiling: readonly NextActionId[]): string {
   return ceiling.length === 0
     ? 'no action'
     : ceiling.join(', ');
 }
 
 /** Why the chain stopped, or null for an ending the two lines have already said. */
-export function stopLine(stop: NextStop, state: NextState, ceiling: readonly string[] | null): string | null {
+export function stopLine(stop: NextStop, state: NextState, ceiling: NextCeiling): string | null {
   if (stop === 'dry-run') return `${STOP_MARK} --${DRY_RUN_FLAG}: nothing ran.`;
   if (stop === 'declined') return `${STOP_MARK} Nothing ran.`;
   if (stop === 'unasked') {
@@ -366,22 +356,6 @@ export function readDryRun(flags: RafaContext['flags']): boolean {
   throw lineRefusal(`--${DRY_RUN_FLAG} takes no value, and read "${value}" as one`);
 }
 
-/**
- * The action ids `--yes` named, or null when the line leaves the flag
- * out: bare it names {@link BARE_YES_ACTIONS}, and a value is read as a
- * comma list. `--no-yes` names nothing, as leaving the flag out does.
- */
-export function readYesCeiling(flags: RafaContext['flags']): readonly string[] | null {
-  const value = flags[YES_FLAG];
-  if (value === undefined || value === false) return null;
-  if (value === true) return BARE_YES_ACTIONS;
-
-  return Object.freeze(value
-    .split(',')
-    .map((word) => word.trim())
-    .filter((word) => word !== ''));
-}
-
 /** How the command reaches the sources and the terminal; each left out is the system's own. */
 export interface NextCommandSeams extends NextSourceSeams {
   /** Opens the prompter the questions are asked through. Called only to ask. */
@@ -432,7 +406,7 @@ async function runStateAction(context: RafaContext, sources: NextSources, state:
 export async function runNext(context: RafaContext, seams: NextCommandSeams): Promise<NextChainReport> {
   expectNoArgument(context.args, NEXT_USAGE);
   const dryRun = readDryRun(context.flags);
-  const ceiling = readYesCeiling(context.flags);
+  const ceiling = readYesCeiling(context.flags, NEXT_USAGE);
   const sources = openNextSources(context, seams);
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
   const prompter = lazyPrompter(openPrompter);
@@ -456,8 +430,8 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   }
 }
 
-/** The action ids help names, in the table's order: the one that runs no command, then the rest. */
-const YES_ID_LIST = ['sync', ...NEXT_COMMAND_ACTIONS.filter((action) => action !== ALWAYS_ASKED)].join(', ');
+/** The action ids help names, as `src/next/ceiling.ts` accepts them. */
+const YES_ID_LIST = YES_ACTIONS.join(', ');
 
 /** The two flags the command declares. */
 const NEXT_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
@@ -470,7 +444,7 @@ const NEXT_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
     name: YES_FLAG,
     description: 'Run the actions named without asking, as a comma list of action ids, and stop at the first'
       + ` action the list leaves out. Bare it names ${BARE_YES_ACTIONS.join(', ')}. The ids are ${YES_ID_LIST};`
-      + ' marking an issue ready is always asked.',
+      + ' a list naming ready, which is always asked, or a word that is no id at all is refused.',
     type: 'string',
   },
 ]);
