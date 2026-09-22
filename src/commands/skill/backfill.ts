@@ -558,6 +558,7 @@ export function createSkillBackfillCommand(seams: SkillBackfillSeams = DEFAULT_B
       },
     ],
     outputs: ['text', 'json'],
+    spends: { when: 'with', flag: '--propose', what: 'one session per batch of skills' },
     run: async (context) => {
       await runBackfill(context, seams);
     },

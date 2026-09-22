@@ -146,6 +146,10 @@ const wrapped = wrapPhaseZeroCommand({
   ],
   aliases: ['start'],
   outputs: ['text', 'json'],
+  spends: {
+    when: 'always',
+    what: 'one session per task, one for the wrap-up, and repair sessions while CI is red',
+  },
 }, start);
 
 /** The wrapped command, refusing a `--runtime` its words do not carry before `start` runs; see the module note. */
