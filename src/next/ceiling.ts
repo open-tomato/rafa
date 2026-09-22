@@ -19,7 +19,8 @@
  *
  * {@link YES_ACTIONS}: `sync`, the one action that runs no registered
  * command (`./sync.ts`), and the seven of {@link NEXT_COMMAND_ACTIONS}
- * that are not {@link ALWAYS_ASKED}. They are taken off that table
+ * that are neither {@link ALWAYS_ASKED} nor `merge-unchecked`, whose
+ * question `pr merge --skip-checks` asks itself. They are taken off that table
  * rather than spelled again, so an id the table gains is accepted here
  * the same day and the list `--yes` names cannot drift from the list
  * the chain can run. `none` is not among them: it is the state that
@@ -83,12 +84,13 @@ export const CEILING_REFUSAL_EXIT = 2;
 
 /**
  * The eight ids a list may name: `sync`, which runs no command, and the
- * seven of the action table that are not {@link ALWAYS_ASKED}. Taken
+ * seven of the action table that are neither {@link ALWAYS_ASKED} nor
+ * `merge-unchecked`. Taken
  * off that table, so the two cannot drift; see the module note.
  */
 export const YES_ACTIONS: readonly NextActionId[] = Object.freeze([
   'sync',
-  ...NEXT_COMMAND_ACTIONS.filter((action) => action !== ALWAYS_ASKED),
+  ...NEXT_COMMAND_ACTIONS.filter((action) => action !== ALWAYS_ASKED && action !== 'merge-unchecked'),
 ]);
 
 /** The four bare `--yes` allows: the ones that neither merge, nor start a loop, nor push. */

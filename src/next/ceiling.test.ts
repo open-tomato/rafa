@@ -103,7 +103,7 @@ describe('the ids a list may name', () => {
 
   it('takes the seven that run a command off the action table rather than spelling them again', () => {
     expect(YES_ACTIONS.filter((action) => action !== 'sync'))
-      .toEqual(NEXT_COMMAND_ACTIONS.filter((action) => action !== ALWAYS_ASKED));
+      .toEqual(NEXT_COMMAND_ACTIONS.filter((action) => action !== ALWAYS_ASKED && action !== 'merge-unchecked'));
   });
 
   it('reads each of the eight, one at a time, as the id it spells', () => {
