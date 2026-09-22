@@ -94,8 +94,10 @@ unmocked. Register the route row the call needs on the fake.
 ### The merge flow
 
 1. Refuse on a dirty working tree, on a PR that is not green or not
-   mergeable (the refusal names which, and points at `pr triage`), and when
-   the branch is checked out in another worktree (names it).
+   mergeable (the refusal names which; `pending` and `red` point at
+   `pr triage`, and verdict `none` — no checks at all — points at
+   `--skip-checks` instead, since triage has nothing to fix there), and
+   when the branch is checked out in another worktree (names it).
 2. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 3. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
@@ -148,9 +150,11 @@ comment is posted on the PR: `Merged with no checks reported, by rafa pr merge
 --skip-checks.` followed by the workflow count that was read (or that it could
 not be read).
 
-`rafa next` sends a PR with verdict `none` to `pr triage` through `redClause`
-unless `--skip-checks` is used. A `rafa next --yes=<ids>` list that names
-`merge-unchecked` is refused with exit 2, like `ready`.
+`rafa next` sends a PR with verdict `none` to `pr triage` through
+`redClause` only when it conflicts; a mergeable PR with verdict `none`
+goes to row 7 (`merge-unchecked`) instead, which hands the merge question
+to `pr merge <n> --skip-checks`. A `rafa next --yes=<ids>` list that
+names `merge-unchecked` is refused with exit 2, like `ready`.
 
 ### Triage assessment
 
