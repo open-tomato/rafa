@@ -23,7 +23,13 @@
  * fake's own pull request back afterwards to prove nothing was merged —
  * `state` stays `OPEN` and no `pr merge` command reached the fake — the
  * same control `merge-skip-checks.test.ts`'s own module note asks for.
- * The merging cases live in the same file, in a later task.
+ *
+ * The merging cases follow: a pull request with no checks and no real
+ * workflow, merged under `--skip-checks --yes` with no question asked,
+ * and one with no checks but one real workflow, merged on a terminal
+ * answering `y`. Each reads the real fake back afterwards for the one
+ * comment `postUncheckedComment` posts, and reads real git for the same
+ * clean-up `merge-driven.test.ts` proves for an ordinary merge.
  */
 import type { MergeSeams } from './merge.js';
 import type { FakePrCheck, FakePullRequestSeed, FakeWorkflow } from '../../pr/gh-fake.js';
@@ -39,7 +45,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
-import { WORKFLOWS_EXIST_WARNING } from '../../pr/unchecked.js';
+import {
+  NO_WORKFLOW_WARNING,
+  UNCHECKED_MERGE_SENTENCE,
+  WORKFLOWS_EXIST_WARNING,
+  workflowCountLine,
+} from '../../pr/unchecked.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createPrMergeCommand } from './merge.js';
@@ -297,5 +308,62 @@ describe('an unchecked merge refused before the question, over the real workflow
     expect(run.stderr).toContain('standard input is no terminal');
     expect(mergeCommandsSent(fake)).toEqual([]);
     expect(fake.pull(NUMBER)?.state).toBe('OPEN');
+  });
+});
+
+describe('an unchecked merge that goes through, over the real fake and real git', () => {
+  it('merges under --yes with no real workflow, asking nothing, cleans up and posts the comment', async () => {
+    const repo = plantMergeRepo('yes-no-workflow');
+    const fake = createFakePrGh();
+    fake.plant(seed(repo, { checks: [] }));
+
+    const run = await ran(repo, fake, [String(NUMBER), '--skip-checks', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.asked).toEqual([]);
+    expect(run.stdout).toContain(workflowCountLine(0));
+    expect(run.stdout).toContain(NO_WORKFLOW_WARNING);
+    expect(run.stdout).toContain(`Merged #${NUMBER} into ${BASE} (squash).`);
+    expect(mergeCommandsSent(fake)).toEqual([['pr', 'merge', String(NUMBER), '--squash']]);
+
+    // Cleaned up, read back from real git — the same steps merge-driven.test.ts proves.
+    expect(git(repo.work, repo.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout).toBe(BASE);
+    expect(git(repo.work, repo.home, 'branch', '--list', BRANCH).stdout).toBe('');
+    expect(git(repo.bare, repo.home, 'show-ref', '--verify', `refs/heads/${BRANCH}`).ok).toBe(false);
+
+    // The one comment posted, carrying the count that was read.
+    const pull = fake.pull(NUMBER);
+    expect(pull?.state).toBe('MERGED');
+    expect(pull?.comments).toHaveLength(1);
+    expect(pull?.comments[0]?.body).toContain(UNCHECKED_MERGE_SENTENCE);
+    expect(pull?.comments[0]?.body).toContain(workflowCountLine(0));
+  });
+
+  it('asks Merge #<n> with no checks? on a terminal with one real workflow, merges on y and comments the count', async () => {
+    const repo = plantMergeRepo('y-one-workflow');
+    const fake = createFakePrGh();
+    fake.plant(seed(repo, { checks: [] }));
+    fake.plantWorkflows(ONE_WORKFLOW);
+
+    const run = await ran(repo, fake, [String(NUMBER), '--skip-checks'], { answer: 'y' });
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.asked).toEqual([`Merge #${NUMBER} with no checks? [y/N] `]);
+    expect(run.stdout).toContain(workflowCountLine(1));
+    expect(run.stdout).toContain(WORKFLOWS_EXIST_WARNING);
+    expect(run.stdout).toContain(`Merged #${NUMBER} into ${BASE} (squash).`);
+    expect(fake.calls()).toContainEqual(['api', 'repos/{owner}/{repo}/actions/workflows']);
+    expect(mergeCommandsSent(fake)).toEqual([['pr', 'merge', String(NUMBER), '--squash']]);
+
+    expect(git(repo.work, repo.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout).toBe(BASE);
+    expect(git(repo.work, repo.home, 'branch', '--list', BRANCH).stdout).toBe('');
+
+    const pull = fake.pull(NUMBER);
+    expect(pull?.state).toBe('MERGED');
+    expect(pull?.comments).toHaveLength(1);
+    expect(pull?.comments[0]?.body).toContain(UNCHECKED_MERGE_SENTENCE);
+    expect(pull?.comments[0]?.body).toContain(workflowCountLine(1));
   });
 });
