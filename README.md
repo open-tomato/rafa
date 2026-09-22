@@ -41,8 +41,24 @@ Read this once; rafa also says it the first time you start a run.
   opens a pull request with `gh`, waits for CI, and may file the
   blockers and unrelated bugs it meets as issues on the project's
   tracker.
-- **It spends your Claude usage**, one session per task plus the plan
-  and the wrap-up. `budget=` on a task caps that task.
+- **It spends your Claude usage.** Every Claude Code session rafa starts
+  counts against your Claude plan's limits, or is billed when you run
+  Claude Code with an API key. `budget=` on a task caps that task. The
+  commands that start sessions are marked 🪙 in this README:
+
+  | Command | Spends usage |
+  | --- | --- |
+  | `rafa plan create` | 🪙 one planning session |
+  | `rafa loop start` | 🪙 one session per task, one for the wrap-up, and repair sessions while CI is red |
+  | `rafa pr triage --resolve` | 🪙 runs a small fixed plan through the loop; without `--resolve`, nothing |
+  | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
+  | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
+
+  Everything else reads files, git and GitHub and spends nothing,
+  `rafa usage` included (it reads `CLAUDE_USAGE_PERCENT` and asks
+  nobody). `rafa loop resume` starts no session itself, but it lets a
+  paused run go on spending. rafa calls no model API directly: all of
+  it goes through the `claude` command.
 - So run it in a repository, on a branch and on a machine where all of
   that is acceptable: a container or a disposable checkout is a good
   first home. Nothing here is a sandbox.
@@ -59,7 +75,8 @@ on.
 The package is `@open-tomato/rafa` on npm (`publishConfig` names
 `https://registry.npmjs.org/` for the scope as well as in general, so a
 machine that maps `@open-tomato` to another registry still publishes
-there, and `npm publish` builds first through `prepack`). It installs globally under either package manager:
+there, and `npm publish` builds first through `prepack`). It installs
+globally under either package manager:
 
 ```bash
 npm i -g @open-tomato/rafa
@@ -105,9 +122,9 @@ the next one, so you rarely have to remember it.
    and the repository and writes a checklist the loop can parse:
 
    ```bash
-   rafa plan create --spec=.rafa/specs/my-feature.md
-   rafa plan create --issue=42        # the spec is issue #42's body
-   rafa plan create --next            # the first undone line of the Roadmap issue
+   rafa plan create --spec=.rafa/specs/my-feature.md   # 🪙
+   rafa plan create --issue=42        # 🪙 the spec is issue #42's body
+   rafa plan create --next            # 🪙 the first undone line of the Roadmap issue
    rafa plan show my-feature          # read it before you run it
    ```
 
@@ -119,7 +136,7 @@ the next one, so you rarely have to remember it.
 4. **Run it.**
 
    ```bash
-   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
+   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md   # 🪙
    ```
 
    On `main` it offers to create `feat/<stub>` from the latest base and
@@ -138,7 +155,7 @@ the next one, so you rarely have to remember it.
 
    ```bash
    rafa pr current        # number, title, checks, URL
-   rafa pr triage         # why is it red, and is the fix simple
+   rafa pr triage         # why is it red, and is the fix simple (🪙 only with --resolve)
    rafa pr merge [--skip-checks] # asks y/N, merges, switches to the base, pulls, deletes both branches
    rafa release tag       # tag the merged version
    rafa effort collect && rafa effort report
