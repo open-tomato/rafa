@@ -22,7 +22,11 @@
  *     repository. A WRITE is the other way round
  *     ({@link PullRequests.editBody}): it was handed the pull request to
  *     act on rather than discovering it, so a number nothing answers for
- *     throws there.
+ *     throws there. {@link PullRequests.workflowCount} is the one read
+ *     that answers null on ANY failure rather than throwing: its null is
+ *     not an empty answer but the riskier one, read by the caller the
+ *     same as "workflows exist", so an outage cannot pass for "this
+ *     repository has no workflow" and a throw would buy nothing.
  *   - The states GitHub spells in its own words are narrowed here
  *     ({@link PullRequestState}, {@link Mergeability}) so a caller
  *     switches on a closed set, while the words that have no closed set
@@ -246,4 +250,17 @@ export interface PullRequests {
    * Empty string when the provider has no log for it.
    */
   failedLog: (runId: string) => Promise<string>;
+  /**
+   * How many workflows the repository holds, or null when that could not
+   * be read.
+   *
+   * Zero is the one answer that means "nothing on the provider tests a
+   * pull request here". Null — a denied read, a missing repository, an
+   * outage, a payload that carries no count — must be read by the caller
+   * as the riskier case, workflows existing, and never as zero: a check
+   * that has not reported is ambiguous exactly when a workflow could
+   * still report it. The count is the whole repository's, not one page
+   * of it.
+   */
+  workflowCount: () => Promise<number | null>;
 }

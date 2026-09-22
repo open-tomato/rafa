@@ -167,6 +167,7 @@ export function createPullRequestsDouble(
     comment: bind('comment'),
     editComment: bind('editComment'),
     failedLog: bind('failedLog'),
+    workflowCount: bind('workflowCount'),
   };
 
   return Object.freeze({
