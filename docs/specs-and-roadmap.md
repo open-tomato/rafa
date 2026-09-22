@@ -100,8 +100,17 @@ rafa plan create --next --dry-run
 
 `--issue` copies the issue's body to `.rafa/specs/rafa-42-<slug>.md` and
 plans from that copy, so the plan keeps the text it was made from even
-if the issue is edited later. The plan, its branch and its pull request
-carry the same name: `rafa-42-<slug>`, `feat/rafa-42-<slug>`,
+if the issue is edited later. If the issue body has changed since the copy
+was saved, `rafa` prints the difference lines and refuses to plan, naming
+the reason and the `--refresh` flag that would overwrite the saved copy
+without asking. If only the local notes file `rafa-42-notes.md` changed,
+the copy is rebuilt and the old one moved to `.rafa/specs/previous/` first.
+With a terminal, a changed body offers a question: update the saved copy
+and plan from the new version? No terminal, no offer — the refusal stands.
+The `--refresh` flag rebuilds the copy and plans without asking. When more
+than fifty previous copies accumulate under `previous/`, `rafa doctor`
+warns that they are safe to delete. The plan, its branch and its pull
+request carry the same name: `rafa-42-<slug>`, `feat/rafa-42-<slug>`,
 `rafa-42: <title>`, with `Closes #42` in the pull request.
 
 ## The roadmap
