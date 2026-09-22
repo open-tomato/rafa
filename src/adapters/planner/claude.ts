@@ -79,9 +79,11 @@
  * the review is read ONCE, right after the session returns, and carried
  * on every answer that session stands behind: the {@link GeneratedPlan},
  * the failed-session rejection and the plan-not-written rejection. That
- * last one is the ordinary shape of a not-ready verdict — a session that
- * judged the spec unplannable writes no plan — so a rejection that lost
- * the reading would leave `rafa plan` with nothing to post. The two
+ * last one is the ordinary shape of a not-ready verdict with a blocking
+ * gap — a session that judged the spec unplannable writes no plan,
+ * where one it can plan under writes the plan and says what it assumed
+ * — so a rejection that lost the reading would leave `rafa plan` with
+ * nothing to post. The two
  * rejections raised BEFORE any session, the plan already there and the
  * spec that cannot be read, carry no review, because no session judged
  * anything.
@@ -89,9 +91,10 @@
  * Nothing here acts on the verdict. A planner that refused a not-ready
  * spec would put the gate in two places and make `--skip-review`
  * unreachable, since that flag bypasses check 3 alone and the session
- * still writes its block. Removing a plan file a not-ready session left
- * behind, posting the gaps, moving the labels and the exit code are
- * `rafa plan`'s.
+ * still writes its block. Weighing the gaps a verdict named, removing a
+ * plan file a blocked session left behind, writing the plan a verdict
+ * can be planned under, posting the gaps, moving the labels and the
+ * exit code are `rafa plan`'s.
  *
  * ## Paths
  *

@@ -16,10 +16,15 @@
  * planner reads once and carries back both on the plan it answers and on
  * what it rejects with (`adapters/planner/claude.ts`). Neither of those
  * acts on it. `plan create` does, through {@link enforceSpecReview}: a
- * review that is not ready moves the plan and the prerequisites file
- * into `rejected/` under `plan.dir` when the session wrote them anyway,
- * publishes the gaps on the issue when there is one, swaps `spec:ready`
- * for `spec:needs-work`, and throws `CommandExit(3)` carrying every gap.
+ * review that is not ready over a gap that BLOCKS planning moves the
+ * plan and the prerequisites file into `rejected/` under `plan.dir`
+ * when the session wrote them anyway, publishes the gaps on the issue
+ * when there is one, swaps `spec:ready` for `spec:needs-work`, and
+ * throws `CommandExit(3)` carrying every gap. One whose gaps are all
+ * non-blocking keeps the plan instead: the gate opens it with the
+ * assumptions, records `review: assumed` in it, posts the same gaps and
+ * moves no label, and `plan create` goes on as it does for a ready
+ * verdict (`board/gate.ts` holds both halves).
  * `--spec=<file>` has no issue and so no labels to move: that route
  * moves the files aside, prints and exits 3. The issue routes fill
  * {@link SpecReviewGateOptions.issue} with the number and the board
@@ -29,8 +34,8 @@
  * A REJECTION is weighed differently from an answer, by
  * {@link rejectedReview}. One whose review block was READ and judged the
  * spec not ready is enforced: a session that judged a spec unplannable
- * writes no plan, and that rejection is the ordinary shape of the
- * verdict. One carrying an `absent` or `malformed` review is not,
+ * writes no plan, and that rejection is the ordinary shape of a verdict
+ * with a blocking gap. One carrying an `absent` or `malformed` review is not,
  * because the session did not finish and what the operator needs is the
  * failure it ended with, not a gate refusal saying the review block was
  * missing.
@@ -119,6 +124,12 @@ export async function generateOrExit(
  * planner's own paths, throws `CommandExit(3)` for a verdict the plan
  * does not stand on, and a plan it left standing on an unread review
  * records `review: missing`.
+ *
+ * `review: assumed` is NOT recorded here: the gate writes it itself,
+ * together with the assumptions section it opens the plan with, because
+ * the two are one write and the verdict is what they record
+ * (`board/gate.ts`). So an `assumed` standing needs nothing of this
+ * function, and the plan it answers over is already stamped.
  */
 export async function settleReview(
   gate: GateBase,

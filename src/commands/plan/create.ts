@@ -87,7 +87,7 @@ const wrapped = wrapPhaseZeroCommand({
     {
       name: 'comment',
       description: 'Posts the gaps of a spec judged not ready on its issue; `--no-comment` prints them and'
-        + ' writes nothing on the board. The labels move either way.',
+        + ' writes nothing on the board. Whatever the verdict does to the labels is unchanged by it.',
       type: 'boolean',
       default: true,
     },

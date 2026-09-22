@@ -68,8 +68,9 @@
  * throw exit code 1 with the whole refusal as the message; a board
  * refusal — an issue or a roadmap whose author is trusted with nothing,
  * a closed or unlabelled issue, a leaking body, a snapshot that differs
- * with no `--refresh` — throws exit code 2, and a spec the
- * planner judged not ready throws exit code 3 with every gap in it. Text mode writes
+ * with no `--refresh` — throws exit code 2, and a spec the planner
+ * judged not ready over a gap that blocks planning throws exit code 3
+ * with every gap in it. Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
  *
@@ -91,7 +92,10 @@
  * readable review, and `issue: "<n>"` on a plan an issue route
  * generated. Every record is written AFTER the gate, so a plan the gate
  * moved aside is never stamped, and each is a warning when it cannot be
- * written.
+ * written. A fourth record, `review: assumed`, is the gate's own: a
+ * verdict no gap of which blocks planning keeps its plan, and the gate
+ * opens it with the assumptions and stamps the word in one write
+ * (`board/gate.ts`).
  *
  * `--skip-review` and `--no-comment` are read through `readGateFlags`
  * (`board/gate.ts`) rather than here, and both are declared on

@@ -197,8 +197,9 @@
  *
  * ## The gate's issue
  *
- * A not-ready verdict posts its gaps on the issue and swaps its labels,
- * and `./gate.ts` takes that as a {@link GateIssue}: the number, the
+ * A not-ready verdict posts its gaps on the issue, and swaps its labels
+ * when one of those gaps blocks planning, and `./gate.ts` takes that as
+ * a {@link GateIssue}: the number, the
  * board to write through, and the TRUST, which the gate spends on the
  * author of a `rafa:spec-review` marker comment already on the issue so
  * it never edits one a stranger planted (`./review-comment.ts`). It is

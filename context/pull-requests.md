@@ -323,13 +323,28 @@ Four checks, cheapest first; any one failing writes no plan file:
    gaps:
      - heading: "Definition of done"
        what: "no item says how the merge clean-up is verified"
+       blocking: true
+     - heading: "Design"
+       what: "the store backend is not named"
+       blocking: false
+       assumption: "the SQLite backend, as every other command reads"
    ```
 
-   On an explicit `verdict: not-ready` the session writes no plan and no
-   prerequisites; the loop enforces that in code (a plan file that appears
-   anyway is removed), posts the gaps as one comment on the issue (marker
-   `<!-- rafa:spec-review v1 -->`, edited on a rerun; `--no-comment` prints
-   only), swaps `spec:ready` for `spec:needs-work`, and exits 3.
+   On a `verdict: not-ready` naming a gap that BLOCKS planning — one where
+   guessing wrong changes what ships or what is safe — the session writes
+   no plan and no prerequisites; the loop enforces that in code (a plan
+   file that appears anyway is removed), posts the gaps as one comment on
+   the issue (marker `<!-- rafa:spec-review v1 -->`, edited on a rerun;
+   `--no-comment` prints only), swaps `spec:ready` for `spec:needs-work`,
+   and exits 3.
+
+   The same verdict with NO blocking gap keeps its plan: nothing is moved,
+   the plan is opened with an assumptions section listing each gap and the
+   assumption it was planned under, its `rafa:plan` block records
+   `review: assumed`, the gaps go up as the same marker comment in a body
+   that says a plan was written, and no label moves. The gate does both
+   writes itself (`src/board/gate.ts`, `src/board/review-stamp.ts`), so
+   the standing it answers is `assumed` and the command does not refuse.
 
    A MISSING or malformed block is not that verdict and is not treated as
    one. It is weighed against the plan the session wrote: one that

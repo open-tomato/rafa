@@ -1,7 +1,13 @@
 /**
  * Tests for the spec-review comment (`src/board/review-comment.ts`):
- * the body a gap list makes, which marker comment a rerun may edit once
- * its author has been read through `./trust.ts`, and the two writes.
+ * the two bodies a gap list makes, which marker comment a rerun may
+ * edit once its author has been read through `./trust.ts`, and the two
+ * writes.
+ *
+ * The bodies are asserted against each OTHER as well as against their
+ * own text: the assumed one must not carry "No plan was written." or
+ * the refusal's remedy, since a plan written under the gaps is exactly
+ * the run where those two sentences would be false on a public issue.
  *
  * The board is a fake holding comments in memory and recording every
  * call, and the trust is a fake permission lookup counting the logins it
@@ -35,6 +41,8 @@ import type { BoardTrust, PermissionReading, TrustReading } from './trust.js';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  ASSUMED_COMMENT_REMEDY,
+  assumedReviewCommentBody,
   COMMENT_REMEDY,
   ignoredReviewCommentMessage,
   readTrustedSpecReviewComment,
@@ -176,6 +184,36 @@ describe('specReviewCommentBody', () => {
 
   it('refuses to write a comment naming no gap', () => {
     expect(() => specReviewCommentBody([])).toThrow(TypeError);
+  });
+});
+
+describe('assumedReviewCommentBody', () => {
+  it('says the plan was written, carries each assumption under its gap and asks for no label', () => {
+    const body = assumedReviewCommentBody(GAPS);
+
+    expect(body.startsWith(`${SPEC_REVIEW_MARKER}\n`)).toBe(true);
+    expect(body).toContain('found 2 gaps, none of them blocking');
+    expect(body).toContain('- **Tasks the plan must carry** — the third task does not name what it changes\n'
+      + '  - Planned under: the task changes the module its name reads on');
+    expect(body).toContain(ASSUMED_COMMENT_REMEDY);
+    expect(body).not.toContain('No plan was written.');
+    expect(body).not.toContain(COMMENT_REMEDY);
+  });
+
+  it('leaves a gap naming no assumption as its item alone', () => {
+    const body = assumedReviewCommentBody(GAPS);
+
+    // The first gap of GAPS names none, which is what a blocking gap
+    // comes back as; the refusal body renders it the same way.
+    expect(body).toContain('- **Definition of done** — no item says how the merge clean-up is verified\n'
+      + '- **Tasks the plan must carry**');
+    expect(body.split('\n').filter((line) => line.startsWith('  - Planned under: '))).toHaveLength(1);
+  });
+
+  it('refuses to write a comment naming no gap, as the refusal body does', () => {
+    expect(() => assumedReviewCommentBody([])).toThrow(TypeError);
+    // The control: the same call over the gaps answers a body.
+    expect(assumedReviewCommentBody(GAPS)).toContain(SPEC_REVIEW_MARKER);
   });
 });
 

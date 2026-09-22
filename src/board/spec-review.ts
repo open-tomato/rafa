@@ -44,10 +44,13 @@
  * What the ENFORCING half does with each of the four is `./gate.ts`'s,
  * and the two halves no longer agree by construction: since 2026-09-20
  * an `absent` or `malformed` reading lets a plan that reads as written
- * stand, stamped `review: missing`, where an explicit `not-ready`
- * verdict removes it. So `answer` is what that caller switches on and
- * `ready` is what it refuses to plan from unweighed; a reading here is
- * still never ready for one of the last two.
+ * stand, stamped `review: missing`, where a `not-ready` verdict with a
+ * blocking gap removes it — and since 2026-09-22 one with no blocking
+ * gap lets the plan stand too, stamped `review: assumed` and opened
+ * with the assumptions its gaps named. So `answer` is what that caller
+ * switches on, `blocking` is what it weighs a `not-ready` verdict by,
+ * and `ready` is what it refuses to plan from unweighed; a reading here
+ * is still never ready for one of the last two.
  *
  * For the same reason {@link SpecReviewReading.gaps} is never empty for
  * a reading that is not ready. A `not-ready` verdict that names no

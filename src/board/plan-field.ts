@@ -2,14 +2,15 @@
  * One field recorded in a generated plan's `rafa:plan` block: the
  * mechanism, and the `issue: <n>` a plan written from the board carries.
  *
- * Three records land in a plan the gate kept. `--skip-review` records
- * `review: skipped` and a session whose review block could not be read
- * records `review: missing`, both `./review-stamp.ts`'s; and a run that
- * planned from an issue records the issue it planned from, which
- * `.rafa/specs/rafa-20-pr-commands.md` asks for in so many words: the plan's
- * `rafa:plan` block gets `issue: <n>`. All three write ONE line into a
- * block a session wrote, so the line-placing is here and each field's own
- * meaning stays with the module that owns it.
+ * Four records land in a plan the gate kept. `--skip-review` records
+ * `review: skipped`, a session whose review block could not be read
+ * records `review: missing` and a verdict every gap of which was
+ * non-blocking records `review: assumed`, all three `./review-stamp.ts`'s;
+ * and a run that planned from an issue records the issue it planned
+ * from, which `.rafa/specs/rafa-20-pr-commands.md` asks for in so many
+ * words: the plan's `rafa:plan` block gets `issue: <n>`. All four write
+ * ONE line into a block a session wrote, so the line-placing is here and
+ * each field's own meaning stays with the module that owns it.
  *
  * Every function here is pure over the plan as text: nothing opens a
  * file, and the caller writes what it is handed. So the cases in

@@ -29,6 +29,29 @@
  * reader seeing `assumed` knows a review ran, named what it did not
  * know, and guessed; `skipped` and `missing` both mean nobody judged.
  *
+ * ## The assumptions are written where the plan is read
+ *
+ * One word in a header is a record for a COMMAND. A person opening the
+ * plan has to see what it guessed before reading a task written under
+ * the guess, so {@link assumptionsHeading} is the section `./gate.ts`
+ * puts in front of everything else in the file: the gaps the review
+ * named, each with the assumption it was planned under, under
+ * {@link ASSUMPTIONS_HEADING}. It is the plan's opening heading and not
+ * a section further down for that reason.
+ *
+ * The section is text and nothing parses it back, so it is built the
+ * way the issue comment is built and out of the same item
+ * (`assumedGapItem`, `./review-comment.ts`): what the issue is told was
+ * assumed and what the plan says was assumed are one spelling, and a
+ * sentence a model folded over several lines is collapsed onto its item
+ * rather than ending the list.
+ *
+ * Nothing here is a heading the plan model reads. `src/plan/parse.ts`
+ * reads `# Stage: <name>` and the checklist grammar reads `- [ ] `;
+ * this section is neither, so a plan opened with it parses exactly as
+ * it did before, which `./review-stamp.test.ts` holds through
+ * `parsePlan` over a stamped plan.
+ *
  * `review` is not one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), so
  * the plan reader keeps it as a `PlanHeaderExtra`: retained, acting on
  * nothing, and listed by `plan show`. That is the shape an unrecognised
@@ -67,8 +90,10 @@
  * warn with.
  */
 import type { PlanFieldAnswer, PlanFieldStamp } from './plan-field.js';
+import type { SpecReviewGap } from './spec-review.js';
 
 import { stampPlanField } from './plan-field.js';
+import { assumedGapItem } from './review-comment.js';
 
 /** The `rafa:plan` field the stamp records. */
 export const REVIEW_FIELD = 'review';
@@ -132,4 +157,39 @@ export function stampReviewMissing(plan: string): ReviewStamp {
  */
 export function stampReviewAssumed(plan: string): ReviewStamp {
   return stampPlanField(plan, REVIEW_FIELD, REVIEW_ASSUMED);
+}
+
+/** The heading a plan written under a review's assumptions opens with. */
+export const ASSUMPTIONS_HEADING = '# Planned under assumptions';
+
+/** What the section says about itself, above the gaps it lists. */
+const ASSUMPTIONS_PREAMBLE = [
+  'The spec review found gaps, none of them blocking, so this plan was',
+  'written under the assumptions below. Each names the gap it was',
+  'written for; closing that gap in the spec is what replaces the guess.',
+];
+
+/**
+ * The section that opens a plan written under a review's assumptions:
+ * {@link ASSUMPTIONS_HEADING}, what the section is, and one item per
+ * gap with the assumption it was planned under.
+ *
+ * Answers text ending in a blank line, so a caller writes it in front
+ * of the plan as it stands and the plan's own title follows it. Takes
+ * the review's gaps as `./spec-review.ts` answers them; a gap naming no
+ * assumption is left out, since the section is the assumptions and a
+ * gap without one contributes none.
+ *
+ * @throws TypeError when NO gap names an assumption, as
+ * `specReviewCommentBody` throws for an empty gap list: a section
+ * naming no assumption tells a reader nothing, and a review with no
+ * blocking gap always names one per gap (`./spec-review.ts`), so an
+ * empty section is a defect in the caller rather than a plan to write.
+ */
+export function assumptionsHeading(gaps: readonly SpecReviewGap[]): string {
+  const items = gaps.filter((gap) => gap.assumption !== null).map(assumedGapItem);
+  if (items.length === 0) {
+    throw new TypeError('board review stamp: no gap named an assumption, and there is no heading to open a plan with');
+  }
+  return [ASSUMPTIONS_HEADING, '', ...ASSUMPTIONS_PREAMBLE, '', ...items, '', ''].join('\n');
 }

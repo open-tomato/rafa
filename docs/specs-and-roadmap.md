@@ -144,8 +144,12 @@ check first, and any failure writes no plan:
    token-shaped string is refused, naming the line.
 5. **The planner's own review.** The planning session judges whether each
    definition-of-done item can be shown by a command and whether anything
-   would have to be guessed. "Not ready" removes the plan, lists the gaps
-   in one comment on the issue and swaps the label to `spec:needs-work`.
+   would have to be guessed, and says of each gap whether it blocks
+   planning. "Not ready" over a blocking gap removes the plan, lists the
+   gaps in one comment on the issue and swaps the label to
+   `spec:needs-work`. "Not ready" over gaps it can all plan under keeps
+   the plan, opens it with the assumptions it planned under, lists the
+   same gaps in the comment and leaves the label alone.
 
 Related, and worth knowing: bugs a run meets that are about one machine
 (a broken toolchain, a failed package build) are kept local and not

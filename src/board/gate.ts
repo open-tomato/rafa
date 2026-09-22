@@ -1,7 +1,12 @@
 /**
- * What a `not-ready` verdict does: the plan and prerequisites files
- * moved into `rejected/` under `plan.dir`, the gaps posted on the
- * issue, `spec:ready` swapped for `spec:needs-work`, and exit code 3.
+ * What a `not-ready` verdict does, which is one of two things. With a
+ * gap that BLOCKS planning: the plan and prerequisites files moved into
+ * `rejected/` under `plan.dir`, the gaps posted on the issue,
+ * `spec:ready` swapped for `spec:needs-work`, and exit code 3. With no
+ * blocking gap among them: the plan kept and opened with the
+ * assumptions the review named, `review: assumed` stamped in its
+ * `rafa:plan` block, the same gaps posted, no label moved and no
+ * refusal.
  *
  * This is the enforcing half of check 3 of the readiness gate. The
  * reading half is `./spec-review.ts`, which turns a planner session's
@@ -28,8 +33,45 @@
  * one warning ({@link unreadReviewWarning}), no comment, no label
  * change, nothing moved, and `unread` answered so the caller records
  * `review: missing` in its `rafa:plan` block
- * (`src/commands/plan/plan-record.ts`, `./review-stamp.ts`). Removal, the comment and the label swap are an
- * explicit `verdict: not-ready`'s alone.
+ * (`src/commands/plan/plan-record.ts`, `./review-stamp.ts`). Removal
+ * and the label swap are a BLOCKING `verdict: not-ready`'s alone.
+ *
+ * ## A gap that stops nothing does not stop the plan
+ *
+ * Every gap of a review carries whether it is `blocking`, and a
+ * non-blocking one carries the `assumption` the planner would plan
+ * under (`./spec-review.ts`). A gap is blocking when guessing wrong
+ * changes what ships or what is safe; one that is not can be planned
+ * under a stated guess, and refusing the whole plan over it spends a
+ * session and a round trip to the spec's author to learn something the
+ * session had already worked out.
+ *
+ * So a `not-ready` verdict whose gaps are ALL non-blocking answers
+ * `assumed` ({@link planUnderAssumptions}): nothing is moved, the plan
+ * is opened with {@link assumptionsHeading} and stamped
+ * {@link REVIEW_ASSUMED_LINE} in one write, the gaps go up as the
+ * comment in the body that says a plan was written
+ * (`assumedReviewCommentBody`, `./review-comment.ts`), and NO label
+ * moves — the spec is as ready as it was, and swapping `spec:ready` for
+ * `spec:needs-work` under a plan that stands would stop the next run
+ * from planning from a spec this one planned from.
+ *
+ * ONE blocking gap is the whole verdict: the refusal below is what
+ * runs, gaps and all, because the blocking one is what nobody can plan
+ * under and the rest ride with it. The reading is the parser's, and it
+ * fails toward blocking — an unreadable `blocking`, and a non-blocking
+ * gap that named no assumption, are both read as blocking there — so
+ * what reaches the assumed path is a review that said, in as many
+ * words, what it was guessing.
+ *
+ * Writing the plan is THIS module's and not the caller's, unlike the
+ * `review: skipped` and `review: missing` records
+ * (`src/commands/plan/plan-record.ts`): those are one line each in a
+ * plan the gate already let stand, while the assumptions are the
+ * verdict itself, and a caller that forgot them would leave a plan
+ * standing over gaps nobody recorded. Both writes are warnings when
+ * they fail, as every write here is: the plan a session paid for stands
+ * either way, and the gaps are in the comment and in the warning.
  *
  * The AGENT half of `rafa plan validate` is not run here. It resolves a
  * roster from the project the dispatcher found and the config that
@@ -67,7 +109,9 @@
  * plan is kept under {@link REJECTED_DIR} where an operator can read
  * it. The move is bounded: exactly the two paths the caller names,
  * each resolved under the repository root, each moved only when it is
- * a file that exists, and only on a reading that is not ready.
+ * a file that exists, and only on a reading that refuses the plan — a
+ * verdict with a blocking gap, or an unread review over a plan that
+ * does not read as written. A verdict planned under moves neither.
  *
  * ## What a failed write does NOT do
  *
@@ -86,9 +130,11 @@
  * `--skip-review` bypasses check 3 ALONE: the caller never reaches this
  * module, and the plan it keeps records `review: skipped`
  * (`./review-stamp.ts`). `--no-comment` suppresses the COMMENT alone,
- * the flag's own scope and the one `rafa pr triage` gives it: the files
- * are still moved aside, the labels still move, and the gaps are still
- * printed, because the refusal message carries them.
+ * the flag's own scope and the one `rafa pr triage` gives it: on a
+ * refusal the files are still moved aside, the labels still move, and
+ * the gaps are still printed, because the refusal message carries them;
+ * on a verdict planned under, the plan is still opened with the
+ * assumptions, which is where the gaps are then written down.
  *
  * Both are read off the command line by {@link readGateFlags} rather
  * than by `src/plan.ts`, which is where the flags a wrapped phase 0
@@ -109,11 +155,12 @@
  * `./plan-spec.ts` answers beside the spec.
  */
 import type { IssueBoard } from './issue-board.js';
+import type { ReviewStamp } from './review-stamp.js';
 import type { SpecReviewGap, SpecReviewReading } from './spec-review.js';
 import type { BoardTrust } from './trust.js';
 import type { Output } from '../ports/index.js';
 
-import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -124,7 +171,8 @@ import { messageOf } from '../config-sections.js';
 
 import { NO_COMMENT_FLAG, SKIP_REVIEW_FLAG } from './flags.js';
 import { SPEC_READY_LABEL } from './readiness.js';
-import { specReviewCommentBody, writeSpecReviewComment } from './review-comment.js';
+import { assumedReviewCommentBody, specReviewCommentBody, writeSpecReviewComment } from './review-comment.js';
+import { assumptionsHeading, REVIEW_ASSUMED_LINE, stampReviewAssumed } from './review-stamp.js';
 
 /** The issue the gate publishes a refusal on, and the board it goes through. */
 export interface GateIssue {
@@ -170,13 +218,13 @@ export const SPEC_NOT_READY_EXIT = 3;
 export const SPEC_NEEDS_WORK_LABEL = 'spec:needs-work';
 
 /**
- * The three ways a plan comes through the gate, in the order
- * {@link enforceSpecReview} weighs them: a verdict that judged the spec
- * ready, a planner that judged nothing, and a session whose review
- * could not be read over a plan that reads as written. Everything else
- * is a refusal and never an answer.
+ * The four ways a plan comes through the gate: a verdict that judged
+ * the spec ready, a planner that judged nothing, a session whose review
+ * could not be read over a plan that reads as written, and a verdict
+ * that judged the spec not ready over gaps it could all plan under.
+ * Everything else is a refusal and never an answer.
  */
-export const SPEC_REVIEW_STANDINGS = ['ready', 'unjudged', 'unread'] as const;
+export const SPEC_REVIEW_STANDINGS = ['ready', 'unjudged', 'unread', 'assumed'] as const;
 
 /** One of {@link SPEC_REVIEW_STANDINGS}. */
 export type SpecReviewStanding = (typeof SPEC_REVIEW_STANDINGS)[number];
@@ -248,6 +296,18 @@ export function specNotReadyMessage(
  */
 export function unreadReviewWarning(reading: string, planPath: string): string {
   return `${reading}; ${planPath} reads as written, so the plan stands unreviewed`;
+}
+
+/**
+ * The one warning a plan written under a review's assumptions leaves
+ * behind: what the reading said, that nothing it found blocks planning,
+ * and that the plan stands on the guesses it named.
+ *
+ * `reading` is `SpecReviewReading.text`, and `planPath` is the plan as
+ * the planner names it, as {@link unreadReviewWarning} takes them.
+ */
+export function assumedReviewWarning(reading: string, planPath: string): string {
+  return `${reading}, none of them blocking; ${planPath} is written under the assumptions the review named`;
 }
 
 /**
@@ -375,16 +435,74 @@ function standOrRefuse(
   );
 }
 
-/** Posts or edits the gaps comment, reporting what it did or why it could not. */
+/**
+ * Opens the plan with the assumptions the review named and records
+ * {@link REVIEW_ASSUMED_LINE} in its `rafa:plan` block, in ONE write,
+ * reporting what it wrote or what was in the way.
+ *
+ * Never throws. A plan that is not there, one that cannot be read or
+ * written, and a gap list holding no assumption to write are each a
+ * WARNING and nothing else: the plan a session paid for stands either
+ * way, and the gaps are on the issue and in
+ * {@link assumedReviewWarning}. That is the rule
+ * `src/commands/plan/plan-record.ts` keeps for its own two records, and
+ * it is kept here for the same reason.
+ *
+ * A plan holding no readable `rafa:plan` block is opened with the
+ * assumptions all the same and warned about: the section is what a
+ * person reads, and the stamp is the line a command reads, so the one
+ * that can be written is.
+ */
+function recordAssumptions(
+  options: SpecReviewGateOptions,
+  gaps: readonly SpecReviewGap[],
+  output: Output,
+): void {
+  const { repoRoot, planPath } = options;
+  const unopened = (why: string): void => {
+    output.warn(`${planPath} was not opened under the review's assumptions: ${why}`);
+  };
+  if (!isWrittenFile(repoRoot, planPath)) {
+    unopened('the session wrote no plan there');
+    return;
+  }
+
+  const file = resolve(repoRoot, planPath);
+  let stamped: ReviewStamp;
+  try {
+    stamped = stampReviewAssumed(`${assumptionsHeading(gaps)}${readFileSync(file, 'utf8')}`);
+    writeFileSync(file, stamped.text, 'utf8');
+  } catch (error) {
+    unopened(messageOf(error));
+    return;
+  }
+
+  if (!stamped.recorded) {
+    output.warn(`${planPath} opens under the review's assumptions and records no ${REVIEW_ASSUMED_LINE}: ${stamped.note}`);
+    return;
+  }
+  output.info(`🧭 ${planPath} opens under the review's assumptions and records ${REVIEW_ASSUMED_LINE}.`);
+}
+
+/**
+ * Posts or edits the gaps comment, reporting what it did or why it
+ * could not.
+ *
+ * `body` is the builder for the comment the standing calls for, not the
+ * text: it is called INSIDE the try, so a gap list it refuses to write
+ * a comment from is a warning here like every other failed write
+ * (`./review-comment.ts`).
+ */
 async function publishGaps(
   issue: GateIssue,
   gaps: readonly SpecReviewGap[],
+  body: (named: readonly SpecReviewGap[]) => string,
   output: Output,
 ): Promise<void> {
   try {
     const write = await writeSpecReviewComment({
       issue: issue.number,
-      body: specReviewCommentBody(gaps),
+      body: body(gaps),
       board: issue.board,
       trust: issue.trust,
     });
@@ -412,6 +530,35 @@ async function swapLabels(issue: GateIssue, output: Output): Promise<void> {
   }
 }
 
+/** True for a review no gap of which blocks planning; see the module note. */
+function nothingBlocks(review: SpecReviewReading): boolean {
+  return !review.gaps.some((gap) => gap.blocking);
+}
+
+/**
+ * What a `not-ready` verdict with no blocking gap does: the plan
+ * opened under the assumptions and stamped, the gaps published, and
+ * `assumed` answered. Nothing is moved and no label changes.
+ */
+async function planUnderAssumptions(
+  options: SpecReviewGateOptions,
+  review: SpecReviewReading,
+  output: Output,
+): Promise<SpecReviewStanding> {
+  output.warn(assumedReviewWarning(review.text, options.planPath));
+  recordAssumptions(options, review.gaps, output);
+
+  const { issue } = options;
+  if (issue !== null) {
+    if (options.comment) {
+      await publishGaps(issue, review.gaps, assumedReviewCommentBody, output);
+    } else {
+      output.info(`💬 ${NO_COMMENT_FLAG}: the gaps were not posted on issue #${String(issue.number)}.`);
+    }
+  }
+  return 'assumed';
+}
+
 /**
  * Lets a review the plan stands on through, and enforces one it does
  * not, answering which of {@link SPEC_REVIEW_STANDINGS} it was.
@@ -429,8 +576,12 @@ async function swapLabels(issue: GateIssue, output: Output): Promise<void> {
  * {@link unreadReviewMessage})` after the two files are moved into
  * {@link REJECTED_DIR}.
  *
- * An explicit `not-ready` verdict moves the two files aside, publishes the
- * gaps, swaps the labels and throws
+ * An explicit `not-ready` verdict is weighed against its own gaps. With
+ * none of them blocking it answers `assumed`: the plan is opened under
+ * the assumptions and stamped `review: assumed`, the gaps are
+ * published, no label moves and nothing is refused. With ONE blocking
+ * gap it moves the two files aside, publishes the gaps, swaps the
+ * labels and throws
  * `CommandExit({@link SPEC_NOT_READY_EXIT}, {@link specNotReadyMessage})`.
  *
  * Which rejections of the planner carry a reading worth enforcing is
@@ -444,12 +595,13 @@ export async function enforceSpecReview(options: SpecReviewGateOptions): Promise
 
   const output = options.output ?? activeOutput();
   if (review.answer !== 'not-ready') return standOrRefuse(options, review, output);
+  if (nothingBlocks(review)) return planUnderAssumptions(options, review, output);
 
   moveWritten(options, output, NOT_READY_REASON);
 
   if (issue !== null) {
     if (options.comment) {
-      await publishGaps(issue, review.gaps, output);
+      await publishGaps(issue, review.gaps, specReviewCommentBody, output);
     } else {
       output.info(`💬 ${NO_COMMENT_FLAG}: the gaps were not posted on issue #${String(issue.number)}.`);
     }

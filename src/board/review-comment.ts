@@ -75,6 +75,21 @@
  * carry a newline, and one of those would end the list item and leave
  * the rest of the sentence as a paragraph of its own.
  *
+ * There are TWO bodies, because the gate now has two things to report
+ * about one gap list. {@link specReviewCommentBody} is the refusal's:
+ * a plan was removed, the label moved, and closing the gaps is what
+ * gets the spec planned. {@link assumedReviewCommentBody} is the one a
+ * review whose every gap is non-blocking gets: the plan WAS written,
+ * each item carries the assumption it was written under, and no label
+ * moved, so its remedy says so (`./gate.ts`). They share the marker, so
+ * a rerun that switches between them edits the one comment the issue
+ * already carries rather than posting a second.
+ *
+ * A body that said "No plan was written" over a plan that stands would
+ * be the one sentence in this comment a person acts on, and it would be
+ * false; that is why the two bodies are two functions rather than one
+ * with a gap list that cannot tell the caller which run wrote it.
+ *
  * Nothing here decides WHETHER to comment: `--no-comment` prints the
  * gaps and writes nothing, and that is the gate's decision
  * (`./gate.ts`). Nothing here posts, either, until
@@ -98,6 +113,10 @@ const ONE_LINE = /\s+/gu;
 
 /** What the comment tells the author to do once the gaps are closed. */
 export const COMMENT_REMEDY = 'Close the gaps, label the issue `spec:ready` again, and plan from it again.';
+
+/** What the comment tells the author when the plan was written anyway. */
+export const ASSUMED_COMMENT_REMEDY = 'Answer these in the spec where an assumption is wrong, and plan from it'
+  + ' again. No label changed: none of these gaps blocked planning.';
 
 /** What the comment says about its own edits, so a reader knows there is one of it. */
 const COMMENT_HISTORY = 'This comment is edited in place each time the spec is reviewed.';
@@ -158,31 +177,73 @@ function gapItem(gap: SpecReviewGap): string {
 }
 
 /**
- * The comment's body: the marker, what the review found, one list item
- * per gap, and what to do about it.
+ * One gap as a markdown list item, with the assumption the plan was
+ * written under beneath it. A gap naming none is its item alone: a
+ * blocking gap plausibly carries no assumption, and every non-blocking
+ * one carries one (`./spec-review.ts`).
+ *
+ * Exported for `./review-stamp.ts`, which opens the plan itself with
+ * the same gaps: the issue comment and the plan's own heading say what
+ * was assumed in ONE spelling, so the two cannot come to disagree.
+ */
+export function assumedGapItem(gap: SpecReviewGap): string {
+  return gap.assumption === null
+    ? gapItem(gap)
+    : `${gapItem(gap)}\n  - Planned under: ${gap.assumption.replace(ONE_LINE, ' ').trim()}`;
+}
+
+/**
+ * Refuses a gap list a comment cannot be made of.
  *
  * @throws TypeError for an empty gap list, as `./leak.ts` and
  * `./readiness.ts` throw for a clean reading: a comment naming no gap
  * tells the author nothing, and a gate that has no gap to post has
  * nothing to refuse either.
  */
-export function specReviewCommentBody(gaps: readonly SpecReviewGap[]): string {
+function requireGaps(gaps: readonly SpecReviewGap[]): void {
   if (gaps.length === 0) {
     throw new TypeError('board review comment: no gap was named, and there is no comment to write');
   }
+}
 
-  return [
-    SPEC_REVIEW_MARKER,
-    `**rafa reviewed this spec before planning and found ${counted(gaps.length, 'gap')}.**`,
-    'No plan was written.',
-    '',
-    ...gaps.map(gapItem),
-    '',
+/** The shape both bodies share: the marker, the finding, the items, the remedy. */
+function commentBody(found: readonly string[], items: readonly string[], remedy: string): string {
+  return [SPEC_REVIEW_MARKER, ...found, '', ...items, '', remedy, '', COMMENT_HISTORY, ''].join('\n');
+}
+
+/**
+ * The comment's body for a refusal: the marker, what the review found,
+ * one list item per gap, and what to do about it.
+ *
+ * @throws TypeError for an empty gap list; see {@link requireGaps}.
+ */
+export function specReviewCommentBody(gaps: readonly SpecReviewGap[]): string {
+  requireGaps(gaps);
+  return commentBody(
+    [`**rafa reviewed this spec before planning and found ${counted(gaps.length, 'gap')}.**`, 'No plan was written.'],
+    gaps.map(gapItem),
     COMMENT_REMEDY,
-    '',
-    COMMENT_HISTORY,
-    '',
-  ].join('\n');
+  );
+}
+
+/**
+ * The comment's body for a review whose every gap is non-blocking: the
+ * same marker and the same gaps, each with the assumption the plan was
+ * written under, and a remedy that does not ask for a label nothing
+ * moved. `./gate.ts` picks this one and holds when.
+ *
+ * @throws TypeError for an empty gap list; see {@link requireGaps}.
+ */
+export function assumedReviewCommentBody(gaps: readonly SpecReviewGap[]): string {
+  requireGaps(gaps);
+  return commentBody(
+    [
+      `**rafa reviewed this spec before planning and found ${counted(gaps.length, 'gap')}, none of them blocking.**`,
+      'The plan was written under the assumptions below.',
+    ],
+    gaps.map(assumedGapItem),
+    ASSUMED_COMMENT_REMEDY,
+  );
 }
 
 /**

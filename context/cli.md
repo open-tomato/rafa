@@ -222,16 +222,20 @@ module's note is the long form.
   to end its final message with a `rafa:spec-review` block, the `claude`
   planner reads it once and carries it back both on the plan it answers
   and on its rejections (`src/adapters/planner/claude.ts`), and this
-  command is what acts on it. An explicit `verdict: not-ready` removes
-  `PLAN-<stub>.md` and `PREREQUISITES-<stub>.md` when the session wrote
-  them anyway, posts the gaps as one `<!-- rafa:spec-review v1 -->`
+  command is what acts on it. A `verdict: not-ready` naming a gap that
+  blocks planning removes `PLAN-<stub>.md` and
+  `PREREQUISITES-<stub>.md` when the session wrote them anyway,
+  posts the gaps as one `<!-- rafa:spec-review v1 -->`
   comment on the issue, edited on a rerun unless the marker comment it
   found was written by an author the trust reading refuses, in which case
   it is reported, left alone and posted beside
   (`src/board/review-comment.ts`), swaps `spec:ready` for
   `spec:needs-work` over `src/board/issue-board.ts`, and throws exit code
-  3 with every gap in the message. A comment or a label swap that fails
-  is a warning and changes neither the other write nor the exit code.
+  3 with every gap in the message. One whose gaps are ALL non-blocking
+  keeps its plan instead: the gate opens the plan with the assumptions,
+  records `review: assumed` in its block, posts the same gaps and moves
+  no label. A comment or a label swap that fails is a warning and
+  changes neither the other write nor the exit code.
   `--spec` names no issue, so that route removes, prints and exits 3. An
   `absent` or `malformed` review is NOT that verdict: on a rejection the
   session's own failure is what the command ends with, and on a plan the

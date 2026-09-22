@@ -25,6 +25,12 @@
  * those a run writes is `./review-gate.ts`'s decision, never this
  * module's.
  *
+ * The third review word has no record here. `review: assumed` — a
+ * verdict no gap of which blocked planning — is written by the GATE
+ * itself, in the same write that opens the plan with the assumptions,
+ * because the two together are what that verdict does
+ * (`src/board/gate.ts`). Nothing in this module runs for it.
+ *
  * ## A record that fails is a warning, never a refusal
  *
  * Every record is written AFTER the gate, so a plan the gate moved
