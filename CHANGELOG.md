@@ -9,6 +9,14 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.9.0 — 2026-09-22, Merge a pull request that reports no checks
+
+- `pr merge`: `--skip-checks` merges a pull request that reports no checks at all, after a warning that depends on whether the repository has workflows and a `Merge #<n> with no checks? [y/N]` question, then comments on the pull request that it did. `--yes` answers the question only where the repository has no workflow, and the flag is refused on a pull request that reports any check, naming each one and its state. Without the flag, a pull request with no checks is refused with a message naming `--skip-checks` and what it means, instead of pointing at `pr triage`. The json result gains an `unchecked` field.
+- `rafa next`: a pull request that reports no checks and does not conflict is now the `pr-no-checks` state, which proposes merging it without checks rather than triaging it, and hands the question to `rafa pr merge --skip-checks` instead of asking its own. A `--yes` list naming `merge-unchecked` is refused with exit code 2, as `ready` is, and the stop line for either step now says to drop `--yes` rather than suggesting a list that would be refused.
+- `pr triage`: a pull request that reports no checks is classed `no-checks` rather than `green`, and its report and comment show the repository's workflow count and the `rafa pr merge <n> --skip-checks` line.
+- Docs: `context/pull-requests.md`, `context/cli.md` and the README cover `--skip-checks`, its warnings, its `--yes` refusal and its comment, the `no-checks` triage class, the `pr-no-checks` state and the always-asked steps, and no longer say a pull request with no checks goes to triage.
+- Tests: driven suites over the gh fake and a scratch repository with a bare remote for every `--skip-checks` refusal and both merges, and integration tests for `rafa next --yes=merge-unchecked`, a conflicting pull request with no checks, and an unchecked merge answered `y`.
+
 ## 0.8.0 — 2026-09-22, One command takes you to the next step
 
 - `rafa next`: reads where the project stands as one of twelve states — with a working tree holding changes to tracked files, or a pull request provider it could not ask, reported ahead of them — says it in one line, proposes the one next step in the next, and runs that step on a yes before proposing what follows. `--dry-run` prints the two lines and stops, which is also what it does when there is no terminal to answer on. `--yes` is a risk ceiling: it accepts eight step ids, allows `sync,wait,unblock,plan` bare, refuses a list naming `ready` or an unknown id with exit code 2, and never hands `pr triage` its `--resolve`. It can fast-forward a base that is behind its remote, and refuses one that has diverged.
