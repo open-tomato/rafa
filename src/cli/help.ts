@@ -71,12 +71,12 @@
  *
  * ## Snapshots
  *
- * `src/cli/testdata/help/` holds what `rafa --help`, `rafa loop --help`
- * and `rafa loop start --help` print over the core registry, and
- * `help.test.ts` holds this renderer to them. They are written afresh
- * only when `RAFA_UPDATE_HELP_SNAPSHOTS=1` is set, so a change to a core
- * command's declaration, or to a default it reads from a constant, goes
- * red until they are regenerated and the diff read.
+ * `src/cli/testdata/help/` holds what `rafa --help`, `rafa loop --help`,
+ * `rafa loop start --help` and `rafa next --help` print over the core
+ * registry, and `help.test.ts` holds this renderer to them. They are
+ * written afresh only when `RAFA_UPDATE_HELP_SNAPSHOTS=1` is set, so a
+ * change to a core command's declaration, or to a default it reads from
+ * a constant, goes red until they are regenerated and the diff read.
  */
 import type { CommandExample, RafaCommand } from './command.js';
 import type { ArgSpec, FlagSpec } from './core/types.js';
