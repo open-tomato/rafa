@@ -9,9 +9,12 @@
  * that table is read over and `sources.ts` composes those readings for
  * a real project, `actions.ts` maps an action id onto the registered
  * command that does it, `sync.ts` holds the one action that runs none,
- * and `ceiling.ts` reads `--yes` as how far a run may go by itself.
- * This module owns the loop, the question and the exit code, and it is
- * the only one of the seven that prints anything.
+ * `ceiling.ts` reads `--yes` as how far a run may go by itself, and
+ * `hint.ts` words the question and the command line, which the six
+ * commands that end by naming what follows say the same way. This
+ * module owns the loop, the action and the exit code, and of the eight
+ * only `hint.ts` also prints — the one line it leaves a run that has
+ * no terminal to be asked on.
  *
  * ## One turn of the chain
  *
@@ -143,6 +146,7 @@ import type { Prompter } from '../project/root-choice.js';
 import { CommandExit } from '../cli/command.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
+import { commandWords, nextQuestion } from '../next/hint.js';
 import { openNextSources } from '../next/sources.js';
 import { readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
@@ -233,11 +237,6 @@ export interface NextChainOptions {
   readonly warn: (line: string) => void;
 }
 
-/** The command and the words it runs with, as a person types them after `rafa`. */
-export function commandWords(invocation: NextInvocation): string {
-  return [invocation.command, ...invocation.argv].join(' ');
-}
-
 /** What is true, on one line. */
 export function stateLine(state: NextState): string {
   return `${STATE_MARK} ${state.reading}.`;
@@ -249,16 +248,6 @@ export function proposalLine(state: NextState, invocation: NextInvocation | null
     ? ''
     : ` — rafa ${commandWords(invocation)}`;
   return `${PROPOSAL_MARK} ${state.proposal}${runs}`;
-}
-
-/** The proposal as a sentence opens: its first letter upper-cased, everything else left alone. */
-function capitalised(text: string): string {
-  return `${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
-}
-
-/** The question one proposal is put as, spelled `[y/N]` and ending in a space to type after. */
-export function nextQuestion(state: NextState): string {
-  return `${capitalised(state.proposal)}? [y/N] `;
 }
 
 /** The ids a ceiling names, as a sentence lists them. */

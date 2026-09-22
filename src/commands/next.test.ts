@@ -132,6 +132,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
 import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
+import { nextQuestion } from '../next/hint.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -143,7 +144,6 @@ import {
   dryRunOf,
   MAX_ACTIONS,
   NEXT_USAGE,
-  nextQuestion,
   proposalLine,
   readDryRun,
   runNextChain,
