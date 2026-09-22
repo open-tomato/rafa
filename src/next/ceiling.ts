@@ -4,10 +4,12 @@
  * anything is read, and which two actions are asked about whatever a
  * list says.
  *
- * Without the flag every action is asked about, one `[y/N]` each. With
- * it, the ids it names may run unasked and the chain STOPS at the first
- * action outside the list, that action's proposal already printed, so
- * the person reads what is left to do and decides. It is a ceiling and
+ * Without the flag every action is asked about, one `[y/N]` each, and
+ * `merge-unchecked`'s is put by `pr merge --skip-checks` rather than by
+ * `rafa next` (`src/commands/next.ts`). With it, the ids it names may
+ * run unasked and the chain STOPS at the first action outside the list,
+ * that action's proposal already printed, so the person reads what is
+ * left to do and decides. It is a ceiling and
  * not a script: it says how far a run may go by itself, never what to
  * do, which stays `./state.ts`'s answer.
  *

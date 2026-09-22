@@ -12,11 +12,13 @@ Description:
   reads the project again and proposes what follows. It stops when the answer is
   no, when an action fails, when there is nothing to run, and once a loop has
   started. A working tree with changes to tracked files and a pull request
-  provider that cannot be asked are reported in place of a proposal. `--dry-run`
-  prints the two lines and stops, and so does a run with no terminal to answer
-  on and no `--yes`, since there is nobody to put the question to. With
-  `--output=json` the steps and why the chain stopped are the data of the
-  terminal result event.
+  provider that cannot be asked are reported in place of a proposal. A pull
+  request no check has reported on is proposed as `rafa pr merge <n>
+  --skip-checks`, which asks its own question after the warning it prints, so
+  rafa next asks none before it. `--dry-run` prints the two lines and stops, and
+  so does a run with no terminal to answer on and no `--yes`, since there is
+  nobody to put the question to. With `--output=json` the steps and why the
+  chain stopped are the data of the terminal result event.
 
 Flags:
   --dry-run   boolean
@@ -27,8 +29,8 @@ Flags:
       Run the actions named without asking, as a comma list of action ids, and
       stop at the first action the list leaves out. Bare it names sync, wait,
       unblock, plan. The ids are sync, resume, wait, triage, merge, start, plan,
-      unblock; a list naming ready, which is always asked, or a word that is no
-      id at all is refused.
+      unblock; a list naming ready or merge-unchecked, which are always asked,
+      or a word that is no id at all is refused.
 
 Examples:
   rafa next
