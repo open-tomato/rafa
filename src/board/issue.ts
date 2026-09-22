@@ -86,19 +86,42 @@
  * and the run keeps the exact text it planned from even when somebody
  * edits the issue an hour later.
  *
- * That only holds while the file is not silently rewritten, so a
- * snapshot that is already there and DIFFERS from what this run would
- * write refuses the command, and `--refresh` is the word that says
- * "take the issue as it reads now". A snapshot that matches is left
- * alone and reported {@link SpecSnapshot.action} `unchanged` — the file
- * is not rewritten, so its modification time still says when the text
- * was first taken.
+ * That only holds while the file is not silently rewritten, and a
+ * rewrite is told apart by which part of the snapshot differs, read by
+ * {@link readSnapshotChange}:
  *
- * "Differs" is measured against the WHOLE file this run would write, the
- * appended notes included. A notes file edited since the snapshot was
- * taken is a changed spec, because the planner reads the appended text
- * as part of it, and a rule that compared the issue body alone would let
- * that edit through unnoticed.
+ * ```text
+ * matches               left alone              unchanged
+ * local notes differ    moved, then rewritten   notes-rebuilt
+ * issue body differs    refused                 (snapshotDiffersMessage)
+ *   under --refresh     moved, then rewritten   refreshed
+ * nothing there         written                 created
+ * ```
+ *
+ * A snapshot that matches is left alone and its file is not touched,
+ * so its modification time still says when the text was first taken.
+ *
+ * A change in the ISSUE BODY refuses the command, and `--refresh` is the
+ * word that says "take the issue as it reads now": the body is what
+ * somebody else can edit on the board, so planning from an edit nobody
+ * here has read is what the refusal stops. The refused run touches
+ * nothing — the saved copy stays, and `previous/` is not written.
+ *
+ * A change in the LOCAL NOTES alone is rebuilt without asking. The notes
+ * file lives beside the snapshot and only a person on this machine
+ * edits it, so its edit is one the operator made and wants planned
+ * from; refusing it would ask them to confirm their own change. It is
+ * still a changed spec — the planner reads the appended text as part of
+ * it — which is why "differs" is measured against the WHOLE file this
+ * run would write, the notes included, and why the write says
+ * `notes-rebuilt` rather than `unchanged`.
+ *
+ * Every rewrite of a saved copy first MOVES the old one to `previous/`
+ * under `specs.dir` (`./previous-copy.ts`, which holds the name and why
+ * it never overwrites), and {@link SpecSnapshot.previous} names where it
+ * went, so a plan made from the old text stays traceable to it. The
+ * move happens before the write: a write that then fails leaves no saved
+ * copy rather than a half-written one, and the old text is kept.
  *
  * The body is normalised before it is written: CRLF line endings become
  * LF and trailing blank lines become one newline. Trailing SPACES are
@@ -182,6 +205,7 @@ import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
 import { REFRESH_FLAG } from './flags.js';
 import { notesPath, specPath } from './naming.js';
+import { movePreviousCopy } from './previous-copy.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board issue';
@@ -587,7 +611,7 @@ export function notesCollisionMessage(path: string, issue: number): string {
 }
 
 /** What a write did to the snapshot file. */
-export type SnapshotAction = 'created' | 'refreshed' | 'unchanged';
+export type SnapshotAction = 'created' | 'refreshed' | 'notes-rebuilt' | 'unchanged';
 
 /** What {@link writeSpecSnapshot} is asked. */
 export interface SpecSnapshotOptions {
@@ -597,7 +621,7 @@ export interface SpecSnapshotOptions {
   readonly specsDir: string;
   /** The issue read, checked by {@link requireSpecIssue} already. */
   readonly issue: SpecIssue;
-  /** True under `--refresh`: a snapshot that differs is rewritten, not refused. */
+  /** True under `--refresh`: a snapshot whose issue body differs is rewritten, not refused. */
   readonly refresh: boolean;
 }
 
@@ -611,6 +635,11 @@ export interface SpecSnapshot {
   readonly action: SnapshotAction;
   /** The local notes file appended, as a path, or null when there was none. */
   readonly notes: string | null;
+  /**
+   * Where the saved copy this write replaced was moved, under
+   * `specs.dir` as configured, or null when nothing was replaced.
+   */
+  readonly previous: string | null;
   /** The text the file now holds. */
   readonly text: string;
 }
@@ -620,10 +649,18 @@ export interface SpecSnapshot {
  * with its local notes appended, and answers where it went and what the
  * write did.
  *
+ * A saved copy that matches is left alone (`unchanged`). One whose
+ * local notes alone differ is rebuilt (`notes-rebuilt`), and one whose
+ * issue body differs is rebuilt only under `options.refresh`
+ * (`refreshed`); before either rewrite the saved copy is moved to
+ * `previous/` by `movePreviousCopy`, and {@link SpecSnapshot.previous}
+ * names where it went.
+ *
  * Throws `CommandExit({@link ISSUE_REFUSAL_EXIT},
- * {@link snapshotDiffersMessage})` when a snapshot is already there,
- * differs from what this run would write and `options.refresh` is
- * false; the module note holds what "differs" measures and why.
+ * {@link snapshotDiffersMessage})` when the issue body differs and
+ * `options.refresh` is false, with the saved copy and `previous/` left
+ * as they were; the module note holds what "differs" measures and why.
+ * Throws an `Error` naming the file when the move or the write fails.
  */
 export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
   const { repoRoot, specsDir, issue, refresh } = options;
@@ -644,14 +681,20 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
     notes: local === null
       ? null
       : notes,
+    previous: null,
     text,
   };
 
   if (existing === text) return { ...written, action: 'unchanged' };
-  if (existing !== null && !refresh) {
+
+  const action = rewriteAction(existing, issue.body, local, notes, refresh);
+  if (action === null) {
     throw new CommandExit(ISSUE_REFUSAL_EXIT, snapshotDiffersMessage(path, issue.number));
   }
 
+  const previous = action === 'created'
+    ? null
+    : movePreviousCopy({ repoRoot, specsDir, path }).path;
   try {
     mkdirSync(dirname(absolute), { recursive: true });
     writeFileSync(absolute, text);
@@ -659,7 +702,26 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
     throw new Error(`${PREFIX}: the snapshot ${path} could not be written: ${messageOf(error)}`, { cause: error });
   }
 
-  return existing === null
-    ? written
-    : { ...written, action: 'refreshed' };
+  return { ...written, action, previous };
+}
+
+/**
+ * What a write over the saved copy `existing`, which differs from what
+ * this run would write, is to do: `created` when there is none,
+ * `notes-rebuilt` when only the local notes differ, `refreshed` when the
+ * issue body differs under `--refresh`, and null for the refusal.
+ */
+function rewriteAction(
+  existing: string | null,
+  body: string,
+  notes: string | null,
+  notesFile: string,
+  refresh: boolean,
+): Exclude<SnapshotAction, 'unchanged'> | null {
+  if (existing === null) return 'created';
+  const { kind } = readSnapshotChange({ saved: existing, body, notes, notesPath: notesFile });
+  if (kind === 'notes') return 'notes-rebuilt';
+  return refresh
+    ? 'refreshed'
+    : null;
 }

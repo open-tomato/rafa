@@ -54,7 +54,10 @@
  * passes: the issue body is unchanged and only the LOCAL NOTES were
  * edited. A rule comparing the body alone would write nothing and say
  * the snapshot was unchanged, which is the silent version of planning
- * from text nobody wrote.
+ * from text nobody wrote; a rule refusing every difference would refuse
+ * it. So that case asserts `notes-rebuilt`, the new text, and the old
+ * text under `previous/`, beside a case where the notes AND the body
+ * changed, which must still refuse and leave `previous/` unwritten.
  *
  * ## Mutations driven
  *
@@ -117,12 +120,26 @@
  *    text.
  *  - the body read the same only when the copy holds no notes: 3 fail,
  *    the three cases whose reading is `notes`.
+ *
+ * Four mutations of {@link writeSpecSnapshot} were driven on 2026-09-22
+ * over the same command, restored from a scratch copy and verified with
+ * `shasum -c` after each. 45 pass either side:
+ *
+ *  - a notes-only change refused unless under `--refresh`: 2 fail, the
+ *    two notes-rebuilt cases.
+ *  - the saved copy written over, not moved to `previous/`: 2 fail, the
+ *    `--refresh` case and the notes-rebuilt case that reads the old text
+ *    back.
+ *  - a change to the notes AND the body rebuilt like a notes-only one:
+ *    1 fail, the case that refuses it.
+ *  - the saved copy moved before the refusal is thrown: 2 fail, the two
+ *    refusals that assert `previous/` was never made.
  */
 import type { SnapshotChange, SpecIssue } from './issue.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -148,6 +165,7 @@ import {
   writeSpecSnapshot,
 } from './issue.js';
 import { notesPath, specPath } from './naming.js';
+import { previousDir } from './previous-copy.js';
 
 /** Where every file this file writes goes. */
 let root = '';
@@ -577,6 +595,7 @@ describe('writeSpecSnapshot', () => {
     expect(written.absolute).toBe(join(root, SPECS_DIR, `${STUB}.md`));
     expect(written.absolute.startsWith(root)).toBe(true);
     expect(written.notes).toBeNull();
+    expect(written.previous).toBeNull();
     expect(fileAt(written.path)).toBe('# Spec\n\nBody.\n');
   });
 
@@ -609,7 +628,9 @@ describe('writeSpecSnapshot', () => {
 
     expect(first.action).toBe('created');
     expect(again.action).toBe('unchanged');
+    expect(again.previous).toBeNull();
     expect(statSync(again.absolute).mtimeMs).toBe(stamp);
+    expect(existsSync(join(root2, previousDir(SPECS_DIR)))).toBe(false);
     rmSync(root2, { recursive: true, force: true });
   });
 
@@ -630,6 +651,7 @@ describe('writeSpecSnapshot', () => {
     expect(write).toThrow(REFRESH_FLAG);
     expect(write).toThrow(/no longer matches it/u);
     expect(readFileSync(join(root2, path), 'utf8')).toBe('# Spec\n\nThe text this run planned from.\n');
+    expect(existsSync(join(root2, previousDir(SPECS_DIR)))).toBe(false);
     rmSync(root2, { recursive: true, force: true });
   });
 
@@ -648,10 +670,13 @@ describe('writeSpecSnapshot', () => {
 
     expect(written.action).toBe('refreshed');
     expect(readFileSync(written.absolute, 'utf8')).toBe('# Spec\n\nEdited on the board.\n');
+    expect(written.previous).not.toBeNull();
+    expect(written.previous?.startsWith(join(previousDir(SPECS_DIR), `${STUB}.`))).toBe(true);
+    expect(readFileSync(join(root2, written.previous ?? ''), 'utf8')).toBe('# Spec\n\nThe old text.\n');
     rmSync(root2, { recursive: true, force: true });
   });
 
-  it('refuses when only the local notes changed, with the issue body untouched', () => {
+  it('rebuilds without refusing when only the local notes changed, keeping the old copy', () => {
     const root2 = mkdtempSync(join(tmpdir(), 'rafa-board-notes-changed-'));
     const issue = issueOf({ body: '# Spec\n' });
     mkdirSync(join(root2, SPECS_DIR), { recursive: true });
@@ -659,14 +684,41 @@ describe('writeSpecSnapshot', () => {
     const first = writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
     writeFileSync(join(root2, notesPath(SPECS_DIR, 20)), 'A second note, added today.\n');
 
-    const write = (): unknown => writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
+    const rebuilt = writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
 
     expect(first.action).toBe('created');
-    expect(write).toThrow(CommandExit);
-    expect(write).toThrow(REFRESH_FLAG);
-    expect(writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: true }).action)
-      .toBe('refreshed');
-    expect(readFileSync(first.absolute, 'utf8')).toMatch(/A second note, added today\./u);
+    expect(rebuilt.action).toBe('notes-rebuilt');
+    expect(readFileSync(first.absolute, 'utf8'))
+      .toBe(`# Spec\n\n${LOCAL_NOTES_HEADING}\n\nA second note, added today.\n`);
+    expect(readdirSync(join(root2, previousDir(SPECS_DIR)))).toHaveLength(1);
+    expect(readFileSync(join(root2, rebuilt.previous ?? ''), 'utf8'))
+      .toBe(`# Spec\n\n${LOCAL_NOTES_HEADING}\n\nThe first note.\n`);
+    rmSync(root2, { recursive: true, force: true });
+  });
+
+  it('rebuilds when the notes file is removed, and still refuses a body edit beside a notes edit', () => {
+    const root2 = mkdtempSync(join(tmpdir(), 'rafa-board-notes-gone-'));
+    const issue = issueOf({ body: '# Spec\n' });
+    const notesFile = join(root2, notesPath(SPECS_DIR, 20));
+    mkdirSync(join(root2, SPECS_DIR), { recursive: true });
+    writeFileSync(notesFile, 'The first note.\n');
+    writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
+    writeFileSync(notesFile, 'A second note.\n');
+
+    const both = (): unknown => writeSpecSnapshot({
+      repoRoot: root2,
+      specsDir: SPECS_DIR,
+      issue: issueOf({ body: '# Spec\n\nEdited on the board.\n' }),
+      refresh: false,
+    });
+
+    expect(both).toThrow(REFRESH_FLAG);
+    expect(existsSync(join(root2, previousDir(SPECS_DIR)))).toBe(false);
+    rmSync(notesFile);
+    const rebuilt = writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
+    expect(rebuilt.action).toBe('notes-rebuilt');
+    expect(rebuilt.notes).toBeNull();
+    expect(readFileSync(rebuilt.absolute, 'utf8')).toBe('# Spec\n');
     rmSync(root2, { recursive: true, force: true });
   });
 

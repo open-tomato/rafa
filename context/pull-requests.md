@@ -425,7 +425,9 @@ records `review: skipped`.
   a closed issue or one without `type:spec`, and run the readiness checks —
   the author's trust, the `spec:ready` label, the leak refusal, the
   completeness refusal and the planner's own review. An
-  existing snapshot that differs is refused without `--refresh`. A local
+  existing snapshot whose issue body differs is refused without
+  `--refresh`; one whose local notes alone differ is rebuilt, the old copy
+  moved to `<specs.dir>/previous/` first, as every rebuild moves it. A local
   file `<specs.dir>/rafa-<n>-notes.md`, when present, is appended
   under "Local notes": machine paths and private hosts live there and never
   on the board. The plan's `rafa:plan` block gets `issue: <n>`.

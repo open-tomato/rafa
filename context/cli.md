@@ -295,8 +295,10 @@ New; it replaces no earlier text. What a row or an action added to
   the body, with `<specs.dir>/rafa-<n>-notes.md` appended under
   "Local notes", to `<specs.dir>/rafa-<n>-<slug>.md`. The planner reads
   that snapshot, so the stub, the prompt, the session and the classifier
-  keys are `--spec`'s own; a snapshot already there that differs is
-  refused without `--refresh`. `--next` reads the roadmap issue
+  keys are `--spec`'s own; a snapshot already there whose issue body
+  differs is refused without `--refresh`, one whose local notes alone
+  differ is rebuilt, and every rebuild first moves the old copy to
+  `<specs.dir>/previous/`. `--next` reads the roadmap issue
   `roadmap.issue` names, else the pinned issue titled `Roadmap`, prints
   each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal and stops before

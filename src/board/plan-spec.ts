@@ -444,8 +444,8 @@ export type PlanSpecResolution =
  * the words typed (`./spec-source.ts`) and exit
  * {@link BOARD_REFUSAL_EXIT} for the board's own state — an issue or a
  * roadmap whose author is trusted with nothing, a closed or unlabelled
- * issue, a leaking body, an incomplete body, a snapshot that differs
- * with no `--refresh`, a roadmap that cannot be resolved.
+ * issue, a leaking body, an incomplete body, a snapshot whose issue
+ * body differs with no `--refresh`, a roadmap that cannot be resolved.
  */
 export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpecResolution> {
   const { repoRoot } = options;
