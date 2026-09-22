@@ -34,6 +34,7 @@ module's note is the long form.
 | `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: the plans directory, the task counts, an issue as a line and the argument refusals |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
+| `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
 | `src/commands/issue/ready.ts` | `rafa issue ready <n>`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes. Exit code 0 for the normal completion; 1 for an unusable config or a swap `gh` refused; 2 for an untrusted author and for a body with gaps. The four status values are `marked`, `declined` (question answered no), `unasked` (no terminal), and `already` (label already on). There is no `--yes` flag; the question is always asked where there is a terminal. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state, and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal. |
 | `src/commands/issue/issue-tracker.ts` | what the seven `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
@@ -104,7 +105,10 @@ New; it replaces no earlier text. What a row or an action added to
   `src/commands/index.test.ts` holds. Its `IMPORT_PATTERN` matches
   RELATIVE specifiers only, those opening `./` or `../`, so a module's
   `node:fs` and `node:path` imports are spelled nowhere in the roster and
-  adding one reddens nothing.
+  adding one reddens nothing. Only the registered command modules are
+  listed, not the helpers they import: an import added to
+  `src/commands/plan/spec-route.ts` reddens nothing, while one added to
+  `src/commands/plan/create.ts` does.
 - **Neither roster walks the filesystem.** Both are spelled lists checked
   against `CORE_REGISTRY`, so a module added under `src/commands/` and not
   yet registered reddens neither, and a plan can split "add the module"
