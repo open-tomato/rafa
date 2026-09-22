@@ -79,10 +79,11 @@
  * reaches with a state it could have run.
  *
  * Which ids a list may name — the eight, the four bare `--yes` allows,
- * and the two lists refused with exit code 2, one naming `ready` and
- * one naming a word that is no action id — is `src/next/ceiling.ts`,
- * read here through {@link readYesCeiling} before any source is opened
- * and asked through {@link allowedUnasked} once a state has answered.
+ * and the two lists refused with exit code 2, one naming `ready` or
+ * `merge-unchecked` and one naming a word that is no action id — is
+ * `src/next/ceiling.ts`, read here through {@link readYesCeiling}
+ * before any source is opened and asked through {@link allowedUnasked}
+ * once a state has answered.
  *
  * ## Without a terminal it behaves as `--dry-run`
  *
