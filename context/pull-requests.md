@@ -31,10 +31,13 @@ exits 0; red exits 1; a pull request with NO checks at all exits 1 too, and
 is answered at once rather than waited out, since a PR that does not merge
 cleanly schedules no run and no amount of waiting makes one; the deadline
 passing with checks still running exits 3. A green wait writes its report
-through the output, and every other ending carries it as the message of its
-exit, because the dispatcher drops a command's payload when it ends
-non-zero. The clock and the wait between polls are seams, so its tests
-spend no real second.
+through the output and then names the one step that follows, which for
+checks that have just passed is the merge (`src/next/ending.ts`,
+`--no-hint` to turn it off); every other ending carries the report as the
+message of its exit, because the dispatcher drops a command's payload when
+it ends non-zero, and gets no hint, since that report already names the
+rafa command for what it found. The clock and the wait between polls are
+seams, so its tests spend no real second.
 
 ### The provider and preflight
 
@@ -98,13 +101,18 @@ unmocked. Register the route row the call needs on the fake.
    it still exists, `git fetch --prune`.
 4. Tick the roadmap, print what is ready and the two follow-ups when they
    apply: `rafa release tag` and `bun run snapshot`.
-5. Last, run the unblock reading over every open issue labelled
+5. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
    about each one whose blockers have all closed and removing the label on a
    yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code.
+6. Last, name the one step that follows — with the base pulled and both
+   branches gone, the next plan or the loop on a plan already there
+   (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
+   DECLINED ends without it: nothing moved, so the hint would put the
+   question that was just answered no.
 
 A failure after the merge never undoes it; it prints the remaining steps as
 commands.

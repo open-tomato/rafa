@@ -30,6 +30,21 @@
  * and refusing the whole command would make it fail inside a script
  * over a label a person has to choose to add.
  *
+ * ## The ending, on a label that is on
+ *
+ * A run that MARKED the issue, and one that found it marked already,
+ * ends by naming the one step that follows — for a roadmap line that is
+ * ready and unblocked, the plan (`src/next/ending.ts`, `--no-hint` to
+ * turn it off). The declined run and the one with no terminal end
+ * without it: no label moved, so the state still reads as an issue
+ * carrying no `spec:ready`, and the hint would put the very question
+ * that was just answered no, or name this command to the run that has
+ * nobody to answer it.
+ *
+ * `--no-hint` is the one flag declared here, and it skips no question
+ * of this command's: it turns off the ENDING, and the marking question
+ * is put whether or not it is typed.
+ *
  * ## The other place this run is made
  *
  * {@link runIssueReady} is also what `plan create --issue` and
@@ -97,6 +112,7 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner } from '../../pr/git.js';
 import type { Prompter } from '../../project/root-choice.js';
 
@@ -109,6 +125,7 @@ import { hasSpecReadyLabel, requireCompleteSpec, SPEC_READY_LABEL } from '../../
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/git.js';
 import { createLinePrompter } from '../../project/root-choice.js';
 import { answeredYes } from '../../start/branch-decision.js';
@@ -315,6 +332,8 @@ export interface ReadySeams {
   readonly isTerminal?: () => boolean;
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter?: () => Prompter;
+  /** How the ending hint reaches the state and the terminal. The system's own when left out. */
+  readonly ending?: NextEndingSeams;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -398,8 +417,9 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
       + ' the repository, refuses a body that does not fill the spec template, and then asks whether to mark it'
       + ` ${SPEC_READY_LABEL}. On a yes it swaps the labels in one write, adding ${SPEC_READY_LABEL} and`
       + ` removing ${SPEC_NEEDS_WORK_LABEL}. It always asks and declares no flag that skips the question;`
-      + ' without a terminal it prints both readings and adds no label. With `--output=json` the report is the'
-      + ' data of the terminal result event.',
+      + ' without a terminal it prints both readings and adds no label. A run that marks the issue, or finds'
+      + ' it marked already, ends by naming the one step that follows, which `--no-hint` turns off. With'
+      + ' `--output=json` the report is the data of the terminal result event.',
     args: [
       {
         name: 'n',
@@ -408,7 +428,7 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
         required: true,
       },
     ],
-    flags: [],
+    flags: [HINT_FLAG_SPEC],
     examples: [
       {
         cmd: 'rafa issue ready 57',
@@ -418,11 +438,12 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
     outputs: ['text', 'json'],
     run: async (context) => {
       const made = await markIssueReady(context, seams);
-      if (context.outputMode === 'json') {
-        context.output.result(made);
-        return;
+      if (context.outputMode === 'json') context.output.result(made);
+      else writeReport(context, made);
+      // A run that added no label left the project where it was; see the module note.
+      if (made.status === 'marked' || made.status === 'already') {
+        await endWithNextStep(context, seams.ending);
       }
-      writeReport(context, made);
     },
   };
   return Object.freeze(command);

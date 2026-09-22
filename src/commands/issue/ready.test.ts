@@ -10,6 +10,15 @@
  * was or was not spent and the cases about the write hold that nothing
  * was written.
  *
+ * The ending a run that marked the issue names the next step with is
+ * driven through an {@link endingProbe} — one state from a literal, the
+ * readings counted — and every other dispatched case types `--no-hint`.
+ * Left to the system seams the ending would read the real project:
+ * `git` and `gh` spawned in the scratch directory the case planted. The
+ * probe's count is what makes the two silences readings: the declined
+ * run and the one with no terminal each count ZERO readings against the
+ * marked run's one.
+ *
  * ## The controls
  *
  * Five readings here could pass while wrong, and each is paired:
@@ -34,11 +43,12 @@
  *    and no `gh issue edit` was sent, against the dispatched case above
  *    it, which opens one and sends one over the same planted board.
  */
-import type { ReadyAsk } from './ready.js';
+import type { ReadyAsk, ReadySeams } from './ready.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
+import type { RafaCommand } from '../../cli/command.js';
 import type { GitRunner } from '../../pr/git.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -52,6 +62,7 @@ import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { CommandExit } from '../../cli/command.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { ENDING_LINE, endingProbe } from '../../tests/ending-probe.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 
 import {
@@ -493,6 +504,14 @@ const fakeGit: GitRunner = (args) => (args.join(' ') === 'remote get-url origin'
   ? { ok: true, stdout: `${ORIGIN}\n`, stderr: '' }
   : { ok: false, stdout: '', stderr: `no route for ${args.join(' ')}` });
 
+/**
+ * Typed by every dispatched case driving no ending of its own, so that
+ * no case composes the real sources and spawns `git` and `gh` in the
+ * scratch project it planted. The cases below that drive one hand the
+ * command `ending` seams and leave it off.
+ */
+const NO_HINT = '--no-hint';
+
 describe('rafa issue ready, dispatched', () => {
   /** A project of this file's own, one per case. */
   const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'case-')));
@@ -514,7 +533,7 @@ describe('rafa issue ready, dispatched', () => {
       }),
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [command], plant());
+    const outcome = await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [command], plant());
 
     expect(asked).toEqual(['Mark #57 spec:ready? [y/N] ']);
     expect(outcome).toEqual({
@@ -540,7 +559,7 @@ describe('rafa issue ready, dispatched', () => {
       },
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [command], plant());
+    const outcome = await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [command], plant());
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain('there is no terminal to ask on, so spec:ready was not added');
@@ -558,7 +577,7 @@ describe('rafa issue ready, dispatched', () => {
       },
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [command], plant());
+    const outcome = await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [command], plant());
 
     expect(outcome.exitCode).toBe(2);
     expect(outcome.stderr).toBe(`issue #57 was opened by outsider, who has no write access to ${REPO};`
@@ -577,7 +596,7 @@ describe('rafa issue ready, dispatched', () => {
       },
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [command], plant());
+    const outcome = await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [command], plant());
 
     expect(outcome.exitCode).toBe(2);
     expect(outcome.stderr).toContain('issue #57 is not ready to plan from:');
@@ -597,7 +616,7 @@ describe('rafa issue ready, dispatched', () => {
       }),
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '57', '--output=json'], SUBJECTS, [command], plant());
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--output=json', NO_HINT], SUBJECTS, [command], plant());
     const results = eventsOf(outcome.stdout).filter((event) => event.type === 'result');
 
     expect(outcome.exitCode).toBe(0);
@@ -619,14 +638,98 @@ describe('rafa issue ready, dispatched', () => {
     });
     const project = plant();
 
-    const none = await dispatchInProject(['issue', 'ready'], SUBJECTS, [command], project);
-    const two = await dispatchInProject(['issue', 'ready', '57', '58'], SUBJECTS, [command], project);
-    const word = await dispatchInProject(['issue', 'ready', 'next'], SUBJECTS, [command], project);
+    const none = await dispatchInProject(['issue', 'ready', NO_HINT], SUBJECTS, [command], project);
+    const two = await dispatchInProject(['issue', 'ready', '57', '58', NO_HINT], SUBJECTS, [command], project);
+    const word = await dispatchInProject(['issue', 'ready', 'next', NO_HINT], SUBJECTS, [command], project);
 
     expect([none.exitCode, two.exitCode, word.exitCode]).toEqual([1, 1, 1]);
     expect(none.stderr).toBe(`❌ Name the issue number to mark ready\nUsage: ${READY_USAGE}\n`);
     expect(two.stderr).toContain('Expected one issue number, got 2: 57 58');
     expect(word.stderr).toContain('"next" is no issue number');
     expect(gh.calls()).toEqual([]);
+  });
+});
+
+describe('the ending it names the next step with', () => {
+  /** A project of this block's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'ending-')));
+
+  /** The command over a dispatched `gh`, answering the marking question with `answer`. */
+  function commandAnswering(gh: ReturnType<typeof dispatchedGh>, answer: string, ending: ReadySeams['ending']): RafaCommand {
+    return createIssueReadyCommand({
+      openGh: () => gh.run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => ({
+        say: () => undefined,
+        ask: () => Promise.resolve(answer),
+        close: () => undefined,
+      }),
+      ending,
+    });
+  }
+
+  it('ends a run that marked the issue by naming the step that follows, last of all', async () => {
+    const probe = endingProbe();
+    const command = commandAnswering(dispatchedGh(), 'y', probe.seams);
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [command], plant());
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout.trimEnd().split('\n')
+      .at(-1)).toBe(ENDING_LINE);
+    expect(probe.reads()).toBe(1);
+  });
+
+  it('reads nothing at all when the marking was declined, which the run that marked does read', async () => {
+    const declined = endingProbe();
+    const marked = endingProbe();
+
+    const quiet = await dispatchInProject(
+      ['issue', 'ready', '57'],
+      SUBJECTS,
+      [commandAnswering(dispatchedGh(), 'n', declined.seams)],
+      plant(),
+    );
+    const loud = await dispatchInProject(
+      ['issue', 'ready', '57'],
+      SUBJECTS,
+      [commandAnswering(dispatchedGh(), 'y', marked.seams)],
+      plant(),
+    );
+
+    expect([declined.reads(), quiet.stdout.includes('Next:')]).toEqual([0, false]);
+    expect([marked.reads(), loud.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
+  });
+
+  it('reads nothing where there was no terminal to mark it on', async () => {
+    const probe = endingProbe();
+    const command = createIssueReadyCommand({
+      openGh: () => dispatchedGh().run,
+      openGit: () => fakeGit,
+      isTerminal: () => false,
+      ending: probe.seams,
+    });
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [command], plant());
+
+    expect(outcome.stdout).toContain('was not added');
+    expect([probe.reads(), outcome.stdout.includes('Next:')]).toEqual([0, false]);
+  });
+
+  it('reads nothing and prints nothing under --no-hint', async () => {
+    const probe = endingProbe();
+    const command = commandAnswering(dispatchedGh(), 'y', probe.seams);
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [command], plant());
+
+    expect(outcome.exitCode).toBe(0);
+    expect([probe.reads(), outcome.stdout.includes('Next:')]).toEqual([0, false]);
+  });
+
+  it('declares the flag that turns it off, and no flag that skips the marking question', () => {
+    const command = createIssueReadyCommand();
+
+    expect(command.flags.map((flag) => [flag.name, flag.type, flag.default])).toEqual([['hint', 'boolean', true]]);
   });
 });

@@ -77,6 +77,18 @@
  * this command spends no `gh pr view` to find that out ahead of the
  * checks read, since the checks read answers it.
  *
+ * ## The ending, on the green run alone
+ *
+ * A green wait ends with the one step that follows, which for a pull
+ * request whose checks have just passed is the merge
+ * (`src/next/ending.ts`, `--no-hint` to turn it off). The other four
+ * endings get none: each is a `CommandExit` carrying its own report,
+ * and that report already names the rafa command for what it found —
+ * `rafa pr triage <n>` for a red one, `rafa pr show <n>` for one with
+ * no checks, `rafa pr wait <n>` again for a deadline that passed. A
+ * hint would have to print ahead of the throw, which is ahead of the
+ * report it belongs under.
+ *
  * ## The clock and the wait are injected
  *
  * {@link PrWaitSeams} carries `clock` and `sleep` beside the provider
@@ -91,9 +103,11 @@
  */
 import type { PrSeams } from './pr-context.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { NextEndingSeams } from '../../next/ending.js';
 import type { CheckRow, ChecksVerdict } from '../../pr/index.js';
 
 import { CommandExit } from '../../cli/command.js';
+import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 
@@ -137,6 +151,8 @@ export interface PrWaitSeams extends PrSeams {
   readonly clock?: () => number;
   /** The wait between polls. A real timer when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /** How the ending hint reaches the state and the terminal. The system's own when left out. */
+  readonly ending?: NextEndingSeams;
 }
 
 /** The seams the registered action runs with: the system's own, every one. */
@@ -331,6 +347,7 @@ export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): Ra
         description: `How many minutes to wait before giving up. ${DEFAULT_WAIT_TIMEOUT_MIN} when it is left out.`,
         type: 'string',
       },
+      HINT_FLAG_SPEC,
     ],
     examples: [
       {
@@ -352,11 +369,9 @@ export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): Ra
       const waited = await runWait(context, seams);
       // A non-zero ending carries the report itself; see the module note.
       if (waited.exitCode !== 0) throw new CommandExit(waited.exitCode, waited.text);
-      if (context.outputMode === 'json') {
-        context.output.result(waited);
-        return;
-      }
-      context.output.info(waited.text);
+      if (context.outputMode === 'json') context.output.result(waited);
+      else context.output.info(waited.text);
+      await endWithNextStep(context, seams.ending);
     },
   };
   return Object.freeze(command);

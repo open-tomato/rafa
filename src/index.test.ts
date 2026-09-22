@@ -355,7 +355,11 @@ const CLI_IMPORTS: ImportList = [
  * it imports, spelled here as {@link CLI_IMPORTS} is.
  */
 const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
-  ['./commands/plan/create.js', [['../../plan.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/plan/create.js', [
+    ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
+    ['../../plan.js', ['default']],
+    ['../wrap.js', ['wrapPhaseZeroCommand']],
+  ]],
   ['./commands/plan/list.js', [
     ['../../plan/index.js', ['parsePlan']],
     ['./plan-files.js', [
@@ -395,6 +399,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan-files.js', ['countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'plural']],
   ]],
   ['./commands/loop/start.js', [
+    ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
     ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS', 'DEFAULT_CI_TIMEOUT_MIN']],
     ['../../start/runtime.js', ['refuseMisplacedRuntime']],
     ['../../start.js', ['default']],
@@ -491,6 +496,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../cli/command.js', ['CommandExit']],
+    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', [
       'cleanUpSteps',
       'commandLine',
@@ -521,6 +527,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/pr/triage.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
+    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', ['createGitRunner']],
     ['../../pr/triage/classify.js', ['classifyTriage']],
     ['../../pr/triage/comment.js', ['triageCommentBody', 'writeTriageComment']],

@@ -23,6 +23,17 @@
  * or spawns `gh`: the provider is the double (`pr/pull-requests-double.ts`),
  * and the branch and the `origin` probe are seams.
  *
+ * ## The ending is driven, never composed
+ *
+ * The green run ends by naming the step that follows, so every
+ * dispatching case either hands the command an {@link endingProbe} —
+ * one state from a literal, the readings counted — or types
+ * `--no-hint`. Left to the system seams the ending would read the real
+ * project: `git` and `gh` spawned in the scratch directory the case
+ * planted. The probe's count is what makes the two silences readings:
+ * the red and no-checks endings, and the `--no-hint` run, each count
+ * ZERO readings against the green run's one.
+ *
  * Three controls carry readings that would otherwise pass while wrong:
  * the provider factory records whether it was reached, so "a refused
  * line makes no provider" is measured; the double's call log is asserted
@@ -48,6 +59,7 @@ import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
 import { PR_USAGE } from './pr-context.js';
 import {
@@ -213,10 +225,21 @@ interface Ran {
   readonly events: readonly CliEvent[];
 }
 
+/**
+ * Typed by every case driving no ending of its own, so that no case
+ * composes the real sources and spawns `git` and `gh` in the scratch
+ * project it planted. A case that hands the command `ending` seams
+ * leaves it off and drives the ending through them.
+ */
+const NO_HINT = '--no-hint';
+
 /** Dispatches `rafa pr wait` over `seams` from `project`, with `words` after the action. */
 async function ran(seams: PrWaitSeams, project: PlantedProject, words: readonly string[] = []): Promise<Ran> {
   const command: RafaCommand = createPrWaitCommand(seams);
-  const run = await dispatchInProject(['pr', 'wait', ...words], SUBJECTS, [command], project);
+  const line = seams.ending === undefined
+    ? [...words, NO_HINT]
+    : words;
+  const run = await dispatchInProject(['pr', 'wait', ...line], SUBJECTS, [command], project);
   return {
     run,
     events: words.includes('--output=json')
@@ -474,14 +497,70 @@ describe('the refusals', () => {
   });
 });
 
+describe('the ending it names the next step with', () => {
+  it('ends a green wait by printing the step that follows, after the report', async () => {
+    const clock = fakeClock();
+    const provider = pollingPulls([checksOf([row()], 'green')]);
+    const probe = endingProbe();
+    const { run } = await ran({ ...caseSeams(provider.pulls, clock).seams, ending: probe.seams }, freshProject(), ['41']);
+
+    expect(run.exitCode).toBe(0);
+    expect(linesOf(run.stdout.trimEnd()).at(-1)).toBe(ENDING_LINE);
+    expect([probe.reads(), probe.asked()]).toEqual([1, []]);
+  });
+
+  it('puts the question where there is a terminal, printing no line', async () => {
+    const clock = fakeClock();
+    const provider = pollingPulls([checksOf([row()], 'green')]);
+    const probe = endingProbe({ terminal: true });
+    const { run } = await ran({ ...caseSeams(provider.pulls, clock).seams, ending: probe.seams }, freshProject(), ['41']);
+
+    expect(probe.asked()).toEqual([ENDING_QUESTION]);
+    expect(run.stdout).not.toContain(ENDING_LINE);
+  });
+
+  it('reads nothing at all on the four endings that carry their own report', async () => {
+    const clock = fakeClock();
+    const red = pollingPulls([checksOf([row({ state: 'FAILURE', outcome: 'fail' })], 'red')]);
+    const none = pollingPulls([checksOf([], 'none')]);
+    const refused = endingProbe();
+    const unreported = endingProbe();
+
+    const { run: redRun } = await ran({ ...caseSeams(red.pulls, clock).seams, ending: refused.seams }, freshProject(), ['41']);
+    const { run: noneRun } = await ran({ ...caseSeams(none.pulls, fakeClock()).seams, ending: unreported.seams }, freshProject(), ['41']);
+
+    expect([redRun.exitCode, noneRun.exitCode]).toEqual([1, 1]);
+    expect([refused.reads(), unreported.reads()]).toEqual([0, 0]);
+    expect([redRun.stdout, noneRun.stdout].join('')).not.toContain('Next:');
+  });
+
+  it('reads nothing and prints nothing under --no-hint, which the green run does both of', async () => {
+    const off = endingProbe();
+    const on = endingProbe();
+    const quiet = await ran(
+      { ...caseSeams(pollingPulls([checksOf([row()], 'green')]).pulls, fakeClock()).seams, ending: off.seams },
+      freshProject(),
+      ['41', NO_HINT],
+    );
+    const loud = await ran(
+      { ...caseSeams(pollingPulls([checksOf([row()], 'green')]).pulls, fakeClock()).seams, ending: on.seams },
+      freshProject(),
+      ['41'],
+    );
+
+    expect([off.reads(), quiet.run.stdout.includes('Next:')]).toEqual([0, false]);
+    expect([on.reads(), loud.run.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
+  });
+});
+
 describe('the command itself', () => {
-  it('routes as pr wait, declares both renderings, one optional argument and one flag, and is frozen', () => {
+  it('routes as pr wait, declares both renderings, one optional argument and its two flags, and is frozen', () => {
     const command = createPrWaitCommand();
 
     expect([command.subject, command.action, command.name]).toEqual(['pr', 'wait', 'pr wait']);
     expect(command.outputs).toEqual(['text', 'json']);
     expect(command.args?.map((arg) => [arg.name, arg.required ?? false])).toEqual([['n', false]]);
-    expect(command.flags?.map((flag) => flag.name)).toEqual(['timeout']);
+    expect(command.flags?.map((flag) => [flag.name, flag.default])).toEqual([['timeout', undefined], ['hint', true]]);
     expect(Object.isFrozen(command)).toBe(true);
   });
 

@@ -183,6 +183,13 @@ function freshRoot(): string {
   return mkdtempSync(join(tempBase, 'repo-'));
 }
 
+/**
+ * Typed by every case here, so that no case composes the real sources
+ * for the ending hint and spawns `git` and `gh` in the scratch project
+ * it planted. The ending itself is driven in the command's own suite.
+ */
+const NO_HINT = '--no-hint';
+
 describe('rafa issue ready, dispatched over its own board', () => {
   it('swaps the labels on a yes, over a real board', async () => {
     const board = boardOf({ 601: { body: COMPLETE, labels: [SPEC_LABEL], author: 'octocat' } });
@@ -194,7 +201,7 @@ describe('rafa issue ready, dispatched over its own board', () => {
       openPrompter: prompter.open,
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '601'], SUBJECTS, [command], freshProject());
+    const outcome = await dispatchInProject(['issue', 'ready', '601', NO_HINT], SUBJECTS, [command], freshProject());
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain(`Marked #601 ${SPEC_READY_LABEL}, and took ${SPEC_NEEDS_WORK_LABEL} off it`);
@@ -211,7 +218,7 @@ describe('rafa issue ready, dispatched over its own board', () => {
       openPrompter: unopenedPrompter(),
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '602'], SUBJECTS, [command], freshProject());
+    const outcome = await dispatchInProject(['issue', 'ready', '602', NO_HINT], SUBJECTS, [command], freshProject());
 
     expect(outcome.exitCode).toBe(2);
     expect(outcome.stderr).toBe(`issue #602 was opened by outsider, who has no write access to ${REPO};`
@@ -228,7 +235,7 @@ describe('rafa issue ready, dispatched over its own board', () => {
       openPrompter: unopenedPrompter(),
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '603'], SUBJECTS, [command], freshProject());
+    const outcome = await dispatchInProject(['issue', 'ready', '603', NO_HINT], SUBJECTS, [command], freshProject());
 
     expect(outcome.exitCode).toBe(2);
     expect(outcome.stderr).toContain('issue #603 is not ready to plan from:');
@@ -245,7 +252,7 @@ describe('rafa issue ready, dispatched over its own board', () => {
       openPrompter: unopenedPrompter(),
     });
 
-    const outcome = await dispatchInProject(['issue', 'ready', '604'], SUBJECTS, [command], freshProject());
+    const outcome = await dispatchInProject(['issue', 'ready', '604', NO_HINT], SUBJECTS, [command], freshProject());
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain('there is no terminal to ask on, so spec:ready was not added.'

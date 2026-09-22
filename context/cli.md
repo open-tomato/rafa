@@ -336,7 +336,8 @@ module's note is the long form.
   `src/commands/index.test.ts` holds the command's declared flags equal
   to the quoted `--` literals of the modules named for it and a module
   that also quotes a `gh` argument, as `src/board/issue.ts` does, cannot
-  be one of them. `src/plan.ts` keeps `--stub` and `--no-progress`.
+  be one of them. `src/plan.ts` keeps `--stub` and `--no-progress`, and
+  `hint` is the wrapper's, read by neither.
 - **`init` sets up a project and needs none** (`src/commands/init.ts`),
   declaring `needsProject: false`.
   `--root=<path>` names the root, absolute or relative to the working
@@ -757,26 +758,30 @@ module's note is the long form.
   no stub. The command reads `true` and `false` as the values of the flag
   and refuses any other with exit code 1, naming the order that works.
 - **A wrapped command declares exactly the flags its phase 0 module
-  reads**, as the line types them. `src/commands/index.test.ts` holds
-  each list equal to the quoted `--` literals of the modules reading that
-  line. A wrapped command's `outputs` is `['text']` until it writes
-  through the active output, and each now declares `text` and `json`, as
+  reads**, plus the wrapper's own, as the line types them.
+  `src/commands/index.test.ts` holds each list equal to the quoted `--`
+  literals of the modules reading that line, with one flag held apart and
+  named: `hint`, which `plan create` and `loop start` declare and no
+  phase 0 parser reads, since `endingWith` (`src/next/ending.ts`) reads
+  it off the parsed context once the phase 0 function has returned. A
+  wrapped command's `outputs` is `['text']` until it writes through the
+  active output, and each now declares `text` and `json`, as
   `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` neither, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,
-  `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`
-  and `progress`, three of them mutually exclusive (`spec`, `issue` and
-  `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
+  `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`,
+  `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
+  and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
   flags `state`, `type`, `module`, `search` and `limit`, `show` the
   argument `id`, `create` the flags `title`, `body`, `type`, `module` and
   `priority`, `comment` the argument `id` and the flag `body`, and `move`
   the arguments `id` and `state`; each declares `text` and `json`. Of the `pr` actions, `pr current` and `pr list`
   declare no argument and no flag, each with `text` and `json`. `pr show` and `pr view`
   declare the argument `n` and no flag. `pr merge`
-  declares the argument `n` and the flags `yes` and `method`, and `pr triage`
-  the argument `n` and the flags `comment`, `resolve` and `max-attempts`;
-  each declares `text` and `json`.
+  declares the argument `n` and the flags `yes`, `method` and `hint`, and
+  `pr triage` the argument `n` and the flags `comment`, `resolve`,
+  `max-attempts` and `hint`; each declares `text` and `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal

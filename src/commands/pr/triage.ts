@@ -100,6 +100,18 @@
  * That refusal is `./triage-resolve.ts`'s first step, so it is made
  * once wherever a resolve run is started from.
  *
+ * ## The ending
+ *
+ * A run that ended 0 finishes by naming the one step that follows
+ * (`src/next/ending.ts`, `--no-hint` to turn it off), which is the
+ * reading `rafa next` makes of the same project and is worded by the
+ * same function. So a pull request the assessment found green ends
+ * with the merge, one whose checks are still running ends with the
+ * wait, and one still red ends with another assessment — the honest
+ * reading, since a triage reports and repairs nothing by itself. A
+ * `--resolve` run that gave up ends with its own exit 3 and the
+ * follow-up prompt instead, as every refusal does.
+ *
  * ## What is allowed to fail
  *
  * A comment that could not be written is REPORTED and does not refuse
@@ -132,11 +144,13 @@ import type { ResolveResult } from './triage-resolve.js';
 import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
 import type { Permissions } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
@@ -198,6 +212,8 @@ export interface TriageSeams extends PrSeams {
    * (`./triage-trust.ts`).
    */
   readonly permissions?: (root: string) => Permissions;
+  /** How the ending hint reaches the state and the terminal. The system's own when left out. */
+  readonly ending?: NextEndingSeams;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -589,6 +605,7 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
         type: 'number',
         default: DEFAULT_MAX_ATTEMPTS,
       },
+      HINT_FLAG_SPEC,
     ],
     examples: [
       {
@@ -619,6 +636,7 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       if (triaged.exitCode !== 0) {
         throw new CommandExit(triaged.exitCode, triaged.resolve?.headline ?? '');
       }
+      await endWithNextStep(context, seams.ending);
     },
   };
   return Object.freeze(command);

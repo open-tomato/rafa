@@ -14,6 +14,16 @@
  * argv. The task after this one drives the same command over a real
  * repository with a bare remote.
  *
+ * ## The ending is driven, never composed
+ *
+ * A merge that went through ends by naming the step that follows, so
+ * every case either hands the command an {@link endingProbe} — one
+ * state from a literal, the readings counted — or types `--no-hint`.
+ * Left to the system seams that ending would read the real project:
+ * `git` and `gh` spawned in the scratch directory the case planted.
+ * The probe's count is what makes the declined run's silence a
+ * reading: it counts ZERO readings against the merged run's one.
+ *
  * Three controls carry readings that would otherwise pass while wrong:
  * the provider records whether `merge` was ever sent, so "it refused
  * and merged nothing" is measured; the git runner records every command,
@@ -47,6 +57,7 @@ import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
 import { createPrMergeCommand, summaryLine } from './merge.js';
 import { PR_USAGE } from './pr-context.js';
@@ -305,10 +316,21 @@ interface Ran {
   readonly lines: readonly string[];
 }
 
+/**
+ * Typed by every case driving no ending of its own, so that no case
+ * composes the real sources and spawns `git` and `gh` in the scratch
+ * project it planted. A case that hands the command `ending` seams
+ * leaves it off and drives the ending through them.
+ */
+const NO_HINT = '--no-hint';
+
 /** Dispatches `rafa pr merge` over `seams` from `project`, with `words` after the action. */
 async function ran(seams: MergeSeams, project: PlantedProject, words: readonly string[] = []): Promise<Ran> {
   const command: RafaCommand = createPrMergeCommand(seams);
-  const run = await dispatchInProject(['pr', 'merge', ...words], SUBJECTS, [command], project);
+  const line = seams.ending === undefined
+    ? [...words, NO_HINT]
+    : words;
+  const run = await dispatchInProject(['pr', 'merge', ...line], SUBJECTS, [command], project);
   return {
     run,
     events: words.includes('--output=json')
@@ -884,14 +906,65 @@ describe('json mode', () => {
   });
 });
 
+describe('the ending it names the next step with', () => {
+  it('ends a merge that went through by printing the step that follows, last of all', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const probe = endingProbe();
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran({ ...seams.seams, ending: probe.seams }, project, ['41']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(ENDING_LINE);
+    expect([probe.reads(), probe.asked()]).toEqual([1, []]);
+  });
+
+  it('puts the question where there is a terminal, printing no line', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const probe = endingProbe({ terminal: true });
+    const seams = caseSeams(stub.pulls, project);
+    const { run } = await ran({ ...seams.seams, ending: probe.seams }, project, ['41']);
+
+    expect(probe.asked()).toEqual([ENDING_QUESTION]);
+    expect(run.stdout).not.toContain(ENDING_LINE);
+  });
+
+  it('reads nothing at all when the merge was declined, which the merge that ran does read', async () => {
+    const declinedProbe = endingProbe();
+    const takenProbe = endingProbe();
+    const declinedProject = freshProject();
+    const takenProject = freshProject();
+    const declined = caseSeams(stubPulls().pulls, declinedProject, { answer: '' });
+    const taken = caseSeams(stubPulls().pulls, takenProject);
+
+    const quiet = await ran({ ...declined.seams, ending: declinedProbe.seams }, declinedProject, ['41']);
+    const loud = await ran({ ...taken.seams, ending: takenProbe.seams }, takenProject, ['41']);
+
+    expect([declinedProbe.reads(), quiet.run.stdout.includes('Next:')]).toEqual([0, false]);
+    expect([takenProbe.reads(), loud.run.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
+  });
+
+  it('reads nothing and prints nothing under --no-hint', async () => {
+    const probe = endingProbe();
+    const project = freshProject();
+    const seams = caseSeams(stubPulls().pulls, project);
+    const { run } = await ran({ ...seams.seams, ending: probe.seams }, project, ['41', NO_HINT]);
+
+    expect(run.exitCode).toBe(0);
+    expect([probe.reads(), run.stdout.includes('Next:')]).toEqual([0, false]);
+  });
+});
+
 describe('the command itself', () => {
-  it('routes as pr merge, declares both renderings, one optional number and its two flags, and is frozen', () => {
+  it('routes as pr merge, declares both renderings, one optional number and its three flags, and is frozen', () => {
     const command = createPrMergeCommand();
 
     expect([command.subject, command.action, command.name]).toEqual(['pr', 'merge', 'pr merge']);
     expect(command.outputs).toEqual(['text', 'json']);
     expect(command.args.map((arg) => [arg.name, arg.required ?? false])).toEqual([['n', false]]);
-    expect(command.flags.map((flag) => [flag.name, flag.type])).toEqual([['yes', 'boolean'], ['method', 'string']]);
+    expect(command.flags.map((flag) => [flag.name, flag.type]))
+      .toEqual([['yes', 'boolean'], ['method', 'string'], ['hint', 'boolean']]);
     expect(Object.isFrozen(command)).toBe(true);
   });
 

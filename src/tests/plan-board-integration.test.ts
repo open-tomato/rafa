@@ -41,6 +41,12 @@
  * proof that the session was handed the exact file the board route wrote
  * — notes appended — and not a copy of the claim.
  *
+ * The command the first half dispatches is the module's declaration
+ * wrapped again, as `src/plan.test.ts`'s is, so the ENDING the default
+ * export carries (`endingWith`, `src/next/ending.ts`) is replaced along
+ * with `run` and no case here reads a state or spends a `gh` call on
+ * one. The ending is held in `src/next/ending.test.ts`.
+ *
  * The second half runs in-process, over `tickRoadmapAfterMerge` and
  * `resolvePlanSpec` called directly with one shared `gh` fake between
  * them: no process is spawned, and no case reaches GitHub, spawns `gh`

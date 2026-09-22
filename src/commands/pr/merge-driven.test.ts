@@ -222,7 +222,7 @@ async function ran(repo: MergeRepo, pulls: PullRequests, words: readonly string[
   };
   const command = createPrMergeCommand(seams);
   const project: PlantedProject = { root: repo.work, home: repo.home };
-  const run = await dispatchInProject(['pr', 'merge', ...words], SUBJECTS, [command], project);
+  const run = await dispatchInProject(['pr', 'merge', ...words, NO_HINT], SUBJECTS, [command], project);
   return {
     exitCode: run.exitCode,
     stdout: run.stdout,
@@ -231,6 +231,13 @@ async function ran(repo: MergeRepo, pulls: PullRequests, words: readonly string[
     asked,
   };
 }
+
+/**
+ * Typed by every case here, so that no case composes the real sources
+ * for the ending hint and spawns `git` and `gh` in the scratch project
+ * it planted. The ending itself is driven in the command's own suite.
+ */
+const NO_HINT = '--no-hint';
 
 describe('what it refuses, read off a real repository', () => {
   it('refuses a dirty working tree, listing what git wrote, and merges nothing', async () => {

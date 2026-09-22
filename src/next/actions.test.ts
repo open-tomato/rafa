@@ -12,6 +12,14 @@
  * caller's project is resolved over an in-memory filesystem seam
  * (`src/project/scope.ts`) rather than a directory planted on disk.
  *
+ * One case reads a flag the caller never typed: `hint`, which the
+ * action context sets to false for every action, since `rafa next`
+ * reads the state again itself after each one and six of these eight
+ * commands would otherwise end with a hint of their own
+ * (`./ending.ts`). It is paired with a reading of the WORDS, which
+ * carry no `--no-hint`: the line the chain prints stays the line a
+ * person would type.
+ *
  * The declaration cases are the ones that read the real commands: they
  * hold the eight spellings of the table to the modules that export
  * them, every flag word an action passes to a flag that command
@@ -68,6 +76,7 @@ import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { actionInvocation, NEXT_COMMAND_ACTIONS, runAction, runsCommand } from './actions.js';
+import { HINT_FLAG } from './hint.js';
 
 /** The project root the caller's context carries. */
 const ROOT = join('/', 'scratch', 'project');
@@ -264,7 +273,7 @@ describe('what an action is called with', () => {
     await runAction(caller, STATES.start);
 
     expect(seen[0]?.context.args).toEqual([]);
-    expect(seen[0]?.context.flags).toEqual({ plan: PLAN, 'create-branch': true, 'ci-wait': true });
+    expect(seen[0]?.context.flags).toEqual({ plan: PLAN, 'create-branch': true, 'ci-wait': true, hint: false });
   });
 
   it('reads a number the state names as the command positional word', async () => {
@@ -272,7 +281,8 @@ describe('what an action is called with', () => {
 
     await runAction(caller, STATES.ready);
 
-    expect([seen[0]?.spelling, seen[0]?.context.args, seen[0]?.context.flags]).toEqual(['issue ready', ['64'], {}]);
+    expect([seen[0]?.spelling, seen[0]?.context.args, seen[0]?.context.flags])
+      .toEqual(['issue ready', ['64'], { hint: false }]);
   });
 
   it('hands on the caller output, project, registry, environment, signal, mode and verbosity', async () => {
@@ -296,8 +306,17 @@ describe('what an action is called with', () => {
 
     expect(seen[0]?.context.argv).toEqual(['--next']);
     expect(seen[0]?.context.args).toEqual([]);
-    expect(seen[0]?.context.flags).toEqual({ next: true });
+    expect(seen[0]?.context.flags).toEqual({ next: true, hint: false });
     expect(caller.flags).toEqual({ 'dry-run': true, yes: 'merge,plan' });
+  });
+
+  it('turns the ending hint off for every action, without putting a word in its line', async () => {
+    const { caller, seen } = harnessFor();
+
+    for (const action of NEXT_COMMAND_ACTIONS) await runAction(caller, STATES[action]);
+
+    expect(seen.map((call) => call.context.flags[HINT_FLAG])).toEqual(NEXT_COMMAND_ACTIONS.map(() => false));
+    expect(seen.flatMap((call) => call.context.argv.filter((word) => word.includes('hint')))).toEqual([]);
   });
 
   it('writes what the command writes through the caller own output', async () => {

@@ -121,9 +121,9 @@
  * (`src/next/sync.ts`). So each action keeps its own refusals, and
  * {@link NextCommandSeams} is the whole of what a test replaces.
  *
- * An action writes through {@link actionOutput}, which is the caller's
- * output with its `result` taken: an invocation gives ONE result, and
- * the chain's is the report.
+ * An action writes through {@link actionOutput} (`src/next/ending.ts`),
+ * which is the caller's output with its `result` taken: an invocation
+ * gives ONE result, and the chain's is the report.
  *
  * ## The exit code
  *
@@ -140,12 +140,12 @@ import type { NextCeiling } from '../next/ceiling.js';
 import type { NextSources } from '../next/readings.js';
 import type { NextSourceSeams } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
-import type { Output } from '../ports/index.js';
 import type { Prompter } from '../project/root-choice.js';
 
 import { CommandExit } from '../cli/command.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
+import { actionOutput } from '../next/ending.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
 import { openNextSources } from '../next/sources.js';
 import { readNextState } from '../next/state.js';
@@ -413,23 +413,6 @@ export interface NextCommandSeams extends NextSourceSeams {
 
 /** The seams the registered command runs with: the system's own, every one. */
 export const DEFAULT_NEXT_SEAMS: NextCommandSeams = Object.freeze({});
-
-/**
- * The output an action writes through: the caller's, with `result`
- * taken rather than passed on.
- *
- * One invocation gives exactly ONE result and the dispatcher refuses a
- * second (`src/cli/dispatch.ts`). A chain runs several commands, and
- * `pr wait` and `issue ready` each give one in json mode, so handing
- * theirs on would throw inside the second action of a chain and would
- * leave no result for the chain itself. The action's lines still go
- * through, which in json mode is a log event each, so what it did is on
- * the stream either way; what is dropped is its payload, and the
- * payload of the invocation is {@link NextChainReport}.
- */
-export function actionOutput(output: Output): Output {
-  return Object.freeze({ ...output, result: () => undefined });
-}
 
 /**
  * Runs one state's action: the registered command it names, or, for

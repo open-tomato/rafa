@@ -96,6 +96,13 @@ function dataOf(events: readonly CliEvent[]): Record<string, unknown> {
   return (events.at(-1) as { data?: Record<string, unknown> }).data ?? {};
 }
 
+/**
+ * Typed by every case here, so that no case composes the real sources
+ * for the ending hint and spawns `git` and `gh` in the scratch project
+ * it planted. The ending itself is driven in the command's own suite.
+ */
+const NO_HINT = '--no-hint';
+
 /** Dispatches `rafa pr triage <n> --output=json` and answers its readings. */
 async function readingsOf(
   seams: TriageSeams,
@@ -104,7 +111,7 @@ async function readingsOf(
 ): Promise<readonly Record<string, unknown>[]> {
   const command = createPrTriageCommand(seams);
   const run = await dispatchInProject(
-    ['pr', 'triage', String(number), '--output=json'],
+    ['pr', 'triage', String(number), '--output=json', NO_HINT],
     SUBJECTS,
     [command],
     project,
@@ -342,7 +349,7 @@ describe('the bare line, over more than one candidate, including the 72-hour ski
     const command = createPrTriageCommand(seams);
     const project = freshProject();
 
-    const run = await dispatchInProject(['pr', 'triage', '--output=json'], SUBJECTS, [command], project);
+    const run = await dispatchInProject(['pr', 'triage', '--output=json', NO_HINT], SUBJECTS, [command], project);
 
     expect(run.exitCode).toBe(0);
     const data = dataOf(eventsOf(run.stdout));

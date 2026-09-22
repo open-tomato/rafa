@@ -78,6 +78,16 @@
  * `args`, `flags` and `argv` are replaced, so a `--dry-run` or a
  * `--yes=merge,plan` on the `next` line is no flag of `pr merge`.
  *
+ * One flag is set rather than read: {@link HINT_FLAG} is false in every
+ * action's context, whatever the command declares it as. Six of the
+ * eight commands here end by naming the step that follows
+ * (`./ending.ts`), and the chain reads the state again itself after
+ * every action — so leaving the flag at its default would read the
+ * state twice for one step and, with a terminal, put two questions
+ * about it. The words are untouched: the action's `argv` carries no
+ * `--no-hint`, so the line `rafa next` prints stays the line a person
+ * would type.
+ *
  * The output mode is the caller's whatever the action's words say,
  * because one invocation renders one way and ends in one terminal
  * event. That event holds one result: the dispatcher's output refuses a
@@ -91,6 +101,8 @@ import type { RafaCommand, RafaContext } from '../cli/command.js';
 
 import { CommandExit, commandSpelling } from '../cli/command.js';
 import { parseArgs } from '../cli/core/parseArgs.js';
+
+import { HINT_FLAG } from './hint.js';
 
 /** What a defect and a refusal this module raises open with. */
 const PREFIX = 'rafa next';
@@ -192,7 +204,7 @@ function actionContext(caller: RafaContext, command: RafaCommand, argv: readonly
   return Object.freeze({
     ...caller,
     args: Object.freeze(positional),
-    flags: Object.freeze(flags),
+    flags: Object.freeze({ ...flags, [HINT_FLAG]: false }),
     argv: Object.freeze([...argv]),
   });
 }

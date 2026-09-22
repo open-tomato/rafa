@@ -216,6 +216,13 @@ function twelveQuestion(): string {
   return `#12 was blocked by #${String(A)}, all closed. Remove ${SPEC_BLOCKED_LABEL}? [y/N] `;
 }
 
+/**
+ * Typed by every case here, so that no case composes the real sources
+ * for the ending hint and spawns `git` and `gh` in the scratch project
+ * it planted. The ending itself is driven in the command's own suite.
+ */
+const NO_HINT = '--no-hint';
+
 describe('a Blocked by: #A issue, unblocked once #A closes', () => {
   it('waits while #A is open, and is offered for removal once #A closes, over the real board', async () => {
     const waiting = fakeGh(sharedBoard(false));
@@ -348,7 +355,7 @@ describe('the question asked at the end of a merge that closes #A', () => {
 
     // --yes skips the "Merge? [y/N]" question, and answers none of the
     // unblock question: this run's only question is the one about #12.
-    const outcome = await dispatchInProject(['pr', 'merge', '41', '--yes'], SUBJECTS, [command], project);
+    const outcome = await dispatchInProject(['pr', 'merge', '41', '--yes', NO_HINT], SUBJECTS, [command], project);
     const lines = outcome.stdout.split('\n').filter((line) => line !== '');
 
     expect(outcome.exitCode).toBe(0);

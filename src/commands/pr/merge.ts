@@ -89,6 +89,16 @@
  * the reading asks nothing and writes nothing, as it does under `rafa
  * issue unblock`.
  *
+ * ## The ending, on a merge that went through
+ *
+ * Last of all, after the unblock reading, the command names the one
+ * step that follows — with the base pulled and both branches gone, that
+ * is the next plan or the loop on a plan already there
+ * (`src/next/ending.ts`, `--no-hint` to turn it off). A DECLINED merge
+ * ends without one: nothing moved, so the state still reads as a green
+ * pull request waiting to be merged, and the hint would put the very
+ * question that was just answered no.
+ *
  * ## The remote branch, and which remote
  *
  * Whether the remote branch is still there is read AFTER the merge, by
@@ -124,6 +134,7 @@ import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { NextEndingSeams } from '../../next/ending.js';
 import type { ChecksVerdict, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { Prompter } from '../../project/root-choice.js';
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
@@ -134,6 +145,7 @@ import { join } from 'node:path';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { CommandExit } from '../../cli/command.js';
+import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import {
   cleanUpSteps,
   commandLine,
@@ -184,6 +196,8 @@ export interface MergeSeams extends PrSeams {
   readonly isTerminal?: () => boolean;
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter?: () => Prompter;
+  /** How the ending hint reaches the state and the terminal. The system's own when left out. */
+  readonly ending?: NextEndingSeams;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -582,6 +596,7 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
         description: 'How to merge: squash, merge or rebase. `pr.mergeMethod` when it is left out.',
         type: 'string',
       },
+      HINT_FLAG_SPEC,
     ],
     examples: [
       {
@@ -601,6 +616,8 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
     run: async (context) => {
       const merged = await runMerge(context, seams);
       if (context.outputMode === 'json') context.output.result(merged);
+      // A declined merge left the project where it was; see the module note.
+      if (merged.merged) await endWithNextStep(context, seams.ending);
     },
   };
   return Object.freeze(command);

@@ -39,6 +39,15 @@
  * `--detached`, which `loop start` now declares, is read by
  * `start/run-config.ts`, which refuses it.
  *
+ * One flag is held apart from that equality, and named: `hint`, which
+ * `plan create` and `loop start` declare and no phase 0 parser reads.
+ * It is the wrapper's — `endingWith` in `src/next/ending.ts` reads it
+ * off the parsed context once the phase 0 function has returned — so a
+ * reader module quoting it would be a fiction. The case holds the rest
+ * of each declaration equal to the literals as before AND holds that
+ * flag to be declared, so dropping it reddens the case rather than
+ * passing as "no unread flag".
+ *
  * `plan create` names two files because its board flags are read by
  * three modules under `src/board/` and the words they read sit in one,
  * `board/flags.ts`, which records why. The rule the case rests on is
@@ -154,8 +163,8 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr show': [['n'], []],
   'pr view': [['n'], []],
   'pr list': [[], []],
-  'pr merge': [['n'], ['yes', 'method']],
-  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts']],
+  'pr merge': [['n'], ['yes', 'method', 'hint']],
+  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts', 'hint']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
@@ -298,6 +307,18 @@ function typedFlag(flag: RafaCommand['flags'][number]): string {
     ? `--no-${flag.name}`
     : `--${flag.name}`;
 }
+
+/**
+ * The flags a WRAPPER declares over a phase 0 command, per command,
+ * which no phase 0 parser reads: `hint`, the ending the two of these
+ * that are in the cycle finish with, read by `src/next/ending.ts` off
+ * the parsed context rather than off the words. Held separately below,
+ * and held to be there.
+ */
+const WRAPPER_FLAGS: Readonly<Record<string, readonly string[]>> = {
+  'plan create': ['hint'],
+  'loop start': ['hint'],
+};
 
 /** The quoted flag literals of a source, each once and sorted: `'--name'` and `'--name=`. */
 function literalFlags(source: string): string[] {
@@ -468,12 +489,16 @@ describe('the flags each command declares', () => {
     expect([command.args.map((arg) => arg.name), command.flags.map((flag) => flag.name)]).toEqual(OWN_DECLARATIONS[spelling] ?? []);
   });
 
-  it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(READERS, spelling)))('declares for %s exactly the flags its phase 0 module reads', (spelling, command) => {
+  it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(READERS, spelling)))('declares for %s exactly the flags its phase 0 module reads, beside the wrapper flag', (spelling, command) => {
     const readers = READERS[spelling] ?? [];
     const read = literalFlags(readers.map((file) => readFileSync(join(SRC_DIR, file), 'utf8')).join('\n'));
+    const wrapper = WRAPPER_FLAGS[spelling] ?? [];
+    const names = command.flags.map((flag) => flag.name);
+    const own = command.flags.filter((flag) => !wrapper.includes(flag.name));
 
     expect(readers.length).toBeGreaterThan(0);
-    expect(command.flags.map(typedFlag).sort((a, b) => a.localeCompare(b))).toEqual(read);
+    expect(own.map(typedFlag).sort((a, b) => a.localeCompare(b))).toEqual(read);
+    expect(names.filter((name) => wrapper.includes(name))).toEqual(wrapper);
   });
 
   it('reads a planted quoted flag literal, and none inside a message', () => {
