@@ -34,6 +34,7 @@
  * | `api repos/<repo>/issues/<n>/comments [-X POST -f body=]` | `comments`, `comment` |
  * | `api repos/<repo>/issues/comments/<id> -X PATCH -f body=` | `editComment` |
  * | `api repos/<repo>/collaborators/<login>/permission` | the trust reading |
+ * | `api repos/<repo>/actions/workflows` | the workflow count |
  *
  * The two comment members go through `gh api` rather than through
  * `gh pr view --json comments` and `gh pr comment`. The `--json` field
@@ -67,8 +68,19 @@
  * every later `pr view --json body` then answers, and writes nothing to
  * either stream, because what `gh pr edit` writes was not recorded
  * either.
+ *
+ * The repository holds no workflow until {@link FakePrGh.plantWorkflows}
+ * gives it some, as `open-tomato/rafa` has none, and the workflows path
+ * answers a recorded 403 or 404 instead once
+ * {@link FakePrGh.refuseWorkflows} plants one.
  */
-import type { FakePrComment, FakePullRequest, FakePullRequestSeed } from './gh-fake-shapes.js';
+import type {
+  FakeHttpStatus,
+  FakePrComment,
+  FakePullRequest,
+  FakePullRequestSeed,
+  FakeWorkflow,
+} from './gh-fake-shapes.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import {
@@ -90,16 +102,20 @@ import {
   renderPermission,
   renderPull,
   renderRestComment,
+  renderWorkflows,
   WEB_WITH_JSON,
+  workflowsFailure,
 } from './gh-fake-shapes.js';
 
 export type {
   FakeCheckKind,
+  FakeHttpStatus,
   FakePrAuthor,
   FakePrCheck,
   FakePrComment,
   FakePullRequest,
   FakePullRequestSeed,
+  FakeWorkflow,
 } from './gh-fake-shapes.js';
 
 export { logFailedText } from './gh-fake-shapes.js';
@@ -140,6 +156,10 @@ export interface FakePrGh {
   readonly expireRun: (id: string) => void;
   /** Gives a login the permission the collaborators endpoint answers. */
   readonly plantPermission: (login: string, permission: string) => void;
+  /** Replaces the workflows the repository holds, which start empty. */
+  readonly plantWorkflows: (workflows: readonly FakeWorkflow[]) => void;
+  /** Makes the workflows path answer the recorded failure under `status`. */
+  readonly refuseWorkflows: (status: FakeHttpStatus) => void;
 }
 
 /** The repository the working directory resolves to when the options name none. */
@@ -256,6 +276,8 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
   let mergeRefusals: ReadonlyMap<number, string> = new Map();
   let runLogs: ReadonlyMap<string, string | null> = new Map();
   let permissions: ReadonlyMap<string, string> = new Map();
+  let workflows: readonly FakeWorkflow[] = [];
+  let workflowsRefusal: FakeHttpStatus | null = null;
   let nextCommentId = FIRST_COMMENT_ID;
   let calls: readonly (readonly string[])[] = [];
 
@@ -442,6 +464,14 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
       : ok(JSON.stringify(renderPermission(login, permission)));
   };
 
+  /** `repos/<repo>/actions/workflows`: the workflow count, or its planted failure. */
+  const handleWorkflowsPath = (method: string): GhResult => {
+    if (method !== 'GET') return failed(`fake gh: workflows are modelled for GET alone, and were handed ${method}\n`);
+    return workflowsRefusal === null
+      ? ok(JSON.stringify(renderWorkflows(workflows, named)))
+      : workflowsFailure(workflowsRefusal);
+  };
+
   const handleApi = (parsed: ParsedCommand): GhResult => {
     const path = parsed.positionals[0] ?? '';
     const method = flagValue(parsed, '-X') ?? 'GET';
@@ -449,9 +479,10 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     const comments = /^repos\/([^/]+\/[^/]+)\/issues\/(\d+)\/comments$/.exec(path);
     const comment = /^repos\/([^/]+\/[^/]+)\/issues\/comments\/(\d+)$/.exec(path);
     const permission = /^repos\/([^/]+\/[^/]+)\/collaborators\/([^/]+)\/permission$/.exec(path);
-    const match = comments ?? comment ?? permission;
+    const workflowList = /^repos\/([^/]+\/[^/]+)\/actions\/workflows$/.exec(path);
+    const match = comments ?? comment ?? permission ?? workflowList;
     if (match === null) {
-      return failed(`fake gh: api models the issue comment and collaborator permission paths alone, and was handed ${path}\n`);
+      return failed(`fake gh: api models the issue comment, collaborator permission and workflow list paths alone, and was handed ${path}\n`);
     }
     const [, inPath = '', tail = ''] = match;
     const refused = apiRepoProblem(path, inPath);
@@ -459,6 +490,7 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
 
     if (comments !== null) return handleCommentsPath(parsed, tail, method);
     if (comment !== null) return handleCommentPath(parsed, tail, method);
+    if (workflowList !== null) return handleWorkflowsPath(method);
     return handlePermissionPath(tail, method);
   };
 
@@ -507,6 +539,12 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     },
     plantPermission: (login, permission) => {
       permissions = new Map([...permissions, [login, permission]]);
+    },
+    plantWorkflows: (planted) => {
+      workflows = Object.freeze(planted.map((workflow) => Object.freeze({ ...workflow })));
+    },
+    refuseWorkflows: (status) => {
+      workflowsRefusal = status;
     },
   };
   return Object.freeze(fake);
