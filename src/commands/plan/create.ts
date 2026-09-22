@@ -69,7 +69,8 @@ const wrapped = wrapPhaseZeroCommand({
     },
     {
       name: 'refresh',
-      description: 'Rewrites a snapshot that no longer matches the issue, which is otherwise refused.',
+      description: 'Rebuilds a snapshot that no longer matches the issue without asking; the old copy moves under'
+        + ' `previous/`.',
       type: 'boolean',
     },
     {
