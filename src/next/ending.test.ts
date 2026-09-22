@@ -1,8 +1,8 @@
 /**
  * Tests for the ending the six commands finish with (`./ending.ts`):
  * the line a run with no terminal is left, the question a terminal is
- * put, the step a yes runs, and the wrapper the two phase 0 commands
- * of the six are ended by.
+ * put, the step a yes runs, the hint's own two-second timeout, and the
+ * wrapper the two phase 0 commands of the six are ended by.
  *
  * Every case drives the `readState` seam, so none reaches git, `gh`,
  * the board or a provider, and the state each is read off is a
@@ -17,7 +17,7 @@
  *
  * ## The controls
  *
- * Four readings here would pass against an ending that had stopped
+ * Five readings here would pass against an ending that had stopped
  * doing anything at all, and each is paired:
  *
  *  - the `--no-hint` case counts the readings and the lines of the run
@@ -27,7 +27,21 @@
  *  - the no-terminal case holds "no prompter was opened" against the
  *    terminal case, which opens one;
  *  - the `endingWith` refusal case holds "no state was read" against
- *    the same wrapper over an inner run that returns, which reads one.
+ *    the same wrapper over an inner run that returns, which reads one;
+ *  - the timeout case holds "nothing was printed, asked or run" for a
+ *    `readState` that never settles AGAINST the same world answered in
+ *    time, which prints or asks one thing.
+ *
+ * Every other case here builds a `readState` and an `expire` that never
+ * resolves, so the hint's own reading always wins the race
+ * (`./hint.test.ts` drives that race itself); the timeout block is the
+ * one exception, with `expire` resolving on the next tick and
+ * `readState` left to hang, which is the shape `--next --no-hint`
+ * would ALSO leave silent — turning the hint off answers null before a
+ * reading is even started, so `plan create --next --no-hint` prints no
+ * ending line for the same reason a `plan create --next` that outran
+ * two seconds would, and the wrapper block below drives the flag
+ * itself rather than only the module-level default it already covers.
  *
  * ## The two wrapped commands, and what is held where
  *
@@ -155,6 +169,15 @@ interface Drive {
   readonly flags?: Readonly<Record<string, string | boolean>>;
   /** What the step the yes runs refuses with, or nothing for one that returns. */
   readonly refusal?: CommandExit;
+  /**
+   * Whether the hint's own timeout ever expires. Left out it never
+   * does, which is what lets every other case's `readState` settle
+   * first; the timeout case below sets this true and a `readState`
+   * that never settles to drive the race the other way.
+   */
+  readonly expires?: boolean;
+  /** Whether `readState` ever settles; true when left out. */
+  readonly reading?: boolean;
 }
 
 /** What a case reads back: what the ending wrote, asked, opened and ran. */
@@ -167,6 +190,7 @@ interface Driven {
   readonly reads: number;
   readonly seen: readonly Seen[];
   readonly results: readonly unknown[];
+  readonly waited: readonly number[];
 }
 
 /** Runs the ending over one world and answers it beside everything it spent. */
@@ -175,6 +199,7 @@ async function drive(over: Drive = {}): Promise<Driven> {
   const asked: string[] = [];
   const results: unknown[] = [];
   const seen: Seen[] = [];
+  const waited: number[] = [];
   let opened = 0;
   let closed = 0;
   let reads = 0;
@@ -199,9 +224,17 @@ async function drive(over: Drive = {}): Promise<Driven> {
     isTerminal: () => over.terminal === true,
     readState: async (): Promise<NextState> => {
       reads += 1;
+      if (over.reading === false) return new Promise<NextState>(() => undefined);
       return over.state ?? STATES.green;
     },
-    expire: () => new Promise<void>(() => undefined),
+    expire: (ms: number) => {
+      waited.push(ms);
+      return over.expires === true
+        ? new Promise<void>((resolve) => {
+          setTimeout(resolve, 0);
+        })
+        : new Promise<void>(() => undefined);
+    },
     openPrompter: (): Prompter => {
       opened += 1;
       return {
@@ -218,7 +251,7 @@ async function drive(over: Drive = {}): Promise<Driven> {
   };
 
   const ending = await endWithNextStep(context, seams);
-  return { ending, info, asked, opened, closed, reads, seen, results };
+  return { ending, info, asked, opened, closed, reads, seen, results, waited };
 }
 
 describe('the line a run with no terminal is left', () => {
@@ -302,6 +335,17 @@ describe('--no-hint', () => {
   });
 });
 
+describe('the hint\'s own timeout', () => {
+  it('prints nothing, asks nothing and runs nothing once the reading outruns it', async () => {
+    const timedOut = await drive({ terminal: true, reading: false, expires: true });
+    const answered = await drive({ state: STATES.green, terminal: true, answer: 'y' });
+
+    expect([timedOut.ending, timedOut.info, timedOut.asked, timedOut.seen]).toEqual([null, [], [], []]);
+    expect([timedOut.opened, timedOut.closed]).toEqual([0, 0]);
+    expect(answered.seen.length).toBe(1);
+  });
+});
+
 describe('the wrapper the two phase 0 commands are ended by', () => {
   /** A command whose run records that it ran, and refuses with `refusal` when one is given. */
   function inner(ran: string[], refusal?: CommandExit): RafaCommand {
@@ -324,10 +368,10 @@ describe('the wrapper the two phase 0 commands are ended by', () => {
   }
 
   /** A context of this block's own, collecting the lines the ending writes. */
-  function contextFor(info: string[]): RafaContext {
+  function contextFor(info: string[], flags: Readonly<Record<string, string | boolean>> = {}): RafaContext {
     return Object.freeze({
       args: [],
-      flags: {},
+      flags,
       outputMode: 'text',
       verbosity: 2,
       output: sinkOutput({ info: (line: string) => info.push(line) }),
@@ -384,6 +428,18 @@ describe('the wrapper the two phase 0 commands are ended by', () => {
     await wrote.run(contextFor(info));
 
     expect([reads.length, info.length]).toEqual([1, 1]);
+  });
+
+  it('runs the plan and reads no state for `--next --no-hint`, printing no ending line', async () => {
+    const order: string[] = [];
+    const info: string[] = [];
+    const reads: number[] = [];
+    const wrapped = endingWith(inner(order), countingSeams(reads));
+
+    await wrapped.run(contextFor(info, { next: true, [HINT_FLAG]: false }));
+
+    expect(order).toEqual(['inner']);
+    expect([reads.length, info]).toEqual([0, []]);
   });
 
   it('keeps everything the command declared, and is frozen', () => {

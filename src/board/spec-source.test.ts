@@ -390,6 +390,17 @@ describe('readSpecSourceFlags', () => {
     expect([flags.request, flags.dryRun]).toEqual([null, true]);
   });
 
+  it('reads --no-next as naming no source, the meaning it had before the ending hint declared --next as a flag', () => {
+    // `parseArgs` reads `--no-next` as `next: false` on the parsed flags
+    // (`src/cli/core/parseArgs.ts`), but this module reads the raw words
+    // of `args` for the literal `--next` and `--next=`, and `--no-next`
+    // is neither, so it lands here exactly where a line naming nothing
+    // at all does: a null request, refused by `plan create` with
+    // {@link noSourceMessage}, not read as `--next` given.
+    expect(readSpecSourceFlags(['--no-next']).request).toBe(null);
+    expect(readSpecSourceFlags(['--no-next', NEXT_FLAG]).request).toEqual({ kind: 'next', roadmap: null });
+  });
+
   it('refuses --spec with --issue, naming both, and lets either alone through', () => {
     const refused = refusalOf(() => readSpecSourceFlags([`${SPEC_FLAG}=a.md`, `${ISSUE_FLAG}=20`]));
 
