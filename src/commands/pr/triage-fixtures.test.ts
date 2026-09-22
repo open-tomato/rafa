@@ -5,7 +5,7 @@
  *
  * `triage.test.ts` proves the command's refusals, its ordering and its
  * writes; `classify.test.ts` proves the classifier holds the class set
- * closed over literal inputs. Neither reads the ten fixture directories
+ * closed over literal inputs. Neither reads the eleven fixture directories
  * a earlier task captured, one per {@link TRIAGE_CLASSES} member, each
  * holding `pr.json` (the exact shape `gh pr view --json <DETAIL_FIELDS>`
  * answers, `gh.ts`'s `readDetail`), `checks.json` (the exact shape
@@ -19,7 +19,7 @@
  * Three jobs:
  *
  *   - Every class, produced from its own fixture, closed both ends the
- *     way `classify.test.ts` holds the set: the ten classes produced are
+ *     way `classify.test.ts` holds the set: the eleven classes produced are
  *     exactly `TRIAGE_CLASSES`, and each fixture produces the class its
  *     directory is named for. `green` is read off `rerun.decision`
  *     rather than off `assessment.triageClass`, because a first-ever

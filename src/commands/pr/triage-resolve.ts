@@ -103,10 +103,13 @@
  *
  * Two readings answer it, because a conflict and a red battery leave
  * the pull request in different shapes. The checks going green is the
- * ordinary one. The other is a fresh assessment whose class is `green`,
- * which is what a resolved conflict answers in a repository that
- * schedules no run for the merge ref at all (`src/pr/checks.ts`: `none`
- * is a verdict, not a wait).
+ * ordinary one. The other is a fresh assessment whose class is `green`
+ * or `no-checks`, the second being what a resolved conflict answers in
+ * a repository that schedules no run for the merge ref at all
+ * (`src/pr/checks.ts`: `none` is a verdict, not a wait). The conflict
+ * `--resolve` was asked to clear is gone either way; whether to merge
+ * with no checks is `rafa pr merge --skip-checks`'s question, not this
+ * one's.
  *
  * ## The comment is written twice per attempt, and once more at the end
  *
@@ -441,7 +444,9 @@ async function endOfAttempt(
   const reading = await run.reassess();
   const fresh = reading.assessment;
   const assessment = fresh ?? before.assessment;
-  const green = waited.verdict === 'green' || fresh?.triageClass === 'green';
+  const green = waited.verdict === 'green'
+    || fresh?.triageClass === 'green'
+    || fresh?.triageClass === 'no-checks';
   return {
     reading,
     outcome: { triageClass: assessment.triageClass, step: assessment.step },

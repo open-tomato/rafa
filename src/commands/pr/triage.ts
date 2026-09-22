@@ -437,6 +437,9 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
     rows: checks.rows,
     step: logs.chosen?.evidence.step,
     conflictFiles: conflict?.files ?? [],
+    // Not read yet: null is the unreadable reading, which the `no-checks`
+    // reason reports as such and never as "no workflow".
+    workflowCount: null,
   });
   const assessed: TriageReading = {
     detail,

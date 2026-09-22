@@ -157,6 +157,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
     rows,
     step: seed.evidence?.step,
     conflictFiles: seed.conflictFiles ?? [],
+    workflowCount: null,
   });
   return {
     detail: pull,
