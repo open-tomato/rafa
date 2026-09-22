@@ -23,24 +23,25 @@
  * taken away, which the later row must then answer. A table that
  * answered the earlier row unconditionally would pass the first half of
  * each pair and fail the second. The pairs are 1 over 2, 1 over 4, 4
- * over 2, 3 over 4, 4 over 5, 5 over 6, 6 over 7, 7 over 8, 8 over 9, 10
- * over 9, 10 over 11, 11 over 12 and 12 over 8, and the finished plan
- * whose pull request was merged in the browser, which is row 12 read
- * off a plan branch. `4 over 2` and `12 over 8` are the same shape as
- * `10 over 9`: rows 2 and 8 each carry their own base-branch conjunct
+ * over 2, 3 over 4, 4 over 5, 5 over 6, 6 over 8, 8 over 9, 9 over 10,
+ * 11 over 10, 11 over 12, 12 over 13 and 13 over 9, and the finished
+ * plan whose pull request was merged in the browser, which is row 13
+ * read off a plan branch. Row 7's pairs, 5 over 7, 6 over 7 and 7 over
+ * 8, are driven in `./state-no-checks.test.ts`. `4 over 2` and `13 over 9` are the same shape as
+ * `11 over 10`: rows 2 and 9 each carry their own base-branch conjunct
  * inline rather than through a reading `./readings.test.ts` already
  * covers, so a plan branch never answers `sync` or `start` for a base
  * that is behind or a plan that is unstarted somewhere else, no matter
- * how true the rest of the row's reading is off the base branch. Rows 9,
- * 10 and 11 need no such pair: their own base-branch conjunct lives once
+ * how true the rest of the row's reading is off the base branch. Rows 10,
+ * 11 and 12 need no such pair: their own base-branch conjunct lives once
  * in `picked()` (`./readings.ts`), and `./readings.test.ts` already
  * holds it to asking the board nothing off the base branch.
  *
  * Each pre-condition is driven the same way: the modified tree beside
- * the same situation with a clean one, which answers row 9; the tree
+ * the same situation with a clean one, which answers row 10; the tree
  * holding untracked files alone beside the same two paths written as
  * tracked ones; and the unusable provider beside a provider that
- * answers no pull request, which is row 12. Both are held to asking
+ * answers no pull request, which is row 13. Both are held to asking
  * NOTHING they did not need, by the call log of the double.
  *
  * ## What passes while wrong
@@ -50,12 +51,12 @@
  * restored from a scratch copy and verified with `shasum -c` each time,
  * against 91 pass and 0 fail either side:
  *
- *  - row 9's "waits on nothing" conjunct dropped, so a line that is
+ *  - row 10's "waits on nothing" conjunct dropped, so a line that is
  *    ready AND blocked answers `plan`: 88 pass and 3 fail, the 10-over-9
- *    pair and the two cases that read row 10 at all. Every other case
+ *    pair and the two cases that read row 11 at all. Every other case
  *    plants a line that is one or the other, and none of them notices.
  *  - row 5 narrowed to a pending verdict alone, so a merge GitHub has
- *    not settled falls through rows 5, 6 and 7 to the last row: 90 pass
+ *    not settled falls through rows 5 to 8 to the last row: 90 pass
  *    and 1 fail, the unsettled-merge case alone. The three pull request
  *    rows stop partitioning an open pull request, and only the case
  *    that plants `unknown` sees it.
@@ -77,13 +78,13 @@
  *    row answers — what the mutant really changes is the cost and the
  *    two pre-conditions' own order, so those are the cases that hold it.
  *  - the provider pre-condition read ahead of the whole table rather
- *    than ahead of rows 5, 6 and 7: 108 pass and 2 fail, both the cases
+ *    than ahead of rows 5 to 8: 108 pass and 2 fail, both the cases
  *    that count what a running loop asks the double. Every answer is
  *    unchanged; the `gh` call is what the mutant spends.
  *
  * Two more were driven the same way on 2026-09-21 and 2026-09-22, one at
  * a time, over `env -u CLAUDECODE bun test src/next/` with the `4 over
- * 2` and `12 over 8` pairs below in place, each restored from a scratch
+ * 2` and `13 over 9` pairs below in place, each restored from a scratch
  * copy and verified with `shasum -c` before the next:
  *
  *  - row 2's own base-branch conjunct dropped, so a plan branch whose
@@ -92,12 +93,12 @@
  *    alone. Before that pair existed the same mutant passed every case
  *    in the file, because nothing ever planted a plan branch beside a
  *    behind base at once.
- *  - row 8's own base-branch conjunct dropped, so an unstarted plan
+ *  - row 9's own base-branch conjunct dropped, so an unstarted plan
  *    answers `start` off the base branch, wherever one happens to sit
  *    unstarted: 140 pass and 0 fail before, 139 pass and 1 fail after,
- *    the `12 over 8` pair alone. Every other case either plants no
+ *    the `13 over 9` pair alone. Every other case either plants no
  *    unstarted plan at all or is already on the base when it plants one,
- *    so none of them notices row 8 firing where row 12 should.
+ *    so none of them notices row 9 firing where row 13 should.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { BlockedLine } from '../board/blocked-line.js';
@@ -324,6 +325,7 @@ const ROW: Readonly<Record<string, Partial<Situation>>> = {
   'tracker-open': { branch: PLAN_BRANCH, plans: { [STUB]: { plan: OPEN_PLAN } } },
   'pr-pending': { branch: PLAN_BRANCH, pull: { verdict: 'pending', mergeable: 'mergeable' } },
   'pr-red': { branch: PLAN_BRANCH, pull: { verdict: 'red', mergeable: 'mergeable' } },
+  'pr-no-checks': { branch: PLAN_BRANCH, pull: { verdict: 'none', mergeable: 'mergeable' } },
   'pr-green': { branch: PLAN_BRANCH, pull: { verdict: 'green', mergeable: 'mergeable' } },
   'plan-unstarted': { plans: { [STUB]: { plan: OPEN_PLAN } } },
   'issue-ready': { roadmap: walked(), ready: true },
@@ -338,7 +340,7 @@ function stateOf(over: Partial<Situation> = {}): ReturnType<typeof readNextState
 }
 
 describe('the table itself', () => {
-  it('holds the twelve states in the order the spec writes them', () => {
+  it('holds the thirteen states in the order the specs write them', () => {
     expect(NEXT_STATES).toEqual([
       'loop-running',
       'base-behind',
@@ -346,6 +348,7 @@ describe('the table itself', () => {
       'tracker-open',
       'pr-pending',
       'pr-red',
+      'pr-no-checks',
       'pr-green',
       'plan-unstarted',
       'issue-ready',
@@ -430,7 +433,7 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.pullRequest).toBe(PR);
   });
 
-  it('row 5 also takes a merge GitHub has not settled, which is neither row 6 nor row 7', async () => {
+  it('row 5 also takes a merge GitHub has not settled, which none of rows 6, 7 and 8 takes', async () => {
     const state = await stateOf({ branch: PLAN_BRANCH, pull: { verdict: 'green', mergeable: 'unknown' } });
 
     expect(state.id).toBe('pr-pending');
@@ -452,14 +455,7 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.reading).toContain('conflicts with `main`');
   });
 
-  it('row 6 takes a pull request reporting no check at all', async () => {
-    const state = await stateOf({ branch: PLAN_BRANCH, pull: { verdict: 'none', mergeable: 'mergeable' } });
-
-    expect(state.id).toBe('pr-red');
-    expect(state.reading).toContain('reports no check at all');
-  });
-
-  it('row 7 proposes the merge, naming the base it merges into', async () => {
+  it('row 8 proposes the merge, naming the base it merges into', async () => {
     const state = await stateOf(ROW['pr-green']);
 
     expect(state.action).toBe('merge');
@@ -467,7 +463,7 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.proposal).toBe(`merge #${PR} into \`main\``);
   });
 
-  it('row 8 names the plan nobody has started, and carries its file', async () => {
+  it('row 9 names the plan nobody has started, and carries its file', async () => {
     const state = await stateOf(ROW['plan-unstarted']);
 
     expect(state.action).toBe('start');
@@ -476,14 +472,14 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.planPath).toContain(`PLAN-${STUB}.md`);
   });
 
-  it('row 8 passes over a plan that has a run, and over one that has a branch', async () => {
+  it('row 9 passes over a plan that has a run, and over one that has a branch', async () => {
     const hasRun = await stateOf({ plans: { [STUB]: { plan: OPEN_PLAN } }, runs: [record({ state: 'stopped' })] });
     const hasBranch = await stateOf({ plans: { [STUB]: { plan: OPEN_PLAN } }, refs: [`refs/heads/${PLAN_BRANCH}`] });
 
     expect([hasRun.id, hasBranch.id]).toEqual(['nothing-left', 'nothing-left']);
   });
 
-  it('row 9 names the ready line and proposes its plan', async () => {
+  it('row 10 names the ready line and proposes its plan', async () => {
     const state = await stateOf(ROW['issue-ready']);
 
     expect(state.action).toBe('plan');
@@ -492,7 +488,7 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.issue).toBe(ISSUE);
   });
 
-  it('row 10 names what the line waits on, in the board reading own words', async () => {
+  it('row 11 names what the line waits on, in the board reading own words', async () => {
     const state = await stateOf(ROW['issue-blocked']);
 
     expect(state.action).toBe('unblock');
@@ -501,7 +497,7 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.issue).toBe(ISSUE);
   });
 
-  it('row 11 names the missing label and proposes marking it ready', async () => {
+  it('row 12 names the missing label and proposes marking it ready', async () => {
     const state = await stateOf(ROW['issue-not-ready']);
 
     expect(state.action).toBe('ready');
@@ -509,7 +505,7 @@ describe('each row, with what it says and what it carries', () => {
     expect(state.proposal).toBe(`check the spec of #${ISSUE} and mark it ready`);
   });
 
-  it('row 12 names the roadmap it walked and how many lines it passed', async () => {
+  it('row 13 names the roadmap it walked and how many lines it passed', async () => {
     const state = await stateOf(ROW['nothing-left']);
 
     expect(state.action).toBe('none');
@@ -567,14 +563,14 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
     expect([both.id, alone.id]).toEqual(['pr-pending', 'pr-red']);
   });
 
-  it('reads a red pull request that merges as row 6, and row 7 once it is green', async () => {
+  it('reads a red pull request that merges as row 6, and row 8 once it is green', async () => {
     const both = await stateOf(ROW['pr-red']);
     const alone = await stateOf(ROW['pr-green']);
 
     expect([both.id, alone.id]).toEqual(['pr-red', 'pr-green']);
   });
 
-  it('reads a green pull request beside an unstarted plan as row 7, and row 8 without the pull request', async () => {
+  it('reads a green pull request beside an unstarted plan as row 8, and row 9 without the pull request', async () => {
     const plans = { [STUB]: { plan: OPEN_PLAN } };
     const both = await stateOf({ plans, pull: { verdict: 'green', mergeable: 'mergeable', branch: BASE } });
     const alone = await stateOf({ plans });
@@ -582,7 +578,7 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
     expect([both.id, alone.id]).toEqual(['pr-green', 'plan-unstarted']);
   });
 
-  it('reads an unstarted plan beside a ready roadmap line as row 8, and row 9 without the plan', async () => {
+  it('reads an unstarted plan beside a ready roadmap line as row 9, and row 10 without the plan', async () => {
     const board = { roadmap: walked(), ready: true };
     const both = await stateOf({ ...board, plans: { [STUB]: { plan: OPEN_PLAN } } });
     const alone = await stateOf(board);
@@ -590,28 +586,28 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
     expect([both.id, alone.id]).toEqual(['plan-unstarted', 'issue-ready']);
   });
 
-  it('reads a line that is ready and blocked as row 10, and row 9 once it waits on nothing', async () => {
+  it('reads a line that is ready and blocked as row 11, and row 10 once it waits on nothing', async () => {
     const both = await stateOf(ROW['issue-blocked']);
     const alone = await stateOf(ROW['issue-ready']);
 
     expect([both.id, alone.id]).toEqual(['issue-blocked', 'issue-ready']);
   });
 
-  it('reads a line that is blocked and unready as row 10, and row 11 once it waits on nothing', async () => {
+  it('reads a line that is blocked and unready as row 11, and row 12 once it waits on nothing', async () => {
     const both = await stateOf({ roadmap: walked(), ready: false, blocked: waiting() });
     const alone = await stateOf(ROW['issue-not-ready']);
 
     expect([both.id, alone.id]).toEqual(['issue-blocked', 'issue-not-ready']);
   });
 
-  it('reads an unready line as row 11, and row 12 once the roadmap has no line left', async () => {
+  it('reads an unready line as row 12, and row 13 once the roadmap has no line left', async () => {
     const both = await stateOf(ROW['issue-not-ready']);
     const alone = await stateOf(ROW['nothing-left']);
 
     expect([both.id, alone.id]).toEqual(['issue-not-ready', 'nothing-left']);
   });
 
-  it('reads a finished plan whose pull request was merged in the browser as row 12, naming the base', async () => {
+  it('reads a finished plan whose pull request was merged in the browser as row 13, naming the base', async () => {
     const state = await stateOf({
       branch: PLAN_BRANCH,
       plans: { [STUB]: { plan: OPEN_PLAN, tracker: DONE_TRACKER } },
@@ -624,14 +620,14 @@ describe('two rows both true: the earlier one wins, and the later one answers wi
     expect(state.proposal).toBe(`nothing to run from \`${PLAN_BRANCH}\`; the cycle goes on from \`${BASE}\``);
   });
 
-  it('reads a branch that is no plan branch at all as row 12 too', async () => {
+  it('reads a branch that is no plan branch at all as row 13 too', async () => {
     const state = await stateOf({ branch: 'scratch' });
 
     expect(state.id).toBe('nothing-left');
     expect(state.reading).toBe('`scratch` is no plan branch, and it has no open pull request');
   });
 
-  it('reads a branch that is no plan branch at all as row 12 even with an unstarted plan waiting, and row 8 once the branch is the base itself', async () => {
+  it('reads a branch that is no plan branch at all as row 13 even with an unstarted plan waiting, and row 9 once the branch is the base itself', async () => {
     const plans = { [STUB]: { plan: OPEN_PLAN } };
     const both = await stateOf({ branch: 'scratch', plans });
     const alone = await stateOf({ plans });

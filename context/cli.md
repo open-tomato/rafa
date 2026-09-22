@@ -40,7 +40,7 @@ module's note is the long form.
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status` and `list` share: the session a line picks, a session's checklist and rough ETA, and the refusals |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class; and `pr wait`, its checks polled until they settle, the deadline passes or it turns out to have none, exiting 0 green, 1 red and on no checks at all, and 3 at the deadline |
 | `src/commands/pr/wait.ts` | `rafa pr wait [<n>] [--timeout=<minutes>]`: polls one pull request's checks until they settle or the deadline passes, reading and writing nothing else. Exit code 0 for green (every check passed); 1 for red (a check failed) or none (no checks at all); 3 for a deadline that passed with checks still running or pending. The `--timeout` flag takes a minute count from 1, defaulting to `DEFAULT_CI_TIMEOUT_MIN`; the number is read from the line, so `rafa pr wait --timeout 41` is a 41-minute wait on the branch's own PR, not a wait on #41. The verdict state values are `green`, `red`, `none`, `pending`, and `timeout`. A green run ends with the one step that follows; the other four each carry their report as the message of their `CommandExit`. The poll is the same `waitForChecks` the loop's own CI gate uses, so one wait and the loop agree about what green means and how often a pull request is asked. The report is the data of a json-mode terminal result when green, or its error message when not. See `--no-hint` under the ending hint. |
-| `src/commands/pr/triage-read.ts` | what `pr triage` gathers that is neither the line nor the pull request: the Actions run id off a check link, the `--log-failed` capture of each failing run, and the conflicting file list, read with `git merge-tree` between refs resolved first and never fetched |
+| `src/commands/pr/triage-read.ts` | what `pr triage` gathers that is neither the line nor the pull request: the Actions run id off a check link, the `--log-failed` capture of each failing run, the repository's workflow count when no check reported, and the conflicting file list, read with `git merge-tree` between refs resolved first and never fetched |
 | `src/commands/pr/triage-resolve.ts` | what `--resolve` does with an assessment: the worktree added and removed, the pinned plan filled and capped at `pr.resolveBudget`, one loop run an attempt, the CI wait after each, the attempt guard's two stops, the comment with its dependabot rebase note, and the exit code 3 a run that gave up ends with |
 | `src/commands/pr/triage-trust.ts` | board trust as `pr triage` asks it, over `src/board/trust.ts`: the newest `rafa:pr-triage` marker comment whose author holds write access or is listed in `board.trustedAuthors`, with every newer one passed over and reported rather than read, and the exit-2 refusal `--resolve` makes over a pull request whose own author is neither trusted nor a known dependency-bump bot |
 | `src/commands/pr/resolve-loop.ts` | one `--resolve` attempt's loop: the filled plan written under `~/.rafa/resolve/pr-<n>/attempt-<k>`, outside the worktree so the loop's own commit cannot push it, and `rafa loop start --plan=<file> --no-ci-wait` spawned in the worktree with its stdout forwarded a line at a time |
@@ -56,8 +56,36 @@ module's note is the long form.
 | `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, and the two install warnings |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
-| `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. The eight action ids are `sync`, `plan`, `ready`, `start`, `commit`, `next-base`, `review`, and `resume`; only `sync` and `plan` may run unasked without `--yes`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether it was asked about, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
+| `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
+
+
+### Changing the `rafa next` table
+
+New; it replaces no earlier text. What a row or an action added to
+`src/next/` has to touch:
+
+- **Row numbers are cited outside `state.ts`.** The table is first-match
+  and its module note numbers the rows, but the notes of `actions.ts`,
+  `readings.ts` and `sources.ts` and the titles in `state.test.ts` cite
+  rows by number too. Inserting a row means grepping `src/next` for
+  `rows\? [0-9]` and renumbering each hit.
+- **A new `NextActionId` fails `check-types`** until `ACTION_COMMANDS`
+  (`actions.ts`, a `Record` over `NextCommandActionId`) maps it to a
+  command.
+- **A mapped action can be listed under `--yes` straight away.**
+  `YES_ACTIONS` is `NEXT_COMMAND_ACTIONS` minus `ALWAYS_ASKED`, so an
+  action that must never run from a list goes into `ALWAYS_ASKED` and
+  `ALWAYS_ASKED_WHY` in the same change.
+- **An action whose command asks its own question is handed over.** The
+  chain closes its prompter first (`handOver`, `prompter.close` in
+  `runNext`). Two `createLinePrompter`s on one stdin both receive every
+  line, and the idle one holds the answer and gives it back as its own
+  next answer.
+- **The dry-run reading is taken once per invocation.** `dryRunOf` runs
+  once in `runNext`, so with no terminal and no `--yes` the run is a dry
+  run from its first turn. A driven test of a handed-over action sets
+  `isTerminal` to true.
 
 ### The core roster
 
@@ -788,7 +816,7 @@ module's note is the long form.
   the arguments `id` and `state`; each declares `text` and `json`. Of the `pr` actions, `pr current` and `pr list`
   declare no argument and no flag, each with `text` and `json`. `pr show` and `pr view`
   declare the argument `n` and no flag. `pr merge`
-  declares the argument `n` and the flags `yes`, `method` and `hint`, and
+  declares the argument `n` and the flags `yes`, `skip-checks`, `method` and `hint`, and
   `pr triage` the argument `n` and the flags `comment`, `resolve`,
   `max-attempts` and `hint`; each declares `text` and `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
@@ -879,7 +907,9 @@ module's note is the long form.
   that is none of the three GitHub merge methods, a number the repository
   has no pull request for, a git reading that failed, each of the four
   merge refusals (dirty tree, not green, not mergeable, branch in another
-  worktree), no terminal to ask on without `--yes`, a provider that would
+  worktree), `--skip-checks` on a pull request that reports checks, no
+  terminal to ask on without `--yes`, `--yes` beside `--skip-checks` where
+  workflows exist or their count could not be read, a provider that would
   not merge, and a clean-up step that failed. `pr triage` throws 1 for a
   stray word, a word that is no whole number from 1, a flag that swallowed
   the number, a config that cannot be used, a `--max-attempts` that is no

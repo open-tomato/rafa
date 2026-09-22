@@ -82,6 +82,7 @@ import {
   isManifestPath,
   LOCKFILE_FILES,
   MANIFEST_FILES,
+  noChecksReason,
   readsAsConflicting,
   stepTokens,
 } from './classify.js';
@@ -110,6 +111,7 @@ const PENDING_ROWS = rowsOf(['gates', 'IN_PROGRESS'], ['snapshot', 'FAILURE']);
 /** A pull request, mergeable and human-authored unless a case says otherwise. */
 function pull(overrides: Partial<ClassifiedPullRequest> = {}): ClassifiedPullRequest {
   return {
+    number: 86,
     title: 'Add the pr triage command',
     author: { login: 'marcos', isBot: false },
     mergeable: 'mergeable',
@@ -138,6 +140,7 @@ function input(overrides: Partial<ClassifyTriageInput> = {}): ClassifyTriageInpu
     rows: GREEN_ROWS,
     step: undefined,
     conflictFiles: [],
+    workflowCount: 0,
     ...overrides,
   };
 }
@@ -178,6 +181,7 @@ function classOf(one: ClassifyTriageInput): TriageClass {
 const EVERY_CLASS: readonly (readonly [TriageClass, ClassifyTriageInput])[] = [
   ['green', input()],
   ['pending', input({ rows: PENDING_ROWS })],
+  ['no-checks', input({ rows: [] })],
   ['conflict-lockfile', conflicting(['bun.lock'])],
   ['conflict-manifest', conflicting(['package.json'])],
   ['conflict-other', conflicting(['src/config.ts'])],
@@ -364,12 +368,42 @@ describe('the non-red readings', () => {
     expect(classOf(input({ rows: RED_ROWS, step: step('bun test') }))).toBe('ci-test');
   });
 
-  it('calls a mergeable pull request with no checks at all green, and distinguishes it', () => {
+  it('calls a pull request with no checks at all no-checks, never green, and never simple', () => {
     const read = classifyTriage(input({ rows: [] }));
 
-    expect(read.triageClass).toBe('green');
+    expect(read.triageClass).toBe('no-checks');
     expect(read.verdict).toBe('none');
-    expect(read.reason).toContain('no checks at all');
+    expect(read.failing).toEqual([]);
+    expect(read.simple).toBe(false);
+    expect(classifyTriage(input({ rows: [], pr: bumpPull() })).simple).toBe(false);
+    expect(classOf(input())).toBe('green');
+  });
+
+  it('carries the workflow count and the --skip-checks line in the no-checks reason', () => {
+    const none = classifyTriage(input({ rows: [], workflowCount: 0 })).reason;
+    const one = classifyTriage(input({ rows: [], workflowCount: 1 })).reason;
+    const unread = classifyTriage(input({ rows: [], workflowCount: null })).reason;
+
+    expect(none).toBe('the head reports no checks at all; the repository defines 0 workflows;'
+      + ' to merge it anyway, run rafa pr merge 86 --skip-checks');
+    expect(one).toContain('; the repository defines 1 workflow;');
+    expect(unread).toContain('; the repository\'s workflow count could not be read;');
+    expect(unread).toContain('rafa pr merge 86 --skip-checks');
+    expect(noChecksReason(7, 3)).toContain('defines 3 workflows; to merge it anyway, run rafa pr merge 7 --skip-checks');
+  });
+
+  it('reads the workflow count only on no checks, and keeps a conflict with none a conflict', () => {
+    const green = classifyTriage(input({ workflowCount: null })).reason;
+    const conflicted = classifyTriage(input({
+      pr: pull({ mergeable: 'conflicting', mergeStateStatus: 'DIRTY' }),
+      rows: [],
+      conflictFiles: ['bun.lock'],
+    }));
+
+    expect(green).not.toContain('workflow');
+    expect(green).not.toContain('--skip-checks');
+    expect(conflicted.triageClass).toBe('conflict-lockfile');
+    expect(conflicted.reason).not.toContain('--skip-checks');
   });
 
   it('calls a run still going pending even when another row has already failed', () => {
@@ -405,6 +439,7 @@ describe('the simple flag', () => {
     for (const pr of [pull(), bumpPull()]) {
       expect(classifyTriage(input({ pr })).simple).toBe(false);
       expect(classifyTriage(input({ pr, rows: PENDING_ROWS })).simple).toBe(false);
+      expect(classifyTriage(input({ pr, rows: [] })).simple).toBe(false);
       expect(classifyTriage(failedIn('bun test', pr)).simple).toBe(false);
     }
   });

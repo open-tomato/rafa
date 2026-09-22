@@ -120,6 +120,7 @@ const MEMBERS: readonly Member[] = [
   { name: 'comment', lines: ['  comment: async (_n: number, _body: string) => comment,'] },
   { name: 'editComment', lines: ['  editComment: async (_id: string, _body: string) => comment,'] },
   { name: 'failedLog', lines: ['  failedLog: async (_runId: string) => "",'] },
+  { name: 'workflowCount', lines: ['  workflowCount: async () => (summary.number > 0 ? 0 : null),'] },
 ];
 
 /** The records every adapter probe is built out of. */
@@ -189,6 +190,7 @@ const CONFORMING_PROBE = probeSource(
   'export const mergeableIsExact: Equals<T.Mergeability, "mergeable" | "conflicting" | "unknown"> = true;',
   'export const kindIsExact: Equals<T.PullRequests["kind"], "gh"> = true;',
   'export const detailIsASummary: T.PullRequestSummary = detail;',
+  'export const countIsNullable: Equals<Awaited<ReturnType<T.PullRequests["workflowCount"]>>, number | null> = true;',
   'export const rowsAreTheCheckRows: Equals<T.ChecksReading["rows"], readonly T.CheckRow[]> = true;',
   'export async function verdictOfPr(pr: T.PullRequests): Promise<T.ChecksVerdict> {',
   '  return (await pr.checks(33)).verdict;',
@@ -257,6 +259,27 @@ const REFUSALS: readonly Refusal[] = [
     // which is the reading: a provider cannot quietly answer a record
     // where the port promises nothing.
     names: 'Type \'Promise<PullRequestDetail>\' is not assignable to type \'Promise<void>\'',
+  },
+  {
+    title: 'an adapter with no workflowCount',
+    file: 'omits-workflow-count.ts',
+    source: probeSource(...adapterSource({ omit: 'workflowCount' })),
+    code: 2741,
+    names: '\'workflowCount\'',
+  },
+  {
+    title: 'an adapter whose workflowCount answers undefined when it could not read one',
+    file: 'workflow-count-undefined.ts',
+    source: probeSource(...adapterSource({
+      rewrite: {
+        name: 'workflowCount',
+        lines: ['  workflowCount: async () => (summary.number > 0 ? 0 : undefined),'],
+      },
+    })),
+    code: 2322,
+    // Null is the port's word for "could not be read"; undefined is not
+    // an answer a caller switches on.
+    names: 'Type \'undefined\' is not assignable to type \'number | null\'',
   },
   {
     title: 'an adapter whose merge takes one method only',

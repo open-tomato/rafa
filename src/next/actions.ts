@@ -23,14 +23,15 @@
  * | `wait` | `pr wait` | `<pull request>` |
  * | `triage` | `pr triage` | `<pull request>` |
  * | `merge` | `pr merge` | `<pull request> --yes` |
+ * | `merge-unchecked` | `pr merge` | `<pull request> --skip-checks` |
  * | `start` | `loop start` | `--plan=<plan file> --create-branch` |
  * | `plan` | `plan create` | `--next` |
  * | `unblock` | `issue unblock` | `<issue>` |
  * | `ready` | `issue ready` | `<issue>` |
  *
- * The words come off the state: the pull request of rows 5, 6 and 7,
- * the issue of rows 10 and 11, and the absolute plan file of rows 3, 4
- * and 8, which `--plan` resolves against the project root and therefore
+ * The words come off the state: the pull request of rows 5, 6, 7 and 8,
+ * the issue of rows 11 and 12, and the absolute plan file of rows 3, 4
+ * and 9, which `--plan` resolves against the project root and therefore
  * takes as it is (`src/start/plan-path.ts`). A state whose row left the
  * field it proposes an action over null is a defect of the table and
  * throws here, naming the state and the action, rather than running a
@@ -47,11 +48,18 @@
  *    one that does not merge, a head branch checked out elsewhere — are
  *    all read before the question, and the unblock question it ends
  *    with is one `--yes` does not answer either (`src/commands/pr/merge.ts`).
+ *  - `merge-unchecked` passes `--skip-checks` and NOT `--yes`. The
+ *    question `Merge #<n> with no checks? [y/N]` is `pr merge`'s own,
+ *    asked after it has read the workflow count and printed the warning
+ *    that count calls for, so it is the one decision `rafa next` must
+ *    not answer on the person's behalf; and where workflows exist
+ *    `pr merge` refuses `--yes` beside `--skip-checks` outright.
+ *    Without a terminal it refuses rather than merging unasked.
  *  - `triage` passes the number alone, so no action ever passes
  *    `--resolve`: the words are the same whether the person typed `y`
  *    or `--yes` allowed the step, and a repair session is never spent
  *    unasked.
- *  - `start` passes `--create-branch` and `resume` does not. Row 8 is
+ *  - `start` passes `--create-branch` and `resume` does not. Row 9 is
  *    read on the base branch, where `loop start` would otherwise stop
  *    to offer the plan's branch; rows 3 and 4 are read on that branch
  *    already.
@@ -143,12 +151,13 @@ function planFlagOf(state: NextState): string {
   return `--plan=${needed(state, state.planPath, 'plan file')}`;
 }
 
-/** The eight actions that run a command, each with its own; see the module note. */
+/** The nine actions that run a command, each with its own; see the module note. */
 const ACTION_COMMANDS: Readonly<Record<NextCommandActionId, ActionCommandSpec>> = Object.freeze({
   resume: { subject: 'loop', action: 'start', argv: (state) => [planFlagOf(state)] },
   wait: { subject: 'pr', action: 'wait', argv: (state) => [pullRequestOf(state)] },
   triage: { subject: 'pr', action: 'triage', argv: (state) => [pullRequestOf(state)] },
   merge: { subject: 'pr', action: 'merge', argv: (state) => [pullRequestOf(state), '--yes'] },
+  'merge-unchecked': { subject: 'pr', action: 'merge', argv: (state) => [pullRequestOf(state), '--skip-checks'] },
   start: { subject: 'loop', action: 'start', argv: (state) => [planFlagOf(state), '--create-branch'] },
   plan: { subject: 'plan', action: 'create', argv: () => ['--next'] },
   unblock: { subject: 'issue', action: 'unblock', argv: (state) => [issueOf(state)] },
@@ -156,7 +165,7 @@ const ACTION_COMMANDS: Readonly<Record<NextCommandActionId, ActionCommandSpec>> 
 });
 
 /**
- * The eight action ids that run a registered command, in the table's
+ * The nine action ids that run a registered command, in the table's
  * order. Taken off the table itself, so a caller reading the ids and
  * the mapping that answers for them cannot drift apart.
  */

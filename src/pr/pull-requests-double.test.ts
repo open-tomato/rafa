@@ -130,6 +130,16 @@ describe('the pull request double', () => {
     await expect(composed.pulls.list()).rejects.toThrow('which this case did not name');
   });
 
+  it('answers the null workflowCount a case names, and spells the call with no arguments', async () => {
+    const double = createPullRequestsDouble({ workflowCount: () => Promise.resolve(null) });
+
+    expect(await double.pulls.workflowCount()).toBeNull();
+    expect(double.sent()).toEqual(['workflowCount']);
+    // The control: a double that names a count answers it, so the null
+    // above is the case's answer and not a default.
+    expect(await createPullRequestsDouble({ workflowCount: () => Promise.resolve(3) }).pulls.workflowCount()).toBe(3);
+  });
+
   it('records every call it was handed, the refused ones included and in order', async () => {
     const double = createPullRequestsDouble({ get: () => Promise.resolve(null) });
 

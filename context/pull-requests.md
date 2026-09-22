@@ -14,7 +14,8 @@ Seven actions read and control pull requests:
   check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
 - `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable
-- `pr merge [<n>] [--yes] [--method=squash|merge|rebase]` — merge the PR
+- `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
+  merge the PR; `--skip-checks` is for a PR that reports no checks at all
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
@@ -93,8 +94,10 @@ unmocked. Register the route row the call needs on the fake.
 ### The merge flow
 
 1. Refuse on a dirty working tree, on a PR that is not green or not
-   mergeable (the refusal names which, and points at `pr triage`), and when
-   the branch is checked out in another worktree (names it).
+   mergeable (the refusal names which; `pending` and `red` point at
+   `pr triage`, and verdict `none` — no checks at all — points at
+   `--skip-checks` instead, since triage has nothing to fix there), and
+   when the branch is checked out in another worktree (names it).
 2. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 3. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
@@ -119,6 +122,40 @@ unmocked. Register the route row the call needs on the fake.
 A failure after the merge never undoes it; it prints the remaining steps as
 commands.
 
+### The --skip-checks flow
+
+`--skip-checks` is accepted on verdict `none` ONLY — a PR that reports no
+checks at all. On `pending`, `red` or `green`, the flag is refused, and the
+refusal names each check row and its state. Without the flag, `none` is
+refused as today, naming `--skip-checks` and what it means.
+
+Before asking to merge, the command reads the repository's workflow count
+(`gh api repos/<repo>/actions/workflows`, `total_count`). Zero is the
+"no workflow" case; one or more, OR a count that could not be read, is the
+"workflows exist" case, which is the riskier one. Two warnings:
+
+- no workflow: "nothing on GitHub has tested this branch; you are relying on
+  the checks run locally"
+- workflows exist: "CI may not have started (a path filter, a draft, Actions
+  disabled, or it has not registered yet); this is probably not what you want"
+
+Then it shows `#n title, branch → base, method` and asks `Merge #<n> with no
+checks? [y/N]`. `--yes` answers the question in the no-workflow case only and
+is REFUSED in the workflows-exist case. Without a TTY and without `--yes` it
+refuses.
+
+After the merge, the usual clean-up runs (switch to the base branch, `git pull
+--ff-only`, delete local and remote branches, `git fetch --prune`), then ONE
+comment is posted on the PR: `Merged with no checks reported, by rafa pr merge
+--skip-checks.` followed by the workflow count that was read (or that it could
+not be read).
+
+`rafa next` sends a PR with verdict `none` to `pr triage` through
+`redClause` only when it conflicts; a mergeable PR with verdict `none`
+goes to row 7 (`merge-unchecked`) instead, which hands the merge question
+to `pr merge <n> --skip-checks`. A `rafa next --yes=<ids>` list that
+names `merge-unchecked` is refused with exit 2, like `ready`.
+
 ### Triage assessment
 
 Assessment is CODE, not a session:
@@ -127,13 +164,17 @@ Assessment is CODE, not a session:
   baseRefName,isCrossRepository,mergeable,mergeStateStatus,
   statusCheckRollup,updatedAt,labels`, the failing rows through
   `parseChecks`, the tail of `gh run view <id> --log-failed` for each
-  failing job, and for a conflict the file list from `git merge-tree
-  --write-tree` with a liveness control (the `merge-tree-mergeability-readings`
-  skill's rule).
-- Classify into one class: `green`, `pending`, `conflict-lockfile`,
-  `conflict-manifest` (`package.json` where both sides added or bumped
-  entries), `conflict-other`, `ci-install`, `ci-lint`, `ci-types`, `ci-test`,
-  `ci-other`. The failing STEP name decides the `ci-*` class.
+  failing job, the repository's workflow count (`gh api
+  repos/<repo>/actions/workflows`) when no check reported at all, and for a
+  conflict the file list from `git merge-tree --write-tree` with a liveness
+  control (the `merge-tree-mergeability-readings` skill's rule).
+- Classify into one class: `green`, `pending`, `no-checks`,
+  `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
+  added or bumped entries), `conflict-other`, `ci-install`, `ci-lint`,
+  `ci-types`, `ci-test`, `ci-other`. The failing STEP name decides the `ci-*`
+  class; `no-checks` means the PR reports no checks at all (verdict `none`),
+  whatever the workflow count; the count, or that it could not be read,
+  goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,
   `conflict-manifest`, and `ci-install` or `ci-lint` on a dependency bump
   PR (author `dependabot[bot]` or title `chore(deps`). Everything else is
@@ -141,6 +182,14 @@ Assessment is CODE, not a session:
 - Output: the class, the evidence (files, step, log excerpt capped at 40
   lines), and a ready FOLLOW-UP PROMPT for another session that carries all
   of it, so that session does not assess again.
+- A class added to `TRIAGE_CLASSES` (`src/pr/triage/classes.ts`) needs, in
+  the same change, its line in `FOLLOW_UP_TASKS` (`src/pr/triage/follow-up.ts`,
+  a `Record` over the class, so `check-types` fails without it), a case in
+  `classify.test.ts` that produces it, and a fixture folder
+  `src/tests/fixtures/pr-triage/<class>/` (`pr.json`, checks, log). Both
+  tests check the closed set from each end, and the pre-commit hook runs no
+  tests, so a missing fixture only shows up in `bun run test`. This bullet
+  is new and replaces no earlier text.
 
 The triage comment:
 
@@ -203,7 +252,10 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
   `src/pr/conflict-sentence.test.ts` and `src/tests/plan-injection.test.ts`,
   the last because the prompt's FIRST line is the `wrap-up` classifier key
   `PROMPT_SHAPES` reads. Run the three together before the full suite.
-- Then the existing CI wait. Guard against an unfixable PR: `attempts` in
+- Then the existing CI wait. A fresh assessment of class `green` OR
+  `no-checks` counts as resolved (`endOfAttempt`,
+  `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
+  repository that schedules no checks reads `no-checks`. Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
   stop, update the comment, remove the worktree, print the follow-up prompt,

@@ -139,7 +139,7 @@ the next one, so you rarely have to remember it.
    ```bash
    rafa pr current        # number, title, checks, URL
    rafa pr triage         # why is it red, and is the fix simple
-   rafa pr merge          # asks y/N, merges, switches to the base, pulls, deletes both branches
+   rafa pr merge [--skip-checks] # asks y/N, merges, switches to the base, pulls, deletes both branches
    rafa release tag       # tag the merged version
    rafa effort collect && rafa effort report
    ```

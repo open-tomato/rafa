@@ -21,6 +21,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   fillSeed,
+  httpFailure,
   logFailedText,
   missingPull,
   missingRun,
@@ -30,6 +31,9 @@ import {
   renderPermission,
   renderPull,
   renderRestComment,
+  renderWorkflows,
+  WORKFLOWS_PAGE,
+  workflowsFailure,
 } from './gh-fake-shapes.js';
 
 /** The repository every case here renders against. */
@@ -225,7 +229,80 @@ describe('the payloads gh api answers', () => {
   });
 });
 
+describe('the workflows payload gh api answers', () => {
+  it('writes a repository with no workflow byte for byte as open-tomato/rafa answered it', () => {
+    expect(JSON.stringify(renderWorkflows([], REPO))).toBe('{"total_count":0,"workflows":[]}');
+  });
+
+  it('writes total_count first and each workflow in the recorded key order', () => {
+    const payload = renderWorkflows([{ name: 'Unit and Integration Tests' }, { name: 'Lint', state: 'disabled_manually' }], REPO);
+    const listed = payload['workflows'] as readonly Record<string, unknown>[];
+
+    expect(Object.keys(payload)).toEqual(['total_count', 'workflows']);
+    expect(payload['total_count']).toBe(2);
+    expect(listed.map((workflow) => Object.keys(workflow))).toEqual(Array(2).fill([
+      'id',
+      'node_id',
+      'name',
+      'path',
+      'state',
+      'created_at',
+      'updated_at',
+      'url',
+      'html_url',
+      'badge_url',
+    ]));
+    expect(listed.map((workflow) => [workflow['name'], workflow['state']]))
+      .toEqual([['Unit and Integration Tests', 'active'], ['Lint', 'disabled_manually']]);
+    expect(listed[1]).toMatchObject({
+      path: '.github/workflows/lint.yml',
+      url: `https://api.github.com/repos/${REPO}/actions/workflows/${String(listed[1]?.['id'])}`,
+    });
+  });
+
+  it('counts every workflow in total_count and lists the first page of 30 alone, as github/docs answered 119 beside 30', () => {
+    const many = Array.from({ length: 119 }, (_, index) => ({ name: `workflow ${index}` }));
+
+    const payload = renderWorkflows(many, REPO);
+
+    expect(WORKFLOWS_PAGE).toBe(30);
+    expect(payload['total_count']).toBe(119);
+    expect(payload['workflows']).toHaveLength(30);
+  });
+});
+
 describe('the failures gh writes', () => {
+  it('writes a 403 in the 404 envelope with its own status', () => {
+    const result = httpFailure(403, 'no', 'https://docs.github.com/x');
+
+    expect(result).toEqual({
+      ok: false,
+      stdout: '{"message":"no","documentation_url":"https://docs.github.com/x","status":"403"}',
+      stderr: 'gh: no (HTTP 403)\n',
+    });
+  });
+
+  it('answers the recorded 404 on the workflows path', () => {
+    expect(workflowsFailure(404)).toEqual({
+      ok: false,
+      stdout: '{"message":"Not Found","documentation_url":"https://docs.github.com/rest/actions/workflows#list-repository-workflows","status":"404"}',
+      stderr: 'gh: Not Found (HTTP 404)\n',
+    });
+  });
+
+  it('answers the recorded actions 403 on the workflows path', () => {
+    const result = workflowsFailure(403);
+    const message = 'You must have repository read permissions or have the repository Actions policies fine-grained permission.';
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toBe(`gh: ${message} (HTTP 403)\n`);
+    expect(JSON.parse(result.stdout)).toEqual({
+      message,
+      documentation_url: 'https://docs.github.com/rest/actions/workflows#list-repository-workflows',
+      status: '403',
+    });
+  });
+
   it('names a pull request that does not exist the way GraphQL does', () => {
     expect(missingPull('999999')).toEqual({
       ok: false,

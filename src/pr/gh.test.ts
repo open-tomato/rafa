@@ -73,6 +73,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { workflowsFailure } from './gh-fake-shapes.js';
 import { createFakePrGh, logFailedText } from './gh-fake.js';
 import { createGhPullRequests, ghAuthOk, ghPullRequestsIn } from './gh.js';
 
@@ -507,6 +508,98 @@ describe('failedLog', () => {
     await expect(pr.failedLog('42')).rejects.toThrow(
       'gh pull requests: gh run view 42 --log-failed failed: failed to get run: HTTP 404: Not Found',
     );
+  });
+});
+
+describe('workflowCount', () => {
+  // Stub runners, not the fake: these hold what the adapter sends and
+  // how it reads each answer. The fake-driven reading over the recorded
+  // repositories is its own case.
+
+  /** A runner answering `result` to every command, recording what it was sent. */
+  function recording(result: GhResult): { pr: PullRequests; sent: string[][] } {
+    const sent: string[][] = [];
+    const gh: GhRunner = async (args) => {
+      sent.push([...args]);
+      return result;
+    };
+    return { pr: createGhPullRequests({ gh }), sent };
+  }
+
+  /** A successful read writing `payload` as JSON. */
+  const wrote = (payload: unknown): GhResult => ({ ok: true, stdout: JSON.stringify(payload), stderr: '' });
+
+  it('sends the workflows path alone, and answers zero as zero and not as null', async () => {
+    const runner = recording(wrote({ total_count: 0, workflows: [] }));
+
+    expect(await runner.pr.workflowCount()).toBe(0);
+    expect(runner.sent).toEqual([['api', 'repos/{owner}/{repo}/actions/workflows']]);
+  });
+
+  it('answers total_count rather than the length of the first page it came with', async () => {
+    const page = Array.from({ length: 30 }, (_, index) => ({ id: index + 1, name: `w${index}` }));
+
+    expect(await recording(wrote({ total_count: 119, workflows: page })).pr.workflowCount()).toBe(119);
+  });
+
+  it.each([
+    ['the recorded 403', workflowsFailure(403)],
+    ['the recorded 404', workflowsFailure(404)],
+    ['an outage', OUTAGE],
+  ])('answers null on %s, where every other read throws', async (_label, result) => {
+    expect(await recording(result).pr.workflowCount()).toBeNull();
+  });
+
+  it('answers null on a failure whose stdout carries a count, reading the exit code first', async () => {
+    // The control on reading the exit code: this payload would answer 3
+    // on the success path, which the case above it cannot tell apart.
+    const failed: GhResult = { ...wrote({ total_count: 3 }), ok: false };
+
+    expect(await recording(failed).pr.workflowCount()).toBeNull();
+    expect(await recording(wrote({ total_count: 3 })).pr.workflowCount()).toBe(3);
+  });
+
+  it.each([
+    ['output that is not JSON', { ok: true, stdout: 'not json', stderr: '' }],
+    ['no total_count', wrote({ workflows: [] })],
+    ['a total_count written as a string', wrote({ total_count: '3' })],
+    ['a negative total_count', wrote({ total_count: -1 })],
+    ['a fractional total_count', wrote({ total_count: 1.5 })],
+    ['a list rather than a mapping', wrote([{ total_count: 3 }])],
+    ['null', wrote(null)],
+  ])('answers null on a successful read with %s, never a guessed count', async (_label, result) => {
+    expect(await recording(result).pr.workflowCount()).toBeNull();
+  });
+});
+
+describe('workflowCount over the gh fake', () => {
+  // The stub cases above hold what the adapter sends and how it reads
+  // each shape; this is the reading driven through the recorded
+  // repository the fake models, as the note above promised.
+
+  it('answers zero for a repository with no workflow, the fake\'s own starting state', async () => {
+    const fake = createFakePrGh();
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.workflowCount()).toBe(0);
+    expect(fake.calls()).toEqual([['api', 'repos/{owner}/{repo}/actions/workflows']]);
+  });
+
+  it('answers the count of a repository holding three workflows', async () => {
+    const fake = createFakePrGh();
+    fake.plantWorkflows([{ name: 'Lint' }, { name: 'Tests' }, { name: 'Release' }]);
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.workflowCount()).toBe(3);
+  });
+
+  it('answers null for a repository whose workflows path answers 403, never the count it held before', async () => {
+    const fake = createFakePrGh();
+    fake.plantWorkflows([{ name: 'Lint' }, { name: 'Tests' }, { name: 'Release' }]);
+    fake.refuseWorkflows(403);
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.workflowCount()).toBeNull();
   });
 });
 

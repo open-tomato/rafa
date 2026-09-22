@@ -21,7 +21,7 @@
  * person would type.
  *
  * The declaration cases are the ones that read the real commands: they
- * hold the eight spellings of the table to the modules that export
+ * hold the spellings of the table to the modules that export
  * them, every flag word an action passes to a flag that command
  * declares, and every positional word to an argument it declares. A
  * rename on either side is what they are there for, and their control
@@ -126,6 +126,7 @@ const STATES: Readonly<Record<string, NextState>> = Object.freeze({
   wait: stateOf({ id: 'pr-pending', action: 'wait', pullRequest: PR }),
   triage: stateOf({ id: 'pr-red', action: 'triage', pullRequest: PR }),
   merge: stateOf({ id: 'pr-green', action: 'merge', pullRequest: PR }),
+  'merge-unchecked': stateOf({ id: 'pr-no-checks', action: 'merge-unchecked', pullRequest: PR }),
   start: stateOf({ id: 'plan-unstarted', action: 'start', planStub: 'rafa-63', planPath: PLAN }),
   plan: stateOf({ id: 'issue-ready', action: 'plan', issue: ISSUE }),
   unblock: stateOf({ id: 'issue-blocked', action: 'unblock', issue: ISSUE }),
@@ -181,7 +182,12 @@ function harnessFor(without: readonly string[] = []): Harness {
   const commands = [
     recording(seen, 'pr', 'wait'),
     recording(seen, 'pr', 'triage'),
-    recording(seen, 'pr', 'merge', { flags: [{ name: 'yes', description: 'Merge without asking.', type: 'boolean' }] }),
+    recording(seen, 'pr', 'merge', {
+      flags: [
+        { name: 'yes', description: 'Merge without asking.', type: 'boolean' },
+        { name: 'skip-checks', description: 'Merge with no checks.', type: 'boolean' },
+      ],
+    }),
     recording(seen, 'loop', 'start', {
       args: [],
       flags: [
@@ -214,7 +220,7 @@ function harnessFor(without: readonly string[] = []): Harness {
 }
 
 describe('the command each action runs', () => {
-  it('maps the eight action ids of the table onto their commands and words', () => {
+  it('maps the nine action ids of the table onto their commands and words', () => {
     const invocations = NEXT_COMMAND_ACTIONS.map((action) => {
       const invocation = actionInvocation(STATES[action]);
       return [action, invocation?.command, invocation?.argv];
@@ -225,6 +231,7 @@ describe('the command each action runs', () => {
       ['wait', 'pr wait', ['41']],
       ['triage', 'pr triage', ['41']],
       ['merge', 'pr merge', ['41', '--yes']],
+      ['merge-unchecked', 'pr merge', ['41', '--skip-checks']],
       ['start', 'loop start', [`--plan=${PLAN}`, '--create-branch']],
       ['plan', 'plan create', ['--next']],
       ['unblock', 'issue unblock', ['64']],
@@ -237,6 +244,23 @@ describe('the command each action runs', () => {
 
     expect(words.filter((word) => word.startsWith('--resolve'))).toEqual([]);
     expect(words.filter((word) => word === '--yes')).toEqual(['--yes']);
+  });
+
+  it('runs merge-unchecked without --yes, leaving the unchecked question to pr merge', async () => {
+    const { caller, seen } = harnessFor();
+
+    await runAction(caller, STATES['merge-unchecked']);
+
+    expect([seen[0]?.spelling, seen[0]?.context.args, seen[0]?.context.flags])
+      .toEqual(['pr merge', ['41'], { 'skip-checks': true, hint: false }]);
+    expect(seen[0]?.context.argv).not.toContain('--yes');
+  });
+
+  it('throws over a merge-unchecked state that names no pull request', () => {
+    const noPull = stateOf({ id: 'pr-no-checks', action: 'merge-unchecked' });
+
+    expect(runsCommand('merge-unchecked')).toBe(true);
+    expect(() => actionInvocation(noPull)).toThrow(/state "pr-no-checks" proposes "merge-unchecked" and names no pull request/);
   });
 
   it('answers no invocation for the two ids that run no command', () => {
@@ -415,6 +439,7 @@ describe('the declarations the table names', () => {
   it('answers for a spelling and a flag the declarations do not hold, which is the control', () => {
     expect(declaredAs('pr sync')).toBeUndefined();
     expect(declaredAs('pr merge')?.flags.map((flag) => flag.name)).not.toContain('resolve');
+    expect(declaredAs('pr merge')?.flags.map((flag) => flag.name)).toContain('skip-checks');
     expect(declaredAs('plan create')?.args).toEqual([]);
   });
 });

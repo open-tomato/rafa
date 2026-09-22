@@ -35,6 +35,14 @@
  * `--body` read as an empty one reddened the no-body refusal, and
  * `--title` added to the route's flags reddened the unmodelled-flag
  * case.
+ *
+ * Six more were driven on 2026-09-22, when the workflow list route was
+ * added, one run each over this file and `gh-fake-shapes.test.ts`, with
+ * 76 pass before and both modules restored byte-identical (sha256)
+ * after: `total_count` capped at the page, the page left unsliced, a
+ * planted refusal ignored, a trailing newline on the payload, a POST
+ * accepted, and a numeric `status` in the failure body. Each reddened at
+ * least one case, the refusal two and the numeric status eight.
  */
 import type { FakePrGh } from './gh-fake.js';
 
@@ -392,7 +400,7 @@ describe('gh api over comments', () => {
 
   it('refuses a path it does not model', async () => {
     expect(await withOnePull().run(['api', 'graphql', '-f', 'query=pullRequest'])).toEqual(failure(
-      'fake gh: api models the issue comment and collaborator permission paths alone, and was handed graphql\n',
+      'fake gh: api models the issue comment, collaborator permission and workflow list paths alone, and was handed graphql\n',
     ));
   });
 });
@@ -418,6 +426,58 @@ describe('gh api over a collaborator permission', () => {
   it('refuses a write against the permission path', async () => {
     expect(await createFakePrGh().run(['api', 'repos/{owner}/{repo}/collaborators/octo/permission', '-X', 'PUT']))
       .toEqual(failure('fake gh: a permission is modelled for GET alone, and was handed PUT\n'));
+  });
+});
+
+describe('gh api over the workflow list', () => {
+  /** The workflow list of the fake's own repository. */
+  const WORKFLOWS = 'repos/open-tomato/rafa/actions/workflows';
+
+  it('answers no workflow, with no trailing newline, until a case plants some', async () => {
+    expect(await createFakePrGh().run(['api', WORKFLOWS]))
+      .toEqual({ ok: true, stdout: '{"total_count":0,"workflows":[]}', stderr: '' });
+  });
+
+  it('answers the count of the workflows a case planted, through the placeholder path too', async () => {
+    const fake = createFakePrGh();
+    fake.plantWorkflows([{ name: 'Lint' }, { name: 'Tests' }, { name: 'Release' }]);
+
+    const payload = await json(fake, ['api', 'repos/{owner}/{repo}/actions/workflows']);
+
+    expect(payload).toMatchObject({ total_count: 3 });
+    expect((payload as { workflows: readonly { name: string }[] }).workflows.map((workflow) => workflow.name))
+      .toEqual(['Lint', 'Tests', 'Release']);
+  });
+
+  it.each([
+    [403, 'gh: You must have repository read permissions or have the repository Actions policies fine-grained permission. (HTTP 403)\n'],
+    [404, 'gh: Not Found (HTTP 404)\n'],
+  ] as const)('answers the recorded %p a case planted, never a count', async (status, stderr) => {
+    const fake = createFakePrGh();
+    fake.plantWorkflows([{ name: 'Lint' }]);
+    fake.refuseWorkflows(status);
+
+    const result = await fake.run(['api', WORKFLOWS]);
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toBe(stderr);
+    expect(JSON.parse(result.stdout)).toMatchObject({ status: String(status) });
+  });
+
+  it('refuses a write against the workflow list', async () => {
+    expect(await createFakePrGh().run(['api', WORKFLOWS, '-X', 'POST']))
+      .toEqual(failure('fake gh: workflows are modelled for GET alone, and were handed POST\n'));
+  });
+
+  it('refuses the workflow list of another repository', async () => {
+    expect(await createFakePrGh().run(['api', 'repos/cli/cli/actions/workflows'])).toEqual(failure(
+      'fake gh: models one repository, open-tomato/rafa, and was handed repos/cli/cli/actions/workflows\n',
+    ));
+  });
+
+  it('refuses one workflow, a path it does not model', async () => {
+    expect((await createFakePrGh().run(['api', `${WORKFLOWS}/25016`])).stderr)
+      .toBe(`fake gh: api models the issue comment, collaborator permission and workflow list paths alone, and was handed ${WORKFLOWS}/25016\n`);
   });
 });
 

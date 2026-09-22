@@ -18,8 +18,8 @@
  *
  * | Setting | Field | What it answers |
  * | --- | --- | --- |
- * | `plan.dir` | `planDir` | the plans directory rows 3, 4 and 8 read |
- * | `pr.base` | `prBase` | the base rows 2 and 8 to 12 are read against |
+ * | `plan.dir` | `planDir` | the plans directory rows 3, 4 and 9 read |
+ * | `pr.base` | `prBase` | the base rows 2 and 9 to 13 are read against |
  * | `pr.provider` | `prProvider` | whether this repository has a provider at all |
  * | `roadmap.issue` | `roadmapIssue` | the roadmap issue, when a layer named one |
  *
@@ -42,7 +42,7 @@
  * `requireGhProvider`, so a repository that is no GitHub one is refused
  * with exit 2 and `PR_NEEDS_GH`, the constant every `pr` action refuses
  * with. The message opens with `rafa pr`, which is right here: every
- * action rows 5, 6 and 7 propose IS a `pr` action, and a second wording
+ * action rows 5 to 8 propose IS a `pr` action, and a second wording
  * of one refusal is the smell `context/source.md` names.
  *
  * That check asks the config and `origin`, and it spawns no `gh`.
@@ -63,7 +63,7 @@
  * The memo lives for the length of one board, which is one `rafa next`
  * answer: the walk reads the picked line's issue to ask whether it is
  * closed, and `blocking` and `isReady` then read the LABELS and the
- * `Blocked by:` line off that same answer, so rows 9, 10 and 11 cost no
+ * `Blocked by:` line off that same answer, so rows 10, 11 and 12 cost no
  * `gh issue view` of their own. `spec-source.ts` memoises for the same
  * reason and its suite counts the reads; `./sources.test.ts` counts them
  * here.
@@ -79,7 +79,7 @@
  * A failed branch scan is carried out as {@link NextRoadmapReading}
  * `.problems` rather than thrown, which is `scanClaimBranches`'s own
  * shape and what `./readings.ts` carries into the answer. The scan is
- * taken here as well as by `./readings.ts`'s row 8, so an answer that
+ * taken here as well as by `./readings.ts`'s row 9, so an answer that
  * reaches both spends two `git for-each-ref` calls — both local, both
  * free of the network, and each memoised where it is taken.
  */

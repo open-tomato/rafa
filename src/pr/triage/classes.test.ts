@@ -62,8 +62,8 @@ function simpleClasses(dependencyBump: boolean): readonly TriageClass[] {
 }
 
 describe('the class list', () => {
-  it('carries ten distinct classes and freezes the list', () => {
-    expect(TRIAGE_CLASSES).toHaveLength(10);
+  it('carries eleven distinct classes and freezes the list', () => {
+    expect(TRIAGE_CLASSES).toHaveLength(11);
     expect(new Set(TRIAGE_CLASSES).size).toBe(TRIAGE_CLASSES.length);
     expect(Object.isFrozen(TRIAGE_CLASSES)).toBe(true);
   });
@@ -74,6 +74,8 @@ describe('the class list', () => {
     expect(isTriageClass('ci-typecheck')).toBe(false);
     expect(isTriageClass('conflict')).toBe(false);
     expect(isTriageClass('Green')).toBe(false);
+    expect(isTriageClass('no-check')).toBe(false);
+    expect(isTriageClass('none')).toBe(false);
     expect(isTriageClass('')).toBe(false);
     expect(isTriageClass(undefined)).toBe(false);
   });
@@ -134,6 +136,17 @@ describe('the eligibility rule', () => {
     for (const dependencyBump of [false, true]) {
       expect(isSimpleTriageClass('green', { dependencyBump })).toBe(false);
       expect(isSimpleTriageClass('pending', { dependencyBump })).toBe(false);
+    }
+  });
+
+  it('declares no-checks, reads it back, and keeps it out of both simple sets', () => {
+    expect(TRIAGE_CLASSES).toContain('no-checks');
+    expect(TRIAGE_CLASSES.indexOf('no-checks')).toBe(TRIAGE_CLASSES.indexOf('pending') + 1);
+    expect(isTriageClass('no-checks')).toBe(true);
+    expect(SIMPLE_TRIAGE_CLASSES).not.toContain('no-checks');
+    expect(DEPENDENCY_BUMP_SIMPLE_CLASSES).not.toContain('no-checks');
+    for (const dependencyBump of [false, true]) {
+      expect(isSimpleTriageClass('no-checks', { dependencyBump })).toBe(false);
     }
   });
 

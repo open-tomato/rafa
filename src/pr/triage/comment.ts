@@ -96,6 +96,19 @@
  * duplication is deliberate; trimming either copy would cost one of the
  * two readers.
  *
+ * ## A no-checks comment says how to merge it anyway
+ *
+ * `no-checks` has nothing to fix, so its evidence ends, after the
+ * verdict, with the decision `rafa pr merge --skip-checks` asks for, in
+ * that command's own words (`../unchecked.ts`): the workflow count read,
+ * the warning of its case, and the backticked command with whether
+ * `--yes` may answer it. The count is
+ * {@link TriageCommentInput.workflowCount}; left out, it reads as a
+ * count that could not be read — the riskier case — and never as "no
+ * workflow". `src/commands/pr/triage-report.ts` prints the same three
+ * lines in the same place for a terminal. Every other class carries
+ * none of them.
+ *
  * ## What it does not check
  *
  * WHO wrote the comment. {@link findTriageComment} and
@@ -120,6 +133,7 @@ import type { PullRequestComment, PullRequests } from '../types.js';
 
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 import { readRafaBlocks } from '../../plan/blocks.js';
+import { readUnchecked, skipChecksCommand } from '../unchecked.js';
 
 import { buildFollowUpPrompt, excerptCaption, excerptLines, fencedBlock } from './follow-up.js';
 
@@ -186,6 +200,12 @@ export interface TriageCommentInput {
   readonly resolved: boolean;
   /** The failing job's log reading, when there was a failing job. */
   readonly evidence?: FailedLogEvidence | undefined;
+  /**
+   * The repository's workflow count, null when it could not be read,
+   * and left out when it was never asked for. Read only for a
+   * `no-checks` assessment; see the module note.
+   */
+  readonly workflowCount?: number | null | undefined;
 }
 
 /**
@@ -434,6 +454,26 @@ function evidenceLines(assessment: TriageAssessment): string {
   ].join('\n');
 }
 
+/**
+ * The lines after the verdict of a `no-checks` assessment: the workflow
+ * count, the warning of its case and the `--skip-checks` line; empty for
+ * every other class. See the module note.
+ */
+function noChecksLines(input: TriageCommentInput): readonly string[] {
+  if (input.assessment.triageClass !== 'no-checks') return [];
+  const number = input.pr.number;
+  const unchecked = readUnchecked(number, input.workflowCount ?? null);
+  const [count = '', warning = ''] = unchecked.warning;
+  const yes = unchecked.yesMayAnswer
+    ? '`--yes` may answer it'
+    : '`--yes` is refused, so a person must answer it';
+  return [
+    `- Workflows: ${count}`,
+    `- Warning: ${warning}`,
+    `- To merge it anyway: \`${skipChecksCommand(number)}\` (it asks first; ${yes})`,
+  ];
+}
+
 /** The log excerpt under the evidence, or nothing when no log was read. */
 function excerptSection(evidence: FailedLogEvidence | undefined): string {
   if (evidence === undefined) return '';
@@ -482,7 +522,7 @@ export function triageCommentBody(input: TriageCommentInput): string {
     '',
     fencedBlock(block, TRIAGE_BLOCK_FENCE),
     '',
-    `${evidenceLines(assessment)}${excerptSection(input.evidence)}`,
+    `${[evidenceLines(assessment), ...noChecksLines(input)].join('\n')}${excerptSection(input.evidence)}`,
     '',
     followUpSection(input),
     '',

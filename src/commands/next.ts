@@ -41,6 +41,35 @@
  * the same decision asked twice (`src/next/actions.ts`). The line is
  * what happened, not a line to retype.
  *
+ * ## The one question handed over
+ *
+ * One action is not asked about here at all: `merge-unchecked`, of
+ * {@link QUESTION_HANDED_OVER}. It runs `pr merge <n> --skip-checks`
+ * with no `--yes`, and that command reads the repository's workflow
+ * count, prints the warning the count calls for and asks `Merge #<n>
+ * with no checks? [y/N]` itself — the warning is what the answer has to
+ * be given over, and `rafa next` never reads it. Asking here as well
+ * would put the decision twice, the first time without the warning, so
+ * the chain prints its two lines and runs the action with no question
+ * of its own, and the step records `asked` as false: the question was
+ * `pr merge`'s. A no there merges nothing and ends `pr merge` with exit
+ * code 0, so the chain reads the same state back and stops `unchanged`.
+ *
+ * Before such an action runs, the chain calls
+ * {@link NextChainOptions.handOver}, which in {@link runNext} closes
+ * the prompter its own questions went through. Two line prompters open
+ * on one standard input BOTH receive every line, and the one nobody is
+ * asking buffers it: measured on bun 1.3.14 over a `PassThrough`, the
+ * `y` typed for the inner prompter's question was the answer the outer
+ * one gave to its NEXT question, which would be a step run on a yes
+ * nobody typed for it. Closed first, the outer prompter is opened
+ * afresh on the next question and reads only what is typed after it.
+ *
+ * `--yes` cannot reach it: a list naming `merge-unchecked` is refused
+ * with exit code 2 (`src/next/ceiling.ts`), and a list that leaves it
+ * out stops there `unasked`, where the stop line says to drop `--yes`
+ * rather than to name an id no list may name — as it does for `ready`.
+ *
  * ## The four ways it stops, and the four endings beside them
  *
  * The spec's four ({@link NextStop}): `declined`, the person said no;
@@ -71,18 +100,22 @@
  *
  * ## `--yes` is a risk ceiling
  *
- * Without it every action is asked about. With it none of the ids it
- * names is: they may run unasked, and the chain STOPS at the first
+ * Without it every action is asked about, `merge-unchecked` by the
+ * command it runs rather than here. With it none of the ids it names
+ * is: they may run unasked, and the chain STOPS at the first
  * action the list leaves out, with that action's proposal already
  * printed, so the person reads what is left to do and decides. That
  * stop is `unasked`, and it is the only one of the endings this module
- * reaches with a state it could have run.
+ * reaches with a state it could have run. Its line names the list that
+ * would allow the step, except for a step no list may name — `ready`
+ * and `merge-unchecked` — where it says to drop `--yes` and be asked.
  *
  * Which ids a list may name — the eight, the four bare `--yes` allows,
- * and the two lists refused with exit code 2, one naming `ready` and
- * one naming a word that is no action id — is `src/next/ceiling.ts`,
- * read here through {@link readYesCeiling} before any source is opened
- * and asked through {@link allowedUnasked} once a state has answered.
+ * and the two lists refused with exit code 2, one naming `ready` or
+ * `merge-unchecked` and one naming a word that is no action id — is
+ * `src/next/ceiling.ts`, read here through {@link readYesCeiling}
+ * before any source is opened and asked through {@link allowedUnasked}
+ * once a state has answered.
  *
  * ## Without a terminal it behaves as `--dry-run`
  *
@@ -144,7 +177,7 @@ import type { Prompter } from '../project/root-choice.js';
 
 import { CommandExit } from '../cli/command.js';
 import { actionInvocation, runAction } from '../next/actions.js';
-import { allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
+import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
 import { openNextSources } from '../next/sources.js';
@@ -177,6 +210,12 @@ export const MAX_ACTIONS = 12;
 /** The actions that hand the checkout to a loop, after which the chain stops. */
 const LOOP_ACTIONS: readonly NextActionId[] = Object.freeze(['start', 'resume']);
 
+/**
+ * The actions whose question the command they run puts itself, so the
+ * chain asks none of its own before them; see the module note.
+ */
+export const QUESTION_HANDED_OVER: ReadonlySet<NextActionId> = new Set<NextActionId>(['merge-unchecked']);
+
 /** Puts one question and answers whether it was said yes to. */
 export type NextAsk = (question: string) => Promise<boolean>;
 
@@ -195,7 +234,7 @@ export interface NextStep {
   readonly action: NextActionId;
   /** What ran or would have, as a person types it after `rafa`, or null for an action that runs no command. */
   readonly command: string | null;
-  /** Whether the question was put. */
+  /** Whether `rafa next` put its question; false for an action of {@link QUESTION_HANDED_OVER}, which asks its own. */
   readonly asked: boolean;
   /** Whether the action ran. */
   readonly ran: boolean;
@@ -227,6 +266,12 @@ export interface NextChainOptions {
   readonly run: (state: NextState) => Promise<void>;
   /** Puts one question and answers whether it was said yes to. */
   readonly ask: NextAsk;
+  /**
+   * Called before an action of {@link QUESTION_HANDED_OVER} runs, so
+   * nothing `ask` reads through is left open to take the answer typed
+   * for that action's own question. Left out, nothing is called.
+   */
+  readonly handOver?: () => void;
   /** The action ids that may run unasked, as `--yes` named them, or null when every one is asked about. */
   readonly ceiling: NextCeiling;
   /** Why the run prints the two lines and no question, or null for a run that acts. */
@@ -271,8 +316,12 @@ export function stopLine(stop: NextStop, state: NextState, ceiling: NextCeiling,
   if (stop === 'dry-run') return dryRunLine(dryRun);
   if (stop === 'declined') return `${STOP_MARK} Nothing ran.`;
   if (stop === 'unasked') {
-    return `${STOP_MARK} --${YES_FLAG} allows ${namedIds(ceiling ?? [])}, and this step is ${state.action},`
-      + ` so nothing ran; type --${YES_FLAG}=${[...ceiling ?? [], state.action].join(',')} to allow it,`
+    const allows = `${STOP_MARK} --${YES_FLAG} allows ${namedIds(ceiling ?? [])}, and this step is ${state.action},`
+      + ' so nothing ran;';
+    if (ALWAYS_ASKED.has(state.action)) {
+      return `${allows} no --${YES_FLAG} list allows it, so drop --${YES_FLAG} to be asked.`;
+    }
+    return `${allows} type --${YES_FLAG}=${[...ceiling ?? [], state.action].join(',')} to allow it,`
       + ` or drop --${YES_FLAG} to be asked.`;
   }
   if (stop === 'loop-started') {
@@ -322,7 +371,7 @@ function ended(steps: readonly NextStep[], step: NextStep, stop: NextStop): Next
  * holds. Whatever an action throws travels out unchanged.
  */
 export async function runNextChain(options: NextChainOptions): Promise<NextChainReport> {
-  const { read, run, ask, ceiling, dryRun, info, warn } = options;
+  const { read, run, ask, handOver, ceiling, dryRun, info, warn } = options;
   let steps: readonly NextStep[] = [];
   let previous: NextState | null = null;
 
@@ -355,10 +404,13 @@ export async function runNextChain(options: NextChainOptions): Promise<NextChain
 
     const unasked = allowedUnasked(state.action, ceiling);
     if (!unasked && ceiling !== null) return stopHere('unasked');
-    if (!unasked && !await ask(nextQuestion(state))) return stopHere('declined', { asked: true });
+    const handedOver = QUESTION_HANDED_OVER.has(state.action);
+    const asks = !unasked && !handedOver;
+    if (asks && !await ask(nextQuestion(state))) return stopHere('declined', { asked: true });
 
+    if (handedOver) handOver?.();
     await run(state);
-    steps = [...steps, stepOf(state, invocation, { asked: !unasked, ran: true })];
+    steps = [...steps, stepOf(state, invocation, { asked: asks, ran: true })];
 
     if (LOOP_ACTIONS.includes(state.action)) return stopAfter('loop-started');
     if (steps.length >= MAX_ACTIONS) return stopAfter('capped');
@@ -450,6 +502,7 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
       read: () => readNextState(sources),
       run: (state: NextState) => runStateAction(context, sources, state),
       ask: prompter.ask,
+      handOver: prompter.close,
       ceiling,
       dryRun,
       info: (line: string) => {
@@ -479,7 +532,8 @@ const NEXT_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
     name: YES_FLAG,
     description: 'Run the actions named without asking, as a comma list of action ids, and stop at the first'
       + ` action the list leaves out. Bare it names ${BARE_YES_ACTIONS.join(', ')}. The ids are ${YES_ID_LIST};`
-      + ' a list naming ready, which is always asked, or a word that is no id at all is refused.',
+      + ` a list naming ${[...ALWAYS_ASKED].join(' or ')}, which are always asked, or a word that is no id at all`
+      + ' is refused.',
     type: 'string',
   },
 ]);
@@ -497,7 +551,9 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       + ' command that does it, then reads the project again and proposes what follows. It stops when the'
       + ' answer is no, when an action fails, when there is nothing to run, and once a loop has started. A'
       + ' working tree with changes to tracked files and a pull request provider that cannot be asked are'
-      + ' reported in place of a proposal. `--dry-run` prints the two lines and stops, and so does a run'
+      + ' reported in place of a proposal. A pull request no check has reported on is proposed as'
+      + ' `rafa pr merge <n> --skip-checks`, which asks its own question after the warning it prints, so'
+      + ' rafa next asks none before it. `--dry-run` prints the two lines and stops, and so does a run'
       + ' with no terminal to answer on and no `--yes`, since there is nobody to put the question to.'
       + ' With `--output=json`'
       + ' the steps and why the chain stopped are the data of the terminal result event.',

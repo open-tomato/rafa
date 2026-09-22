@@ -49,6 +49,19 @@
  * like every other evidence line, so a terminal reader sees the same 40
  * lines the comment and the follow-up prompt carry.
  *
+ * ## A no-checks assessment ends with how to merge it anyway
+ *
+ * `no-checks` has nothing to fix, so what a reader needs under it is
+ * the decision `rafa pr merge --skip-checks` would ask for, in the
+ * words that command prints before its question (`src/pr/unchecked.ts`):
+ * the workflow count read, the warning of its case, and the command
+ * itself — {@link skipChecksCommand} — with whether `--yes` may answer
+ * it. The count is {@link TriageReading.workflows}, which
+ * `readWorkflowCount` (`./triage-read.ts`) asked for on this reading;
+ * where it was not handed one, the count reads as unread, the riskier
+ * case, and never as "no workflow". The lines follow the verdict, in
+ * the same place in `src/pr/triage/comment.ts`.
+ *
  * ## The prompt is printed whole, unindented
  *
  * The follow-up prompt exists to be COPIED into a session, so it is
@@ -56,7 +69,7 @@
  * wrapping, no prefix. Indenting it would put four spaces at the head
  * of every line a person pastes, which in markdown is a code block.
  */
-import type { ConflictFilesReading, FailedLogsReading } from './triage-read.js';
+import type { ConflictFilesReading, FailedLogsReading, WorkflowCountReading } from './triage-read.js';
 import type { IgnoredTriageComment } from './triage-trust.js';
 import type { PullRequestDetail } from '../../pr/index.js';
 import type { TriageAssessment } from '../../pr/triage/classify.js';
@@ -65,6 +78,7 @@ import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { RerunReading } from '../../pr/triage/rerun.js';
 
 import { excerptCaption, excerptLines } from '../../pr/triage/follow-up.js';
+import { readUnchecked, skipChecksCommand } from '../../pr/unchecked.js';
 
 import { SEPARATOR } from './current.js';
 
@@ -90,6 +104,11 @@ export interface TriageReading {
   readonly assessment: TriageAssessment | null;
   /** The failing job logs, or null when none was asked for. */
   readonly logs: FailedLogsReading | null;
+  /**
+   * The repository's workflow count, or null when it was not asked for:
+   * `readWorkflowCount` asks only on verdict `none`. See the module note.
+   */
+  readonly workflows: WorkflowCountReading | null;
   /** The conflicting file list, or null when GitHub said the head merges. */
   readonly conflict: ConflictFilesReading | null;
   /** The follow-up prompt, or null when nothing was assessed. */
@@ -112,6 +131,16 @@ function ignoredLines(ignored: readonly IgnoredTriageComment[]): readonly string
 /** The evidence the reading carries, or `undefined` when no log was read. */
 export function evidenceOf(reading: TriageReading): FailedLogEvidence | undefined {
   return reading.logs?.chosen?.evidence;
+}
+
+/**
+ * The workflow count the reading carries: the count read, null when it
+ * could not be read, and `undefined` when it was never asked for.
+ */
+export function workflowCountOf(reading: TriageReading): number | null | undefined {
+  return reading.workflows === null
+    ? undefined
+    : reading.workflows.count;
 }
 
 /** The `#n title — head → base — head <sha>` line every reading opens with. */
@@ -171,6 +200,26 @@ function excerptBlock(reading: TriageReading): readonly string[] {
   ];
 }
 
+/**
+ * The lines under a `no-checks` assessment: the workflow count, the
+ * warning of its case and the `--skip-checks` line; empty for every
+ * other class. See the module note.
+ */
+export function noChecksLines(reading: TriageReading, assessment: TriageAssessment): readonly string[] {
+  if (assessment.triageClass !== 'no-checks') return [];
+  const number = reading.detail.number;
+  const unchecked = readUnchecked(number, workflowCountOf(reading) ?? null);
+  const [count = '', warning = ''] = unchecked.warning;
+  const yes = unchecked.yesMayAnswer
+    ? '--yes may answer it'
+    : '--yes is refused, so a person must answer it';
+  return [
+    `${INDENT}Workflows: ${count}`,
+    `${INDENT}Warning: ${warning}`,
+    `${INDENT}To merge it anyway: ${skipChecksCommand(number)} (it asks first; ${yes})`,
+  ];
+}
+
 /** The evidence lines of an assessment: why, the files, the step, the checks, the verdict. */
 function evidenceLines(reading: TriageReading, assessment: TriageAssessment): readonly string[] {
   const step = assessment.step === undefined
@@ -182,6 +231,7 @@ function evidenceLines(reading: TriageReading, assessment: TriageAssessment): re
     `${INDENT}Failing step: ${step}`,
     `${INDENT}Failing checks: ${pathList(assessment.failing.map((row) => row.name), 'none failing')}`,
     `${INDENT}Checks verdict: ${assessment.verdict}`,
+    ...noChecksLines(reading, assessment),
     ...excerptBlock(reading),
   ];
 }

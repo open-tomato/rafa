@@ -1,5 +1,5 @@
 /**
- * The classifier: four readings of a pull request in, one
+ * The classifier: five readings of a pull request in, one
  * {@link TriageClass} out.
  *
  * `rafa pr triage` assesses in CODE, and this module is where the
@@ -7,11 +7,13 @@
  * the time it is called — the pull request as `gh pr view --json …`
  * answered it, the check rows through `parseChecks` (`../checks.ts`),
  * the failing step out of `gh run view <id> --log-failed`
- * (`./evidence.ts`), and the conflicting paths out of
- * `git merge-tree --write-tree` (`./conflict.ts`) — so nothing here
- * spawns a process, reads a file or awaits. It is a pure function over
- * those four, which is what lets one case per class drive it from
- * literals and what keeps the class set measurable from both ends.
+ * (`./evidence.ts`), the conflicting paths out of
+ * `git merge-tree --write-tree` (`./conflict.ts`), and the repository's
+ * workflow count through `PullRequests.workflowCount` (`../types.ts`) —
+ * so nothing here spawns a process, reads a file or awaits. It is a
+ * pure function over those five, which is what lets one case per class
+ * drive it from literals and what keeps the class set measurable from
+ * both ends.
  *
  * It also never throws. A triage that crashed on an odd reading would
  * leave the pull request unassessed and uncommented, where the two
@@ -21,9 +23,9 @@
  *
  * ## The precedence, and why a conflict outranks a red check
  *
- * {@link classifyTriage} asks four questions in this order: does the
- * pull request conflict, is anything pending, is anything failing, and
- * otherwise it is green.
+ * {@link classifyTriage} asks five questions in this order: does the
+ * pull request conflict, is anything pending, is anything failing, does
+ * it report no checks at all, and otherwise it is green.
  *
  * The conflict goes first because a conflicting pull request's checks
  * are not evidence about its code. GitHub builds a workflow run against
@@ -38,6 +40,20 @@
  * Pending outranks failing for the reason `verdictOf` already reduces
  * that way: a partial reading of a run still in flight is not a red
  * pull request yet.
+ *
+ * ## No checks is not green
+ *
+ * Verdict `none` — zero check rows — is `no-checks`, never `green`:
+ * nothing failed, but nothing passed either, and `rafa pr merge`
+ * refuses it without `--skip-checks`. So its reason carries the two
+ * things a reader needs to decide: the workflow count as
+ * `workflowCountLine` (`../unchecked.ts`) spells it — zero is the
+ * no-workflow case, one or more or an unreadable count (`null`) the
+ * riskier one where CI may simply not have started — and the
+ * `rafa pr merge <n> --skip-checks` line that merges it anyway. A
+ * conflicting pull request with no checks stays a conflict: the
+ * conflict branch comes first, and GitHub reports no checks for a head
+ * it cannot merge.
  *
  * ## Who decides that it conflicts
  *
@@ -114,6 +130,7 @@ import type { CheckRow, ChecksVerdict } from '../checks.js';
 import type { PullRequestDetail } from '../types.js';
 
 import { failingRows, verdictOf } from '../checks.js';
+import { workflowCountLine } from '../unchecked.js';
 
 import { isDependencyBump, isSimpleTriageClass } from './classes.js';
 
@@ -232,10 +249,10 @@ export const CI_STEP_RULES: readonly CiStepRule[] = Object.freeze([
  */
 export type ClassifiedPullRequest = Pick<
   PullRequestDetail,
-  'author' | 'mergeable' | 'mergeStateStatus' | 'title'
+  'author' | 'mergeable' | 'mergeStateStatus' | 'number' | 'title'
 >;
 
-/** The four captured readings {@link classifyTriage} decides on. */
+/** The five captured readings {@link classifyTriage} decides on. */
 export interface ClassifyTriageInput {
   /** The pull request as `gh pr view --json …` answered it. */
   readonly pr: ClassifiedPullRequest;
@@ -253,6 +270,13 @@ export interface ClassifyTriageInput {
    * not be read; see the module note.
    */
   readonly conflictFiles: readonly string[];
+  /**
+   * The repository's workflow count as `PullRequests.workflowCount`
+   * answered it, or `null` when it could not be read. Read only on
+   * verdict `none`, where it goes into the `no-checks` reason; see the
+   * module note.
+   */
+  readonly workflowCount: number | null;
 }
 
 /** What one classification concluded. */
@@ -408,11 +432,14 @@ function failureReason(step: FailedStep | undefined, failing: readonly CheckRow[
     : `${count} failing, the failing step being "${step.name}"`;
 }
 
-/** The sentence behind `green`, which has two readings. */
-function greenReason(verdict: ChecksVerdict, rows: readonly CheckRow[]): string {
-  return verdict === 'none'
-    ? 'the head merges cleanly and reports no checks at all'
-    : `the head merges cleanly and all ${checkCount(rows.length)} passed`;
+/**
+ * The sentence behind `no-checks`: that nothing reported, the workflow
+ * count as `workflowCountLine` spells it, and the `--skip-checks` line.
+ */
+export function noChecksReason(number: number, workflowCount: number | null): string {
+  const count = workflowCountLine(workflowCount).replace(/\.$/, '');
+  return `the head reports no checks at all; ${count.charAt(0).toLowerCase()}${count.slice(1)};`
+    + ` to merge it anyway, run rafa pr merge ${number} --skip-checks`;
 }
 
 /** What the precedence decides, before the flags are computed over it. */
@@ -420,8 +447,8 @@ type DecidedClass = Pick<TriageAssessment, 'files' | 'reason' | 'step' | 'triage
 
 /**
  * The precedence itself — conflict, then pending, then failing, then
- * green — kept apart from the flags so that the order is one readable
- * list of four branches and nothing else.
+ * no checks, then green — kept apart from the flags so that the order
+ * is one readable list of five branches and nothing else.
  */
 function decideClass(
   input: ClassifyTriageInput,
@@ -454,20 +481,28 @@ function decideClass(
       reason: failureReason(step, failingRows(rows)),
     };
   }
+  if (verdict === 'none') {
+    return {
+      triageClass: 'no-checks',
+      files: [],
+      step: undefined,
+      reason: noChecksReason(input.pr.number, input.workflowCount),
+    };
+  }
   return {
     triageClass: 'green',
     files: [],
     step: undefined,
-    reason: greenReason(verdict, rows),
+    reason: `the head merges cleanly and all ${checkCount(rows.length)} passed`,
   };
 }
 
 /**
- * Classifies one pull request from its four captured readings.
+ * Classifies one pull request from its five captured readings.
  *
  * Total and pure: every input reaches exactly one class, nothing is
  * spawned, nothing is awaited and nothing is thrown. The precedence —
- * conflict, then pending, then failing, then green — and the reason
+ * conflict, then pending, then failing, then no checks, then green — and the reason
  * each class is reached by are in the module note.
  */
 export function classifyTriage(input: ClassifyTriageInput): TriageAssessment {

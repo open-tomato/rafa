@@ -35,6 +35,27 @@
  * workflow that was never scheduled. `merge-state-before-checks` in
  * `merge.test.ts` holds that.
  *
+ * ## `skipChecks`: verdict `none` alone
+ *
+ * {@link MergeRefusalReading.skipChecks} is `--skip-checks` read in. It
+ * lifts the checks refusal for verdict `none` and for nothing else: a
+ * pull request with zero check rows has nothing to wait for and nothing
+ * to fix. On `pending`, `red` or `green` the flag is itself the refusal
+ * (`skip-checks-refused`), because each has check rows and skipping them
+ * would merge past a run still going, a run that failed, or — for green —
+ * a flag that says something untrue about the merge. That refusal lists
+ * each row of {@link MergeRefusalReading.rows} with its state, so the
+ * operator sees what the flag would have skipped. It is read at the
+ * checks' place in the order, so a dirty tree or a conflict still
+ * answers first, and a conflicting pull request — whose checks read
+ * `none` too — is still refused as a conflict, flag or no flag. What an
+ * allowed unchecked merge then warns and asks is `./unchecked.ts`'s.
+ *
+ * Without the flag, verdict `none` is still refused, but not with the
+ * triage pointer the `red` and `pending` refusals end with: triage has
+ * nothing to fix where there are no check rows. That refusal names
+ * `--skip-checks` and what merging with no checks means instead.
+ *
  * `unknown` mergeability refuses too, rather than being treated as
  * mergeable: it is GitHub's answer while it is still computing the
  * merge commit, so acting on it sends a merge GitHub is about to refuse
@@ -82,9 +103,10 @@
  * through {@link shellQuote} — `./preflight-items.ts` owns the one
  * shell quoter here, and a second one could disagree with it.
  */
-import type { ChecksVerdict } from './checks.js';
+import type { CheckRow, ChecksVerdict } from './checks.js';
 import type { Mergeability } from './types.js';
 
+import { formatRows } from './checks.js';
 import { shellQuote } from './preflight-items.js';
 
 /** How every refusal in this module opens. */
@@ -186,6 +208,7 @@ export type MergeRefusalReason =
   | 'dirty-tree'
   | 'not-mergeable'
   | 'checks-not-green'
+  | 'skip-checks-refused'
   | 'branch-checked-out';
 
 /** A refusal: the reason a caller switches on, and what it prints. */
@@ -209,6 +232,19 @@ export interface MergeRefusalReading {
   readonly merge: MergeState;
   /** The verdict over its checks. */
   readonly checks: ChecksVerdict;
+  /**
+   * The check rows {@link checks} was read from. Only the
+   * `skip-checks-refused` refusal reads them, to name each row and its
+   * state; absent reads as no rows gathered, and that refusal then names
+   * the verdict alone.
+   */
+  readonly rows?: readonly CheckRow[];
+  /**
+   * `--skip-checks`: allow a merge whose verdict is `none`, and refuse
+   * the flag on every other verdict; see the module note. False when
+   * absent.
+   */
+  readonly skipChecks?: boolean;
   /** Every checkout of this repository. */
   readonly worktrees: readonly WorktreeEntry[];
   /** The current checkout's path, as git prints it; see the module note. */
@@ -264,8 +300,23 @@ function triagePointer(number: number): string {
 /** How the checks refusal names a verdict that is not green. */
 function checksClause(verdict: ChecksVerdict): string {
   if (verdict === 'red') return 'its checks failed (red)';
-  if (verdict === 'pending') return 'its checks are still running (pending)';
-  return 'it reports no checks at all (none)';
+  return 'its checks are still running (pending)';
+}
+
+/**
+ * The refusal for verdict `none` without `--skip-checks`. It does not
+ * point at triage, which has nothing to fix on a pull request with no
+ * check rows; it names the flag instead, and what taking it means.
+ */
+function noChecksRefusal(number: number): MergeRefusal {
+  return {
+    reason: 'checks-not-green',
+    message: [
+      `${REFUSAL_PREFIX}: #${number} reports no checks at all (none), so nothing on GitHub has tested it.`,
+      `To merge it anyway, run rafa pr merge ${number} --skip-checks.`,
+      'Merging with no checks means no check has passed: you rely on the checks run locally, and rafa asks before it merges.',
+    ].join('\n'),
+  };
 }
 
 function dirtyTreeRefusal(tree: WorkingTreeStatus): MergeRefusal {
@@ -297,6 +348,7 @@ function mergeStateRefusal(reading: MergeRefusalReading): MergeRefusal {
 
 function checksRefusal(reading: MergeRefusalReading): MergeRefusal {
   const { checks, number } = reading;
+  if (checks === 'none') return noChecksRefusal(number);
   return {
     reason: 'checks-not-green',
     message: [
@@ -304,6 +356,33 @@ function checksRefusal(reading: MergeRefusalReading): MergeRefusal {
       triagePointer(number),
     ].join('\n'),
   };
+}
+
+function skipChecksRefusal(reading: MergeRefusalReading): MergeRefusal {
+  const { checks, number, rows = [] } = reading;
+  const listed = rows.length === 0
+    ? []
+    : [formatRows(rows)];
+  return {
+    reason: 'skip-checks-refused',
+    message: [
+      `${REFUSAL_PREFIX}: --skip-checks is only for a PR that reports no checks at all, and #${number} reports checks (${checks}).`,
+      ...listed,
+      'Run rafa pr merge without --skip-checks: the flag cannot skip checks that exist.',
+    ].join('\n'),
+  };
+}
+
+/** The checks refusal `reading` earns, or null when its checks let the merge on. */
+function checksRefusalOf(reading: MergeRefusalReading): MergeRefusal | null {
+  if (reading.skipChecks === true) {
+    return reading.checks === 'none'
+      ? null
+      : skipChecksRefusal(reading);
+  }
+  return reading.checks === 'green'
+    ? null
+    : checksRefusal(reading);
 }
 
 function worktreeRefusal(branch: string, held: readonly WorktreeEntry[]): MergeRefusal {
@@ -325,13 +404,14 @@ function worktreeRefusal(branch: string, held: readonly WorktreeEntry[]): MergeR
 
 /**
  * The first refusal `reading` earns, or null when the merge may go
- * ahead. The order, and why the merge state is read before the checks
- * verdict, are in the module note.
+ * ahead. The order, why the merge state is read before the checks
+ * verdict, and what `skipChecks` allows, are in the module note.
  */
 export function readMergeRefusal(reading: MergeRefusalReading): MergeRefusal | null {
   if (!reading.tree.clean) return dirtyTreeRefusal(reading.tree);
   if (reading.merge.mergeable !== 'mergeable') return mergeStateRefusal(reading);
-  if (reading.checks !== 'green') return checksRefusal(reading);
+  const checks = checksRefusalOf(reading);
+  if (checks !== null) return checks;
 
   const held = worktreesHolding(reading.worktrees, reading.branch, reading.at);
   return held.length === 0

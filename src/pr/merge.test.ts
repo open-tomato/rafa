@@ -36,11 +36,21 @@
  *  - the current worktree no longer excluded from
  *    {@link worktreesHolding}, so a merge refuses its own checkout:
  *    3 fail, two of them the controls on the refusing cases.
+ *
+ * Three more were driven the same way on 2026-09-22 against the
+ * `skipChecks` reading, 48 pass either side:
+ *
+ *  - the flag allowing every verdict, not `none` alone: 4 fail.
+ *  - the flag ignored, so `none` refuses as without it: 6 fail.
+ *  - the flag read before the merge state, so a conflicting pull
+ *    request reading `none` merges: 2 fail.
  */
+import type { CheckRow } from './checks.js';
 import type { MergeRefusalReading } from './merge.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { classifyState } from './checks.js';
 import {
   cleanUpSteps,
   commandLine,
@@ -81,6 +91,11 @@ const GREEN: MergeRefusalReading = {
   worktrees: parseWorktrees('worktree /private/tmp/mergeprobe/main\nbranch refs/heads/main\n'),
   at: HERE,
 };
+
+/** A check row as `parseChecks` builds one, from a name and GitHub's state. */
+function row(name: string, state: string): CheckRow {
+  return { name, state, link: '', outcome: classifyState(state) };
+}
 
 describe('parseWorkingTree', () => {
   it('reads a clean tree from the empty answer git gives for one', () => {
@@ -236,7 +251,25 @@ describe('readMergeRefusal', () => {
   it('refuses a mergeable PR that reports no checks at all', () => {
     const refusal = readMergeRefusal({ ...GREEN, checks: 'none' });
     expect(refusal?.reason).toBe('checks-not-green');
-    expect(refusal?.message).toContain('it reports no checks at all (none)');
+    expect(refusal?.message).toContain('#12 reports no checks at all (none), so nothing on GitHub has tested it.');
+  });
+
+  it('names --skip-checks and what it means when refusing a PR with no checks', () => {
+    const refusal = readMergeRefusal({ ...GREEN, checks: 'none' });
+    expect(refusal?.message).toContain('run rafa pr merge 12 --skip-checks.');
+    expect(refusal?.message).toContain('no check has passed: you rely on the checks run locally');
+    // Triage has nothing to fix on zero check rows, so it is not pointed at.
+    expect(refusal?.message).not.toContain('rafa pr triage');
+    // Control: the same reading with the flag is allowed.
+    expect(readMergeRefusal({ ...GREEN, checks: 'none', skipChecks: true })).toBeNull();
+  });
+
+  it('keeps the triage pointer and no flag hint on red and pending', () => {
+    for (const checks of ['red', 'pending'] as const) {
+      const message = readMergeRefusal({ ...GREEN, checks })?.message ?? '';
+      expect(message).toContain('Run rafa pr triage 12 to see why.');
+      expect(message).not.toContain('--skip-checks');
+    }
   });
 
   it('refuses a branch another worktree holds, naming that worktree', () => {
@@ -291,6 +324,88 @@ describe('readMergeRefusal', () => {
       merge: { mergeable: 'conflicting', status: 'DIRTY' },
     });
     expect(refusal?.reason).toBe('dirty-tree');
+  });
+});
+
+describe('readMergeRefusal with skipChecks', () => {
+  /** The reading `--skip-checks` is for: mergeable, clean, zero check rows. */
+  const UNCHECKED: MergeRefusalReading = { ...GREEN, checks: 'none', rows: [], skipChecks: true };
+
+  it('allows a merge whose checks read none', () => {
+    expect(readMergeRefusal(UNCHECKED)).toBeNull();
+  });
+
+  it('refuses the same reading without the flag', () => {
+    // The control on the case above: only `skipChecks` differs, so the
+    // flag is what let it through.
+    expect(readMergeRefusal({ ...UNCHECKED, skipChecks: false })?.reason)
+      .toBe('checks-not-green');
+    expect(readMergeRefusal({ ...GREEN, checks: 'none', rows: [] })?.reason)
+      .toBe('checks-not-green');
+  });
+
+  it('refuses the flag on a red PR, naming each row and its state', () => {
+    const refusal = readMergeRefusal({
+      ...UNCHECKED,
+      checks: 'red',
+      rows: [row('lint', 'SUCCESS'), row('test', 'FAILURE')],
+    });
+    expect(refusal?.reason).toBe('skip-checks-refused');
+    expect(refusal?.message)
+      .toContain('--skip-checks is only for a PR that reports no checks at all, and #12 reports checks (red).');
+    expect(refusal?.message).toContain('pass    lint — SUCCESS');
+    expect(refusal?.message).toContain('fail    test — FAILURE');
+    expect(refusal?.message).toContain('without --skip-checks');
+  });
+
+  it('refuses the flag on a pending PR, naming each row and its state', () => {
+    const refusal = readMergeRefusal({
+      ...UNCHECKED,
+      checks: 'pending',
+      rows: [row('build', 'IN_PROGRESS'), row('lint', 'SUCCESS')],
+    });
+    expect(refusal?.reason).toBe('skip-checks-refused');
+    expect(refusal?.message).toContain('reports checks (pending)');
+    expect(refusal?.message).toContain('pending build — IN_PROGRESS');
+    expect(refusal?.message).toContain('pass    lint — SUCCESS');
+  });
+
+  it('refuses the flag on a green PR, naming each row and its state', () => {
+    // Green without the flag merges (the first readMergeRefusal case);
+    // this is the flag alone turning it into a refusal.
+    const refusal = readMergeRefusal({
+      ...UNCHECKED,
+      checks: 'green',
+      rows: [row('test', 'SUCCESS'), row('docs', 'SKIPPED')],
+    });
+    expect(refusal?.reason).toBe('skip-checks-refused');
+    expect(refusal?.message).toContain('reports checks (green)');
+    expect(refusal?.message).toContain('pass    test — SUCCESS');
+    expect(refusal?.message).toContain('pass    docs — SKIPPED');
+  });
+
+  it('names the verdict alone when no rows were handed in', () => {
+    const refusal = readMergeRefusal({ ...UNCHECKED, checks: 'red', rows: undefined });
+    expect(refusal?.reason).toBe('skip-checks-refused');
+    expect(refusal?.message).toContain('reports checks (red)');
+    expect(refusal?.message).not.toContain('no checks reported');
+  });
+
+  it('still names the conflict when a conflicting PR reads none', () => {
+    // A conflict leaves verdict `none` too; the flag must not turn it
+    // into an allowed merge. The allowed case above is its control.
+    const refusal = readMergeRefusal({
+      ...UNCHECKED,
+      merge: { mergeable: 'conflicting', status: 'DIRTY' },
+    });
+    expect(refusal?.reason).toBe('not-mergeable');
+  });
+
+  it('still refuses a dirty tree and a branch held elsewhere', () => {
+    expect(readMergeRefusal({ ...UNCHECKED, tree: parseWorkingTree('?? a.ts\n') })?.reason)
+      .toBe('dirty-tree');
+    expect(readMergeRefusal({ ...UNCHECKED, worktrees: parseWorktrees(WORKTREE_LIST) })?.reason)
+      .toBe('branch-checked-out');
   });
 });
 
