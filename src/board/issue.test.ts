@@ -139,7 +139,7 @@ import type { SnapshotChange, SpecIssue } from './issue.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -693,6 +693,67 @@ describe('writeSpecSnapshot', () => {
     expect(readdirSync(join(root2, previousDir(SPECS_DIR)))).toHaveLength(1);
     expect(readFileSync(join(root2, rebuilt.previous ?? ''), 'utf8'))
       .toBe(`# Spec\n\n${LOCAL_NOTES_HEADING}\n\nThe first note.\n`);
+    rmSync(root2, { recursive: true, force: true });
+  });
+
+  it('leaves the saved copy and an already-populated previous/ untouched when a body change is refused', () => {
+    const root2 = mkdtempSync(join(tmpdir(), 'rafa-board-refused-leaves-previous-'));
+    const issue = issueOf({ body: '# Spec\n' });
+    const notesFile = join(root2, notesPath(SPECS_DIR, 20));
+    mkdirSync(join(root2, SPECS_DIR), { recursive: true });
+    writeFileSync(notesFile, 'The first note.\n');
+    writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
+    writeFileSync(notesFile, 'A second note.\n');
+    const rebuilt = writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue, refresh: false });
+    expect(rebuilt.action).toBe('notes-rebuilt');
+    const previous = join(root2, previousDir(SPECS_DIR));
+    const before = readdirSync(previous).sort((a, b) => a.localeCompare(b));
+    const previousText = readFileSync(join(root2, rebuilt.previous ?? ''), 'utf8');
+    const savedBefore = fileAt(rebuilt.path);
+
+    const write = (): unknown => writeSpecSnapshot({
+      repoRoot: root2,
+      specsDir: SPECS_DIR,
+      issue: issueOf({ body: '# Spec\n\nEdited on the board.\n' }),
+      refresh: false,
+    });
+
+    expect(write).toThrow(REFRESH_FLAG);
+    expect(readdirSync(previous).sort((a, b) => a.localeCompare(b))).toEqual(before);
+    expect(readFileSync(join(root2, rebuilt.previous ?? ''), 'utf8')).toBe(previousText);
+    expect(fileAt(rebuilt.path)).toBe(savedBefore);
+    rmSync(root2, { recursive: true, force: true });
+  });
+
+  it('keeps two distinct previous copies when two rewrites read the same mtime', () => {
+    const root2 = mkdtempSync(join(tmpdir(), 'rafa-board-same-mtime-'));
+    const path = snapshotAt();
+    const same = new Date('2026-09-22T10:15:00.000Z');
+    mkdirSync(join(root2, SPECS_DIR), { recursive: true });
+    writeFileSync(join(root2, path), '# Spec\n\nFirst old text.\n');
+    utimesSync(join(root2, path), same, same);
+
+    const first = writeSpecSnapshot({
+      repoRoot: root2,
+      specsDir: SPECS_DIR,
+      issue: issueOf({ body: '# Spec\n\nEdited once.\n' }),
+      refresh: true,
+    });
+    utimesSync(join(root2, path), same, same);
+
+    const second = writeSpecSnapshot({
+      repoRoot: root2,
+      specsDir: SPECS_DIR,
+      issue: issueOf({ body: '# Spec\n\nEdited twice.\n' }),
+      refresh: true,
+    });
+
+    expect(first.previous).not.toBeNull();
+    expect(second.previous).not.toBeNull();
+    expect(first.previous).not.toBe(second.previous);
+    expect(readdirSync(join(root2, previousDir(SPECS_DIR)))).toHaveLength(2);
+    expect(readFileSync(join(root2, first.previous ?? ''), 'utf8')).toBe('# Spec\n\nFirst old text.\n');
+    expect(readFileSync(join(root2, second.previous ?? ''), 'utf8')).toBe('# Spec\n\nEdited once.\n');
     rmSync(root2, { recursive: true, force: true });
   });
 
