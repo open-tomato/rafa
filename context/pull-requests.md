@@ -26,7 +26,9 @@ carries help snapshots too.
 `pr wait` composes `waitForChecks` (`src/pr/checks.ts`) over the provider's
 `checks` and is READ-ONLY: no repair session, no comment, no label, no
 merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those, and
-the deadline and the poll interval are that gate's own constants. Green
+the deadline and the poll interval are that gate's own constants. The same
+`waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop
+agree about what green means and how often a pull request is asked. Green
 exits 0; red exits 1; a pull request with NO checks at all exits 1 too, and
 is answered at once rather than waited out, since a PR that does not merge
 cleanly schedules no run and no amount of waiting makes one; the deadline
