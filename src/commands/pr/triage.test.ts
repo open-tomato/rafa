@@ -266,6 +266,19 @@ const RED_41: FakePullRequestSeed = {
   checks: [FAILING_GATES],
 };
 
+/**
+ * A pull request that reports no checks at all, on the branch the seams
+ * answer. The fake plants no workflow for it, so its workflow count
+ * reads 0 — the `no-workflow` case — the same repository
+ * `.pull-requests-double.ts` and `unchecked.ts` describe as having none.
+ */
+const NO_CHECKS_41: FakePullRequestSeed = {
+  number: 41,
+  title: 'rafa-20: pull request commands',
+  headRefName: BRANCH,
+  checks: [],
+};
+
 describe('the line', () => {
   it('refuses a second word, naming the usage line, and makes no provider', async () => {
     const seams = caseSeams(plantedFake([RED_41]));
@@ -338,6 +351,21 @@ describe('assessing the pull request a number names', () => {
     expect(outcome.run.stdout).toContain('Failing step: bunx eslint .');
     expect(outcome.run.stdout).toContain('is assigned a value but never used');
     expect(outcome.run.stdout).toContain('# Assessed pull request: act on this triage');
+  });
+
+  it('classes a zero-check pull request no-checks, naming the workflow count read and the --skip-checks line', async () => {
+    const outcome = await overFake([NO_CHECKS_41], ['41']);
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(calls(outcome.fake)).toContain('api repos/{owner}/{repo}/actions/workflows');
+    expect(outcome.run.stdout).toContain('no-checks — not simple — attempts 0 of 2');
+    expect(outcome.run.stdout).toContain('the head reports no checks at all; the repository defines 0 workflows;'
+      + ' to merge it anyway, run rafa pr merge 41 --skip-checks');
+    expect(outcome.run.stdout).toContain('Workflows: The repository defines 0 workflows.');
+    expect(outcome.run.stdout)
+      .toContain('nothing on GitHub has tested this branch; you are relying on the checks run locally');
+    expect(outcome.run.stdout)
+      .toContain('To merge it anyway: rafa pr merge 41 --skip-checks (it asks first; --yes may answer it)');
   });
 
   it('leaves one triage comment carrying the marker, the class and the head it was read at', async () => {
@@ -541,6 +569,18 @@ describe('which pull request a bare line assesses', () => {
 
     expect(outcome.run.exitCode).toBe(0);
     expect(outcome.run.stdout).toContain('no red pull request to triage');
+  });
+
+  it('skips a zero-check pull request off the branch, selecting none rather than reading it as red', async () => {
+    const outcome = await overFake(
+      [{ ...NO_CHECKS_41, headRefName: 'feat/pr-41' }],
+      [],
+      { branch: 'main' },
+    );
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(outcome.run.stdout).toContain('no red pull request to triage');
+    expect(outcome.run.stdout).not.toContain('#41');
   });
 
   it('warns at a detached HEAD and reads the red pull requests instead of refusing', async () => {
