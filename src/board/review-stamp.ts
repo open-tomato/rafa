@@ -1,7 +1,9 @@
 /**
  * What the readiness gate leaves behind in a plan it did not refuse:
- * `review: skipped` for `--skip-review`, and `review: missing` for a
- * session whose `rafa:spec-review` block could not be read.
+ * `review: skipped` for `--skip-review`, `review: missing` for a
+ * session whose `rafa:spec-review` block could not be read, and
+ * `review: assumed` for a review that found gaps and none of them
+ * blocking.
  *
  * `--skip-review` bypasses check 3 of the readiness gate — the
  * planner's own first pass over the spec — and ALONE
@@ -19,6 +21,13 @@
  * the causes are: one is an operator's flag, the other a session that
  * said nothing, and a plan carrying either was planned from a spec no
  * review passed.
+ *
+ * `review: assumed` records the third way: the review read, the spec
+ * judged not ready, and every gap it named non-blocking, so the plan
+ * IS written under the assumptions the reviewer would plan by. It is
+ * kept apart from the other two because the spec WAS judged here — a
+ * reader seeing `assumed` knows a review ran, named what it did not
+ * know, and guessed; `skipped` and `missing` both mean nobody judged.
  *
  * `review` is not one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), so
  * the plan reader keeps it as a `PlanHeaderExtra`: retained, acting on
@@ -70,11 +79,17 @@ export const REVIEW_SKIPPED = 'skipped';
 /** What the field is set to when the session returned no readable review. */
 export const REVIEW_MISSING = 'missing';
 
+/** What the field is set to when every gap the review found was non-blocking. */
+export const REVIEW_ASSUMED = 'assumed';
+
 /** The line `--skip-review` leaves behind, indentation aside. */
 export const REVIEW_SKIPPED_LINE = `${REVIEW_FIELD}: ${REVIEW_SKIPPED}`;
 
 /** The line an unread review leaves behind, indentation aside. */
 export const REVIEW_MISSING_LINE = `${REVIEW_FIELD}: ${REVIEW_MISSING}`;
+
+/** The line a review of non-blocking gaps leaves behind, indentation aside. */
+export const REVIEW_ASSUMED_LINE = `${REVIEW_FIELD}: ${REVIEW_ASSUMED}`;
 
 /** What a stamp did, or what stopped it; `./plan-field.ts` spells the five. */
 export type ReviewStampAnswer = PlanFieldAnswer;
@@ -104,4 +119,17 @@ export function stampReviewSkipped(plan: string): ReviewStamp {
  */
 export function stampReviewMissing(plan: string): ReviewStamp {
   return stampPlanField(plan, REVIEW_FIELD, REVIEW_MISSING);
+}
+
+/**
+ * The plan with `review: assumed` recorded in its `rafa:plan` block.
+ *
+ * What `./gate.ts` writes over a `not-ready` review whose every gap is
+ * non-blocking: the plan stands, its opening heading carries the
+ * assumptions, and this line records that it was planned under them.
+ * Takes the plan as read and answers the text to write, as
+ * {@link stampReviewSkipped} does.
+ */
+export function stampReviewAssumed(plan: string): ReviewStamp {
+  return stampPlanField(plan, REVIEW_FIELD, REVIEW_ASSUMED);
 }
