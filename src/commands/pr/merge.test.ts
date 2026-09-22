@@ -56,6 +56,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
+import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
@@ -655,19 +656,19 @@ describe('the follow-ups', () => {
   it('names both where the version on the base is neither tagged nor installed', async () => {
     const stub = stubPulls();
     const project = freshProject();
-    plantPackage(project, `{"version": "${VERSION}", "scripts": {"snapshot": "bun scripts/snapshot-runtime.ts"}}`);
+    plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
     const { run, lines } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes']);
 
     expect(run.exitCode).toBe(0);
     expect(lines).toContain('Follow-ups:');
     expect(lines.at(-2)).toContain('rafa release tag');
-    expect(lines.at(-1)).toContain('bun run snapshot');
+    expect(lines.at(-1)).toContain('rafa self-update');
   });
 
   it('names neither for a version that is tagged and already installed as the runtime', async () => {
     const stub = stubPulls();
     const project = freshProject();
-    plantPackage(project, `{"version": "${VERSION}", "scripts": {"snapshot": "bun scripts/snapshot-runtime.ts"}}`);
+    plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
     mkdirSync(join(project.home, '.rafa', 'runtime', VERSION), { recursive: true });
     const seams = caseSeams(stub.pulls, project, {
       git: { [`tag --list v${VERSION}`]: ok(`v${VERSION}\n`) },

@@ -356,7 +356,7 @@ function followUpsFor(pr: PrContext, git: GitRunner): readonly FollowUp[] {
   return readFollowUps({
     version: facts.version,
     tagged: tags.ok && tags.stdout.trim() !== '',
-    snapshotScript: facts.snapshotScript,
+    rafaCheckout: facts.rafaCheckout,
     runtimeInstalled: existsSync(join(pr.project.home, RUNTIME_SUBDIR, facts.version)),
   });
 }

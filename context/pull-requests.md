@@ -100,7 +100,7 @@ unmocked. Register the route row the call needs on the fake.
    squash leaves it unmerged in git's eyes), delete the remote branch when
    it still exists, `git fetch --prune`.
 4. Tick the roadmap, print what is ready and the two follow-ups when they
-   apply: `rafa release tag` and `bun run snapshot`.
+   apply: `rafa release tag` and `rafa self-update`.
 5. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
