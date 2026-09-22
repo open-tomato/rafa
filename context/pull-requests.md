@@ -172,8 +172,9 @@ Assessment is CODE, not a session:
   `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
   added or bumped entries), `conflict-other`, `ci-install`, `ci-lint`,
   `ci-types`, `ci-test`, `ci-other`. The failing STEP name decides the `ci-*`
-  class; `no-checks` means the PR reports no checks at all (workflow count is
-  zero or unreadable).
+  class; `no-checks` means the PR reports no checks at all (verdict `none`),
+  whatever the workflow count; the count, or that it could not be read,
+  goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,
   `conflict-manifest`, and `ci-install` or `ci-lint` on a dependency bump
   PR (author `dependabot[bot]` or title `chore(deps`). Everything else is
@@ -181,6 +182,14 @@ Assessment is CODE, not a session:
 - Output: the class, the evidence (files, step, log excerpt capped at 40
   lines), and a ready FOLLOW-UP PROMPT for another session that carries all
   of it, so that session does not assess again.
+- A class added to `TRIAGE_CLASSES` (`src/pr/triage/classes.ts`) needs, in
+  the same change, its line in `FOLLOW_UP_TASKS` (`src/pr/triage/follow-up.ts`,
+  a `Record` over the class, so `check-types` fails without it), a case in
+  `classify.test.ts` that produces it, and a fixture folder
+  `src/tests/fixtures/pr-triage/<class>/` (`pr.json`, checks, log). Both
+  tests check the closed set from each end, and the pre-commit hook runs no
+  tests, so a missing fixture only shows up in `bun run test`. This bullet
+  is new and replaces no earlier text.
 
 The triage comment:
 
@@ -243,7 +252,10 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
   `src/pr/conflict-sentence.test.ts` and `src/tests/plan-injection.test.ts`,
   the last because the prompt's FIRST line is the `wrap-up` classifier key
   `PROMPT_SHAPES` reads. Run the three together before the full suite.
-- Then the existing CI wait. Guard against an unfixable PR: `attempts` in
+- Then the existing CI wait. A fresh assessment of class `green` OR
+  `no-checks` counts as resolved (`endOfAttempt`,
+  `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
+  repository that schedules no checks reads `no-checks`. Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
   stop, update the comment, remove the worktree, print the follow-up prompt,

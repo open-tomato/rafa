@@ -56,8 +56,36 @@ module's note is the long form.
 | `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, and the two install warnings |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
-| `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. There are nine action ids: `sync`, `plan`, `merge-unchecked`, and the always-asked set of `ready`, `start`, `commit`, `next-base`, `review`, and `resume`. Only `sync` and `plan` may run unasked without `--yes`. `merge-unchecked` is never asked about by `rafa next` and is also always unasked — it closes the prompter and hands the merge question to `pr merge <n> --skip-checks`. A `--yes=<ids>` list naming `merge-unchecked` is refused with exit 2, like `ready`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn. Each row is indexed by one of the nine ids: on a PR with no checks, the row is `pr-no-checks`, holding action `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
+| `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
+
+
+### Changing the `rafa next` table
+
+New; it replaces no earlier text. What a row or an action added to
+`src/next/` has to touch:
+
+- **Row numbers are cited outside `state.ts`.** The table is first-match
+  and its module note numbers the rows, but the notes of `actions.ts`,
+  `readings.ts` and `sources.ts` and the titles in `state.test.ts` cite
+  rows by number too. Inserting a row means grepping `src/next` for
+  `rows\? [0-9]` and renumbering each hit.
+- **A new `NextActionId` fails `check-types`** until `ACTION_COMMANDS`
+  (`actions.ts`, a `Record` over `NextCommandActionId`) maps it to a
+  command.
+- **A mapped action can be listed under `--yes` straight away.**
+  `YES_ACTIONS` is `NEXT_COMMAND_ACTIONS` minus `ALWAYS_ASKED`, so an
+  action that must never run from a list goes into `ALWAYS_ASKED` and
+  `ALWAYS_ASKED_WHY` in the same change.
+- **An action whose command asks its own question is handed over.** The
+  chain closes its prompter first (`handOver`, `prompter.close` in
+  `runNext`). Two `createLinePrompter`s on one stdin both receive every
+  line, and the idle one holds the answer and gives it back as its own
+  next answer.
+- **The dry-run reading is taken once per invocation.** `dryRunOf` runs
+  once in `runNext`, so with no terminal and no `--yes` the run is a dry
+  run from its first turn. A driven test of a handed-over action sets
+  `isTerminal` to true.
 
 ### The core roster
 
