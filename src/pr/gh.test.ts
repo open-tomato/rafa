@@ -572,6 +572,37 @@ describe('workflowCount', () => {
   });
 });
 
+describe('workflowCount over the gh fake', () => {
+  // The stub cases above hold what the adapter sends and how it reads
+  // each shape; this is the reading driven through the recorded
+  // repository the fake models, as the note above promised.
+
+  it('answers zero for a repository with no workflow, the fake\'s own starting state', async () => {
+    const fake = createFakePrGh();
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.workflowCount()).toBe(0);
+    expect(fake.calls()).toEqual([['api', 'repos/{owner}/{repo}/actions/workflows']]);
+  });
+
+  it('answers the count of a repository holding three workflows', async () => {
+    const fake = createFakePrGh();
+    fake.plantWorkflows([{ name: 'Lint' }, { name: 'Tests' }, { name: 'Release' }]);
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.workflowCount()).toBe(3);
+  });
+
+  it('answers null for a repository whose workflows path answers 403, never the count it held before', async () => {
+    const fake = createFakePrGh();
+    fake.plantWorkflows([{ name: 'Lint' }, { name: 'Tests' }, { name: 'Release' }]);
+    fake.refuseWorkflows(403);
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.workflowCount()).toBeNull();
+  });
+});
+
 describe('what the adapter refuses in a payload', () => {
   it('refuses a row that is not a mapping, and a payload that is not a list', async () => {
     await expect(writing([null]).list()).rejects.toThrow(
