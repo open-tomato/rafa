@@ -46,7 +46,7 @@ is `tail`'s, and `${PIPESTATUS[0]}` prints empty here because zsh spells
 that array `$pipestatus` and indexes it from 1. The test runner writes
 pass/fail counts after all tests complete, and its order is
 deterministic, so two runs of the same tree move only where a case reads
-an input the tree does not own — which one case does, below.
+an input the tree does not own — which two cases do, below.
 
 **One case reads a frozen copy of session logs.**
 `src/tests/parity-differential.test.ts` runs the collector twice, once
@@ -68,6 +68,28 @@ by re-running the file instead: the race does not survive a re-run
 against a sibling that has since gone quiet, while a real parity failure
 reproduces every time. Do NOT reach for a stash-and-re-run to prove it
 pre-existing: that is a second full suite against a moving input.
+
+**One case reads the sibling's LIVE store, and it is red here.**
+`src/tests/parity-lineage.test.ts` compares the sibling's stored effort
+rows against a fresh collection over that sibling's live session
+directory, neither of them an input this repository owns. Two of its six
+cases fail on this machine — `matches every plainly-stored session row to
+its fresh counterpart, byte for byte` and `accounts for every grown
+session log: neither size nor mtime moved backward` — both throwing
+`parity lineage: stored session <id> has no fresh counterpart` from
+`freshCounterpartOf`, because the `.jsonl` for a session the stored rows
+name has been deleted from the live directory. **So `bun run test` cannot
+exit 0 here**, and the gate capture to record is exit 1 with `2 fail`
+under that one file, not "green apart from". Unlike the differential race
+above, this does NOT clear on a re-run, and that is the first control:
+reproducing alone separates the two. The second is a run at the base,
+which a stash cannot give you since the input is outside the tree —
+`git worktree add -q --detach <tmp> origin/main`, `ln -s` the real
+`node_modules` into it, run the one file there (about 5s, no `bun install`
+needed), and remove it with `git worktree remove --force`. Identical
+counts at both ends prove the base is red for the same reason. Measured
+at `0aec45d` and at rafa-63's head: `4 pass`, `2 fail` either side. Do not
+re-file it as a finding; over twenty tasks of one plan already did.
 
 **One suite prints a model refusal on a clean run.**
 `src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
@@ -94,6 +116,13 @@ the test's absolute path, `include` empty, `typeRoots` naming
 `./node_modules/.bin/tsc -p` on it. A type-level claim that must stay
 checked belongs in the suite instead, as in `src/ports/index.test.ts`,
 which runs `ts.createProgram` over probe files.
+
+Widening an exported interface therefore reaches every `*.test.ts`
+literal of it with no gate saying so: grep the type name across the test
+files and fix each literal by hand. Adding `blocking` to `SpecReviewGap`
+reddened a `toEqual` in `src/adapters/planner/claude.test.ts`, which
+builds a gap as an object literal rather than through `parseSpecReview`,
+and only `bun test` reported it.
 
 **A passing test file proves nothing about its imports.** Bun answers a
 bare `'vitest'` import with its own runner, so a file never ported off

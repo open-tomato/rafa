@@ -20,7 +20,7 @@ module's note is the long form.
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
-| `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help` and `rafa loop start --help` |
+| `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help` and `rafa next --help` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
@@ -1116,19 +1116,22 @@ home and the warnings read before the invocation are options.
   default reads, runs
   `RAFA_UPDATE_HELP_SNAPSHOTS=1 bun test src/cli/help.test.ts`, reads the
   diff, and keeps this page true.
-- **The frozen set is three files** — `rafa.txt`, `rafa-loop.txt` and
-  `rafa-loop-start.txt` — and none of them renders another command's flag
-  list. A flag added to `init`, to `plan create` or to a `pr` action shows
-  only in that command's own `--help`, which is not snapshotted, so the
-  updater legitimately writes the three back BYTE-IDENTICAL. That is the
-  expected reading and not a writer that never fired; the control that
-  tells them apart is dirtying one snapshot with an extra line and
-  re-running the updater, which returns the file to its original sha.
+- **The frozen set is four files** — `rafa.txt`, `rafa-loop.txt`,
+  `rafa-loop-start.txt` and `rafa-next.txt`, the list `SNAPSHOTS` in
+  `src/cli/help.test.ts` spells — and none of them renders another
+  command's flag list. A flag added to `init`, to `plan create` or to a
+  `pr` action shows only in that command's own `--help`, which is not
+  snapshotted, so the updater legitimately writes all four back
+  BYTE-IDENTICAL. That is the expected reading and not a writer that
+  never fired; the control that tells them apart is dirtying one snapshot
+  with an extra line and re-running the updater, which returns the file
+  to its original sha.
 - **A new SUBJECT moves `rafa.txt` alone.** The root roster is the only
-  one of the three that lists subjects; `rafa-loop.txt` and
-  `rafa-loop-start.txt` render a different subtree and are untouched.
-  Read which files actually differ off `git status`, never off the
-  assumption that all three move together.
+  one of the four that lists subjects; the other three render a single
+  command or subtree and are untouched. Read which files actually differ
+  off `git status`, never off the assumption that they all move
+  together — registering a command reddens exactly three cases in
+  `src/cli/help.test.ts`, all of them on `rafa.txt`.
 
 ### Describe
 
