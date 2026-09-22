@@ -50,6 +50,15 @@
  * run could plan instead, and plan nothing. Every one of those endings
  * exits 0: the roadmap is in the state it is in, and no command failed.
  *
+ * An issue whose body no longer reads as its saved copy is ASKED about
+ * rather than refused outright, when there is a terminal and no
+ * `--refresh`: {@link createPlanRefreshOffer} puts the dated question
+ * once every check has run on the body as it reads now
+ * (`board/snapshot-settle.ts`), and a yes plans from it and keeps the
+ * old copy under `previous/`. No terminal, a no, an ended input or
+ * `--dry-run` keeps the refusal exactly; `--refresh` rebuilds without
+ * asking.
+ *
  * The board routes resolve BEFORE the plan-already-there refusal,
  * because the stub is read off the snapshot's name and there is no name
  * until the issue has been read. So `--issue` against a stub already
@@ -69,16 +78,18 @@
  *
  * ## Nothing here spawns
  *
- * The resolution and both offers are seams ({@link SpecRouteSeams}), so
+ * The resolution and the three offers are seams ({@link SpecRouteSeams}), so
  * `./spec-route.test.ts` measures what a route is handed without
  * reaching GitHub or opening a terminal. The defaults spawn nothing of
  * their own either: making the `gh` and `git` runners is free and the
  * `--spec` route calls neither (`board/plan-spec.ts`), and
- * {@link createPlanReadyOffer} and {@link createPlanBlockedOffer} read
+ * {@link createPlanReadyOffer}, {@link createPlanBlockedOffer} and
+ * {@link createPlanRefreshOffer} read
  * `process.stdin.isTTY` and open a prompter only to ask.
  */
 import type { AlternativeOffer } from '../../board/blocked-line.js';
 import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
+import type { RefreshOffer } from '../../board/snapshot-settle.js';
 
 import fs from 'fs';
 import path from 'path';
@@ -89,6 +100,7 @@ import { CommandExit } from '../../cli/command.js';
 
 import { createPlanBlockedOffer } from './blocked-offer.js';
 import { createPlanReadyOffer } from './ready-offer.js';
+import { createPlanRefreshOffer } from './refresh-offer.js';
 
 /**
  * Where `--spec` looks for its spec, in order, each as the planner is
@@ -146,7 +158,7 @@ export interface SpecRouteOptions {
 /** The resolution itself, as `board/plan-spec.ts` performs it. */
 export type PlanSpecResolver = (options: PlanSpecOptions) => Promise<PlanSpecResolution>;
 
-/** How the resolution and the two offers are reached; each left out is the command's own. */
+/** How the resolution and the three offers are reached; each left out is the command's own. */
 export interface SpecRouteSeams {
   /** Resolves the route; `resolvePlanSpec` when left out. */
   readonly resolve?: PlanSpecResolver;
@@ -154,6 +166,8 @@ export interface SpecRouteSeams {
   readonly makeReadyOffer?: () => ReadyOffer | null;
   /** Makes the blocked-line offer; {@link createPlanBlockedOffer} when left out. */
   readonly makeAlternativeOffer?: () => AlternativeOffer | null;
+  /** Makes the changed-issue question; {@link createPlanRefreshOffer} when left out. */
+  readonly makeRefreshOffer?: () => RefreshOffer | null;
 }
 
 /** The seams a `plan create` run resolves with: the command's own, every one. */
@@ -179,6 +193,7 @@ export async function resolveCreateSpec(
   const resolve = seams.resolve ?? resolvePlanSpec;
   const makeReadyOffer = seams.makeReadyOffer ?? createPlanReadyOffer;
   const makeAlternativeOffer = seams.makeAlternativeOffer ?? createPlanBlockedOffer;
+  const makeRefreshOffer = seams.makeRefreshOffer ?? createPlanRefreshOffer;
 
   return await resolve({
     request: source.request,
@@ -189,10 +204,11 @@ export async function resolveCreateSpec(
     roadmapIssue: options.roadmapIssue,
     trustedAuthors: options.trustedAuthors,
     findSpec: (spec) => findSpec(repoRoot, spec, specsDir),
-    // Both are read for the terminal when they are made, which is once
+    // All three are read for the terminal when they are made, which is once
     // per run and before any body is: see `./ready-offer.ts` for why
     // that reading must not wait until an unlabelled line turns up.
     offerReady: makeReadyOffer(),
     offerAlternative: makeAlternativeOffer(),
+    offerRefresh: makeRefreshOffer(),
   });
 }

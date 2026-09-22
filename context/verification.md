@@ -91,6 +91,17 @@ counts at both ends prove the base is red for the same reason. Measured
 at `0aec45d` and at rafa-63's head: `4 pass`, `2 fail` either side. Do not
 re-file it as a finding; over twenty tasks of one plan already did.
 
+**One case reads a gitignored plan, and it is red in any checkout
+without it.** `src/plan/parse.test.ts`'s `a real plan file on disk` reads
+`.rafa/plans/PLAN-phase-0-package-parity-cutover.md` rather than a
+fixture, and `.rafa/` is gitignored whole, so where that file is absent
+the suite reports an unhandled `ENOENT` between tests on top of the
+parity-lineage failures above. Measured at rafa-80's head and at
+`origin/main` alike. Prove it pre-existing with the worktree at
+`origin/main`, not a stash: once a plan's diff is committed a stash is a
+no-op, and it would only pull uncommitted work out from under a session
+still editing.
+
 **One suite prints a model refusal on a clean run.**
 `src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
 `Sorry, this request could not be completed.` and exits 3, and a second

@@ -161,6 +161,7 @@
  * each left out being the runner's own.
  */
 import type { BlockedIssuesReport } from './doctor-blocked.js';
+import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardRow, BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
@@ -195,6 +196,7 @@ import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
+import { readPreviousCopies } from './doctor-previous.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 import { isFile, plural } from './plan/plan-files.js';
 
@@ -269,6 +271,8 @@ export interface DoctorResult {
   readonly legacyStore: LegacyStoreReading | null;
   /** Which of `plan.dir` and `specs.dir` still name a pre-init directory; null for a config that could not be loaded. */
   readonly preInitDirs: PreInitDirsReading | null;
+  /** How many previous copies `previous/` under `specs.dir` holds; null when they could not be counted. */
+  readonly previousCopies: PreviousCopiesReading | null;
   /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
   readonly board: BoardStatus | null;
   /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board. */
@@ -287,6 +291,8 @@ interface InstallReadings {
   readonly legacyStore: LegacyStoreReading | null;
   /** Which of `plan.dir` and `specs.dir` still name a pre-init directory; null for a config that could not be loaded. */
   readonly preInitDirs: PreInitDirsReading | null;
+  /** How many previous copies `previous/` under `specs.dir` holds; null when they could not be counted. */
+  readonly previousCopies: PreviousCopiesReading | null;
   /** Why the effort directories could not be checked, as a warning; null when they were. */
   readonly storeProblem: string | null;
 }
@@ -487,24 +493,36 @@ function readPreInit(project: ProjectFound): PreInitDirsReading | null {
   }
 }
 
+/** The previous-copy count under `specs.dir`; null for a config that could not be loaded or a `previous/` that could not be read. */
+function readPrevious(project: ProjectFound): PreviousCopiesReading | null {
+  try {
+    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+    return readPreviousCopies(project.root, config);
+  } catch {
+    return null;
+  }
+}
+
 /** Every reading about the install; a store that cannot be checked is a warning, not a failure. */
 function readInstall(context: RafaContext, project: ProjectFound): InstallReadings {
   const binPath = readBinPath(context.env['PATH'], project.home);
   const preInitDirs = readPreInit(project);
+  const previousCopies = readPrevious(project);
   try {
-    return { binPath, legacyStore: readLegacyStore(project.root), preInitDirs, storeProblem: null };
+    return { binPath, legacyStore: readLegacyStore(project.root), preInitDirs, previousCopies, storeProblem: null };
   } catch (error) {
     const storeProblem = `rafa doctor: the effort store directories could not be checked: ${messageOf(error)}`;
-    return { binPath, legacyStore: null, preInitDirs, storeProblem };
+    return { binPath, legacyStore: null, preInitDirs, previousCopies, storeProblem };
   }
 }
 
 /** Writes each warning the readings carry, and in text mode the line saying the `PATH` order holds. */
 function writeInstall(context: RafaContext, install: InstallReadings): void {
-  const { binPath, legacyStore, preInitDirs, storeProblem } = install;
+  const { binPath, legacyStore, preInitDirs, previousCopies, storeProblem } = install;
   if (storeProblem !== null) context.output.warn(storeProblem);
   if (legacyStore !== null && legacyStore.warning !== null) context.output.warn(legacyStore.warning);
   if (preInitDirs !== null && preInitDirs.warning !== null) context.output.warn(preInitDirs.warning);
+  if (previousCopies !== null && previousCopies.warning !== null) context.output.warn(previousCopies.warning);
   if (binPath.warning !== null) {
     context.output.warn(binPath.warning);
     return;
@@ -657,6 +675,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     binPath: install.binPath,
     legacyStore: install.legacyStore,
     preInitDirs: install.preInitDirs,
+    previousCopies: install.previousCopies,
     board: readings.board,
     blocked: readings.blocked,
   };
@@ -713,7 +732,8 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' timeout. It exits 1 when a required item fails, naming the item, its probe and its exit code or'
       + ' first line of stderr, where `rafa loop start` would halt, and 0 otherwise. It warns when'
       + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
-      + ' not on PATH ahead of `~/.bun/bin`; a warning never changes the exit code. On a repository whose'
+      + ' not on PATH ahead of `~/.bun/bin`, and when `previous/` under `specs.dir` holds more than fifty'
+      + ' previous copies of issue specs, which are safe to delete; a warning never changes the exit code. On a repository whose'
       + ' provider is `gh` it also reads the GitHub board `rafa init --board` sets up and prints one row per'
       + ' part — the seven labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
       + ' missing, or unknown for a reading that failed, naming `rafa init --board` as the fix; it writes'

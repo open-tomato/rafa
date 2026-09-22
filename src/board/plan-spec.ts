@@ -18,7 +18,7 @@
  *           └─► resolveSpecSource          the route (./spec-source.ts)
  *                  ├─► createGhSpecIssueReader     gh issue view
  *                  ├─► inspectSpecIssue            the checks below
- *                  └─► writeSpecSnapshot           <specs.dir>/rafa-<n>-<slug>.md
+ *                  └─► settleSpecSnapshot          <specs.dir>/rafa-<n>-<slug>.md
  * ```
  *
  * The two runners are made LAZILY in the sense that matters: making one
@@ -151,6 +151,19 @@
  * `--issue=<n>` would be, by {@link inspectSpecIssue}, once the answer
  * is yes.
  *
+ * ## The question a changed body is asked
+ *
+ * {@link PlanSpecOptions.offerRefresh} is the third question, put when a
+ * saved copy's BODY no longer matches the issue and `--refresh` was not
+ * given (`./snapshot-settle.ts`). It is asked only after every check
+ * above has passed on the body as it reads now, so an edit by an author
+ * nobody trusts, or one that emptied a template heading, is refused by
+ * its check before anybody is asked. It is handed on under the same two
+ * rules as the others: null from the wiring where there is no terminal,
+ * and none here under `--dry-run`, because a yes rewrites the saved copy.
+ * A run handed none refuses a changed body with the sentence it always
+ * did.
+ *
  * ## The repository a refusal names
  *
  * A trust refusal names the repository, and `gh` is never told which
@@ -213,6 +226,7 @@
 import type { AlternativeOffer } from './blocked-line.js';
 import type { GateIssue } from './gate.js';
 import type { SpecIssue } from './issue.js';
+import type { RefreshOffer } from './snapshot-settle.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
 import type { BoardTrust, PermissionReading, Permissions } from './trust.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
@@ -417,6 +431,12 @@ export interface PlanSpecOptions {
    * Never called under `--dry-run`, for the same reason.
    */
   readonly offerAlternative?: AlternativeOffer | null;
+  /**
+   * Asks whether to plan from an issue whose body changed since its
+   * saved copy; null, or left out, for a run that refuses one as it
+   * always did. Never called under `--dry-run`, for the same reason.
+   */
+  readonly offerRefresh?: RefreshOffer | null;
   /** Runs `gh`; one made for the project root when left out. */
   readonly gh?: GhRunner;
   /** Runs `git`; one made for the project root when left out. */
@@ -444,8 +464,8 @@ export type PlanSpecResolution =
  * the words typed (`./spec-source.ts`) and exit
  * {@link BOARD_REFUSAL_EXIT} for the board's own state — an issue or a
  * roadmap whose author is trusted with nothing, a closed or unlabelled
- * issue, a leaking body, an incomplete body, a snapshot that differs
- * with no `--refresh`, a roadmap that cannot be resolved.
+ * issue, a leaking body, an incomplete body, a snapshot whose issue
+ * body differs with no `--refresh` and no yes to the question, a roadmap that cannot be resolved.
  */
 export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpecResolution> {
   const { repoRoot } = options;
@@ -486,6 +506,12 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     ? undefined
     : offerAlternative;
 
+  // The question a changed body is asked, under the same two rules: a
+  // yes rewrites the saved copy, which a `--dry-run` run must not.
+  const offerRefresh = options.dryRun
+    ? null
+    : options.offerRefresh ?? null;
+
   const resolution = await resolveSpecSource({
     request: options.request,
     refresh: options.refresh,
@@ -495,6 +521,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     findSpec: options.findSpec,
     issues: createGhSpecIssueReader({ gh }),
     inspect: (issue) => inspectSpecIssue(issue, trust(), offer),
+    offerRefresh,
     roadmap: {
       configured: options.roadmapIssue,
       search: createGhRoadmapSearch({ gh }),

@@ -136,7 +136,8 @@
  * ## What `--dry-run` does, and does not
  *
  * It does every READ and every REFUSAL, and stops before the first
- * WRITE: no snapshot, no session. The spec asks for it on `--next`
+ * WRITE: no snapshot, no session, and no question about a saved copy
+ * the issue has changed since (below). The spec asks for it on `--next`
  * ("prints the pick and stops"), and it behaves the same on the other
  * two, because a flag that works on one route and is ignored on the
  * others is a flag an operator has to remember the shape of.
@@ -145,6 +146,23 @@
  * effect: `plan create --next --dry-run` is how a person asks "what
  * would this run do", and "it would refuse, because issue #33 is not
  * labelled spec:ready" is the useful half of that answer.
+ *
+ * ## A saved copy the issue no longer matches
+ *
+ * The snapshot is written by `settleSpecSnapshot` (`./snapshot-settle.ts`)
+ * rather than by the bare `writeSpecSnapshot`, and at the same place the
+ * bare write stood: after {@link requireSpecIssue}, after
+ * {@link SpecSourceOptions.inspect} and after the `--dry-run` stop. So
+ * every check reads the body as it reads NOW before a saved copy is
+ * compared or a question asked, and a yes skips none of them.
+ *
+ * A copy that differs has its difference lines printed first. A
+ * notes-only change is rebuilt without asking; a body change is rebuilt
+ * under `--refresh`, handed to {@link SpecSourceOptions.offerRefresh}
+ * otherwise, and refused with `snapshotDiffersMessage` on a no, an ended
+ * input or no offer at all — the refusal a changed body always met. The
+ * offer is a seam this module only passes on; `./plan-spec.ts` hands
+ * none under `--dry-run`, and this module never reaches it there.
  *
  * ## The branch scan's problems are printed, never swallowed
  *
@@ -165,6 +183,7 @@ import type {
   RoadmapSearch,
   RoadmapSkip,
 } from './roadmap.js';
+import type { RefreshOffer } from './snapshot-settle.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 
@@ -188,7 +207,7 @@ import {
   REFRESH_FLAG,
   SPEC_FLAG,
 } from './flags.js';
-import { requireSpecIssue, writeSpecSnapshot } from './issue.js';
+import { requireSpecIssue } from './issue.js';
 import {
   createRoadmapReadings,
   exhaustedMessage,
@@ -198,6 +217,7 @@ import {
   scanClaimBranches,
   skipSentence,
 } from './roadmap.js';
+import { settleSpecSnapshot } from './snapshot-settle.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board spec source';
@@ -382,6 +402,12 @@ export interface SpecSourceOptions {
   readonly issues: SpecIssueReader;
   /** The checks that run after the issue is read and before it is written. */
   readonly inspect?: (issue: SpecIssue) => Promise<void>;
+  /**
+   * Asks whether to plan from an issue whose body changed since its
+   * saved copy; null, or left out, for a run that refuses one as it
+   * always did. Never reached under `--dry-run`. See the saved-copy note.
+   */
+  readonly offerRefresh?: RefreshOffer | null;
   /** What `--next` needs; a `--next` resolution without it is a defect. */
   readonly roadmap?: RoadmapSeams;
   /** Where the lines go; the active output when left out. */
@@ -615,12 +641,14 @@ async function settlePick(line: RoadmapLine, settlement: PickSettlement): Promis
  * `--issue` and `--next` read the issue, refuse the ones no plan may be
  * written from (`./issue.ts`), run
  * {@link SpecSourceOptions.inspect}, and snapshot the body under
- * `specs.dir`, answering that file. `--next` reads the number off the
+ * `specs.dir` through `settleSpecSnapshot`, answering that file; a saved
+ * copy whose body changed is rebuilt only under `--refresh` or on a yes
+ * from {@link SpecSourceOptions.offerRefresh}. `--next` reads the number off the
  * roadmap first and prints what it skipped to reach it.
  *
  * Throws `CommandExit` for every refusal the routes carry: this
  * module's own exit {@link SOURCE_REFUSAL_EXIT}, and the board's exit 2
- * from `./issue.ts` and `./roadmap.ts` unchanged.
+ * from `./issue.ts`, `./roadmap.ts` and `./snapshot-settle.ts` unchanged.
  */
 export async function resolveSpecSource(options: SpecSourceOptions): Promise<SpecSourceResolution> {
   const { request, repoRoot, specsDir, refresh, dryRun } = options;
@@ -661,7 +689,14 @@ export async function resolveSpecSource(options: SpecSourceOptions): Promise<Spe
     return stopped('dry-run');
   }
 
-  const snapshot = writeSpecSnapshot({ repoRoot, specsDir, issue: read, refresh });
+  const snapshot = await settleSpecSnapshot({
+    repoRoot,
+    specsDir,
+    issue: read,
+    refresh,
+    offerRefresh: options.offerRefresh ?? null,
+    output,
+  });
   return Object.freeze({
     outcome: 'spec' as const,
     spec: Object.freeze({

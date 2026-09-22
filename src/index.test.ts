@@ -722,6 +722,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../utils/tracker.js', ['trackerPathFor']],
     ['./doctor-blocked.js', ['readBlockedIssues', 'renderBlockedIssues']],
+    ['./doctor-previous.js', ['readPreviousCopies']],
     ['./init-board.js', ['BOARD_FIX', 'BOARD_HEADING']],
     ['./plan/plan-files.js', ['isFile', 'plural']],
   ]],

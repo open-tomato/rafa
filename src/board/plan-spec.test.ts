@@ -163,27 +163,33 @@
 import type { AlternativeOffer } from './blocked-line.js';
 import type { SpecIssue } from './issue.js';
 import type { ReadyOffer } from './plan-spec.js';
+import type { RefreshOffer } from './snapshot-settle.js';
 import type { BoardTrust } from './trust.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
+import type { Prompter } from '../project/root-choice.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
+import { lazyPrompter } from '../commands/issue/ready.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
-import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from './issue.js';
+import { ISSUE_REFUSAL_EXIT, ISSUE_VIEW_FIELDS, snapshotDiffersMessage, snapshotText, SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
-import { specPath } from './naming.js';
+import { notesPath, specPath } from './naming.js';
 import { boardRepoLabel, BOARD_REFUSAL_EXIT, inspectSpecIssue, resolvePlanSpec, UNNAMED_REPO } from './plan-spec.js';
+import { previousDir } from './previous-copy.js';
 import { SPEC_READY_LABEL, specReadyRefusalMessage, TEMPLATE_HEADINGS } from './readiness.js';
 import { PR_LIST_FIELDS } from './roadmap.js';
+import { notesRebuiltLine, refreshQuestion } from './snapshot-settle.js';
 import { TRUST_REFUSAL_EXIT } from './trust.js';
 
 /** Where snapshots go, as a project configures it. */
@@ -340,6 +346,8 @@ interface PlanSpecFields {
   readonly trustedAuthors?: readonly string[];
   readonly offerReady?: ReadyOffer | null;
   readonly offerAlternative?: AlternativeOffer | null;
+  readonly offerRefresh?: RefreshOffer | null;
+  readonly output?: Output;
 }
 
 /**
@@ -382,9 +390,10 @@ function ask(
     findSpec: (spec) => spec,
     offerReady: fields.offerReady ?? null,
     offerAlternative: fields.offerAlternative ?? null,
+    offerRefresh: fields.offerRefresh ?? null,
     gh,
     git,
-    output: OUTPUT,
+    output: fields.output ?? OUTPUT,
   });
 }
 
@@ -896,5 +905,189 @@ describe('the offer --next makes past a blocked line', () => {
     expect(dry).toEqual({ outcome: 'stopped', reason: 'blocked' });
     expect(asked).toBe(1);
     expect(existsSync(join(root, snapshotAt(33)))).toBe(false);
+  });
+});
+
+describe('the question a changed body is asked, over --issue', () => {
+  /** A complete body that reads as an edit of {@link completeBody}: same headings, a different first detail. */
+  function editedBody(number: number): string {
+    return completeSpecBody(`Issue ${String(number)}`, 'An earlier detail, before the edit.');
+  }
+
+  /** Plants the saved copy {@link editedBody} would leave, so the issue as read is a changed body. */
+  function plantEdited(number: number): void {
+    const file = join(root, snapshotAt(number));
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, snapshotText(editedBody(number), null));
+  }
+
+  /** An offer that must not be reached: a check that runs before it refuses first. */
+  const UNREACHED_REFRESH: RefreshOffer = (request) => {
+    throw new Error(`the resolution asked issue #${String(request.issue)} about a changed body it must not ask about`);
+  };
+
+  it('refuses a body change answered no, leaving the saved copy and previous/ untouched', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+    const offerRefresh: RefreshOffer = () => Promise.resolve(false);
+
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, git.git, { offerRefresh }));
+
+    expect(refused.exitCode).toBe(ISSUE_REFUSAL_EXIT);
+    expect(refused.message).toBe(snapshotDiffersMessage(snapshotAt(20), 20));
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(editedBody(20), null));
+    expect(existsSync(join(root, previousDir(SPECS_DIR)))).toBe(false);
+  });
+
+  it('refuses an input that ended before an answer, the same way', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+    const ended: Prompter = { say: () => undefined, ask: () => Promise.resolve(null), close: () => undefined };
+    const offerRefresh: RefreshOffer = (request) => lazyPrompter(() => ended).ask(refreshQuestion(request.issue, request.savedAt));
+
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, git.git, { offerRefresh }));
+
+    expect(refused.exitCode).toBe(ISSUE_REFUSAL_EXIT);
+    expect(refused.message).toBe(snapshotDiffersMessage(snapshotAt(20), 20));
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(editedBody(20), null));
+    expect(existsSync(join(root, previousDir(SPECS_DIR)))).toBe(false);
+  });
+
+  it('refuses with no terminal to ask on, offered none, the same way', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+
+    const refused = await refusal(() => ask({ kind: 'issue', issue: 20 }, board.gh, git.git, { offerRefresh: null }));
+
+    expect(refused.exitCode).toBe(ISSUE_REFUSAL_EXIT);
+    expect(refused.message).toBe(snapshotDiffersMessage(snapshotAt(20), 20));
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(editedBody(20), null));
+    expect(existsSync(join(root, previousDir(SPECS_DIR)))).toBe(false);
+  });
+
+  it('is refused by trust before the question is ever reached, on an author without write access', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20, { author: 'outsider' })], { outsider: 'read' });
+    const git = plantedGit();
+
+    const refused = await refusal(() => ask(
+      { kind: 'issue', issue: 20 },
+      board.gh,
+      git.git,
+      { offerRefresh: UNREACHED_REFRESH },
+    ));
+
+    expect(refused.exitCode).toBe(TRUST_REFUSAL_EXIT);
+    expect(refused.message).toContain('issue #20 was opened by outsider');
+    expect(existsSync(join(root, previousDir(SPECS_DIR)))).toBe(false);
+  });
+
+  it('is refused by the completeness check before the question is ever reached, on an emptied heading', async () => {
+    plantEdited(20);
+    const emptied = completeBody(20).replace(/(## Design\n\n)[^#]*/u, '$1');
+    const board = plantedGh([issueOf(20, { body: emptied })]);
+    const git = plantedGit();
+
+    const refused = await refusal(() => ask(
+      { kind: 'issue', issue: 20 },
+      board.gh,
+      git.git,
+      { offerRefresh: UNREACHED_REFRESH },
+    ));
+
+    expect(refused.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(refused.message).toContain('"Design" is empty');
+    expect(existsSync(join(root, previousDir(SPECS_DIR)))).toBe(false);
+  });
+
+  it('plans from the new body on a yes, leaving the old copy under previous/', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+    const offerRefresh: RefreshOffer = () => Promise.resolve(true);
+
+    const resolved = await ask({ kind: 'issue', issue: 20 }, board.gh, git.git, { offerRefresh });
+
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(resolved.spec).toMatchObject({ kind: 'issue', issue: 20, path: snapshotAt(20) });
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(completeBody(20), null));
+    // The old copy is not dropped: previous/ holds it, byte for byte.
+    const previous = readdirSync(join(root, previousDir(SPECS_DIR)));
+    expect(previous).toHaveLength(1);
+    expect(readFileSync(join(root, previousDir(SPECS_DIR), previous[0] ?? ''), 'utf8'))
+      .toBe(snapshotText(editedBody(20), null));
+  });
+
+  it('rebuilds a notes-only edit without asking, printing the notes line and the info line', async () => {
+    const file = join(root, snapshotAt(20));
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, snapshotText(completeBody(20), null));
+    writeFileSync(join(root, notesPath(SPECS_DIR, 20)), 'A note taken on this machine.\n');
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+    const lines: string[] = [];
+
+    const resolved = await ask(
+      { kind: 'issue', issue: 20 },
+      board.gh,
+      git.git,
+      { offerRefresh: UNREACHED_REFRESH, output: sinkOutput({ info: (message) => lines.push(message) }) },
+    );
+
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(completeBody(20), 'A note taken on this machine.'));
+    const previous = readdirSync(join(root, previousDir(SPECS_DIR)));
+    expect(previous).toHaveLength(1);
+    // No question is asked over a notes-only edit; the notes line prints
+    // first, then the info line naming where the old copy went.
+    expect(lines).toEqual([
+      `local notes: ${notesPath(SPECS_DIR, 20)} changed since the saved copy`,
+      notesRebuiltLine(snapshotAt(20), 20, join(previousDir(SPECS_DIR), previous[0] ?? '')),
+    ]);
+  });
+
+  it('rebuilds a changed body under --refresh without asking, and still moves the old copy', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+
+    const resolved = await ask(
+      { kind: 'issue', issue: 20 },
+      board.gh,
+      git.git,
+      { refresh: true, offerRefresh: UNREACHED_REFRESH },
+    );
+
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(completeBody(20), null));
+    const previous = readdirSync(join(root, previousDir(SPECS_DIR)));
+    expect(previous).toHaveLength(1);
+    expect(readFileSync(join(root, previousDir(SPECS_DIR), previous[0] ?? ''), 'utf8'))
+      .toBe(snapshotText(editedBody(20), null));
+  });
+
+  it('plans from the saved copy untouched under --spec, though the issue body changed since', async () => {
+    plantEdited(20);
+    const board = plantedGh([issueOf(20)]);
+    const git = plantedGit();
+
+    const resolved = await ask(
+      { kind: 'spec', spec: snapshotAt(20) },
+      board.gh,
+      git.git,
+      { offerRefresh: UNREACHED_REFRESH },
+    );
+
+    // The route asks gh and git nothing, as the case above this
+    // describe already establishes; here the point is that the saved
+    // copy itself is neither compared nor rewritten.
+    expect(board.sent()).toEqual([]);
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(resolved.spec).toMatchObject({ kind: 'spec', issue: null, path: snapshotAt(20) });
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(editedBody(20), null));
+    expect(existsSync(join(root, previousDir(SPECS_DIR)))).toBe(false);
   });
 });

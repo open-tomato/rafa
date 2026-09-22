@@ -126,6 +126,7 @@
 import type { AlternativeOfferRequest } from './blocked-line.js';
 import type { SpecIssue } from './issue.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
+import type { RefreshOffer, RefreshOfferRequest } from './snapshot-settle.js';
 import type { RoadmapSeams, SpecSourceResolution } from './spec-source.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
@@ -152,6 +153,7 @@ import {
   ISSUE_REFUSAL_EXIT,
   missingSpecLabelMessage,
   REFRESH_FLAG,
+  snapshotDiffersMessage,
   SPEC_LABEL,
 } from './issue.js';
 import { specPath } from './naming.js';
@@ -516,6 +518,7 @@ function issueRun(options: {
   readonly refresh?: boolean;
   readonly dryRun?: boolean;
   readonly inspect?: (issue: SpecIssue) => Promise<void>;
+  readonly offerRefresh?: RefreshOffer | null;
   readonly output?: ReturnType<typeof sinkOutput>;
 }): Promise<SpecSourceResolution> {
   return resolveSpecSource({
@@ -527,6 +530,7 @@ function issueRun(options: {
     findSpec: () => 'never',
     issues: plantedIssues(options.issues ?? boardIssues()).read,
     inspect: options.inspect,
+    offerRefresh: options.offerRefresh,
     output: options.output ?? capture().output,
   });
 }
@@ -590,6 +594,48 @@ describe('resolveSpecSource over --issue', () => {
     const resolution = await issueRun({ issue: 52, issues: stale, refresh: true });
     expect(specOf(resolution).path).toBe(snapshotAt(52));
     expect(readFileSync(join(root, snapshotAt(52)), 'utf8')).toBe(issueOf(52).body);
+  });
+
+  it('hands a changed body to offerRefresh after the checks, and plans from it on a yes', async () => {
+    const stale = [issueOf(53)];
+    mkdirSync(join(root, SPECS_DIR), { recursive: true });
+    writeFileSync(join(root, snapshotAt(53)), 'what an older run planned from\n');
+    const order: string[] = [];
+    const asked: RefreshOfferRequest[] = [];
+
+    const resolution = await issueRun({
+      issue: 53,
+      issues: stale,
+      inspect: () => {
+        order.push('inspect');
+        return Promise.resolve();
+      },
+      offerRefresh: (request) => {
+        order.push('offer');
+        asked.push(request);
+        return Promise.resolve(true);
+      },
+    });
+
+    expect(order).toEqual(['inspect', 'offer']);
+    expect(asked.map(({ issue, path }) => ({ issue, path }))).toEqual([{ issue: 53, path: snapshotAt(53) }]);
+    expect(specOf(resolution).path).toBe(snapshotAt(53));
+    expect(readFileSync(join(root, snapshotAt(53)), 'utf8')).toBe(issueOf(53).body);
+  });
+
+  it('refuses a changed body the offer answers no to, and leaves the saved copy', async () => {
+    const stale = [issueOf(54)];
+    mkdirSync(join(root, SPECS_DIR), { recursive: true });
+    writeFileSync(join(root, snapshotAt(54)), 'what an older run planned from\n');
+
+    const refused = await refusal(() => issueRun({
+      issue: 54,
+      issues: stale,
+      offerRefresh: () => Promise.resolve(false),
+    }));
+
+    expect(refused.message).toBe(snapshotDiffersMessage(snapshotAt(54), 54));
+    expect(readFileSync(join(root, snapshotAt(54)), 'utf8')).toBe('what an older run planned from\n');
   });
 
   it('under --dry-run reads the issue, runs the checks, prints it and writes nothing', async () => {

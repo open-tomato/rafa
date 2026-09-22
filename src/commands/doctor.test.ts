@@ -133,6 +133,7 @@ import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
+import { readPreviousCopies } from './doctor-previous.js';
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readPlanFlag } from './doctor.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
@@ -198,6 +199,15 @@ function plant(root: string, path: string, text = 'rows'): void {
   const file = join(root, path);
   mkdirSync(join(file, '..'), { recursive: true });
   writeFileSync(file, text, 'utf8');
+}
+
+/** Writes `count` previous copies under `.rafa/specs/previous/` of `root`, the default `specs.dir`. */
+function plantPrevious(root: string, count: number): void {
+  const dir = join(root, '.rafa', 'specs', 'previous');
+  mkdirSync(dir, { recursive: true });
+  for (let index = 0; index < count; index += 1) {
+    writeFileSync(join(dir, `copy-${String(index)}.md`), 'rows', 'utf8');
+  }
 }
 
 /** What one dispatch wrote, and its exit code. */
@@ -851,6 +861,25 @@ describe('the warnings beside the report', () => {
     expect(quiet.stdout).not.toContain('before it had defaults of its own');
     expect(quiet.stdout).not.toContain('warn: ');
   });
+
+  it('warns for a project whose previous/ holds fifty-one previous copies, and not for one holding fifty', async () => {
+    const warned = plantWorld();
+    plantPrevious(warned.root, 51);
+    const quiet = plantWorld();
+    plantPrevious(quiet.root, 50);
+    const warning = readPreviousCopies(warned.root, { specsDir: join('.rafa', 'specs') }).warning;
+
+    const warnedRun = await doctor(warned);
+    const quietRun = await doctor(quiet);
+
+    expect(warning).not.toBeNull();
+    expect(warnedRun.exitCode).toBe(0);
+    expect(lines(warnedRun.stdout).at(-2)).toBe(`warn: ${warning}`);
+    expect(lines(warnedRun.stdout).at(-1)).toBe(aheadLine(warned));
+    expect(quietRun.exitCode).toBe(0);
+    expect(quietRun.stdout).not.toContain('previous copies of issue specs');
+    expect(quietRun.stdout).not.toContain('warn: ');
+  });
 });
 
 describe('json mode', () => {
@@ -886,6 +915,21 @@ describe('json mode', () => {
       ['required', 'needed', 'pass'],
       ['optional', 'mgrep', 'fail'],
     ]);
+  });
+
+  it('carries the previous-copy count and warning in the result data', async () => {
+    const world = plantWorld();
+    plantPrevious(world.root, 51);
+    const warning = readPreviousCopies(world.root, { specsDir: join('.rafa', 'specs') }).warning;
+
+    const run = await doctor(world, ['--output=json']);
+    const events = eventsOf(run.stdout);
+    const result = events.find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+
+    expect(run.exitCode).toBe(0);
+    expect(events.filter((event) => event.type === 'log').map((event) => (event as { message?: string }).message))
+      .toContain(warning);
+    expect(result?.data?.previousCopies).toEqual({ count: 51, warning });
   });
 
   it('ends a halt with the command_exit error naming the failed item and no data, where a pass gives data', async () => {
