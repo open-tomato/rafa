@@ -121,7 +121,54 @@ describe('the shape check', () => {
       deprecated: { since: '0.2.0', use: 'loop start' },
       hidden: false,
       exec: true,
+      spends: { when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' },
     })).toBeNull();
+  });
+
+  it.each([
+    ['always', { when: 'always', what: 'one planning session' }],
+    ['with', { when: 'with', flag: '--propose', what: 'one session per batch of skills' }],
+    ['unless', { when: 'unless', flag: '--no-model', what: 'one session' }],
+    ['through', { when: 'through', what: 'when the step it runs is one of the above' }],
+  ])('answers null for a spends declaration of the %s form', (_title, spends) => {
+    expect(commandProblem({ ...VALID, spends })).toBeNull();
+  });
+
+  it.each([
+    ['spends as a string', 'always', 'command "loop start": spends is "always", expected absent or a mapping'],
+    ['spends as null', null, 'command "loop start": spends is null, expected absent or a mapping'],
+    [
+      'spends with an unknown when',
+      { when: 'sometimes', what: 'x' },
+      'command "loop start": spends.when is "sometimes", expected one of always, with, unless, through',
+    ],
+    [
+      'spends with no what',
+      { when: 'always' },
+      'command "loop start": spends.what is undefined, expected a string',
+    ],
+    [
+      'a with form whose flag has no dashes',
+      { when: 'with', flag: 'resolve', what: 'x' },
+      'command "loop start": spends.flag is "resolve", expected a flag as typed, starting with --',
+    ],
+    [
+      'an unless form with no flag',
+      { when: 'unless', what: 'x' },
+      'command "loop start": spends.flag is undefined, expected a flag as typed, starting with --',
+    ],
+    [
+      'an always form carrying a flag',
+      { when: 'always', flag: '--resolve', what: 'x' },
+      'command "loop start": spends.flag is "--resolve", expected absent when spends.when is "always"',
+    ],
+  ])('refuses a module entry carrying %s', (_title, spends, message) => {
+    expect(commandProblem({ ...VALID, spends })).toBe(message);
+  });
+
+  it('names an earlier field before a bad spends', () => {
+    expect(commandProblem({ ...VALID, name: 1, spends: 'always' }))
+      .toBe('command "loop start": name is 1, expected a string');
   });
 
   it.each([
