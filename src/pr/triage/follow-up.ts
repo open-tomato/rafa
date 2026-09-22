@@ -68,14 +68,15 @@
  * tenth class is a compile error here rather than a prompt whose "What
  * to do" section is blank. `green` and `pending` get a line too, and
  * theirs says there is nothing to fix and nothing to wait for
- * respectively — a caller may build a prompt for any assessment, and a
- * prompt that quietly omitted the work for two of the ten classes would
+ * respectively, and `no-checks` gets one saying there is nothing to fix
+ * — a caller may build a prompt for any assessment, and a prompt that
+ * quietly omitted the work for three of the eleven classes would
  * be a worse reading than one that says the work is none.
  *
  * The lines name the SHAPE of the work and never a plan file: the
  * pinned resolve plans (`src/pr/plans/resolve-<class>.md`) are the
  * `--resolve` path's own, they exist for four classes only, and a prompt
- * that pointed at one for the other six would point at nothing.
+ * that pointed at one for the other seven would point at nothing.
  */
 import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
@@ -133,6 +134,9 @@ export const FOLLOW_UP_TASKS: Readonly<Record<TriageClass, string>> = Object.fre
     + ' assessed; say so rather than inventing work.',
   'pending': 'Nothing to fix yet: checks are still running. Wait for them and read'
     + ' the outcome; do not change the branch on a partial reading.',
+  'no-checks': 'Nothing to fix: the pull request reported no checks at all, so'
+    + ' nothing failed and nothing is running. Do not change the branch; merging'
+    + ' without checks is a decision for rafa pr merge --skip-checks, not a fix.',
   'conflict-lockfile': 'Merge the base branch into the head, take the BASE branch'
     + ' lockfile for every conflicting lockfile below, reinstall to regenerate it,'
     + ' run the gates, then commit and push. Never force-push.',
