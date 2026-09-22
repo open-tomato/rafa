@@ -1,7 +1,8 @@
 /**
  * Where the project stands, in ONE answer: the twelve states of
- * `.rafa/specs/rafa-63-one-command-next-step.md`, read in the spec's
- * order, the first match winning.
+ * `.rafa/specs/rafa-63-one-command-next-step.md` and the thirteenth
+ * `.rafa/specs/rafa-86-merge-pull-request-reports.md` adds, read in the
+ * spec's order, the first match winning.
  *
  * Each answer carries three things and nothing else: the action id
  * `src/next/actions.ts` runs a registered command for, the one-line
@@ -38,7 +39,7 @@
  *
  * The tree is read ahead of EVERY row, since one `git status
  * --porcelain` asks nothing of the network. The provider is read where
- * the table would read it, ahead of rows 5, 6 and 7 and not before:
+ * the table would read it, ahead of rows 5, 6, 7 and 8 and not before:
  * asking it earlier would spend a `gh` call on a state rows 1 to 4
  * settle without one, and a provider nobody asked is a provider nobody
  * can report on. So a running loop is still row 1 with the provider
@@ -53,66 +54,68 @@
  * | 3 | `tracker-blocked` | `resume` | the branch is a plan branch whose checklist holds a blocked task |
  * | 4 | `tracker-open` | `resume` | the branch is a plan branch whose checklist holds an open task |
  * | 5 | `pr-pending` | `wait` | the branch has an open pull request that is still settling |
- * | 6 | `pr-red` | `triage` | that pull request is red, reports no check at all, or conflicts |
- * | 7 | `pr-green` | `merge` | that pull request is green and merges |
- * | 8 | `plan-unstarted` | `start` | the branch is the base and a plan has no run and no branch |
- * | 9 | `issue-ready` | `plan` | the branch is the base and the roadmap's next line is ready |
- * | 10 | `issue-blocked` | `unblock` | that line waits on issues that have not closed |
- * | 11 | `issue-not-ready` | `ready` | that line carries no `spec:ready` label |
- * | 12 | `nothing-left` | none | nothing above is true |
+ * | 6 | `pr-red` | `triage` | that pull request is red, or conflicts |
+ * | 7 | `pr-no-checks` | `merge-unchecked` | that pull request reports no check at all and merges |
+ * | 8 | `pr-green` | `merge` | that pull request is green and merges |
+ * | 9 | `plan-unstarted` | `start` | the branch is the base and a plan has no run and no branch |
+ * | 10 | `issue-ready` | `plan` | the branch is the base and the roadmap's next line is ready |
+ * | 11 | `issue-blocked` | `unblock` | that line waits on issues that have not closed |
+ * | 12 | `issue-not-ready` | `ready` | that line carries no `spec:ready` label |
+ * | 13 | `nothing-left` | none | nothing above is true |
  *
  * The order IS the resolution. Each row states only what is new, and
- * every earlier row's negation is implied by reaching it: row 9's "no
- * plan" is row 8's reading negated, and row 4's "no loop running" is row
+ * every earlier row's negation is implied by reaching it: row 10's "no
+ * plan" is row 9's reading negated, and row 4's "no loop running" is row
  * 1's. So a plan branch carrying open tasks AND an open pull request
- * resumes the loop (row 4) rather than waiting on CI (row 5), and a
- * green pull request is merged (row 7) rather than starting the plan
- * that is sitting unstarted beside it (row 8).
+ * resumes the loop (row 4) rather than waiting on CI (row 5), a
+ * conflicting pull request with no checks is triaged (row 6) rather than
+ * merged unchecked (row 7), and a green pull request is merged (row 8)
+ * rather than starting the plan that is sitting unstarted beside it
+ * (row 9).
  *
  * ## Where a row is read wider than the spec's words, and why
  *
- * Four readings say more than the table's prose does, because the rows
+ * Three readings say more than the table's prose does, because the rows
  * have to PARTITION what they are read over: a state the table names
  * nothing for would leave `rafa next` with nothing to say.
  *
  *  - Row 5 also takes an open pull request whose mergeability GitHub
- *    answers `unknown`. Row 7 needs `mergeable` and row 6 needs
- *    `conflicting`, so `unknown` is neither, and it is what `pr merge`
+ *    answers `unknown`. Rows 7 and 8 need `mergeable` and row 6 needs
+ *    `conflicting`, so `unknown` is none of them, and it is what `pr merge`
  *    refuses with "GitHub may still be computing the merge"
  *    (`src/pr/merge.ts`) — which is a wait.
- *  - Row 6 also takes a `none` verdict, a pull request reporting no
- *    check at all. `pr merge` refuses that one too (`checks-not-green`)
- *    and its refusal points at `rafa pr triage <n>`, which is this
- *    row's action, and `src/start/pr-lifecycle.ts` frames no checks as
- *    almost always a conflict. It is NOT the reading `pr triage`'s own
- *    selection makes: a repository with no workflows answers `none` for
- *    every pull request forever — this one does
- *    (`context/verification.md`) — so a bare `rafa pr triage` counting
- *    `none` would select all of them. Here the pull request is already
- *    named by its number, which is the form that note says reaches such
- *    a one.
- *  - Row 9 also requires the line NOT to be blocked. `spec:ready` and
+ *  - Row 10 also requires the line NOT to be blocked. `spec:ready` and
  *    `spec:blocked` are independent facts (`src/board/blocked.ts`), so
  *    an issue can carry both; without the conjunct the first-match rule
  *    would answer `plan` for an issue whose work waits on another, and
- *    row 10 would never be reached for it.
- *  - Row 12 is the LAST row and answers whatever the eleven above did
+ *    row 11 would never be reached for it.
+ *  - Row 13 is the LAST row and answers whatever the twelve above did
  *    not. On the base branch that is a roadmap with no line left. Off
  *    it, it is a checkout with nothing to do — the finished plan whose
  *    pull request somebody merged in the browser is the one that lands
  *    there — and it says so, naming the base as where the cycle goes on.
  *
- * Rows 5, 6 and 7 partition an open pull request between them because
- * of the first two: `pending` or `unknown` is row 5, then `red`, `none`
- * or `conflicting` is row 6, and what is left — green and mergeable —
- * is row 7.
+ * Rows 5 to 8 partition an open pull request between them because of
+ * the first reading: `pending` or `unknown` is row 5, then `red` or
+ * `conflicting` is row 6, then a `none` verdict that merges is row 7,
+ * and what is left — green and mergeable — is row 8.
+ *
+ * ## Row 7: no check at all
+ *
+ * A pull request reporting no check at all (verdict `none`, zero check
+ * rows, `verdictOf` in `src/pr/checks.ts`) has nothing for `pr triage`
+ * to fix, so it is its own row rather than a clause of row 6. Its action
+ * is `merge-unchecked`, which `pr merge --skip-checks` does, and which
+ * asks its own question. Row 6 still takes such a pull request when it
+ * conflicts, since a conflict is what triage repairs and a pull request
+ * that conflicts is often one GitHub never scheduled a check for.
  *
  * ## What it reads, and what it never spends
  *
  * `./readings.ts` holds the readings and the order they are asked in:
  * each is made at most once per answer and only when it is asked for,
  * so the working tree is read once ahead of the table, the provider is
- * reached from row 5 on and the board from row 9 on. A reading that
+ * reached from row 5 on and the board from row 10 on. A reading that
  * failed is carried out as {@link NextState.problems} rather than
  * thrown, and the caller prints those beside the answer.
  */
@@ -146,6 +149,7 @@ export type NextActionId =
   | 'wait'
   | 'triage'
   | 'merge'
+  | 'merge-unchecked'
   | 'start'
   | 'plan'
   | 'unblock'
@@ -159,6 +163,7 @@ export type NextStateId =
   | 'tracker-open'
   | 'pr-pending'
   | 'pr-red'
+  | 'pr-no-checks'
   | 'pr-green'
   | 'plan-unstarted'
   | 'issue-ready'
@@ -368,13 +373,12 @@ async function readPrPending(world: NextWorld): Promise<RowAnswer | null> {
 /** Why row 6 takes a pull request, or null when it does not; see the module note. */
 function redClause(open: OpenPull): string | null {
   if (open.mergeable === 'conflicting') return `conflicts with \`${open.summary.baseRefName}\``;
-  if (open.verdict === 'red') return 'its checks are red';
-  return open.verdict === 'none'
-    ? 'it reports no check at all'
+  return open.verdict === 'red'
+    ? 'its checks are red'
     : null;
 }
 
-/** Row 6: that pull request is red, reports no check at all, or conflicts. */
+/** Row 6: that pull request is red, or conflicts. */
 async function readPrRed(world: NextWorld): Promise<RowAnswer | null> {
   const open = await world.openPull();
   if (open === null) return null;
@@ -391,7 +395,26 @@ async function readPrRed(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 7: that pull request is green and merges. */
+/**
+ * Row 7: that pull request reports no check at all and merges. Row 6
+ * has taken it when it conflicts and row 5 when GitHub has not settled
+ * the merge; see the module note.
+ */
+async function readPrNoChecks(world: NextWorld): Promise<RowAnswer | null> {
+  const open = await world.openPull();
+  if (open === null || open.verdict !== 'none' || open.mergeable !== 'mergeable') return null;
+
+  const base = `\`${open.summary.baseRefName}\``;
+  return {
+    id: 'pr-no-checks',
+    action: 'merge-unchecked',
+    reading: `${prLabel(open)} is open on \`${open.summary.headRefName}\`, reports no check at all and merges into ${base}`,
+    proposal: `merge ${prLabel(open)} into ${base} with no checks`,
+    pullRequest: open.summary.number,
+  };
+}
+
+/** Row 8: that pull request is green and merges. */
 async function readPrGreen(world: NextWorld): Promise<RowAnswer | null> {
   const open = await world.openPull();
   if (open === null || open.verdict !== 'green' || open.mergeable !== 'mergeable') return null;
@@ -406,7 +429,7 @@ async function readPrGreen(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 8: on the base branch, and a plan has no run and no branch. */
+/** Row 9: on the base branch, and a plan has no run and no branch. */
 function readPlanUnstarted(world: NextWorld): RowAnswer | null {
   if (!onBase(world)) return null;
 
@@ -423,7 +446,7 @@ function readPlanUnstarted(world: NextWorld): RowAnswer | null {
   };
 }
 
-/** Row 9: the roadmap's next line is ready, and it waits on nothing. */
+/** Row 10: the roadmap's next line is ready, and it waits on nothing. */
 async function readIssueReady(world: NextWorld): Promise<RowAnswer | null> {
   const picked = await world.picked();
   if (picked === null || !picked.ready || picked.blocked !== null) return null;
@@ -438,7 +461,7 @@ async function readIssueReady(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 10: that line waits on issues that have not closed. */
+/** Row 11: that line waits on issues that have not closed. */
 async function readIssueBlocked(world: NextWorld): Promise<RowAnswer | null> {
   const picked = await world.picked();
   if (picked === null || picked.blocked === null) return null;
@@ -454,7 +477,7 @@ async function readIssueBlocked(world: NextWorld): Promise<RowAnswer | null> {
 }
 
 /**
- * Row 11: that line carries no `spec:ready` label. Rows 9 and 10 have
+ * Row 12: that line carries no `spec:ready` label. Rows 10 and 11 have
  * taken every line that is ready and unblocked and every line that is
  * blocked, so a line reaching this row carries neither label.
  */
@@ -472,7 +495,7 @@ async function readIssueNotReady(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 12 off the base branch: a checkout with nothing left to do. */
+/** Row 13 off the base branch: a checkout with nothing left to do. */
 function readNothingHere(world: NextWorld): RowAnswer {
   const where = branchLabel(world);
   const plan = world.branchPlan();
@@ -487,7 +510,7 @@ function readNothingHere(world: NextWorld): RowAnswer {
   };
 }
 
-/** Row 12: nothing the eleven rows above name is true; see the module note. */
+/** Row 13: nothing the twelve rows above name is true; see the module note. */
 async function readNothingLeft(world: NextWorld): Promise<RowAnswer> {
   if (!onBase(world)) return readNothingHere(world);
 
@@ -512,7 +535,7 @@ interface NextRow {
   readonly pulls?: true;
 }
 
-/** The twelve rows, in the spec's order; the first that answers wins. */
+/** The thirteen rows, in the spec's order; the first that answers wins. */
 const ROWS: readonly NextRow[] = Object.freeze([
   { id: 'loop-running', read: readLoopRunning },
   { id: 'base-behind', read: readBaseBehind },
@@ -520,6 +543,7 @@ const ROWS: readonly NextRow[] = Object.freeze([
   { id: 'tracker-open', read: readTrackerOpen },
   { id: 'pr-pending', read: readPrPending, pulls: true },
   { id: 'pr-red', read: readPrRed, pulls: true },
+  { id: 'pr-no-checks', read: readPrNoChecks, pulls: true },
   { id: 'pr-green', read: readPrGreen, pulls: true },
   { id: 'plan-unstarted', read: readPlanUnstarted },
   { id: 'issue-ready', read: readIssueReady },
@@ -529,7 +553,7 @@ const ROWS: readonly NextRow[] = Object.freeze([
 ] as const);
 
 /**
- * The twelve states, in the order they are read. Taken off the table
+ * The thirteen states, in the order they are read. Taken off the table
  * itself, so the order a caller reads here and the order an answer is
  * decided by cannot drift apart.
  */
@@ -551,18 +575,18 @@ function answer(row: RowAnswer, problems: readonly string[]): NextState {
 }
 
 /**
- * The ONE state the project is in: the twelve rows read in order, the
+ * The ONE state the project is in: the thirteen rows read in order, the
  * first that answers winning, with every reading that failed carried
  * beside it.
  *
  * The two pre-conditions come first: the working tree ahead of every
- * row, the provider ahead of the three rows that read it. Either one
+ * row, the provider ahead of the four rows that read it. Either one
  * answers in the table's place, carrying `none` to run.
  *
  * A row asks only the readings it needs and each of them at most once,
  * so a state an early row settles costs nothing a later one would have
  * spent. See the module note for the order, for the two pre-conditions
- * and for the four rows read wider than the spec's prose.
+ * and for the three rows read wider than the spec's prose.
  */
 export async function readNextState(sources: NextSources): Promise<NextState> {
   const world = openWorld(sources);
@@ -580,7 +604,7 @@ export async function readNextState(sources: NextSources): Promise<NextState> {
     if (found !== null) return answer(found, world.problems());
   }
 
-  // Unreachable: row 12 answers for every reading. A table edited to end
+  // Unreachable: row 13 answers for every reading. A table edited to end
   // on a row that can answer null is the defect this catches.
   throw new Error(`${PREFIX}: no row of the table answered, and the last row answers for every reading`);
 }

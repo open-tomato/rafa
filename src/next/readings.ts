@@ -21,7 +21,7 @@
  * that is running is answered out of `.rafa/runs/` and
  * {@link NextWorld.tracked} alone, with no provider and no board asked
  * at all. The provider is reached from row 5 on, and the board from row
- * 9 on.
+ * 10 on.
  *
  * {@link NextWorld.tracked} is the one reading the table does not own:
  * `./state.ts` makes it ahead of every row, for the pre-condition that

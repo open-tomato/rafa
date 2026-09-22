@@ -28,9 +28,9 @@
  * | `unblock` | `issue unblock` | `<issue>` |
  * | `ready` | `issue ready` | `<issue>` |
  *
- * The words come off the state: the pull request of rows 5, 6 and 7,
- * the issue of rows 10 and 11, and the absolute plan file of rows 3, 4
- * and 8, which `--plan` resolves against the project root and therefore
+ * The words come off the state: the pull request of rows 5, 6 and 8,
+ * the issue of rows 11 and 12, and the absolute plan file of rows 3, 4
+ * and 9, which `--plan` resolves against the project root and therefore
  * takes as it is (`src/start/plan-path.ts`). A state whose row left the
  * field it proposes an action over null is a defect of the table and
  * throws here, naming the state and the action, rather than running a
@@ -51,7 +51,7 @@
  *    `--resolve`: the words are the same whether the person typed `y`
  *    or `--yes` allowed the step, and a repair session is never spent
  *    unasked.
- *  - `start` passes `--create-branch` and `resume` does not. Row 8 is
+ *  - `start` passes `--create-branch` and `resume` does not. Row 9 is
  *    read on the base branch, where `loop start` would otherwise stop
  *    to offer the plan's branch; rows 3 and 4 are read on that branch
  *    already.
@@ -107,8 +107,13 @@ import { HINT_FLAG } from './hint.js';
 /** What a defect and a refusal this module raises open with. */
 const PREFIX = 'rafa next';
 
-/** An action id that runs a registered command: every one but `none` and `sync`. */
-export type NextCommandActionId = Exclude<NextActionId, 'none' | 'sync'>;
+/**
+ * An action id that runs a registered command: every one but `none`,
+ * `sync` and `merge-unchecked`. The last is row 7 of `./state.ts`, which
+ * has no command mapped here yet, so {@link actionInvocation} answers
+ * null for it and {@link runAction} refuses it rather than merging.
+ */
+export type NextCommandActionId = Exclude<NextActionId, 'none' | 'sync' | 'merge-unchecked'>;
 
 /** The command one action runs, and the words it runs with, read off the state. */
 interface ActionCommandSpec {
