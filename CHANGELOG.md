@@ -9,6 +9,11 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.9.1 — 2026-09-22, Plan from an edited issue without retyping the command
+
+- `plan create`: `--issue` and `--next` no longer stop on a saved copy that differs from the issue. They print what differs first — an `issue body: +<a> -<r> lines` line naming the headings that changed, and a `local notes:` line — then rebuild a copy whose local notes alone changed without asking, and on a changed body ask `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]` where there is a terminal. Every check on the issue still runs before the question, a no or an ended input refuses as before and writes nothing, and without a terminal the refusal stands. `--refresh` rebuilds without asking. Every rebuild first moves the old copy to `<specs.dir>/previous/`, stamped with its modification time and never overwriting an earlier one.
+- `doctor`: warns once `<specs.dir>/previous/` holds more than fifty previous copies, which are safe to delete, without changing the exit code; the json result carries the count.
+
 ## 0.9.0 — 2026-09-22, Merge a pull request that reports no checks
 
 - `pr merge`: `--skip-checks` merges a pull request that reports no checks at all, after a warning that depends on whether the repository has workflows and a `Merge #<n> with no checks? [y/N]` question, then comments on the pull request that it did. `--yes` answers the question only where the repository has no workflow, and the flag is refused on a pull request that reports any check, naming each one and its state. Without the flag, a pull request with no checks is refused with a message naming `--skip-checks` and what it means, instead of pointing at `pr triage`. The json result gains an `unchecked` field.
