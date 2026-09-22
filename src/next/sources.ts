@@ -89,6 +89,7 @@ import type { BlockedLine } from '../board/blocked-line.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
+import type { SessionRecord } from '../loop/sessions.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
@@ -227,10 +228,29 @@ function nextConfig(project: ProjectFound, warn: (message: string) => void): Nex
  * read off git, the board or the provider here: every reading is a
  * function the table calls only where a row asks for it.
  */
+/**
+ * What {@link openNextSources} answers: the sources, and {@link
+ * OpenedNextSources.answer} for the next one. Only `rafa next` holds
+ * this type; every reading takes the plain {@link NextSources}, so a
+ * test's double needs nothing new.
+ */
+export interface OpenedNextSources extends NextSources {
+  /**
+   * Sources for ONE answer, with a board of their own. The board memoises
+   * the issue it reads so the rows over one answer cost one `gh issue
+   * view` between them, and a memo held across a chain's turns is a
+   * chain that cannot see what its own action changed: on 2026-09-23
+   * `rafa next` marked #82 ready, read the labels it had cached before
+   * that, proposed the same step again and stopped `unchanged`. So the
+   * chain takes a new answer per turn.
+   */
+  readonly answer: () => NextSources;
+}
+
 export function openNextSources(
   context: RafaContext,
   seams: NextSourceSeams = DEFAULT_NEXT_SOURCE_SEAMS,
-): NextSources {
+): OpenedNextSources {
   const project = nextProject(context);
   const config = nextConfig(project, (message: string) => {
     context.output.warn(message);
@@ -245,12 +265,18 @@ export function openNextSources(
   const gh = (seams.openGh ?? ((root: string): GhRunner => createGhRunner({ cwd: root })))(project.root);
   const loop = resolveLoopSeams({ isAlive: seams.isAlive });
 
-  return Object.freeze({
+  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue });
+  const held = {
     base: config.prBase ?? DEFAULT_BASE_BRANCH,
     plans: plansDirAt(project.root, config.planDir),
-    runs: () => readRecords(project.root, loop),
+    runs: (): readonly SessionRecord[] => readRecords(project.root, loop),
     git,
     pulls: (seams.pullRequests ?? ghPullRequestsIn)(project.root),
-    board: ghNextBoard({ gh, git, configured: config.roadmapIssue }),
+  };
+
+  return Object.freeze({
+    ...held,
+    board: board(),
+    answer: () => Object.freeze({ ...held, board: board() }),
   });
 }

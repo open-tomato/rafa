@@ -499,7 +499,9 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
 
   try {
     return await runNextChain({
-      read: () => readNextState(sources),
+      // A new answer per turn: its board reads the issue again, so the
+      // chain sees what the step it just ran changed (`next/sources.ts`).
+      read: () => readNextState(sources.answer()),
       run: (state: NextState) => runStateAction(context, sources, state),
       ask: prompter.ask,
       handOver: prompter.close,
