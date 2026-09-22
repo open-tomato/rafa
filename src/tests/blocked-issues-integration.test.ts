@@ -150,11 +150,11 @@ function fakeGh(board: Readonly<Record<string, BoardIssue>>): {
 
   const run: GhRunner = (args) => {
     calls.push(args);
-    // The roadmap tick's own path, `repos/{owner}/{repo}/issues/<n>`
-    // (`board/roadmap-tick.ts`), sent with no `issue` or `--label`/`all`
+    // The roadmap tick's own call, `api repos/{owner}/{repo}/issues/<n>`
+    // (`board/roadmap-tick.ts`), carrying no `issue` or `--label`/`all`
     // word of its own; matched last, as `merge.test.ts`'s combined fake
     // matches it, so it never shadows the routes below.
-    if (args[0]?.startsWith('repos/') === true) {
+    if (args[0] === 'api' && args[1]?.startsWith('repos/') === true) {
       const sent = args.find((arg) => arg.startsWith('body='));
       if (sent !== undefined) roadmapBody = sent.slice('body='.length);
       return ok(JSON.stringify({ number: ROADMAP_ISSUE, body: roadmapBody }));

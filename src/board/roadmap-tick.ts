@@ -43,6 +43,13 @@
  * | Step | Command |
  * |---|---|
  * | read | `gh api repos/{owner}/{repo}/issues/<n>` |
+ *
+ * Every call opens with `api`: it is the gh SUBCOMMAND, and `gh` with a
+ * path as its first word answers `unknown command` and exits 1. The
+ * fake in `src/adapters/tracker/github-fake.ts` refuses the same way,
+ * which is what keeps this honest (measured 2026-09-23: the tick of
+ * issue #31 failed in production because both calls left `api` out,
+ * while their unit tests asserted the argument list they were given).
  * | write | `gh api repos/{owner}/{repo}/issues/<n> -X PATCH -f body=<body>` |
  *
  * One REST resource, read and written, with `{owner}/{repo}` left for
@@ -221,14 +228,14 @@ export function createGhRoadmapBody(options: { readonly gh: GhRunner }): Roadmap
   return Object.freeze({
     read: async (issue: number): Promise<string> => {
       const path = pathOf(issue, 'read');
-      const result = await gh([path]);
+      const result = await gh(['api', path]);
       if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, `gh api ${path}`)}`);
       return bodyOf(result.stdout, `gh api ${path}`);
     },
 
     write: async (issue: number, body: string): Promise<string> => {
       const path = pathOf(issue, 'write');
-      const result = await gh([path, '-X', 'PATCH', '-f', `body=${body}`]);
+      const result = await gh(['api', path, '-X', 'PATCH', '-f', `body=${body}`]);
       const command = `gh api ${path} -X PATCH -f body=<body>`;
       if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
       return bodyOf(result.stdout, command);

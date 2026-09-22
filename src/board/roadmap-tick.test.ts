@@ -10,6 +10,16 @@
  * no case spawns a process, reaches GitHub or reads the configuration
  * `gh` keeps under the home.
  *
+ * A stub answers whatever it is handed, so a stub alone cannot tell a
+ * runnable `gh` command from an unrunnable one: on 2026-09-22 the tick
+ * of issue #31 failed in production with `unknown command
+ * \"repos/{owner}/{repo}/issues/31\" for \"gh\"` while the two cases
+ * below passed, because both the code and their expectations left the
+ * `api` subcommand out. So the last describe drives the same board over
+ * {@link createFakeGh}, which dispatches on the subcommand and refuses
+ * what it does not model, exactly as `gh` refuses an unknown command.
+ * Restore the bug and those cases redden; the two stub cases do not.
+ *
  * A retry passes while wrong most easily by re-sending the first
  * attempt's text rather than re-reading, so the case that retries plants
  * a SECOND body with a line the first did not have and asserts the write
@@ -27,6 +37,8 @@ import type { RoadmapBody } from './roadmap-tick.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
+
+import { createFakeGh } from '../adapters/tracker/github-fake.js';
 
 import {
   createGhRoadmapBody,
@@ -186,7 +198,7 @@ describe('createGhRoadmapBody', () => {
 
     const body = await createGhRoadmapBody({ gh: stub.run }).read(31);
 
-    expect(stub.calls()).toEqual([['repos/{owner}/{repo}/issues/31']]);
+    expect(stub.calls()).toEqual([['api', 'repos/{owner}/{repo}/issues/31']]);
     expect(body).toBe(roadmap());
   });
 
@@ -195,7 +207,7 @@ describe('createGhRoadmapBody', () => {
 
     const stored = await createGhRoadmapBody({ gh: stub.run }).write(31, 'sent');
 
-    expect(stub.calls()).toEqual([['repos/{owner}/{repo}/issues/31', '-X', 'PATCH', '-f', 'body=sent']]);
+    expect(stub.calls()).toEqual([['api', 'repos/{owner}/{repo}/issues/31', '-X', 'PATCH', '-f', 'body=sent']]);
     expect(stored).toBe('stored');
   });
 
@@ -319,5 +331,68 @@ describe('tickSentence', () => {
   it('names the attempts and the problem when the tick failed', () => {
     expect(tickSentence({ ...base, status: 'failed', attempts: 2, problem: 'gh said 502' }))
       .toBe('the roadmap, issue #31 was not ticked after 2 attempts: gh said 502');
+  });
+});
+
+describe('createGhRoadmapBody over the gh fake', () => {
+  /**
+   * The fake with one roadmap issue planted, and the board over it. The
+   * fake numbers what it creates from 1, so the roadmap here is issue 1
+   * rather than this repository's #31; the board takes any number.
+   */
+  async function plantRoadmap(body: string): Promise<{
+    readonly fake: ReturnType<typeof createFakeGh>;
+    readonly board: RoadmapBody;
+    readonly issue: number;
+  }> {
+    const fake = createFakeGh();
+    const created = await fake.run(['issue', 'create', '--title', 'Roadmap', '--body', body]);
+    if (!created.ok) throw new Error(`planting the roadmap failed: ${created.stderr}`);
+    return { fake, board: createGhRoadmapBody({ gh: fake.run }), issue: 1 };
+  }
+
+  it('reads the body through a runner that dispatches on the subcommand, as gh does', async () => {
+    const { board, fake, issue } = await plantRoadmap(roadmap());
+
+    const read = await board.read(issue);
+
+    expect(read).toBe(roadmap());
+    expect(fake.calls().at(-1)?.[0]).toBe('api');
+  });
+
+  it('writes the body through the same runner, and the issue holds it afterwards', async () => {
+    const { board, fake, issue } = await plantRoadmap(roadmap());
+    const ticked = roadmap().replace('- [ ] #20', '- [x] #20');
+
+    const stored = await board.write(issue, ticked);
+
+    expect(stored).toBe(ticked);
+    expect(fake.issue('1')?.body).toBe(ticked);
+    expect(await board.read(issue)).toBe(ticked);
+  });
+
+  it('rejects a call that is not a gh subcommand, the shape of the production failure', async () => {
+    const { fake, issue } = await plantRoadmap(roadmap());
+    // What `createGhRoadmapBody` sent before the fix: the REST path as
+    // the first word, with no `api` ahead of it.
+    const pathFirst = createGhRoadmapBody({
+      gh: (args) => fake.run(args[0] === 'api'
+        ? args.slice(1)
+        : args),
+    });
+
+    await expect(pathFirst.read(issue)).rejects.toThrow(/unhandled command repos/);
+  });
+
+  it('refuses a PATCH that carries a body beside another field, so a tick cannot close an issue by accident', async () => {
+    const { fake } = await plantRoadmap(roadmap());
+
+    const result = await fake.run([
+      'api', 'repos/{owner}/{repo}/issues/1', '-X', 'PATCH', '-f', 'body=ticked', '-f', 'state=closed',
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain('body alone');
+    expect(fake.issue('1')?.state).toBe('OPEN');
   });
 });
