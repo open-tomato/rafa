@@ -79,9 +79,11 @@ describe('tickRoadmapAfterMerge', () => {
     });
 
     expect(result).toMatchObject({ roadmap: 31, status: 'ticked', ticked: [20], attempts: 1 });
-    expect(stub.calls().map((call) => call[0])).toEqual([
-      'repos/{owner}/{repo}/issues/31',
-      'repos/{owner}/{repo}/issues/31',
+    // `api` first, then the path: the tick sends a gh subcommand, not a
+    // bare REST path (`board/roadmap-tick.ts`).
+    expect(stub.calls().map((call) => call.slice(0, 2))).toEqual([
+      ['api', 'repos/{owner}/{repo}/issues/31'],
+      ['api', 'repos/{owner}/{repo}/issues/31'],
     ]);
     expect(stub.calls()[1]).toContain('body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n');
     expect(warnings.lines()).toEqual([]);

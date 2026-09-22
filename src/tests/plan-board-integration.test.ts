@@ -573,7 +573,7 @@ function sharedBoard(roadmap: SpecIssue, others: readonly SpecIssue[]): { readon
     if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}/collaborators/octocat/permission') {
       return Promise.resolve(said(JSON.stringify({ permission: 'admin', role_name: 'admin' })));
     }
-    if (typeof args[0] === 'string' && args[0].startsWith(`repos/{owner}/{repo}/issues/${String(roadmap.number)}`)) {
+    if (args[0] === 'api' && args[1]?.startsWith(`repos/{owner}/{repo}/issues/${String(roadmap.number)}`) === true) {
       if (args.includes('-X') && args.includes('PATCH')) {
         const bodyArg = args.find((arg) => arg.startsWith('body='));
         if (bodyArg !== undefined) body = bodyArg.slice('body='.length);

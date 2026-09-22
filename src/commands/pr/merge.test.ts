@@ -710,8 +710,8 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
-      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
-      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
       BLOCKED_LISTING,
     ]);
     expect(lines).toContain(`Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`);
@@ -735,8 +735,8 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
-      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
-      `repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       BLOCKED_LISTING,
     ]);
     expect(lines.some((line) => line.startsWith('warn: ') && line.includes('was not ticked'))).toBe(true);

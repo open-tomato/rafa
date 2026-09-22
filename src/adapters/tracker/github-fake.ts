@@ -385,19 +385,34 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       if (named !== '{owner}/{repo}' && named !== repo) {
         return failed(`fake gh: models one repository, ${repo ?? 'none'}, and was handed ${path}\n`);
       }
-      // `gh api` sends a POST once `-f` is passed, and a POST cannot update an issue.
-      if (flagValue(parsed, '-X') !== 'PATCH') return failed(`fake gh: ${path} is modelled for -X PATCH alone\n`);
-      const issue = namedIssue(number);
-      if ('ok' in issue) return issue;
-
+      const method = flagValue(parsed, '-X');
       const fields = new Map((parsed.flags.get('-f') ?? []).map((pair): [string, string] => {
         const at = pair.indexOf('=');
         return [pair.slice(0, at), pair.slice(at + 1)];
       }));
+      // `gh api` sends a POST once `-f` is passed, and a POST cannot update an
+      // issue; with no field and no method it is the GET the roadmap reads
+      // its body with (`src/board/roadmap-tick.ts`).
+      if (method !== 'PATCH' && (method !== undefined || fields.size > 0)) {
+        return failed(`fake gh: ${path} is modelled for -X PATCH alone\n`);
+      }
+      const issue = namedIssue(number);
+      if ('ok' in issue) return issue;
+
+      if (method === undefined) return ok(`${JSON.stringify(render(issue, ['body', 'number', 'state', 'title']))}\n`);
+
+      // The roadmap's own write: one body, and no state beside it.
+      const body = fields.get('body');
+      if (body !== undefined) {
+        if (fields.size > 1) return failed('fake gh: api PATCH models body alone, with no other field\n');
+        store({ ...issue, body });
+        return ok(`${JSON.stringify(render(issues.get(number) ?? issue, ['body', 'number', 'state', 'title']))}\n`);
+      }
+
       const state = fields.get('state');
       const reason = fields.get('state_reason');
       if (state !== 'closed' || (reason !== 'completed' && reason !== 'not_planned')) {
-        return failed('fake gh: api PATCH models state=closed with state_reason completed or not_planned alone\n');
+        return failed('fake gh: api PATCH models body alone, or state=closed with state_reason completed or not_planned\n');
       }
       store({ ...issue, state: 'CLOSED', stateReason: reason.toUpperCase() });
       return ok(`${JSON.stringify(render(issues.get(number) ?? issue, ['number', 'state', 'stateReason']))}\n`);
