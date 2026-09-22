@@ -75,8 +75,8 @@
  *     `pr wait [<n>] [--timeout=<minutes>]`, its checks polled until
  *     they settle or the deadline passes with nothing written, exiting 0
  *     green, 1 red and on no checks at all, and 3 at the deadline; and
- *     `pr merge [<n>] [--yes] [--method=squash|merge|rebase]`, one
- *     merged and both branches cleaned up after it; and
+ *     `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`,
+ *     one merged and both branches cleaned up after it; and
  *     `pr triage [<n>] [--no-comment] [--max-attempts=<count>]`, one
  *     assessed in code into a class with its evidence and a follow-up
  *     prompt, the reading left as one comment per pull request. Each

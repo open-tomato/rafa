@@ -788,7 +788,7 @@ module's note is the long form.
   the arguments `id` and `state`; each declares `text` and `json`. Of the `pr` actions, `pr current` and `pr list`
   declare no argument and no flag, each with `text` and `json`. `pr show` and `pr view`
   declare the argument `n` and no flag. `pr merge`
-  declares the argument `n` and the flags `yes`, `method` and `hint`, and
+  declares the argument `n` and the flags `yes`, `skip-checks`, `method` and `hint`, and
   `pr triage` the argument `n` and the flags `comment`, `resolve`,
   `max-attempts` and `hint`; each declares `text` and `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
@@ -879,7 +879,9 @@ module's note is the long form.
   that is none of the three GitHub merge methods, a number the repository
   has no pull request for, a git reading that failed, each of the four
   merge refusals (dirty tree, not green, not mergeable, branch in another
-  worktree), no terminal to ask on without `--yes`, a provider that would
+  worktree), `--skip-checks` on a pull request that reports checks, no
+  terminal to ask on without `--yes`, `--yes` beside `--skip-checks` where
+  workflows exist or their count could not be read, a provider that would
   not merge, and a clean-up step that failed. `pr triage` throws 1 for a
   stray word, a word that is no whole number from 1, a flag that swallowed
   the number, a config that cannot be used, a `--max-attempts` that is no

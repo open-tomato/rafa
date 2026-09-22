@@ -14,7 +14,8 @@ Seven actions read and control pull requests:
   check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
 - `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable
-- `pr merge [<n>] [--yes] [--method=squash|merge|rebase]` — merge the PR
+- `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
+  merge the PR; `--skip-checks` is for a PR that reports no checks at all
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle

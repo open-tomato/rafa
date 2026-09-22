@@ -958,14 +958,14 @@ describe('the ending it names the next step with', () => {
 });
 
 describe('the command itself', () => {
-  it('routes as pr merge, declares both renderings, one optional number and its three flags, and is frozen', () => {
+  it('routes as pr merge, declares both renderings, one optional number and its four flags, and is frozen', () => {
     const command = createPrMergeCommand();
 
     expect([command.subject, command.action, command.name]).toEqual(['pr', 'merge', 'pr merge']);
     expect(command.outputs).toEqual(['text', 'json']);
     expect(command.args.map((arg) => [arg.name, arg.required ?? false])).toEqual([['n', false]]);
     expect(command.flags.map((flag) => [flag.name, flag.type]))
-      .toEqual([['yes', 'boolean'], ['method', 'string'], ['hint', 'boolean']]);
+      .toEqual([['yes', 'boolean'], ['skip-checks', 'boolean'], ['method', 'string'], ['hint', 'boolean']]);
     expect(Object.isFrozen(command)).toBe(true);
   });
 
@@ -977,6 +977,7 @@ describe('the command itself', () => {
     expect(command.examples.map((example) => example.cmd)).toEqual([
       'rafa pr merge',
       'rafa pr merge 41 --yes',
+      'rafa pr merge 41 --skip-checks',
       'rafa pr merge 41 --method=rebase --output=json',
     ]);
   });

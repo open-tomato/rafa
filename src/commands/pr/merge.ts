@@ -1,6 +1,6 @@
 /**
- * `rafa pr merge [<n>] [--yes] [--method=squash|merge|rebase]`: the
- * pull request merged through the provider, and the five git steps
+ * `rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`:
+ * the pull request merged through the provider, and the five git steps
  * after it run here, each one reported.
  *
  * `src/pr/merge.ts` holds what this refuses on and what the clean-up
@@ -37,6 +37,23 @@
  * declines: the question is spelled `[y/N]` and the default is no. A
  * declined merge is not a failure — nothing was merged and nothing was
  * broken — so it ends 0, saying so.
+ *
+ * ## `--skip-checks`
+ *
+ * A pull request whose checks read verdict `none` — zero check rows — is
+ * refused without the flag, and with it is the one verdict let past the
+ * checks refusal; on `pending`, `red` or `green` the flag is itself
+ * refused, naming each row (`readMergeRefusal`, which is handed the rows
+ * and the flag). What the flag adds past that is `./merge-unchecked.ts`'s
+ * and is called at the three points its module note names: the workflow
+ * count read and its two refusals in place of {@link requireTerminal},
+ * the warning and `Merge #<n> with no checks? [y/N]` in place of
+ * `Merge? [y/N]`, and the one comment posted straight after the provider
+ * merged, before the roadmap tick and the clean-up, so a clean-up that
+ * fails cannot drop it. The merge, the clean-up, the follow-ups and the
+ * unblock reading are this module's own and run as they do without the
+ * flag. {@link PrMergeResult.unchecked} carries what the flag read and
+ * posted, and is null without it.
  *
  * ## After the merge, nothing is undone
  *
@@ -125,17 +142,21 @@
  * cannot be read, a detached HEAD, and a branch with no open pull
  * request. Its own, all exit 1: a `--method` that is none of the three;
  * a number the repository has no pull request for; a git reading that
- * failed; each of the four refusals `readMergeRefusal` answers; no
- * terminal to ask on and no `--yes`; a provider that would not merge;
- * and a clean-up step that failed.
+ * failed; each of the refusals `readMergeRefusal` answers, `--skip-checks`
+ * on a pull request that reports checks among them; no terminal to ask
+ * on and no `--yes`; `--yes` beside `--skip-checks` where workflows exist
+ * or their count could not be read; a provider that would not merge; and
+ * a clean-up step that failed.
  */
 import type { FollowUp } from './merge-followups.js';
+import type { UncheckedMerge } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { NextEndingSeams } from '../../next/ending.js';
-import type { ChecksVerdict, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { ChecksReading, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { UncheckedCase } from '../../pr/unchecked.js';
 import type { Prompter } from '../../project/root-choice.js';
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
@@ -164,6 +185,7 @@ import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
 import { tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
+import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
 import {
   lineRefusal,
   onProvider,
@@ -214,6 +236,16 @@ export interface MergeStepReport {
   readonly ok: boolean;
 }
 
+/** What `--skip-checks` read and posted, as the result carries it; see the module note. */
+export interface UncheckedMergeReport {
+  /** The workflow count read, or null where it could not be read. */
+  readonly workflowCount: number | null;
+  /** Which reading of "no checks" that count gives. */
+  readonly case: UncheckedCase;
+  /** The URL of the comment posted after the merge; null for a declined merge or a comment that would not post. */
+  readonly commentUrl: string | null;
+}
+
 /** What json mode gives as the terminal result's `data`. */
 export interface PrMergeResult {
   readonly number: number;
@@ -240,6 +272,8 @@ export interface PrMergeResult {
   readonly roadmapTick: RoadmapTickResult | null;
   /** What the unblock reading came to, or null when the pull request closes no issue. */
   readonly unblocked: UnblockReport | null;
+  /** What `--skip-checks` read and posted, or null when the flag was not given. */
+  readonly unchecked: UncheckedMergeReport | null;
 }
 
 /** A refusal of this action with exit code 1. */
@@ -279,7 +313,7 @@ export function summaryLine(detail: PullRequestDetail, method: MergeMethod): str
 }
 
 /** Everything `readMergeRefusal` reads off git, gathered at the project root. */
-function refuseFromGit(git: GitRunner, detail: PullRequestDetail, verdict: ChecksVerdict): void {
+function refuseFromGit(git: GitRunner, detail: PullRequestDetail, checks: ChecksReading, skipChecks: boolean): void {
   const tree = parseWorkingTree(gitOrRefuse(git, ['status', '--porcelain'], 'read the working tree'));
   const worktrees = parseWorktrees(gitOrRefuse(git, ['worktree', 'list', '--porcelain'], 'list the worktrees'));
   const at = gitOrRefuse(git, ['rev-parse', '--show-toplevel'], 'read the repository root').trim();
@@ -289,7 +323,9 @@ function refuseFromGit(git: GitRunner, detail: PullRequestDetail, verdict: Check
     base: detail.baseRefName,
     tree,
     merge: { mergeable: detail.mergeable, status: detail.mergeStateStatus },
-    checks: verdict,
+    checks: checks.verdict,
+    rows: checks.rows,
+    skipChecks,
     worktrees,
     at,
   });
@@ -484,9 +520,66 @@ function runCleanUp(
   return reports;
 }
 
+/** What {@link askToMerge} decided: whether to merge, and what `--skip-checks` read when it was given. */
+interface MergeAnswer {
+  readonly go: boolean;
+  readonly unchecked: UncheckedMerge | null;
+}
+
+/**
+ * Makes the terminal refusals, writes the summary line, and asks — the
+ * unchecked question where `--skip-checks` was given, `Merge? [y/N]`
+ * otherwise — with `--yes` answering where it may; see the module note.
+ */
+async function askToMerge(
+  context: RafaContext,
+  pr: PrContext,
+  seams: MergeSeams,
+  ask: { readonly number: number; readonly summary: string; readonly yes: boolean; readonly skipChecks: boolean },
+): Promise<MergeAnswer> {
+  const { number, summary, yes, skipChecks } = ask;
+  const unchecked = skipChecks
+    ? await readUncheckedMerge({ pulls: pr.pulls, number, yes, summary, isTerminal: seams.isTerminal })
+    : null;
+  if (unchecked === null && !yes) requireTerminal(seams, summary);
+  context.output.info(summary);
+
+  if (unchecked !== null) {
+    const warn = (message: string): void => {
+      context.output.warn(message);
+    };
+    return { go: await confirmUncheckedMerge(unchecked, { warn, openPrompter: seams.openPrompter }), unchecked };
+  }
+  return { go: yes || await confirmed(seams), unchecked };
+}
+
+/** What the result carries for `--skip-checks`, or null without it. */
+function uncheckedReport(unchecked: UncheckedMerge | null, commentUrl: string | null): UncheckedMergeReport | null {
+  return unchecked === null
+    ? null
+    : { workflowCount: unchecked.workflowCount, case: unchecked.reading.case, commentUrl };
+}
+
+/** Posts the unchecked-merge comment where `--skip-checks` was given; its URL, or null. Never throws. */
+async function commentIfUnchecked(
+  context: RafaContext,
+  pr: PrContext,
+  number: number,
+  unchecked: UncheckedMerge | null,
+): Promise<string | null> {
+  if (unchecked === null) return null;
+  const posted = await postUncheckedComment(pr.pulls, number, unchecked, (message) => {
+    context.output.warn(message);
+  });
+  if (posted === null) return null;
+  context.output.info(`Commented on #${number} that it was merged with no checks: ${posted.url}`);
+  return posted.url;
+}
+
 /** Merges the pull request and cleans up after it, reporting each line; see the module note. */
 export async function runMerge(context: RafaContext, seams: MergeSeams): Promise<PrMergeResult> {
   const yes = readBooleanFlag(context.flags, 'yes', USAGE);
+  const skipChecks = readBooleanFlag(context.flags, 'skip-checks', USAGE);
   const wanted = readMethodFlag(context.flags, USAGE);
   const asked = readPullArgument(context.args, USAGE);
   const pr = openPrContext(context, seams);
@@ -499,11 +592,10 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     throw lineRefusal(`No pull request #${pick.number} at ${pr.project.root}`, USAGE);
   }
   const checks = await onProvider(`read the checks of #${pick.number}`, () => pr.pulls.checks(pick.number));
-  refuseFromGit(git, detail, checks.verdict);
+  refuseFromGit(git, detail, checks, skipChecks);
 
   const summary = summaryLine(detail, method);
-  if (!yes) requireTerminal(seams, summary);
-  context.output.info(summary);
+  const answer = await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks });
   // What the run answers if it stops here, and the base of what it answers if it does not.
   const answered: PrMergeResult = {
     number: detail.number,
@@ -519,8 +611,9 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     followUps: [],
     roadmapTick: null,
     unblocked: null,
+    unchecked: uncheckedReport(answer.unchecked, null),
   };
-  if (!yes && !await confirmed(seams)) {
+  if (!answer.go) {
     context.output.info('Nothing was merged.');
     return answered;
   }
@@ -530,6 +623,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     throw refusal([`❌ ${pr.pulls.kind} would not merge #${detail.number}: ${outcome.detail}`]);
   }
   context.output.info(`Merged #${detail.number} into ${detail.baseRefName} (${method}).`);
+  const commentUrl = await commentIfUnchecked(context, pr, detail.number, answer.unchecked);
   const roadmapTick = await reportTick(context, pr, seams, detail);
 
   const remoteBranchPresent = remoteHoldsBranch(git, detail.headRefName, (message) => {
@@ -554,6 +648,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     followUps,
     roadmapTick,
     unblocked,
+    unchecked: uncheckedReport(answer.unchecked, commentUrl),
   };
 }
 
@@ -569,7 +664,11 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' and prunes, reporting each step. Refuses before it asks anything on a dirty working tree, on a pull'
       + ' request that is not green or does not merge, and on a head branch checked out in another worktree. It'
       + ' shows the pull request, its branches and the method and asks `Merge? [y/N]`; `--yes` skips the question,'
-      + ' and without a terminal and without `--yes` it refuses. A step that fails never undoes the merge: it'
+      + ' and without a terminal and without `--yes` it refuses. A pull request that reports no checks at all is'
+      + ' refused unless `--skip-checks` is given, which is refused on any pull request that does report checks;'
+      + ' with it the command reads how many workflows the repository defines, prints a warning for that case, asks'
+      + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow),'
+      + ' and after the merge posts one comment on the pull request saying so. A step that fails never undoes the merge: it'
       + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
       + ' every issue the pull request closes on the roadmap issue, warning rather than failing when that write'
       + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'
@@ -592,6 +691,13 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
         type: 'boolean',
       },
       {
+        name: 'skip-checks',
+        description: 'Merge a pull request that reports no checks at all, after a warning and its own question.'
+          + ' Refused where the pull request reports any check; `--yes` beside it is refused where the repository'
+          + ' defines a workflow or its workflow count could not be read.',
+        type: 'boolean',
+      },
+      {
         name: 'method',
         description: 'How to merge: squash, merge or rebase. `pr.mergeMethod` when it is left out.',
         type: 'string',
@@ -606,6 +712,10 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       {
         cmd: 'rafa pr merge 41 --yes',
         note: 'Merges pull request 41 without asking, then runs the clean-up.',
+      },
+      {
+        cmd: 'rafa pr merge 41 --skip-checks',
+        note: 'Warns that nothing on GitHub tested pull request 41, asks, merges it and comments that it had no checks.',
       },
       {
         cmd: 'rafa pr merge 41 --method=rebase --output=json',
