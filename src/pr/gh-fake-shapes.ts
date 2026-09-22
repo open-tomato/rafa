@@ -85,6 +85,31 @@
  *     no GitHub account is the 404 above, with the message
  *     `<login> is not a user`.
  *
+ * Read the same way on 2026-09-22, again off `gh` 2.100.0 with read-only
+ * commands, for the workflow count:
+ *
+ *   - `gh api repos/<repo>/actions/workflows` answers
+ *     `{"total_count","workflows"}` and exit 0. `open-tomato/rafa`, which
+ *     has no workflow, answered exactly `{"total_count":0,"workflows":[]}`
+ *     with no trailing newline. `cli/cli` answered 21, each workflow
+ *     `{"id","node_id","name","path","state","created_at","updated_at",
+ *     "url","html_url","badge_url"}` in that order, `state` read as
+ *     `active` or `disabled_manually`. `github/docs` answered
+ *     `total_count` 119 beside a `workflows` array of 30: without
+ *     `--paginate` the array is the first page and `total_count` the
+ *     whole count, so only `total_count` counts.
+ *   - A repository the account cannot read (`open-tomato/no-such-repo-rafa86`)
+ *     is the 404 above: message `Not Found`, documentation URL
+ *     `https://docs.github.com/rest/actions/workflows#list-repository-workflows`.
+ *   - No repository read answered the workflows path with a 403, so its
+ *     403 is the ENVELOPE recorded off two sibling `actions` paths
+ *     (`repos/github/docs/actions/permissions` and
+ *     `repos/cli/cli/actions/secrets`): exit 1, the body
+ *     `{"message","documentation_url","status":"403"}` on stdout and
+ *     `gh: <message> (HTTP 403)` on stderr, the 404's shape with the
+ *     other status. The message it carries is the `actions/permissions`
+ *     one verbatim, beside the workflows documentation URL.
+ *
  * NOT recorded, because reading one would write to a repository: what
  * `gh pr merge`, `gh pr edit`, a comment POST and a comment PATCH write
  * when they succeed, and what any of them writes when it fails. So the
@@ -250,12 +275,37 @@ export function isResult(value: object): value is GhResult {
   return 'ok' in value;
 }
 
+/** The HTTP statuses a `gh api` failure is recorded for. */
+export type FakeHttpStatus = 403 | 404;
+
+/** A recorded `gh api` failure: the body on stdout, `gh: <message> (HTTP <status>)` on stderr. */
+export function httpFailure(status: FakeHttpStatus, message: string, documentationUrl: string): GhResult {
+  return failed(
+    `gh: ${message} (HTTP ${status})\n`,
+    JSON.stringify({ message, documentation_url: documentationUrl, status: String(status) }),
+  );
+}
+
 /** The recorded 404: the body on stdout, `gh: <message> (HTTP 404)` on stderr. */
 export function notFound(message: string, documentationUrl: string): GhResult {
-  return failed(
-    `gh: ${message} (HTTP 404)\n`,
-    JSON.stringify({ message, documentation_url: documentationUrl, status: '404' }),
-  );
+  return httpFailure(404, message, documentationUrl);
+}
+
+/** The documentation URL the workflows path's failures carry, as recorded. */
+export const WORKFLOWS_DOCS = 'https://docs.github.com/rest/actions/workflows#list-repository-workflows';
+
+/** The message the recorded `actions` 403 carries; see the module note. */
+export const ACTIONS_FORBIDDEN =
+  'You must have repository read permissions or have the repository Actions policies fine-grained permission.';
+
+/** How many workflows one page of `gh api .../actions/workflows` holds, as recorded. */
+export const WORKFLOWS_PAGE = 30;
+
+/** The recorded failure of the workflows path under one status. */
+export function workflowsFailure(status: FakeHttpStatus): GhResult {
+  return status === 404
+    ? httpFailure(404, 'Not Found', WORKFLOWS_DOCS)
+    : httpFailure(403, ACTIONS_FORBIDDEN, WORKFLOWS_DOCS);
 }
 
 /** Recorded for a pull request number the repository has none of. */
@@ -412,6 +462,42 @@ export function renderPermission(login: string, permission: string): Record<stri
     permission,
     role_name: permission,
     user: { login, type: 'User' },
+  };
+}
+
+/** One workflow the fake repository holds. */
+export interface FakeWorkflow {
+  readonly name: string;
+  /** `active` when left out; `disabled_manually` was also recorded. */
+  readonly state?: string;
+}
+
+/** One workflow as the workflows path writes it, keys in the recorded order. */
+function renderWorkflow(workflow: FakeWorkflow, index: number, repo: string): Record<string, unknown> {
+  const id = 25016 + index;
+  const file = `${workflow.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.yml`;
+  return {
+    id,
+    node_id: `W_kwDOfake${id}`,
+    name: workflow.name,
+    path: `.github/workflows/${file}`,
+    state: workflow.state ?? 'active',
+    created_at: '2026-09-18T11:00:00.000+02:00',
+    updated_at: '2026-09-18T11:00:00.000+02:00',
+    url: `https://api.github.com/repos/${repo}/actions/workflows/${id}`,
+    html_url: `https://github.com/${repo}/blob/main/.github/workflows/${file}`,
+    badge_url: `https://github.com/${repo}/workflows/${encodeURIComponent(workflow.name)}/badge.svg`,
+  };
+}
+
+/**
+ * The workflows payload: `total_count` the whole count, `workflows` the
+ * first page of {@link WORKFLOWS_PAGE} alone, as recorded unpaginated.
+ */
+export function renderWorkflows(workflows: readonly FakeWorkflow[], repo: string): Record<string, unknown> {
+  return {
+    total_count: workflows.length,
+    workflows: workflows.slice(0, WORKFLOWS_PAGE).map((workflow, index) => renderWorkflow(workflow, index, repo)),
   };
 }
 

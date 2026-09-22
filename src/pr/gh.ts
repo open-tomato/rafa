@@ -68,6 +68,14 @@
  *     ONE argument after `--body`, never interpolated into a command
  *     line: the runner spawns `gh` with an argument list, so a body
  *     holding newlines, quotes or backticks reaches GitHub as written.
+ *   - **The workflow count is `total_count`, never the length of
+ *     `workflows`.** `gh api repos/<repo>/actions/workflows` without
+ *     `--paginate` answers the first page of 30 beside the whole count
+ *     (`github/docs`: 119 beside 30), so `workflowCount` reads the count
+ *     field alone and sends no `--paginate`. Every failure of that read
+ *     — the recorded 403 and 404, an outage, a payload whose
+ *     `total_count` is not a whole number — answers null, as the port
+ *     declares, rather than throwing like the other reads.
  *
  * ## What is refused, and what is narrowed
  *
@@ -132,6 +140,9 @@ const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus
 
 /** The fields a check row is read from; `parseChecks` reads exactly these. */
 const CHECK_FIELDS = 'name,state,link';
+
+/** The path the workflow count is read from. */
+const WORKFLOWS_PATH = `repos/${REPO_PATH}/actions/workflows`;
 
 /** How many pull requests `list` asks for: `gh pr list`'s own default. */
 const LIST_LIMIT = 30;
@@ -299,6 +310,26 @@ function readComment(value: unknown, command: string, where: string): PullReques
     updatedAt: readString(comment['updated_at'], command, `${where}.updated_at`),
     url: readString(comment['html_url'], command, `${where}.html_url`),
   };
+}
+
+/**
+ * The `total_count` of a workflows payload, or null when `stdout` is not
+ * JSON or its count is not a whole number of zero or more.
+ */
+function readWorkflowCount(stdout: string): number | null {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(stdout) as unknown;
+  } catch {
+    // Unreadable is the port's null, not a refusal; see the module note.
+    return null;
+  }
+  const count = isMapping(payload)
+    ? payload['total_count']
+    : undefined;
+  return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+    ? count
+    : null;
 }
 
 /** The pull request number `member` was handed, as an argument. Throws when it is not one. */
@@ -476,6 +507,14 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       // A dropped log is an ordinary state of an old run; a missing run is not.
       if (result.stderr.includes(LOG_DROPPED)) return '';
       throw failure(command, result);
+    },
+
+    workflowCount: async (): Promise<number | null> => {
+      const result = await gh(['api', WORKFLOWS_PATH]);
+      // Any failure is the port's null, the riskier reading; see the module note.
+      return result.ok
+        ? readWorkflowCount(result.stdout)
+        : null;
     },
   };
   return Object.freeze(pulls);

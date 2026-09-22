@@ -136,6 +136,16 @@ written after a reference under the same session and artifact is skipped
 as that row's duplicate. An inserted row reaches `progress.txt` as the
 bullet `- artifact: <key>`.
 
+**Read a plan's recorded debt back out of `findings` and
+`out_of_scope_bugs`, keyed by `plan_stub` and ordered by `seq`.** That is
+where a task's substance lands; `task_reports` holds no prose, as the row
+above says. Select EVERY column rather than filtering on `kind`: a row
+`store/tracker-refs.ts` inserted for a filed issue carries only the
+dispatch, the key and the `tracker_ref`, leaving `kind`, `what` and
+`signal` NULL, so a `where kind = ...` query silently drops exactly the
+findings that were escalated. Measured over rafa-63: 210 rows under the
+stub, 12 of them null-`kind`.
+
 ### Attribution
 
 **`planStubFromPrompt` (`src/utils/plan-stamp.ts`) answers the FIRST

@@ -384,6 +384,13 @@ function plant(planting: Planting): Scratch {
   return { repo, home, claude, callLog, path: [bin, dirname(gitBinary)].join(delimiter) };
 }
 
+/**
+ * Typed by every run here, so that no run composes the real sources for
+ * the ending hint in the scratch repository. The ending itself is
+ * driven in `src/next/ending.test.ts`.
+ */
+const NO_HINT = '--no-hint';
+
 /** What one `rafa loop start` run did. */
 interface LoopRun {
   readonly exitCode: number | null;
@@ -399,7 +406,7 @@ function runLoopStart(scratch: Scratch, mode: 'text' | 'json', flags: readonly s
   }
   const env: Record<string, string> = { PATH: scratch.path, HOME: scratch.home };
   if (mode === 'json') env.RAFA_OUTPUT = 'json';
-  const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags], {
+  const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags, NO_HINT], {
     cwd: scratch.repo,
     env,
     timeout: KILL_AFTER_MS,

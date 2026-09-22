@@ -501,8 +501,19 @@ export interface RoadmapPick {
   readonly skipped: readonly RoadmapSkip[];
 }
 
-/** Why `line` is passed over, or null when it is the answer. */
-async function skipOf(line: RoadmapLine, readings: RoadmapReadings): Promise<RoadmapSkip | null> {
+/**
+ * Why `line` is passed over, or null when it is the answer: the four
+ * readings, cheapest first, each line stopping at the first that answers
+ * yes.
+ *
+ * Exported for `./blocked-line.ts`, which walks on from a blocked line
+ * and must ask the done and taken questions exactly as this walk does
+ * rather than spelling their order a second time.
+ */
+export async function readRoadmapSkip(
+  line: RoadmapLine,
+  readings: RoadmapReadings,
+): Promise<RoadmapSkip | null> {
   if (line.ticked) return { line, reason: 'ticked', detail: '' };
   if (await readings.isClosed(line.issue)) return { line, reason: 'closed', detail: '' };
 
@@ -533,7 +544,7 @@ export async function pickNextRoadmapLine(
   let skipped: readonly RoadmapSkip[] = [];
 
   for (const line of lines) {
-    const skip = await skipOf(line, readings);
+    const skip = await readRoadmapSkip(line, readings);
     if (skip === null) return Object.freeze({ line, skipped: Object.freeze(skipped) });
     skipped = [...skipped, skip];
   }

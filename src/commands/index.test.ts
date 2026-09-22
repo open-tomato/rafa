@@ -1,15 +1,15 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the forty-one commands it registers: what the registry
+ * declarations of the forty-five commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `doctor`, `init`, `self-update`, `plan list`, `plan show`, `plan validate`,
+ * `describe`, `doctor`, `init`, `next`, `self-update`, `plan list`, `plan show`, `plan validate`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
- * the five `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
+ * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
  * `skill check`, `skill list`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
  * `release status`, `release tag`,
- * and the six `pr` actions
+ * and the seven `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -38,6 +38,15 @@
  * and no phase 0 module reads, and skips the same flag inside a message.
  * `--detached`, which `loop start` now declares, is read by
  * `start/run-config.ts`, which refuses it.
+ *
+ * One flag is held apart from that equality, and named: `hint`, which
+ * `plan create` and `loop start` declare and no phase 0 parser reads.
+ * It is the wrapper's — `endingWith` in `src/next/ending.ts` reads it
+ * off the parsed context once the phase 0 function has returned — so a
+ * reader module quoting it would be a fiction. The case holds the rest
+ * of each declaration equal to the literals as before AND holds that
+ * flag to be declared, so dropping it reddens the case rather than
+ * passing as "no unread flag".
  *
  * `plan create` names two files because its board flags are read by
  * three modules under `src/board/` and the words they read sit in one,
@@ -107,10 +116,13 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'issue create': ['text', 'json'],
   'issue comment': ['text', 'json'],
   'issue move': ['text', 'json'],
+  'issue ready': ['text', 'json'],
+  'issue unblock': ['text', 'json'],
   'pr current': ['text', 'json'],
   'pr show': ['text', 'json'],
   'pr view': ['text', 'json'],
   'pr list': ['text', 'json'],
+  'pr wait': ['text', 'json'],
   'pr merge': ['text', 'json'],
   'pr triage': ['text', 'json'],
   'effort collect': ['text', 'json'],
@@ -126,6 +138,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'instinct check': ['text', 'json'],
   'instinct list': ['text', 'json'],
   'instinct show': ['text', 'json'],
+  'next': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
   'self-update': ['text', 'json'],
@@ -150,12 +163,15 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue create': [[], ['title', 'body', 'type', 'module', 'priority']],
   'issue comment': [['id'], ['body']],
   'issue move': [['id', 'state'], []],
+  'issue ready': [['n'], ['hint']],
+  'issue unblock': [['n'], ['all']],
   'pr current': [[], []],
   'pr show': [['n'], []],
   'pr view': [['n'], []],
   'pr list': [[], []],
-  'pr merge': [['n'], ['yes', 'method']],
-  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts']],
+  'pr wait': [['n'], ['timeout', 'hint']],
+  'pr merge': [['n'], ['yes', 'skip-checks', 'method', 'hint']],
+  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts', 'hint']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
@@ -169,6 +185,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct show': [['id'], []],
   'release status': [[], ['plan']],
   'release tag': [[], []],
+  'next': [[], ['dry-run', 'yes']],
   'init': [[], ['root', 'yes', 'board', 'release']],
   'doctor': [[], ['plan']],
   'self-update': [[], ['force']],
@@ -216,12 +233,15 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['issue create --title=Timeouts', 'issue create', ['--title=Timeouts'], ''],
   ['issue comment 12 --body=Reproduced', 'issue comment', ['12', '--body=Reproduced'], ''],
   ['issue move 12 done', 'issue move', ['12', 'done'], ''],
+  ['issue ready 57', 'issue ready', ['57'], ''],
+  ['issues unblock --all', 'issue unblock', ['--all'], ''],
   ['pr current', 'pr current', [], ''],
   ['prs show 41', 'pr show', ['41'], ''],
   ['pr view', 'pr view', [], ''],
   ['pr list', 'pr list', [], ''],
   ['pr merge 41 --yes --method=squash', 'pr merge', ['41', '--yes', '--method=squash'], ''],
   ['pr triage 41 --no-comment', 'pr triage', ['41', '--no-comment'], ''],
+  ['pr wait 41 --timeout=5', 'pr wait', ['41', '--timeout=5'], ''],
   ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
@@ -240,6 +260,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['instinct show gate-order', 'instinct show', ['gate-order'], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
+  ['next --dry-run', 'next', ['--dry-run'], ''],
   ['self-update', 'self-update', [], ''],
   ['describe', 'describe', [], ''],
 ];
@@ -299,6 +320,18 @@ function typedFlag(flag: RafaCommand['flags'][number]): string {
     : `--${flag.name}`;
 }
 
+/**
+ * The flags a WRAPPER declares over a phase 0 command, per command,
+ * which no phase 0 parser reads: `hint`, the ending the two of these
+ * that are in the cycle finish with, read by `src/next/ending.ts` off
+ * the parsed context rather than off the words. Held separately below,
+ * and held to be there.
+ */
+const WRAPPER_FLAGS: Readonly<Record<string, readonly string[]>> = {
+  'plan create': ['hint'],
+  'loop start': ['hint'],
+};
+
 /** The quoted flag literals of a source, each once and sorted: `'--name'` and `'--name=`. */
 function literalFlags(source: string): string[] {
   const flags = [...source.matchAll(/'(--[a-z][a-z-]*)['=]/g)].map((match) => match[1] ?? '');
@@ -327,7 +360,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the five issue actions, the four pr readers, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, the two release actions, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the three plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -344,10 +377,13 @@ describe('the core roster', () => {
       'issue create',
       'issue comment',
       'issue move',
+      'issue ready',
+      'issue unblock',
       'pr current',
       'pr show',
       'pr view',
       'pr list',
+      'pr wait',
       'pr merge',
       'pr triage',
       'effort collect',
@@ -365,6 +401,7 @@ describe('the core roster', () => {
       'instinct show',
       'release status',
       'release tag',
+      'next',
       'init',
       'doctor',
       'self-update',
@@ -448,7 +485,7 @@ describe('how the command tree routes', () => {
     const unknown = await dispatchRecorded('stop');
 
     expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report\n');
-    expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move\n');
+    expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move, ready, unblock\n');
     expect(unknown.stderr).toBe('rafa: unknown subject or command "stop"\n');
     expect([bare.outcome.exitCode, issue.outcome.exitCode, unknown.outcome.exitCode]).toEqual([1, 1, 1]);
     expect([...bare.ran, ...issue.ran, ...unknown.ran]).toEqual([]);
@@ -468,12 +505,16 @@ describe('the flags each command declares', () => {
     expect([command.args.map((arg) => arg.name), command.flags.map((flag) => flag.name)]).toEqual(OWN_DECLARATIONS[spelling] ?? []);
   });
 
-  it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(READERS, spelling)))('declares for %s exactly the flags its phase 0 module reads', (spelling, command) => {
+  it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(READERS, spelling)))('declares for %s exactly the flags its phase 0 module reads, beside the wrapper flag', (spelling, command) => {
     const readers = READERS[spelling] ?? [];
     const read = literalFlags(readers.map((file) => readFileSync(join(SRC_DIR, file), 'utf8')).join('\n'));
+    const wrapper = WRAPPER_FLAGS[spelling] ?? [];
+    const names = command.flags.map((flag) => flag.name);
+    const own = command.flags.filter((flag) => !wrapper.includes(flag.name));
 
     expect(readers.length).toBeGreaterThan(0);
-    expect(command.flags.map(typedFlag).sort((a, b) => a.localeCompare(b))).toEqual(read);
+    expect(own.map(typedFlag).sort((a, b) => a.localeCompare(b))).toEqual(read);
+    expect(names.filter((name) => wrapper.includes(name))).toEqual(wrapper);
   });
 
   it('reads a planted quoted flag literal, and none inside a message', () => {

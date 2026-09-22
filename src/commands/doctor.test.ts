@@ -59,6 +59,19 @@
  * reddened 8; the fix line dropped, so a board with gaps names no way
  * to fill them, reddened 3.
  *
+ * ## The blocked issues
+ *
+ * The lines `./doctor-blocked.ts` contributes are driven through that
+ * same fake, which answers the blocked listing from `blocked` and the
+ * board listing from `known`. A fake left bare answers both with no
+ * row, which is why every board case above holds its lines whole: a
+ * board with no issue labelled `spec:blocked` prints none of these.
+ *
+ * One mutation of `src/commands/doctor.ts` was driven against them on
+ * 2026-09-21, the file run alone on a baseline of 36 pass and restored
+ * from a scratch copy verified by sha256: the blocked lines dropped
+ * from what text mode prints reddened 2 cases.
+ *
  * ## The plan's start-only items
  *
  * Their cases plant a plan, the PREREQUISITES file beside it holding one
@@ -98,6 +111,7 @@ import { delimiter, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { version } from '../../package.json';
+import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
 import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { ROADMAP_ROW_NAME } from '../board/status.js';
@@ -118,6 +132,7 @@ import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
+import { BLOCKED_HEADING } from './doctor-blocked.js';
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readPlanFlag } from './doctor.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
@@ -258,25 +273,43 @@ function probeOf(item: PrerequisiteItem): string {
   return probe;
 }
 
-/** What the `gh` runner of a case answers: the labels and the open issues of one imaginary repository. */
+/** What the `gh` runner of a case answers: the labels and the issues of one imaginary repository. */
 interface FakeRepo {
   readonly labels?: readonly string[];
+  /** The open issues the roadmap search finds. */
   readonly issues?: readonly { number: number; title: string }[];
+  /** The open issues labelled `spec:blocked`, with their bodies. */
+  readonly blocked?: readonly { number: number; body: string }[];
+  /** Every issue number the board holds, open and closed. */
+  readonly known?: readonly number[];
+}
+
+/** Which reading a command is, since three of them are `gh issue list`. */
+function routeOf(args: readonly string[]): string {
+  const route = args.slice(0, 2).join(' ');
+  if (route !== 'issue list') return route;
+  if (args.includes('--label')) return 'issue list --label';
+  if (args.includes('all')) return 'issue list --state all';
+  return 'issue list --search';
 }
 
 /**
- * A `gh` runner over `repo`, answering the two commands the board rows
- * read and failing every other, and the argument lists it was handed.
- * So no case of this file spawns `gh`.
+ * A `gh` runner over `repo`, answering the four commands the board rows
+ * and the blocked issues read and failing every other, and the readings
+ * it was asked for. So no case of this file spawns `gh`.
  */
 function fakeGh(repo: FakeRepo = {}): { run: GhRunner; calls: () => readonly string[] } {
   const calls: string[] = [];
   const run: GhRunner = (args) => {
-    const route = args.slice(0, 2).join(' ');
+    const route = routeOf(args);
     calls.push(route);
     const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
     if (route === 'label list') return ok(JSON.stringify((repo.labels ?? []).map((name) => ({ name }))));
-    if (route === 'issue list') return ok(JSON.stringify(repo.issues ?? []));
+    if (route === 'issue list --search') return ok(JSON.stringify(repo.issues ?? []));
+    if (route === 'issue list --label') return ok(JSON.stringify(repo.blocked ?? []));
+    if (route === 'issue list --state all') {
+      return ok(JSON.stringify((repo.known ?? []).map((number) => ({ number }))));
+    }
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${route}` });
   };
   return { run, calls: () => calls };
@@ -312,7 +345,7 @@ function bareBoardLines(): string[] {
     `  missing  ${SPEC_TEMPLATE_PATH}: the repository carries no spec issue template`,
     `  missing  ${ROADMAP_ROW_NAME}: no open issue is titled ${ROADMAP_TITLE}`,
     `  missing  ${ROADMAP_SETTING}: the project config names no roadmap issue`,
-    `Run ${BOARD_FIX} to set up 9 parts of the board this run did not find.`,
+    `Run ${BOARD_FIX} to set up 10 parts of the board this run did not find.`,
   ];
 }
 
@@ -996,9 +1029,9 @@ describe('the board rows', () => {
     const control = await doctor(ready, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => setUp.run) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-12)).toEqual([...bareBoardLines(), aheadLine(bare)]);
+    expect(lines(run.stdout).slice(-13)).toEqual([...bareBoardLines(), aheadLine(bare)]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-11)).toEqual([
+    expect(lines(control.stdout).slice(-12)).toEqual([
       BOARD_HEADING,
       ...BOARD_LABELS.map((label) => `  present  label ${label.name}`),
       `  present  ${SPEC_TEMPLATE_PATH}`,
@@ -1006,7 +1039,7 @@ describe('the board rows', () => {
       `  present  ${ROADMAP_SETTING}`,
       aheadLine(ready),
     ]);
-    expect(setUp.calls()).toEqual(['label list']);
+    expect(setUp.calls()).toEqual(['label list', 'issue list --label']);
   });
 
   it('prints no row and opens no runner where the provider is not gh, where a gh provider opens one', async () => {
@@ -1075,8 +1108,69 @@ describe('the board rows', () => {
     const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [MISSING_TOOL_PROBE]: failed }) });
 
     expect(run.exitCode).toBe(1);
-    expect(lines(run.stdout).slice(-12)).toEqual([...bareBoardLines(), aheadLine(world)]);
+    expect(lines(run.stdout).slice(-13)).toEqual([...bareBoardLines(), aheadLine(world)]);
     expect(run.stderr).toContain('rafa loop start would halt here, before any session.');
+  });
+});
+
+describe('the blocked issues', () => {
+  it('names a labelled issue whose Blocked by line is missing, where one whose line reads is only counted', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const faulted: DoctorSeams['openGh'] = () => fakeGh({ blocked: [{ number: 12, body: 'nothing here\n' }] }).run;
+    const reading: DoctorSeams['openGh'] = () => fakeGh({
+      blocked: [{ number: 12, body: 'Blocked by: #24\n' }],
+      known: [12, 24],
+    }).run;
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, faulted) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, reading) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout).slice(-3)).toEqual([
+      BLOCKED_HEADING,
+      `  #12 is labelled ${SPEC_BLOCKED_LABEL} and its body carries no "Blocked by:" line;`
+        + ` name them as "Blocked by: #24 #26", or take the ${SPEC_BLOCKED_LABEL} label off`,
+      aheadLine(world),
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout).slice(-3)).toEqual([
+      BLOCKED_HEADING,
+      `  1 issue labelled ${SPEC_BLOCKED_LABEL}, naming 1 blocker this run could read`,
+      aheadLine(controlWorld),
+    ]);
+  });
+
+  it('prints no line at all for a board carrying no such issue, where one carrying it prints the heading', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const carrying: DoctorSeams['openGh'] = () => fakeGh({ blocked: [{ number: 12, body: 'no line\n' }] }).run;
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, carrying) });
+
+    expect(lines(run.stdout)).not.toContain(BLOCKED_HEADING);
+    expect(lines(control.stdout)).toContain(BLOCKED_HEADING);
+  });
+
+  it('gives the readings as the blocked of the json result, where a repository with no GitHub board gives null', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const carrying: DoctorSeams['openGh'] = () => fakeGh({ blocked: [{ number: 12, body: 'no line\n' }] }).run;
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    const run = await doctor(world, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN, {}, carrying) });
+    const control = await doctor(controlWorld, ['--output=json'], { seams: ghSeams(() => null) });
+
+    expect(run.exitCode).toBe(0);
+    expect(dataOf(run.stdout)?.blocked?.readings.map((read) => [read.issue, read.kind])).toEqual([[12, 'no-line']]);
+    expect(dataOf(run.stdout)?.blocked?.faults.length).toBe(1);
+    expect(dataOf(run.stdout)?.blocked?.problem).toBe(null);
+    expect(control.exitCode).toBe(0);
+    expect(dataOf(control.stdout)?.blocked).toBe(null);
   });
 });
 

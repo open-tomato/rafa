@@ -5,6 +5,7 @@ Usage:
   rafa loop start [--plan=<string>] [--start-at=<string>] [--inject=<string>]
     [--runtime=<string>] [--no-ci-wait] [--ci-timeout=<number>]
     [--ci-attempts=<number>] [--create-branch] [--any-branch] [-d|--detached]
+    [--no-hint]
 
 Description:
   Walks the tracker of a plan one task at a time, each in a Claude Code session
@@ -61,6 +62,9 @@ Flags:
   -d, --detached    boolean
       Runs the loop in the background. Refused until phase 6, before anything is
       read: until then a run holds the terminal it starts in.
+  --hint            boolean, default true
+      Ends by naming the one step that follows, asking it where there is a
+      terminal to answer on; `--no-hint` reads nothing and prints nothing.
 
 Examples:
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md

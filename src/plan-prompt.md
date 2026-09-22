@@ -23,9 +23,14 @@ on the `open-tomato/rafa` board.
 * Before planning, review the spec as written, and report that review at the
   END of your final message as a `rafa:spec-review` block carrying
   `verdict: ready` or `verdict: not-ready`, with empty `gaps:` for ready, or a
-  list of `{heading, what}` gaps for not-ready — only continue planning after
-  you have judged the spec ready. The block is the LAST thing you write: end
-  the final message with it, after the summary, and write nothing after it.
+  list of gaps for not-ready. Every gap carries `heading`, `what` and
+  `blocking: true` or `blocking: false`, and a gap that is NOT blocking also
+  carries the `assumption:` you would plan under — one sentence naming the
+  guess, not a restatement of the gap. A gap is blocking when guessing wrong
+  changes what ships or what is safe; write no plan while one gap is blocking,
+  and plan under your stated assumptions when every gap is non-blocking.
+  The block is the LAST thing you write: end the final message with it, after
+  the summary, and write nothing after it.
 * Inspect each definition-of-done item: can it be shown by running a command
   or demonstrating a UI interaction, or is it worded too broadly for a reader
   to measure?
@@ -35,8 +40,10 @@ on the `open-tomato/rafa` board.
 * Inspect the headers the spec names: are they the ones the dev-planner
   format requires, and does each hold actual content or only placeholders?
 * If any inspection finds a gap, write its heading as it appears in the spec,
-  the `what` explaining the gap clearly, and list them all under `gaps:` in
-  that closing block.
+  the `what` explaining the gap clearly, `blocking:` for whether it must be
+  answered before anything is planned, the `assumption:` you would plan under
+  when it is not blocking, and list them all under `gaps:` in that closing
+  block.
 
 Create a plan based on the spec at the end of this prompt, following the
 dev-planner format specification that precedes it. Produce the required

@@ -1,8 +1,8 @@
 /**
- * What `rafa pr current`, `show`, `view`, `list`, `merge` and `triage`
- * share: the usage line each refuses with, the words and flags each
- * reads off its line, the provider check and its exit-2 refusal, and
- * which pull request an action acts on.
+ * What `rafa pr current`, `show`, `view`, `list`, `merge`, `triage` and
+ * `wait` share: the usage line each refuses with, the words and flags
+ * each reads off its line, the provider check and its exit-2 refusal,
+ * and which pull request an action acts on.
  *
  * ## The order an action does things in
  *
@@ -18,7 +18,7 @@
  * `resolvePrProvider` (`src/pr/provider.ts`) with the PROJECT ROOT as
  * the repository, and hands the reading to `requireGhProvider`, which
  * throws `CommandExit(2, PR_NEEDS_GH)` for anything but `gh`. The
- * message is a constant there, so every one of the six refuses a
+ * message is a constant there, so every one of the seven refuses a
  * repository without a `gh` provider with the same words, whether the
  * config said `none` or `origin` is no GitHub remote.
  *
@@ -74,9 +74,10 @@
  * nothing about why. `agent vendor` and `skill check --fix` refuse the
  * same way.
  *
- * `--method` and `--max-attempts` are read by the one action each
- * belongs to. They are a choice and a number, they are refused in that
- * action's own words, and a reader here would be shared by nobody.
+ * `--method`, `--max-attempts` and `--timeout` are read by the one
+ * action each belongs to. They are a choice and two numbers, they are
+ * refused in that action's own words, and a reader here would be shared
+ * by nobody.
  *
  * ## The exit codes
  *
@@ -100,8 +101,8 @@ import { messageOf } from '../../config-sections.js';
 import { ConfigError } from '../../config.js';
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 
-/** One of the six actions of the `pr` subject. */
-export type PrAction = 'current' | 'show' | 'view' | 'list' | 'merge' | 'triage';
+/** One of the seven actions of the `pr` subject. */
+export type PrAction = 'current' | 'show' | 'view' | 'list' | 'merge' | 'triage' | 'wait';
 
 /**
  * The usage line each action's refusals name.
@@ -117,8 +118,9 @@ export const PR_USAGE: Readonly<Record<PrAction, string>> = Object.freeze({
   show: 'rafa pr show [<n>]',
   view: 'rafa pr view [<n>]',
   list: 'rafa pr list',
-  merge: 'rafa pr merge [<n>] [--yes] [--method=squash|merge|rebase]',
+  merge: 'rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]',
   triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]',
+  wait: 'rafa pr wait [<n>] [--timeout=<minutes>]',
 });
 
 /** A pull request number as a line writes it: a whole number from 1. */

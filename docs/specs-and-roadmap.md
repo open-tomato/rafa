@@ -41,6 +41,22 @@ credentials. Machine-specific notes go in a local file,
 `.rafa/specs/rafa-<n>-notes.md`, which rafa appends to its own copy of
 the spec and never sends anywhere.
 
+### Blocking other specs
+
+A spec may depend on work in another spec. Add a line to the issue body:
+
+```text
+Blocked by: #42, #57
+```
+
+The `rafa plan create --next` command reads this line and skips the spec,
+offering instead the first unblocked spec under it. Once the blockers
+close, `rafa issue unblock #<n>` removes the `spec:blocked` label and the
+spec is ready for planning. `rafa pr merge` runs that same unblock logic
+when a merged PR closes one or more blockers. The line names one or more
+issue numbers separated by commas or spaces; missing, malformed or invalid
+lines are reported by `rafa doctor`.
+
 ### A prompt for drafting one
 
 Paste this into a Claude Code session opened in your repository, with
@@ -116,6 +132,7 @@ sync.
 | `type:spec` | This issue is a spec. | The template. |
 | `spec:ready` | A person has read it and says a plan may be made from it. | A maintainer. |
 | `spec:needs-work` | Agreed in outline, details pending; or the planner's review found gaps and listed them in a comment. | A maintainer, or rafa after a review. |
+| `spec:blocked` | One or more issues named in the `Blocked by:` line must be closed first. Removed when all blockers close. | rafa or a person. |
 | `type:bug` | A defect. rafa files these itself for out-of-scope bugs a run meets. | rafa or a person. |
 | `needs-triage` | Filed by a run and not looked at yet. | rafa. |
 | `module:unassigned` | No part of the project owns this yet. | rafa. |
@@ -144,8 +161,12 @@ check first, and any failure writes no plan:
    token-shaped string is refused, naming the line.
 5. **The planner's own review.** The planning session judges whether each
    definition-of-done item can be shown by a command and whether anything
-   would have to be guessed. "Not ready" removes the plan, lists the gaps
-   in one comment on the issue and swaps the label to `spec:needs-work`.
+   would have to be guessed, and says of each gap whether it blocks
+   planning. "Not ready" over a blocking gap removes the plan, lists the
+   gaps in one comment on the issue and swaps the label to
+   `spec:needs-work`. "Not ready" over gaps it can all plan under keeps
+   the plan, opens it with the assumptions it planned under, lists the
+   same gaps in the comment and leaves the label alone.
 
 Related, and worth knowing: bugs a run meets that are about one machine
 (a broken toolchain, a failed package build) are kept local and not

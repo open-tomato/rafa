@@ -6,32 +6,82 @@
  *
  * ## Where plans sit
  *
- * `list` and `show` read {@link PLANS_DIR}, the configured plans directory
- * under the git root. `rafa plan create` writes `PLAN-<stub>.md`, and
- * `rafa loop start` looks for its default plan, in `plan.dir` under the
- * project root the dispatcher resolves, with `.rafa/plans` as the default
- * unless a config names another. These two read where those write only
- * when `plan.dir` is `.plans` and the project root is the git toplevel.
- * The loop keeps its copy of a plan beside it as `PLAN_TRACKER-<stub>.md`
- * (`utils/tracker.ts`) and ticks that copy as tasks finish. These two do
- * not read `plan.dir` yet, and read the directory the phase 0 commands used.
+ * `list` and `show` read the directory {@link resolvePlansDir} answers:
+ * `plan.dir` of the config that resolves for the project the dispatcher
+ * found, resolved against that project's root, which is `.rafa/plans`
+ * unless a config names another. That is the directory `rafa plan
+ * create` writes `PLAN-<stub>.md` into and the one `rafa loop start`
+ * looks for its default plan in, so the readers and the writers are on
+ * one directory whatever `plan.dir` is set to. The loop keeps its copy
+ * of a plan beside it as `PLAN_TRACKER-<stub>.md` (`utils/tracker.ts`)
+ * and ticks that copy as tasks finish. `rafa plan validate` takes a file
+ * path and reads no config, so it is on none of this.
+ *
+ * A {@link PlansDir} carries the two spellings a command needs: `path`,
+ * absolute, is the directory read, and `label`, `plan.dir` as the config
+ * spells it, is what a path a person reads opens with. A config
+ * `loadConfig` refuses is refused with exit code 1, naming the command
+ * and every problem.
  *
  * A stub is one a plan stamp can carry (`utils/plan-stamp.ts`): one or
  * more letters, digits, `.`, `_` and `-`. It holds no slash, so a file
  * named from one never leaves the directory.
  */
+import type { RafaContext } from '../../cli/command.js';
 import type { PlanIssue, PlanTask } from '../../plan/index.js';
+import type { ProjectFound } from '../../project/scope.js';
 
 import { statSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
+import { loadConfig } from '../../config-load.js';
+import { ConfigError } from '../../config.js';
 import { isStampableStub } from '../../utils/plan-stamp.js';
 
-/** Where plans sit, under the git root. */
-export const PLANS_DIR = '.plans';
+/** Where the plans of one invocation sit, in the two spellings a command needs. */
+export interface PlansDir {
+  /** `plan.dir` as the config spells it, which is what a path a person reads opens with. */
+  readonly label: string;
+  /** The directory read: `label` resolved against the project root, absolute. */
+  readonly path: string;
+}
 
-/** Answers the root of the repository a command reads: the git root, unless a test hands another. */
-export type RepoRootFinder = () => string;
+/** Where plans sit for a project `root` and a `planDir`, in both spellings. */
+export function plansDirAt(root: string, planDir: string): PlansDir {
+  return { label: planDir, path: resolve(root, planDir) };
+}
+
+/**
+ * The project the dispatcher resolved for a command that declares it
+ * needs one, which is every command but the three that do not.
+ */
+export function requireProject(context: RafaContext, command: string): ProjectFound {
+  if (context.project === null) throw new Error(`${command} runs inside a project, and was handed none`);
+  return context.project;
+}
+
+/**
+ * Where plans sit for `project`, read off the `plan.dir` of the config
+ * that resolves there; a refusal with exit code 1 naming `command` for a
+ * config `loadConfig` refuses. See the module note.
+ */
+export function resolvePlansDir(
+  project: ProjectFound,
+  command: string,
+  warn: (message: string) => void,
+): PlansDir {
+  try {
+    const { config } = loadConfig({ root: project.root, home: project.home }, {}, warn);
+    return plansDirAt(project.root, config.planDir);
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    throw new CommandExit(1, [
+      `❌ ${command}: the config cannot be used:`,
+      ...error.problems.map((problem) => `   ${problem}`),
+    ].join('\n'));
+  }
+}
 
 /** A plan's tasks, counted by checkbox. */
 export interface TaskCounts {

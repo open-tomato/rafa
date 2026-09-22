@@ -19,6 +19,13 @@
  * base chooses between — leave the base, or stay on it deliberately —
  * and `--any-branch` outranks it.
  *
+ * `--hint` is read by neither, and by nothing before the run: it is
+ * this tree's own ({@link HINT_FLAG_SPEC}), and `endingWith` reads it
+ * once `start` has returned, to end a finished run by naming the one
+ * step that follows — with the pull request pushed, the wait on its
+ * checks (`src/next/ending.ts`). A run that refused or was interrupted
+ * throws out of the inner run and ends with no hint.
+ *
  * `--runtime=<path|version>` is read by `start/runtime.ts`, right after
  * that refusal. A `--runtime` typed ahead of the subject is read by the
  * dispatcher into the context's `flags` and left out of its `argv`, the
@@ -27,6 +34,7 @@
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
+import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 import { refuseMisplacedRuntime } from '../../start/runtime.js';
 import start from '../../start.js';
@@ -118,6 +126,7 @@ const wrapped = wrapPhaseZeroCommand({
       type: 'boolean',
       aliases: ['d'],
     },
+    HINT_FLAG_SPEC,
   ],
   examples: [
     {
@@ -148,4 +157,4 @@ const loopStart: RafaCommand = Object.freeze({
   },
 });
 
-export default loopStart;
+export default endingWith(loopStart);

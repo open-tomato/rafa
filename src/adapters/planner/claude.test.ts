@@ -135,7 +135,8 @@ const READY_OUTPUT = outputWith('verdict: ready\ngaps: []');
 
 /** The output of a session that judged the spec not ready, naming one gap. */
 const NOT_READY_OUTPUT = outputWith(
-  'verdict: not-ready\ngaps:\n  - heading: "Definition of done"\n    what: "no item names a command"',
+  'verdict: not-ready\ngaps:\n  - heading: "Definition of done"\n'
+    + '    what: "no item names a command"\n    blocking: true',
 );
 
 /** The output of a session whose block is not valid YAML. */
@@ -426,7 +427,12 @@ describe('a claude planner reading its session review', () => {
     expect(generated.review?.answer).toBe('not-ready');
     expect(generated.review?.ready).toBe(false);
     expect(generated.review?.gaps).toEqual([
-      { heading: 'Definition of done', what: 'no item names a command' },
+      {
+        heading: 'Definition of done',
+        what: 'no item names a command',
+        blocking: true,
+        assumption: null,
+      },
     ]);
   });
 

@@ -354,6 +354,7 @@ function stub(script: Script): Recorded {
     comment: () => unreached('comment'),
     editComment: () => unreached('editComment'),
     failedLog: () => unreached('failedLog'),
+    workflowCount: () => unreached('workflowCount'),
   };
 
   const seams: Partial<ReleaseStageSeams> = {

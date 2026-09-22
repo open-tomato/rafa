@@ -344,6 +344,67 @@ describe('the comment body', () => {
   });
 });
 
+describe('a no-checks comment', () => {
+  const NO_WORKFLOW = 'nothing on GitHub has tested this branch; you are relying on the checks run locally';
+  const WORKFLOWS_EXIST = 'CI may not have started (a path filter, a draft, Actions disabled, or it has not registered yet);'
+    + ' this is probably not what you want';
+
+  /** A `no-checks` assessment, as the classifier reaches one. */
+  const noChecks = assess({
+    triageClass: 'no-checks',
+    simple: false,
+    dependencyBump: false,
+    conflicting: false,
+    files: [],
+    reason: 'the head reports no checks at all; the repository defines 0 workflows;'
+      + ' to merge it anyway, run rafa pr merge 21 --skip-checks',
+  });
+
+  it('ends the evidence, after the verdict, with the count, the warning and the --skip-checks line', () => {
+    const lines = triageCommentBody(input({ assessment: noChecks, workflowCount: 0 })).split('\n');
+    const verdict = lines.findIndex((line) => line.startsWith('- Checks verdict: `none`'));
+
+    expect(lines).toContain('**rafa triage**: `no-checks`, not simple, not resolved');
+    expect(lines).toContain('class: "no-checks"');
+    expect(verdict).toBeGreaterThan(0);
+    expect(lines.slice(verdict + 1, verdict + 4)).toEqual([
+      '- Workflows: The repository defines 0 workflows.',
+      `- Warning: ${NO_WORKFLOW}`,
+      '- To merge it anyway: `rafa pr merge 21 --skip-checks` (it asks first; `--yes` may answer it)',
+    ]);
+  });
+
+  it('warns that CI may not have started, and refuses --yes, when one or more workflows exist', () => {
+    const body = triageCommentBody(input({ assessment: noChecks, workflowCount: 1 }));
+
+    expect(body).toContain('- Workflows: The repository defines 1 workflow.');
+    expect(body).toContain(`- Warning: ${WORKFLOWS_EXIST}`);
+    expect(body).toContain('(it asks first; `--yes` is refused, so a person must answer it)');
+    expect(body).not.toContain(NO_WORKFLOW);
+  });
+
+  it('reads a count that could not be read, and one left out, as workflows existing and never as none', () => {
+    for (const workflowCount of [null, undefined]) {
+      const body = triageCommentBody(input({ assessment: noChecks, workflowCount }));
+
+      expect(body).toContain('- Workflows: The repository\'s workflow count could not be read.');
+      expect(body).toContain(`- Warning: ${WORKFLOWS_EXIST}`);
+      expect(body).not.toContain(NO_WORKFLOW);
+    }
+  });
+
+  it('carries none of the three lines for any other class, whatever count it is handed', () => {
+    const others = [assess(), assess({ triageClass: 'green', conflicting: false, files: [], verdict: 'green' })];
+
+    for (const assessment of others) {
+      const body = triageCommentBody(input({ assessment, workflowCount: 0 }));
+
+      expect(body).not.toContain('- Workflows:');
+      expect(body).not.toContain('--skip-checks');
+    }
+  });
+});
+
 describe('which comment is the triage', () => {
   it('answers null for a list with no marker in it, one naming a triage included', () => {
     const comments = [

@@ -109,6 +109,41 @@ on the `open-tomato/rafa` board. The word "phase" and its letters are
 retired; merged work keeps its old file names and a table in the Roadmap
 issue maps them.
 
+### The next workflow
+
+**`rafa next` orchestrates the entire delivery cycle** from the roadmap
+through planning, PR merge, and the next step. One invocation reads the
+board state, prints what is ready and the one thing to do next, runs that
+action, reads again, and repeats until nothing is left to do. The eight
+action ids are `sync`, `plan`, `ready`, `start`, `commit`, `next-base`,
+`review`, and `resume`. Only `sync` and `plan` run without asking by
+default; `--yes` allows others unasked and `--dry-run` prints without
+running. A session can be started, resumed mid-plan, or moved to the
+next issue when the roadmap advances. After every action, `next` names
+the step that follows — the merge to run, the loop to resume, or the
+loop already running — unless `--no-hint` turns off the hint.
+
+Blocked specs are those marked `spec:blocked` with a `Blocked by:` line
+naming one or more open blockers. `plan create --next` skips them,
+offers the first unblocked spec instead, and asks whether to plan that
+one. Once a blocker closes, `rafa issue unblock [<n>]` checks the line,
+asks when every blocker is closed, and removes the label. `pr merge`
+runs that same `issue unblock` logic after a clean merge, so closing
+issue #24 automatically unblocks any issue naming it in a `Blocked by:`
+line, with no extra commands needed.
+
+### Marking a spec ready
+
+**`rafa issue ready <n>` marks an issue as ready for planning** after
+checking two things: the author must have write access (or be listed as
+trusted in config), and the body must fill the spec template completely.
+The command is offered automatically by `plan create --issue` and
+`plan create --next` in a terminal, where a yes labels the issue with
+`spec:ready` and proceeds to plan it, or a no exits with the check result.
+A spec without the label cannot be planned from the board routes. See
+`context/pull-requests.md` for the readiness gate's four checks and how
+the planner's own review can keep a plan when assumptions are named.
+
 ### Files beside the tree
 
 **`.rafa/plans/` and `.rafa/specs/` are gitignored**, so they live only in the

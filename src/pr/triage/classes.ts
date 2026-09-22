@@ -66,13 +66,17 @@ import type { PullRequestSummary } from '../types.js';
  *
  * Exactly one of these is the answer, so the set covers the reasons a
  * pull request is NOT actionable (`green`, `pending`) beside the ones
- * that make it red. `ci-other` and `conflict-other` are the deliberate
+ * that make it red. `no-checks` is neither: the pull request reported
+ * zero check rows (verdict `none`), so nothing is red and nothing is
+ * running, yet nothing has passed either — there is no fix to plan, and
+ * the way forward is `rafa pr merge --skip-checks`, not a resolve. `ci-other` and `conflict-other` are the deliberate
  * catch-alls: a failing step nothing recognises is still reported and
  * still commented, it is simply never resolved automatically.
  */
 export type TriageClass
   = | 'green'
     | 'pending'
+    | 'no-checks'
     | 'conflict-lockfile'
     | 'conflict-manifest'
     | 'conflict-other'
@@ -84,13 +88,14 @@ export type TriageClass
 
 /**
  * Every class, in the order a listing and the closed-set test read
- * them: the two non-red readings, then the conflicts, then the CI
+ * them: the two non-red readings, then `no-checks`, then the conflicts, then the CI
  * failures. Frozen, because a caller that pushed onto it would change
  * what every later reader accepts.
  */
 export const TRIAGE_CLASSES: readonly TriageClass[] = Object.freeze([
   'green',
   'pending',
+  'no-checks',
   'conflict-lockfile',
   'conflict-manifest',
   'conflict-other',
@@ -187,8 +192,8 @@ export function isDependencyBump(pr: DependencyBumpReading): boolean {
  *
  * The one rule: {@link SIMPLE_TRIAGE_CLASSES} always, and
  * {@link DEPENDENCY_BUMP_SIMPLE_CLASSES} when `dependencyBump` is true.
- * Everything else — including `green` and `pending`, which are not
- * failures to resolve at all — is assessed only.
+ * Everything else — including `green`, `pending` and `no-checks`,
+ * which are not failures to resolve at all — is assessed only.
  *
  * The bump reading is taken as an already-read boolean rather than as a
  * pull request, because a re-run reads its class and its `simple` flag

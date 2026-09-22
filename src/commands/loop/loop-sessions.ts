@@ -290,6 +290,14 @@ export interface SessionChecklist {
   readonly file: string;
   /** Its tasks, in file order. */
   readonly tasks: readonly PlanTask[];
+  /**
+   * Its lines, on the `split('\n')` a task's `lineNum` counts in, so the
+   * line a task sits on is `lines[task.lineNum]`. A reader wanting what
+   * a line trails that the model does not hold — a blocker comment,
+   * which `status.ts` prints — reads it here rather than reading the
+   * file a second time.
+   */
+  readonly lines: readonly string[];
 }
 
 /** The checklist of the plan a record names, or null when neither its tracker nor the plan is a file. */
@@ -297,7 +305,8 @@ export function readSessionChecklist(root: string, record: Pick<SessionRecord, '
   const plan = join(root, record.plan);
   const file = [trackerPathFor(plan), plan].find((path) => isFile(path));
   if (file === undefined) return null;
-  return { file, tasks: parsePlan(readFileSync(file, 'utf8')).tasks };
+  const content = readFileSync(file, 'utf8');
+  return { file, tasks: parsePlan(content).tasks, lines: content.split('\n') };
 }
 
 /** The checkbox a checklist holds at a 1-based line, or null when no task is there. */

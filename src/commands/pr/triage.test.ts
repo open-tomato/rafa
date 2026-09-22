@@ -18,6 +18,13 @@
  * the same recorded fake, so the account a marker comment was written by
  * is answered by the planted repository and no case spawns `gh` for it.
  *
+ * The ending an assessment that ended 0 names the next step with is
+ * driven through an {@link endingProbe} — one state from a literal, the
+ * readings counted — or turned off with `--no-hint`, which every case
+ * that hands no `ending` seams types. Left to the system seams it would
+ * read the real project: `git` and `gh` spawned in the scratch
+ * directory the case planted.
+ *
  * Five controls carry readings that would otherwise pass while wrong:
  *
  *   - The provider factory records whether it was reached, so "a refused
@@ -47,6 +54,7 @@
  */
 import type { TriageSeams } from './triage.js';
 import type { RafaCommand } from '../../cli/command.js';
+import type { NextEndingSeams } from '../../next/ending.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner, PullRequests } from '../../pr/index.js';
@@ -63,6 +71,7 @@ import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
 import { PR_USAGE } from './pr-context.js';
 import { createPrTriageCommand, DEFAULT_MAX_ATTEMPTS, readMaxAttempts } from './triage.js';
@@ -201,10 +210,21 @@ interface Ran {
   readonly events: readonly CliEvent[];
 }
 
+/**
+ * Typed by every case driving no ending of its own, so that no case
+ * composes the real sources and spawns `git` and `gh` in the scratch
+ * project it planted. A case that hands the command `ending` seams
+ * leaves it off and drives the ending through them.
+ */
+const NO_HINT = '--no-hint';
+
 /** Dispatches `rafa pr triage` over `seams` from `project`, with `words` after the action. */
 async function ran(seams: TriageSeams, project: PlantedProject, words: readonly string[] = []): Promise<Ran> {
   const command: RafaCommand = createPrTriageCommand(seams);
-  const run = await dispatchInProject(['pr', 'triage', ...words], SUBJECTS, [command], project);
+  const line = seams.ending === undefined
+    ? [...words, NO_HINT]
+    : words;
+  const run = await dispatchInProject(['pr', 'triage', ...line], SUBJECTS, [command], project);
   return {
     run,
     events: words.includes('--output=json')
@@ -228,10 +248,14 @@ async function overFake(
   seeds: readonly FakePullRequestSeed[],
   words: readonly string[] = [],
   options: SeamOptions = {},
+  ending?: NextEndingSeams,
 ): Promise<Ran & { readonly fake: ReturnType<typeof createFakePrGh> }> {
   const fake = plantedFake(seeds);
   const seams = caseSeams(fake, options);
-  return { ...await ran(seams.seams, freshProject(), words), fake };
+  const over: TriageSeams = ending === undefined
+    ? seams.seams
+    : { ...seams.seams, ending };
+  return { ...await ran(over, freshProject(), words), fake };
 }
 
 /** A pull request that is red on `gates`, on the branch the seams answer. */
@@ -240,6 +264,19 @@ const RED_41: FakePullRequestSeed = {
   title: 'rafa-20: pull request commands',
   headRefName: BRANCH,
   checks: [FAILING_GATES],
+};
+
+/**
+ * A pull request that reports no checks at all, on the branch the seams
+ * answer. The fake plants no workflow for it, so its workflow count
+ * reads 0 — the `no-workflow` case — the same repository
+ * `.pull-requests-double.ts` and `unchecked.ts` describe as having none.
+ */
+const NO_CHECKS_41: FakePullRequestSeed = {
+  number: 41,
+  title: 'rafa-20: pull request commands',
+  headRefName: BRANCH,
+  checks: [],
 };
 
 describe('the line', () => {
@@ -314,6 +351,21 @@ describe('assessing the pull request a number names', () => {
     expect(outcome.run.stdout).toContain('Failing step: bunx eslint .');
     expect(outcome.run.stdout).toContain('is assigned a value but never used');
     expect(outcome.run.stdout).toContain('# Assessed pull request: act on this triage');
+  });
+
+  it('classes a zero-check pull request no-checks, naming the workflow count read and the --skip-checks line', async () => {
+    const outcome = await overFake([NO_CHECKS_41], ['41']);
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(calls(outcome.fake)).toContain('api repos/{owner}/{repo}/actions/workflows');
+    expect(outcome.run.stdout).toContain('no-checks — not simple — attempts 0 of 2');
+    expect(outcome.run.stdout).toContain('the head reports no checks at all; the repository defines 0 workflows;'
+      + ' to merge it anyway, run rafa pr merge 41 --skip-checks');
+    expect(outcome.run.stdout).toContain('Workflows: The repository defines 0 workflows.');
+    expect(outcome.run.stdout)
+      .toContain('nothing on GitHub has tested this branch; you are relying on the checks run locally');
+    expect(outcome.run.stdout)
+      .toContain('To merge it anyway: rafa pr merge 41 --skip-checks (it asks first; --yes may answer it)');
   });
 
   it('leaves one triage comment carrying the marker, the class and the head it was read at', async () => {
@@ -519,6 +571,18 @@ describe('which pull request a bare line assesses', () => {
     expect(outcome.run.stdout).toContain('no red pull request to triage');
   });
 
+  it('skips a zero-check pull request off the branch, selecting none rather than reading it as red', async () => {
+    const outcome = await overFake(
+      [{ ...NO_CHECKS_41, headRefName: 'feat/pr-41' }],
+      [],
+      { branch: 'main' },
+    );
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(outcome.run.stdout).toContain('no red pull request to triage');
+    expect(outcome.run.stdout).not.toContain('#41');
+  });
+
   it('warns at a detached HEAD and reads the red pull requests instead of refusing', async () => {
     const outcome = await overFake([RED_41], [], { branch: 'HEAD' });
 
@@ -559,5 +623,35 @@ describe('json mode', () => {
 
     expect((data['selection'] as Record<string, unknown>)['decision']).toBe('branch');
     expect(outcome.events.map((event) => event.type)).toEqual(['start', 'result']);
+  });
+});
+
+describe('the ending it names the next step with', () => {
+  it('ends an assessment that ran by printing the step that follows, last of all', async () => {
+    const probe = endingProbe();
+    const outcome = await overFake([RED_41], ['41'], {}, probe.seams);
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(outcome.run.stdout.trimEnd().split('\n')
+      .at(-1)).toBe(ENDING_LINE);
+    expect([probe.reads(), probe.asked()]).toEqual([1, []]);
+  });
+
+  it('puts the question where there is a terminal, printing no line', async () => {
+    const probe = endingProbe({ terminal: true });
+    const outcome = await overFake([RED_41], ['41'], {}, probe.seams);
+
+    expect(probe.asked()).toEqual([ENDING_QUESTION]);
+    expect(outcome.run.stdout).not.toContain(ENDING_LINE);
+  });
+
+  it('reads nothing and prints nothing under --no-hint, which the run without it does both of', async () => {
+    const off = endingProbe();
+    const on = endingProbe();
+    const quiet = await overFake([RED_41], ['41', NO_HINT], {}, off.seams);
+    const loud = await overFake([RED_41], ['41'], {}, on.seams);
+
+    expect([off.reads(), quiet.run.stdout.includes('Next:')]).toEqual([0, false]);
+    expect([on.reads(), loud.run.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
   });
 });

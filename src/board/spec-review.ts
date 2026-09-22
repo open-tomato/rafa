@@ -16,6 +16,11 @@
  * gaps:
  *   - heading: "Definition of done"
  *     what: "no item says how the merge clean-up is verified"
+ *     blocking: true
+ *   - heading: "Design"
+ *     what: "the store backend is not named"
+ *     blocking: false
+ *     assumption: "the SQLite backend, as every other command reads"
  * ```
  * ````
  *
@@ -39,10 +44,13 @@
  * What the ENFORCING half does with each of the four is `./gate.ts`'s,
  * and the two halves no longer agree by construction: since 2026-09-20
  * an `absent` or `malformed` reading lets a plan that reads as written
- * stand, stamped `review: missing`, where an explicit `not-ready`
- * verdict removes it. So `answer` is what that caller switches on and
- * `ready` is what it refuses to plan from unweighed; a reading here is
- * still never ready for one of the last two.
+ * stand, stamped `review: missing`, where a `not-ready` verdict with a
+ * blocking gap removes it — and since 2026-09-22 one with no blocking
+ * gap lets the plan stand too, stamped `review: assumed` and opened
+ * with the assumptions its gaps named. So `answer` is what that caller
+ * switches on, `blocking` is what it weighs a `not-ready` verdict by,
+ * and `ready` is what it refuses to plan from unweighed; a reading here
+ * is still never ready for one of the last two.
  *
  * For the same reason {@link SpecReviewReading.gaps} is never empty for
  * a reading that is not ready. A `not-ready` verdict that names no
@@ -93,7 +101,14 @@
  *
  * A gap carries the `heading` it sits under and `what` is wrong with
  * it, the two fields `ReadinessGap` shares, so the not-ready comment
- * prints the code gaps and the reviewed gaps as one list.
+ * prints the code gaps and the reviewed gaps as one list. It also
+ * carries whether it is {@link SpecReviewGap.blocking} and, when it is
+ * not, the {@link SpecReviewGap.assumption} the planner would plan
+ * under: a gap is blocking when guessing wrong changes what ships or
+ * what is safe, and one that is not can be planned under a stated
+ * guess. The prompt asks for both per gap, and
+ * `./spec-review.test.ts`'s drift guard holds the ask to what is read
+ * here.
  *
  *   - `gaps` absent or null names no gap. For a `ready` verdict that is
  *     the ordinary case.
@@ -104,6 +119,24 @@
  *   - An entry whose `heading` is unusable keeps its `what` under
  *     {@link REVIEW_HEADING}, because the sentence is the part the
  *     author acts on and a gap is worth more misfiled than lost.
+ *   - An entry whose `blocking` is anything but `true` or `false`,
+ *     absence included, is reported and read as BLOCKING. The verdict
+ *     is matched leniently and this field is not, because leniency
+ *     here fails toward planning: a gap read non-blocking by accident
+ *     would let a plan stand over a question nobody answered, while a
+ *     gap read blocking by accident costs one more review round.
+ *   - An entry that is NOT blocking and names no usable `assumption`
+ *     is reported and read as blocking as well. What makes a
+ *     non-blocking gap safe is the guess the planner wrote down; with
+ *     none written there is nothing for a plan to open under, and
+ *     inventing one here is the guess the field exists to prevent. So
+ *     every gap this module answers `blocking` false for carries an
+ *     `assumption`, which is the invariant a caller weighing the gaps
+ *     can lean on.
+ *   - An `assumption` beside a blocking gap is kept as written and
+ *     reported by nothing. The two fields are read independently, and
+ *     a blocking gap's assumption is nothing a caller plans under: what
+ *     is blocking is answered in the spec, not guessed.
  *
  * Every drop is recorded in {@link SpecReviewReading.issues}, whose
  * `field` is a path in the block's own key names (`gaps[2].what`) so it
@@ -156,18 +189,35 @@ export interface SpecReviewGap {
   readonly heading: string;
   /** What is wrong under that heading, as the session wrote it. */
   readonly what: string;
+  /**
+   * True when guessing wrong here changes what ships or what is safe,
+   * so nothing can be planned until the spec answers it. True for
+   * every gap whose `blocking` was unreadable and for every
+   * non-blocking one that named no assumption; see the module note.
+   */
+  readonly blocking: boolean;
+  /**
+   * What the planner would plan under, as the session wrote it. Never
+   * null for a gap that is not blocking; null for a blocking gap that
+   * named none.
+   */
+  readonly assumption: string | null;
 }
 
 /** The gap a session that returned no readable block is refused with. */
 export const MISSING_REVIEW_GAP: SpecReviewGap = {
   heading: REVIEW_HEADING,
   what: 'the review block was not returned',
+  blocking: true,
+  assumption: null,
 };
 
 /** The gap a `not-ready` verdict naming no usable gap is refused with. */
 export const UNNAMED_GAP: SpecReviewGap = {
   heading: REVIEW_HEADING,
   what: 'the review block judged the spec not ready without naming a gap',
+  blocking: true,
+  assumption: null,
 };
 
 /** One thing the block said that this reading does not hold as written. */
@@ -265,9 +315,26 @@ function issueAt(field: string, text: string): SpecReviewIssue {
 }
 
 /**
+ * Whether the entry at `field` blocks planning. Anything but `true` or
+ * `false` is recorded and read as blocking; see the module note for why
+ * this field is read strictly where the verdict is not.
+ */
+function readBlocking(item: Mapping, field: string, issues: SpecReviewIssue[]): boolean {
+  const value = valueAt(item, 'blocking');
+  if (typeof value === 'boolean') return value;
+
+  const text = `${field}.blocking is ${describeValue(value)}, not true or false; `
+    + 'the gap is read as blocking';
+  issues.push(issueAt(`${field}.blocking`, text));
+  return true;
+}
+
+/**
  * The gap one `gaps` entry names, or null after recording why it is
  * dropped. An unusable `heading` is recorded and replaced; an unusable
- * `what` drops the entry, since it carried nothing to act on.
+ * `what` drops the entry, since it carried nothing to act on; an
+ * unreadable `blocking`, and a non-blocking gap with no `assumption`,
+ * are recorded and read as blocking.
  */
 function readGap(item: unknown, field: string, issues: SpecReviewIssue[]): SpecReviewGap | null {
   if (!isMapping(item)) {
@@ -291,7 +358,16 @@ function readGap(item: unknown, field: string, issues: SpecReviewIssue[]): SpecR
     issues.push(issueAt(`${field}.heading`, text));
   }
 
-  return { heading: heading ?? REVIEW_HEADING, what };
+  const blocking = readBlocking(item, field, issues);
+  const assumption = stringAt(item, 'assumption');
+  if (!blocking && assumption === null) {
+    const text = `${field}.assumption is ${describeValue(valueAt(item, 'assumption'))}, `
+      + 'not what a non-blocking gap would be planned under; the gap is read as blocking';
+    issues.push(issueAt(`${field}.assumption`, text));
+    return { heading: heading ?? REVIEW_HEADING, what, blocking: true, assumption: null };
+  }
+
+  return { heading: heading ?? REVIEW_HEADING, what, blocking, assumption };
 }
 
 /** Every usable gap the block names, in the order it wrote them. */

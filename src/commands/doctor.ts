@@ -60,7 +60,7 @@
  * ## The board rows
  *
  * A repository that resolves to `pr.provider: gh` also gets one row per
- * part of the GitHub board `rafa init --board` makes — the six labels,
+ * part of the GitHub board `rafa init --board` makes — the seven labels,
  * the spec issue template, the Roadmap issue and `roadmap.issue` — each
  * read through {@link readBoardStatus} (`board/status.ts`) as present,
  * missing or, for a reading that failed, unknown. A run with any row
@@ -78,6 +78,16 @@
  * preflight halted prints its rows before the refusal, since they were
  * read by then and a person reading a halt still wants the whole
  * picture.
+ *
+ * ## The blocked issues
+ *
+ * That same repository gets one more reading, through the same runner:
+ * every open issue labelled `spec:blocked` whose `Blocked by:` line is
+ * missing or unreadable, named under `Blocked issues:`
+ * (`./doctor-blocked.ts`, which holds the `gh` commands, the lines and
+ * why they are a module of their own). It is the report half of a
+ * dependency the spec keeps as data and refuses to guess at, and like a
+ * board row it writes nothing and never changes the exit code.
  *
  * ## What it does not do
  *
@@ -130,7 +140,9 @@
  * items a resume passed over; the steps that file names and nothing
  * checks; and the verdict with any `known-missing:` lines; then
  * {@link renderBoard}'s lines for a repository that has a GitHub board,
- * and none for one that has not. A halt
+ * and none for one that has not; then {@link renderBlockedIssues}'s
+ * lines, which a board holding no issue labelled `spec:blocked` has
+ * none of either. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
@@ -145,9 +157,10 @@
  * (`cli/dispatch.ts`), so a case names them through its options. How a
  * probe and a service request run, the timeout, the clock, the
  * `origin` probe the provider is read through and the runner the board
- * rows are read with are {@link DoctorSeams}, each left out being the
- * runner's own.
+ * rows and the blocked issues are read with are {@link DoctorSeams},
+ * each left out being the runner's own.
  */
+import type { BlockedIssuesReport } from './doctor-blocked.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardRow, BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
@@ -181,6 +194,7 @@ import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
+import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 import { isFile, plural } from './plan/plan-files.js';
 
@@ -189,7 +203,7 @@ export interface DoctorSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
-  /** Opens the runner the board rows are read with. `gh` spawned in the root when left out. */
+  /** Opens the runner both board readings go through. `gh` spawned in the root when left out. */
   readonly openGh?: (root: string) => GhRunner;
 }
 
@@ -257,6 +271,14 @@ export interface DoctorResult {
   readonly preInitDirs: PreInitDirsReading | null;
   /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
   readonly board: BoardStatus | null;
+  /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board. */
+  readonly blocked: BlockedIssuesReport | null;
+}
+
+/** Both readings of the GitHub board, each null for a project that has none. */
+interface BoardReadings {
+  readonly board: BoardStatus | null;
+  readonly blocked: BlockedIssuesReport | null;
 }
 
 /** The three readings about the install, read before the preflight. */
@@ -421,15 +443,32 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
 }
 
 /**
- * Every part of the GitHub board as it stands, or null for a project
- * whose provider is not `gh` and so has no board. Reads and writes
- * nothing of its own; see the module note.
+ * The runner both board readings go through, opened once, or null for
+ * a project whose provider is not `gh` and so has no board.
  */
-async function checkBoard(preflight: DoctorPreflight, seams: DoctorSeams): Promise<BoardStatus | null> {
+function boardRunner(preflight: DoctorPreflight, seams: DoctorSeams): GhRunner | null {
   if (preflight.provider !== 'gh') return null;
-  const root = preflight.root;
   const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
-  return readBoardStatus({ gh: openGh(root), root });
+  return openGh(preflight.root);
+}
+
+/**
+ * Every part of the GitHub board as it stands, or null for a project
+ * that has none. Reads and writes nothing of its own; see the module
+ * note.
+ */
+async function checkBoard(preflight: DoctorPreflight, gh: GhRunner | null): Promise<BoardStatus | null> {
+  if (gh === null) return null;
+  return readBoardStatus({ gh, root: preflight.root });
+}
+
+/**
+ * Every open issue labelled `spec:blocked`, read, or null for a project
+ * that has no board; see the module note and `./doctor-blocked.ts`.
+ */
+async function checkBlocked(gh: GhRunner | null): Promise<BlockedIssuesReport | null> {
+  if (gh === null) return null;
+  return readBlockedIssues({ gh });
 }
 
 /**
@@ -605,7 +644,7 @@ function haltRefusal(halt: string): CommandExit {
 }
 
 /** The data json mode gives for a preflight that did not halt. */
-function resultOf(preflight: DoctorPreflight, install: InstallReadings, board: BoardStatus | null): DoctorResult {
+function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings: BoardReadings): DoctorResult {
   return {
     root: preflight.root,
     plan: preflight.plan,
@@ -618,7 +657,8 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, board: B
     binPath: install.binPath,
     legacyStore: install.legacyStore,
     preInitDirs: install.preInitDirs,
-    board,
+    board: readings.board,
+    blocked: readings.blocked,
   };
 }
 
@@ -635,12 +675,18 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
   const install = readInstall(context, project);
   try {
     const preflight = await checkPreflight(context, project, seams);
-    const board = await checkBoard(preflight, seams);
+    const gh = boardRunner(preflight, seams);
+    const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh) };
     if (context.outputMode !== 'json') {
-      for (const line of [...renderDoctor(preflight), ...renderBoard(board)]) context.output.info(line);
+      const lines = [
+        ...renderDoctor(preflight),
+        ...renderBoard(readings.board),
+        ...renderBlockedIssues(readings.blocked),
+      ];
+      for (const line of lines) context.output.info(line);
     }
     if (preflight.report.halt !== null) throw haltRefusal(preflight.report.halt);
-    if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, board));
+    if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings));
   } finally {
     writeInstall(context, install);
   }
@@ -669,11 +715,14 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
       + ' not on PATH ahead of `~/.bun/bin`; a warning never changes the exit code. On a repository whose'
       + ' provider is `gh` it also reads the GitHub board `rafa init --board` sets up and prints one row per'
-      + ' part — the six labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
+      + ' part — the seven labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
       + ' missing, or unknown for a reading that failed, naming `rafa init --board` as the fix; it writes'
-      + ' nothing to the board and a row never changes the exit code. With `--output=json` the'
-      + ' checks, both readings and those rows are the data of the terminal result event, unless a required'
-      + ' item failed.',
+      + ' nothing to the board and a row never changes the exit code. It then names, under `Blocked'
+      + ' issues:`, every open issue labelled `spec:blocked` whose `Blocked by:` line is missing, names no'
+      + ' issue, names itself, or names an id the board has no issue for, with what an author does about'
+      + ' it; that reading writes nothing and never changes the exit code either. With `--output=json` the'
+      + ' checks, both readings, those rows and those issues are the data of the terminal result event,'
+      + ' unless a required item failed.',
     args: [],
     flags: [
       {

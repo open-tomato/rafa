@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Six actions read and control pull requests:
+Seven actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -14,12 +14,33 @@ Six actions read and control pull requests:
   check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
 - `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable
-- `pr merge [<n>] [--yes] [--method=squash|merge|rebase]` — merge the PR
+- `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
+  merge the PR; `--skip-checks` is for a PR that reports no checks at all
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
+- `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
 
-`<n>` defaults to the open PR of the current branch. All actions carry
-summary, examples, `outputs: [text, json]` and help snapshots.
+`<n>` defaults to the open PR of the current branch. Every action carries a
+summary, examples and `outputs: [text, json]`; each one in the core roster
+carries help snapshots too.
+
+`pr wait` composes `waitForChecks` (`src/pr/checks.ts`) over the provider's
+`checks` and is READ-ONLY: no repair session, no comment, no label, no
+merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those, and
+the deadline and the poll interval are that gate's own constants. The same
+`waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop
+agree about what green means and how often a pull request is asked. Green
+exits 0; red exits 1; a pull request with NO checks at all exits 1 too, and
+is answered at once rather than waited out, since a PR that does not merge
+cleanly schedules no run and no amount of waiting makes one; the deadline
+passing with checks still running exits 3. A green wait writes its report
+through the output and then names the one step that follows, which for
+checks that have just passed is the merge (`src/next/ending.ts`,
+`--no-hint` to turn it off); every other ending carries the report as the
+message of its exit, because the dispatcher drops a command's payload when
+it ends non-zero, and gets no hint, since that report already names the
+rafa command for what it found. The clock and the wait between polls are
+seams, so its tests spend no real second.
 
 ### The provider and preflight
 
@@ -73,8 +94,10 @@ unmocked. Register the route row the call needs on the fake.
 ### The merge flow
 
 1. Refuse on a dirty working tree, on a PR that is not green or not
-   mergeable (the refusal names which, and points at `pr triage`), and when
-   the branch is checked out in another worktree (names it).
+   mergeable (the refusal names which; `pending` and `red` point at
+   `pr triage`, and verdict `none` — no checks at all — points at
+   `--skip-checks` instead, since triage has nothing to fix there), and
+   when the branch is checked out in another worktree (names it).
 2. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 3. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
@@ -82,10 +105,56 @@ unmocked. Register the route row the call needs on the fake.
    squash leaves it unmerged in git's eyes), delete the remote branch when
    it still exists, `git fetch --prune`.
 4. Tick the roadmap, print what is ready and the two follow-ups when they
-   apply: `rafa release tag` and `bun run snapshot`.
+   apply: `rafa release tag` and `rafa self-update`.
+5. Run the unblock reading over every open issue labelled
+   `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
+   asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
+   about each one whose blockers have all closed and removing the label on a
+   yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
+   `runUnblock`). `--yes` does not answer that question, and every failure of
+   it is a warning rather than an exit code.
+6. Last, name the one step that follows — with the base pulled and both
+   branches gone, the next plan or the loop on a plan already there
+   (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
+   DECLINED ends without it: nothing moved, so the hint would put the
+   question that was just answered no.
 
 A failure after the merge never undoes it; it prints the remaining steps as
 commands.
+
+### The --skip-checks flow
+
+`--skip-checks` is accepted on verdict `none` ONLY — a PR that reports no
+checks at all. On `pending`, `red` or `green`, the flag is refused, and the
+refusal names each check row and its state. Without the flag, `none` is
+refused as today, naming `--skip-checks` and what it means.
+
+Before asking to merge, the command reads the repository's workflow count
+(`gh api repos/<repo>/actions/workflows`, `total_count`). Zero is the
+"no workflow" case; one or more, OR a count that could not be read, is the
+"workflows exist" case, which is the riskier one. Two warnings:
+
+- no workflow: "nothing on GitHub has tested this branch; you are relying on
+  the checks run locally"
+- workflows exist: "CI may not have started (a path filter, a draft, Actions
+  disabled, or it has not registered yet); this is probably not what you want"
+
+Then it shows `#n title, branch → base, method` and asks `Merge #<n> with no
+checks? [y/N]`. `--yes` answers the question in the no-workflow case only and
+is REFUSED in the workflows-exist case. Without a TTY and without `--yes` it
+refuses.
+
+After the merge, the usual clean-up runs (switch to the base branch, `git pull
+--ff-only`, delete local and remote branches, `git fetch --prune`), then ONE
+comment is posted on the PR: `Merged with no checks reported, by rafa pr merge
+--skip-checks.` followed by the workflow count that was read (or that it could
+not be read).
+
+`rafa next` sends a PR with verdict `none` to `pr triage` through
+`redClause` only when it conflicts; a mergeable PR with verdict `none`
+goes to row 7 (`merge-unchecked`) instead, which hands the merge question
+to `pr merge <n> --skip-checks`. A `rafa next --yes=<ids>` list that
+names `merge-unchecked` is refused with exit 2, like `ready`.
 
 ### Triage assessment
 
@@ -95,13 +164,17 @@ Assessment is CODE, not a session:
   baseRefName,isCrossRepository,mergeable,mergeStateStatus,
   statusCheckRollup,updatedAt,labels`, the failing rows through
   `parseChecks`, the tail of `gh run view <id> --log-failed` for each
-  failing job, and for a conflict the file list from `git merge-tree
-  --write-tree` with a liveness control (the `merge-tree-mergeability-readings`
-  skill's rule).
-- Classify into one class: `green`, `pending`, `conflict-lockfile`,
-  `conflict-manifest` (`package.json` where both sides added or bumped
-  entries), `conflict-other`, `ci-install`, `ci-lint`, `ci-types`, `ci-test`,
-  `ci-other`. The failing STEP name decides the `ci-*` class.
+  failing job, the repository's workflow count (`gh api
+  repos/<repo>/actions/workflows`) when no check reported at all, and for a
+  conflict the file list from `git merge-tree --write-tree` with a liveness
+  control (the `merge-tree-mergeability-readings` skill's rule).
+- Classify into one class: `green`, `pending`, `no-checks`,
+  `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
+  added or bumped entries), `conflict-other`, `ci-install`, `ci-lint`,
+  `ci-types`, `ci-test`, `ci-other`. The failing STEP name decides the `ci-*`
+  class; `no-checks` means the PR reports no checks at all (verdict `none`),
+  whatever the workflow count; the count, or that it could not be read,
+  goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,
   `conflict-manifest`, and `ci-install` or `ci-lint` on a dependency bump
   PR (author `dependabot[bot]` or title `chore(deps`). Everything else is
@@ -109,6 +182,14 @@ Assessment is CODE, not a session:
 - Output: the class, the evidence (files, step, log excerpt capped at 40
   lines), and a ready FOLLOW-UP PROMPT for another session that carries all
   of it, so that session does not assess again.
+- A class added to `TRIAGE_CLASSES` (`src/pr/triage/classes.ts`) needs, in
+  the same change, its line in `FOLLOW_UP_TASKS` (`src/pr/triage/follow-up.ts`,
+  a `Record` over the class, so `check-types` fails without it), a case in
+  `classify.test.ts` that produces it, and a fixture folder
+  `src/tests/fixtures/pr-triage/<class>/` (`pr.json`, checks, log). Both
+  tests check the closed set from each end, and the pre-commit hook runs no
+  tests, so a missing fixture only shows up in `bun run test`. This bullet
+  is new and replaces no earlier text.
 
 The triage comment:
 
@@ -171,7 +252,10 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
   `src/pr/conflict-sentence.test.ts` and `src/tests/plan-injection.test.ts`,
   the last because the prompt's FIRST line is the `wrap-up` classifier key
   `PROMPT_SHAPES` reads. Run the three together before the full suite.
-- Then the existing CI wait. Guard against an unfixable PR: `attempts` in
+- Then the existing CI wait. A fresh assessment of class `green` OR
+  `no-checks` counts as resolved (`endOfAttempt`,
+  `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
+  repository that schedules no checks reads `no-checks`. Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
   stop, update the comment, remove the worktree, print the follow-up prompt,
@@ -182,26 +266,46 @@ the ordinary loop, so commits, reports and effort rows are the usual ones.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. TWO routes ask the question today, both
-through `src/commands/pr/triage-trust.ts`: the triage marker comment's
-author, and the pull request's author for `pr triage --resolve`.
+someone allowed to change the repo. SIX routes ask the question. Two are
+`src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
+the pull request's author for `pr triage --resolve`. Three are
+`requireTrustedBoardAuthor`'s — the board entry point in
+`src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
+the repo label. Two of those are `plan create`'s: `src/board/plan-spec.ts`'s
+`inspectSpecIssue` calls it ahead of the label check, the leak refusal and
+the completeness refusal, and its `inspectRoadmapIssue` calls it on the
+ROADMAP issue a `--next` walk reads its order off, before a line is parsed
+out of that body and before either taken reading is spent. The third is
+`rafa issue ready <n>` (`src/commands/issue/ready.ts`), which calls it
+before the completeness check and before its own question, so an outsider's
+issue is refused with exit 2 and nobody is asked anything. The login all
+three ask about is `SpecIssue.author`, which `src/board/issue.ts`'s
+`ISSUE_VIEW_FIELDS` fetches.
 
-**The `plan create` routes do NOT ask it.** Check 0 below is specified and
-unwired: `src/board/plan-spec.ts`'s `inspectSpecIssue` runs the label check,
-the leak refusal and the completeness refusal only, and
-`src/board/issue.ts`'s `ISSUE_VIEW_FIELDS`
-does not fetch `author`, so nothing on that route holds a login to read at
-all. An issue an outsider opened and a member labelled `spec:ready` is
-therefore snapshotted and planned from, and the label — which only a
-write-holder can add — is the whole of what stands between it and a plan.
-Wiring it is one widening of that field list, `author` threaded through
-`SpecIssue`, and `readAuthorTrust`/`requireTrustedAuthor` called from
-`inspectSpecIssue` ahead of the label check. Until that lands, read any
-sentence here about `--issue` or `--next` trust as the specification and
-not as the code. The `rafa:spec-review` comment reader spends no trust
-reading BY DESIGN, which is a different thing from this gap:
-`src/board/review-comment.ts` holds why, and it is that nothing ever reads
-that comment back into a prompt.
+**Every body a `plan create` run reads is checked**: the issue `--issue=<n>`
+names, the roadmap a `--next` walk reads, and the line that walk picks. The
+roadmap runs check 0 alone — it carries no `spec:ready` label and fills no
+template, and what a planted line in it takes is the ORDER, not a prompt.
+Its refusal is the shared sentence, so it names the roadmap as `issue #<n>`
+and closes with the issue remedy, "a member must open the spec"; a remedy of
+its own would mean a third `BoardItemKind` in `src/board/trust.ts`.
+
+The SIXTH is the `rafa:spec-review` comment
+(`src/board/review-comment.ts`), and it IGNORES rather than refuses.
+Nothing in that comment is ever read back into a prompt, so what a planted
+one would take is the EDIT: the gate keeps one comment per issue, GitHub
+refuses an edit of another account's comment, and the gap list would be lost
+run after run. So `readTrustedSpecReviewComment` walks the issue's marker
+comments newest first over `readBoardTrust` and edits the first one a
+trusted account wrote; the refused ones are reported by id and author
+through the gate's warnings and left alone, and the gaps go in a comment
+posted beside them. The trust is the one check 0 already built, carried on
+`GateIssue` beside the number and the board.
+
+The repository a plan refusal names is a LABEL read from `origin` through
+the `git` seam (`boardRepoLabel`), never an input to the lookup: `gh`
+resolves the repository from the directory it runs in. It is read on the
+first issue a run reads, so `--spec=<file>` spends no `git` for it.
 
 The issue's AUTHOR must hold `admin`, `maintain` or `write` on the
 repository (`gh api repos/{owner}/{repo}/collaborators/{login}/permission`),
@@ -223,12 +327,27 @@ follow-up prompt.
 Four checks, cheapest first; any one failing writes no plan file:
 
 0. Trust (section above): the issue's author must hold write access or be
-   listed, checked before the body is snapshotted. NOT WIRED on either
-   `plan create` route — the section above names the gap and what closing
-   it costs.
+   listed, checked before the body is read any further or snapshotted. It
+   costs one `gh api` per LOGIN a run checks, spent ahead of the free
+   checks, and none at all for a login in `board.trustedAuthors`. A
+   `--next` run checks two authors, the roadmap's and the picked line's,
+   and the lookup is memoised for the length of one resolution, so one
+   person who opened both costs one call.
 1. Label (a person's decision): the issue carries `spec:ready`. Without it:
    "issue #<n> is not marked spec:ready", exit 2. `plan create --next` STOPS
    at a next line that is not ready and says so; it never skips ahead.
+   Where there is a TERMINAL, both board routes OFFER the label instead of
+   stopping there: `src/commands/plan/ready-offer.ts` puts
+   `rafa issue ready`'s own run — its two readings, its
+   `Mark #<n> spec:ready? [y/N]` question and its one label swap — inside
+   check 1, over the issue the route has already read, so no second
+   `gh issue view` is spent. A yes labels the issue and the run goes on to
+   the leak and completeness checks and the snapshot; a no throws the
+   refusal above. Two runs are offered nothing and keep that refusal
+   exactly: one with no terminal to ask on, read once when the command
+   starts, and one under `--dry-run`, which writes nothing and the swap is
+   a write. The leak refusal runs before the offer, since the offer quotes
+   headings off the body.
 2. Code: BOTH halves are wired and both refuse, the leak first. The leak
    refusal is `src/board/leak.ts`. The heading-completeness half is
    `requireCompleteSpec` (`src/board/readiness.ts`) — every template
@@ -258,13 +377,28 @@ Four checks, cheapest first; any one failing writes no plan file:
    gaps:
      - heading: "Definition of done"
        what: "no item says how the merge clean-up is verified"
+       blocking: true
+     - heading: "Design"
+       what: "the store backend is not named"
+       blocking: false
+       assumption: "the SQLite backend, as every other command reads"
    ```
 
-   On an explicit `verdict: not-ready` the session writes no plan and no
-   prerequisites; the loop enforces that in code (a plan file that appears
-   anyway is removed), posts the gaps as one comment on the issue (marker
-   `<!-- rafa:spec-review v1 -->`, edited on a rerun; `--no-comment` prints
-   only), swaps `spec:ready` for `spec:needs-work`, and exits 3.
+   On a `verdict: not-ready` naming a gap that BLOCKS planning — one where
+   guessing wrong changes what ships or what is safe — the session writes
+   no plan and no prerequisites; the loop enforces that in code (a plan
+   file that appears anyway is removed), posts the gaps as one comment on
+   the issue (marker `<!-- rafa:spec-review v1 -->`, edited on a rerun;
+   `--no-comment` prints only), swaps `spec:ready` for `spec:needs-work`,
+   and exits 3.
+
+   The same verdict with NO blocking gap keeps its plan: nothing is moved,
+   the plan is opened with an assumptions section listing each gap and the
+   assumption it was planned under, its `rafa:plan` block records
+   `review: assumed`, the gaps go up as the same marker comment in a body
+   that says a plan was written, and no label moves. The gate does both
+   writes itself (`src/board/gate.ts`, `src/board/review-stamp.ts`), so
+   the standing it answers is `assumed` and the command does not refuse.
 
    A MISSING or malformed block is not that verdict and is not treated as
    one. It is weighed against the plan the session wrote: one that
@@ -287,10 +421,10 @@ records `review: skipped`.
 
 - `plan create --issue=<n>` — the spec is issue `<n>`'s body, snapshotted to
   `<specs.dir>/rafa-<n>-<slug>.md` (slug from the title). Fetch the issue
-  (`gh issue view <n> --json number,title,body,state,labels`), refuse a
-  closed issue or one without `type:spec`, and run the readiness checks
-  that are wired — the `spec:ready` label, the leak refusal, the thin-list
-  warning and the planner's own review — per check 0 and check 2 above. An
+  (`gh issue view <n> --json number,title,body,state,labels,author`), refuse
+  a closed issue or one without `type:spec`, and run the readiness checks —
+  the author's trust, the `spec:ready` label, the leak refusal, the
+  completeness refusal and the planner's own review. An
   existing snapshot that differs is refused without `--refresh`. A local
   file `<specs.dir>/rafa-<n>-notes.md`, when present, is appended
   under "Local notes": machine paths and private hosts live there and never
@@ -304,6 +438,23 @@ records `review: skipped`.
   taken is the answer; then as `--issue=<n>`. It prints what it skipped and
   why ("#20 taken: PR #33 open"), and exits 0 with a message when nothing is
   left. `--dry-run` prints the pick and stops.
+
+  A pick that is BLOCKED is the one line the walk offers its way past.
+  Its issue carries `spec:blocked` and its `Blocked by:` line names a
+  blocker the board still holds open, or one whose state this run could
+  not read (`src/board/blocked-line.ts`). Such a line is neither planned
+  nor stepped over silently: the run says `#57 is blocked by #24 (open)`,
+  walks on for the first line under it that is ready, not blocked and not
+  taken, names that one and asks `Plan #58 instead? [y/N]` through
+  `src/commands/plan/blocked-offer.ts`. Only a yes plans it. A no, a run
+  with no terminal to ask on, a `--dry-run` run and a roadmap with no such
+  line under the blocked one each plan nothing and say which, all four
+  exiting 0. READY there is the `spec:ready` label, which the ordinary
+  walk does not ask for: the pick is offered the label where it is
+  missing, while this one is named for a single yes and must need no
+  second question. An issue labelled `spec:blocked` whose line is missing
+  or unreadable counts as blocked and is REPORTED with the fault sentence
+  `rafa doctor` and `issue unblock` print, never guessed at.
 
 Both routes are mutually exclusive with `--spec` and with each other.
 

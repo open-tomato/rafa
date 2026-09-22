@@ -52,6 +52,7 @@ Read this once; rafa also says it the first time you start a run.
   | `rafa loop start` | 🪙 one session per task, one for the wrap-up, and repair sessions while CI is red |
   | `rafa pr triage --resolve` | 🪙 runs a small fixed plan through the loop; without `--resolve`, nothing |
   | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
+  | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
 
   Everything else reads files, git and GitHub and spends nothing,
   `rafa usage` included (it reads `CLAUDE_USAGE_PERCENT` and asks
@@ -155,7 +156,7 @@ the next one, so you rarely have to remember it.
    ```bash
    rafa pr current        # number, title, checks, URL
    rafa pr triage         # why is it red, and is the fix simple (🪙 only with --resolve)
-   rafa pr merge          # asks y/N, merges, switches to the base, pulls, deletes both branches
+   rafa pr merge [--skip-checks] # asks y/N, merges, switches to the base, pulls, deletes both branches
    rafa release tag       # tag the merged version
    rafa effort collect && rafa effort report
    ```
@@ -327,6 +328,8 @@ built. A box is ticked by the change that finishes the feature.
 - [x] A failing pull request is diagnosed, and fixed when the fix is simple
 - [x] A version bump and a changelog entry with every pull request
 - [x] Start a plan from the main branch and rafa makes the branch for you
+- [x] One command takes you to the next step: merge, clean up, plan,
+  branch, start
 - [ ] The right skills reach the right task, chosen when the plan is
   written
 - [ ] Know which skills earn their place and which are ignored

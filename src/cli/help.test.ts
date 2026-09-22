@@ -1,22 +1,23 @@
 /**
- * Tests for the help renderer (`src/cli/help.ts`): the three frozen
+ * Tests for the help renderer (`src/cli/help.ts`): the four frozen
  * snapshots over the core registry, and each rule of the module note over
  * a registry built here.
  *
  * ## The snapshots
  *
- * `testdata/help/rafa.txt`, `rafa-loop.txt` and `rafa-loop-start.txt`
- * hold what `rafa --help`, `rafa loop --help` and
- * `rafa loop start --help` print. Each case dispatches its line through
- * `dispatch` over `CORE_REGISTRY` with the renderer handed in, an empty
- * environment and streams of its own, so what is compared is the
- * dispatcher's stdout. One more case spawns `src/rafa.ts --help` and
- * holds its stdout to the root snapshot: the control that the entry hands
- * this renderer in, which the dispatched cases cannot see.
+ * `testdata/help/rafa.txt`, `rafa-loop.txt`, `rafa-loop-start.txt` and
+ * `rafa-next.txt` hold what `rafa --help`, `rafa loop --help`,
+ * `rafa loop start --help` and `rafa next --help` print. Each case
+ * dispatches its line through `dispatch` over `CORE_REGISTRY` with the
+ * renderer handed in, an empty environment and streams of its own, so
+ * what is compared is the dispatcher's stdout. One more case spawns
+ * `src/rafa.ts --help` and holds its stdout to the root snapshot: the
+ * control that the entry hands this renderer in, which the dispatched
+ * cases cannot see.
  *
  * Regenerating is opt-in, read as `src/tests/report-ask-live.test.ts`
  * reads its recapture flag. With `RAFA_UPDATE_HELP_SNAPSHOTS=1` this file
- * writes all three before any case reads them, so a run that regenerates
+ * writes all four before any case reads them, so a run that regenerates
  * compares against what it just wrote and is green by construction: the
  * change is read in the diff. With the variable unset, or set to anything
  * else, nothing is written, and a snapshot that no longer matches is red.
@@ -83,6 +84,7 @@ const SNAPSHOTS: readonly (readonly [line: string, file: string])[] = [
   ['--help', 'rafa.txt'],
   ['loop --help', 'rafa-loop.txt'],
   ['loop start --help', 'rafa-loop-start.txt'],
+  ['next --help', 'rafa-next.txt'],
 ];
 
 /** The CLI entry the spawned case runs. */
@@ -252,7 +254,7 @@ describe('the frozen help snapshots', () => {
 
     expect(renderHelp({ level: 'root' }, CORE_REGISTRY)).toBe(snapshot);
     expect(renderHelp({ level: 'root' }, lessUsage)).not.toBe(snapshot);
-    expect(blockOf(snapshot, 'Commands')).toEqual(['  init, doctor, self-update, usage, describe']);
+    expect(blockOf(snapshot, 'Commands')).toEqual(['  next, init, doctor, self-update, usage, describe']);
   });
 
   it('holds the root snapshot as what src/rafa.ts prints for --help', () => {

@@ -168,7 +168,7 @@ describe('readLabelRows', () => {
     expect(rows.filter((row) => row.outcome === 'present').map((row) => row.name))
       .toEqual(['type:bug', 'needs-triage']);
     expect(rows.filter((row) => row.outcome === 'missing').map((row) => row.name))
-      .toEqual(['type:spec', 'spec:ready', 'spec:needs-work', 'module:unassigned']);
+      .toEqual(['type:spec', 'spec:ready', 'spec:needs-work', 'spec:blocked', 'module:unassigned']);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list']);
   });
 
@@ -333,7 +333,7 @@ describe('readBoardStatus', () => {
     expect(snapshot(root)).toEqual(before);
   });
 
-  it('answers all nine rows missing over a bare repository and writes nothing', async () => {
+  it('answers all ten rows missing over a bare repository and writes nothing', async () => {
     const root = freshRoot('whole-bare');
     const gh = fakeBoard();
     const before = snapshot(root);
@@ -341,7 +341,7 @@ describe('readBoardStatus', () => {
     const status = await readBoardStatus({ gh: gh.run, root });
 
     expect(outcomes(status.rows)).toEqual(status.rows.map(() => 'missing'));
-    expect(boardGaps(status)).toHaveLength(9);
+    expect(boardGaps(status)).toHaveLength(10);
     expect(status.roadmapIssue).toBe(null);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list', 'issue list']);
     expect(snapshot(root)).toEqual(before);
@@ -355,7 +355,7 @@ describe('readBoardStatus', () => {
     const status = await readBoardStatus({ gh: gh.run, root });
 
     expect(boardGaps(status).map((row) => row.name))
-      .toEqual(['spec:needs-work', 'type:bug', 'needs-triage', 'module:unassigned', ROADMAP_SETTING]);
+      .toEqual(['spec:needs-work', 'spec:blocked', 'type:bug', 'needs-triage', 'module:unassigned', ROADMAP_SETTING]);
     expect(boardGaps(status).every((row) => row.outcome === 'missing')).toBe(true);
   });
 });

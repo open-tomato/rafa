@@ -7,7 +7,7 @@
  * checkout (`.rafa/specs/rafa-20-pr-commands.md`): a spec is an issue, its
  * readiness is a label, and the order is a task list in one pinned
  * issue. A repository that has none of that cannot be planned from, and
- * making it by hand is six labels, a template file and an issue body
+ * making it by hand is seven labels, a template file and an issue body
  * nobody remembers the shape of. This module makes all four, and
  * {@link setUpBoard} is the whole of it; the question, the flags and the
  * lines printed are `src/commands/init.ts`'s, and the present-or-missing
@@ -19,7 +19,7 @@
  * it, `present` when it was already there and nothing was written, or
  * `refused` when it was not made and the detail says why. So a second
  * run over a board already set up writes no byte and answers `present`
- * six-plus-three times, which is what keeps `rafa init`'s "Nothing
+ * seven-plus-three times, which is what keeps `rafa init`'s "Nothing
  * changed." true when the board step is part of it.
  *
  * A refusal is never a throw. `setUpBoard` reports a failed `gh`
@@ -30,11 +30,12 @@
  *
  * ## The labels, and where their names come from
  *
- * {@link BOARD_LABELS} is the spec's list, and not one of the six names
+ * {@link BOARD_LABELS} is the spec's list, and not one of the seven names
  * is spelled here for the first time: `type:spec` is `./issue.ts`'s
  * {@link SPEC_LABEL}, the label an issue is refused for not carrying,
  * `spec:ready` is `./readiness.ts`'s {@link SPEC_READY_LABEL},
- * `spec:needs-work` is `./gate.ts`'s {@link SPEC_NEEDS_WORK_LABEL}, and
+ * `spec:needs-work` is `./gate.ts`'s {@link SPEC_NEEDS_WORK_LABEL},
+ * `spec:blocked` is `./blocked.ts`'s {@link SPEC_BLOCKED_LABEL}, and
  * `type:bug`, `needs-triage` and `module:unassigned` are built from
  * `GITHUB_LABELS`, the prefixes `src/adapters/tracker/github.ts` files a
  * draft under. A label spelled twice is a label the gate looks for and
@@ -53,7 +54,7 @@
  * every run a write.
  *
  * That listing reads {@link LABEL_LIST_LIMIT} labels. A repository
- * holding more than that can have one of the six fall off the end, and
+ * holding more than that can have one of the seven fall off the end, and
  * what it costs is a refused part: `gh label create --help` says
  * `--force` is what updates a label that already exists, so the plain
  * form this sends fails, and the failure is reported as the refusal
@@ -117,6 +118,7 @@ import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 import { configFilePath } from '../config.js';
 
+import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from './gate.js';
 import { SPEC_LABEL } from './issue.js';
 import { BRANCH_PREFIX, ID_PREFIX } from './naming.js';
@@ -139,7 +141,7 @@ export interface BoardLabel {
 }
 
 /**
- * The six labels the workflow files under, in the order they are made.
+ * The seven labels the workflow files under, in the order they are made.
  * See the module note on where each name comes from.
  */
 export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
@@ -154,6 +156,10 @@ export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
   {
     name: SPEC_NEEDS_WORK_LABEL,
     description: 'The readiness gate found gaps in this spec, listed in a comment',
+  },
+  {
+    name: SPEC_BLOCKED_LABEL,
+    description: 'The work waits on other issues, named by a Blocked by: line in the body',
   },
   {
     name: `${GITHUB_LABELS.typePrefix}bug`,
@@ -309,7 +315,7 @@ export function missingBoardLabels(held: readonly string[]): readonly BoardLabel
 
 /**
  * Makes each of {@link BOARD_LABELS} the repository does not carry, and
- * answers one part per label. A failed listing refuses all six, naming
+ * answers one part per label. A failed listing refuses all seven, naming
  * the command, because nothing is known about any of them then.
  */
 export async function setUpLabels(gh: GhRunner): Promise<readonly BoardPart[]> {
@@ -620,7 +626,7 @@ export interface BoardSetupOptions {
 
 /**
  * Makes every part of the board that is missing and answers what each
- * came to: the six labels, the spec issue template, the pinned Roadmap
+ * came to: the seven labels, the spec issue template, the pinned Roadmap
  * issue and `roadmap.issue`.
  *
  * Writes nothing a second time: a run over a board already set up

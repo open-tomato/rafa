@@ -1,9 +1,18 @@
 /**
- * Tests for what the plan commands share (`plan-files.ts`): the task
- * counts and their phrase, the file a stub names and the stub a file name
- * carries, what is read as a file, one issue as a line, and the refusal of
- * a line handing a command the wrong number of arguments.
+ * Tests for what the plan commands share (`plan-files.ts`): where plans
+ * sit, the task counts and their phrase, the file a stub names and the
+ * stub a file name carries, what is read as a file, one issue as a line,
+ * and the refusal of a line handing a command the wrong number of
+ * arguments.
+ *
+ * The directory cases plant a project of their own and read `plan.dir`
+ * back off it: one whose config sets none, which is the `.rafa/plans`
+ * default, and one whose config names `docs/plans` on purpose, which is
+ * the exemption `default-plan-dirs.test.ts` carves out for a test. The
+ * refusal case plants a config the loader cannot use at all.
  */
+import type { ProjectFound } from '../../project/scope.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +20,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
+import { CONFIG_DEFAULTS } from '../../config.js';
+import { scopeAt } from '../../project/scope.js';
+import { plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {
   checkbox,
@@ -21,8 +33,9 @@ import {
   isFile,
   issueLine,
   planFileName,
-  PLANS_DIR,
+  plansDirAt,
   plural,
+  resolvePlansDir,
   stubOfPlanFile,
 } from './plan-files.js';
 
@@ -45,6 +58,69 @@ function exitOf(run: () => unknown): unknown {
   return undefined;
 }
 
+/** A project rooted at a fresh directory under `tempBase`, its config `text` unless it is left out. */
+function plantProject(text?: string): ProjectFound {
+  const root = mkdtempSync(join(tempBase, 'project-'));
+  const home = mkdtempSync(join(tempBase, 'home-'));
+  if (text === undefined) plantProjectConfig(root);
+  else plantProjectConfig(root, text);
+  return { found: true, root, home, project: scopeAt(root), user: scopeAt(home) };
+}
+
+/** What a resolution warned about, collected. */
+function warningsOf(): { warn: (message: string) => void; lines: string[] } {
+  const lines: string[] = [];
+  return { warn: (message: string) => lines.push(message), lines };
+}
+
+describe('where plans sit', () => {
+  it('resolves the default directory for a project whose config sets no plan.dir', () => {
+    const project = plantProject();
+    const warnings = warningsOf();
+
+    expect(CONFIG_DEFAULTS.planDir).toBe(join('.rafa', 'plans'));
+    expect(resolvePlansDir(project, 'rafa plan list', warnings.warn)).toEqual({
+      label: join('.rafa', 'plans'),
+      path: join(project.root, '.rafa', 'plans'),
+    });
+    expect(warnings.lines).toEqual([]);
+  });
+
+  it('resolves the directory a config names, which is where the default case would have read none', () => {
+    const project = plantProject('plan:\n  dir: docs/plans\n');
+    const warnings = warningsOf();
+
+    expect(resolvePlansDir(project, 'rafa plan list', warnings.warn)).toEqual({
+      label: 'docs/plans',
+      path: join(project.root, 'docs', 'plans'),
+    });
+    expect(warnings.lines).toEqual([]);
+  });
+
+  it('resolves an absolute plan.dir as itself, the project root unread', () => {
+    const project = plantProject('plan:\n  dir: /tmp/rafa-plans-elsewhere\n');
+
+    expect(resolvePlansDir(project, 'rafa plan list', () => undefined))
+      .toEqual({ label: '/tmp/rafa-plans-elsewhere', path: '/tmp/rafa-plans-elsewhere' });
+  });
+
+  it('refuses a config the loader will not give with exit code 1, naming the command and the problem', () => {
+    const project = plantProject('plan:\n  dir: ""\n');
+
+    expect(exitOf(() => resolvePlansDir(project, 'rafa plan show', () => undefined))).toEqual({
+      exitCode: 1,
+      message: [
+        '❌ rafa plan show: the config cannot be used:',
+        `   ${join(project.root, '.rafa', 'config.yaml')}: plan.dir is "", expected a directory path`,
+      ].join('\n'),
+    });
+  });
+
+  it('carries both spellings of a directory, the path resolved against the project root', () => {
+    expect(plansDirAt('/project', 'plans')).toEqual({ label: 'plans', path: '/project/plans' });
+  });
+});
+
 describe('the task counts', () => {
   it('counts each checkbox, the open tasks being the rest', () => {
     const statuses = ['done', 'unchecked', 'blocked', 'done', 'unchecked', 'unchecked'] as const;
@@ -63,9 +139,9 @@ describe('the task counts', () => {
 });
 
 describe('the plan files', () => {
-  it('reads plans from .plans, naming the plan and the tracker of a stub', () => {
-    expect([PLANS_DIR, planFileName('my-plan', false), planFileName('my-plan', true)])
-      .toEqual(['.plans', 'PLAN-my-plan.md', 'PLAN_TRACKER-my-plan.md']);
+  it('names the plan and the tracker of a stub', () => {
+    expect([planFileName('my-plan', false), planFileName('my-plan', true)])
+      .toEqual(['PLAN-my-plan.md', 'PLAN_TRACKER-my-plan.md']);
   });
 
   it.each([
@@ -95,8 +171,8 @@ describe('the plan files', () => {
 
 describe('issues and counts in prose', () => {
   it('writes an issue as the file, the line, the reason and the text', () => {
-    expect(issueLine('.plans/PLAN-a.md', { reason: 'unclosed-block', line: 9, text: 'never closed' }))
-      .toBe('.plans/PLAN-a.md:9: unclosed-block: never closed');
+    expect(issueLine('.rafa/plans/PLAN-a.md', { reason: 'unclosed-block', line: 9, text: 'never closed' }))
+      .toBe('.rafa/plans/PLAN-a.md:9: unclosed-block: never closed');
   });
 
   it('adds an s to the noun unless the count is one', () => {
