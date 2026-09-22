@@ -19,6 +19,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   readUnchecked,
+  skipChecksCommand,
   uncheckedCaseOf,
   uncheckedComment,
   uncheckedQuestion,
@@ -61,6 +62,13 @@ describe('uncheckedQuestion', () => {
   test('names the pull request number', () => {
     expect(uncheckedQuestion(86)).toBe('Merge #86 with no checks? [y/N]');
     expect(uncheckedQuestion(7)).toBe('Merge #7 with no checks? [y/N]');
+  });
+});
+
+describe('skipChecksCommand', () => {
+  test('names the pull request number and the flag', () => {
+    expect(skipChecksCommand(86)).toBe('rafa pr merge 86 --skip-checks');
+    expect(skipChecksCommand(7)).toBe('rafa pr merge 7 --skip-checks');
   });
 });
 

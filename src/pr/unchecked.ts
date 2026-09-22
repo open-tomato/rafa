@@ -83,6 +83,15 @@ export function workflowCountLine(workflowCount: number | null): string {
   return `The repository defines ${workflowCount} ${noun}.`;
 }
 
+/**
+ * The command that merges pull request `number` with no checks,
+ * `rafa pr merge <n> --skip-checks`, as `rafa pr triage` prints it under
+ * a `no-checks` assessment.
+ */
+export function skipChecksCommand(number: number): string {
+  return `rafa pr merge ${number} --skip-checks`;
+}
+
 /** The question asked before an unchecked merge of pull request `number`. */
 export function uncheckedQuestion(number: number): string {
   return `Merge #${number} with no checks? [y/N]`;

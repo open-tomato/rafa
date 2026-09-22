@@ -1,14 +1,15 @@
 /**
  * What `rafa pr triage` gathers that is neither the line nor the pull
- * request itself: the failing job logs, read through the port, and the
- * conflicting file list, read through git.
+ * request itself: the failing job logs and the repository's workflow
+ * count, read through the port, and the conflicting file list, read
+ * through git.
  *
  * `src/pr/triage/` holds the pure half of the assessment — the classes,
  * the classifier, the log reader, the conflict parser, the comment, the
  * re-run readings and the selection — and every module there is total
  * and spawns nothing. This module is the impure half that feeds them:
  * it decides WHICH run's log to ask for and WHICH refs to merge, sends
- * those two questions, and hands the answers on as data. Nothing here
+ * those questions, and hands the answers on as data. Nothing here
  * classifies; `classifyTriage` does.
  *
  * ## The run id comes off the check link
@@ -42,6 +43,21 @@
  * never a throw. A log GitHub has dropped comes back from the port as
  * the empty string, which `readFailedLog` reads as no jobs, no step and
  * no lines — an ordinary reading, not a failure.
+ *
+ * ## The workflow count is read only when no check reported
+ *
+ * `classifyTriage` reads the count on verdict `none` alone, where it
+ * goes into the `no-checks` reason, so {@link readWorkflowCount} asks
+ * `PullRequests.workflowCount` only then and answers null — NOT ASKED —
+ * for every other verdict, which spends no `gh api` call on a pull
+ * request whose checks did report. Asked, the reading's `count` is the
+ * port's answer, where null is a count that could not be read: the
+ * riskier reading `src/pr/unchecked.ts` files beside "workflows exist",
+ * never "no workflow". The port answers null on any failure rather than
+ * throwing; a rejection is caught all the same and read as that null,
+ * because a triage that crashed on it would leave the pull request
+ * unassessed where an unread count only makes the warning the stricter
+ * one.
  *
  * ## The conflict is read only when GitHub says it might be one
  *
@@ -86,7 +102,7 @@ import type { ConflictReading } from '../../pr/triage/conflict.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 
 import { messageOf } from '../../config-sections.js';
-import { failingRows } from '../../pr/index.js';
+import { failingRows, verdictOf } from '../../pr/index.js';
 import { readConflict } from '../../pr/triage/conflict.js';
 import { readFailedLog } from '../../pr/triage/evidence.js';
 
@@ -105,6 +121,15 @@ const REMOTE = 'origin';
 
 /** The port members this module sends; a caller hands over the provider it already has. */
 export type TriageLogReader = Pick<PullRequests, 'failedLog'>;
+
+/** The port member {@link readWorkflowCount} sends. */
+export type TriageWorkflowReader = Pick<PullRequests, 'workflowCount'>;
+
+/** The workflow count, as it read when it was asked for; see the module note. */
+export interface WorkflowCountReading {
+  /** The repository's workflow count, or null when it could not be read. */
+  readonly count: number | null;
+}
 
 /** One failing run's log, as it read. */
 export interface FailedJobReading {
@@ -225,6 +250,23 @@ export async function readFailedLogs(
     unlinked: unlinkedChecks(rows),
     problems,
   };
+}
+
+/**
+ * The repository's workflow count, read only when the check rows read
+ * verdict `none`; null when it was not asked for. Never throws; see the
+ * module note.
+ */
+export async function readWorkflowCount(
+  pulls: TriageWorkflowReader,
+  rows: readonly CheckRow[],
+): Promise<WorkflowCountReading | null> {
+  if (verdictOf(rows) !== 'none') return null;
+  try {
+    return { count: await pulls.workflowCount() };
+  } catch {
+    return { count: null };
+  }
 }
 
 /** The base refs tried, nearest the remote first; see the module note. */

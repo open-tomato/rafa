@@ -128,9 +128,10 @@ Assessment is CODE, not a session:
   baseRefName,isCrossRepository,mergeable,mergeStateStatus,
   statusCheckRollup,updatedAt,labels`, the failing rows through
   `parseChecks`, the tail of `gh run view <id> --log-failed` for each
-  failing job, and for a conflict the file list from `git merge-tree
-  --write-tree` with a liveness control (the `merge-tree-mergeability-readings`
-  skill's rule).
+  failing job, the repository's workflow count (`gh api
+  repos/<repo>/actions/workflows`) when no check reported at all, and for a
+  conflict the file list from `git merge-tree --write-tree` with a liveness
+  control (the `merge-tree-mergeability-readings` skill's rule).
 - Classify into one class: `green`, `pending`, `conflict-lockfile`,
   `conflict-manifest` (`package.json` where both sides added or bumped
   entries), `conflict-other`, `ci-install`, `ci-lint`, `ci-types`, `ci-test`,

@@ -180,7 +180,7 @@ import {
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 
 import { runResolveLoop, writeResolvePlan } from './resolve-loop.js';
-import { evidenceOf } from './triage-report.js';
+import { evidenceOf, workflowCountOf } from './triage-report.js';
 import { readTrustedTriageComment, requireTrustedResolveAuthor } from './triage-trust.js';
 
 /** The exit code a `--resolve` run that gave up ends with; the spec's. */
@@ -289,13 +289,19 @@ function blockOf(detail: PullRequestDetail, assessment: TriageAssessment, at: st
   };
 }
 
-/** The comment body one write puts on the pull request, the dependabot note included. */
+/**
+ * The comment body one write puts on the pull request, the dependabot
+ * note included. `workflowCount` is read off the reading `assessment`
+ * came from, which after an attempt is the fresh one, not
+ * `run.reading`: a resolved conflict can come back `no-checks`.
+ */
 function resolveCommentBody(
   run: ResolveRun,
   detail: PullRequestDetail,
   assessment: TriageAssessment,
   attempts: number,
   resolved: boolean,
+  workflowCount: number | null | undefined,
 ): string {
   const body = triageCommentBody({
     pr: detail,
@@ -304,6 +310,7 @@ function resolveCommentBody(
     attempts,
     resolved,
     evidence: evidenceOf(run.reading),
+    workflowCount,
   });
   return isDependabotBranch(detail)
     ? `${body}\n${DEPENDABOT_REBASE_NOTE}\n`
@@ -326,8 +333,9 @@ async function writeResolveComment(
   assessment: TriageAssessment,
   attempts: number,
   resolved: boolean,
+  workflowCount: number | null | undefined,
 ): Promise<void> {
-  const body = resolveCommentBody(run, detail, assessment, attempts, resolved);
+  const body = resolveCommentBody(run, detail, assessment, attempts, resolved, workflowCount);
   try {
     const found = await readTrustedTriageComment(await run.pulls.comments(run.number), run.trust);
     for (const ignored of found.ignored) run.output.warn(`   ${ignored.reason}`);
@@ -590,7 +598,7 @@ async function runAttempts(
   while (true) {
     const start = readAttemptStart({ stored: state.spent, maxAttempts: run.maxAttempts });
     if (start.stopped) {
-      await writeResolveComment(run, detail, state.assessment, state.spent, false);
+      await writeResolveComment(run, detail, state.assessment, state.spent, false, workflowCountOf(state.reading));
       const removal = closeWorktree(run, resolveWorktreePath(run.home, run.number));
       return ended(run, state, {
         ran: state.lines.length > 0,
@@ -604,7 +612,7 @@ async function runAttempts(
     run.output.info(attemptHeadline(run, state.assessment, start));
     const worktree = openWorktree(run, detail);
     state.spent = start.attempts;
-    await writeResolveComment(run, detail, state.assessment, state.spent, false);
+    await writeResolveComment(run, detail, state.assessment, state.spent, false, workflowCountOf(state.reading));
 
     const planPath = planFor(run, detail, state, state.spent);
     run.output.info(`   Running ${planPath}`);
@@ -625,7 +633,7 @@ async function runAttempts(
     state.evidence = end.evidence;
 
     if (end.green) {
-      await writeResolveComment(run, detail, state.assessment, state.spent, true);
+      await writeResolveComment(run, detail, state.assessment, state.spent, true, workflowCountOf(state.reading));
       return ended(run, state, {
         ran: true,
         resolved: true,
@@ -652,7 +660,7 @@ async function runAttempts(
       : noPlanReason(end.assessment.triageClass);
     if (!repeat.stopped && reason === null) continue;
 
-    await writeResolveComment(run, detail, state.assessment, state.spent, false);
+    await writeResolveComment(run, detail, state.assessment, state.spent, false, workflowCountOf(state.reading));
     const removal = closeWorktree(run, worktree);
     return ended(run, state, {
       ran: true,

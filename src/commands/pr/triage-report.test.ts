@@ -4,7 +4,8 @@
  * {@link renderTriage} is pure and total, so every shape — assessed with
  * a conflict, assessed with a failing step and a log excerpt, already
  * assessed, waiting on a run, green, a comment posted, a comment edited,
- * a comment refused, `--no-comment`, a log that could not be read — is
+ * a comment refused, `--no-comment`, a log that could not be read, no
+ * checks at all with each workflow count — is
  * driven by calling it with a reading built here. Nothing in this file
  * spawns a process, reaches a provider or reads a clock.
  *
@@ -15,6 +16,7 @@
  * one thing built by hand is the log evidence, which `readFailedLog`
  * already has its own cases for.
  */
+import type { WorkflowCountReading } from './triage-read.js';
 import type { TriageReading } from './triage-report.js';
 import type { CheckRow, PullRequestComment, PullRequestDetail } from '../../pr/index.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
@@ -26,7 +28,7 @@ import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
 import { buildFollowUpPrompt } from '../../pr/triage/follow-up.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 
-import { evidenceOf, renderTriage, renderTriages } from './triage-report.js';
+import { evidenceOf, noChecksLines, renderTriage, renderTriages, workflowCountOf } from './triage-report.js';
 
 /** The head commit every reading is pinned to. */
 const HEAD = '0badc0ffee1234567890abcdef1234567890abcd';
@@ -115,6 +117,7 @@ interface ReadingSeed {
   readonly ignored?: TriageReading['ignored'];
   readonly unlinked?: readonly string[];
   readonly maxAttempts?: number;
+  readonly workflows?: WorkflowCountReading | null;
 }
 
 /** A reading as the command builds one, through the real rerun reader and classifier. */
@@ -144,6 +147,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
       ignored: seed.ignored ?? [],
       assessment: null,
       logs: null,
+      workflows: null,
       conflict: null,
       prompt: null,
       write: null,
@@ -157,7 +161,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
     rows,
     step: seed.evidence?.step,
     conflictFiles: seed.conflictFiles ?? [],
-    workflowCount: null,
+    workflowCount: seed.workflows?.count ?? null,
   });
   return {
     detail: pull,
@@ -165,6 +169,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
     ignored: seed.ignored ?? [],
     assessment,
     logs,
+    workflows: seed.workflows ?? null,
     conflict: null,
     prompt: buildFollowUpPrompt({ pr: pull, assessment, evidence: seed.evidence }),
     write: seed.write ?? null,
@@ -365,5 +370,76 @@ describe('several pull requests', () => {
 
   it('answers the empty string for no pull request at all', () => {
     expect(renderTriages([])).toBe('');
+  });
+});
+
+describe('a pull request that reports no checks at all', () => {
+  const NO_WORKFLOW = 'nothing on GitHub has tested this branch; you are relying on the checks run locally';
+  const WORKFLOWS_EXIST = 'CI may not have started (a path filter, a draft, Actions disabled, or it has not registered yet);'
+    + ' this is probably not what you want';
+
+  /** A zero-check reading whose workflow count read `count`. */
+  function noChecks(workflows: WorkflowCountReading | null): TriageReading {
+    return reading({ rows: [], workflows });
+  }
+
+  it('prints the class, the count, the no-workflow warning and the --skip-checks line --yes may answer', () => {
+    const lines = linesOf(renderTriage(noChecks({ count: 0 })));
+    const verdict = lines.indexOf('   Checks verdict: none');
+
+    expect(lines[2]).toBe('no-checks — not simple — attempts 0 of 2');
+    expect(lines).toContain('   Why: the head reports no checks at all; the repository defines 0 workflows;'
+      + ' to merge it anyway, run rafa pr merge 41 --skip-checks');
+    expect(verdict).toBeGreaterThan(0);
+    expect(lines.slice(verdict + 1, verdict + 4)).toEqual([
+      '   Workflows: The repository defines 0 workflows.',
+      `   Warning: ${NO_WORKFLOW}`,
+      '   To merge it anyway: rafa pr merge 41 --skip-checks (it asks first; --yes may answer it)',
+    ]);
+  });
+
+  it('prints the workflows-exist warning and refuses --yes when one or more workflows exist', () => {
+    const lines = linesOf(renderTriage(noChecks({ count: 3 })));
+
+    expect(lines).toContain('   Workflows: The repository defines 3 workflows.');
+    expect(lines).toContain(`   Warning: ${WORKFLOWS_EXIST}`);
+    expect(lines).toContain('   To merge it anyway: rafa pr merge 41 --skip-checks'
+      + ' (it asks first; --yes is refused, so a person must answer it)');
+    expect(lines.join('\n')).not.toContain(NO_WORKFLOW);
+  });
+
+  it('reads an unreadable count, and a count never asked for, as workflows existing and never as none', () => {
+    for (const workflows of [{ count: null }, null]) {
+      const text = renderTriage(noChecks(workflows));
+
+      expect(text).toContain('   Workflows: The repository\'s workflow count could not be read.');
+      expect(text).toContain(`   Warning: ${WORKFLOWS_EXIST}`);
+      expect(text).toContain('--yes is refused');
+      expect(text).not.toContain(NO_WORKFLOW);
+    }
+  });
+
+  it('prints none of the three lines for any other class', () => {
+    const others = [
+      reading(),
+      reading({ rows: [row('gates', 'FAILURE')], evidence: evidence() }),
+      reading({ rows: [row('gates', 'IN_PROGRESS')] }),
+      reading({ detail: detail({ mergeable: 'conflicting', mergeStateStatus: 'DIRTY' }), rows: [], conflictFiles: ['bun.lock'], workflows: { count: 0 } }),
+    ];
+
+    for (const other of others) {
+      const text = renderTriage(other);
+
+      expect(text).not.toContain('Workflows:');
+      expect(text).not.toContain('To merge it anyway:');
+      if (other.assessment !== null) expect(noChecksLines(other, other.assessment)).toEqual([]);
+    }
+    expect(others[3]?.assessment?.triageClass).toBe('conflict-lockfile');
+  });
+
+  it('answers the count the reading carries, null when unread, and undefined when never asked for', () => {
+    expect(workflowCountOf(noChecks({ count: 2 }))).toBe(2);
+    expect(workflowCountOf(noChecks({ count: null }))).toBeNull();
+    expect(workflowCountOf(noChecks(null))).toBeUndefined();
   });
 });

@@ -1,7 +1,12 @@
 /**
  * Tests for what `rafa pr triage` gathers (`triage-read.ts`): the run id
- * off a check link, the failing job logs through the port, and the
- * conflicting file list through git.
+ * off a check link, the failing job logs and the workflow count through
+ * the port, and the conflicting file list through git.
+ *
+ * The workflow-count cases drive a stub answering `workflowCount` and
+ * recording each call, so "not asked" is a count of calls and not an
+ * absent answer: the zero-row case that DOES ask is the control that
+ * the stub records at all.
  *
  * The log cases drive a stub answering `failedLog` and nothing else, so
  * what is measured is which runs were ASKED FOR and which reading became
@@ -43,6 +48,7 @@ import {
   headCandidates,
   readConflictFiles,
   readFailedLogs,
+  readWorkflowCount,
   resolvesRef,
   runIdOf,
   unlinkedChecks,
@@ -330,5 +336,57 @@ describe('the conflicting file list', () => {
 
   it('plants every repository under its own temporary directory', () => {
     expect(tempBase.startsWith(realpathSync(tmpdir()))).toBe(true);
+  });
+});
+
+/** A stub answering `workflowCount` with `answer`, counting every call. */
+function workflowReader(answer: () => Promise<number | null>): {
+  readonly pulls: { workflowCount: () => Promise<number | null> };
+  readonly calls: () => number;
+} {
+  let calls = 0;
+  return {
+    pulls: {
+      workflowCount: () => {
+        calls += 1;
+        return answer();
+      },
+    },
+    calls: () => calls,
+  };
+}
+
+describe('readWorkflowCount', () => {
+  it('asks once when no check reported, and answers the count read, zero included', async () => {
+    for (const count of [0, 1, 119]) {
+      const reader = workflowReader(() => Promise.resolve(count));
+
+      expect(await readWorkflowCount(reader.pulls, [])).toEqual({ count });
+      expect(reader.calls()).toBe(1);
+    }
+  });
+
+  it('carries a count the port could not read as null, never as zero', async () => {
+    const reader = workflowReader(() => Promise.resolve(null));
+
+    expect(await readWorkflowCount(reader.pulls, [])).toEqual({ count: null });
+  });
+
+  it('reads a rejection as a count that could not be read, rather than throwing', async () => {
+    const reader = workflowReader(() => Promise.reject(new Error('HTTP 403')));
+
+    expect(await readWorkflowCount(reader.pulls, [])).toEqual({ count: null });
+    expect(reader.calls()).toBe(1);
+  });
+
+  it('asks nothing, and answers null, when any check row reported, passing or failing', async () => {
+    const verdicts = [
+      [row('gates', 'SUCCESS', 'https://example.test/1')],
+      [failing('gates', '9006')],
+    ];
+    const reader = workflowReader(() => Promise.resolve(0));
+
+    for (const rows of verdicts) expect(await readWorkflowCount(reader.pulls, rows)).toBeNull();
+    expect(reader.calls()).toBe(0);
   });
 });
