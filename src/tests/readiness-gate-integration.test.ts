@@ -24,7 +24,9 @@
  *      planted session output, one per reading
  *   4. `enforceSpecReview` — what a `not-ready` reading (or `--skip-review`
  *      bypassing it) does to a plan a session wrote anyway: moved into
- *      `rejected/`, commented on, its labels swapped
+ *      `rejected/`, commented on, its labels swapped when a gap among
+ *      them blocks; opened under the assumptions and stamped
+ *      `review: assumed`, with no label moved, when none of them do
  *
  * No case here reaches GitHub or spawns `gh` or `claude`: the board is
  * a fake recording its calls, exactly as `gate.test.ts`'s is, and the
@@ -63,7 +65,12 @@ import {
   SPEC_READY_LABEL,
   TEMPLATE_HEADINGS,
 } from '../board/readiness.js';
-import { REVIEW_SKIPPED_LINE, stampReviewSkipped } from '../board/review-stamp.js';
+import {
+  ASSUMPTIONS_HEADING,
+  REVIEW_ASSUMED_LINE,
+  REVIEW_SKIPPED_LINE,
+  stampReviewSkipped,
+} from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
 import { CommandExit } from '../cli/command.js';
 
@@ -74,6 +81,24 @@ const PLAN_PATH = '.rafa/plans/PLAN-rafa-31.md';
 
 /** The prerequisites file beside it. */
 const PREREQUISITES_PATH = '.rafa/plans/PREREQUISITES-rafa-31.md';
+
+/**
+ * A plan carrying a `rafa:plan` block, as a planner session writes one,
+ * for the assumed case: `enforceSpecReview` stamps `review: assumed` into
+ * this block, so the case needs one to stamp, unlike the other cases
+ * here, which `plantRepo` hands a line of prose that is refused or
+ * removed unread.
+ */
+const PLAN_TEXT = [
+  '# Plan: rafa-31',
+  '',
+  '```rafa:plan',
+  'stub: rafa-31',
+  '```',
+  '',
+  '- [ ] Do the thing',
+  '',
+].join('\n');
 
 /**
  * A complete issue body, one section per template heading, in template
@@ -148,6 +173,41 @@ const NOT_READY_OUTPUT = reviewOutput(
   '    what: "no item says how the label swap is verified"',
   '  - heading: "Tasks the plan must carry"',
   '    what: "the second task does not name what file it adds the check to"',
+);
+
+/**
+ * The same two gaps as {@link NOT_READY_OUTPUT}, neither of which blocks
+ * planning: each names the assumption the plan is written under.
+ */
+const ASSUMED_OUTPUT = reviewOutput(
+  'verdict: not-ready',
+  'gaps:',
+  '  - heading: "Definition of done"',
+  '    what: "no item says how the label swap is verified"',
+  '    blocking: false',
+  '    assumption: "the label swap is verified by asserting the board call"',
+  '  - heading: "Tasks the plan must carry"',
+  '    what: "the second task does not name what file it adds the check to"',
+  '    blocking: false',
+  '    assumption: "the check is added to src/board/readiness.ts"',
+);
+
+/**
+ * {@link ASSUMED_OUTPUT}'s two gaps, one field apart: the second one
+ * blocks, and its assumption is still named. What turns the verdict from
+ * a plan opened under its assumptions into a refusal is `blocking` alone.
+ */
+const ONE_BLOCKING_OUTPUT = reviewOutput(
+  'verdict: not-ready',
+  'gaps:',
+  '  - heading: "Definition of done"',
+  '    what: "no item says how the label swap is verified"',
+  '    blocking: false',
+  '    assumption: "the label swap is verified by asserting the board call"',
+  '  - heading: "Tasks the plan must carry"',
+  '    what: "the second task does not name what file it adds the check to"',
+  '    blocking: true',
+  '    assumption: "the check is added to src/board/readiness.ts"',
 );
 
 /** A verdict that lets the issue's plan stand. */
@@ -443,6 +503,77 @@ describe('a not-ready verdict on a plan the session wrote anyway', () => {
       '💬 Posted the review comment on issue #31.',
       `🏷  Swapped ${SPEC_READY_LABEL} for ${SPEC_NEEDS_WORK_LABEL} on issue #31.`,
     ]);
+    expect(lines.warn).toEqual([]);
+  });
+
+  it('opens the plan under both assumptions and stamps review: assumed when neither gap blocks', async () => {
+    const root = plantRepo([PREREQUISITES_PATH]);
+    writeFileSync(join(root, PLAN_PATH), PLAN_TEXT, 'utf8');
+    const { board, calls } = fakeBoard();
+    const { lines, output } = capture();
+    const review = parseSpecReview(ASSUMED_OUTPUT);
+
+    const standing = await enforceSpecReview({
+      review,
+      source: 'issue #31',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 31, board },
+      comment: true,
+      output,
+    });
+
+    // The reading this case is about: a not-ready verdict no gap of
+    // which blocks, which is what the plan is written under.
+    expect(review.answer).toBe('not-ready');
+    expect(review.gaps.some((gap) => gap.blocking)).toBe(false);
+    expect(standing).toBe('assumed');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(true);
+    expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(true);
+    expect(existsSync(join(root, rejectedPath(PLAN_PATH)))).toBe(false);
+
+    const written = readFileSync(join(root, PLAN_PATH), 'utf8');
+    expect(written.split('\n')[0]).toBe(ASSUMPTIONS_HEADING);
+    expect(written).toContain('- Planned under: the label swap is verified by asserting the board call');
+    expect(written).toContain('- Planned under: the check is added to src/board/readiness.ts');
+    expect(written.endsWith(`${REVIEW_ASSUMED_LINE}\n\`\`\`\n\n- [ ] Do the thing\n`)).toBe(true);
+
+    expect(calls.map((call) => call[0])).toEqual(['comments', 'comment']);
+    const body = String(calls[1]?.[2]);
+    expect(body).toContain('found 2 gaps, none of them blocking');
+    expect(body).not.toContain('No plan was written.');
+    expect(lines.info).toContain(
+      `🧭 ${PLAN_PATH} opens under the review's assumptions and records ${REVIEW_ASSUMED_LINE}.`,
+    );
+  });
+
+  it('removes the plan, posts the comment and swaps the label when one of the same two gaps blocks', async () => {
+    const root = plantRepo([PLAN_PATH, PREREQUISITES_PATH]);
+    const { board, calls } = fakeBoard();
+    const { lines, output } = capture();
+    const review = parseSpecReview(ONE_BLOCKING_OUTPUT);
+
+    const refusal = await asyncThrownBy(enforceSpecReview({
+      review,
+      source: 'issue #31',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 31, board },
+      comment: true,
+      output,
+    }));
+
+    expect(review.gaps.filter((gap) => gap.blocking)).toHaveLength(1);
+    expect(refusal.exitCode).toBe(SPEC_NOT_READY_EXIT);
+    expect(existsSync(join(root, PLAN_PATH))).toBe(false);
+    expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(false);
+    expect(existsSync(join(root, rejectedPath(PLAN_PATH)))).toBe(true);
+
+    expect(calls.map((call) => call[0])).toEqual(['comments', 'comment', 'swapLabels']);
+    expect(calls[2]).toEqual(['swapLabels', 31, SPEC_READY_LABEL, SPEC_NEEDS_WORK_LABEL]);
+    expect(String(calls[1]?.[2])).toContain('No plan was written.');
     expect(lines.warn).toEqual([]);
   });
 
