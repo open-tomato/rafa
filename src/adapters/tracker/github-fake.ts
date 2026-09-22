@@ -24,6 +24,12 @@
  *     fields asked for, keys in name order, and each label as `id`,
  *     `name`, `description` and `color`. An open issue's `stateReason` is
  *     an empty string; a closed one's is `COMPLETED` or `NOT_PLANNED`.
+ *   - An issue's `author` is `{"id","is_bot","login","name"}` for a
+ *     person, the shape `src/pr/gh-fake-shapes.ts` records for a pull
+ *     request's: `gh issue view 1 --repo cli/cli --json author`,
+ *     read on 2026-09-21 with the same `gh` 2.100.0, answered
+ *     `{"id":"MDQ6VXNlcjk4NDgy","is_bot":false,"login":"vilmibm","name":"Nate Smith"}`.
+ *     A bot-authored issue was not read; the fake plants people only.
  *   - `gh issue list` answered its rows newest first.
  *   - `--label "needs-triage,enhancement"` answered what two `--label`
  *     flags did, so a label value is split on commas.
@@ -75,6 +81,8 @@ export interface FakeGhIssue {
   readonly state: 'OPEN' | 'CLOSED';
   /** `COMPLETED` or `NOT_PLANNED` once closed; empty while open, as recorded. */
   readonly stateReason: string;
+  /** The login that opened it; every issue the fake plants carries the fake's own account. */
+  readonly author: string;
   readonly comments: readonly string[];
 }
 
@@ -124,6 +132,9 @@ const DEFAULT_LABELS = [
   'wontfix',
 ];
 
+/** The account `gh auth status` names, and the author of every issue the fake plants. */
+const FAKE_LOGIN = 'rafa-fake';
+
 /** Recorded with no hosts configured. */
 const NOT_LOGGED_IN = 'You are not logged into any GitHub hosts. To log in, run: gh auth login\n';
 
@@ -134,7 +145,7 @@ const NO_REMOTES = 'no git remotes found\n';
 const LABEL_CREATE_ERROR = 'HTTP 403: Resource not accessible by integration (label create)\n';
 
 /** The fields each viewing command can be asked for. */
-const VIEW_FIELDS: ReadonlySet<string> = new Set(['body', 'labels', 'number', 'state', 'stateReason', 'title', 'url']);
+const VIEW_FIELDS: ReadonlySet<string> = new Set(['author', 'body', 'labels', 'number', 'state', 'stateReason', 'title', 'url']);
 
 /** The flags a modelled command takes, and how many arguments it takes besides. */
 interface CommandShape {
@@ -260,6 +271,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
   /** An issue as `--json` writes it: the fields asked for, keys in name order. */
   const render = (issue: FakeGhIssue, fields: readonly string[]): Record<string, unknown> => {
     const values: Record<string, unknown> = {
+      author: { id: `MDQ6VXNlcmZha2U${issue.author}`, is_bot: false, login: issue.author, name: issue.author },
       body: issue.body,
       labels: issue.labels.map((name, index) => ({ id: `LA_fake${index}`, name, description: '', color: 'ededed' })),
       number: issue.number,
@@ -277,7 +289,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
 
   const handlers = new Map<string, (parsed: ParsedCommand) => GhResult>([
     ['auth status', () => (authOk
-      ? ok('github.com\n  Logged in to github.com account rafa-fake (keyring)\n')
+      ? ok(`github.com\n  Logged in to github.com account ${FAKE_LOGIN} (keyring)\n`)
       : failed(NOT_LOGGED_IN))],
 
     ['repo view', (parsed) => {
@@ -304,7 +316,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       if (missing !== undefined) return failed(`could not add label: '${missing}' not found\n`);
 
       const number = Math.max(0, ...[...issues.values()].map((issue) => issue.number)) + 1;
-      store({ number, title, body, labels: wanted, state: 'OPEN', stateReason: '', comments: [] });
+      store({ number, title, body, labels: wanted, state: 'OPEN', stateReason: '', author: FAKE_LOGIN, comments: [] });
       return ok(`${urlOf(number)}\n`);
     }],
 

@@ -4,12 +4,15 @@
  *
  * ## What is read
  *
- * `PLAN-<stub>.md` in the configured plans directory at the git root, or
- * with `--tracker` `PLAN_TRACKER-<stub>.md` beside it: the copy `rafa loop
- * start` makes when it first runs the plan, and ticks as tasks finish. A
- * stub no plan stamp can carry is refused before any file is looked for, so
- * the file named never leaves the configured directory (`plan-files.ts`). A
- * stub naming no file is refused too, both with exit code 1.
+ * `PLAN-<stub>.md` in the configured plans directory, or with
+ * `--tracker` `PLAN_TRACKER-<stub>.md` beside it: the copy `rafa loop
+ * start` makes when it first runs the plan, and ticks as tasks finish.
+ * The directory is `plan.dir` resolved against the project root the
+ * dispatcher found, `.rafa/plans` unless a config names another
+ * (`plan-files.ts`), and a config `loadConfig` refuses is refused with
+ * exit code 1. A stub no plan stamp can carry is refused before any file
+ * is looked for, so the file named never leaves that directory. A stub
+ * naming no file is refused too, both with exit code 1.
  *
  * ## `--tracker` is typed after the stub
  *
@@ -30,16 +33,16 @@
  * extra's value is `unknown` to the parser, which never serialises one
  * (`plan/parse.ts`), so only its key is given.
  *
- * In text mode it writes the stub, the file relative to the git root, the
- * issue and spec the header names when it names them, and the counts.
- * Then each task under its stage heading, the tasks above every heading
- * first, with its checkbox as the checklist writes it and its sentence
+ * In text mode it writes the stub, the file under the plans directory as
+ * `plan.dir` spells it, the issue and spec the header names when it
+ * names them, and the counts. Then each task under its stage heading,
+ * the tasks above every heading first, with its checkbox as the checklist writes it and its sentence
  * without its declaration. Then the issues, when there are any. The plan
  * and stage contexts are left to json mode and to the file. An issue is
  * shown and never refused: `rafa plan validate` is the check that exits
  * nonzero on one.
  */
-import type { RepoRootFinder, TaskCounts } from './plan-files.js';
+import type { PlansDir, TaskCounts } from './plan-files.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { PlanIssue, PlanStage, PlanTask } from '../../plan/index.js';
 
@@ -48,7 +51,6 @@ import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { parsePlan } from '../../plan/index.js';
-import { getRepoRoot } from '../../utils/git.js';
 import { isStampableStub } from '../../utils/plan-stamp.js';
 
 import {
@@ -59,11 +61,15 @@ import {
   isFile,
   issueLine,
   planFileName,
-  PLANS_DIR,
+  requireProject,
+  resolvePlansDir,
 } from './plan-files.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa plan show <stub> [--tracker]';
+
+/** How a refusal that names no usage names the command. */
+const COMMAND = 'rafa plan show';
 
 /** The `rafa:plan` fields as the command gives them: each extra by its key alone. */
 export interface ShownHeader {
@@ -112,17 +118,17 @@ function missingText(stub: string, tracker: boolean, relative: string): string {
 }
 
 /**
- * The plan `stub` names in the configured plans directory at repository
- * `root`, or its tracker; a refusal with exit code 1 for a stub no plan
- * stamp can carry and for one naming no file. See the module note.
+ * The plan `stub` names in `plans`, the configured plans directory, or
+ * its tracker; a refusal with exit code 1 for a stub no plan stamp can
+ * carry and for one naming no file. See the module note.
  */
-export function showPlan(root: string, stub: string, tracker: boolean): ShownPlan {
+export function showPlan(plans: PlansDir, stub: string, tracker: boolean): ShownPlan {
   if (!isStampableStub(stub)) {
     throw new CommandExit(1, `❌ "${stub}" is no plan stub: a stub is letters, digits, ".", "_" and "-"`);
   }
   const name = planFileName(stub, tracker);
-  const file = join(root, PLANS_DIR, name);
-  if (!isFile(file)) throw new CommandExit(1, missingText(stub, tracker, join(PLANS_DIR, name)));
+  const file = join(plans.path, name);
+  if (!isFile(file)) throw new CommandExit(1, missingText(stub, tracker, join(plans.label, name)));
 
   const model = parsePlan(readFileSync(file, 'utf8'));
   const { header } = model;
@@ -149,9 +155,12 @@ function taskLine(task: PlanTask): string {
   return `  ${checkbox(task.status)} ${task.text}`;
 }
 
-/** The lines text mode writes for a plan; see the module note. */
-export function renderShownPlan(shown: ShownPlan): string[] {
-  const relative = join(PLANS_DIR, planFileName(shown.stub, shown.tracker));
+/**
+ * The lines text mode writes for a plan, its file named under
+ * `dirLabel`, `plan.dir` as the config spells it; see the module note.
+ */
+export function renderShownPlan(shown: ShownPlan, dirLabel: string): string[] {
+  const relative = join(dirLabel, planFileName(shown.stub, shown.tracker));
   const fileLabel = shown.tracker
     ? 'Tracker'
     : 'File';
@@ -171,57 +180,58 @@ export function renderShownPlan(shown: ShownPlan): string[] {
   return lines;
 }
 
-/** The command, reading the repository `findRepoRoot` answers; see the module note. */
-export function createPlanShowCommand(findRepoRoot: RepoRootFinder = getRepoRoot): RafaCommand {
-  const command: RafaCommand = {
-    name: 'plan show',
-    subject: 'plan',
-    action: 'show',
-    summary: 'show one plan, or its tracker, stage by stage',
-    description: 'Reads a plan file at the git root with the plan parser and prints its stub, the issue'
-      + ' and spec its rafa:plan block names, and its tasks counted by checkbox, then each task under'
-      + ' its stage heading and every issue the parser reported. With `--tracker` it reads the loop'
-      + ' tracker copy instead, which the loop ticks as tasks finish. Type `--tracker` after the stub:'
-      + ' typed before it, the stub is read as the value of the flag and refused. With'
-      + ' `--output=json` the plan is the data of the terminal result event.',
-    args: [
-      {
-        name: 'stub',
-        description: 'The plan stub, which names the corresponding plan file.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: 'tracker',
-        description: 'Reads the loop tracker copy instead of the plan, which it ticks as tasks finish.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa plan show my-feature',
-        note: 'Prints the plan stage by stage.',
-      },
-      {
-        cmd: 'rafa plan show my-feature --tracker --output=json',
-        note: 'Writes a start event, then a result event whose data is the tracker as the plan parser reads it.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    run: async (context) => {
-      const tracker = readTrackerFlag(context.flags.tracker);
-      const stub = expectOneArgument(context.args, USAGE);
-      const shown = showPlan(findRepoRoot(), stub, tracker);
-      if (context.outputMode === 'json') {
-        context.output.result(shown);
-        return;
-      }
-      for (const line of renderShownPlan(shown)) context.output.info(line);
+/** The command; see the module note. */
+const planShowCommand: RafaCommand = {
+  name: 'plan show',
+  subject: 'plan',
+  action: 'show',
+  summary: 'show one plan, or its tracker, stage by stage',
+  description: 'Reads a plan file in the plans directory `plan.dir` names, under the project root, with'
+    + ' the plan parser and prints its stub, the issue and spec its rafa:plan block names, and its'
+    + ' tasks counted by checkbox, then each task under'
+    + ' its stage heading and every issue the parser reported. With `--tracker` it reads the loop'
+    + ' tracker copy instead, which the loop ticks as tasks finish. Type `--tracker` after the stub:'
+    + ' typed before it, the stub is read as the value of the flag and refused. With'
+    + ' `--output=json` the plan is the data of the terminal result event.',
+  args: [
+    {
+      name: 'stub',
+      description: 'The plan stub, which names the corresponding plan file.',
+      type: 'string',
+      required: true,
     },
-  };
-  return Object.freeze(command);
-}
+  ],
+  flags: [
+    {
+      name: 'tracker',
+      description: 'Reads the loop tracker copy instead of the plan, which it ticks as tasks finish.',
+      type: 'boolean',
+    },
+  ],
+  examples: [
+    {
+      cmd: 'rafa plan show my-feature',
+      note: 'Prints the plan stage by stage.',
+    },
+    {
+      cmd: 'rafa plan show my-feature --tracker --output=json',
+      note: 'Writes a start event, then a result event whose data is the tracker as the plan parser reads it.',
+    },
+  ],
+  outputs: ['text', 'json'],
+  run: async (context) => {
+    const tracker = readTrackerFlag(context.flags.tracker);
+    const stub = expectOneArgument(context.args, USAGE);
+    const plans = resolvePlansDir(requireProject(context, COMMAND), COMMAND, (message) => {
+      context.output.warn(message);
+    });
+    const shown = showPlan(plans, stub, tracker);
+    if (context.outputMode === 'json') {
+      context.output.result(shown);
+      return;
+    }
+    for (const line of renderShownPlan(shown, plans.label)) context.output.info(line);
+  },
+};
 
-export default createPlanShowCommand();
+export default Object.freeze(planShowCommand);

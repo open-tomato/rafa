@@ -1,5 +1,5 @@
 /**
- * Tests for the board setup (`src/board/setup.ts`): the six labels, the
+ * Tests for the board setup (`src/board/setup.ts`): the seven labels, the
  * spec issue template, the pinned Roadmap issue, the `roadmap.issue`
  * line written into the project config, and a second run that writes
  * nothing.
@@ -65,6 +65,7 @@ import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
+import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from './gate.js';
 import { SPEC_LABEL } from './issue.js';
 import { SPEC_READY_LABEL } from './readiness.js';
@@ -201,11 +202,12 @@ function partNamed(parts: readonly { name: string }[], name: string): { name: st
 }
 
 describe('BOARD_LABELS', () => {
-  it('names the six labels the workflow files under, each with a description', () => {
+  it('names the seven labels the workflow files under, each with a description', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toEqual([
       'type:spec',
       'spec:ready',
       'spec:needs-work',
+      'spec:blocked',
       'type:bug',
       'needs-triage',
       'module:unassigned',
@@ -217,6 +219,7 @@ describe('BOARD_LABELS', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toContain(SPEC_LABEL);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(SPEC_READY_LABEL);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(SPEC_NEEDS_WORK_LABEL);
+    expect(BOARD_LABELS.map((label) => label.name)).toContain(SPEC_BLOCKED_LABEL);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(GITHUB_LABELS.needsTriage);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.modulePrefix}unassigned`);
   });
@@ -232,6 +235,7 @@ describe('setUpLabels', () => {
       ['type:spec', 'created'],
       ['spec:ready', 'created'],
       ['spec:needs-work', 'created'],
+      ['spec:blocked', 'created'],
       ['type:bug', 'present'],
       ['needs-triage', 'present'],
       ['module:unassigned', 'created'],
@@ -241,6 +245,7 @@ describe('setUpLabels', () => {
       'type:spec',
       'spec:ready',
       'spec:needs-work',
+      'spec:blocked',
       'module:unassigned',
     ]);
   });
@@ -306,7 +311,7 @@ describe('setUpLabels', () => {
 describe('missingBoardLabels', () => {
   it('answers the labels not held, in the order they are made', () => {
     expect(missingBoardLabels(['spec:ready', 'module:unassigned']).map((label) => label.name))
-      .toEqual(['type:spec', 'spec:needs-work', 'type:bug', 'needs-triage']);
+      .toEqual(['type:spec', 'spec:needs-work', 'spec:blocked', 'type:bug', 'needs-triage']);
     expect(missingBoardLabels(BOARD_LABELS.map((label) => label.name))).toEqual([]);
   });
 });

@@ -4,12 +4,11 @@
  *
  * ## What is listed
  *
- * Each file in the configured plans directory at the git root named
- * `PLAN-<stub>.md` whose stub a plan stamp can carry (`plan-files.ts`), in
- * stub order. A tracker is never listed on its own, nor is a bare
- * `PLAN.md`, which has no stub for `rafa plan show` to name, nor anything
- * that is not a file. With no plans directory the list is empty, which is
- * no refusal.
+ * Each file in the configured plans directory named `PLAN-<stub>.md`
+ * whose stub a plan stamp can carry (`plan-files.ts`), in stub order. A
+ * tracker is never listed on its own, nor is a bare `PLAN.md`, which has
+ * no stub for `rafa plan show` to name, nor anything that is not a file.
+ * With no plans directory the list is empty, which is no refusal.
  *
  * A plan's tasks are counted from its tracker, `PLAN_TRACKER-<stub>.md`,
  * when there is one, since that is the copy the loop ticks, and from the
@@ -17,28 +16,32 @@
  * itself: the file `rafa loop start` announces them for, and the one
  * `rafa plan validate` checks.
  *
+ * The directory is `plan.dir` resolved against the project root the
+ * dispatcher found, `.rafa/plans` unless a config names another
+ * (`plan-files.ts`), and a config `loadConfig` refuses is refused with
+ * exit code 1.
+ *
  * ## What it writes
  *
  * In json mode the list is the terminal result's `data`: `dir`, the
- * directory read, and `plans`, each with its `stub`, its `plan` and
- * `tracker` paths, absolute and `tracker` null without one, its task
- * counts under `tasks`, and its number of `issues`. In text mode it writes
- * the header naming the directory, then one row per plan, the stubs padded
- * to one column, then the counts, `no tracker` for a plan with none and the
- * issues when there are any; or the header naming the directory with no
- * plans listed.
+ * directory read and absolute, and `plans`, each with its `stub`, its
+ * `plan` and `tracker` paths, absolute and `tracker` null without one,
+ * its task counts under `tasks`, and its number of `issues`. In text
+ * mode it writes the header naming the directory as `plan.dir` spells
+ * it, then one row per plan, the stubs padded to one column, then the
+ * counts, `no tracker` for a plan with none and the issues when there
+ * are any; or the header naming the directory with no plans listed.
  *
  * The command declares no argument and no flag, and refuses a line
  * handing it an argument with exit code 1.
  */
-import type { RepoRootFinder, TaskCounts } from './plan-files.js';
+import type { PlansDir, TaskCounts } from './plan-files.js';
 import type { RafaCommand } from '../../cli/command.js';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { parsePlan } from '../../plan/index.js';
-import { getRepoRoot } from '../../utils/git.js';
 
 import {
   countTasks,
@@ -46,12 +49,13 @@ import {
   formatCounts,
   isFile,
   planFileName,
-  PLANS_DIR,
   plural,
+  requireProject,
+  resolvePlansDir,
   stubOfPlanFile,
 } from './plan-files.js';
 
-/** The usage line a refusal names. */
+/** The usage line a refusal names, which is also how a refusal names the command. */
 const USAGE = 'rafa plan list';
 
 /** One plan the list holds. */
@@ -90,9 +94,9 @@ function listing(dir: string, stub: string): PlanListing {
   return { stub, plan, tracker, tasks: countTasks(counted.tasks), issues: planModel.issues.length };
 }
 
-/** Every plan in the configured plans directory at repository `root`; see the module note. */
-export function listPlans(root: string): PlanList {
-  const dir = join(root, PLANS_DIR);
+/** Every plan in `plans`, the configured plans directory; see the module note. */
+export function listPlans(plans: PlansDir): PlanList {
+  const dir = plans.path;
   if (!existsSync(dir)) return { dir, plans: [] };
   const stubs = readdirSync(dir)
     .filter((name) => isFile(join(dir, name)))
@@ -110,51 +114,55 @@ function rowNotes(plan: PlanListing): string {
   return notes.join('; ');
 }
 
-/** The lines text mode writes for a list; see the module note. */
-export function renderPlanList(list: PlanList): string[] {
-  const label = `${PLANS_DIR}/`;
+/**
+ * The lines text mode writes for a list, its paths opening with
+ * `dirLabel`, `plan.dir` as the config spells it; see the module note.
+ */
+export function renderPlanList(list: PlanList, dirLabel: string): string[] {
+  const label = `${dirLabel}/`;
   if (list.plans.length === 0) return [`No plans in ${label}.`];
   const width = Math.max(...list.plans.map((plan) => plan.stub.length));
   return [`Plans in ${label}:`, ...list.plans.map((plan) => `  ${plan.stub.padEnd(width)}   ${rowNotes(plan)}`)];
 }
 
-/** The command, reading the repository `findRepoRoot` answers; see the module note. */
-export function createPlanListCommand(findRepoRoot: RepoRootFinder = getRepoRoot): RafaCommand {
-  const command: RafaCommand = {
-    name: 'plan list',
-    subject: 'plan',
-    action: 'list',
-    summary: 'list the plans, with the tasks done in each',
-    description: 'Lists each `PLAN-<stub>.md` in the configured plans directory at the git root, in stub'
-      + ' order, with its tasks counted by checkbox: from its tracker, `PLAN_TRACKER-<stub>.md`, once'
-      + ' there is one, and from the plan itself before then. A plan with no tracker is marked `no'
-      + ' tracker`, and a plan the plan parser did not read as written shows how many issues `rafa plan'
-      + ' validate` reports for it. With `--output=json` the list is the data of the terminal result'
-      + ' event, each path absolute.',
-    args: [],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa plan list',
-        note: 'Prints one row per plan: its stub, then its tasks done, blocked and open.',
-      },
-      {
-        cmd: 'rafa plan list --output=json',
-        note: 'Writes a start event, then a result event whose data is the list.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    run: async (context) => {
-      expectNoArgument(context.args, USAGE);
-      const list = listPlans(findRepoRoot());
-      if (context.outputMode === 'json') {
-        context.output.result(list);
-        return;
-      }
-      for (const line of renderPlanList(list)) context.output.info(line);
+/** The command; see the module note. */
+const planListCommand: RafaCommand = {
+  name: 'plan list',
+  subject: 'plan',
+  action: 'list',
+  summary: 'list the plans, with the tasks done in each',
+  description: 'Lists each `PLAN-<stub>.md` in the plans directory `plan.dir` names, in stub'
+    + ' order, with its tasks counted by checkbox: from its tracker, `PLAN_TRACKER-<stub>.md`, once'
+    + ' there is one, and from the plan itself before then. A plan with no tracker is marked `no'
+    + ' tracker`, and a plan the plan parser did not read as written shows how many issues `rafa plan'
+    + ' validate` reports for it. The directory is read under the project root, and is `.rafa/plans`'
+    + ' unless a config names another. With `--output=json` the list is the data of the terminal result'
+    + ' event, each path absolute.',
+  args: [],
+  flags: [],
+  examples: [
+    {
+      cmd: 'rafa plan list',
+      note: 'Prints one row per plan: its stub, then its tasks done, blocked and open.',
     },
-  };
-  return Object.freeze(command);
-}
+    {
+      cmd: 'rafa plan list --output=json',
+      note: 'Writes a start event, then a result event whose data is the list.',
+    },
+  ],
+  outputs: ['text', 'json'],
+  run: async (context) => {
+    expectNoArgument(context.args, USAGE);
+    const plans = resolvePlansDir(requireProject(context, USAGE), USAGE, (message) => {
+      context.output.warn(message);
+    });
+    const list = listPlans(plans);
+    if (context.outputMode === 'json') {
+      context.output.result(list);
+      return;
+    }
+    for (const line of renderPlanList(list, plans.label)) context.output.info(line);
+  },
+};
 
-export default createPlanListCommand();
+export default Object.freeze(planListCommand);

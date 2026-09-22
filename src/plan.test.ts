@@ -18,6 +18,15 @@
  * record file outside the repository, then answers or rejects as the case
  * names.
  *
+ * The wrapping drops one thing on purpose: the ENDING. The module's
+ * default export is `endingWith(...)` (`src/next/ending.ts`), and
+ * `wrapPhaseZeroCommand` replaces `run`, so the command the child
+ * dispatches ends where `plan` ends and reads no state. That is what
+ * keeps every case here from composing the real sources — `git` and
+ * `gh` spawned in the scratch repository, for a line no case is about —
+ * and leaves the ending to be held where it is driven,
+ * `src/next/ending.test.ts`.
+ *
  * First on the child's PATH is a stand-in `claude` that leaves a marker
  * and exits 97, and every case holds the marker absent. A command that
  * went around the registry to spawn a session would reach the stand-in,
@@ -94,6 +103,19 @@
  * `warn`, and the usage refusal thrown with no message, each reddened its
  * json case alone.
  *
+ * ## The mutation record below predates one split
+ *
+ * Every mutation named here was driven while `src/plan.ts` still carried
+ * the board routes, the gate wiring and the records. Three of those
+ * pieces have since moved, each with its own suite:
+ * `rejectedReview`, `generateOrExit` and the `recordMissingReview` call
+ * to `src/commands/plan/review-gate.ts`, the three records to
+ * `src/commands/plan/plan-record.ts`, and the route resolution with the
+ * `--spec` candidate rule to `src/commands/plan/spec-route.ts`. The
+ * `recordPlanIssue` call is still this module's. A rerun of one of those
+ * mutations therefore edits the module that now holds it, and the cases
+ * it reddens here are the ones named below.
+ *
  * One mutation of `plan.ts` was driven on 2026-09-19 over this file, the
  * module restored from a scratch copy and verified with `shasum -c`: the
  * `recordPlanIssue` call dropped left 20 pass and 1 fail against 21 pass
@@ -150,16 +172,19 @@ const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
 const SPEC = '# Spec: a command probe\n\nNothing to build.\n';
 
 /**
- * The issue the stand-in `gh` answers `issue view` with; the one board
- * read a case here makes. Its body fills every template heading
- * (`./tests/spec-bodies.ts`) because the board route refuses an issue
- * with a readiness gap before it snapshots one, and what this case is
- * about is the snapshot.
+ * The issue the stand-in `gh` answers `issue view` with; the first of
+ * the two board reads a case here makes, the other being the permission
+ * lookup on its {@link ISSUE.author}. Its body fills every template
+ * heading (`./tests/spec-bodies.ts`) and its author holds write access
+ * on the stand-in, because the board route refuses an issue with an
+ * untrusted author or a readiness gap before it snapshots one, and what
+ * this case is about is the snapshot.
  */
 const ISSUE = {
   number: 20,
   title: 'The board routes',
   body: completeSpecBody('Spec: the board routes', 'Nothing to build.'),
+  author: 'octocat',
 };
 
 /** The spec content the fixture hands the context's builder. */
@@ -322,8 +347,10 @@ function plantScratch(): Scratch {
   writeFileSync(claude, ['#!/bin/sh', `: > '${spawned}'`, 'exit 97', ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
 
-  // The one board read `--issue` makes, answered by a stand-in: no case
-  // here reaches GitHub, and a second read would exit 1 naming its words.
+  // The two board reads `--issue` makes, answered by a stand-in: the
+  // issue, and check 0's permission lookup on the author who opened it
+  // (`src/board/plan-spec.ts`). No case here reaches GitHub, and a
+  // third read would exit 1 naming its words.
   const gh = join(bin, 'gh');
   writeFileSync(gh, [
     '#!/bin/sh',
@@ -334,7 +361,12 @@ function plantScratch(): Scratch {
       body: ISSUE.body,
       state: 'OPEN',
       labels: [{ name: 'type:spec' }, { name: 'spec:ready' }],
+      author: { login: ISSUE.author },
     })}'`,
+    '  exit 0',
+    'fi',
+    `if [ "$1" = "api" ] && [ "$2" = "repos/{owner}/{repo}/collaborators/${ISSUE.author}/permission" ]; then`,
+    `  printf '%s' '${JSON.stringify({ permission: 'admin', role_name: 'admin' })}'`,
     '  exit 0',
     'fi',
     'echo "the stand-in gh was asked $*" >&2',

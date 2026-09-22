@@ -311,6 +311,8 @@ built. A box is ticked by the change that finishes the feature.
 - [x] A failing pull request is diagnosed, and fixed when the fix is simple
 - [x] A version bump and a changelog entry with every pull request
 - [x] Start a plan from the main branch and rafa makes the branch for you
+- [x] One command takes you to the next step: merge, clean up, plan,
+  branch, start
 - [ ] The right skills reach the right task, chosen when the plan is
   written
 - [ ] Know which skills earn their place and which are ignored

@@ -291,7 +291,7 @@ async function resolved(options: CaseOptions): Promise<Ran> {
   };
   const command: RafaCommand = createPrTriageCommand(seams);
   const words = options.words ?? ['41', '--resolve'];
-  const run = await dispatchInProject(['pr', 'triage', ...words], SUBJECTS, [command], project);
+  const run = await dispatchInProject(['pr', 'triage', ...words, NO_HINT], SUBJECTS, [command], project);
   return { ...run, fake, git, loops, slept: () => slept, project };
 }
 
@@ -322,6 +322,13 @@ function fixesIt(fake: FakePrGh): void {
     checks: [PASSING_GATES],
   }));
 }
+
+/**
+ * Typed by every case here, so that no case composes the real sources
+ * for the ending hint and spawns `git` and `gh` in the scratch project
+ * it planted. The ending itself is driven in the command's own suite.
+ */
+const NO_HINT = '--no-hint';
 
 describe('a resolve run that fixed the pull request', () => {
   it('adds the worktree, runs the plan, waits on the checks and exits 0', async () => {

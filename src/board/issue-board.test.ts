@@ -1,5 +1,5 @@
 /**
- * Tests for the issue board (`src/board/issue-board.ts`): the four
+ * Tests for the issue board (`src/board/issue-board.ts`): the five
  * commands it sends, the comment shape it reads back, and the arguments
  * it refuses before any command leaves.
  *
@@ -21,6 +21,13 @@
  * hyphen check dropped from the label argument, so `--repo` reaches
  * `gh` as a flag, left 196 pass and 1 fail against 197 pass either
  * side — the refusal case below.
+ *
+ * One mutation of `removeLabel` was driven on 2026-09-21 the same way,
+ * over `bun test src/board/issue-board.test.ts`, the module restored
+ * from a scratch copy and verified with `shasum -c`: `--add-label`
+ * added back to its argument list, so the removal becomes a swap onto
+ * a label nobody asked for, left 13 pass and 1 fail against 14 pass
+ * either side — the argument list case below.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
@@ -187,5 +194,43 @@ describe('swapLabels', () => {
     expect(stub.calls()).toEqual([]);
     // The control: ordinary labels on an ordinary issue send the command.
     await expect(board.swapLabels(7, 'spec:ready', 'spec:needs-work')).resolves.toBeUndefined();
+  });
+});
+
+describe('removeLabel', () => {
+  it('takes the label off in a gh issue edit carrying no --add-label', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).removeLabel(7, 'spec:blocked');
+
+    expect(stub.calls()).toEqual([['issue', 'edit', '7', '--remove-label', 'spec:blocked']]);
+  });
+
+  it('rejects a failed removal, naming the command', async () => {
+    const stub = stubGh(failed('gh: could not remove label: not found'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).removeLabel(7, 'spec:blocked'))
+      .rejects.toThrow('gh issue edit 7 --remove-label spec:blocked failed');
+  });
+
+  it('names itself, not swapLabels, in the label it refuses', async () => {
+    const stub = stubGh(wrote(''));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).removeLabel(7, '--repo')).rejects.toThrow(
+      'board issue: removeLabel refused the label',
+    );
+  });
+
+  it('refuses a label that would reach gh as a flag, an empty one, and an issue that is no number', async () => {
+    const stub = stubGh(wrote(''));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.removeLabel(7, '--repo')).rejects.toThrow(TypeError);
+    await expect(board.removeLabel(7, '')).rejects.toThrow(TypeError);
+    await expect(board.removeLabel(0, 'spec:blocked')).rejects.toThrow(TypeError);
+    await expect(board.removeLabel(1.5, 'spec:blocked')).rejects.toThrow(TypeError);
+    expect(stub.calls()).toEqual([]);
+    // The control: an ordinary label on an ordinary issue sends the command.
+    await expect(board.removeLabel(7, 'spec:blocked')).resolves.toBeUndefined();
   });
 });

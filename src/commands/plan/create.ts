@@ -14,11 +14,25 @@
  * Three of them name the one spec a run plans from and are mutually
  * exclusive — `--spec`, `--issue` and `--next` — so none is `required`
  * and a line naming none is refused by the command with its usage.
+ *
+ * The tenth flag is read by neither: `hint` is this tree's own
+ * ({@link HINT_FLAG_SPEC}), and `endingWith` reads it AFTER `src/plan.ts`
+ * has returned, to end a run that wrote a plan by naming the one step
+ * that follows — the loop on the plan it has just written
+ * (`src/next/ending.ts`). A run that refused writes nothing and ends
+ * with no hint, since the refusal travels out of the inner run. The
+ * flag is `hint` and not `next` because `--next` is one of the three
+ * above, and `parseArgs` reads `--no-next` as false for it.
+ *
+ * `src/plan.ts` is handed the word along with the rest of the line and
+ * reads no flag it does not know, so `--no-hint` reaching its parser
+ * changes nothing there.
  */
+import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import plan from '../../plan.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-export default wrapPhaseZeroCommand({
+const wrapped = wrapPhaseZeroCommand({
   name: 'plan create',
   subject: 'plan',
   action: 'create',
@@ -73,7 +87,7 @@ export default wrapPhaseZeroCommand({
     {
       name: 'comment',
       description: 'Posts the gaps of a spec judged not ready on its issue; `--no-comment` prints them and'
-        + ' writes nothing on the board. The labels move either way.',
+        + ' writes nothing on the board. Whatever the verdict does to the labels is unchanged by it.',
       type: 'boolean',
       default: true,
     },
@@ -88,6 +102,7 @@ export default wrapPhaseZeroCommand({
       type: 'boolean',
       default: true,
     },
+    HINT_FLAG_SPEC,
   ],
   examples: [
     {
@@ -102,7 +117,8 @@ export default wrapPhaseZeroCommand({
     {
       cmd: 'rafa plan create --issue=20',
       note: 'Snapshots the body of issue 20 to .rafa/specs/rafa-20-<slug>.md and plans from it, recording'
-        + ' issue: "20" in the plan. Refuses an issue that is closed, unlabelled or not marked spec:ready.',
+        + ' issue: "20" in the plan. Refuses an issue that is closed or unlabelled; one that is not marked'
+        + ' spec:ready is offered the label where there is a terminal, and refused where there is not.',
     },
     {
       cmd: 'rafa plan create --next --dry-run',
@@ -118,3 +134,5 @@ export default wrapPhaseZeroCommand({
   aliases: ['plan'],
   outputs: ['text', 'json'],
 }, plan);
+
+export default endingWith(wrapped);

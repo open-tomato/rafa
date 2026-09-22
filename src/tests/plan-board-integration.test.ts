@@ -30,8 +30,9 @@
  * The first half spawns `bun src/rafa.ts plan create` in a scratch git
  * repository, exactly as `src/plan.test.ts` does and for the same
  * reason: the board routes build their own `gh` and `git` runners
- * (`src/board/plan-spec.ts`) unless the caller hands one over, and
- * `src/plan.ts` hands none over, so only a real process with a stand-in
+ * (`src/board/plan-spec.ts`) unless the caller hands one over, and the
+ * route the command resolves through (`src/commands/plan/spec-route.ts`)
+ * hands none over, so only a real process with a stand-in
  * `gh` first on its PATH drives them without reaching GitHub. The
  * planner is a fixture resolved through a registry handed to the
  * command in place of core's, as `src/plan.test.ts`'s is; unlike that
@@ -40,10 +41,25 @@
  * proof that the session was handed the exact file the board route wrote
  * — notes appended — and not a copy of the claim.
  *
+ * The command the first half dispatches is the module's declaration
+ * wrapped again, as `src/plan.test.ts`'s is, so the ENDING the default
+ * export carries (`endingWith`, `src/next/ending.ts`) is replaced along
+ * with `run` and no case here reads a state or spends a `gh` call on
+ * one. The ending is held in `src/next/ending.test.ts`.
+ *
  * The second half runs in-process, over `tickRoadmapAfterMerge` and
  * `resolvePlanSpec` called directly with one shared `gh` fake between
  * them: no process is spawned, and no case reaches GitHub, spawns `gh`
  * or `git`, or touches a real home.
+ *
+ * Both halves answer check 0, the author's trust: every planted issue
+ * carries an author, and both stubs answer
+ * `gh api repos/{owner}/{repo}/collaborators/<login>/permission` with
+ * `admin`. That check runs first (`src/board/plan-spec.ts`), so a board
+ * that did not answer it would refuse every case here for its author
+ * and no case could reach the reading it is about. `--next` also reads
+ * `origin` through `git` for the label a refusal would carry, which a
+ * scratch repository answers with no remote.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue } from '../board/issue.js';
@@ -178,6 +194,7 @@ function issueOf(over: Partial<SpecIssue> & { readonly number: number }): SpecIs
     body: '',
     state: 'OPEN',
     labels: [],
+    author: 'octocat',
     ...over,
   };
 }
@@ -212,7 +229,16 @@ function writeGhStub(bin: string, table: GhTable): void {
       body: issue.body,
       state: issue.state,
       labels: issue.labels.map((name) => ({ name })),
+      author: { login: issue.author },
     })}'`);
+    lines.push('  exit 0');
+    lines.push('fi');
+  }
+  // Check 0's own read: every planted author holds write access here,
+  // so the trust check clears and the case's own subject is what fails.
+  for (const login of new Set(table.issues.map((issue) => issue.author))) {
+    lines.push(`if [ "$1" = "api" ] && [ "$2" = "repos/{owner}/{repo}/collaborators/${login}/permission" ]; then`);
+    lines.push(`  printf '%s' '${shellQuoted({ permission: 'admin', role_name: 'admin' })}'`);
     lines.push('  exit 0');
     lines.push('fi');
   }
@@ -540,9 +566,13 @@ function sharedBoard(roadmap: SpecIssue, others: readonly SpecIssue[]): { readon
         body: current,
         state: found.state,
         labels: found.labels.map((name) => ({ name })),
+        author: { login: found.author },
       })));
     }
     if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(said('[]'));
+    if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}/collaborators/octocat/permission') {
+      return Promise.resolve(said(JSON.stringify({ permission: 'admin', role_name: 'admin' })));
+    }
     if (typeof args[0] === 'string' && args[0].startsWith(`repos/{owner}/{repo}/issues/${String(roadmap.number)}`)) {
       if (args.includes('-X') && args.includes('PATCH')) {
         const bodyArg = args.find((arg) => arg.startsWith('body='));
@@ -594,6 +624,7 @@ describe('the tick pr merge writes, read back by the very walk plan create --nex
         repoRoot: root,
         specsDir: SPECS_DIR,
         roadmapIssue: ROADMAP_NUMBER,
+        trustedAuthors: [],
         findSpec: (spec) => spec,
         gh: board.gh,
         git: noBranches(),

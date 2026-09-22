@@ -198,6 +198,13 @@ function stillListed(git: GitRunner, path: string): boolean {
   return git(['worktree', 'list', '--porcelain']).stdout.includes(path);
 }
 
+/**
+ * Typed by every case here, so that no case composes the real sources
+ * for the ending hint and spawns `git` and `gh` in the scratch project
+ * it planted. The ending itself is driven in the command's own suite.
+ */
+const NO_HINT = '--no-hint';
+
 describe('the planted repository, read directly', () => {
   it('answers a real CONFLICT from git merge-tree, not merely a nonzero exit', () => {
     const repo = plantConflictRepo('liveness');
@@ -245,7 +252,7 @@ describe('a real lockfile conflict the attempt actually fixes', () => {
     const command = createPrTriageCommand(seams);
     const project: PlantedProject = { root: repo.work, home: repo.home };
 
-    const run = await dispatchInProject(['pr', 'triage', String(NUMBER), '--resolve'], SUBJECTS, [command], project);
+    const run = await dispatchInProject(['pr', 'triage', String(NUMBER), '--resolve', NO_HINT], SUBJECTS, [command], project);
 
     expect(run.exitCode).toBe(0);
     expect(loops).toHaveLength(1);
@@ -293,7 +300,7 @@ describe('a real lockfile conflict no attempt fixes', () => {
     const command = createPrTriageCommand(seams);
     const project: PlantedProject = { root: repo.work, home: repo.home };
 
-    const run = await dispatchInProject(['pr', 'triage', String(NUMBER), '--resolve'], SUBJECTS, [command], project);
+    const run = await dispatchInProject(['pr', 'triage', String(NUMBER), '--resolve', NO_HINT], SUBJECTS, [command], project);
 
     expect(run.exitCode).toBe(3);
     expect(loops).toHaveLength(2);

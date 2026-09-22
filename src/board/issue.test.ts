@@ -7,7 +7,10 @@
  * fake (`src/adapters/tracker/github-fake.ts`), which models
  * `gh issue view <n> --json` and writes exactly the fields asked for, so
  * a field list this module got wrong is refused by the fake rather than
- * quietly answered. Everything the fake cannot produce — a payload that
+ * quietly answered. `author` is one of the fields it models, added with
+ * the read that asks for it: the fake plants `rafa-fake`, the account
+ * its own `gh auth status` names, as every issue's author, which is why
+ * the login the read case asserts is that one and not the spec's. Everything the fake cannot produce — a payload that
  * is not JSON, one answering another issue's number, a body that is not
  * a string, a command that failed — is driven through {@link stubGh}, a
  * runner answering one recorded result. No case spawns `gh`, reaches
@@ -35,6 +38,16 @@
  * snapshot that matches, a notes file that changed nothing — and the
  * two refusal sentences are asserted apart, since an operator told
  * "closed" about an unlabelled issue looks in the wrong place.
+ *
+ * The author is the other shape that passes while wrong, in the other
+ * direction: a read answering the EMPTY login for every issue satisfies
+ * every case that only asks the command not to fail, and the empty
+ * login is what the module answers on purpose for an author it cannot
+ * read. So the login is asserted against the one the payload named —
+ * `rafa-fake` off the fake, `vilmibm` and `app/dependabot` off the
+ * recorded person and bot mappings — beside the case that drives six
+ * authors no login can be made of and asserts the empty string with the
+ * rest of the issue still read.
  *
  * The `--refresh` rule has one case that no simpler implementation
  * passes: the issue body is unchanged and only the LOCAL NOTES were
@@ -68,6 +81,21 @@
  *    was left in, so the case saw the half that was taken out.
  *  - the notes name collision left unrefused: 1 fail, the `Notes` title
  *    case.
+ *
+ * Two more were driven on 2026-09-21 over the same command, with the
+ * module copied to a scratch path, restored from the copy and verified
+ * with `shasum -c` after each. 404 pass either side:
+ *
+ *  - the author read as the empty login for every payload, with
+ *    {@link ISSUE_VIEW_FIELDS} left asking for it: 4 fail, the six-field
+ *    read, the person's mapping, the bot's mapping, and the
+ *    JSON/not-JSON case that reads a login too.
+ *  - `author` dropped from {@link ISSUE_VIEW_FIELDS}, the reading left
+ *    in: 3 fail, the field-list case, the six-field read — whose issue
+ *    now carries no author at all rather than failing, which is the
+ *    lenient reading working as written — and the case asserting the
+ *    command in a failure message, since the field list is spelled in
+ *    it.
  */
 import type { SpecIssue } from './issue.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
@@ -174,6 +202,7 @@ function issueOf(fields: Partial<SpecIssue> = {}): SpecIssue {
     body: '## What you get\n\nA plan from the board.\n',
     state: 'OPEN',
     labels: [SPEC_LABEL],
+    author: 'octocat',
     ...fields,
   };
 }
@@ -203,7 +232,7 @@ afterAll(() => {
 });
 
 describe('createGhSpecIssueReader', () => {
-  it('reads the five fields off one gh issue view command', async () => {
+  it('reads the six fields off one gh issue view command', async () => {
     const { fake, number } = await plantIssue({
       title: 'Plans from the board',
       body: '## What you get\n\nA plan.\n',
@@ -219,13 +248,57 @@ describe('createGhSpecIssueReader', () => {
       body: '## What you get\n\nA plan.\n',
       state: 'OPEN',
       labels: [SPEC_LABEL, 'spec:ready'],
+      author: 'rafa-fake',
     });
     expect(fake.calls().slice(before))
       .toEqual([['issue', 'view', String(number), '--json', ISSUE_VIEW_FIELDS]]);
   });
 
-  it('asks for the fields the spec names, which the strict fake models', () => {
-    expect(ISSUE_VIEW_FIELDS).toBe('number,title,body,state,labels');
+  it('asks for the spec\'s fields and the author, which the strict fake models', () => {
+    expect(ISSUE_VIEW_FIELDS).toBe('number,title,body,state,labels,author');
+    expect(ISSUE_VIEW_FIELDS.split(',')).toContain('author');
+  });
+
+  it('keeps the login off the author mapping gh answers, and nothing else of it', async () => {
+    const payload = {
+      number: 20,
+      title: TITLE,
+      body: 'body',
+      state: 'OPEN',
+      labels: [],
+      author: { id: 'MDQ6VXNlcjk4NDgy', is_bot: false, login: 'vilmibm', name: 'Nate Smith' },
+    };
+
+    const issue = await createGhSpecIssueReader({ gh: stubGh(wrote(JSON.stringify(payload))).run })(20);
+
+    expect(issue.author).toBe('vilmibm');
+    expect(issue).toEqual({ number: 20, title: TITLE, body: 'body', state: 'OPEN', labels: [], author: 'vilmibm' });
+  });
+
+  it('reads a bot author, whose mapping carries no id and no name, by its login', async () => {
+    const payload = {
+      number: 20,
+      title: TITLE,
+      body: 'body',
+      state: 'OPEN',
+      labels: [],
+      author: { is_bot: true, login: 'app/dependabot' },
+    };
+
+    expect((await createGhSpecIssueReader({ gh: stubGh(wrote(JSON.stringify(payload))).run })(20)).author)
+      .toBe('app/dependabot');
+  });
+
+  it('reads an author it cannot make a login of as the empty login, rather than failing the command', async () => {
+    const unreadable: readonly unknown[] = [undefined, null, 'vilmibm', {}, { login: 12 }, []];
+
+    for (const author of unreadable) {
+      const payload = { number: 20, title: TITLE, body: 'body', state: 'OPEN', labels: [], author };
+      const issue = await createGhSpecIssueReader({ gh: stubGh(wrote(JSON.stringify(payload))).run })(20);
+
+      expect(issue.author).toBe('');
+      expect(issue.title).toBe(TITLE);
+    }
   });
 
   it('reads a closed issue as closed, beside an open one read as open', async () => {
@@ -240,7 +313,7 @@ describe('createGhSpecIssueReader', () => {
     const stub = stubGh(failed('GraphQL: Could not resolve to an issue or pull request with the number of 20.\n'));
 
     await expect(createGhSpecIssueReader({ gh: stub.run })(20)).rejects.toThrow(
-      /gh issue view 20 --json number,title,body,state,labels failed: GraphQL: Could not resolve/u,
+      /gh issue view 20 --json number,title,body,state,labels,author failed: GraphQL: Could not resolve/u,
     );
   });
 
@@ -251,12 +324,12 @@ describe('createGhSpecIssueReader', () => {
   });
 
   it('fails when the payload is not JSON, and passes when it is', async () => {
-    const issue = { number: 20, title: TITLE, body: 'body', state: 'OPEN', labels: [] };
+    const issue = { number: 20, title: TITLE, body: 'body', state: 'OPEN', labels: [], author: { login: 'octocat' } };
 
     await expect(createGhSpecIssueReader({ gh: stubGh(wrote('not json')).run })(20))
       .rejects.toThrow(/wrote output that is not JSON/u);
     await expect(createGhSpecIssueReader({ gh: stubGh(wrote(JSON.stringify(issue))).run })(20))
-      .resolves.toEqual({ ...issue, state: 'OPEN', labels: [] });
+      .resolves.toEqual({ ...issue, state: 'OPEN', labels: [], author: 'octocat' });
   });
 
   it('fails when the payload answers another issue than the one asked for', async () => {

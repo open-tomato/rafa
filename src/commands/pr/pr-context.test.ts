@@ -1,5 +1,5 @@
 /**
- * Tests for what the six `pr` actions share (`pr-context.ts`): the usage
+ * Tests for what the seven `pr` actions share (`pr-context.ts`): the usage
  * lines, the readers of a line, the provider check and its exit-2
  * refusal, and the pull request an action acts on.
  *
@@ -220,18 +220,20 @@ function plantRepo(project: PlantedProject, branch: string): void {
 }
 
 describe('the usage lines', () => {
-  it('names all six actions, the four taking a number carrying an optional one, and is frozen', () => {
-    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage'] as const;
+  it('names all seven actions, the five taking a number carrying an optional one, and is frozen', () => {
+    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait'] as const;
 
     expect(Object.keys(PR_USAGE)).toEqual([...actions]);
     expect(actions.map((action) => PR_USAGE[action].startsWith(`rafa pr ${action}`))).toEqual(actions.map(() => true));
-    expect(actions.filter((action) => PR_USAGE[action].includes('[<n>]'))).toEqual(['show', 'view', 'merge', 'triage']);
+    expect(actions.filter((action) => PR_USAGE[action].includes('[<n>]')))
+      .toEqual(['show', 'view', 'merge', 'triage', 'wait']);
     expect(Object.isFrozen(PR_USAGE)).toBe(true);
   });
 
   it('puts every flag after the number, so the usage line is the order that works', () => {
     expect(PR_USAGE.merge).toBe('rafa pr merge [<n>] [--yes] [--method=squash|merge|rebase]');
     expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]');
+    expect(PR_USAGE.wait).toBe('rafa pr wait [<n>] [--timeout=<minutes>]');
   });
 });
 

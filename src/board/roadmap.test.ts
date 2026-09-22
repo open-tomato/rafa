@@ -186,7 +186,7 @@ function plantedReadings(planted: {
 
 /** An issue as a `SpecIssueReader` answers one. */
 function specIssue(number: number, state: 'OPEN' | 'CLOSED'): SpecIssue {
-  return { number, title: `issue ${String(number)}`, body: '', state, labels: ['type:spec'] };
+  return { number, title: `issue ${String(number)}`, body: '', state, labels: ['type:spec'], author: 'octocat' };
 }
 
 /** What a thrown `CommandExit` carried, or the failure of a call that did not throw. */

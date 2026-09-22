@@ -1,14 +1,14 @@
 /**
  * Tests for the spec-review parser (`src/board/spec-review.ts`): the
  * four readings a plan session's captured output answers, which block
- * of several is read, how the verdict is matched, and what becomes of a
- * gap that cannot be read.
+ * of several is read, how the verdict is matched, what becomes of a
+ * gap that cannot be read, and whether a gap is read as blocking.
  *
- * The parser is pure: a string in, a reading out. One case reaches
- * outside it — the drift guard reads `src/plan-prompt.md`, because
- * WHICH block is read is only right while the prompt asks for the block
- * where this parser looks for it. No case plants a seam, reaches a home
- * directory or spawns a session.
+ * The parser is pure: a string in, a reading out. The drift guard is
+ * what reaches outside it, reading `src/plan-prompt.md`, because two
+ * things are only right while the prompt asks for them: WHICH block is
+ * read, and the two fields a gap carries beside `heading` and `what`.
+ * No case plants a seam, reaches a home directory or spawns a session.
  *
  * A gate like this passes for the wrong reason in two opposite ways,
  * and both have a case here:
@@ -24,8 +24,9 @@
  *
  * Thirteen mutations of `spec-review.ts` were driven against this file
  * on 2026-09-20, one at a time, the module restored from a scratch copy
- * and verified by `shasum` after each. 24 pass either side, and each
- * count below is that run's own:
+ * and verified by `shasum` after each. 24 pass either side — the 24
+ * cases the file held that day, before `blocking` and `assumption` were
+ * read — and each count below is that run's own, not re-measured since:
  *
  *  - `parseSpecReview` answering a ready reading for every input: 18
  *    fail.
@@ -61,11 +62,37 @@
  *  - every issue's `field` renamed, standing for an issue recorded in
  *    the wrong place: 3 fail.
  *
- * The drift guard is not one of those thirteen: no mutation of the
- * module can redden it, since what it reads is the prompt. Its control
- * is the case beside it, which rewrites the prompt's ask back to the
- * opening one this parser was written for before 2026-09-20 and asserts
- * the guard answers false.
+ * Four more mutations were driven on 2026-09-22, for `blocking` and
+ * `assumption`, the same way: 34 pass either side, and each fails
+ * exactly the two cases named:
+ *
+ *  - an unreadable `blocking` read as NON-blocking rather than
+ *    blocking, which is the direction that would let a plan stand over
+ *    a question nobody answered: the absent-`blocking` case and the
+ *    neither-true-nor-false one.
+ *  - `blocking` read leniently, as `Boolean(value)` with nothing
+ *    reported, the leniency the verdict gets: the same two. They assert
+ *    the issue's `field` as well as the flag, which is what separates a
+ *    value read for its truthiness from one refused.
+ *  - the fallback dropped for a non-blocking gap that names no
+ *    assumption, so it stays non-blocking with nothing to plan under:
+ *    the missing-assumption case and the blank-assumption one.
+ *  - `assumption` never read, always null: the case reading a blocking
+ *    gap beside a non-blocking one, and the case keeping an assumption
+ *    written beside a blocking gap.
+ *
+ * The drift guard is not one of those seventeen: no mutation of the
+ * module can redden it, since what it reads is the prompt. Its controls
+ * are the cases beside it, one rewriting the prompt's ask back to the
+ * opening one this parser was written for before 2026-09-20, the other
+ * back to the `{heading, what}` gap it read before 2026-09-22, each
+ * asserting the guard it belongs to answers false while the other still
+ * answers true.
+ *
+ * Both guards match SUBSTRINGS of the prompt, so rewrapping a prompt
+ * sentence across a line break reddens them: that is how the widened
+ * ask was first written, and the guard caught it. A prompt edit keeps
+ * each quoted clause on one line.
  */
 import { readFileSync } from 'node:fs';
 
@@ -101,11 +128,30 @@ const ASK_AT_END = 'END of your final message as a';
 /** The sentence spelling out that nothing follows the block. */
 const ASK_IS_LAST = 'The block is the LAST thing you write';
 
+/** The clause asking every gap for the flag the parser reads it by. */
+const ASK_BLOCKING = '`blocking: true` or `blocking: false`';
+
+/** The clause asking a non-blocking gap for the assumption to plan under. */
+const ASK_ASSUMPTION = 'carries the `assumption:` you would plan under';
+
+/** The sentence telling the session which gaps are blocking. */
+const ASK_WHEN_BLOCKING = 'A gap is blocking when guessing wrong';
+
 /** True when `prompt` asks for the review block at the end of the final message. */
 function asksForTheBlockLast(prompt: string): boolean {
   return prompt.includes(SPEC_REVIEW_FENCE)
     && prompt.includes(ASK_AT_END)
     && prompt.includes(ASK_IS_LAST);
+}
+
+/**
+ * True when `prompt` asks each gap for both fields this parser reads
+ * beside `heading` and `what`, and says when a gap is blocking.
+ */
+function asksForBlockingAndAssumption(prompt: string): boolean {
+  return prompt.includes(ASK_BLOCKING)
+    && prompt.includes(ASK_ASSUMPTION)
+    && prompt.includes(ASK_WHEN_BLOCKING);
 }
 
 /** Every gap of `output` as `<heading>: <what>`, in the order it answers them. */
@@ -162,7 +208,8 @@ describe('a ready verdict', () => {
   });
 
   it('carries whatever gaps a ready verdict still names, without refusing it', () => {
-    const body = 'verdict: ready\ngaps:\n  - heading: "Design"\n    what: "one name is odd"';
+    const body = 'verdict: ready\ngaps:\n  - heading: "Design"\n    what: "one name is odd"\n'
+      + '    blocking: false\n    assumption: "the name in the spec is the one that ships"';
 
     expect(parseSpecReview(outputWith(body)).ready).toBe(true);
     expect(gapsIn(outputWith(body))).toEqual(['Design: one name is odd']);
@@ -174,16 +221,28 @@ describe('a not-ready verdict', () => {
     const body = 'verdict: not-ready\ngaps:\n'
       + '  - heading: "Definition of done"\n'
       + '    what: "no item says how the merge clean-up is verified"\n'
+      + '    blocking: true\n'
       + '  - heading: "Tasks the plan must carry"\n'
-      + '    what: "the third task names no file"';
+      + '    what: "the third task names no file"\n'
+      + '    blocking: true';
     const reading = parseSpecReview(outputWith(body));
 
     expect(reading.answer).toBe('not-ready');
     expect(reading.ready).toBe(false);
     expect(reading.issues).toEqual([]);
     expect(reading.gaps).toEqual([
-      { heading: 'Definition of done', what: 'no item says how the merge clean-up is verified' },
-      { heading: 'Tasks the plan must carry', what: 'the third task names no file' },
+      {
+        heading: 'Definition of done',
+        what: 'no item says how the merge clean-up is verified',
+        blocking: true,
+        assumption: null,
+      },
+      {
+        heading: 'Tasks the plan must carry',
+        what: 'the third task names no file',
+        blocking: true,
+        assumption: null,
+      },
     ]);
     expect(reading.text).toBe(
       'the rafa:spec-review block at line 3 judged the spec not ready, naming 2 gaps',
@@ -206,19 +265,23 @@ describe('a not-ready verdict', () => {
       + '  - heading: "Design"\n'
       + '  - "Design is thin"\n'
       + '  - heading: "Design"\n'
-      + '    what: "the store port is not named"';
+      + '    what: "the store port is not named"\n'
+      + '    blocking: true';
     const reading = parseSpecReview(outputWith(body));
 
-    expect(reading.gaps).toEqual([{ heading: 'Design', what: 'the store port is not named' }]);
+    expect(reading.gaps).toEqual([
+      { heading: 'Design', what: 'the store port is not named', blocking: true, assumption: null },
+    ]);
     expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps[0].what', 'gaps[1]']);
   });
 
   it('files a gap with no usable heading under the review, rather than losing it', () => {
-    const body = 'verdict: not-ready\ngaps:\n  - what: "nothing says what is verified"';
+    const body = 'verdict: not-ready\ngaps:\n  - what: "nothing says what is verified"\n'
+      + '    blocking: true';
     const reading = parseSpecReview(outputWith(body));
 
     expect(reading.gaps).toEqual([
-      { heading: REVIEW_HEADING, what: 'nothing says what is verified' },
+      { heading: REVIEW_HEADING, what: 'nothing says what is verified', blocking: true, assumption: null },
     ]);
     expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps[0].heading']);
   });
@@ -232,12 +295,124 @@ describe('a not-ready verdict', () => {
 
   it('ignores a key it does not know, so a later phase does not break this one', () => {
     const body = 'verdict: not-ready\nconfidence: low\ngaps:\n'
-      + '  - heading: "Design"\n    what: "thin"\n      \n';
+      + '  - heading: "Design"\n    what: "thin"\n    blocking: true\n      \n';
     const reading = parseSpecReview(outputWith(body.trimEnd()));
 
     expect(reading.answer).toBe('not-ready');
     expect(reading.issues).toEqual([]);
     expect(gapsIn(outputWith(body.trimEnd()))).toEqual(['Design: thin']);
+  });
+});
+
+describe('the blocking flag on a gap and the assumption beside it', () => {
+  it('reads a blocking gap and a non-blocking one, each as the session wrote it', () => {
+    const body = 'verdict: not-ready\ngaps:\n'
+      + '  - heading: "Definition of done"\n'
+      + '    what: "no item says how the clean-up is shown"\n'
+      + '    blocking: true\n'
+      + '  - heading: "Design"\n'
+      + '    what: "the store backend is not named"\n'
+      + '    blocking: false\n'
+      + '    assumption: "the SQLite backend, as every other command reads"';
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.issues).toEqual([]);
+    expect(reading.gaps).toEqual([
+      {
+        heading: 'Definition of done',
+        what: 'no item says how the clean-up is shown',
+        blocking: true,
+        assumption: null,
+      },
+      {
+        heading: 'Design',
+        what: 'the store backend is not named',
+        blocking: false,
+        assumption: 'the SQLite backend, as every other command reads',
+      },
+    ]);
+  });
+
+  it('reads a gap that names no blocking as blocking, and reports where it was written', () => {
+    const body = 'verdict: not-ready\ngaps:\n'
+      + '  - heading: "Design"\n    what: "the store backend is not named"';
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.gaps).toEqual([
+      {
+        heading: 'Design',
+        what: 'the store backend is not named',
+        blocking: true,
+        assumption: null,
+      },
+    ]);
+    expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps[0].blocking']);
+    expect(reading.issues[0]?.text).toBe(
+      'gaps[0].blocking is nothing, not true or false; the gap is read as blocking',
+    );
+  });
+
+  it('reads a blocking that is neither true nor false as blocking, however it is spelled', () => {
+    const gap = (blocking: string): string => 'verdict: not-ready\ngaps:\n'
+      + `  - heading: "Design"\n    what: "the backend is not named"\n    blocking: ${blocking}`;
+
+    expect(parseSpecReview(outputWith(gap('"false"'))).gaps[0]?.blocking).toBe(true);
+    expect(parseSpecReview(outputWith(gap('maybe'))).gaps[0]?.blocking).toBe(true);
+    expect(parseSpecReview(outputWith(gap('0'))).gaps[0]?.blocking).toBe(true);
+    expect(parseSpecReview(outputWith(gap('maybe'))).issues[0]?.text).toBe(
+      'gaps[0].blocking is "maybe", not true or false; the gap is read as blocking',
+    );
+    expect(parseSpecReview(outputWith(gap('0'))).issues.map((issue) => issue.field))
+      .toEqual(['gaps[0].blocking']);
+  });
+
+  it('reads a non-blocking gap that names no assumption as blocking, rather than guessing one', () => {
+    const body = 'verdict: not-ready\ngaps:\n'
+      + '  - heading: "Design"\n    what: "the store backend is not named"\n    blocking: false';
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.gaps).toEqual([
+      {
+        heading: 'Design',
+        what: 'the store backend is not named',
+        blocking: true,
+        assumption: null,
+      },
+    ]);
+    expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps[0].assumption']);
+    expect(reading.issues[0]?.text).toBe(
+      'gaps[0].assumption is nothing, not what a non-blocking gap would be planned under; '
+        + 'the gap is read as blocking',
+    );
+  });
+
+  it('reads a blank assumption the same way, so no plan opens under an empty line', () => {
+    const body = 'verdict: not-ready\ngaps:\n'
+      + '  - heading: "Design"\n    what: "the backend is not named"\n'
+      + '    blocking: false\n    assumption: "   "';
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.gaps[0]?.blocking).toBe(true);
+    expect(reading.gaps[0]?.assumption).toBeNull();
+    expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps[0].assumption']);
+  });
+
+  it('keeps an assumption written beside a blocking gap, rather than dropping it', () => {
+    const body = 'verdict: not-ready\ngaps:\n'
+      + '  - heading: "Design"\n    what: "the backend is not named"\n'
+      + '    blocking: true\n    assumption: "the SQLite backend"';
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.issues).toEqual([]);
+    expect(reading.gaps[0]?.blocking).toBe(true);
+    expect(reading.gaps[0]?.assumption).toBe('the SQLite backend');
+  });
+
+  it('refuses both gaps a reading of its own with the same flag, so neither plans itself', () => {
+    expect(MISSING_REVIEW_GAP.blocking).toBe(true);
+    expect(MISSING_REVIEW_GAP.assumption).toBeNull();
+    expect(UNNAMED_GAP.blocking).toBe(true);
+    expect(UNNAMED_GAP.assumption).toBeNull();
   });
 });
 
@@ -325,5 +500,23 @@ describe('the drift guard between the prompt and this parser', () => {
 
   it('finds no ask left in the prompt for a block that opens the answer', () => {
     expect(PLAN_PROMPT).not.toContain('open your answer with');
+  });
+
+  it('finds the prompt asking each gap for blocking, and a non-blocking one for its assumption', () => {
+    expect(asksForBlockingAndAssumption(PLAN_PROMPT)).toBe(true);
+  });
+
+  it('proves that guard fails on the narrower ask of a heading and a what alone', () => {
+    const narrow = PLAN_PROMPT.replace(ASK_BLOCKING, 'nothing else')
+      .replace(ASK_ASSUMPTION, 'carries no more')
+      .replace(ASK_WHEN_BLOCKING, 'Judge the spec as a whole');
+
+    expect(asksForBlockingAndAssumption(narrow)).toBe(false);
+    expect(narrow).toContain(SPEC_REVIEW_FENCE);
+    expect(asksForTheBlockLast(narrow)).toBe(true);
+  });
+
+  it('finds no ask left in the prompt for the gap shape this parser outgrew', () => {
+    expect(PLAN_PROMPT).not.toContain('`{heading, what}` gaps');
   });
 });

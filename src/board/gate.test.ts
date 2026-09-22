@@ -30,6 +30,19 @@
  * standing case holds the WARNING it wrote and the empty call list
  * beside the files still on disk.
  *
+ * `not-ready` has TWO enforcements since 2026-09-22 and both are here.
+ * A verdict whose every gap is non-blocking writes the plan, and the
+ * cases for it assert what a gate that refused everything could not
+ * satisfy: the plan still on disk, its first line the assumptions
+ * heading, the review line in its block, the plan below it byte for
+ * byte, the comment posted in the body that says a plan was written,
+ * and `swapLabels` never called. One blocking gap beside a
+ * non-blocking one keeps the refusal, and its case asserts the move,
+ * the refusal body and the swap, so a gate that planned under
+ * everything fails it. The two are driven from the SAME two gaps, one
+ * field apart, which is what says the branch turns on `blocking` and
+ * not on anything else about the review.
+ *
  * Five mutations of `gate.ts` were driven on 2026-09-19, one at a time
  * over `env -u CLAUDECODE bun test src/board/ src/plan.test.ts`, the
  * module restored from a scratch copy and verified with `shasum -c`
@@ -73,9 +86,30 @@
  * `rmSync`, so the gate deletes as it used to, fails 3 of the 18 cases
  * here — the byte-for-byte case, the both-files case and the
  * plan-alone case — where 18 pass with the move in place.
+ *
+ * Four mutations of the assumed path were driven on 2026-09-22, one at
+ * a time over `env -u CLAUDECODE bun test src/board/ src/plan.test.ts
+ * src/tests/readiness-gate-integration.test.ts`, the module restored
+ * from a scratch copy and verified with `shasum -c` after each. 564
+ * pass either side:
+ *
+ *  - the assumed branch dropped, so every `not-ready` verdict is
+ *    refused as it was before the change: 559 pass, 5 fail — the five
+ *    cases here that plan under a verdict, and not the blocking one.
+ *  - every `not-ready` verdict planned under, the mutation the
+ *    blocking case exists to catch: 551 pass, 13 fail — that case, the
+ *    six refusal cases above it, the two board-write ones, the
+ *    active-output one, the two `src/plan.test.ts` cases and the
+ *    `src/tests/readiness-gate-integration.test.ts` one.
+ *  - the assumptions section left out with the stamp kept: 562 pass, 2
+ *    fail — the two cases that read the file the gate wrote back.
+ *  - the refusal body posted for a verdict planned under, so the
+ *    comment tells the author no plan was written over a plan that
+ *    stands: 563 pass, 1 fail — the case that reads the posted body.
  */
 import type { IssueBoard } from './issue-board.js';
 import type { SpecReviewReading } from './spec-review.js';
+import type { BoardTrust } from './trust.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -85,6 +119,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { parsePlan } from '../plan/parse.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
@@ -98,7 +133,22 @@ import {
 } from './gate.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import { SPEC_REVIEW_MARKER } from './review-comment.js';
+import { ASSUMPTIONS_HEADING, REVIEW_ASSUMED_LINE } from './review-stamp.js';
 import { parseSpecReview } from './spec-review.js';
+
+/**
+ * The trust the gate's issue carries, allow-listing the account every
+ * fake marker comment here is written by. Its lookup THROWS, so a case
+ * that reached one would fail rather than pass quietly: an allow-list
+ * hit spends none (`./trust.ts`).
+ */
+const TRUSTING: BoardTrust = {
+  permissions: () => {
+    throw new Error('the gate spent a permission lookup on an allow-listed author');
+  },
+  trustedAuthors: ['rafa-bot'],
+  repo: 'open-tomato/rafa',
+};
 
 /** The plan path every case names, as a planner names one. */
 const PLAN_PATH = '.rafa/plans/PLAN-rafa-20.md';
@@ -124,6 +174,38 @@ const NOT_READY = reviewOf(
   '    what: "the third task does not name what it changes"',
 );
 
+/** A verdict naming two gaps, neither of which blocks planning. */
+const ASSUMED = reviewOf(
+  'verdict: not-ready',
+  'gaps:',
+  '  - heading: "Design"',
+  '    what: "the store backend is not named"',
+  '    blocking: false',
+  '    assumption: "the SQLite backend, as every other command reads"',
+  '  - heading: "Tasks the plan must carry"',
+  '    what: "the third task does not name what it changes"',
+  '    blocking: false',
+  '    assumption: "the task changes the module its name reads on"',
+);
+
+/**
+ * The same two gaps, one field apart: the second one blocks, and its
+ * assumption is written all the same. What the branch turns on is
+ * `blocking` and not whether a gap named a guess.
+ */
+const ONE_BLOCKING = reviewOf(
+  'verdict: not-ready',
+  'gaps:',
+  '  - heading: "Design"',
+  '    what: "the store backend is not named"',
+  '    blocking: false',
+  '    assumption: "the SQLite backend, as every other command reads"',
+  '  - heading: "Tasks the plan must carry"',
+  '    what: "the third task does not name what it changes"',
+  '    blocking: true',
+  '    assumption: "the task changes the module its name reads on"',
+);
+
 /** A verdict that lets the plan stand. */
 const READY = reviewOf('verdict: ready');
 
@@ -147,6 +229,23 @@ const PLAN_TEXT = [
 
 /** The same plan with its header block left open: two parser issues. */
 const UNREADABLE_PLAN_TEXT = ['# Plan: rafa-20', '', '```rafa:plan', 'stub: rafa-20', '', '- [ ] Do the thing', ''].join('\n');
+
+/**
+ * The same plan as a verdict planned under leaves it, below the
+ * assumptions section: byte for byte the session's own, with the review
+ * line recorded above its closing fence.
+ */
+const ASSUMED_PLAN_TEXT = [
+  '# Plan: rafa-20',
+  '',
+  '```rafa:plan',
+  'stub: rafa-20',
+  REVIEW_ASSUMED_LINE,
+  '```',
+  '',
+  '- [ ] Do the thing',
+  '',
+].join('\n');
 
 /** The lines an enforcement wrote, by level. */
 interface Lines {
@@ -204,6 +303,10 @@ function fakeBoard(marker: boolean, faults: BoardFaults = {}): { board: IssueBoa
       return faults.labels === undefined
         ? Promise.resolve()
         : Promise.reject(new Error(faults.labels));
+    },
+    removeLabel: (issue, label) => {
+      calls.push(['removeLabel', issue, label]);
+      return Promise.resolve();
     },
   };
   return { board, calls };
@@ -272,7 +375,7 @@ describe('enforceSpecReview lets through', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     });
@@ -293,7 +396,7 @@ describe('enforceSpecReview lets through', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output: capture().output,
     });
@@ -316,7 +419,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -379,7 +482,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -399,7 +502,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board: fakeBoard(false).board },
+      issue: { number: 20, board: fakeBoard(false).board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -419,7 +522,7 @@ describe('enforceSpecReview on a not-ready verdict', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: false,
       output,
     }));
@@ -453,6 +556,179 @@ describe('enforceSpecReview on a not-ready verdict', () => {
 
 });
 
+describe('enforceSpecReview on a not-ready verdict it can plan under', () => {
+  it('opens the plan with the assumptions, records the review, posts the gaps and moves no label', async () => {
+    const root = plantPlanned(PLAN_TEXT);
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+
+    const standing = await enforceSpecReview({
+      review: ASSUMED,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board, trust: TRUSTING },
+      comment: true,
+      output,
+    });
+
+    // The reading this case is about: a not-ready verdict no gap of
+    // which blocks, which is what the plan is written under.
+    expect(ASSUMED.answer).toBe('not-ready');
+    expect(ASSUMED.gaps.some((gap) => gap.blocking)).toBe(false);
+    expect(standing).toBe('assumed');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(true);
+    expect(existsSync(join(root, PREREQUISITES_PATH))).toBe(true);
+    expect(existsSync(join(root, rejectedPath(PLAN_PATH)))).toBe(false);
+
+    const written = readFileSync(join(root, PLAN_PATH), 'utf8');
+    expect(written.split('\n')[0]).toBe(ASSUMPTIONS_HEADING);
+    expect(written).toContain('- Planned under: the SQLite backend, as every other command reads');
+    expect(written).toContain('- Planned under: the task changes the module its name reads on');
+    expect(written.endsWith(ASSUMED_PLAN_TEXT)).toBe(true);
+
+    expect(calls.map((call) => call[0])).toEqual(['comments', 'comment']);
+    const body = String(calls[1]?.[2]);
+    expect(body).toContain('found 2 gaps, none of them blocking');
+    expect(body).toContain('- Planned under: the SQLite backend, as every other command reads');
+    expect(body).not.toContain('No plan was written.');
+    expect(lines.warn).toEqual([
+      'the rafa:spec-review block at line 3 judged the spec not ready, naming 2 gaps, none of them blocking;'
+        + ` ${PLAN_PATH} is written under the assumptions the review named`,
+    ]);
+    expect(lines.info).toEqual([
+      `🧭 ${PLAN_PATH} opens under the review's assumptions and records ${REVIEW_ASSUMED_LINE}.`,
+      '💬 Posted the review comment on issue #20.',
+    ]);
+  });
+
+  it('leaves the plan it opened reading as written, with the review word among its extras', async () => {
+    const root = plantPlanned(PLAN_TEXT);
+
+    await enforceSpecReview({
+      review: ASSUMED,
+      source: SOURCE,
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: null,
+      comment: true,
+      output: capture().output,
+    });
+    const model = parsePlan(readFileSync(join(root, PLAN_PATH), 'utf8'));
+
+    expect(model.issues).toEqual([]);
+    expect(model.header.stub).toBe('rafa-20');
+    expect(model.header.extras).toEqual([{ key: 'review', value: 'assumed' }]);
+    expect(model.tasks.map((task) => task.text)).toEqual(['Do the thing']);
+  });
+
+  it('removes the files, posts the gaps and swaps the labels when one gap among them blocks', async () => {
+    const root = plantPlanned(PLAN_TEXT);
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+
+    const refusal = await refusalOf(enforceSpecReview({
+      review: ONE_BLOCKING,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board, trust: TRUSTING },
+      comment: true,
+      output,
+    }));
+
+    expect(ONE_BLOCKING.gaps.filter((gap) => gap.blocking)).toHaveLength(1);
+    expect(ONE_BLOCKING.gaps.map((gap) => gap.assumption)).toEqual(ASSUMED.gaps.map((gap) => gap.assumption));
+    expect(existsSync(join(root, PLAN_PATH))).toBe(false);
+    expect(existsSync(join(root, rejectedPath(PLAN_PATH)))).toBe(true);
+    expect(calls.map((call) => call[0])).toEqual(['comments', 'comment', 'swapLabels']);
+    expect(calls[2]).toEqual(['swapLabels', 20, SPEC_READY_LABEL, SPEC_NEEDS_WORK_LABEL]);
+    expect(String(calls[1]?.[2])).toContain('No plan was written.');
+    expect(refusal.exitCode).toBe(SPEC_NOT_READY_EXIT);
+    expect(refusal.message).toContain('"Tasks the plan must carry": the third task does not name what it changes');
+    expect(refusal.message).toContain('"Design": the store backend is not named');
+    expect(lines.warn).toEqual([]);
+  });
+
+  it('writes the plan and sends no command at all under --no-comment', async () => {
+    const root = plantPlanned(PLAN_TEXT);
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+
+    const standing = await enforceSpecReview({
+      review: ASSUMED,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board, trust: TRUSTING },
+      comment: false,
+      output,
+    });
+
+    expect(standing).toBe('assumed');
+    expect(calls).toEqual([]);
+    expect(readFileSync(join(root, PLAN_PATH), 'utf8')).toContain(REVIEW_ASSUMED_LINE);
+    expect(lines.info).toContain(`💬 ${NO_COMMENT_FLAG}: the gaps were not posted on issue #20.`);
+  });
+
+  it('warns and stands when the session wrote no plan to open, rather than refusing the verdict', async () => {
+    const root = plantRepo([]);
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+
+    const standing = await enforceSpecReview({
+      review: ASSUMED,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board, trust: TRUSTING },
+      comment: true,
+      output,
+    });
+
+    expect(standing).toBe('assumed');
+    expect(existsSync(join(root, PLAN_PATH))).toBe(false);
+    expect(lines.warn).toContain(
+      `${PLAN_PATH} was not opened under the review's assumptions: the session wrote no plan there`,
+    );
+    // The control: the gaps still went up, so the warning is about the
+    // plan alone and not about a path that gave up on the verdict.
+    expect(calls.map((call) => call[0])).toEqual(['comments', 'comment']);
+  });
+
+  it('opens a plan holding no rafa:plan block anyway, warning that it records no review line', async () => {
+    // `plantRepo` writes a line of prose, not a plan: there is no block
+    // to stamp, and the assumptions are still what a person reads.
+    const root = plantRepo();
+    const { lines, output } = capture();
+
+    const standing = await enforceSpecReview({
+      review: ASSUMED,
+      source: SOURCE,
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: null,
+      comment: true,
+      output,
+    });
+
+    const written = readFileSync(join(root, PLAN_PATH), 'utf8');
+
+    expect(standing).toBe('assumed');
+    expect(written.split('\n')[0]).toBe(ASSUMPTIONS_HEADING);
+    expect(written.endsWith('written anyway\n')).toBe(true);
+    expect(written).not.toContain(REVIEW_ASSUMED_LINE);
+    expect(lines.warn.at(-1)).toContain(`records no ${REVIEW_ASSUMED_LINE}`);
+    expect(lines.info).toEqual([]);
+  });
+});
+
 describe('enforceSpecReview on a review it could not read', () => {
   it('lets a plan that reads as written stand on a missing block, with one warning and no board call', async () => {
     const root = plantPlanned(PLAN_TEXT);
@@ -465,7 +741,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     });
@@ -492,7 +768,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     });
@@ -540,7 +816,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: root,
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -572,7 +848,7 @@ describe('enforceSpecReview on a review it could not read', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -594,7 +870,7 @@ describe('enforceSpecReview when a board write fails', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));
@@ -614,7 +890,7 @@ describe('enforceSpecReview when a board write fails', () => {
       repoRoot: plantRepo([]),
       planPath: PLAN_PATH,
       prerequisitesPath: PREREQUISITES_PATH,
-      issue: { number: 20, board },
+      issue: { number: 20, board, trust: TRUSTING },
       comment: true,
       output,
     }));

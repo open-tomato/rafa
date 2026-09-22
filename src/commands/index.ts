@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the forty-one registered so far wrap a
+ * of each is its command. Five of the forty-five registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show` and
@@ -22,8 +22,9 @@
  * `list`, which act on a run through its session record and share
  * `loop/loop-sessions.ts`, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
- * `src/preflight/` and starts no run, nor the five `issue` actions, which
- * act on the tracker the chain resolves and share
+ * `src/preflight/` and starts no run, nor the seven `issue` actions,
+ * five of which act on the tracker the chain resolves while `ready` and
+ * `unblock` read and label issues on the GitHub board, all seven sharing
  * `issue/issue-tracker.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
@@ -37,11 +38,14 @@
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
- * the six `pr` actions, which read, merge and triage one repository's
- * pull requests through the PullRequests port and share
+ * the seven `pr` actions, which read, wait on, merge and triage one
+ * repository's pull requests through the PullRequests port and share
  * `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
- * through `src/release/` and share `release/status.ts`'s readers.
+ * through `src/release/` and share `release/status.ts`'s readers, nor
+ * `next`, which reads where the project stands through `src/next/` and
+ * runs each action it proposes by calling the registered command that
+ * does it.
  *
  * ## What is registered
  *
@@ -59,10 +63,18 @@
  *     `issue comment <id> --body=<text>` and `issue move <id> <state>`,
  *     over the Tracker port, on the tracker `tracker.default` and
  *     `tracker.fallback` resolve to through the chain.
+ *   - `issue ready <n> [--no-hint]`, an issue marked `spec:ready` once
+ *     its author and its body check out, and
+ *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
+ *     whose `Blocked by:` line names only closed issues. Both read the
+ *     GitHub board rather than the tracker chain, and both always ask.
  *   - `pr current`, the open pull request of the branch checked out at the
  *     project root on one line; `pr show [<n>]`, that pull request in full
  *     with its checks and its last triage; `pr view [<n>]`, it opened in
- *     the browser; `pr list`, the open pull requests as rows; and
+ *     the browser; `pr list`, the open pull requests as rows;
+ *     `pr wait [<n>] [--timeout=<minutes>]`, its checks polled until
+ *     they settle or the deadline passes with nothing written, exiting 0
+ *     green, 1 red and on no checks at all, and 3 at the deadline; and
  *     `pr merge [<n>] [--yes] [--method=squash|merge|rebase]`, one
  *     merged and both branches cleaned up after it; and
  *     `pr triage [<n>] [--no-comment] [--max-attempts=<count>]`, one
@@ -101,6 +113,10 @@
  *     publish lines rather than running them, refusing on another
  *     branch, on a tag already there, and where the two release files
  *     disagree.
+ *   - `next [--dry-run] [--yes[=<action ids>]]`, top-level: where the
+ *     project stands on one line, the one thing to do about it on the
+ *     next, that action run on a yes through the command that does it,
+ *     and then the same again for what follows.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -141,7 +157,9 @@ import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
 import issueList from './issue/list.js';
 import issueMove from './issue/move.js';
+import issueReady from './issue/ready.js';
 import issueShow from './issue/show.js';
+import issueUnblock from './issue/unblock.js';
 import loopList from './loop/list.js';
 import loopPause from './loop/pause.js';
 import loopResume from './loop/resume.js';
@@ -150,6 +168,7 @@ import loopStatus from './loop/status.js';
 import loopStop from './loop/stop.js';
 import moduleExec from './module/exec.js';
 import moduleList from './module/list.js';
+import next from './next.js';
 import planCreate from './plan/create.js';
 import planList from './plan/list.js';
 import planShow from './plan/show.js';
@@ -160,6 +179,7 @@ import prMerge from './pr/merge.js';
 import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
+import prWait from './pr/wait.js';
 import releaseStatus from './release/status.js';
 import releaseTag from './release/tag.js';
 import selfUpdate from './self-update.js';
@@ -173,8 +193,8 @@ import usage from './usage.js';
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create a plan from a spec; list, show and validate plans' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
-  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues' },
-  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, merge and triage them' },
+  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready and unblock it' },
+  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
@@ -200,10 +220,13 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   issueCreate,
   issueComment,
   issueMove,
+  issueReady,
+  issueUnblock,
   prCurrent,
   prShow,
   prView,
   prList,
+  prWait,
   prMerge,
   prTriage,
   effortCollect,
@@ -221,6 +244,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctShow,
   releaseStatus,
   releaseTag,
+  next,
   init,
   doctor,
   selfUpdate,

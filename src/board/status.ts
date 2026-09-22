@@ -1,6 +1,6 @@
 /**
  * What the board of a GitHub repository holds, READ and never written:
- * the six labels, the spec issue template, the Roadmap issue and
+ * the seven labels, the spec issue template, the Roadmap issue and
  * `roadmap.issue`, each present or missing. `rafa doctor` prints these
  * rows and names `rafa init --board` as the fix
  * (`.rafa/specs/rafa-20-pr-commands.md`, "`rafa init` sets up the board").
@@ -85,7 +85,7 @@ export interface BoardRow {
 
 /** What one reading of the board came to. */
 export interface BoardStatus {
-  /** Every row: the six labels, the template, the issue and the setting. */
+  /** Every row: the seven labels, the template, the issue and the setting. */
   readonly rows: readonly BoardRow[];
   /** The roadmap issue the config names or the search found; null when there is none. */
   readonly roadmapIssue: number | null;
@@ -114,7 +114,7 @@ export function boardGaps(status: BoardStatus): readonly BoardRow[] {
 
 /**
  * One row per label of {@link BOARD_LABELS}. A listing that failed
- * leaves all six `unknown` with its own sentence, because nothing is
+ * leaves all seven `unknown` with its own sentence, because nothing is
  * known about any of them then.
  */
 export async function readLabelRows(gh: GhRunner): Promise<readonly BoardRow[]> {
@@ -217,7 +217,7 @@ async function readRoadmapRows(gh: GhRunner, root: string): Promise<BoardStatus>
 }
 
 /**
- * Reads every part of the board and answers a row for each: the six
+ * Reads every part of the board and answers a row for each: the seven
  * labels, the spec issue template, the Roadmap issue and
  * `roadmap.issue`.
  *

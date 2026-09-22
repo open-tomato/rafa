@@ -65,8 +65,13 @@ is what keeps `src/commands/doctor.test.ts` (898) and
 - **`eslint --fix` spreads a nested ternary over one line per branch**
   (`@stylistic/multiline-ternary`). Sort with `a.localeCompare(b)` rather
   than an `a < b ? -1 : a > b ? 1 : 0` comparator.
-- **`eslint --fix` backslash-escapes an apostrophe in a single-quoted
-  string**, so write test titles without one.
+- **An apostrophe in a test title is written backslash-escaped inside
+  single quotes**, as `describe('the hint\'s own timeout', ...)`.
+  Reaching for double quotes is refused by `@stylistic/quotes`
+  (`Strings must use singlequote`), and `eslint --fix` puts the escape
+  back, so the escape is the convention rather than a thing to route
+  around: 46 titles across `src/` carry one. This bullet read `so write
+  test titles without one` until 2026-09-22, which those 46 falsify.
 - **Markdown is a lint target, and every fenced block needs a language**
   (`markdown/fenced-code-language`). A fence shown INSIDE a fenced example
   — a `context/` page quoting the comment a command writes, say — is read

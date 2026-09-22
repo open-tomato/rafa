@@ -10,6 +10,11 @@
  * writes them, and store rows through the loop's own writer with the
  * clock handed in.
  *
+ * The blockers sit beside their controls: a tracker line carrying a
+ * comment the loop wrote is shown with the comment's text and without the
+ * comment's own spelling, and the demo tracker's blocked line, which
+ * trails none, says so.
+ *
  * The pick sits beside its controls: the running record of the branch
  * picked over an older done one; with none running, the newest record of
  * the branch picked, and a record of another branch never; and
@@ -30,6 +35,7 @@ import { writeTaskReport } from '../../effort/store/reports.js';
 import { SQLITE_SCHEMA_VERSION, sqliteStorePath } from '../../effort/store/sqlite.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
+  DEMO_TRACKER,
   DEMO_TRACKER_PATH,
   LOOP_SUBJECTS,
   loopSeams,
@@ -39,6 +45,7 @@ import {
   resultEvent,
   sessionRecord,
 } from '../../tests/loop-session-fixtures.js';
+import { blockerComment } from '../../utils/tracker.js';
 
 import { createLoopStatusCommand } from './status.js';
 
@@ -95,6 +102,8 @@ describe('rafa loop status, the session a line picks', () => {
     expect(run.stdout).toBe([
       RUNNING_LINE,
       '  Tasks: 1/4 done, 1 blocked, 2 open',
+      '  Blocked: line 6, Second task',
+      '    the line trails no blocker comment',
       '  Task: line 6, Second task',
       '  ETA: none until the session finishes a task',
       '',
@@ -114,6 +123,8 @@ describe('rafa loop status, the session a line picks', () => {
     expect(run.stdout).toBe([
       'Session session-0450: plan `demo` on `feat/demo`, stopped, pid 7171, started 2026-09-15T11:30:00.000Z',
       '  Tasks: 1/4 done, 1 blocked, 2 open',
+      '  Blocked: line 6, Second task',
+      '    the line trails no blocker comment',
       '  Task: line 6, Second task',
       '',
     ].join('\n'));
@@ -151,7 +162,7 @@ describe('rafa loop status, what it shows', () => {
 
     const run = await status(project, []);
 
-    expect(run.stdout.split('\n')[3]).toBe('  ETA: about 30m for 3 tasks left, at 10m per task over the 2 tasks this session finished');
+    expect(run.stdout.split('\n')[5]).toBe('  ETA: about 30m for 3 tasks left, at 10m per task over the 2 tasks this session finished');
   });
 
   it('says a pause that has not taken effect holds once its task ends, and still gives the ETA', async () => {
@@ -159,7 +170,7 @@ describe('rafa loop status, what it shows', () => {
 
     const run = await status(project, []);
 
-    expect(run.stdout.split('\n').slice(2)).toEqual([
+    expect(run.stdout.split('\n').slice(4)).toEqual([
       '  Task: line 6, Second task (the run holds once it ends)',
       '  ETA: none until the session finishes a task',
       '',
@@ -207,6 +218,72 @@ describe('rafa loop status, what it shows', () => {
       },
     });
     expect(run.stdout).not.toContain('Session session-0500');
+  });
+});
+
+/** The demo tracker with `comment` written onto the line of `task`, as `writeTrackerBlocker` writes one. */
+function trackerBlocking(task: string, comment: string): string {
+  return DEMO_TRACKER.replace(`- [ ] ${task}`, `- [BLOCKED] ${task}  ${comment}`);
+}
+
+describe('rafa loop status, the blockers it prints', () => {
+  it('prints the comment a blocked line trails, one line per line of it, with the task text free of it', async () => {
+    const project = projectWith(sessionRecord());
+    const blocker = 'the check-types gate exited 2\nsee `tsc --noEmit`';
+    const line = `- [BLOCKED] Second task  {effort=low}  ${blockerComment(blocker)}`;
+    plantFile(project.root, DEMO_TRACKER_PATH, DEMO_TRACKER.replace('- [BLOCKED] Second task  {effort=low}', line));
+
+    const run = await status(project, []);
+
+    expect(run.stdout.split('\n').slice(1, 4)).toEqual([
+      '  Tasks: 1/4 done, 1 blocked, 2 open',
+      '  Blocked: line 6, Second task',
+      '    the check-types gate exited 2',
+    ]);
+    expect(run.stdout).toContain('    see `tsc --noEmit`\n');
+    expect(run.stdout).not.toContain('<!-- blocked:');
+    expect(run.exitCode).toBe(0);
+  });
+
+  it('prints one blocked task per blocked line, in file order, and says so for a line trailing no comment', async () => {
+    const project = projectWith(sessionRecord());
+    plantFile(project.root, DEMO_TRACKER_PATH, trackerBlocking('Fourth task', blockerComment('the board is down')));
+
+    const run = await status(project, []);
+
+    expect(run.stdout.split('\n').slice(1, 5)).toEqual([
+      '  Tasks: 1/4 done, 2 blocked, 1 open',
+      '  Blocked: line 6, Second task',
+      '    the line trails no blocker comment',
+      '  Blocked: line 8, Fourth task',
+    ]);
+    expect(run.stdout.split('\n')[5]).toBe('    the board is down');
+  });
+
+  it('prints no blocker line for a checklist with no blocked task, and none when neither file is there', async () => {
+    const project = projectWith(sessionRecord(), sessionRecord({ sessionId: 'session-0600', planStub: 'gone', plan: '.plans/PLAN-gone.md', task: null }));
+    plantFile(project.root, DEMO_TRACKER_PATH, DEMO_TRACKER.replace('- [BLOCKED] Second task', '- [x] Second task'));
+
+    const open = await status(project, ['-s', 'session-0500']);
+    const neither = await status(project, ['-s', 'session-0600']);
+
+    expect(open.stdout).not.toContain('Blocked:');
+    expect(open.stdout.split('\n')[1]).toBe('  Tasks: 2/4 done, 0 blocked, 2 open');
+    expect(neither.stdout).not.toContain('Blocked:');
+  });
+
+  it('gives each blocked task its line, its text and its blocker as result data in json mode', async () => {
+    const project = projectWith(sessionRecord());
+    plantFile(project.root, DEMO_TRACKER_PATH, trackerBlocking('Third task', blockerComment('a report with no commit')));
+
+    const run = await status(project, ['--output=json']);
+
+    expect(resultEvent(run.stdout).data).toMatchObject({
+      blocked: [
+        { line: 6, text: 'Second task', blocker: null },
+        { line: 7, text: 'Third task', blocker: 'a report with no commit' },
+      ],
+    });
   });
 });
 

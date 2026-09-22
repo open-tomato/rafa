@@ -1,10 +1,10 @@
 /**
- * The three writes and one read the readiness gate makes on an issue:
- * the comments of an issue, a comment posted, a comment edited, and one
- * label swapped for another.
+ * The four writes and one read made on an issue: the comments of an
+ * issue, a comment posted, a comment edited, one label swapped for
+ * another, and one label taken off.
  *
- * The gate's not-ready branch posts the planner's gaps as one comment,
- * edits that comment on a rerun, and swaps `spec:ready` for
+ * The readiness gate's not-ready branch posts the planner's gaps as one
+ * comment, edits that comment on a rerun, and swaps `spec:ready` for
  * `spec:needs-work` (`.rafa/specs/rafa-20-pr-commands.md`). Those are the
  * only board operations it makes, and this is the seam they go through:
  * {@link IssueBoard} is the interface the gate is written against, and
@@ -12,6 +12,15 @@
  * {@link GhRunner} declared in `src/adapters/tracker/github.ts` and
  * taken by the pull request provider (`src/pr/gh.ts`) and the trust
  * reading (`./trust.ts`) already.
+ *
+ * {@link IssueBoard.removeLabel} is the one member no gate run reaches:
+ * it is here for the unblock run, which takes `spec:blocked` off an
+ * issue whose blockers have all closed (`./blocked.ts`,
+ * `.rafa/specs/rafa-63-one-command-next-step.md`) and adds nothing. A
+ * caller passing an empty string through `swapLabels` instead would
+ * send `gh issue edit <n> --remove-label spec:blocked --add-label`,
+ * whose trailing flag takes the next word or none, so the removal-only
+ * write is a member of its own rather than a special case of the swap.
  *
  * Nothing here spawns, so every case in `./issue-board.test.ts` drives a
  * runner of its own and none of them reaches GitHub or reads the
@@ -35,6 +44,7 @@
  * | `comment` | `gh api repos/{owner}/{repo}/issues/<n>/comments -X POST -f body=<body>` |
  * | `editComment` | `gh api repos/{owner}/{repo}/issues/comments/<id> -X PATCH -f body=<body>` |
  * | `swapLabels` | `gh issue edit <n> --remove-label <removed> --add-label <added>` |
+ * | `removeLabel` | `gh issue edit <n> --remove-label <label>` |
  *
  * The comment paths are the REST ones the pull request provider reads
  * and writes, for the reason it records: a pull request IS an issue to
@@ -58,6 +68,14 @@
  * and the gate does not depend on it: it swaps only after the label
  * check has READ `spec:ready` off the issue, and a failed swap is
  * reported by its caller rather than thrown past it.
+ *
+ * The removal sends the same `gh issue edit` with `--add-label` left
+ * out, so it half-applies nothing: there is one label in it. What `gh`
+ * does with a label the issue does not carry was not measured here
+ * either, and the unblock run does not depend on it for the same
+ * reason the gate does not: it removes only after having READ
+ * `spec:blocked` off the issue, and a failed removal is reported by its
+ * caller.
  *
  * ## Arguments are checked before they reach `gh`
  *
@@ -104,6 +122,8 @@ export interface IssueBoard {
   readonly editComment: (id: string, body: string) => Promise<BoardComment>;
   /** Takes `removed` off the issue and puts `added` on it, in one command. */
   readonly swapLabels: (issue: number, removed: string, added: string) => Promise<void>;
+  /** Takes `label` off the issue and puts nothing on it. */
+  readonly removeLabel: (issue: number, label: string) => Promise<void>;
 }
 
 /** What {@link createGhIssueBoard} is made with. */
@@ -154,11 +174,11 @@ function commentBody(value: string, member: string): string {
   return value;
 }
 
-/** The label `swapLabels` was handed; see the module note on the `-` check. */
-function labelName(value: string, what: string): string {
+/** A label a write was handed; see the module note on the `-` check. */
+function labelName(value: string, member: string, what: string): string {
   if (typeof value !== 'string' || value === '' || value.startsWith('-')) {
     throw new TypeError(
-      `${PREFIX}: swapLabels refused the ${what} label ${describeValue(value)},`
+      `${PREFIX}: ${member} refused ${what} ${describeValue(value)},`
         + ' expected a non-empty name that does not open with a hyphen',
     );
   }
@@ -247,11 +267,20 @@ export function createGhIssueBoard(options: GhIssueBoardOptions): IssueBoard {
 
     swapLabels: async (issue: number, removed: string, added: string): Promise<void> => {
       const number = issueNumber(issue, 'swapLabels');
-      const off = labelName(removed, 'removed');
-      const on = labelName(added, 'added');
+      const off = labelName(removed, 'swapLabels', 'the removed label');
+      const on = labelName(added, 'swapLabels', 'the added label');
       await succeed(
         ['issue', 'edit', number, '--remove-label', off, '--add-label', on],
         `gh issue edit ${number} --remove-label ${off} --add-label ${on}`,
+      );
+    },
+
+    removeLabel: async (issue: number, label: string): Promise<void> => {
+      const number = issueNumber(issue, 'removeLabel');
+      const off = labelName(label, 'removeLabel', 'the label');
+      await succeed(
+        ['issue', 'edit', number, '--remove-label', off],
+        `gh issue edit ${number} --remove-label ${off}`,
       );
     },
   };
