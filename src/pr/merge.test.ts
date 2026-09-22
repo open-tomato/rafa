@@ -251,7 +251,25 @@ describe('readMergeRefusal', () => {
   it('refuses a mergeable PR that reports no checks at all', () => {
     const refusal = readMergeRefusal({ ...GREEN, checks: 'none' });
     expect(refusal?.reason).toBe('checks-not-green');
-    expect(refusal?.message).toContain('it reports no checks at all (none)');
+    expect(refusal?.message).toContain('#12 reports no checks at all (none), so nothing on GitHub has tested it.');
+  });
+
+  it('names --skip-checks and what it means when refusing a PR with no checks', () => {
+    const refusal = readMergeRefusal({ ...GREEN, checks: 'none' });
+    expect(refusal?.message).toContain('run rafa pr merge 12 --skip-checks.');
+    expect(refusal?.message).toContain('no check has passed: you rely on the checks run locally');
+    // Triage has nothing to fix on zero check rows, so it is not pointed at.
+    expect(refusal?.message).not.toContain('rafa pr triage');
+    // Control: the same reading with the flag is allowed.
+    expect(readMergeRefusal({ ...GREEN, checks: 'none', skipChecks: true })).toBeNull();
+  });
+
+  it('keeps the triage pointer and no flag hint on red and pending', () => {
+    for (const checks of ['red', 'pending'] as const) {
+      const message = readMergeRefusal({ ...GREEN, checks })?.message ?? '';
+      expect(message).toContain('Run rafa pr triage 12 to see why.');
+      expect(message).not.toContain('--skip-checks');
+    }
   });
 
   it('refuses a branch another worktree holds, naming that worktree', () => {

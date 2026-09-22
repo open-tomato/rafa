@@ -51,6 +51,11 @@
  * `none` too — is still refused as a conflict, flag or no flag. What an
  * allowed unchecked merge then warns and asks is `./unchecked.ts`'s.
  *
+ * Without the flag, verdict `none` is still refused, but not with the
+ * triage pointer the `red` and `pending` refusals end with: triage has
+ * nothing to fix where there are no check rows. That refusal names
+ * `--skip-checks` and what merging with no checks means instead.
+ *
  * `unknown` mergeability refuses too, rather than being treated as
  * mergeable: it is GitHub's answer while it is still computing the
  * merge commit, so acting on it sends a merge GitHub is about to refuse
@@ -295,8 +300,23 @@ function triagePointer(number: number): string {
 /** How the checks refusal names a verdict that is not green. */
 function checksClause(verdict: ChecksVerdict): string {
   if (verdict === 'red') return 'its checks failed (red)';
-  if (verdict === 'pending') return 'its checks are still running (pending)';
-  return 'it reports no checks at all (none)';
+  return 'its checks are still running (pending)';
+}
+
+/**
+ * The refusal for verdict `none` without `--skip-checks`. It does not
+ * point at triage, which has nothing to fix on a pull request with no
+ * check rows; it names the flag instead, and what taking it means.
+ */
+function noChecksRefusal(number: number): MergeRefusal {
+  return {
+    reason: 'checks-not-green',
+    message: [
+      `${REFUSAL_PREFIX}: #${number} reports no checks at all (none), so nothing on GitHub has tested it.`,
+      `To merge it anyway, run rafa pr merge ${number} --skip-checks.`,
+      'Merging with no checks means no check has passed: you rely on the checks run locally, and rafa asks before it merges.',
+    ].join('\n'),
+  };
 }
 
 function dirtyTreeRefusal(tree: WorkingTreeStatus): MergeRefusal {
@@ -328,6 +348,7 @@ function mergeStateRefusal(reading: MergeRefusalReading): MergeRefusal {
 
 function checksRefusal(reading: MergeRefusalReading): MergeRefusal {
   const { checks, number } = reading;
+  if (checks === 'none') return noChecksRefusal(number);
   return {
     reason: 'checks-not-green',
     message: [
