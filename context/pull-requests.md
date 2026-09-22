@@ -426,16 +426,17 @@ records `review: skipped`.
   the author's trust, the `spec:ready` label, the leak refusal, the
   completeness refusal and the planner's own review — all against the issue
   as it reads NOW before any saved copy is compared or any question asked, so
-  an untrusted or incomplete edited body is refused exactly as on a first read.
-  An existing snapshot prints its difference lines when the issue body has
-  changed. With a terminal, the run offers a question: update the saved copy
-  and plan from the new version? Without a terminal or on a no, the run
-  refuses. The `--refresh` flag rebuilds without asking. A notes-only change
-  is rebuilt without asking, the old copy moved to `<specs.dir>/previous/`
-  first, as every rebuild moves it. A local file `<specs.dir>/rafa-<n>-notes.md`,
-  when present, is appended under "Local notes": machine paths and private
-  hosts live there and never on the board. The plan's `rafa:plan` block gets
-  `issue: <n>`.
+  an untrusted or incomplete edited body is refused exactly as on a first read
+  and saying yes skips nothing. An existing snapshot prints its difference
+  lines when the issue body has changed. A notes-only change rebuilds without
+  asking, the old copy moved to `<specs.dir>/previous/` first. If the body has
+  changed and a terminal is present, the run offers a question: update the
+  saved copy and plan from the new version? The `--refresh` flag (`REFRESH_FLAG`,
+  `src/board/flags.ts`) keeps working and never asks. Without a terminal and
+  without `--refresh`, the changed-body refusal stands. A local file
+  `<specs.dir>/rafa-<n>-notes.md`, when present, is appended under "Local notes":
+  machine paths and private hosts live there and never on the board. The plan's
+  `rafa:plan` block gets `issue: <n>`.
 - `plan create --next[=<roadmap-issue>]` — the first undone line of the
   roadmap issue. The roadmap issue is `roadmap.issue` in config, else the
   pinned issue titled "Roadmap". Its body is parsed by code: task-list lines
