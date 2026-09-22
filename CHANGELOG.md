@@ -9,6 +9,12 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.9.2 — 2026-09-23, two fixes to the board flow
+
+- `rafa pr merge` ticks the roadmap again: the tick called `gh` with the REST path as its first word, so `gh` answered `unknown command` and every tick failed after two attempts (#99).
+- `rafa next` reads the board again after each step, instead of answering the labels it had cached before that step, proposing the same step twice and stopping (#103).
+- Both are covered by cases that redden when the fix is removed: the roadmap board is driven over a `gh` fake that refuses what `gh` refuses, and the chain over a real two-command run sharing one board.
+
 ## 0.9.1 — 2026-09-22, Plan from an edited issue without retyping the command
 
 - `plan create`: `--issue` and `--next` no longer stop on a saved copy that differs from the issue. They print what differs first — an `issue body: +<a> -<r> lines` line naming the headings that changed, and a `local notes:` line — then rebuild a copy whose local notes alone changed without asking, and on a changed body ask `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]` where there is a terminal. Every check on the issue still runs before the question, a no or an ended input refuses as before and writes nothing, and without a terminal the refusal stands. `--refresh` rebuilds without asking. Every rebuild first moves the old copy to `<specs.dir>/previous/`, stamped with its modification time and never overwriting an earlier one.
