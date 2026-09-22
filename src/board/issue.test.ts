@@ -1,7 +1,8 @@
 /**
  * Tests for the issue a plan is written from (`src/board/issue.ts`): the
  * read, the closed and unlabelled refusals, the snapshot written under
- * `specs.dir`, the `--refresh` rule and the local notes appended to it.
+ * `specs.dir`, the `--refresh` rule, the local notes appended to it, and
+ * the reading of how a saved snapshot differs.
  *
  * Two seams, no process. The read is driven through the strict recorded
  * fake (`src/adapters/tracker/github-fake.ts`), which models
@@ -96,8 +97,28 @@
  *    lenient reading working as written — and the case asserting the
  *    command in a failure message, since the field list is spelled in
  *    it.
+ *
+ * Seven mutations of {@link readSnapshotChange} were driven on
+ * 2026-09-22 over `env -u CLAUDECODE bun test src/board/issue.test.ts`,
+ * the module copied to a scratch path, restored from the copy and
+ * verified with `shasum -c` after each. 44 pass either side:
+ *
+ *  - the body prefix test loosened to the saved copy starting with the
+ *    body at all: 1 fail, the appended-and-cut paragraph case.
+ *  - the old notes read after the FIRST separator rather than the last:
+ *    1 fail, the body holding its own Local notes heading.
+ *  - the fence tracking dropped: 1 fail, the fenced `#` line case.
+ *  - the line counts taken as the lines one body has and the other
+ *    lacks, not the longest common subsequence: 1 fail, the moved line.
+ *  - the notes never compared once the body changed: 1 fail, the both
+ *    case.
+ *  - a heading named only when one body has it and the other lacks it:
+ *    4 fail, every case whose heading keeps its line and changes its
+ *    text.
+ *  - the body read the same only when the copy holds no notes: 3 fail,
+ *    the three cases whose reading is `notes`.
  */
-import type { SpecIssue } from './issue.js';
+import type { SnapshotChange, SpecIssue } from './issue.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
@@ -119,6 +140,7 @@ import {
   LOCAL_NOTES_HEADING,
   missingSpecLabelMessage,
   readLocalNotes,
+  readSnapshotChange,
   REFRESH_FLAG,
   requireSpecIssue,
   snapshotText,
@@ -438,6 +460,109 @@ describe('snapshotText', () => {
   it('normalises CRLF line endings, and keeps a markdown line break', () => {
     expect(snapshotText('# Spec\r\n\r\nBody.\r\n', null)).toBe('# Spec\n\nBody.\n');
     expect(snapshotText('One line  \nand the next\n', null)).toBe('One line  \nand the next\n');
+  });
+});
+
+describe('readSnapshotChange', () => {
+  /** Where the notes line says the notes are. */
+  const NOTES = notesPath(SPECS_DIR, 20);
+
+  /** The notes line, spelled out once so every case asserts the same bytes. */
+  const NOTES_LINE = `local notes: ${NOTES} changed since the saved copy`;
+
+  /** The reading of `saved` against `body` and `notes`. */
+  const read = (saved: string, body: string, notes: string | null): SnapshotChange => readSnapshotChange({
+    saved,
+    body,
+    notes,
+    notesPath: NOTES,
+  });
+
+  /** A spec with two headed sections, `design` under the first. */
+  const spec = (design: string): string => `# Spec\n\n## Design\n\n${design}\n\n## Risks\n\nNone.\n`;
+
+  it('answers unchanged, with no line, for the copy this run would write', () => {
+    expect(read(snapshotText(spec('Old.'), 'A note.'), spec('Old.'), 'A note.\n'))
+      .toEqual({ kind: 'unchanged', bodyLine: null, notesLine: null });
+    expect(read('# Spec\n', '# Spec\r\n\r\n', null).kind).toBe('unchanged');
+  });
+
+  it('answers notes, naming the notes file, when only the notes were edited', () => {
+    expect(read(snapshotText(spec('Old.'), 'The first note.'), spec('Old.'), 'A second note.\n'))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: NOTES_LINE });
+  });
+
+  it('answers notes when a notes file was added to a copy that had none, or emptied', () => {
+    expect(read(snapshotText(spec('Old.'), null), spec('Old.'), 'A new note.\n').kind).toBe('notes');
+    expect(read(snapshotText(spec('Old.'), 'A note.'), spec('Old.'), ' \n').kind).toBe('notes');
+    expect(read(snapshotText(spec('Old.'), 'A note.'), spec('Old.'), null).kind).toBe('notes');
+  });
+
+  it('answers body, counting lines and naming the heading whose text changed', () => {
+    const change = read(snapshotText(spec('Old text.'), 'A note.'), spec('New text.\nAnd more.'), 'A note.\n');
+
+    expect(change).toEqual({
+      kind: 'body',
+      bodyLine: 'issue body: +2 -1 lines; headings changed: Design',
+      notesLine: null,
+    });
+  });
+
+  it('answers both, with both lines, when the body and the notes changed', () => {
+    const change = read(snapshotText(spec('Old text.'), 'The first note.'), spec('New text.'), 'Another.\n');
+
+    expect(change).toEqual({
+      kind: 'both',
+      bodyLine: 'issue body: +1 -1 lines; headings changed: Design',
+      notesLine: NOTES_LINE,
+    });
+  });
+
+  it('names a heading renamed as both the one added and the one removed', () => {
+    expect(read('## Before\n\nThe text.\n', '## After\n\nThe text.\n', null).bodyLine)
+      .toBe('issue body: +1 -1 lines; headings changed: After, Before');
+  });
+
+  it('reads no heading changed for an edit above the first heading, and for a body with none', () => {
+    expect(read('Intro.\n\n# Spec\n\nBody.\n', 'Intro, edited.\n\n# Spec\n\nBody.\n', null).bodyLine)
+      .toBe('issue body: +1 -1 lines; no heading changed');
+    expect(read('One line.\n', 'One line.\nTwo lines.\n', null).bodyLine)
+      .toBe('issue body: +1 -0 lines; no heading changed');
+  });
+
+  it('reads a # line inside a fenced code block as text under its heading, not a heading', () => {
+    const old = '## Setup\n\n```sh\n#!/bin/sh\n# install\nbun i\n```\n';
+    const now = '## Setup\n\n```sh\n#!/bin/sh\n# install\nbun install\n```\n';
+
+    expect(read(old, now, null).bodyLine).toBe('issue body: +1 -1 lines; headings changed: Setup');
+  });
+
+  it('counts a line moved once each way, as the longest common subsequence leaves it', () => {
+    // A count of lines one body has and the other lacks reads +0 -0 here.
+    expect(read('A.\nB.\nC.\n', 'B.\nC.\nA.\n', null).bodyLine)
+      .toBe('issue body: +1 -1 lines; no heading changed');
+  });
+
+  it('counts an appended paragraph as lines added, and a cut one as lines removed', () => {
+    // Controls on the prefix test: each body is a prefix of the other, and
+    // neither ends at the notes separator, so both are body changes.
+    expect(read('# Spec\n', '# Spec\n\nMore.\n', null))
+      .toEqual({ kind: 'body', bodyLine: 'issue body: +2 -0 lines; headings changed: Spec', notesLine: null });
+    expect(read('# Spec\n\nMore.\n', '# Spec\n', null).bodyLine)
+      .toBe('issue body: +0 -2 lines; headings changed: Spec');
+  });
+
+  it('reads a body holding its own Local notes heading by the body as it reads now', () => {
+    const body = `# Spec\n\n${LOCAL_NOTES_HEADING}\n\nWritten in the issue.\n`;
+    const edited = `# The spec\n\n${LOCAL_NOTES_HEADING}\n\nWritten in the issue.\n`;
+    const saved = snapshotText(body, 'The first note.');
+
+    expect(read(saved, body, 'A second note.').kind).toBe('notes');
+    expect(read(saved, edited, 'The first note.')).toEqual({
+      kind: 'body',
+      bodyLine: 'issue body: +1 -1 lines; headings changed: The spec, Spec',
+      notesLine: null,
+    });
   });
 });
 
