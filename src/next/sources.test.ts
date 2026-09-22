@@ -394,3 +394,62 @@ describe('the board the roadmap rows are read through', () => {
     expect(await board.blocking(ISSUE)).toBeNull();
   });
 });
+
+describe('the sources of one answer against the next', () => {
+  /** A project whose config names the roadmap, over a gh that can be re-labelled. */
+  function overLabels(labels: () => readonly string[]): {
+    readonly sources: ReturnType<typeof openNextSources>;
+    readonly calls: () => readonly string[];
+  } {
+    const calls: string[] = [];
+    const gh: GhRunner = (args) => {
+      calls.push(args.slice(0, 3).join(' '));
+      const route = args.slice(0, 2).join(' ');
+      if (route === 'pr list') return wrote('[]');
+      if (route === 'issue view') {
+        const number = Number(args[2]);
+        return wrote(number === ROADMAP
+          ? issuePayload(ROADMAP, { body: ROADMAP_BODY })
+          : issuePayload(number, { labels: labels() }));
+      }
+      return Promise.resolve({ ok: false, stdout: '', stderr: `unexpected ${args.join(' ')}` });
+    };
+    const { root, home } = plantProject(`version: 1\nboard:\n  roadmapIssue: ${String(ROADMAP)}\n`);
+    const sources = openNextSources(contextFor(root, home), {
+      readRemote: () => GITHUB_REMOTE,
+      openGh: () => gh,
+      openGit: () => (): GitResult => said(''),
+      pullRequests: () => createPullRequestsDouble({}).pulls,
+    });
+    return { sources, calls: () => calls };
+  }
+
+  it('reads the issue once within one answer, and again for the next one', async () => {
+    const held = { labels: [] as readonly string[] };
+    const { sources, calls } = overLabels(() => held.labels);
+
+    expect(await sources.board.isReady(ISSUE)).toBe(false);
+    expect(await sources.board.blocking(ISSUE)).toBeNull();
+    const withinOne = calls().filter((call) => call === `issue view ${String(ISSUE)}`).length;
+
+    const next = sources.answer();
+    expect(await next.board.isReady(ISSUE)).toBe(false);
+    const overTwo = calls().filter((call) => call === `issue view ${String(ISSUE)}`).length;
+
+    expect([withinOne, overTwo]).toEqual([1, 2]);
+  });
+
+  it('sees a label the last answer did not, which is what a chain turn needs', async () => {
+    const held = { labels: [] as readonly string[] };
+    const { sources } = overLabels(() => held.labels);
+
+    expect(await sources.board.isReady(ISSUE)).toBe(false);
+    // What `rafa issue ready` does between two turns of the chain.
+    held.labels = ['spec:ready'];
+
+    // The same sources answer the reading they cached...
+    expect(await sources.board.isReady(ISSUE)).toBe(false);
+    // ...and the next answer reads the label that was added.
+    expect(await sources.answer().board.isReady(ISSUE)).toBe(true);
+  });
+});
