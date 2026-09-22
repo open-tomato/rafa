@@ -47,8 +47,18 @@ import {
 
 /** Two gaps, as the planner's review names them. */
 const GAPS: readonly SpecReviewGap[] = [
-  { heading: 'Definition of done', what: 'no item says how the merge clean-up is verified' },
-  { heading: 'Tasks the plan must carry', what: 'the third task does not name what it changes' },
+  {
+    heading: 'Definition of done',
+    what: 'no item says how the merge clean-up is verified',
+    blocking: true,
+    assumption: null,
+  },
+  {
+    heading: 'Tasks the plan must carry',
+    what: 'the third task does not name what it changes',
+    blocking: false,
+    assumption: 'the task changes the module its name reads on',
+  },
 ];
 
 /** What a refusal calls the repository in these cases. */
@@ -140,13 +150,23 @@ describe('specReviewCommentBody', () => {
   });
 
   it('counts one gap as one', () => {
-    const one: SpecReviewGap = { heading: 'the review', what: 'the review block was not returned' };
+    const one: SpecReviewGap = {
+      heading: 'the review',
+      what: 'the review block was not returned',
+      blocking: true,
+      assumption: null,
+    };
 
     expect(specReviewCommentBody([one])).toContain('found 1 gap.');
   });
 
   it('collapses a sentence a model wrote over several lines onto its list item', () => {
-    const folded: SpecReviewGap = { heading: 'Design\n', what: 'the store\nis  not named\n' };
+    const folded: SpecReviewGap = {
+      heading: 'Design\n',
+      what: 'the store\nis  not named\n',
+      blocking: true,
+      assumption: null,
+    };
 
     const body = specReviewCommentBody([folded]);
 
