@@ -120,6 +120,38 @@ unmocked. Register the route row the call needs on the fake.
 A failure after the merge never undoes it; it prints the remaining steps as
 commands.
 
+### The --skip-checks flow
+
+`--skip-checks` is accepted on verdict `none` ONLY — a PR that reports no
+checks at all. On `pending`, `red` or `green`, the flag is refused, and the
+refusal names each check row and its state. Without the flag, `none` is
+refused as today, naming `--skip-checks` and what it means.
+
+Before asking to merge, the command reads the repository's workflow count
+(`gh api repos/<repo>/actions/workflows`, `total_count`). Zero is the
+"no workflow" case; one or more, OR a count that could not be read, is the
+"workflows exist" case, which is the riskier one. Two warnings:
+
+- no workflow: "nothing on GitHub has tested this branch; you are relying on
+  the checks run locally"
+- workflows exist: "CI may not have started (a path filter, a draft, Actions
+  disabled, or it has not registered yet); this is probably not what you want"
+
+Then it shows `#n title, branch → base, method` and asks `Merge #<n> with no
+checks? [y/N]`. `--yes` answers the question in the no-workflow case only and
+is REFUSED in the workflows-exist case. Without a TTY and without `--yes` it
+refuses.
+
+After the merge, the usual clean-up runs (switch to the base branch, `git pull
+--ff-only`, delete local and remote branches, `git fetch --prune`), then ONE
+comment is posted on the PR: `Merged with no checks reported, by rafa pr merge
+--skip-checks.` followed by the workflow count that was read (or that it could
+not be read).
+
+`rafa next` sends a PR with verdict `none` to `pr triage` through `redClause`
+unless `--skip-checks` is used. A `rafa next --yes=<ids>` list that names
+`merge-unchecked` is refused with exit 2, like `ready`.
+
 ### Triage assessment
 
 Assessment is CODE, not a session:
@@ -132,10 +164,12 @@ Assessment is CODE, not a session:
   repos/<repo>/actions/workflows`) when no check reported at all, and for a
   conflict the file list from `git merge-tree --write-tree` with a liveness
   control (the `merge-tree-mergeability-readings` skill's rule).
-- Classify into one class: `green`, `pending`, `conflict-lockfile`,
-  `conflict-manifest` (`package.json` where both sides added or bumped
-  entries), `conflict-other`, `ci-install`, `ci-lint`, `ci-types`, `ci-test`,
-  `ci-other`. The failing STEP name decides the `ci-*` class.
+- Classify into one class: `green`, `pending`, `no-checks`,
+  `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
+  added or bumped entries), `conflict-other`, `ci-install`, `ci-lint`,
+  `ci-types`, `ci-test`, `ci-other`. The failing STEP name decides the `ci-*`
+  class; `no-checks` means the PR reports no checks at all (workflow count is
+  zero or unreadable).
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,
   `conflict-manifest`, and `ci-install` or `ci-lint` on a dependency bump
   PR (author `dependabot[bot]` or title `chore(deps`). Everything else is
