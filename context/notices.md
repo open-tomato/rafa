@@ -18,6 +18,15 @@ each ahead of the first thing that costs money:
   have created, with nothing run on it.
 - `plan create` (`src/plan.ts`): before the planner session.
 
+`loop start` prints the risk total (`src/start/risk-total.ts`) just
+before its notice step on every run, dismissed notices or not. Two
+spawned suites feel it: `noTaskLines()` in `src/tests/loop-output.test.ts`
+compares the whole output of a run with no open task, so a line added
+ahead of the tracker goes into that list in print order; and the
+reading's accounts step calls `gh repo view --json
+nameWithOwner,visibility` before triage's `gh auth status`, which the
+pinned `gh.calls` list of `src/tests/task-report.test.ts` spells.
+
 On a terminal the pending notices are printed and ONE question follows:
 `y` continues, `d` continues and dismisses what was shown, anything else
 (an empty line and an ended input included) cancels with exit 1. Without
