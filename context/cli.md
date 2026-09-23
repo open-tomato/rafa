@@ -1195,7 +1195,8 @@ home and the warnings read before the invocation are options.
   (each a `name`, a `summary` and its `actions`) and `commands`, the
   top-level ones. An action and a top-level command share one shape:
   `name`, `summary`, `description`, `args`, `flags`, `examples`,
-  `outputs`, `aliases`, `deprecated` and `module`. Every field is on every
+  `outputs`, `aliases`, `deprecated`, `module` and `spends`, the
+  `spends` declaration as written or null. Every field is on every
   entry, with `null` or an empty list for what a declaration leaves out.
   An argument or a flag carries `required` as a boolean and `default` as
   a value or null, and a flag its `aliases`.
