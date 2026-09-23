@@ -12,8 +12,8 @@
  * ## The three levels
  *
  *   - `rafa --help`: the tagline, the usage lines, a quick start, each
- *     subject with its summary, the top-level commands by name, and the
- *     global flags.
+ *     subject with its summary, the top-level commands by name, the
+ *     global flags, and the spend legend.
  *   - `rafa <subject> --help`: the subject's summary, its usage lines,
  *     each action with its summary, and two examples across the subject.
  *   - `rafa <subject> <action> --help`: the action's summary, its
@@ -47,6 +47,25 @@
  * A hidden action is in no roster. It is left out of its subject's
  * actions and examples, the quick start, the top-level commands and every
  * `See also`. Its own help still renders, since it still dispatches.
+ *
+ * ## The spend mark
+ *
+ * A command declaring `spends` (`./spends.ts`) carries a mark at the END
+ * of its roster line, after its summary, so the column the summaries
+ * align on is untouched by the glyph's two columns. An action's line in
+ * its subject's help, and a top-level command's name in the root
+ * `Commands:` list, carry `spendsMark`: the bare `🪙` for `always` and
+ * `through`, and `🪙 with --resolve` or `🪙 unless --no-model` for a
+ * form naming a flag. A subject's line in the root help carries the bare
+ * mark when any visible action of the subject declares `spends`; a hidden
+ * one does not mark it. The root help closes on {@link SPENDS_LEGEND},
+ * after the global flags, when any visible command declares `spends`.
+ *
+ * The mark is wrapped as ONE word: its space is never a break, so a
+ * summary that wraps carries `🪙 with --resolve` whole onto the next line
+ * rather than leaving the glyph behind its condition. `🪙` is two UTF-16
+ * units wide and two terminal columns, so the width counted by `length`
+ * is the width printed.
  *
  * ## The usage line and the tables
  *
@@ -85,6 +104,7 @@ import type { HelpRequest } from './route.js';
 
 import { isTopLevel } from './command.js';
 import { mountKey } from './registry.js';
+import { SPENDS_GLYPH, spendsMark } from './spends.js';
 
 /** The column help's prose is wrapped at. */
 export const HELP_WIDTH = 80;
@@ -114,6 +134,9 @@ export const GLOBAL_FLAGS: readonly GlobalFlag[] = Object.freeze([
   { spelling: '--version', note: 'print "rafa <version>" and exit; typed alone, no short form' },
 ]);
 
+/** The root help's closing line, saying what the spend mark means. */
+export const SPENDS_LEGEND = `${SPENDS_GLYPH}  starts Claude Code sessions, which spend your Claude usage`;
+
 /** The indent of a block's lines under its heading. */
 const INDENT = '  ';
 
@@ -132,20 +155,30 @@ const MIN_TEXT_WIDTH = 20;
 /** A help request for one action. */
 type ActionRequest = Extract<HelpRequest, { level: 'action' }>;
 
-/** A row of two columns: the left, and the text beside it, which may be empty. */
-type Row = readonly [left: string, right: string];
+/**
+ * A row of two columns: the left, and the text beside it, which may be
+ * empty, then a spend mark wrapped as one word, or null for none.
+ */
+type Row = readonly [left: string, right: string, mark?: string | null];
 
 /** A table row: the left column, the attributes beside it, and the description below. */
 type TableRow = readonly [left: string, attributes: string, description: string];
 
+/** The words of `text`, split on whitespace. */
+function wordsOf(text: string): string[] {
+  return text.split(/\s+/).filter((part) => part !== '');
+}
+
 /**
- * The words of `text` packed into lines, the first at most `first` columns
- * wide and each later one at most `rest`. A longer word stands alone.
+ * `words` packed into lines, the first at most `first` columns wide and
+ * each later one at most `rest`. A longer word stands alone. A word may
+ * hold a space, and is never split at it: that is how a spend mark stays
+ * whole.
  */
-function pack(text: string, first: number, rest: number): string[] {
+function pack(words: readonly string[], first: number, rest: number): string[] {
   const lines: string[] = [];
   let line = '';
-  for (const word of text.split(/\s+/).filter((part) => part !== '')) {
+  for (const word of words) {
     const width = lines.length === 0
       ? first
       : rest;
@@ -164,14 +197,22 @@ function pack(text: string, first: number, rest: number): string[] {
 }
 
 /**
+ * `words` wrapped after `prefix` on their first line and after `indent` on
+ * each later one, or no line when there are none.
+ */
+function hangWords(prefix: string, words: readonly string[], indent = prefix): string[] {
+  const width = (used: string): number => Math.max(HELP_WIDTH - used.length, MIN_TEXT_WIDTH);
+  return pack(words, width(prefix), width(indent)).map((line, index) => (index === 0
+    ? `${prefix}${line}`
+    : `${indent}${line}`));
+}
+
+/**
  * `text` wrapped after `prefix` on its first line and after `indent` on
  * each later one, or no line when `text` is empty.
  */
 function hang(prefix: string, text: string, indent = prefix): string[] {
-  const width = (used: string): number => Math.max(HELP_WIDTH - used.length, MIN_TEXT_WIDTH);
-  return pack(text, width(prefix), width(indent)).map((line, index) => (index === 0
-    ? `${prefix}${line}`
-    : `${indent}${line}`));
+  return hangWords(prefix, wordsOf(text), indent);
 }
 
 /** The column a row's right text starts at: past the longest left that has a right, and the gap. */
@@ -180,12 +221,37 @@ function columnOf(rows: readonly Row[]): number {
   return INDENT.length + Math.max(0, ...lefts) + GAP;
 }
 
-/** One row under a heading, its right text wrapped at `column`. */
-function row([left, right]: Row, column: number): string[] {
+/** One row under a heading, its right text and its mark wrapped at `column`. */
+function row([left, right, mark = null]: Row, column: number): string[] {
   const head = `${INDENT}${left}`;
-  return right === ''
+  const words = mark === null
+    ? wordsOf(right)
+    : [...wordsOf(right), mark];
+  return words.length === 0
     ? [head]
-    : hang(head.padEnd(column), right, ' '.repeat(column));
+    : hangWords(head.padEnd(column), words, ' '.repeat(column));
+}
+
+/** The mark ending a command's roster line, or null for one declaring no `spends`. */
+function markOf(command: RafaCommand): string | null {
+  return command.spends === undefined
+    ? null
+    : spendsMark(command.spends);
+}
+
+/** The bare mark on a subject's line when any visible action of it spends, or null. */
+function subjectMark(subject: SubjectSpec, registry: CommandRegistry): string | null {
+  return registry.actionsOf(subject.name).some((action) => action.spends !== undefined)
+    ? SPENDS_GLYPH
+    : null;
+}
+
+/** A top-level command as the root `Commands:` list names it: its name, then its mark. */
+function commandWord(command: RafaCommand): string {
+  const mark = markOf(command);
+  return mark === null
+    ? command.subject
+    : `${command.subject} ${mark}`;
 }
 
 /** Rows under a heading, their right texts aligned. */
@@ -249,9 +315,14 @@ function renderRoot(registry: CommandRegistry): string {
       ['rafa <subject> <action> --help', 'arguments, flags, examples'],
     ])),
     block('Quick start', quickStart.map((example) => `${INDENT}${example.cmd}`)),
-    block('Subjects', rows(subjects.map((subject) => [subject.name, subject.summary]))),
-    block('Commands', hang(INDENT, topLevel.map((command) => command.subject).join(', '))),
+    block('Subjects', rows(subjects.map((subject) => [subject.name, subject.summary, subjectMark(subject, registry)]))),
+    block('Commands', hangWords(INDENT, topLevel.map((command, index) => (index === topLevel.length - 1
+      ? commandWord(command)
+      : `${commandWord(command)},`)))),
     block('Global flags', rows(GLOBAL_FLAGS.map((flag) => [flag.spelling, flag.note]))),
+    registry.commands().some((command) => command.spends !== undefined)
+      ? [SPENDS_LEGEND]
+      : [],
   ]);
 }
 
@@ -275,7 +346,7 @@ function renderSubject(subject: SubjectSpec, registry: CommandRegistry): string 
       [`${spelling} <action> [args] [flags]`, ''],
       [`${spelling} <action> --help`, 'arguments, flags, examples'],
     ])),
-    block('Actions', rows(actions.map((action) => [action.action, action.summary]))),
+    block('Actions', rows(actions.map((action) => [action.action, action.summary, markOf(action)]))),
     block('Examples', examplesAcross(actions, SUBJECT_EXAMPLES).flatMap(exampleLines)),
   ]);
 }

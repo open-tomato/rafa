@@ -5,7 +5,7 @@ Usage:
   rafa loop <action> --help   arguments, flags, examples
 
 Actions:
-  start    run a plan task by task, then wrap up, open the PR and wait for CI
+  start    run a plan task by task, then wrap up, open the PR and wait for CI 🪙
   stop     stop a running session now, the task it is running marked [BLOCKED]
   pause    pause a running session once the task it is running ends
   resume   resume a paused session from its next task

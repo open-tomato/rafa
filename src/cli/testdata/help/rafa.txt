@@ -24,24 +24,26 @@ Quick start:
   rafa describe --output=json
 
 Subjects:
-  plan       create a plan from a spec; list, show and validate plans
-  loop       start a plan; stop, pause, resume, show and list its sessions
+  plan       create a plan from a spec; list, show and validate plans 🪙
+  loop       start a plan; stop, pause, resume, show and list its sessions 🪙
   issue      the tracker: list, show, create, comment on and move issues; mark
              one ready and unblock it
   pr         the pull request of a branch: one line, in full or in the browser;
-             list, wait on, merge and triage them
+             list, wait on, merge and triage them 🪙
   effort     collect session and commit rows; report per plan
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
-  skill      check a skills directory; list each tier; demote and backfill it
+  skill      check a skills directory; list each tier; demote and backfill it 🪙
   instinct   check an instincts directory; list and show its records
   release    read the release state of the project; tag the release branch's
              HEAD
 
 Commands:
-  next, init, doctor, self-update, usage, describe
+  next 🪙, init, doctor, self-update, usage, describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)
   -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)
   --version       print "rafa <version>" and exit; typed alone, no short form
+
+🪙  starts Claude Code sessions, which spend your Claude usage

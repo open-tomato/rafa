@@ -1126,7 +1126,8 @@ home and the warnings read before the invocation are options.
 - **One renderer for the three levels.** `renderHelp` reads the request
   and the registry it is handed and nothing else, so every command a level
   names is one that dispatches. `rafa --help` lists the usage lines, a
-  quick start, the subjects, the top-level commands and the global flags.
+  quick start, the subjects, the top-level commands and the global flags,
+  and closes on the spend legend when a visible command declares `spends`.
   `rafa <subject> --help` lists the actions and two examples.
   `rafa <subject> <action> --help` gives the usage line, the description,
   the argument and flag tables, the examples, the outputs and `See also`.
@@ -1142,6 +1143,12 @@ home and the warnings read before the invocation are options.
   `loop start` alone reads it and declares it, since a flag typed ahead of
   the subject reaches the context's `flags` and never the `argv` a wrapped
   command is handed.
+- **The spend mark ends a roster line**, after the summary, so the
+  summary column is untouched: `🪙` for `always` and `through`,
+  `🪙 with --resolve` for a form naming a flag, on an action's line, on a
+  top-level command in `Commands:` (`next 🪙`), and bare on a subject's
+  line when a visible action of it spends. It wraps as one word, never
+  split from its condition.
 - **A hidden action** is in no roster, quick start, example list or
   `See also`, and its own help still renders.
 - **Prose wraps at 80 columns.** An example's command is never wrapped.
