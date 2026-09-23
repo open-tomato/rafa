@@ -33,6 +33,7 @@ Subjects:
   effort     collect session and commit rows; report per plan
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
+             🪙
   skill      check a skills directory; list each tier; demote and backfill it 🪙
   instinct   check an instincts directory; list and show its records
   release    read the release state of the project; tag the release branch's

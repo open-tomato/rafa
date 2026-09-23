@@ -23,8 +23,8 @@ module's note is the long form.
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help` and `rafa next --help` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
-| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, `agent list`, the agents `buildInventory` (`src/inventory/`) reads from every source; and `agent show`, one of them through the show view of `src/inventory/show.ts` |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill show`, one of them through the show view of `src/inventory/show.ts`; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, `agent list`, the agents `buildInventory` (`src/inventory/`) reads from every source; `agent show`, one of them through the show view of `src/inventory/show.ts`; and `agent search`, the agents that answer a question, built by `skill/search.ts` |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill show`, one of them through the show view of `src/inventory/show.ts`; `skill search`, the skills that answer a question through the runner of `src/inventory/search/`; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
@@ -125,7 +125,13 @@ New; it replaces no earlier text. What a row or an action added to
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
-  `rafa.txt`.
+  `rafa.txt`. The exception is an action declaring `spends` under a
+  subject none of whose actions did: its subject's line gains the `🪙`
+  mark, which moves `rafa.txt`. A new spender also reddens the spender
+  rosters, `src/cli/spends-roster.test.ts`, the spawned `describe` case
+  of `src/tests/spends-cli-surface.test.ts` and the README table
+  `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
+  registering `agent search` and `skill search`).
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`,
   `plan validate` and `plan risk`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
@@ -134,8 +140,8 @@ New; it replaces no earlier text. What a row or an action added to
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
   `effort collect`, `effort report`, `module list`, `module exec`,
-  `agent vendor`, `agent list`, `agent show`, `skill check`, `skill list`,
-  `skill show`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
+  `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
+  `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `next`, `init`,
   `doctor`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
@@ -180,11 +186,11 @@ New; it replaces no earlier text. What a row or an action added to
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `agent show`, `skill show`, `skill demote`, `skill backfill` and the `pr` actions
-  wrap none: `describe` reads the registry off its context, and `init`,
+  `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
+  `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `agent show`, `skill show`, `skill demote`,
-  `skill backfill` and each `pr` action their `args` and `flags`.
+  each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
+  `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -712,6 +718,32 @@ New; it replaces no earlier text. What a row or an action added to
   a config `loadConfig` refuses. In json mode every part of the view,
   the project root, `loop.settingSources` and the warnings are the
   result's `data`, `text` holding the file under `--full` alone.
+- **`skill search "<question>" [--all] [--no-model]` and
+  `agent search` find the items that answer a question**
+  (`src/commands/skill/search.ts`, whose `createSearchCommand` builds
+  both, over `runSearch` and `rankSearch` of `src/inventory/search/`).
+  The inventory is built through `projectInventory`, as `skill list`
+  builds it. Each kind searched is one `runSearch`: the ranking, one
+  `haiku` session in a scratch copy of the top twelve, the quote check
+  and one `search` effort row, stored in the store `selectEffortStore`
+  opens from the project's config. `--all` searches the other kind too,
+  the command's own first, one session per kind, since a candidate is
+  keyed by its name and a skill and an agent may share one.
+  `--no-model` runs `rankSearch` alone and opens no store; both
+  commands declare `spends` `unless --no-model`. Text mode prints, per
+  kind, a heading, then the kept matches with each quote and its
+  `path:line` and the dropped line, or "not answerable from these
+  files", or the numbered ranking (under `--no-model`, and after the
+  `warn:` notice of a fallback), or `(no skill ranks for these words)`,
+  when no session starts. The parser's issues and an effort row that
+  was not stored are `warn:` lines. The exit code is 0 whatever is
+  found; 1 for no question or two, a blank one, a value read into
+  `--all` or `--model`, and a config `loadConfig` refuses. The switches
+  are read ahead of the question through `readSwitch`, since
+  `--all "<question>"` hands the question to `--all`. In json mode the
+  result's `data` holds the project, `loop.settingSources`, the
+  question, `model`, the warnings and one entry per kind: the runner's
+  outcome, or `status: ranked` with the ranking under `--no-model`.
 - **`skill demote <dir> [--apply]` runs the demotion pass over one
   skills directory** (`src/commands/skill/demote.ts`, over
   `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and
@@ -878,7 +910,7 @@ New; it replaces no earlier text. What a row or an action added to
   it off the parsed context once the phase 0 function has returned. A
   wrapped command's `outputs` is `['text']` until it writes through the
   active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state`, `hidden-from-loop` and `interactive`, aliased `i`, and `agent show` the argument `name`, required, and the flag `full`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state`, `hidden-from-loop` and `interactive`, aliased `i`, `agent show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,

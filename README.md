@@ -54,6 +54,8 @@ your accounts.
   | `rafa loop start` | 🪙 one session per task, one for the wrap-up, and repair sessions while CI is red |
   | `rafa pr triage --resolve` | 🪙 runs a small fixed plan through the loop; without `--resolve`, nothing |
   | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
+  | `rafa skill search` | 🪙 one `haiku` session reading the twelve best-ranked files, one per kind with `--all`; with `--no-model`, nothing |
+  | `rafa agent search` | 🪙 the same as `rafa skill search`, over agent definitions |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.

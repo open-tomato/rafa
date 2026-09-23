@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the forty-eight registered so far wrap a
+ * of each is its command. Five of the fifty registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -32,6 +32,9 @@
  * definitions through `src/agents/roster.ts`, nor `agent list`, which
  * lists the agents `buildInventory` (`src/inventory/`) reads, nor
  * `agent show`, which shows one of them through `src/inventory/show.ts`,
+ * nor `agent search` and `skill search`, which find the items that
+ * answer a question through `src/inventory/search/`, the agent one
+ * built by `skill/search.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which lists the skills `buildInventory`
@@ -97,7 +100,9 @@
  *     holds with its source, its state and whether the loop sees it,
  *     browsed in the terminal under `-i`, and
  *     `agent show <name> [--full]`, the agent definition a name resolves
- *     to, shown as `skill show` shows a skill.
+ *     to, shown as `skill show` shows a skill, and
+ *     `agent search "<question>" [--all] [--no-model]`, found as
+ *     `skill search` finds skills.
  *   - `skill check <dir> [--fix] [--project=<root>]` and
  *     `instinct check <dir>`, the checker over one tier, each exiting
  *     with the number of its failing files and running outside a
@@ -112,6 +117,11 @@
  *     record, its frontmatter, every other holder of the name and its
  *     headings, or its whole file under `--full`, refusing a name no
  *     skill holds.
+ *   - `skill search "<question>" [--all] [--no-model]`, the skills that
+ *     answer a question: the inventory ranked by its words, one `haiku`
+ *     session over the top twelve, and each match kept on a quote found
+ *     in its file, or the ranking alone under `--no-model`, which starts
+ *     no session; `--all` searches agent definitions too.
  *   - `skill demote <dir> [--apply]`, the demotion pass over one skills
  *     directory: the report written with nothing moved, and a report the
  *     review marked `reviewed` applied, exiting with the rows it refused.
@@ -160,6 +170,7 @@ import type { SubjectSpec } from '../cli/registry.js';
 import { createCommandRegistry } from '../cli/registry.js';
 
 import agentList from './agent/list.js';
+import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import describe from './describe.js';
@@ -205,6 +216,7 @@ import skillBackfill from './skill/backfill.js';
 import skillCheck from './skill/check.js';
 import skillDemote from './skill/demote.js';
 import skillList from './skill/list.js';
+import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import usage from './usage.js';
 
@@ -256,9 +268,11 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   agentVendor,
   agentList,
   agentShow,
+  agentSearch,
   skillCheck,
   skillList,
   skillShow,
+  skillSearch,
   skillDemote,
   skillBackfill,
   instinctCheck,

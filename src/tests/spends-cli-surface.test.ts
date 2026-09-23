@@ -96,6 +96,6 @@ describe('rafa describe --output=json, spawned', () => {
     expect(result?.ok).toBe(true);
 
     const document = result?.data as DescribeDocument;
-    expect(spendersOf(document).sort()).toEqual(['loop start', 'next', 'plan create', 'pr triage', 'skill backfill'].sort());
+    expect(spendersOf(document).sort()).toEqual(['agent search', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
   }, RUN_TIMEOUT);
 });

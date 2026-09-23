@@ -1,13 +1,13 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the forty-eight commands it registers: what the registry
+ * declarations of the fifty commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `next`, `self-update`, `plan list`, `plan show`, `plan validate`, `plan risk`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
- * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`,
- * `skill check`, `skill list`, `skill show`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
+ * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
+ * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
  * `release status`, `release tag`,
  * and the seven `pr` actions
  * wrap none, and each is held to the
@@ -133,9 +133,11 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'agent vendor': ['text', 'json'],
   'agent list': ['text', 'json'],
   'agent show': ['text', 'json'],
+  'agent search': ['text', 'json'],
   'skill check': ['text', 'json'],
   'skill list': ['text', 'json'],
   'skill show': ['text', 'json'],
+  'skill search': ['text', 'json'],
   'skill demote': ['text', 'json'],
   'skill backfill': ['text', 'json'],
   'instinct check': ['text', 'json'],
@@ -181,9 +183,11 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'agent vendor': [['name'], ['force']],
   'agent list': [[], ['source', 'state', 'hidden-from-loop', 'interactive']],
   'agent show': [['name'], ['full']],
+  'agent search': [['question'], ['all', 'model']],
   'skill check': [['dir'], ['fix', 'project']],
   'skill list': [[], ['source', 'state', 'hidden-from-loop', 'interactive']],
   'skill show': [['name'], ['full']],
+  'skill search': [['question'], ['all', 'model']],
   'skill demote': [['dir'], ['apply']],
   'skill backfill': [['dir'], ['propose', 'apply', 'project']],
   'instinct check': [['dir'], []],
@@ -257,10 +261,12 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['agent vendor tdd-guide', 'agent vendor', ['tdd-guide'], ''],
   ['agents list', 'agent list', [], ''],
   ['agent show code-reviewer --full', 'agent show', ['code-reviewer', '--full'], ''],
+  ['agents search reviewer --no-model', 'agent search', ['reviewer', '--no-model'], ''],
   ['skill check .claude/skills --fix', 'skill check', ['.claude/skills', '--fix'], ''],
   ['skills check .claude/skills --project=.', 'skill check', ['.claude/skills', '--project=.'], ''],
   ['skill list --tier=user', 'skill list', ['--tier=user'], ''],
   ['skill show verification-loop --full', 'skill show', ['verification-loop', '--full'], ''],
+  ['skill search tsdoc --all', 'skill search', ['tsdoc', '--all'], ''],
   ['skill demote --apply .claude/skills', 'skill demote', ['--apply', '.claude/skills'], ''],
   ['skill backfill .claude/skills --propose', 'skill backfill', ['.claude/skills', '--propose'], ''],
   ['instinct check .rafa/instincts', 'instinct check', ['.rafa/instincts'], ''],
@@ -369,7 +375,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the four plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the three agent actions, skill check, skill list, skill show, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the four plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -403,9 +409,11 @@ describe('the core roster', () => {
       'agent vendor',
       'agent list',
       'agent show',
+      'agent search',
       'skill check',
       'skill list',
       'skill show',
+      'skill search',
       'skill demote',
       'skill backfill',
       'instinct check',
