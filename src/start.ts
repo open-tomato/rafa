@@ -54,8 +54,15 @@
  * fetch that failed, a base that has diverged — is thrown from there as
  * exit code 1, and leaves the run on its base.
  *
- * Once the branch guard lets the run through, and before anything else is
- * printed or checked, the run opens its session (`start/session.ts`): it
+ * Once the branch guard lets the run through, the run prints the plan's
+ * risk total, the one line `rafa plan risk` ends its report with
+ * (`start/risk-total.ts`), on every run whether the standing notices are
+ * pending or dismissed, and then asks for those notices
+ * (`notices/run.ts`). A reading that throws is a warning and stops
+ * nothing.
+ *
+ * Once the notices are answered, and before anything else is printed or
+ * checked, the run opens its session (`start/session.ts`): it
  * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
  * stub and path, the branch, this process's pid, the start time, the state
  * `running` and no task (`loop/sessions.ts`). A record of the plan refuses
@@ -154,7 +161,7 @@
  * all.
  *
  * Every line this module, `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
- * `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
+ * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
@@ -218,6 +225,7 @@ import {
 } from './start/pr-lifecycle.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
+import { announceRiskTotal } from './start/risk-total.js';
 import {
   announcePlanIssues,
   argValue,
@@ -450,6 +458,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   });
   guardRunBranch(planStub, branch, args);
 
+  // The plan's risk total, on every run and ahead of the notices below, so
+  // the count is read before consent is asked (`start/risk-total.ts`).
+  await announceRiskTotal({
+    repoRoot,
+    home: homedir(),
+    planPath,
+    config: runConfig.config,
+    environment: process.env,
+  });
   // Past the guard, so a run that is refused says only why, and ahead of
   // the session record and every session: the alpha and the
   // skip-permissions notices, until the person dismisses them

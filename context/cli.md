@@ -31,7 +31,8 @@ module's note is the long form.
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: the plans directory, the task counts, an issue as a line and the argument refusals |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate` and `plan risk` share: the plans directory, the config a project resolves (`resolveProjectConfig`), the task counts, an issue as a line, the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value |
+| `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
@@ -54,7 +55,8 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, and the two install warnings |
+| `src/commands/doctor.ts` | `rafa doctor`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, and the two install warnings |
+| `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
@@ -115,9 +117,17 @@ New; it replaces no earlier text. What a row or an action added to
   from "register it" across two tasks with the suite green between them.
   Registration itself reddens exactly three: `OWN_DECLARATIONS` and the
   roster expectations in `src/commands/index.test.ts`, `COMMAND_MODULES`
-  in `src/index.test.ts`, and the frozen help snapshots.
-- **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
-  and `plan validate`; `loop start`, aliased `start`; `loop stop`,
+  in `src/index.test.ts`, and the frozen help snapshots — the last only
+  for a new subject or top-level command, or a subject summary that
+  changes with it. A changed subject summary reddens a fourth file as
+  well, `src/tests/spends-cli-surface.test.ts`, whose spawned `--help`
+  case pins each roster line whole, spend mark included. An action
+  registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
+  and `src/cli/help.test.ts` green before the updater ran (measured on
+  2026-09-23); the `plan` summary rewritten beside it is what moved
+  `rafa.txt`.
+- **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`,
+  `plan validate` and `plan risk`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment`, `issue move`,
   `issue ready` and `issue unblock`;
@@ -471,7 +481,11 @@ New; it replaces no earlier text. What a row or an action added to
   it. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
-  refusal, and 0 otherwise. Then, on a repository whose provider is
+  refusal, and 0 otherwise. For a plan `--plan` names, halt or not, it
+  then prints the one risk-total line `loop start` prints before its
+  notices (`src/start/risk-total.ts`), at `info`, a `log` event in json
+  mode, or a warning when the reading throws; the default plan gets
+  none, and neither changes the exit code. Then, on a repository whose provider is
   `gh`, it reads the board `rafa init --board` sets up
   (`src/board/status.ts`) with one `gh label list` and, only when the
   config names no `roadmap.issue`, one `gh issue list`, and prints
@@ -1230,8 +1244,13 @@ message naming the command as typed after `rafa` and saying to declare
   one of the four that lists subjects; the other three render a single
   command or subtree and are untouched. Read which files actually differ
   off `git status`, never off the assumption that they all move
-  together — registering a command reddens exactly three cases in
-  `src/cli/help.test.ts`, all of them on `rafa.txt`.
+  together — registering a subject or a top-level command reddens
+  exactly three cases in `src/cli/help.test.ts`, all of them on
+  `rafa.txt`. So does rewriting a subject's summary alone: the `plan`
+  summary changed with `plan risk` reddened those three and no other
+  (measured on 2026-09-23). An action under an existing subject reddens
+  none, and its summary shows only in its subject's roster, which is not
+  snapshotted.
 
 ### Describe
 

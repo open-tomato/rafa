@@ -24,7 +24,7 @@ Quick start:
   rafa describe --output=json
 
 Subjects:
-  plan       create a plan from a spec; list, show and validate plans 🪙
+  plan       create plans from specs; list, show, validate and risk-read them 🪙
   loop       start a plan; stop, pause, resume, show and list its sessions 🪙
   issue      the tracker: list, show, create, comment on and move issues; mark
              one ready and unblock it

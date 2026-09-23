@@ -2,8 +2,8 @@
  * Tests for what the plan commands share (`plan-files.ts`): where plans
  * sit, the task counts and their phrase, the file a stub names and the
  * stub a file name carries, what is read as a file, one issue as a line,
- * and the refusal of a line handing a command the wrong number of
- * arguments.
+ * the refusal of a line handing a command the wrong number of arguments,
+ * the config a project resolves, and the read of a flag taking no value.
  *
  * The directory cases plant a project of their own and read `plan.dir`
  * back off it: one whose config sets none, which is the `.rafa/plans`
@@ -27,6 +27,7 @@ import { plantProjectConfig } from '../../tests/cli-capture.js';
 import {
   checkbox,
   countTasks,
+  expectAtMostOneArgument,
   expectNoArgument,
   expectOneArgument,
   formatCounts,
@@ -35,7 +36,9 @@ import {
   planFileName,
   plansDirAt,
   plural,
+  readSwitch,
   resolvePlansDir,
+  resolveProjectConfig,
   stubOfPlanFile,
 } from './plan-files.js';
 
@@ -112,6 +115,20 @@ describe('where plans sit', () => {
       message: [
         '❌ rafa plan show: the config cannot be used:',
         `   ${join(project.root, '.rafa', 'config.yaml')}: plan.dir is "", expected a directory path`,
+      ].join('\n'),
+    });
+  });
+
+  it('resolves the whole config for a project, and refuses one the loader will not give as the directory reading does', () => {
+    const named = plantProject('plan:\n  dir: docs/plans\n');
+    const refused = plantProject('plan:\n  dir: ""\n');
+
+    expect(resolveProjectConfig(named, 'rafa plan risk', () => undefined).planDir).toBe('docs/plans');
+    expect(exitOf(() => resolveProjectConfig(refused, 'rafa plan risk', () => undefined))).toEqual({
+      exitCode: 1,
+      message: [
+        '❌ rafa plan risk: the config cannot be used:',
+        `   ${join(refused.root, '.rafa', 'config.yaml')}: plan.dir is "", expected a directory path`,
       ].join('\n'),
     });
   });
@@ -198,6 +215,29 @@ describe('the argument refusals', () => {
     expect(exitOf(() => expectOneArgument(['a', 'b'], 'rafa plan show <stub>'))).toEqual({
       exitCode: 1,
       message: '❌ Expected one argument, got 2: a b\nUsage: rafa plan show <stub>',
+    });
+  });
+
+  it('answers the argument of a line handing one, null for none, and refuses a line handing two', () => {
+    expect(expectAtMostOneArgument(['plan.md'], 'rafa plan risk [<plan>]')).toBe('plan.md');
+    expect(expectAtMostOneArgument([], 'rafa plan risk [<plan>]')).toBeNull();
+    expect(exitOf(() => expectAtMostOneArgument(['a', 'b'], 'rafa plan risk [<plan>]'))).toEqual({
+      exitCode: 1,
+      message: '❌ Expected at most one argument, got 2: a b\nUsage: rafa plan risk [<plan>]',
+    });
+  });
+});
+
+describe('a flag taking no value', () => {
+  it('reads an absent flag as unset and a bare one as set, the two spellings of each included', () => {
+    expect([undefined, false, 'false'].map((value) => readSwitch('strict', value, 'hint'))).toEqual([false, false, false]);
+    expect([true, 'true'].map((value) => readSwitch('strict', value, 'hint'))).toEqual([true, true]);
+  });
+
+  it('refuses a word the parser read as its value, naming the flag, the word and the hint', () => {
+    expect(exitOf(() => readSwitch('strict', 'plan.md', 'Type the plan first.'))).toEqual({
+      exitCode: 1,
+      message: '❌ --strict takes no value, and read "plan.md" as one. Type the plan first.',
     });
   });
 });

@@ -89,6 +89,17 @@
  * dependency the spec keeps as data and refuses to guess at, and like a
  * board row it writes nothing and never changes the exit code.
  *
+ * ## The risk total
+ *
+ * A plan `--plan` names also gets the one line `loop start` prints before
+ * its notices (`start/risk-total.ts`), e.g.
+ * `🛡  Risk: 2 high, 6 notes — rafa plan risk .rafa/plans/PLAN-x.md`:
+ * the reading `rafa plan risk` totals, of the plan's text, the resolved
+ * config and the environment's keys, never its values. It follows the
+ * plan's lines, a halt's included, and precedes the board rows. A reading
+ * that throws is a warning naming the plan. Neither changes the exit code.
+ * The default plan gets no line: `--plan` is how a plan asks for one.
+ *
  * ## What it does not do
  *
  * It starts no run. No run id is generated, no row goes to the store's
@@ -134,12 +145,13 @@
  *
  * In text mode, `rafa <version>` (`src/cli/version.ts`) first, printed
  * before anything is checked so a person reads which build answered
- * whatever the preflight then does; then {@link renderDoctor}'s lines: a
- * head naming the plan, or where none was found, and the PREREQUISITES
- * file merged in; one line per check; the line naming the start-only
- * items a resume passed over; the steps that file names and nothing
- * checks; and the verdict with any `known-missing:` lines; then
- * {@link renderBoard}'s lines for a repository that has a GitHub board,
+ * whatever the preflight then does; then {@link renderDoctor}'s lines
+ * (`./doctor-render.ts`): a head naming the plan, or where none was
+ * found, and the PREREQUISITES file merged in; one line per check; the
+ * line naming the start-only items a resume passed over; the steps that
+ * file names and nothing checks; and the verdict with any
+ * `known-missing:` lines; then the risk total of a plan `--plan` names;
+ * then {@link renderBoard}'s lines for a repository that has a GitHub board,
  * and none for one that has not; then {@link renderBlockedIssues}'s
  * lines, which a board holding no issue labelled `spec:blocked` has
  * none of either. A halt
@@ -149,15 +161,17 @@
  * absolute, for a preflight that did not halt. A halt gives no `data`:
  * the terminal event is the `command_exit` error, whose message is the
  * halt naming every failed required item. In either mode each warning is
- * a `warn` line, a `log` event in json mode.
+ * a `warn` line, a `log` event in json mode, and so is the risk total, at
+ * `info`.
  *
  * ## Seams
  *
  * The project, its home and the environment are the dispatcher's
  * (`cli/dispatch.ts`), so a case names them through its options. How a
  * probe and a service request run, the timeout, the clock, the
- * `origin` probe the provider is read through and the runner the board
- * rows and the blocked issues are read with are {@link DoctorSeams},
+ * `origin` probe the provider is read through, the runner the board rows
+ * and the blocked issues are read with, and the git and `gh` the risk
+ * total reads the accounts through are {@link DoctorSeams},
  * each left out being the runner's own.
  */
 import type { BlockedIssuesReport } from './doctor-blocked.js';
@@ -168,6 +182,7 @@ import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { PrProvider } from '../config-sections.js';
 import type { PrerequisiteItem, RafaConfig } from '../config.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
+import type { AccountSeams } from '../plan/risk/accounts.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
 import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
@@ -175,7 +190,7 @@ import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { ProjectFound } from '../project/scope.js';
 
-import { basename, relative, resolve, sep } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { boardGaps, readBoardStatus } from '../board/status.js';
@@ -193,10 +208,12 @@ import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
 import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
+import { announceRiskTotal } from '../start/risk-total.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
 import { readPreviousCopies } from './doctor-previous.js';
+import { renderDoctor } from './doctor-render.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 import { isFile, plural } from './plan/plan-files.js';
 
@@ -207,6 +224,8 @@ export interface DoctorSeams {
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
   /** Opens the runner both board readings go through. `gh` spawned in the root when left out. */
   readonly openGh?: (root: string) => GhRunner;
+  /** git and `gh` for the plan's risk total, at a root. Both spawned there when left out. */
+  readonly riskRunners?: (root: string) => AccountSeams;
 }
 
 /** The seams the registered command runs with: the runner's own, every one. */
@@ -245,6 +264,8 @@ export interface DoctorPreflight {
   readonly report: PreflightReport;
   /** The steps the PREREQUISITES file names and nothing checks. */
   readonly reminders: readonly PrerequisiteReminder[];
+  /** The config the preflight resolved, which the plan's risk total reads too. */
+  readonly config: RafaConfig;
 }
 
 /** What json mode gives as the terminal result's `data`, for a preflight that did not halt. */
@@ -445,6 +466,7 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
     startTier: start.tier,
     report,
     reminders: items.reminders,
+    config,
   });
 }
 
@@ -532,95 +554,6 @@ function writeInstall(context: RafaContext, install: InstallReadings): void {
   }
 }
 
-/** A path as a line shows it: relative under the root, absolute elsewhere. */
-function shownPath(path: string, root: string): string {
-  return path.startsWith(`${root}${sep}`)
-    ? relative(root, path)
-    : path;
-}
-
-/**
- * How many items were checked: nothing, `count` of them with `whose`
- * naming where they came from, or, once the pull request provider
- * contributed any, how many of the `count` were its.
- */
-function checkedPhrase(count: number, automatic: number, whose: string): string {
-  if (count === 0) return 'nothing to check';
-  if (automatic === 0) return `${plural(count, 'item')} ${whose}checked`;
-  return `${plural(count, 'item')} checked, ${String(automatic)} of them for the pull request provider`;
-}
-
-/** The head line: the plan or where none was found, the file merged in, and how many items were checked. */
-function headLine(preflight: DoctorPreflight): string {
-  const { root, plan, prerequisitesFile, automatic } = preflight;
-  const count = preflight.report.checks.length;
-  if (plan === null) {
-    const where = preflight.lookedFor.map((path) => shownPath(path, root)).join(' or ');
-    const checked = checkedPhrase(count, automatic, 'from the config ');
-    return `Preflight with no plan, none being at ${where}: ${checked}, no run started.`;
-  }
-  const merged = prerequisitesFile === null
-    ? ''
-    : `, with ${basename(prerequisitesFile)} merged in`;
-  const checked = checkedPhrase(count, automatic, '');
-  return `Preflight for ${shownPath(plan, root)}${merged}: ${checked}, no run started.`;
-}
-
-/** One check as a line: its outcome, its tier, the item, how it was checked and how long it took. */
-function checkLine(check: PreflightCheck): string {
-  const how = check.item.probe === null
-    ? 'presence check'
-    : `probe \`${check.item.probe}\``;
-  const item = `${check.item.kind} ${JSON.stringify(check.item.name)}`;
-  return `  ${check.outcome.padEnd(7)} ${check.tier.padEnd(8)} ${item}, ${how}, ${String(check.durationMs)} ms`;
-}
-
-/**
- * The line naming how many start-only items this resume passed over and
- * the tracker that made it one; none on a first dispatch, where each
- * such item has a check line of its own.
- */
-function skippedStartLines(startTier: DoctorStartTier): readonly string[] {
-  const { skipped, tracker } = startTier;
-  if (skipped === 0 || tracker === null) return [];
-  return [
-    `${tracker} already holds a ticked task, so ${plural(skipped, 'start-only item')} of the plan went`
-      + ' unchecked: rafa loop start probes that tier on a first dispatch alone.',
-  ];
-}
-
-/** The steps the PREREQUISITES file names and nothing checks, under a line naming the file. */
-function reminderLines(preflight: DoctorPreflight): readonly string[] {
-  const { reminders, prerequisitesFile } = preflight;
-  if (reminders.length === 0 || prerequisitesFile === null) return [];
-  return [
-    `${basename(prerequisitesFile)} names ${plural(reminders.length, 'step')} the preflight does not check:`,
-    ...reminders.map((reminder) => `  line ${String(reminder.line)}: ${reminder.description}`),
-  ];
-}
-
-/** The verdict of a preflight that did not halt, with its `known-missing:` lines; none for a halt. */
-function verdictLines(report: PreflightReport): readonly string[] {
-  if (report.halt !== null) return [];
-  if (report.knownMissing.length === 0) return ['Preflight passed: rafa loop start would go on to its first session.'];
-  const named = plural(report.knownMissing.length, 'optional item');
-  return [
-    `Preflight passed: rafa loop start would go on, naming ${named} known-missing in every task prompt:`,
-    ...report.knownMissing.map((line) => `  ${line}`),
-  ];
-}
-
-/** The lines text mode writes for a preflight; see the module note. */
-export function renderDoctor(preflight: DoctorPreflight): readonly string[] {
-  return [
-    headLine(preflight),
-    ...preflight.report.checks.map(checkLine),
-    ...skippedStartLines(preflight.startTier),
-    ...reminderLines(preflight),
-    ...verdictLines(preflight.report),
-  ];
-}
-
 /** How wide a board row's outcome column is: `present`, `missing` and `unknown` are each seven. */
 const OUTCOME_WIDTH = 7;
 
@@ -687,6 +620,25 @@ function projectOf(context: RafaContext): ProjectFound {
   return context.project;
 }
 
+/** Writes `lines` at `info` in text mode, and nothing in json mode. */
+function writeText(context: RafaContext, lines: readonly string[]): void {
+  if (context.outputMode === 'json') return;
+  for (const line of lines) context.output.info(line);
+}
+
+/**
+ * The plan's risk total, for a plan `--plan` names: the line
+ * `loop start` prints, or a warning when it cannot be read. See the
+ * module note.
+ */
+async function announceRisk(context: RafaContext, preflight: DoctorPreflight, seams: DoctorSeams): Promise<void> {
+  if (preflight.plan === null || context.flags['plan'] === undefined) return;
+  const { root, plan, config } = preflight;
+  const home = projectOf(context).home;
+  const input = { repoRoot: root, home, planPath: plan, config, environment: context.env };
+  await announceRiskTotal(input, { output: context.output, runners: seams.riskRunners });
+}
+
 /** Runs `doctor` with `seams`; see the module note. */
 async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void> {
   const project = projectOf(context);
@@ -696,14 +648,9 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const preflight = await checkPreflight(context, project, seams);
     const gh = boardRunner(preflight, seams);
     const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh) };
-    if (context.outputMode !== 'json') {
-      const lines = [
-        ...renderDoctor(preflight),
-        ...renderBoard(readings.board),
-        ...renderBlockedIssues(readings.blocked),
-      ];
-      for (const line of lines) context.output.info(line);
-    }
+    writeText(context, renderDoctor(preflight));
+    await announceRisk(context, preflight, seams);
+    writeText(context, [...renderBoard(readings.board), ...renderBlockedIssues(readings.blocked)]);
     if (preflight.report.halt !== null) throw haltRefusal(preflight.report.halt);
     if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings));
   } finally {
@@ -742,13 +689,14 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' issue, names itself, or names an id the board has no issue for, with what an author does about'
       + ' it; that reading writes nothing and never changes the exit code either. With `--output=json` the'
       + ' checks, both readings, those rows and those issues are the data of the terminal result event,'
-      + ' unless a required item failed.',
+      + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
+      + ' `rafa loop start` prints before its notices, which never changes the exit code.',
     args: [],
     flags: [
       {
         name: 'plan',
-        description: 'The plan whose `PREREQUISITES-<stub>.md` is merged in, relative to the project root.'
-          + ' The default plan `rafa loop start` runs when left out.',
+        description: 'The plan whose `PREREQUISITES-<stub>.md` is merged in and whose risk total is printed,'
+          + ' relative to the project root. The default plan `rafa loop start` runs when left out.',
         type: 'string',
       },
     ],

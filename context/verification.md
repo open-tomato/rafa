@@ -104,13 +104,15 @@ still editing.
 
 **One case reads the tracked CHANGELOG, and it is red since 0.9.2.**
 `src/tests/default-plan-dirs.test.ts`'s `finds nothing in the live tree`
-reports `CHANGELOG.md: .plans, .specs`: two entries of the 0.9.2
-section name the old directories without a slash, and the sweep catches
-the slashless spelling too. It fails alone as well, so it is not state
-leaking from an earlier file, and with the two parity-lineage cases the
-full run reads `3 fail`, not 2. A plan's session may not touch a
-released section to fix it, so it stays red until a change exempts
-`CHANGELOG.md` or rewords those lines. This paragraph replaces nothing;
+reports `CHANGELOG.md` holding both old directory tokens: two entries
+of the 0.9.2 section name the old directories without a slash, and the
+sweep catches the slashless spelling too. Do not quote the reported line
+here: until 2026-09-23 this paragraph did, verbatim, and so the same case
+reported `context/verification.md` as a second offender. It fails alone
+as well, so it is not state leaking from an earlier file, and with the
+two parity-lineage cases the full run reads `3 fail`, not 2. A plan's
+session may not touch a released section to fix it, so it stays red
+until a change exempts `CHANGELOG.md` or rewords those lines. This paragraph replaces nothing;
 it is the third known failure the pages above did not list.
 
 **One suite prints a model refusal on a clean run.**

@@ -23,9 +23,15 @@ the shapes the lint config forces.
   hand-rolled `Expected no arguments` is beside `plan-files.ts`'s shared
   `expectNoArgument`, which says `Expected no argument`.
 - **Every `import type` line forms one `import/order` group**
-  (`sharedRules.mjs`), in which a sibling path ranks ahead of a parent
-  one: `./types.js` before `../../config.js`, the reverse of plain name
-  order.
+  (`sharedRules.mjs`), sorted by path depth first: a specifier with fewer
+  `/` segments comes first, and at equal depth `./` ranks ahead of `../`.
+  So `src/plan/risk.ts` spells `./parse.js`, `../config.js`,
+  `./risk/accounts.js`, `../utils/declaration.js` — neither plain name
+  order nor "every sibling before every parent", which is how this bullet
+  read until 2026-09-23. Take the order from the lint message when unsure.
+- **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
+  `Array.prototype.toSorted` fails `check-types` although bun runs it.
+  Sort a copy with `[...array].sort()`.
 
 ### The size cap no gate reads
 

@@ -1,10 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the forty-five commands it registers: what the registry
+ * declarations of the forty-six commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `doctor`, `init`, `next`, `self-update`, `plan list`, `plan show`, `plan validate`,
+ * `describe`, `doctor`, `init`, `next`, `self-update`, `plan list`, `plan show`, `plan validate`, `plan risk`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
  * `skill check`, `skill list`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
@@ -105,6 +105,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'plan list': ['text', 'json'],
   'plan show': ['text', 'json'],
   'plan validate': ['text', 'json'],
+  'plan risk': ['text', 'json'],
   'loop start': ['text', 'json'],
   'loop stop': ['text', 'json'],
   'loop pause': ['text', 'json'],
@@ -153,6 +154,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'plan list': [[], []],
   'plan show': [['stub'], ['tracker']],
   'plan validate': [['file'], []],
+  'plan risk': [['plan'], ['strict']],
   'loop stop': [[], ['session-id']],
   'loop pause': [[], ['session-id']],
   'loop resume': [[], ['session-id']],
@@ -219,6 +221,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['plan list', 'plan list', [], ''],
   ['plans show my-plan --tracker', 'plan show', ['my-plan', '--tracker'], ''],
   ['plan validate .plans/PLAN-a.md', 'plan validate', ['.plans/PLAN-a.md'], ''],
+  ['plans risk .plans/PLAN-a.md --strict', 'plan risk', ['.plans/PLAN-a.md', '--strict'], ''],
   ['loop start --plan=.plans/PLAN-a.md --no-ci-wait', 'loop start', ['--plan=.plans/PLAN-a.md', '--no-ci-wait'], ''],
   ['start --plan=.plans/PLAN-a.md', 'loop start', ['--plan=.plans/PLAN-a.md'], deprecation('start', 'loop start')],
   ['loops start', 'loop start', [], ''],
@@ -360,12 +363,13 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the three plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the four plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
       'plan show',
       'plan validate',
+      'plan risk',
       'loop start',
       'loop stop',
       'loop pause',

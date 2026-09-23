@@ -3,8 +3,9 @@
 Two notices exist, `alpha` and `danger`, both about consent rather than a
 fault (`src/notices/notices.ts`): the package is alpha software, and
 every session rafa spawns runs with `--dangerously-skip-permissions`
-under the person's accounts. The README's "Before you run it" section is
-the same text at rest.
+under the person's accounts. Before you run a plan, use `rafa plan risk`
+to see what it may do on this machine and under your accounts; this is
+not a sandbox, but a reading of what the plan and its skills say.
 
 ### Where they are shown
 
@@ -16,6 +17,15 @@ each ahead of the first thing that costs money:
   session record. A cancel leaves the run on the branch the offer may
   have created, with nothing run on it.
 - `plan create` (`src/plan.ts`): before the planner session.
+
+`loop start` prints the risk total (`src/start/risk-total.ts`) just
+before its notice step on every run, dismissed notices or not. Two
+spawned suites feel it: `noTaskLines()` in `src/tests/loop-output.test.ts`
+compares the whole output of a run with no open task, so a line added
+ahead of the tracker goes into that list in print order; and the
+reading's accounts step calls `gh repo view --json
+nameWithOwner,visibility` before triage's `gh auth status`, which the
+pinned `gh.calls` list of `src/tests/task-report.test.ts` spells.
 
 On a terminal the pending notices are printed and ONE question follows:
 `y` continues, `d` continues and dismisses what was shown, anything else

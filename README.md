@@ -31,7 +31,9 @@ What guides it:
 
 ## Before you run it
 
-Read this once; rafa also says it the first time you start a run.
+Read this once; rafa also says it the first time you start a run. Use
+`rafa plan risk` to see what the plan may do on this machine and under
+your accounts.
 
 - **Every Claude Code session rafa starts runs with
   `--dangerously-skip-permissions`.** That is what lets a plan run
@@ -333,6 +335,7 @@ built. A box is ticked by the change that finishes the feature.
 - [x] One command takes you to the next step: merge, clean up, plan,
   branch, start
 - [x] Every command that spends Claude usage says so in its help
+- [x] Before a run, see what it can do on this machine and under your accounts
 - [ ] The right skills reach the right task, chosen when the plan is
   written
 - [ ] Know which skills earn their place and which are ignored
