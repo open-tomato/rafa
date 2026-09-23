@@ -643,6 +643,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../schema/tiers.js', ['isSkillTier', 'SKILL_TIERS']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
+  ['./commands/skill/show.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../inventory/show.js', ['findShown', 'readShowView', 'renderShowView']],
+    ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch']],
+    ['./list.js', ['DEFAULT_SKILL_LIST_SEAMS', 'projectInventory', 'warningLines']],
+  ]],
   ['./commands/skill/demote.js', [
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
@@ -946,6 +952,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/agent/list.js',
       './commands/skill/check.js',
       './commands/skill/list.js',
+      './commands/skill/show.js',
       './commands/skill/demote.js',
       './commands/skill/backfill.js',
       './commands/instinct/check.js',

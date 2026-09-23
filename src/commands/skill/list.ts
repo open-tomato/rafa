@@ -328,11 +328,17 @@ function projectOf(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The inventory of `project`, under its config's setting sources and loaded modules. */
-async function projectInventory(
+/**
+ * The inventory of `project`, under its config's setting sources and
+ * loaded modules; `rafa skill show` builds its own through this too. A
+ * config `loadConfig` refuses is exit code 1, its message opening with
+ * `commandName`.
+ */
+export async function projectInventory(
   project: ProjectFound,
   context: RafaContext,
   seams: SkillListSeams,
+  commandName = 'rafa skill list',
 ): Promise<{ readonly inventory: Inventory; readonly settingSources: readonly ClaudeSettingSource[] }> {
   try {
     const resolved = loadConfig({ root: project.root, home: project.home });
@@ -349,7 +355,7 @@ async function projectInventory(
     return { inventory, settingSources };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
-    throw new CommandExit(1, ['❌ rafa skill list: the config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)].join('\n'));
+    throw new CommandExit(1, [`❌ ${commandName}: the config cannot be used:`, ...error.problems.map((problem) => `  ${problem}`)].join('\n'));
   }
 }
 

@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the agents `buildInventory` (`src/inventory/`) reads from every source |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill show`, one of them through the show view of `src/inventory/show.ts`; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
@@ -135,7 +135,7 @@ New; it replaces no earlier text. What a row or an action added to
   and `pr triage`;
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `skill check`, `skill list`,
-  `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
+  `skill show`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `next`, `init`,
   `doctor`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
@@ -180,10 +180,10 @@ New; it replaces no earlier text. What a row or an action added to
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `skill demote`, `skill backfill` and the `pr` actions
+  `skill show`, `skill demote`, `skill backfill` and the `pr` actions
   wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `skill demote`,
+  each `issue` action, each checker, each listing, `skill show`, `skill demote`,
   `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
@@ -670,6 +670,26 @@ New; it replaces no earlier text. What a row or an action added to
   mode the kept records, each with its `check`, the filters, the
   pre-filter total, the skills trees and the warnings are the result's
   `data`.
+- **`skill show <name> [--full]` shows the skill a name resolves to**
+  (`src/commands/skill/show.ts`, over the show view of
+  `src/inventory/show.ts`). The inventory is built as `skill list`
+  builds it, through the `projectInventory` that module exports, and
+  the name shows its first holder in precedence order (`findShown`): the
+  skill that answers, or the disabled one still holding the name. Text
+  mode prints the record, every other skill of that name with its
+  source, state and path, the frontmatter as written and the body's
+  headings with their file lines; `--full` prints the whole file in
+  place of the last two. `--full` is read ahead of the name through
+  `readSwitch`, so `rafa skill show --full <name>`, which `parseArgs`
+  hands the name as the flag's value, is refused naming the order that
+  works. A file that no longer reads still shows the record and the
+  other holders, with the reason, and exits 0. The inventory's warnings
+  are `warn:` lines as `skill list` writes them. Exit code 1 is kept for
+  no name or two, a value read into `--full`, a name no skill holds —
+  whose refusal points at `rafa agent show` when an agent holds it — and
+  a config `loadConfig` refuses. In json mode every part of the view,
+  the project root, `loop.settingSources` and the warnings are the
+  result's `data`, `text` holding the file under `--full` alone.
 - **`skill demote <dir> [--apply]` runs the demotion pass over one
   skills directory** (`src/commands/skill/demote.ts`, over
   `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and

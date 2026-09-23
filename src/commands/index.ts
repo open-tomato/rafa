@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the forty-six registered so far wrap a
+ * of each is its command. Five of the forty-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -34,7 +34,8 @@
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which lists the skills `buildInventory`
- * (`src/inventory/`) reads from every source, nor `skill demote` and
+ * (`src/inventory/`) reads from every source, nor `skill show`, which
+ * shows one of them through `src/inventory/show.ts`, nor `skill demote` and
  * `skill backfill`, which run the demotion pass of `src/demote/` and the
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
@@ -102,6 +103,10 @@
  *     source, its state and whether the loop sees it, and `instinct list` and
  *     `instinct show <id>`, the records the project and user instinct
  *     scopes hold, each listing exiting 0 whatever its rows say.
+ *   - `skill show <name> [--full]`, the skill a name resolves to: its
+ *     record, its frontmatter, every other holder of the name and its
+ *     headings, or its whole file under `--full`, refusing a name no
+ *     skill holds.
  *   - `skill demote <dir> [--apply]`, the demotion pass over one skills
  *     directory: the report written with nothing moved, and a report the
  *     review marked `reviewed` applied, exiting with the rows it refused.
@@ -194,6 +199,7 @@ import skillBackfill from './skill/backfill.js';
 import skillCheck from './skill/check.js';
 import skillDemote from './skill/demote.js';
 import skillList from './skill/list.js';
+import skillShow from './skill/show.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -245,6 +251,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   agentList,
   skillCheck,
   skillList,
+  skillShow,
   skillDemote,
   skillBackfill,
   instinctCheck,
