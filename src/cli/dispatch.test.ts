@@ -71,10 +71,22 @@
  * the `cwd` option ignored 4, the `home` option ignored 1, the context's
  * project dropped 32, and the deprecation line written before the project
  * is resolved 12.
+ *
+ * The running command cases came with the dispatcher recording the
+ * command it runs (`running.ts`). Each sets a record of its own ahead of
+ * the invocation, so a record put back is told apart from one cleared,
+ * and `afterEach` clears it. Five mutations of `dispatch.ts` were driven
+ * on 2026-09-23, one run each over this file with 89 pass before, each
+ * restored sha256-identical: no record set reddened two cases, none put
+ * back two, null put back in place of the previous record two, the
+ * record set without its flags one, and a record set ahead of the help
+ * renderer the help case alone.
  */
 import type { RafaCommand, RafaContext } from './command.js';
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
+import type { CommandRegistry } from './registry.js';
+import type { RunningCommand } from './running.js';
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
@@ -95,6 +107,7 @@ import { CommandExit } from './command.js';
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
+import { restoreRunningCommand, runningCommand, setRunningCommand } from './running.js';
 import { versionLine } from './version.js';
 
 /** The directory the dispatcher sits in, which the child probe imports from. */
@@ -304,6 +317,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setActiveOutput(null);
+  restoreRunningCommand(null);
 });
 
 describe('the events of one invocation', () => {
@@ -881,6 +895,74 @@ describe('the active output and the exit code', () => {
 
     expect(outcome.exitCode).toBe(3);
     expect(process.exitCode).toBe(before);
+  });
+});
+
+describe('the running command', () => {
+  /** A record set ahead of the invocation, so putting it back is told apart from clearing it. */
+  const OUTER = command('outer', 'probe');
+
+  /** A registry whose commands read the running record while they run. */
+  function probeRegistry(during: (RunningCommand | null)[]): CommandRegistry {
+    return createCommandRegistry({
+      subjects: [{ name: 'loop', summary: 'the loop' }],
+      commands: [
+        command('loop', 'returns', {
+          flags: [{ name: 'resolve', description: 'Resolves.', type: 'boolean' }],
+          run: async () => {
+            during.push(runningCommand());
+          },
+        }),
+        command('loop', 'throws', {
+          run: async () => {
+            during.push(runningCommand());
+            throw new Error('boom');
+          },
+        }),
+      ],
+    });
+  }
+
+  it('records a command that returns with its parsed flags while it runs, and puts the previous record back', async () => {
+    const during: (RunningCommand | null)[] = [];
+    const registry = probeRegistry(during);
+    setRunningCommand(OUTER, {});
+
+    const { outcome } = await run(['loop', 'returns', '--resolve'], { registry });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(during).toHaveLength(1);
+    expect(during[0]?.command).toBe(registry.find('loop', 'returns'));
+    expect(during[0]?.flags.resolve).toBe(true);
+    expect(runningCommand()?.command).toBe(OUTER);
+  });
+
+  it('records a command that throws while it runs, and puts the previous record back once it ends as command_error', async () => {
+    const during: (RunningCommand | null)[] = [];
+    const registry = probeRegistry(during);
+    setRunningCommand(OUTER, {});
+
+    const { outcome, stderr } = await run(['loop', 'throws'], { registry });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(stderr).toBe('rafa: boom\n');
+    expect(during[0]?.command.name).toBe('loop throws');
+    expect(runningCommand()?.command).toBe(OUTER);
+  });
+
+  it('records nothing for a help request, reading no record while the help is rendered', async () => {
+    const rendering: (RunningCommand | null)[] = [];
+
+    const { outcome } = await run(['loop', 'start', '--help'], {
+      renderHelp: () => {
+        rendering.push(runningCommand());
+        return 'help\n';
+      },
+    });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(rendering).toEqual([null]);
+    expect(runningCommand()).toBeNull();
   });
 });
 

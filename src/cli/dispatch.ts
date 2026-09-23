@@ -24,9 +24,14 @@
  *      its deprecation lines when it has any and runs with its context's
  *      output set as the active output (`src/adapters/output/active.ts`)
  *      in the invocation's output mode, the output and the mode active
- *      before being put back once it ends. Its context's `registry` is
- *      the one the line was routed through, with every module that loaded
- *      mounted on it, and its `project` the project resolved for it.
+ *      before being put back once it ends. It runs recorded as the
+ *      running command with its context's parsed flags (`running.ts`),
+ *      for a reader below its `run` to ask, and the record it replaced is
+ *      put back once it ends, whether it returns or throws; a help
+ *      request, a version request, a refusal and `no_project` run no
+ *      command and record none. Its context's `registry` is the one the
+ *      line was routed through, with every module that loaded mounted on
+ *      it, and its `project` the project resolved for it.
  *   6. The terminal result event is written, and the exit code answered.
  *
  * The dispatcher sets no `process.exitCode` and calls no
@@ -129,6 +134,7 @@ import { CommandExit } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
+import { restoreRunningCommand, setRunningCommand } from './running.js';
 import { versionLine } from './version.js';
 
 /** What every refusal the dispatcher throws opens with. */
@@ -390,6 +396,7 @@ async function runCommand(
   const previous = activeOutput();
   const previousMode = activeOutputMode();
   setActiveOutput(guarded.output, base.outputMode);
+  const previousRunning = setRunningCommand(route.command, base.flags);
   try {
     await route.command.run(context);
     return success(guarded.payload());
@@ -416,6 +423,7 @@ async function runCommand(
         : error.message,
     };
   } finally {
+    restoreRunningCommand(previousRunning);
     setActiveOutput(previous, previousMode);
   }
 }

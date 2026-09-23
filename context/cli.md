@@ -16,7 +16,7 @@ module's note is the long form.
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
