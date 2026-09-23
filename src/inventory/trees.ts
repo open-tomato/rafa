@@ -66,7 +66,7 @@
  * real home unless it is handed it: every path comes from
  * {@link TreeSeams}.
  */
-import type { InventoryKind, InventoryRecord } from './record.js';
+import type { InventoryKind, InventoryRecord, InventorySource } from './record.js';
 import type { CheckReport } from '../check/run.js';
 import type { SkillTier, TierSeams } from '../schema/tiers.js';
 
@@ -131,10 +131,13 @@ function readText(path: string): string | null {
   }
 }
 
-/** One row from a file's frontmatter, with the name, place and verdict given. */
-function sourceItem(
+/**
+ * One row from a file's frontmatter, with the name, place and verdict
+ * given. Shared with the plugin and add-on readers (`plugins.ts`).
+ */
+export function sourceItem(
   kind: InventoryKind,
-  source: SkillTier,
+  source: InventorySource,
   name: string,
   path: string,
   check: SourceItem['check'],
@@ -159,12 +162,12 @@ function sourceItem(
 }
 
 /** Rows sorted by name, then path, so two holders of a name keep a fixed order. */
-function byName(items: readonly SourceItem[]): readonly SourceItem[] {
+export function byName(items: readonly SourceItem[]): readonly SourceItem[] {
   return [...items].sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
 }
 
-/** A checker report on a file as a skill row. */
-function skillItem(report: CheckReport, source: SkillTier, dir: string): SourceItem {
+/** A checker report on a file under `dir` as a skill row. */
+export function skillItem(report: CheckReport, source: InventorySource, dir: string): SourceItem {
   const name = report.name ?? relative(dir, report.path);
   return sourceItem('skill', source, name, report.path, checkVerdict(report.issues));
 }
