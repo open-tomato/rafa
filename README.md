@@ -31,7 +31,9 @@ What guides it:
 
 ## Before you run it
 
-Read this once; rafa also says it the first time you start a run.
+Read this once; rafa also says it the first time you start a run. Use
+`rafa plan risk` to see what the plan may do on this machine and under
+your accounts.
 
 - **Every Claude Code session rafa starts runs with
   `--dangerously-skip-permissions`.** That is what lets a plan run

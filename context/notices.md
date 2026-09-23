@@ -3,8 +3,9 @@
 Two notices exist, `alpha` and `danger`, both about consent rather than a
 fault (`src/notices/notices.ts`): the package is alpha software, and
 every session rafa spawns runs with `--dangerously-skip-permissions`
-under the person's accounts. The README's "Before you run it" section is
-the same text at rest.
+under the person's accounts. Before you run a plan, use `rafa plan risk`
+to see what it may do on this machine and under your accounts; this is
+not a sandbox, but a reading of what the plan and its skills say.
 
 ### Where they are shown
 
