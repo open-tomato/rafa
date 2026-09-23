@@ -105,7 +105,7 @@ export interface InstinctScopeLocation {
   readonly dir: string;
 }
 
-/** Whether `value` names a tier, for a `--tier` a line typed. */
+/** Whether `value` names a tier, for a `rafa skill list --source` a line typed. */
 export function isSkillTier(value: string): value is SkillTier {
   return (SKILL_TIERS as readonly string[]).includes(value);
 }

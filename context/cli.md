@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
@@ -640,23 +640,32 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa skill check --help` draws `[--project=<string>]` where the
   refusals' usage line says `[--project=<root>]`, as `agent vendor`
   draws `<name>` where its own says `<name>...`.
-- **`skill list [--tier=project|rafa|user]` lists what each tier
-  registers** (`src/commands/skill/list.ts`). The tiers are
-  `src/schema/tiers.ts`'s — `<root>/.claude/skills`, `skills/` beside
-  the running `cli.js`, and `~/.claude/skills`, in that order — and one
-  row per skill names its tier, the `stack` its frontmatter carries and
-  whether it passes `checkDirectory`, with the number of failures beside
-  a row that does not. Unlike the two checkers it runs INSIDE a project,
-  since the project tier is one of the three, and it reads the home off
-  the project the dispatcher resolved; the rafa tier is measured from
-  `Bun.main`, which is the command factory's one seam. The project tier
-  is checked against the project and the other two against none, so a
-  body naming a project path is a warning there rather than a failure.
-  A tier whose directory is absent prints its path and
-  `(no such directory)`. The exit code is 0 whatever the rows say — the
-  listing reports and `skill check` gates — and exit code 1 is kept for
-  a positional word and a `--tier` that is no tier. In json mode the
-  tiers, their rows and the two counts are the result's `data`.
+- **`skill list [--source=<source>] [--state=<state>] [--hidden-from-loop]`
+  lists every skill the inventory holds** (`src/commands/skill/list.ts`,
+  over `buildInventory` in `src/inventory/index.ts`). The inventory is
+  built against the project the dispatcher resolved, its home, the
+  config's `loop.settingSources` and the modules `loadModules` answers
+  `loaded`; the rafa tier is measured from `Bun.main`, and the entry and
+  the module loader's seams are the command factory's two seams. One row
+  per skill, of every source (`project`, `rafa`, `user`, `addon:<name>`,
+  `plugin:<name>`), prints `●` when a loop session resolves it and `○`
+  when not, then its name, source, state (`enabled`,
+  `shadowed-by:<source>` or `disabled:<how>`) and summary, the columns
+  padded to the widest cell. `--source` keeps the rows of one whole
+  source string and refuses a `plugin:` or `addon:` source no row or
+  warning names; `--tier` is its alias, marked in the help for removal
+  after one release. `--state` takes `enabled`, `shadowed` or `disabled`
+  and matches the state's prefix; `--hidden-from-loop` keeps
+  `visibleToLoop: false`. The filters combine. A skills tree whose
+  directory is absent prints its path and `(no such directory)`, and an
+  unreadable plugin record, plugin, add-on manifest, settings file or
+  `skillOverrides` entry is one `warn:` line. The exit code is 0
+  whatever the rows say — the listing reports and `skill check` gates —
+  and exit code 1 is kept for a positional word, a `--source` or
+  `--state` it cannot take, and a config `loadConfig` refuses. In json
+  mode the kept records, each with its `check`, the filters, the
+  pre-filter total, the skills trees and the warnings are the result's
+  `data`.
 - **`skill demote <dir> [--apply]` runs the demotion pass over one
   skills directory** (`src/commands/skill/demote.ts`, over
   `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and

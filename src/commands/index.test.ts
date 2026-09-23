@@ -179,7 +179,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'agent vendor': [['name'], ['force']],
   'agent list': [[], []],
   'skill check': [['dir'], ['fix', 'project']],
-  'skill list': [[], ['tier']],
+  'skill list': [[], ['source', 'state', 'hidden-from-loop']],
   'skill demote': [['dir'], ['apply']],
   'skill backfill': [['dir'], ['propose', 'apply', 'project']],
   'instinct check': [['dir'], []],

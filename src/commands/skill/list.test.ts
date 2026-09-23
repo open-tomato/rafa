@@ -1,8 +1,9 @@
 /**
- * Tests for `rafa skill list` (`src/commands/skill/list.ts`): the rows
- * the three tiers give, the `--tier` narrowing, the stack each row
- * shows, the exit code a failing tier does NOT change, and the
- * refusals.
+ * Tests for `rafa skill list` (`src/commands/skill/list.ts`): the
+ * filters a line is read as, the rows `buildInventory` gives and how
+ * `--source`, `--state` and `--hidden-from-loop` narrow them, the
+ * `--tier` alias, the text rows and the json result, the warnings, the
+ * exit code a failing skill does NOT change, and the refusals.
  *
  * Every dispatched case plants a project, a home and a runtime of its
  * own under a temporary directory of this file's own, and dispatches
@@ -14,18 +15,17 @@
  *
  * ## The controls
  *
- * Two readings here could be false negatives, and each is paired.
- *
- * That a failing skill leaves the exit code 0 is held BESIDE the row
- * for the same file, which says it failed and how many rules it broke:
- * a command that checked nothing at all would exit 0 too, and would
- * redden the row.
- *
- * That a body naming a project path is a warning in the user tier is
- * held BESIDE the same body in the project tier, where it is a failure:
- * the project tier is the one resolved against the project, and a
- * resolver that passed no project root anywhere would redden that half.
+ * Each filter could read as working because it drops everything, so
+ * every narrowing case also holds the row it must KEEP, and the tree
+ * it narrows is listed whole first. That a user skill is hidden from
+ * the loop is held beside the same tree under a config whose
+ * `loop.settingSources` includes `user`, where it is visible: a
+ * command that marked every user row hidden would fail that half. That
+ * a failing skill leaves the exit code 0 is held beside its json row,
+ * whose `check` says `fail`.
  */
+import type { InventoryRecord } from '../../inventory/record.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -37,16 +37,20 @@ import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli
 
 import {
   createSkillListCommand,
-  failureCount,
-  readTierFlag,
+  expectKnownSource,
+  isSourceShape,
+  knownSources,
+  listHeading,
+  matchesFilters,
+  readFilters,
+  readSourceFlag,
+  readStateFlag,
   renderSkillList,
-  skillRowLine,
-  skillStack,
-  tierLines,
+  skillRowLines,
 } from './list.js';
 
 /** The subject the dispatched cases route through. */
-const SUBJECTS = [{ name: 'skill', summary: 'list the skills each tier registers' }];
+const SUBJECTS = [{ name: 'skill', summary: 'list every skill' }];
 
 /** A temporary directory of this file's own, its path resolved through every link. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-skill-list-')));
@@ -56,65 +60,116 @@ afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
 
-/** A markdown file: the frontmatter lines given, then the body given. */
-function fileText(lines: readonly string[], body: string): string {
-  return `---\n${lines.join('\n')}\n---\n${body}`;
+/** A skill file whose frontmatter passes every check, under the name and description given. */
+function skillText(name: string, description: string): string {
+  return [
+    '---',
+    `name: ${name}`,
+    `description: ${description}`,
+    'tags: [verification]',
+    'stack: [typescript]',
+    '---',
+    '',
+    `# ${name}`,
+    '',
+    'Read each exit code.',
+    '',
+  ].join('\n');
 }
 
-/** The four required skill fields, filled with values every check accepts. */
-const CLEAN_FIELDS: readonly string[] = [
-  'name: verification-loop',
-  'description: Run the gates in order and read each exit code',
-  'tags: [verification, gates]',
-  'stack: [typescript, bun]',
-];
+/** A skill file missing the two list fields the checker requires. */
+function brokenSkillText(name: string): string {
+  return `---\nname: ${name}\ndescription: Missing its list fields\n---\n\n# ${name}\n`;
+}
 
-/** The same skill without the two fields the schema also requires. */
-const BROKEN_FIELDS: readonly string[] = [
-  'name: half-written',
-  'description: A skill missing the two required list fields',
-];
+/** The config text a case plants: `loop.settingSources` as given. */
+function configText(settingSources: string): string {
+  return `version: 1\nloop:\n  settingSources: ${settingSources}\n`;
+}
 
-/** A body naming nothing any check can refuse. */
-const PLAIN_BODY = '\n# Verification loop\n\nRead each exit code.\n';
-
-/** What one case plants: a project, a home and a runtime, each with its own skills. */
+/** What one case plants: a project, a home and a runtime. */
 interface Planted {
   /** The project root, holding `.rafa/config.yaml`. */
   readonly root: string;
-  /** The home the tiers resolve `~/.claude/skills` under. */
+  /** The home the sources resolve `~/.claude` under. */
   readonly home: string;
   /** The entry the rafa tier is measured from. */
   readonly entry: string;
+  /** The directory the three sit in. */
+  readonly scope: string;
 }
 
-/** Plants one case's tree. A key ending in `/` is an empty directory. */
-function plant(files: Readonly<Record<string, string>>): Planted {
+/** Plants one case's tree, each key a path under the case's directory. */
+function plant(files: Readonly<Record<string, string>>, settingSources = 'project,local'): Planted {
   planted += 1;
   const scope = join(tempBase, `case-${String(planted)}`);
   const root = join(scope, 'project');
   const home = join(scope, 'home');
   const entry = join(scope, 'runtime', 'cli.js');
-  plantProjectConfig(root);
+  plantProjectConfig(root, configText(settingSources));
   mkdirSync(home, { recursive: true });
   mkdirSync(dirname(entry), { recursive: true });
   writeFileSync(entry, '// the runtime\n', 'utf8');
   for (const [name, text] of Object.entries(files)) {
     const path = join(scope, name);
-    if (name.endsWith('/')) {
-      mkdirSync(path, { recursive: true });
-      continue;
-    }
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text, 'utf8');
   }
-  return { root, home, entry };
+  return { root, home, entry, scope };
+}
+
+/** A plugin record naming each plugin given as installed in the user scope. */
+function pluginRecord(plugins: Readonly<Record<string, string>>): string {
+  const entries = Object.entries(plugins).map(([name, installPath]) => [
+    `${name}@market`,
+    [{ scope: 'user', installPath, version: '1.0.0' }],
+  ]);
+  return JSON.stringify({ version: 2, plugins: Object.fromEntries(entries) });
+}
+
+/**
+ * The tree most cases list: a project skill a user skill of the same
+ * name is shadowed by, a user-only skill, a project skill switched off
+ * in `.claude/settings.json`, and a plugin skill.
+ */
+function standardTree(settingSources = 'project,local'): Planted {
+  const scope = join(tempBase, `case-${String(planted + 1)}`);
+  return plant({
+    'project/.claude/skills/verification-loop/SKILL.md': skillText('verification-loop', 'Run the gates in order'),
+    'project/.claude/skills/switched-off/SKILL.md': skillText('switched-off', 'Turned off by the settings'),
+    'project/.claude/settings.json': JSON.stringify({ skillOverrides: { 'switched-off': 'off' } }),
+    'home/.claude/skills/verification-loop/SKILL.md': skillText('verification-loop', 'The home copy of the gates'),
+    'home/.claude/skills/user-only/SKILL.md': skillText('user-only', 'Held by the home alone'),
+    'home/.claude/plugins/installed_plugins.json': pluginRecord({ alpha: join(scope, 'plugins', 'alpha') }),
+    'plugins/alpha/skills/brainstorm/SKILL.md': skillText('brainstorm', 'A plugin skill'),
+  }, settingSources);
 }
 
 /** Dispatches `words` over the command, with the planted tree's seams. */
 async function run(words: readonly string[], tree: Planted) {
-  const command = createSkillListCommand({ entry: () => tree.entry });
+  const command = createSkillListCommand({ entry: () => tree.entry, modules: {} });
   return dispatchInProject(words, SUBJECTS, [command], { root: tree.root, home: tree.home }, { PATH: '' });
+}
+
+/** The json result's data of a run. */
+interface ResultData {
+  readonly skills: readonly InventoryRecord[];
+  readonly total: number;
+  readonly trees: readonly { source: string; exists: boolean }[];
+  readonly warnings: readonly string[];
+  readonly filters: unknown;
+  readonly settingSources: readonly string[];
+}
+
+/** The data of the result event a json run ends with. */
+function resultData(stdout: string): ResultData {
+  const result = eventsOf(stdout).find((event) => event.type === 'result') as unknown as { data: ResultData };
+  return result.data;
+}
+
+/** Each row of a json run as `[name, source, state, visibleToLoop]`. */
+function rowsOf(stdout: string): readonly (readonly [string, string, string, boolean])[] {
+  return resultData(stdout).skills.map((row) => [row.name, row.source, row.state, row.visibleToLoop] as const);
 }
 
 /** The exit code and the message a call refused with. */
@@ -128,181 +183,333 @@ function refusal(call: () => unknown): [number, string] {
   throw new Error('expected a CommandExit, and the call returned');
 }
 
+/** One inventory row, filled with values no case here reads unless it sets them. */
+function record(fields: Partial<InventoryRecord>): InventoryRecord {
+  return {
+    kind: 'skill',
+    name: 'a',
+    source: 'project',
+    path: '/p/.claude/skills/a/SKILL.md',
+    summary: '',
+    whenToUse: null,
+    prevents: null,
+    stack: [],
+    tags: [],
+    check: 'pass',
+    state: 'enabled',
+    visibleToLoop: true,
+    ...fields,
+  };
+}
+
+/** An inventory holding the rows and warnings given, and nothing else. */
+function inventoryOf(records: readonly InventoryRecord[], warningSources: readonly string[] = []) {
+  return {
+    records,
+    trees: [],
+    warnings: warningSources.map((source) => ({ source: source as `plugin:${string}`, path: '/x', reason: 'unreadable' })),
+    overrideWarnings: [],
+  };
+}
+
 describe('the words a skill list line is read as', () => {
-  it('reads a tier the flag names and nothing when it is left out', () => {
-    expect(readTierFlag(undefined)).toBeNull();
-    expect(readTierFlag(false)).toBeNull();
-    expect(readTierFlag('user')).toBe('user');
-    expect(readTierFlag('rafa')).toBe('rafa');
-    expect(readTierFlag('project')).toBe('project');
+  it('reads each source shape and nothing when --source is left out', () => {
+    expect(readSourceFlag(undefined)).toBeNull();
+    expect(readSourceFlag(false)).toBeNull();
+    expect(readSourceFlag('project')).toBe('project');
+    expect(readSourceFlag('rafa')).toBe('rafa');
+    expect(readSourceFlag('user')).toBe('user');
+    expect(readSourceFlag('plugin:alpha')).toBe('plugin:alpha');
+    expect(readSourceFlag('addon:linear')).toBe('addon:linear');
   });
 
-  it('refuses a tier that is no tier and a flag typed with no value', () => {
-    const [code, message] = refusal(() => readTierFlag('users'));
+  it('refuses a source no source is written as, and a --source with no value', () => {
+    const [code, message] = refusal(() => readSourceFlag('users'));
 
     expect(code).toBe(1);
-    expect(message).toContain('--tier is "users", expected one of: project, rafa, user');
-    expect(refusal(() => readTierFlag(true))[1]).toContain('--tier needs a value');
+    expect(message).toContain('--source is "users", expected one of: project, rafa, user, plugin:<name>, addon:<name>');
+    expect(isSourceShape('plugin:')).toBe(false);
+    expect(isSourceShape('addon:x')).toBe(true);
+    expect(refusal(() => readSourceFlag(true))[1]).toContain('--source needs a value');
+  });
+
+  it('reads the three state words and refuses any other', () => {
+    expect(readStateFlag(undefined)).toBeNull();
+    expect(readStateFlag('enabled')).toBe('enabled');
+    expect(readStateFlag('shadowed')).toBe('shadowed');
+    expect(readStateFlag('disabled')).toBe('disabled');
+
+    const [code, message] = refusal(() => readStateFlag('shadowed-by:project'));
+    expect(code).toBe(1);
+    expect(message).toContain('--state is "shadowed-by:project", expected one of: enabled, shadowed, disabled');
+  });
+
+  it('reads the three filters together, --hidden-from-loop as a switch', () => {
+    expect(readFilters({})).toEqual({ source: null, state: null, hiddenFromLoop: false });
+    expect(readFilters({ 'source': 'user', 'state': 'shadowed', 'hidden-from-loop': true }))
+      .toEqual({ source: 'user', state: 'shadowed', hiddenFromLoop: true });
   });
 });
 
-describe('what a row says', () => {
-  it('reads the stack a file carries, and nothing for a file with none or one it cannot read', () => {
-    const tree = plant({
-      'skills/with/SKILL.md': fileText(CLEAN_FIELDS, PLAIN_BODY),
-      'skills/without/SKILL.md': fileText(BROKEN_FIELDS, PLAIN_BODY),
-      'skills/bare/SKILL.md': '# No frontmatter at all\n',
-    });
-    const at = (name: string) => join(dirname(tree.root), 'skills', name, 'SKILL.md');
+describe('which rows a filter keeps', () => {
+  const shadowed = record({ name: 'b', source: 'user', state: 'shadowed-by:project', visibleToLoop: false });
+  const disabled = record({ name: 'c', state: 'disabled:skillOverrides', visibleToLoop: false });
+  const enabled = record({ name: 'a' });
+  const none = { source: null, state: null, hiddenFromLoop: false };
 
-    expect(skillStack(at('with'))).toEqual(['typescript', 'bun']);
-    expect(skillStack(at('without'))).toEqual([]);
-    expect(skillStack(at('bare'))).toEqual([]);
-    expect(skillStack(at('gone'))).toEqual([]);
+  it('keeps every row with no filter, and the whole source string alone under --source', () => {
+    const rows = [enabled, shadowed, disabled];
+
+    expect(rows.filter((row) => matchesFilters(row, none))).toEqual(rows);
+    expect(rows.filter((row) => matchesFilters(row, { ...none, source: 'user' }))).toEqual([shadowed]);
+    expect(matchesFilters(record({ source: 'plugin:alpha' }), { ...none, source: 'plugin:alph' })).toBe(false);
   });
 
-  it('counts the failures of a report and leaves its warnings out', () => {
-    const issues = [
-      { stage: 'schema' as const, code: 'missing-field' as const, severity: 'failure' as const, field: 'tags', line: null, message: 'x' },
-      { stage: 'resolution' as const, code: 'unchecked-path' as const, severity: 'warning' as const, field: null, line: 3, message: 'y' },
-    ];
+  it('matches --state on the prefix of the state, and --hidden-from-loop on visibleToLoop', () => {
+    const rows = [enabled, shadowed, disabled];
 
-    expect(failureCount({ kind: 'skill', path: '/a/SKILL.md', isFile: true, name: 'a', issues, failed: true, fixed: [] })).toBe(1);
+    expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'shadowed' }))).toEqual([shadowed]);
+    expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'disabled' }))).toEqual([disabled]);
+    expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'enabled' }))).toEqual([enabled]);
+    expect(rows.filter((row) => matchesFilters(row, { ...none, hiddenFromLoop: true }))).toEqual([shadowed, disabled]);
   });
 
-  it('writes a passing row, a failing one and an absent tier apart', () => {
-    const row = { tier: 'user' as const, name: 'a', path: '/h/a/SKILL.md', stack: ['bun'], ok: true, failures: 0 };
-    const broken = { ...row, name: 'b', stack: [], ok: false, failures: 2 };
+  it('knows the tiers, then each named source a row or a warning names, and refuses any other', () => {
+    const inventory = inventoryOf(
+      [record({ source: 'plugin:beta' }), record({ kind: 'agent', source: 'addon:linear' })],
+      ['plugin:gone'],
+    );
 
-    expect(skillRowLine(row)).toBe('    ✅ a  [bun]');
-    expect(skillRowLine(broken)).toBe('    ❌ b  [—]  2 failure(s)');
-    expect(tierLines({ tier: 'rafa', dir: '/install/skills', exists: false, skills: [] }))
-      .toEqual(['  rafa  /install/skills  (no such directory)']);
-    expect(tierLines({ tier: 'user', dir: '/h/.claude/skills', exists: true, skills: [] }))
-      .toEqual(['  user  /h/.claude/skills  (no skills)']);
+    expect(knownSources(inventory)).toEqual(['project', 'rafa', 'user', 'addon:linear', 'plugin:beta', 'plugin:gone']);
+    expect(() => expectKnownSource('plugin:gone', inventory)).not.toThrow();
+    expect(() => expectKnownSource('rafa', inventory)).not.toThrow();
+    expect(() => expectKnownSource(null, inventory)).not.toThrow();
+
+    const [code, message] = refusal(() => expectKnownSource('plugin:alpha', inventory));
+    expect(code).toBe(1);
+    expect(message).toContain('--source is "plugin:alpha", which no skill, agent or warning here comes from');
+    expect(message).toContain('known sources: project, rafa, user, addon:linear, plugin:beta, plugin:gone');
+  });
+});
+
+describe('what text mode writes', () => {
+  it('pads every column but the summary to its widest cell, the mark first', () => {
+    const lines = skillRowLines([
+      record({ name: 'verification-loop', summary: 'Run the gates' }),
+      record({ name: 'b', source: 'user', state: 'shadowed-by:project', visibleToLoop: false, summary: '' }),
+    ]);
+
+    expect(lines).toEqual([
+      '  ● verification-loop  project  enabled              Run the gates',
+      '  ○ b                  user     shadowed-by:project',
+    ]);
   });
 
-  it('opens with the tier a line narrowed to and closes with the two counts', () => {
+  it('names each filter given in the heading, and none when none is', () => {
+    const base = {
+      projectRoot: '/p',
+      settingSources: ['project' as const],
+      skills: [],
+      total: 0,
+      trees: [],
+      warnings: [],
+    };
+
+    expect(listHeading({ ...base, filters: { source: null, state: null, hiddenFromLoop: false } }))
+      .toBe('Skills (project: /p):');
+    expect(listHeading({ ...base, filters: { source: 'user', state: 'shadowed', hiddenFromLoop: true } }))
+      .toBe('Skills (project: /p; source user, state shadowed, hidden from the loop):');
+  });
+
+  it('says so when no row matches, lists an absent tree, and closes with the counts and the legend', () => {
     const lines = renderSkillList({
       projectRoot: '/p',
-      tier: 'user',
-      tiers: [{ tier: 'user', dir: '/h/.claude/skills', exists: true, skills: [] }],
-      total: 3,
-      passing: 1,
+      settingSources: ['project', 'local'],
+      filters: { source: 'rafa', state: null, hiddenFromLoop: false },
+      skills: [],
+      total: 4,
+      trees: [{ source: 'rafa', dir: '/install/skills', exists: false }],
+      warnings: [],
     });
 
-    expect(lines[0]).toBe('Skills in the user tier (project: /p):');
-    expect(lines.at(-1)).toBe('3 skill(s): 1 pass the checker, 2 do not');
-    expect(renderSkillList({ projectRoot: '/p', tier: null, tiers: [], total: 0, passing: 0 })[0])
-      .toBe('Skills by tier (project: /p):');
+    expect(lines).toEqual([
+      'Skills (project: /p; source rafa):',
+      '  (no skill matches)',
+      '  rafa  /install/skills  (no such directory)',
+      '0 of 4 skill(s) listed, 0 visible to the loop (loop.settingSources: project, local)',
+      '● a loop session resolves it, ○ it does not',
+    ]);
   });
 });
 
-describe('rafa skill list over planted tiers', () => {
-  it('lists the three tiers in order, each skill with its tier, stack and verdict', async () => {
-    const tree = plant({
-      'project/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, PLAIN_BODY),
-      'home/.claude/skills/half-written/SKILL.md': fileText(BROKEN_FIELDS, PLAIN_BODY),
-      'runtime/skills/': '',
-    });
+describe('rafa skill list over planted sources', () => {
+  it('lists every skill with its source, state and loop mark, and exits 0', async () => {
+    const tree = standardTree();
 
     const answered = await run(['skill', 'list'], tree);
 
     expect(answered.exitCode).toBe(0);
     expect(answered.stderr).toBe('');
     expect(answered.stdout.split('\n').filter((line) => line !== '')).toEqual([
-      `Skills by tier (project: ${tree.root}):`,
-      `  project  ${join(tree.root, '.claude', 'skills')}`,
-      '    ✅ verification-loop  [typescript, bun]',
-      `  rafa  ${join(dirname(tree.entry), 'skills')}  (no skills)`,
-      `  user  ${join(tree.home, '.claude', 'skills')}`,
-      '    ❌ half-written  [—]  2 failure(s)',
-      '2 skill(s): 1 pass the checker, 1 do not',
+      `Skills (project: ${tree.root}):`,
+      '  ○ alpha:brainstorm   plugin:alpha  enabled                  A plugin skill',
+      '  ○ switched-off       project       disabled:skillOverrides  Turned off by the settings',
+      '  ○ user-only          user          enabled                  Held by the home alone',
+      '  ● verification-loop  project       enabled                  Run the gates in order',
+      '  ○ verification-loop  user          shadowed-by:project      The home copy of the gates',
+      `  rafa  ${join(dirname(tree.entry), 'skills')}  (no such directory)`,
+      '5 of 5 skill(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
+      '● a loop session resolves it, ○ it does not',
     ]);
   });
 
-  it('says so for a tier whose directory is not there, and lists the others', async () => {
-    const tree = plant({ 'home/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, PLAIN_BODY) });
-
-    const answered = await run(['skill', 'list'], tree);
-
-    expect(answered.exitCode).toBe(0);
-    expect(answered.stdout).toContain(`  project  ${join(tree.root, '.claude', 'skills')}  (no such directory)`);
-    expect(answered.stdout).toContain(`  rafa  ${join(dirname(tree.entry), 'skills')}  (no such directory)`);
-    expect(answered.stdout).toContain('    ✅ verification-loop  [typescript, bun]');
-    expect(answered.stdout).toContain('1 skill(s): 1 pass the checker, 0 do not');
-  });
-
-  it('narrows to the tier --tier names', async () => {
-    const tree = plant({
-      'project/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, PLAIN_BODY),
-      'home/.claude/skills/half-written/SKILL.md': fileText(BROKEN_FIELDS, PLAIN_BODY),
-    });
-
-    const answered = await run(['skill', 'list', '--tier=user'], tree);
-
-    expect(answered.exitCode).toBe(0);
-    expect(answered.stdout).toContain('Skills in the user tier');
-    expect(answered.stdout).toContain('    ❌ half-written');
-    expect(answered.stdout).not.toContain('verification-loop');
-    expect(answered.stdout).toContain('1 skill(s): 0 pass the checker, 1 do not');
-  });
-
-  it('exits 0 over a tier of failing skills, with the failures on the rows', async () => {
-    const tree = plant({
-      'home/.claude/skills/half-written/SKILL.md': fileText(BROKEN_FIELDS, PLAIN_BODY),
-      'home/.claude/skills/loose.md': fileText(CLEAN_FIELDS, PLAIN_BODY),
-    });
-
-    const answered = await run(['skill', 'list', '--tier=user'], tree);
-
-    expect(answered.exitCode).toBe(0);
-    expect(answered.stdout).toContain('    ❌ half-written  [—]  2 failure(s)');
-    expect(answered.stdout).toContain('2 skill(s): 0 pass the checker, 2 do not');
-  });
-
-  it('resolves a body path against the project for the project tier alone', async () => {
-    const body = '\nRead `src/gone.ts` before the gates.\n';
-    const tree = plant({
-      'project/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, body),
-      'home/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, body),
-    });
-
-    const answered = await run(['skill', 'list'], tree);
-    const rows = answered.stdout.split('\n').filter((line) => line.includes('verification-loop'));
-
-    expect(answered.exitCode).toBe(0);
-    expect(rows).toEqual([
-      '    ❌ verification-loop  [typescript, bun]  1 failure(s)',
-      '    ✅ verification-loop  [typescript, bun]',
-    ]);
-  });
-
-  it('gives the tiers and their rows as the json result', async () => {
-    const tree = plant({ 'project/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, PLAIN_BODY) });
+  it('gives every row, its check and the trees as the json result', async () => {
+    const tree = standardTree();
 
     const answered = await run(['skill', 'list', '--output=json'], tree);
-    const [, result] = eventsOf(answered.stdout);
+    const data = resultData(answered.stdout);
 
     expect(answered.exitCode).toBe(0);
-    expect(result).toMatchObject({
-      type: 'result',
-      ok: true,
-      data: { projectRoot: tree.root, tier: null, total: 1, passing: 1 },
-    });
-    expect((result as { data: { tiers: { tier: string; exists: boolean }[] } }).data.tiers.map((listing) => [listing.tier, listing.exists]))
-      .toEqual([['project', true], ['rafa', false], ['user', false]]);
+    expect(rowsOf(answered.stdout)).toEqual([
+      ['alpha:brainstorm', 'plugin:alpha', 'enabled', false],
+      ['switched-off', 'project', 'disabled:skillOverrides', false],
+      ['user-only', 'user', 'enabled', false],
+      ['verification-loop', 'project', 'enabled', true],
+      ['verification-loop', 'user', 'shadowed-by:project', false],
+    ]);
+    expect(data.total).toBe(5);
+    expect(data.settingSources).toEqual(['project', 'local']);
+    expect(data.filters).toEqual({ source: null, state: null, hiddenFromLoop: false });
+    expect(data.skills.every((row) => row.kind === 'skill' && row.check === 'pass')).toBe(true);
+    expect(data.trees.map((listing) => [listing.source, listing.exists]))
+      .toEqual([['project', true], ['rafa', false], ['user', true]]);
   });
 
-  it('refuses a positional word and a --tier that is no tier', async () => {
-    const tree = plant({ 'home/.claude/skills/verification-loop/SKILL.md': fileText(CLEAN_FIELDS, PLAIN_BODY) });
+  it('marks a user skill visible when loop.settingSources includes user, the control on the hidden mark', async () => {
+    const tree = standardTree('project,local,user');
+
+    const answered = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(rowsOf(answered.stdout)).toEqual([
+      ['alpha:brainstorm', 'plugin:alpha', 'enabled', true],
+      ['switched-off', 'project', 'disabled:skillOverrides', false],
+      ['user-only', 'user', 'enabled', true],
+      ['verification-loop', 'project', 'enabled', true],
+      ['verification-loop', 'user', 'shadowed-by:project', false],
+    ]);
+  });
+
+  it('narrows to one source under --source, a plugin one included', async () => {
+    const tree = standardTree();
+
+    const user = await run(['skill', 'list', '--source=user', '--output=json'], tree);
+    const plugin = await run(['skill', 'list', '--source=plugin:alpha', '--output=json'], tree);
+
+    expect(user.exitCode).toBe(0);
+    expect(rowsOf(user.stdout)).toEqual([
+      ['user-only', 'user', 'enabled', false],
+      ['verification-loop', 'user', 'shadowed-by:project', false],
+    ]);
+    expect(resultData(user.stdout).total).toBe(5);
+    expect(resultData(user.stdout).trees.map((listing) => listing.source)).toEqual(['user']);
+    expect(plugin.exitCode).toBe(0);
+    expect(rowsOf(plugin.stdout)).toEqual([['alpha:brainstorm', 'plugin:alpha', 'enabled', false]]);
+    expect(resultData(plugin.stdout).trees).toEqual([]);
+  });
+
+  it('reads --tier as --source, row for row', async () => {
+    const tree = standardTree();
+
+    const tier = await run(['skill', 'list', '--tier=project', '--output=json'], tree);
+    const source = await run(['skill', 'list', '--source=project', '--output=json'], tree);
+
+    expect(tier.exitCode).toBe(0);
+    expect(resultData(tier.stdout)).toEqual(resultData(source.stdout));
+    expect(rowsOf(tier.stdout).map(([name]) => name)).toEqual(['switched-off', 'verification-loop']);
+  });
+
+  it('narrows on the state prefix under --state, and to the hidden rows under --hidden-from-loop', async () => {
+    const tree = standardTree();
+
+    const shadowed = await run(['skill', 'list', '--state=shadowed', '--output=json'], tree);
+    const disabled = await run(['skill', 'list', '--state=disabled', '--output=json'], tree);
+    const hidden = await run(['skill', 'list', '--hidden-from-loop', '--output=json'], tree);
+    const both = await run(['skill', 'list', '--hidden-from-loop', '--state=enabled', '--source=user', '--output=json'], tree);
+
+    expect(rowsOf(shadowed.stdout)).toEqual([['verification-loop', 'user', 'shadowed-by:project', false]]);
+    expect(rowsOf(disabled.stdout)).toEqual([['switched-off', 'project', 'disabled:skillOverrides', false]]);
+    expect(rowsOf(hidden.stdout).map(([name, source]) => `${source}/${name}`)).toEqual([
+      'plugin:alpha/alpha:brainstorm',
+      'project/switched-off',
+      'user/user-only',
+      'user/verification-loop',
+    ]);
+    expect(rowsOf(both.stdout)).toEqual([['user-only', 'user', 'enabled', false]]);
+  });
+
+  it('names the filters in the text heading and counts the rows they kept', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['skill', 'list', '--source=user', '--state=shadowed'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stdout).toContain(`Skills (project: ${tree.root}; source user, state shadowed):`);
+    expect(answered.stdout).toContain('  ○ verification-loop  user  shadowed-by:project  The home copy of the gates');
+    expect(answered.stdout).not.toContain('user-only');
+    expect(answered.stdout).toContain('1 of 5 skill(s) listed, 0 visible to the loop');
+  });
+
+  it('exits 0 over a failing skill, whose row says fail', async () => {
+    const tree = plant({ 'project/.claude/skills/half-written/SKILL.md': brokenSkillText('half-written') });
+
+    const answered = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(resultData(answered.stdout).skills.map((row) => [row.name, row.check])).toEqual([['half-written', 'fail']]);
+  });
+
+  it('warns about a plugin record that does not read, on stdout in text mode and in the json data', async () => {
+    const tree = plant({
+      'project/.claude/skills/verification-loop/SKILL.md': skillText('verification-loop', 'Run the gates in order'),
+      'home/.claude/plugins/installed_plugins.json': '{ not json',
+    });
+
+    const text = await run(['skill', 'list'], tree);
+    const json = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toMatch(/^warn: plugins: .*installed_plugins\.json: /m);
+    expect(text.stdout).toContain('  ● verification-loop  project  enabled  Run the gates in order');
+    expect(resultData(json.stdout).warnings).toHaveLength(1);
+    expect(resultData(json.stdout).warnings[0]).toStartWith('plugins: ');
+  });
+
+  it('refuses a positional word, a source written as none is, an unknown plugin and a wrong state', async () => {
+    const tree = standardTree();
 
     const worded = await run(['skill', 'list', 'user'], tree);
-    const wrong = await run(['skill', 'list', '--tier=users'], tree);
+    const shape = await run(['skill', 'list', '--source=users'], tree);
+    const unknown = await run(['skill', 'list', '--source=plugin:beta'], tree);
+    const state = await run(['skill', 'list', '--state=hidden'], tree);
 
     expect(worded.exitCode).toBe(1);
     expect(worded.stderr).toContain('Expected no argument, got 1: user');
-    expect(wrong.exitCode).toBe(1);
-    expect(wrong.stderr).toContain('expected one of: project, rafa, user');
+    expect(shape.exitCode).toBe(1);
+    expect(shape.stderr).toContain('expected one of: project, rafa, user, plugin:<name>, addon:<name>');
+    expect(unknown.exitCode).toBe(1);
+    expect(unknown.stderr).toContain('known sources: project, rafa, user, plugin:alpha');
+    expect(state.exitCode).toBe(1);
+    expect(state.stderr).toContain('--state is "hidden", expected one of: enabled, shadowed, disabled');
+  });
+
+  it('refuses a config that cannot be used', async () => {
+    const tree = plant({});
+    plantProjectConfig(tree.root, 'version: 1\nloop:\n  settingSources: nowhere\n');
+
+    const answered = await run(['skill', 'list'], tree);
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stderr).toContain('rafa skill list: the config cannot be used:');
   });
 });

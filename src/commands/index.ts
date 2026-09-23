@@ -32,8 +32,8 @@
  * which copy and read agent definitions through `src/agents/roster.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
- * `skill list`, which runs those checks over the tiers
- * `src/schema/tiers.ts` resolves, nor `skill demote` and
+ * `skill list`, which lists the skills `buildInventory`
+ * (`src/inventory/`) reads from every source, nor `skill demote` and
  * `skill backfill`, which run the demotion pass of `src/demote/` and the
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
@@ -94,8 +94,9 @@
  *     `instinct check <dir>`, the checker over one tier, each exiting
  *     with the number of its failing files and running outside a
  *     project, since `--project` is its only project seam.
- *   - `skill list [--tier=<tier>]`, every skill the three tiers
- *     register with its stack and its verdict, and `instinct list` and
+ *   - `skill list [--source=<source>] [--state=<state>]
+ *     [--hidden-from-loop]`, every skill the inventory holds with its
+ *     source, its state and whether the loop sees it, and `instinct list` and
  *     `instinct show <id>`, the records the project and user instinct
  *     scopes hold, each listing exiting 0 whatever its rows say.
  *   - `skill demote <dir> [--apply]`, the demotion pass over one skills

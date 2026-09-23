@@ -621,10 +621,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/skill/list.js', [
     ['../../check/references.js', ['pathDirectories']],
-    ['../../check/run.js', ['checkDirectory']],
     ['../../cli/command.js', ['CommandExit']],
-    ['../../schema/frontmatter.js', ['readFrontmatter']],
-    ['../../schema/tiers.js', ['isSkillTier', 'resolveSkillTiers', 'SKILL_TIERS', 'tierExists']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config.js', ['ConfigError']],
+    ['../../inventory/index.js', ['buildInventory']],
+    ['../../modules/load.js', ['loadModules', 'moduleSettings']],
+    ['../../schema/tiers.js', ['isSkillTier', 'SKILL_TIERS']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/skill/demote.js', [
