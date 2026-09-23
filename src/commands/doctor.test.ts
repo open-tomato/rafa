@@ -89,6 +89,24 @@
  * before it was wired, reddened 4; and the line a resume prints dropped
  * reddened 2.
  *
+ * ## The risk total
+ *
+ * A plan `--plan` names gets the risk-total line `loop start` prints
+ * (`../start/risk-total.ts`). Its accounts are read over
+ * {@link NO_ACCOUNT_RUNNERS}, which every seam set of this file carries,
+ * so no case spawns git or `gh` for it; the environment a case hands in
+ * is `PATH` alone, so no secret name of the suite's own is counted. Each
+ * case sits beside a control: the default plan, which prints no line;
+ * the same world with no `FAKE_TOKEN`, one note fewer; and runners that
+ * answer beside runners that throw.
+ *
+ * Three mutations of `src/commands/doctor.ts` were driven against them
+ * on 2026-09-23, the file run alone on a baseline of 43 pass and
+ * restored from a scratch copy verified by sha256: the call dropped
+ * reddened 7 cases; the `--plan` gate dropped, so the default plan
+ * prints the line too, reddened 1; and the line moved after the board
+ * rows reddened 1.
+ *
  * ## Spawned
  *
  * One case runs `bun src/rafa.ts doctor` in two scratch repositories
@@ -153,8 +171,27 @@ const MISSING_TOOL_PROBE = 'echo "sh: needed: not found" >&2; exit 127';
 /** An optional probe failing as a tool waiting on a login does once its stdin is closed. */
 const LOGIN_PROBE = 'echo "mgrep: login required" >&2; exit 3';
 
+/**
+ * git with no `origin` and `gh` failing every call, for the plan's risk
+ * total, so no case reads a real account. The line they give is held
+ * below as {@link riskLine}.
+ */
+const NO_ACCOUNT_RUNNERS: NonNullable<DoctorSeams['riskRunners']> = () => ({
+  git: () => ({ ok: false, stdout: '', stderr: 'error: No such remote \'origin\'\n' }),
+  gh: () => Promise.resolve({ ok: false, stdout: '', stderr: 'gh: not planted' }),
+});
+
+/**
+ * The risk total of a plan whose one open task names no tools, read over
+ * {@link NO_ACCOUNT_RUNNERS} and an environment of `PATH` alone: the task
+ * is the high, and the four account readings are the notes.
+ */
+function riskLine(plan: string): string {
+  return `🛡  Risk: 1 high, 4 notes — rafa plan risk ${plan}`;
+}
+
 /** The seams of every in-process case not recording its probes: the real runner, with a clock that stands still. */
-const STILL_CLOCK: DoctorSeams = { checks: { now: () => 0 } };
+const STILL_CLOCK: DoctorSeams = { checks: { now: () => 0 }, riskRunners: NO_ACCOUNT_RUNNERS };
 
 /** The line text mode opens with, before anything is checked. */
 const VERSION_LINE = versionLine();
@@ -340,6 +377,7 @@ function ghSeams(
   return {
     readRemote,
     openGh,
+    riskRunners: NO_ACCOUNT_RUNNERS,
     checks: {
       now: () => 0,
       runProbe: (probe) => Promise.resolve(answers[probe] ?? PASSED),
@@ -497,6 +535,7 @@ describe('the preflight it prints', () => {
       'PREREQUISITES-probe.md names 1 step the preflight does not check:',
       '  line 4: Publish with `npm publish`',
       'Preflight passed: rafa loop start would go on to its first session.',
+      riskLine('.plans/PLAN-probe.md'),
       aheadLine(world),
     ]);
     expect(lines(unnamed.stdout)).toEqual([
@@ -644,6 +683,7 @@ describe('the plan\'s start-only [start] items', () => {
       planHead('1 item checked'),
       CLEAN_LINE,
       'Preflight passed: rafa loop start would go on to its first session.',
+      riskLine('.plans/PLAN-start.md'),
       aheadLine(world),
     ]);
 
@@ -656,6 +696,7 @@ describe('the plan\'s start-only [start] items', () => {
       planHead('nothing to check'),
       SKIPPED_LINE,
       'Preflight passed: rafa loop start would go on to its first session.',
+      riskLine('.plans/PLAN-start.md'),
       aheadLine(resume),
     ]);
 
@@ -1059,6 +1100,93 @@ describe('the automatic items of the pull request provider', () => {
     expect(control.exitCode).toBe(0);
     expect(dataOf(control.stdout)?.automatic).toBe(0);
     expect(dataOf(control.stdout)?.checks).toEqual([]);
+  });
+});
+
+describe('the risk total', () => {
+  /** A world holding a plan whose one open task names no tools. */
+  function plantRiskWorld(config: readonly string[] = []): World {
+    const world = plantWorld(config);
+    plant(world.root, '.plans/PLAN-risk.md', '# Plan\n\n- [ ] A task\n');
+    return world;
+  }
+
+  /** The line the plan above gives. */
+  const RISK_LINE = riskLine('.plans/PLAN-risk.md');
+
+  it('prints the line after the verdict and before the board rows for a plan --plan names, where the default plan prints none', async () => {
+    const world = plantRiskWorld();
+    const named = await doctor(world, ['--plan=.plans/PLAN-risk.md'], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    plant(world.root, '.rafa/plans/PLAN.md', '# Plan\n\n- [ ] A task\n');
+    const unnamed = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+
+    expect(named.exitCode).toBe(0);
+    const out = lines(named.stdout);
+    const verdict = out.indexOf('Preflight passed: rafa loop start would go on to its first session.');
+    expect(verdict).toBeGreaterThan(0);
+    expect(out.slice(verdict + 1, verdict + 3)).toEqual([RISK_LINE, BOARD_HEADING]);
+
+    // The control resolves the default plan, which it checks, and prints
+    // no risk line: `--plan` is how a plan asks for one.
+    expect(unnamed.exitCode).toBe(0);
+    expect(lines(unnamed.stdout)).toContain('Preflight for .rafa/plans/PLAN.md: 2 items checked, 2 of them for the pull request provider, no run started.');
+    expect(unnamed.stdout).not.toContain('Risk:');
+  });
+
+  it('counts a secret-looking variable by its name and writes its value nowhere, in text or json', async () => {
+    const world = plantRiskWorld();
+    const env = { PATH: world.rafaBin, FAKE_TOKEN: 'abc123' };
+
+    const text = await doctor(world, ['--plan=.plans/PLAN-risk.md'], { env });
+    const json = await doctor(world, ['--plan=.plans/PLAN-risk.md', '--output=json'], { env });
+
+    expect(lines(text.stdout)).toContain('🛡  Risk: 1 high, 5 notes — rafa plan risk .plans/PLAN-risk.md');
+    expect(json.stdout).toContain('🛡  Risk: 1 high, 5 notes');
+    for (const written of [text.stdout, text.stderr, json.stdout, json.stderr]) expect(written).not.toContain('abc123');
+    expect([text.exitCode, json.exitCode]).toEqual([0, 0]);
+  });
+
+  it('gives the line as an info log event in json mode, with no text line and the result data as before', async () => {
+    const world = plantRiskWorld();
+
+    const run = await doctor(world, ['--plan=.plans/PLAN-risk.md', '--output=json']);
+
+    expect(run.exitCode).toBe(0);
+    const events = eventsOf(run.stdout);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'log', level: 'info', message: RISK_LINE }));
+    expect(events.some((event) => event.type === 'result')).toBe(true);
+    expect(run.stdout.split('\n').filter((line) => line.startsWith('🛡'))).toEqual([]);
+  });
+
+  it('prints the line for a halt too and leaves the exit code to the preflight', async () => {
+    const world = plantRiskWorld(requiredTool(MISSING_TOOL_PROBE));
+
+    const run = await doctor(world, ['--plan=.plans/PLAN-risk.md']);
+
+    expect(run.exitCode).toBe(1);
+    expect(lines(run.stdout)).toContain(RISK_LINE);
+    expect(run.stderr).toStartWith('rafa doctor: preflight halted: 1 required item failed');
+  });
+
+  it('warns naming the plan when the reading throws and exits 0, beside a control whose reading answers', async () => {
+    const world = plantRiskWorld();
+    const throwing: DoctorSeams = {
+      ...STILL_CLOCK,
+      riskRunners: () => {
+        throw new Error('planted reading failure');
+      },
+    };
+
+    const run = await doctor(world, ['--plan=.plans/PLAN-risk.md'], { seams: throwing });
+    const control = await doctor(world, ['--plan=.plans/PLAN-risk.md']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).not.toContain('🛡');
+    const planPath = join(world.root, '.plans', 'PLAN-risk.md');
+    expect(lines(run.stdout)).toContain(`warn: ⚠️  Risk: could not read ${planPath} — planted reading failure`);
+    expect(control.exitCode).toBe(0);
+    expect(control.stdout).not.toContain('could not read');
+    expect(lines(control.stdout)).toContain(RISK_LINE);
   });
 });
 
