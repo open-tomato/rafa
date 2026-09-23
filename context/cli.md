@@ -570,7 +570,7 @@ New; it replaces no earlier text. What a row or an action added to
   whether one was replaced. A declaration has no variadic spelling, so
   `rafa agent vendor --help` renders the argument as `<name>` where the
   refusals' usage line says `<name>...`.
-- **`agent list [--source=<source>] [--state=<state>] [--hidden-from-loop]`
+- **`agent list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
   lists every agent definition the inventory holds**
   (`src/commands/agent/list.ts`, over `buildInventory` in
   `src/inventory/index.ts`), built as `skill list` builds it and taking
@@ -588,7 +588,9 @@ New; it replaces no earlier text. What a row or an action added to
   positional word, a `--source` or `--state` it cannot take, and a
   config `loadConfig` refuses. In json mode the kept records, the
   filters, the pre-filter total, the agents trees, the vendor names as
-  `unreachable` and the warnings are the result's `data`.
+  `unreachable` and the warnings are the result's `data`. `-i` browses
+  the kept rows as `skill list -i` does, through the helpers that
+  module exports, and prints no vendor hint.
 - **`agent show <name> [--full]` shows the agent definition a name
   resolves to** (`src/commands/agent/show.ts`, over the show view of
   `src/inventory/show.ts`), as `skill show` shows a skill. The inventory
@@ -656,7 +658,7 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa skill check --help` draws `[--project=<string>]` where the
   refusals' usage line says `[--project=<root>]`, as `agent vendor`
   draws `<name>` where its own says `<name>...`.
-- **`skill list [--source=<source>] [--state=<state>] [--hidden-from-loop]`
+- **`skill list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
   lists every skill the inventory holds** (`src/commands/skill/list.ts`,
   over `buildInventory` in `src/inventory/index.ts`). The inventory is
   built against the project the dispatcher resolved, its home, the
@@ -681,7 +683,15 @@ New; it replaces no earlier text. What a row or an action added to
   `--state` it cannot take, and a config `loadConfig` refuses. In json
   mode the kept records, each with its `check`, the filters, the
   pre-filter total, the skills trees and the warnings are the result's
-  `data`.
+  `data`. `-i | --interactive` browses the kept rows instead of printing
+  them, through `browse` (`src/inventory/browse.ts`) on standard error:
+  Enter shows a row, `f` its whole file, Escape goes back, `q` quits,
+  `ctrl-c` is exit code 130. The warnings still go out first, and with
+  no row kept the text listing is printed instead. Exit code 1, before
+  the inventory is built, refuses `-i` when standard input is not a
+  terminal, with a line naming `rafa skill list --output=json`, and
+  refuses it beside `--output=json`. The terminal and the keys are the
+  `terminal` and `keys` seams of the factory.
 - **`skill show <name> [--full]` shows the skill a name resolves to**
   (`src/commands/skill/show.ts`, over the show view of
   `src/inventory/show.ts`). The inventory is built as `skill list`
@@ -868,7 +878,7 @@ New; it replaces no earlier text. What a row or an action added to
   it off the parsed context once the phase 0 function has returned. A
   wrapped command's `outputs` is `['text']` until it writes through the
   active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state` and `hidden-from-loop`, and `agent show` the argument `name`, required, and the flag `full`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state`, `hidden-from-loop` and `interactive`, aliased `i`, and `agent show` the argument `name`, required, and the flag `full`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,

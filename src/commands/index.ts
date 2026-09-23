@@ -93,8 +93,9 @@
  *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
  *     definition copied into the project with a source header, and
  *     `agent list [--source=<source>] [--state=<state>]
- *     [--hidden-from-loop]`, every agent definition the inventory holds
- *     with its source, its state and whether the loop sees it, and
+ *     [--hidden-from-loop] [-i]`, every agent definition the inventory
+ *     holds with its source, its state and whether the loop sees it,
+ *     browsed in the terminal under `-i`, and
  *     `agent show <name> [--full]`, the agent definition a name resolves
  *     to, shown as `skill show` shows a skill.
  *   - `skill check <dir> [--fix] [--project=<root>]` and
@@ -102,8 +103,9 @@
  *     with the number of its failing files and running outside a
  *     project, since `--project` is its only project seam.
  *   - `skill list [--source=<source>] [--state=<state>]
- *     [--hidden-from-loop]`, every skill the inventory holds with its
- *     source, its state and whether the loop sees it, and `instinct list` and
+ *     [--hidden-from-loop] [-i]`, every skill the inventory holds with
+ *     its source, its state and whether the loop sees it, browsed in the
+ *     terminal under `-i`, and `instinct list` and
  *     `instinct show <id>`, the records the project and user instinct
  *     scopes hold, each listing exiting 0 whatever its rows say.
  *   - `skill show <name> [--full]`, the skill a name resolves to: its

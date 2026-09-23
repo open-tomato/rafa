@@ -1,6 +1,6 @@
 /**
  * `rafa agent list [--source=<source>] [--state=<state>]
- * [--hidden-from-loop]`: every agent definition the inventory holds,
+ * [--hidden-from-loop] [-i]`: every agent definition the inventory holds,
  * each with its source, its state, whether a loop session resolves it,
  * and its own summary, then the vendor hint for the home definitions a
  * run cannot reach.
@@ -49,11 +49,26 @@
  * keep, so narrowing the rows never hides it, and json mode gives the
  * same names as `unreachable`.
  *
+ * ## `-i | --interactive`
+ *
+ * Browses the rows the filters kept instead of printing them, as
+ * `rafa skill list -i` does and through the same `interactiveTerminal`
+ * and `browseListing`: the list, Enter to show a definition as
+ * `rafa agent show` would, `f` for its whole file, Escape back, `q` to
+ * quit. The warnings still go out first; the vendor hint, a line of the
+ * text listing, is not printed. When the filters keep no row the text
+ * listing is printed instead. `-i` is refused, exit code 1 and before
+ * the inventory is built, when standard input is not a terminal, with a
+ * line naming `rafa agent list --output=json`, and beside
+ * `--output=json`. The terminal and the keys are the `terminal` and
+ * `keys` seams {@link AgentListSeams} shares with `rafa skill list`.
+ *
  * ## The exit code
  *
  * A listing reports; it exits 0 whatever the rows say. Exit code 1 is
  * kept for the refusals: a positional word, a `--source` or `--state`
- * naming nothing it can take, and a config that cannot be used.
+ * naming nothing it can take, a config that cannot be used, and a `-i`
+ * that cannot browse. `ctrl-c` inside a browse is exit code 130.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ClaudeSettingSource } from '../../config-sections.js';
@@ -72,7 +87,10 @@ import { loadModules, moduleSettings } from '../../modules/load.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 import {
+  browseListing,
   HIDDEN_MARK,
+  interactiveFlag,
+  interactiveTerminal,
   isSourceShape,
   knownSources,
   matchesFilters,
@@ -91,8 +109,11 @@ export const DEFAULT_AGENT_LIST_SEAMS: AgentListSeams = Object.freeze({
   modules: Object.freeze({}),
 });
 
+/** The command's spelling, as the no-terminal refusal names it. */
+const COMMAND_NAME = 'rafa agent list';
+
 /** The usage line a refusal names. */
-const USAGE = 'rafa agent list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop]';
+const USAGE = 'rafa agent list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop] [-i]';
 
 /** What json mode gives as the terminal result's `data`. */
 export interface AgentListResult {
@@ -269,6 +290,7 @@ async function projectInventory(
 async function runList(context: RafaContext, seams: AgentListSeams): Promise<void> {
   const filters = readAgentFilters(context.flags);
   expectNoArgument(context.args, USAGE);
+  const terminal = interactiveTerminal(context, seams, COMMAND_NAME, USAGE);
   const project = projectOf(context);
   const { inventory, settingSources } = await projectInventory(project, context, seams);
   expectKnownAgentSource(filters.source, inventory);
@@ -278,6 +300,15 @@ async function runList(context: RafaContext, seams: AgentListSeams): Promise<voi
   if (context.outputMode === 'json') {
     context.output.result(result);
     return;
+  }
+  if (terminal !== null) {
+    const listing = {
+      commandName: COMMAND_NAME,
+      message: agentListHeading(result).replace(/:$/, ''),
+      rows: result.agents,
+      records: inventory.records,
+    };
+    if (await browseListing(terminal, seams, listing)) return;
   }
   for (const line of renderAgentList(result)) context.output.info(line);
 }
@@ -300,7 +331,8 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
       + ' filters combine. When `~/.claude/agents` holds a name no visible row answers, a trailing line'
       + ' names it and points at `rafa agent vendor`. It spawns no session and exits 0 whatever the rows'
       + ' say. With `--output=json` the rows, the vendor names and the warnings are the data of the'
-      + ' terminal result event.',
+      + ' terminal result event. `-i` browses the listed rows in the terminal instead of printing them,'
+      + ' and refuses without one.',
     args: [],
     flags: [
       {
@@ -320,6 +352,7 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
         description: 'List the rows no session the loop spawns resolves.',
         type: 'boolean',
       },
+      interactiveFlag(),
     ],
     examples: [
       {
@@ -329,6 +362,10 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
       {
         cmd: 'rafa agent list --hidden-from-loop --source=user',
         note: 'Lists the `~/.claude/agents` definitions a loop session does not resolve.',
+      },
+      {
+        cmd: 'rafa agent list -i',
+        note: 'Browses every agent definition: Enter shows one, `f` its whole file, Escape goes back, `q` quits.',
       },
       {
         cmd: 'rafa agent list --output=json',

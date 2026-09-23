@@ -1,6 +1,6 @@
 /**
  * `rafa skill list [--source=<source>] [--state=<state>]
- * [--hidden-from-loop]`: every skill the inventory holds, each with
+ * [--hidden-from-loop] [-i]`: every skill the inventory holds, each with
  * its source, its state, whether a loop session resolves it, and its
  * own summary.
  *
@@ -62,15 +62,38 @@
  * same warnings are in json mode's `data`. None drops a row another
  * source could read.
  *
+ * ## `-i | --interactive`
+ *
+ * Browses the rows the filters kept instead of printing them, through
+ * `browse` (`src/inventory/browse.ts`): the list, Enter to show a row as
+ * `rafa skill show` would, `f` for its whole file, Escape back, `q` to
+ * quit. The browse draws on standard error and prints no row to
+ * standard output; the warnings still go out first. When the filters
+ * keep no row there is nothing to browse, and the text listing with its
+ * `(no skill matches)` line is printed instead.
+ *
+ * `-i` is refused, exit code 1, when standard input is not a terminal,
+ * with a line naming `rafa skill list --output=json`, the listing a
+ * script reads; and beside `--output=json` itself, since the two
+ * answer the same question to two different readers. Both refusals come
+ * before the inventory is built, so a refused `-i` reads no source and
+ * no config. {@link interactiveTerminal} and {@link browseListing} are
+ * exported for `rafa agent list -i`, which browses the same way; the
+ * terminal and the keys are {@link SkillListSeams.terminal} and
+ * {@link SkillListSeams.keys}, a recording terminal and scripted keys in
+ * a test.
+ *
  * ## The exit code is 0 whatever the rows say
  *
  * A listing reports; it does not gate. A source full of failing skills
  * still exits 0, and each row's `check` is in json mode's `data`.
  * Exit code 1 is kept for the refusals: a positional word, a `--source`
- * or `--state` naming nothing it can take, and a config that cannot be
- * used.
+ * or `--state` naming nothing it can take, a config that cannot be
+ * used, and a `-i` that cannot browse. `ctrl-c` inside a browse is exit
+ * code 130.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
+import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { ClaudeSettingSource } from '../../config-sections.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { InventoryRecord } from '../../inventory/record.js';
@@ -79,8 +102,10 @@ import type { ProjectFound } from '../../project/scope.js';
 
 import { pathDirectories } from '../../check/references.js';
 import { CommandExit } from '../../cli/command.js';
+import { processTerminal, refuseWithoutTerminal } from '../../cli/prompt/terminal.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
+import { browse } from '../../inventory/browse.js';
 import { buildInventory } from '../../inventory/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { isSkillTier, SKILL_TIERS } from '../../schema/tiers.js';
@@ -92,6 +117,10 @@ export interface SkillListSeams {
   readonly entry: () => string;
   /** What the config's modules are loaded through. */
   readonly modules: ModuleLoadSeams;
+  /** The terminal `-i` browses on; `processTerminal()` when left out. */
+  readonly terminal?: () => Terminal;
+  /** The keys `-i` reads, opened once per browse; standard input's when left out. */
+  readonly keys?: () => AsyncIterable<Key>;
 }
 
 /** The seams the registered command runs with. */
@@ -100,8 +129,11 @@ export const DEFAULT_SKILL_LIST_SEAMS: SkillListSeams = Object.freeze({
   modules: Object.freeze({}),
 });
 
+/** The command's spelling, as the no-terminal refusal names it. */
+const COMMAND_NAME = 'rafa skill list';
+
 /** The usage line a refusal names. */
-const USAGE = 'rafa skill list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop]';
+const USAGE = 'rafa skill list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop] [-i]';
 
 /** The words `--state` takes, each matched as a prefix of a row's state. */
 export const STATE_FILTERS = ['enabled', 'shadowed', 'disabled'] as const;
@@ -322,6 +354,80 @@ export function renderSkillList(result: SkillListResult): readonly string[] {
   ];
 }
 
+/** The `-i | --interactive` switch both listings declare; see the module note. */
+export function interactiveFlag(): RafaFlagSpec {
+  return {
+    name: 'interactive',
+    description: 'Browse the listed rows in the terminal: Enter shows one, `f` its full context,'
+      + ' Escape goes back, `q` quits. Refused without a terminal and with `--output=json`.',
+    type: 'boolean',
+    aliases: ['i'],
+  };
+}
+
+/** The line the no-terminal refusal names after its own, pointing at the json listing. */
+export function interactiveInstead(commandName: string): string {
+  return `Run \`${commandName} --output=json\` to read the rows without one.`;
+}
+
+/**
+ * The terminal `-i` browses on, or null when the line did not give
+ * `-i`. Refuses `-i` beside `--output=json`, and refuses when standard
+ * input is not a terminal with {@link interactiveInstead}'s line, both
+ * exit code 1 and both before the inventory is built.
+ */
+export function interactiveTerminal(
+  context: Pick<RafaContext, 'flags' | 'outputMode'>,
+  seams: Pick<SkillListSeams, 'terminal'>,
+  commandName: string,
+  usage: string,
+): Terminal | null {
+  if (context.flags['interactive'] !== true) return null;
+  if (context.outputMode === 'json') {
+    throw new CommandExit(1, '❌ -i browses the rows in a terminal and --output=json writes them as data;'
+      + ` give one or the other\nUsage: ${usage}`);
+  }
+  const terminal = seams.terminal?.() ?? processTerminal();
+  refuseWithoutTerminal(terminal, { instead: interactiveInstead(commandName) });
+  return terminal;
+}
+
+/** What `-i` browses. */
+export interface InteractiveListing {
+  /** The command's spelling, for the no-terminal line. */
+  readonly commandName: string;
+  /** The list view's question: the text heading without its colon. */
+  readonly message: string;
+  /** The rows the filters kept, in order. */
+  readonly rows: readonly InventoryRecord[];
+  /** The whole inventory, for the show view's other holders. */
+  readonly records: readonly InventoryRecord[];
+}
+
+/**
+ * Browses `listing` on `terminal` until a view quits; answers false,
+ * browsing nothing, when the filters kept no row, so the caller prints
+ * its text listing and its `(no ... matches)` line instead.
+ */
+export async function browseListing(
+  terminal: Terminal,
+  seams: Pick<SkillListSeams, 'keys'>,
+  listing: InteractiveListing,
+): Promise<boolean> {
+  if (listing.rows.length === 0) return false;
+  await browse({
+    message: listing.message,
+    rows: listing.rows,
+    records: listing.records,
+    terminal,
+    instead: interactiveInstead(listing.commandName),
+    ...(seams.keys === undefined
+      ? {}
+      : { keys: seams.keys() }),
+  });
+  return true;
+}
+
 /** The project the dispatcher resolved, which this command declares it needs. */
 function projectOf(context: RafaContext): ProjectFound {
   if (context.project === null) throw new Error('rafa skill list runs inside a project, and was handed none');
@@ -363,6 +469,7 @@ export async function projectInventory(
 async function runList(context: RafaContext, seams: SkillListSeams): Promise<void> {
   const filters = readFilters(context.flags);
   expectNoArgument(context.args, USAGE);
+  const terminal = interactiveTerminal(context, seams, COMMAND_NAME, USAGE);
   const project = projectOf(context);
   const { inventory, settingSources } = await projectInventory(project, context, seams);
   expectKnownSource(filters.source, inventory);
@@ -372,6 +479,15 @@ async function runList(context: RafaContext, seams: SkillListSeams): Promise<voi
   if (context.outputMode === 'json') {
     context.output.result(result);
     return;
+  }
+  if (terminal !== null) {
+    const listing = {
+      commandName: COMMAND_NAME,
+      message: listHeading(result).replace(/:$/, ''),
+      rows: result.skills,
+      records: inventory.records,
+    };
+    if (await browseListing(terminal, seams, listing)) return;
   }
   for (const line of renderSkillList(result)) context.output.info(line);
 }
@@ -393,7 +509,8 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
       + ' `--hidden-from-loop` keeps the rows no loop session resolves. The filters combine. A skills'
       + ' directory that is not there says so, and a source that does not read is a warning. The exit code'
       + ' is 0 whatever the rows say: this command reports and `rafa skill check` gates. With'
-      + ' `--output=json` the rows, each with its checker verdict, are the data of the terminal result event.',
+      + ' `--output=json` the rows, each with its checker verdict, are the data of the terminal result event.'
+      + ' `-i` browses the listed rows in the terminal instead of printing them, and refuses without one.',
     args: [],
     flags: [
       {
@@ -413,6 +530,7 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
         description: 'List the rows no session the loop spawns resolves.',
         type: 'boolean',
       },
+      interactiveFlag(),
     ],
     examples: [
       {
@@ -426,6 +544,10 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
       {
         cmd: 'rafa skill list --hidden-from-loop',
         note: 'Lists the skills a loop session does not resolve under `loop.settingSources`.',
+      },
+      {
+        cmd: 'rafa skill list -i --source=project',
+        note: 'Browses the project\'s skills: Enter shows one, `f` its whole file, Escape goes back, `q` quits.',
       },
       {
         cmd: 'rafa skill list --output=json',

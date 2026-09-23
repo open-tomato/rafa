@@ -620,7 +620,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../schema/tiers.js', ['SKILL_TIERS']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['../skill/list.js', [
+      'browseListing',
       'HIDDEN_MARK',
+      'interactiveFlag',
+      'interactiveTerminal',
       'isSourceShape',
       'knownSources',
       'matchesFilters',
@@ -643,8 +646,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/skill/list.js', [
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
+    ['../../cli/prompt/terminal.js', ['processTerminal', 'refuseWithoutTerminal']],
     ['../../config-load.js', ['loadConfig']],
     ['../../config.js', ['ConfigError']],
+    ['../../inventory/browse.js', ['browse']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../schema/tiers.js', ['isSkillTier', 'SKILL_TIERS']],

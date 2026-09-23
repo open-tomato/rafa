@@ -23,7 +23,19 @@
  * command that marked every user row hidden would fail that half. That
  * a failing skill leaves the exit code 0 is held beside its json row,
  * whose `check` says `fail`.
+ *
+ * ## `-i`
+ *
+ * The browse runs over a recording terminal and scripted keys handed in
+ * as the `terminal` and `keys` seams. The no-terminal refusal is held
+ * beside the same line over a terminal that is one, which browses and
+ * exits 0, so a command refusing `-i` always would fail that half; and
+ * the refusal is measured to come before any key is read and before the
+ * config is loaded, by a key source that counts its openings and a
+ * config that cannot be used.
  */
+import type { SkillListSeams } from './list.js';
+import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { InventoryRecord } from '../../inventory/record.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,11 +45,16 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
+import { INTERRUPT_EXIT_CODE, NO_TERMINAL_TEXT } from '../../cli/prompt/terminal.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {
+  browseListing,
   createSkillListCommand,
   expectKnownSource,
+  interactiveFlag,
+  interactiveInstead,
+  interactiveTerminal,
   isSourceShape,
   knownSources,
   listHeading,
@@ -145,9 +162,9 @@ function standardTree(settingSources = 'project,local'): Planted {
   }, settingSources);
 }
 
-/** Dispatches `words` over the command, with the planted tree's seams. */
-async function run(words: readonly string[], tree: Planted) {
-  const command = createSkillListCommand({ entry: () => tree.entry, modules: {} });
+/** Dispatches `words` over the command, with the planted tree's seams and any `-i` seams given. */
+async function run(words: readonly string[], tree: Planted, browsing: Pick<SkillListSeams, 'terminal' | 'keys'> = {}) {
+  const command = createSkillListCommand({ entry: () => tree.entry, modules: {}, ...browsing });
   return dispatchInProject(words, SUBJECTS, [command], { root: tree.root, home: tree.home }, { PATH: '' });
 }
 
@@ -511,5 +528,225 @@ describe('rafa skill list over planted sources', () => {
 
     expect(answered.exitCode).toBe(1);
     expect(answered.stderr).toContain('rafa skill list: the config cannot be used:');
+  });
+});
+
+/** A terminal recording what the browse writes; a terminal only when `isTTY`. */
+function recordingTerminal(isTTY = true): { readonly terminal: Terminal; readonly written: () => string } {
+  const writes: string[] = [];
+  const terminal: Terminal = {
+    isTTY,
+    setRawMode: () => undefined,
+    write: (text) => {
+      writes.push(text);
+    },
+    onInterrupt: () => () => undefined,
+    exit: () => undefined,
+  };
+  return { terminal, written: () => writes.join('') };
+}
+
+/** A key source yielding `keys` then ending, counting how often it is opened. */
+function scriptedKeys(keys: readonly Key[]): { readonly keys: () => AsyncIterable<Key>; readonly opened: () => number } {
+  let opened = 0;
+  return {
+    keys: () => {
+      opened += 1;
+      return (async function* yieldKeys() {
+        yield* keys;
+      })();
+    },
+    opened: () => opened,
+  };
+}
+
+/** The key for typing `typed`. */
+function char(typed: string): Key {
+  return { name: 'char', char: typed };
+}
+
+const DOWN: Key = { name: 'down' };
+const ENTER: Key = { name: 'enter' };
+const ESCAPE: Key = { name: 'escape' };
+
+describe('the -i helpers', () => {
+  it('declares -i as the one-letter alias of a boolean --interactive', () => {
+    expect(interactiveFlag()).toMatchObject({ name: 'interactive', type: 'boolean', aliases: ['i'] });
+  });
+
+  it('answers null without -i, and never asks for a terminal', () => {
+    let asked = 0;
+    const seams = {
+      terminal: () => {
+        asked += 1;
+        return recordingTerminal(false).terminal;
+      },
+    };
+
+    expect(interactiveTerminal({ flags: {}, outputMode: 'text' }, seams, 'rafa skill list', 'usage')).toBeNull();
+    expect(asked).toBe(0);
+  });
+
+  it('answers the terminal under -i when it is one, and refuses one that is not, naming --output=json', () => {
+    const tty = recordingTerminal(true).terminal;
+    const pipe = recordingTerminal(false).terminal;
+    const context = { flags: { interactive: true }, outputMode: 'text' as const };
+
+    expect(interactiveTerminal(context, { terminal: () => tty }, 'rafa skill list', 'usage')).toBe(tty);
+    const [code, message] = refusal(() => interactiveTerminal(context, { terminal: () => pipe }, 'rafa skill list', 'usage'));
+    expect(code).toBe(1);
+    expect(message).toContain(NO_TERMINAL_TEXT);
+    expect(message).toContain('Run `rafa skill list --output=json` to read the rows without one.');
+    expect(interactiveInstead('rafa agent list')).toContain('rafa agent list --output=json');
+  });
+
+  it('refuses -i beside --output=json, even on a terminal', () => {
+    const tty = recordingTerminal(true).terminal;
+
+    const [code, message] = refusal(() => interactiveTerminal(
+      { flags: { interactive: true }, outputMode: 'json' },
+      { terminal: () => tty },
+      'rafa skill list',
+      'the usage line',
+    ));
+
+    expect(code).toBe(1);
+    expect(message).toContain('-i browses the rows in a terminal and --output=json writes them as data');
+    expect(message).toContain('Usage: the usage line');
+  });
+
+  it('browses nothing and opens no key source when no row is listed', async () => {
+    const script = scriptedKeys([char('q')]);
+    const { terminal, written } = recordingTerminal();
+    const listing = { commandName: 'rafa skill list', message: 'Skills', records: [] };
+
+    expect(await browseListing(terminal, { keys: script.keys }, { ...listing, rows: [] })).toBe(false);
+    expect(script.opened()).toBe(0);
+    expect(written()).toBe('');
+    expect(await browseListing(terminal, { keys: script.keys }, { ...listing, rows: [record({ name: 'kept' })] })).toBe(true);
+    expect(script.opened()).toBe(1);
+    expect(written()).toContain('kept');
+  });
+});
+
+describe('rafa skill list -i over planted sources', () => {
+  it('refuses without a terminal, naming --output=json, before a key is read', async () => {
+    const tree = standardTree();
+    const script = scriptedKeys([char('q')]);
+
+    const answered = await run(['skill', 'list', '-i'], tree, { terminal: () => recordingTerminal(false).terminal, keys: script.keys });
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stderr).toContain(NO_TERMINAL_TEXT);
+    expect(answered.stderr).toContain('rafa skill list --output=json');
+    expect(answered.stdout).not.toContain('verification-loop');
+    expect(script.opened()).toBe(0);
+  });
+
+  it('browses and exits 0 on the same line over a terminal, the control on the refusal', async () => {
+    const tree = standardTree();
+    const script = scriptedKeys([char('q')]);
+    const { terminal, written } = recordingTerminal();
+
+    const answered = await run(['skill', 'list', '-i'], tree, { terminal: () => terminal, keys: script.keys });
+
+    expect(answered.exitCode).toBe(0);
+    expect(script.opened()).toBe(1);
+    expect(written()).toContain(`Skills (project: ${tree.root})`);
+    expect(written()).toContain('verification-loop');
+  });
+
+  it('refuses without a terminal before the config is read', async () => {
+    const tree = plant({});
+    plantProjectConfig(tree.root, 'version: 1\nloop:\n  settingSources: nowhere\n');
+
+    const refused = await run(['skill', 'list', '-i'], tree, { terminal: () => recordingTerminal(false).terminal });
+    const listed = await run(['skill', 'list'], tree);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain(NO_TERMINAL_TEXT);
+    expect(refused.stderr).not.toContain('the config cannot be used');
+    expect(listed.stderr).toContain('the config cannot be used');
+  });
+
+  it('refuses -i beside --output=json', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['skill', 'list', '-i', '--output=json'], tree, { terminal: () => recordingTerminal().terminal });
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stdout).toContain('--output=json writes them as data');
+  });
+
+  it('moves down twice, shows the row, opens its full context, goes back and quits, printing no row', async () => {
+    const tree = standardTree();
+    const script = scriptedKeys([DOWN, DOWN, ENTER, char('f'), ESCAPE, char('q')]);
+    const { terminal, written } = recordingTerminal();
+
+    const answered = await run(['skill', 'list', '--interactive'], tree, { terminal: () => terminal, keys: script.keys });
+
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stderr).toBe('');
+    expect(answered.stdout).not.toContain('user-only');
+    expect(written()).toContain('[show] skill user-only (user)');
+    expect(written()).toContain('[full context] skill user-only (user)');
+    expect(written()).toContain('\ndescription: Held by the home alone\n');
+    expect(written()).not.toContain('[show] skill verification-loop');
+  });
+
+  it('browses the rows the filters keep, and no other', async () => {
+    const tree = standardTree();
+    const { terminal, written } = recordingTerminal();
+
+    const answered = await run(['skill', 'list', '-i', '--source=user'], tree, {
+      terminal: () => terminal,
+      keys: scriptedKeys([ENTER, char('q')]).keys,
+    });
+
+    expect(answered.exitCode).toBe(0);
+    expect(written()).toContain(`Skills (project: ${tree.root}; source user)`);
+    expect(written()).toContain('user-only');
+    expect(written()).not.toContain('alpha:brainstorm');
+    expect(written()).toContain('[show] skill user-only (user)');
+  });
+
+  it('prints the text listing and reads no key when the filters keep no row', async () => {
+    const tree = standardTree();
+    const script = scriptedKeys([char('q')]);
+    const { terminal, written } = recordingTerminal();
+
+    const answered = await run(['skill', 'list', '-i', '--source=rafa'], tree, { terminal: () => terminal, keys: script.keys });
+
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stdout).toContain('  (no skill matches)');
+    expect(script.opened()).toBe(0);
+    expect(written()).toBe('');
+  });
+
+  it('still writes the warnings to stdout ahead of the browse', async () => {
+    const tree = plant({
+      'project/.claude/skills/verification-loop/SKILL.md': skillText('verification-loop', 'Run the gates in order'),
+      'home/.claude/plugins/installed_plugins.json': '{ not json',
+    });
+
+    const answered = await run(['skill', 'list', '-i'], tree, {
+      terminal: () => recordingTerminal().terminal,
+      keys: scriptedKeys([char('q')]).keys,
+    });
+
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stdout).toMatch(/^warn: plugins: /m);
+    expect(answered.stdout).not.toContain('Run the gates in order');
+  });
+
+  it('exits 130 on ctrl-c', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['skill', 'list', '-i'], tree, {
+      terminal: () => recordingTerminal().terminal,
+      keys: scriptedKeys([DOWN, { name: 'ctrl-c' }]).keys,
+    });
+
+    expect(answered.exitCode).toBe(INTERRUPT_EXIT_CODE);
   });
 });

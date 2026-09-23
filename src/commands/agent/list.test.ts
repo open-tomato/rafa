@@ -22,7 +22,16 @@
  * `user`, where it is visible and the hint is gone: a command that
  * marked every user row hidden, or printed the hint always, would fail
  * that half.
+ *
+ * ## `-i`
+ *
+ * The browse runs over a recording terminal and scripted keys handed in
+ * as the `terminal` and `keys` seams. The no-terminal refusal is held
+ * beside the same line over a terminal that is one, which browses and
+ * exits 0, so a command refusing `-i` always would fail that half.
  */
+import type { AgentListSeams } from './list.js';
+import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { InventoryRecord } from '../../inventory/record.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -32,6 +41,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
+import { NO_TERMINAL_TEXT } from '../../cli/prompt/terminal.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {
@@ -106,9 +116,9 @@ function standardTree(settingSources = 'project,local'): Planted {
   }, settingSources);
 }
 
-/** Dispatches `words` over the command, with the planted tree's seams. */
-async function run(words: readonly string[], tree: Planted) {
-  const command = createAgentListCommand({ entry: () => tree.entry, modules: {} });
+/** Dispatches `words` over the command, with the planted tree's seams and any `-i` seams given. */
+async function run(words: readonly string[], tree: Planted, browsing: Pick<AgentListSeams, 'terminal' | 'keys'> = {}) {
+  const command = createAgentListCommand({ entry: () => tree.entry, modules: {}, ...browsing });
   return dispatchInProject(words, SUBJECTS, [command], { root: tree.root, home: tree.home }, { PATH: '' });
 }
 
@@ -413,5 +423,91 @@ describe('rafa agent list over planted sources', () => {
 
     expect(answered.exitCode).toBe(1);
     expect(answered.stderr).toContain('rafa agent list: the config cannot be used:');
+  });
+});
+
+/** A terminal recording what the browse writes; a terminal only when `isTTY`. */
+function recordingTerminal(isTTY = true): { readonly terminal: Terminal; readonly written: () => string } {
+  const writes: string[] = [];
+  const terminal: Terminal = {
+    isTTY,
+    setRawMode: () => undefined,
+    write: (text) => {
+      writes.push(text);
+    },
+    onInterrupt: () => () => undefined,
+    exit: () => undefined,
+  };
+  return { terminal, written: () => writes.join('') };
+}
+
+/** A key source yielding `keys` then ending, counting how often it is opened. */
+function scriptedKeys(keys: readonly Key[]): { readonly keys: () => AsyncIterable<Key>; readonly opened: () => number } {
+  let opened = 0;
+  return {
+    keys: () => {
+      opened += 1;
+      return (async function* yieldKeys() {
+        yield* keys;
+      })();
+    },
+    opened: () => opened,
+  };
+}
+
+/** The key for typing `typed`. */
+function char(typed: string): Key {
+  return { name: 'char', char: typed };
+}
+
+describe('rafa agent list -i over planted sources', () => {
+  it('refuses without a terminal, naming its own --output=json, before a key is read', async () => {
+    const tree = standardTree();
+    const script = scriptedKeys([char('q')]);
+
+    const answered = await run(['agent', 'list', '-i'], tree, { terminal: () => recordingTerminal(false).terminal, keys: script.keys });
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stderr).toContain(NO_TERMINAL_TEXT);
+    expect(answered.stderr).toContain('Run `rafa agent list --output=json` to read the rows without one.');
+    expect(script.opened()).toBe(0);
+  });
+
+  it('browses and exits 0 on the same line over a terminal, the control on the refusal', async () => {
+    const tree = standardTree();
+    const { terminal, written } = recordingTerminal();
+
+    const answered = await run(['agent', 'list', '-i'], tree, { terminal: () => terminal, keys: scriptedKeys([char('q')]).keys });
+
+    expect(answered.exitCode).toBe(0);
+    expect(written()).toContain(`Agents (project: ${tree.root})`);
+    expect(written()).toContain('tdd-guide');
+  });
+
+  it('shows a definition, opens its full context and quits, printing neither a row nor the vendor hint', async () => {
+    const tree = standardTree();
+    const keys: readonly Key[] = [{ name: 'down' }, { name: 'enter' }, char('f'), { name: 'escape' }, char('q')];
+    const { terminal, written } = recordingTerminal();
+
+    const text = await run(['agent', 'list'], tree);
+    const answered = await run(['agent', 'list', '--interactive'], tree, { terminal: () => terminal, keys: scriptedKeys(keys).keys });
+
+    expect(text.stdout).toContain('rafa agent vendor');
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stdout).not.toContain('rafa agent vendor');
+    expect(answered.stdout).not.toContain('home-only');
+    expect(written()).toContain('[show] agent home-only (user)');
+    expect(written()).toContain('[full context] agent home-only (user)');
+    expect(written()).toContain('The home-only body.');
+  });
+
+  it('refuses -i beside --output=json', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['agent', 'list', '-i', '--output=json'], tree, { terminal: () => recordingTerminal().terminal });
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stdout).toContain('--output=json writes them as data');
+    expect(answered.stdout).toContain('Usage: rafa agent list');
   });
 });
