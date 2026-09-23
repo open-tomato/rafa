@@ -57,8 +57,10 @@
  * What this reader does not read, each a known gap rather than a
  * silent one: a `plugin.json` naming extra `skills` or `agents` paths
  * beside the default directories, and `enabledPlugins` in the settings
- * files, which decides whether an installed plugin loads at all and is
- * the disabled reading's (`disabled.ts`), not a source's.
+ * files, which decides whether an installed plugin loads at all. That
+ * one belongs to a disabled reading, not a source, and `disabled.ts`
+ * does not read it either: it reads `skillOverrides`, which exempts
+ * plugin skills, and the frontmatter switches.
  *
  * ## Add-ons: the loaded modules' own manifests
  *
