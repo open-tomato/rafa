@@ -144,6 +144,27 @@ A spec without the label cannot be planned from the board routes. See
 `context/pull-requests.md` for the readiness gate's four checks and how
 the planner's own review can keep a plan when assumptions are named.
 
+### The interaction rule
+
+**A person fills in a form, rafa runs ONE fixed-template session, code
+validates the result, and the person accepts or rejects. No conversation
+inside rafa.** The command reads the form through the prompt kit in
+`src/cli/prompt/`, collects answers into a payload, passes them to a
+Claude session with a fixed prompt template and receives one response.
+A gate code checks the response against a schema — validating the
+structure, running any custom checks, and reporting every failure. If all
+checks pass, the person is offered the result: a yes confirms the action
+and the command ends successfully, a no discards it and the command exits
+with no state written, asking why only in a test. Commands that read a
+form declare their own `spends` on their `RafaCommand` (`src/cli/spends.ts`)
+for the one session they will start if the person reaches the form. No
+command spawns a second Claude session, no prompt asks the person to
+continue in Claude Code, and no runtime dependency enters the package:
+the prompt kit runs in raw mode on `stdio` and every session reads the
+API from the `RafaContext.env` values or the `.rafa/config.yaml`, so the
+loop's own machinery (`src/utils/claude.ts` for the session and
+`src/effort/store/` for the record) runs all the code.
+
 ### Files beside the tree
 
 **`.rafa/plans/` and `.rafa/specs/` are gitignored**, so they live only in the
