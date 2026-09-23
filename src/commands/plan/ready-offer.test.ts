@@ -55,7 +55,7 @@
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { SpecIssue } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { Prompter } from '../../project/root-choice.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { ReadyOptions, ReadyReport } from '../issue/ready.js';
 
 import { describe, expect, it } from 'bun:test';

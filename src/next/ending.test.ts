@@ -58,8 +58,8 @@
 import type { NextEndingSeams } from './ending.js';
 import type { NextState } from './state.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { Output } from '../ports/index.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { describe, expect, it } from 'bun:test';
 

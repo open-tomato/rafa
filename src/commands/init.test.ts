@@ -65,7 +65,7 @@
  */
 import type { InitResult, InitSeams } from './init.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../project/root-choice.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import {
   existsSync,

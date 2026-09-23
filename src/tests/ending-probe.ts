@@ -22,9 +22,9 @@
  * same state, which is what keeps this file honest as the wording
  * changes.
  */
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { NextEndingSeams } from '../next/ending.js';
 import type { NextState } from '../next/state.js';
-import type { Prompter } from '../project/root-choice.js';
 
 /** The pull request the green state names. */
 export const ENDING_PR = 41;

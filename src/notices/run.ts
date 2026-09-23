@@ -13,8 +13,8 @@ import { homedir } from 'node:os';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { RAFA_VERSION } from '../cli/version.js';
-import { createLinePrompter } from '../project/root-choice.js';
 
 import { offerNotices } from './notices.js';
 

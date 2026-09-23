@@ -126,15 +126,15 @@ import type { BlockedReading } from '../../board/blocked.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssueReader } from '../../board/issue.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../project/root-choice.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
 import { CommandExit } from '../../cli/command.js';
+import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
-import { createLinePrompter } from '../../project/root-choice.js';
 import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 import { plural } from '../plan/plan-files.js';
 

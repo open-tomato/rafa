@@ -42,10 +42,10 @@
  * them reads standard input or waits on an answer.
  */
 import type { RefreshOffer, RefreshOfferRequest } from '../../board/snapshot-settle.js';
-import type { Prompter } from '../../project/root-choice.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 
 import { refreshQuestion } from '../../board/snapshot-settle.js';
-import { createLinePrompter } from '../../project/root-choice.js';
+import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { lazyPrompter } from '../issue/ready.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */

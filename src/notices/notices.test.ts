@@ -1,5 +1,5 @@
 import type { NoticeSeams } from './notices.js';
-import type { Prompter } from '../project/root-choice.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';

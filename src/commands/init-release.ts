@@ -67,8 +67,8 @@
  * is the project config under the root it is handed, which every case
  * in `./init-release.test.ts` points at its own temporary directory.
  */
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { ReleaseEnabled } from '../config-sections.js';
-import type { Prompter } from '../project/root-choice.js';
 import type { ReleaseFileSettings } from '../release/enabled.js';
 
 import { writeFileSync } from 'node:fs';

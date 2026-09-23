@@ -73,10 +73,10 @@
  */
 import type { NextHintSeams, NextStepHint } from './hint.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { Output } from '../ports/index.js';
-import type { Prompter } from '../project/root-choice.js';
 
-import { createLinePrompter } from '../project/root-choice.js';
+import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { answeredYes } from '../start/branch-decision.js';
 
 import { runAction } from './actions.js';

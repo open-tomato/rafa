@@ -33,7 +33,7 @@
  *    cases. A prompter left open holds standard input past the question.
  */
 import type { RefreshOfferRequest } from '../../board/snapshot-settle.js';
-import type { Prompter } from '../../project/root-choice.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 
 import { describe, expect, it } from 'bun:test';
 

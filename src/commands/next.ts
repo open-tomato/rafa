@@ -168,14 +168,15 @@
  * action that failed.
  */
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextSources } from '../next/readings.js';
 import type { NextSourceSeams } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { CommandExit } from '../cli/command.js';
+import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
@@ -183,7 +184,6 @@ import { commandWords, nextQuestion } from '../next/hint.js';
 import { openNextSources } from '../next/sources.js';
 import { readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
-import { createLinePrompter } from '../project/root-choice.js';
 import { REMOTE } from '../start/branch-decision.js';
 
 import { lazyPrompter } from './issue/ready.js';

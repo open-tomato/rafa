@@ -35,8 +35,8 @@
  * suite never told git about directly, and the sha the new branch ends
  * on is read back off the real ref rather than asserted from a script.
  */
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { GitRunner } from '../pr/index.js';
-import type { Prompter } from '../project/root-choice.js';
 import type { BranchOutcome, BranchRequest, BranchSeams } from '../start/branch.js';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

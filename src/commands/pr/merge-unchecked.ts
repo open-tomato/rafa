@@ -59,14 +59,14 @@
  * `./merge.ts` should post it straight after the merge rather than
  * behind the local clean-up, which can fail and would silently drop it.
  */
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PullRequestComment, PullRequests } from '../../pr/index.js';
 import type { UncheckedReading } from '../../pr/unchecked.js';
-import type { Prompter } from '../../project/root-choice.js';
 
 import { CommandExit } from '../../cli/command.js';
+import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { messageOf } from '../../config-sections.js';
 import { readUnchecked } from '../../pr/unchecked.js';
-import { createLinePrompter } from '../../project/root-choice.js';
 
 /** The indent a refusal's quoted lines carry, as `./merge.ts` indents them. */
 const INDENT = '   ';

@@ -1,8 +1,8 @@
 /**
  * Tests for taking a root (`root-choice.ts`): each candidate as the list
  * shows it, the question, `--yes`'s first candidate, a named path, each
- * kind of answer, the prompt loop, and the line prompter over streams of
- * its own.
+ * kind of answer and the prompt loop, over a scripted prompter; the line
+ * prompter itself is tested in `src/cli/prompt/confirm.test.ts`.
  *
  * The candidates are built here, over directories under this file's own
  * temporary root, so each case names exactly the list it reads. One
@@ -10,25 +10,19 @@
  * the first candidate, with a git probe answering no repository. A named
  * path is refused and resolved over the disk, and every root answered is
  * asserted to sit under the temporary root.
- *
- * The prompter cases write to a `PassThrough` and read back what the
- * prompter wrote; the end of input is the stream's `end`, and the case
- * for a line typed before it is asked for waits one turn of the event
- * loop so readline has read it.
  */
-import type { Prompter, RootReading } from './root-choice.js';
+import type { RootReading } from './root-choice.js';
 import type { RootCandidate, RootCandidates } from './roots.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PassThrough } from 'node:stream';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   candidateLines,
-  createLinePrompter,
   describeCandidate,
   firstCandidate,
   namedRoot,
@@ -99,24 +93,6 @@ function scripted(answers: readonly string[]): { prompter: Prompter; said: strin
     close: () => undefined,
   };
   return { prompter, said, asked };
-}
-
-/** A prompter over streams of its own, and what it has written so far. */
-function overStreams(): { prompter: Prompter; input: PassThrough; written: () => string } {
-  const input = new PassThrough();
-  const output = new PassThrough();
-  const chunks: string[] = [];
-  output.on('data', (chunk: Buffer) => {
-    chunks.push(chunk.toString());
-  });
-  return { prompter: createLinePrompter(input, output), input, written: () => chunks.join('') };
-}
-
-/** One turn of the event loop. */
-async function settle(): Promise<void> {
-  await new Promise((done) => {
-    setTimeout(done, 0);
-  });
 }
 
 /** A root reading of `path` from `source`. */
@@ -234,56 +210,5 @@ describe('promptForRoot', () => {
     expect(root).toBeNull();
     expect(script.said).toEqual([candidateLines(REFUSED_FIRST).join('\n')]);
     expect(script.asked).toEqual([rootQuestion(REFUSED_FIRST)]);
-  });
-});
-
-describe('createLinePrompter', () => {
-  it('writes the question, then answers the line typed after it', async () => {
-    const { prompter, input, written } = overStreams();
-
-    const answer = prompter.ask('Root? ');
-    input.write('two words \n');
-
-    expect(await answer).toBe('two words ');
-    expect(written()).toBe('Root? ');
-    prompter.close();
-  });
-
-  it('keeps lines typed before they are asked for, in order, and reads CRLF as one break', async () => {
-    const { prompter, input } = overStreams();
-    input.write('one\r\ntwo\n');
-    await settle();
-
-    expect([await prompter.ask(''), await prompter.ask('')]).toEqual(['one', 'two']);
-    prompter.close();
-  });
-
-  it('answers null to a pending question and every later one once the input ends', async () => {
-    const { prompter, input } = overStreams();
-
-    const pending = prompter.ask('Root? ');
-    input.end();
-
-    expect(await pending).toBeNull();
-    expect(await prompter.ask('Root? ')).toBeNull();
-  });
-
-  it('delivers a last line that ends without a line break before answering null', async () => {
-    const { prompter, input } = overStreams();
-    input.end('last');
-    await settle();
-
-    expect([await prompter.ask(''), await prompter.ask('')]).toEqual(['last', null]);
-  });
-
-  it('writes what it says with a line break, and answers null once closed', async () => {
-    const { prompter, written } = overStreams();
-
-    prompter.say('listed');
-    prompter.close();
-    await settle();
-
-    expect(await prompter.ask('Root? ')).toBeNull();
-    expect(written()).toBe('listed\nRoot? ');
   });
 });

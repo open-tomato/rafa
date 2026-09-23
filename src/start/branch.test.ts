@@ -26,8 +26,8 @@
  * process, so each case sets a sink and the last one sets it back.
  */
 import type { BranchOutcome, BranchRequest, BranchSeams } from './branch.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 

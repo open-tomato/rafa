@@ -34,6 +34,7 @@
 import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../cli/command.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   ChecksReading,
@@ -44,7 +45,6 @@ import type {
   PullRequests,
 } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
-import type { Prompter } from '../../project/root-choice.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

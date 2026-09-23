@@ -112,9 +112,9 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner } from '../../pr/git.js';
-import type { Prompter } from '../../project/root-choice.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
@@ -124,10 +124,10 @@ import { boardRepoLabel, issueSource } from '../../board/plan-spec.js';
 import { hasSpecReadyLabel, requireCompleteSpec, SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
 import { CommandExit } from '../../cli/command.js';
+import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { messageOf } from '../../config-sections.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/git.js';
-import { createLinePrompter } from '../../project/root-choice.js';
 import { answeredYes } from '../../start/branch-decision.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
