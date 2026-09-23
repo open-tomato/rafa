@@ -190,8 +190,12 @@ function isAbsent(error: unknown): boolean {
   return isMapping(error) && Object.hasOwn(error, 'code') && error.code === 'ENOENT';
 }
 
-/** A settings file's parsed mapping, null when absent, or the reason it does not read. */
-function readSettings(path: string): Readonly<Record<string, unknown>> | null | string {
+/**
+ * A JSON file's parsed mapping, null when absent, or the reason it does
+ * not read. `mcp.ts` reads `.mcp.json`, `~/.claude.json` and the
+ * settings files through it too, so an unreadable file is worded one way.
+ */
+export function readSettings(path: string): Readonly<Record<string, unknown>> | null | string {
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
