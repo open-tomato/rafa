@@ -20,6 +20,10 @@ The slug summarizes what the user gets, using two to four words joined by
 hyphens. The order of work lives in ONE place: the pinned "Roadmap" issue
 on the `open-tomato/rafa` board.
 
+* Commands that start Claude sessions must declare `spends` on their
+  `RafaCommand` — see the dev-planner skill's "Command-development rule" for
+  guidance.
+
 * Before planning, review the spec as written, and report that review at the
   END of your final message as a `rafa:spec-review` block carrying
   `verdict: ready` or `verdict: not-ready`, with empty `gaps:` for ready, or a

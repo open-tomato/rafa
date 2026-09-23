@@ -471,6 +471,27 @@ The report rules in this skill restate `src/report/parse.ts`, which is the autho
 
 ---
 
+## Command-development rule: Claude session declaration
+
+When planning work on rafa commands: every command that can start a Claude
+Code session must declare its `spends` field on its `RafaCommand` definition.
+The field tells the help system, `describe` output, and the spawn guard in
+`src/utils/claude.ts` what Claude usage the command declares. It is optional,
+and takes one of four shapes:
+
+- `{ when: 'always'; what: string }` — the command always starts a session
+- `{ when: 'with'; flag: string; what: string }` — starts a session only when
+  the named flag is passed (flag written as `--resolve`, matched by name)
+- `{ when: 'unless'; flag: string; what: string }` — starts a session unless
+  the named flag is passed
+- `{ when: 'through'; what: string }` — may start a session through a
+  sub-command it calls
+
+The `what` field is a short phrase describing the session (e.g., "one planning
+session"). See `context/cli.md` for the command architecture and examples.
+
+---
+
 ## Examples
 
 Each module task below carries its own unit tests, and each stage closes on a test task over what its modules do together.
