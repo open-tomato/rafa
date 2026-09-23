@@ -33,6 +33,13 @@
  * spawning exactly what it spawned before. What json mode changes is in
  * the section "What reaches the operator" below.
  *
+ * The search runner (`inventory/search/index.ts`) captures its one
+ * session through the same spawner without going through
+ * `runClaudeCaptured`: it builds its argument list with
+ * {@link claudeArgs} and hands the spawner the one option no other
+ * caller passes, {@link CapturedSpawnOptions.cwd}, since that session
+ * runs inside the scratch copy of its candidates.
+ *
  * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
  * rather than before, and the ordering is load-bearing rather than
  * cosmetic. `--tools` is
@@ -421,16 +428,32 @@ export interface CapturedSession {
 }
 
 /**
+ * Where a captured session runs. Every field is optional, and an empty
+ * object spawns exactly what no options spawn.
+ */
+export interface CapturedSpawnOptions {
+  /**
+   * The session's working directory, or the loop's own when absent. The
+   * search session (`src/inventory/search/index.ts`) is the one caller
+   * that names one: it runs inside the scratch copy of its candidates.
+   */
+  readonly cwd?: string;
+}
+
+/**
  * Runs `claude` with an argument list and a prompt on stdin, and
  * answers the exit code together with the session's stdout.
  *
  * A seam of its own rather than a widened {@link ClaudeSpawner}:
  * widening that one would change what every existing `runClaude`
- * double has to answer, for sessions whose output nothing reads.
+ * double has to answer, for sessions whose output nothing reads. The
+ * third parameter is optional for the same reason: a double written
+ * for `(args, prompt)` is still a `CapturingSpawner`.
  */
 export type CapturingSpawner = (
   args: readonly string[],
   prompt: string,
+  options?: CapturedSpawnOptions,
 ) => Promise<CapturedSession>;
 
 /**
@@ -487,7 +510,9 @@ async function teeToOperator(
  * answer.
  *
  * Everything else matches {@link spawnClaude}: the executable, the
- * prompt on stdin, the environment. Stderr stays inherited, so the
+ * prompt on stdin, the environment. The working directory is the
+ * loop's own unless `options.cwd` names another; {@link spawnClaude}
+ * never names one. Stderr stays inherited, so the
  * operator sees it and the capture never holds it, and a report parsed
  * out of `stdout` cannot have been a warning line.
  *
@@ -523,21 +548,26 @@ async function teeToOperator(
 export async function spawnClaudeCaptured(
   args: readonly string[],
   prompt: string,
+  options: CapturedSpawnOptions = {},
 ): Promise<CapturedSession> {
   guardSpend();
-  return spawnCaptured(args, prompt);
+  return spawnCaptured(args, prompt, options);
 }
 
 /** {@link spawnClaudeCaptured} past its guard, which both doors spawn through. */
 async function spawnCaptured(
   args: readonly string[],
   prompt: string,
+  options: CapturedSpawnOptions = {},
 ): Promise<CapturedSession> {
   const proc = Bun.spawn([CLAUDE_BIN, ...args], {
     stdin: new TextEncoder().encode(prompt),
     stdout: 'pipe',
     stderr: 'inherit',
     env: claudeSessionEnv(),
+    ...(options.cwd === undefined
+      ? {}
+      : { cwd: options.cwd }),
   });
   liveSessions.add(proc);
   let stdout: string;

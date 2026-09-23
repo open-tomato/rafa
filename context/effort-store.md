@@ -5,6 +5,13 @@ pipeline write: the `EffortStore` port (`store/types.ts`), an NDJSON and a
 SQLite backend, and `selectEffortStore` (`store/index.ts`), which picks one
 from `store` in `.rafa/config.yaml`, `sqlite` by default.
 
+**One kind of session row is not collected.** The search runner
+(`src/inventory/search/index.ts`) stores the `search` row of its own
+session: Claude Code files that session's log under the scratch copy it
+ran in, never under the project's log directory `effort collect` walks.
+The runner reads the log with `collectSessionRow` and appends it under
+`sessions` with `kind` set to `search`.
+
 ### Where it lives
 
 **Both backends write under `.rafa/effort/` in the project root.**
