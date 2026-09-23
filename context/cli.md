@@ -1132,7 +1132,11 @@ session does:
   `loop start`).
 - `with`: the command may start a session only when a specific `flag` is
   typed on the run (`pr triage --resolve`). `flag` is written as typed,
-  with its two leading dashes.
+  with its two leading dashes. `pr triage` itself never spawns: its
+  `--resolve` shells out to a child `rafa loop start`
+  (`resolve-loop.ts`), whose own dispatcher records `loop start`, so the
+  guard checks triage's `with` only against a planted stand-in
+  (`src/tests/spend-guard-dispatch.test.ts`), never a production path.
 - `unless`: the command may start a session on any run except one carrying
   a specific `flag`. That flag is written as typed, with its two leading
   dashes.
