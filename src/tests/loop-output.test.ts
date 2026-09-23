@@ -570,6 +570,10 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
   return [
     ['warn', `\n⚠️  Branch \`${STUB}\` carries no \`<type>/\` prefix.`],
     ['warn', '   The run proceeds; the convention is `feat/<plan-stub>`.'],
+    // The risk total, ahead of the notices (`start/risk-total.ts`): the
+    // spawned run's env is PATH and HOME alone and the scratch has no
+    // `origin`, so the four notes are the account readings, measured.
+    ['info', `🛡  Risk: 0 high, 4 notes — rafa plan risk .plans/PLAN-${STUB}.md`],
     ['info', `🧭 Task sessions are handed the plan as \`${CONFIG_DEFAULTS.inject}\` (the default); the wrap-up is handed all of it.`],
     ['warn', `\n⚠️  The plan holds ${issues.length} part(s) the loop does not read as written:`],
     ...issues.map((issue) => ['warn', `   line ${issue.line}: ${issue.text}`] as const),

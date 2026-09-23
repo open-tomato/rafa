@@ -802,8 +802,11 @@ describe('rafa start, over a stand-in claude', () => {
     expect(run.output).toContain(`Task blocked by its own report: ${BLOCKER_TASK}`);
     expect(run.output).toContain('blocker: a stand-in blocker of call 1');
 
-    // Its triage tried `github` first, met the stand-in `gh` once, and fell back.
-    expect(readFileSync(join(scratch.calls, 'gh.calls'), 'utf8')).toBe('auth status\n');
+    // The risk total before the notices asked the stand-in `gh` which
+    // repository the `github` tracker files on (`start/risk-total.ts`);
+    // then its triage tried `github` first, met `gh` once, and fell back.
+    expect(readFileSync(join(scratch.calls, 'gh.calls'), 'utf8'))
+      .toBe('repo view --json nameWithOwner,visibility\nauth status\n');
     expect(run.output).toContain('tracker chain: github unavailable: gh auth status: ');
     expect(run.output).toContain('gh stand-in: not logged in');
 
