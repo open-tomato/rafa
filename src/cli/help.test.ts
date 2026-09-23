@@ -395,6 +395,48 @@ describe('the spend mark', () => {
   });
 });
 
+describe('the Spends block of an action help', () => {
+  it('says what plan create spends, after its description, with the bare mark for always', () => {
+    const text = helpFor(CORE_REGISTRY, 'plan create');
+    const headings = headingsOf(text);
+
+    expect(blockOf(text, 'Spends')).toEqual(['  🪙 one planning session']);
+    expect(headings.indexOf('Spends:')).toBe(headings.indexOf('Description:') + 1);
+  });
+
+  it('says what pr triage spends, its condition ahead of the colon', () => {
+    expect(blockOf(helpFor(CORE_REGISTRY, 'pr triage'), 'Spends')).toEqual([
+      '  🪙 with --resolve: runs a small fixed plan through the loop',
+    ]);
+  });
+
+  it('has no Spends block for a command that declares nothing', () => {
+    const text = helpFor(CORE_REGISTRY, 'pr show');
+
+    expect(CORE_REGISTRY.commands().find((entry) => entry.name === 'pr show')?.spends).toBeUndefined();
+    expect(headingsOf(text)).not.toContain('Spends:');
+    expect(text).not.toContain('🪙');
+  });
+
+  it('writes unless with its flag and through bare, over the spending registry', () => {
+    expect(blockOf(helpFor(SPENDING, 'search'), 'Spends')).toEqual(['  🪙 unless --no-model: one ranking session']);
+    expect(blockOf(helpFor(SPENDING, 'next'), 'Spends')).toEqual(['  🪙 when the step it runs spends']);
+  });
+
+  it('wraps a long what at the block indent and never splits the mark from its condition', () => {
+    const what = 'x '.repeat(HELP_WIDTH).trim();
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'pr', summary: 'pull requests' }],
+      commands: [command('pr', 'triage', { spends: { when: 'with', flag: '--resolve', what } })],
+    });
+    const lines = blockOf(helpFor(registry, 'pr triage'), 'Spends');
+
+    expect(lines[0]?.startsWith('  🪙 with --resolve: x x')).toBe(true);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.every((line) => line.startsWith('  ') && line.length <= HELP_WIDTH)).toBe(true);
+  });
+});
+
 describe('the global flags the root help lists', () => {
   /** The context `assembleContext` builds for a line and an environment. */
   const read = (argv: string[], env: Record<string, string> = {}) => assembleContext({ argv, env, stream: memoryStream().stream });

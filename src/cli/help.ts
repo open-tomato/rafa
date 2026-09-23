@@ -18,9 +18,10 @@
  *     each action with its summary, and two examples across the subject.
  *   - `rafa <subject> <action> --help`: the action's summary, its
  *     deprecation when it declares one, a usage line built from its
- *     `args` and `flags`, its description, a table of its arguments and
- *     one of its flags, its examples, its outputs, and the other actions
- *     of its subject under `See also`.
+ *     `args` and `flags`, its description, what it spends when it
+ *     declares `spends`, a table of its arguments and one of its flags,
+ *     its examples, its outputs, and the other actions of its subject
+ *     under `See also`.
  *
  * Each level opens with a title line, `<spelling> — <summary>`, and every
  * other block is a heading line ending in `:` with its lines indented
@@ -67,6 +68,13 @@
  * units wide and two terminal columns, so the width counted by `length`
  * is the width printed.
  *
+ * An action's own help carries a `Spends:` block after its description,
+ * one line wrapped at the block's indent: the mark, then `what`. For a
+ * form naming a flag the mark ends in a colon, `🪙 with --resolve: runs a
+ * small fixed plan through the loop`, and for `always` and `through` it
+ * is the bare glyph, `🪙 one planning session`. The mark is one word here
+ * too. An action declaring nothing has no `Spends:` block.
+ *
  * ## The usage line and the tables
  *
  * A required argument is `<name>` and an optional one `[name]`. A flag
@@ -104,7 +112,7 @@ import type { HelpRequest } from './route.js';
 
 import { isTopLevel } from './command.js';
 import { mountKey } from './registry.js';
-import { SPENDS_GLYPH, spendsMark } from './spends.js';
+import { SPENDS_GLYPH, spendsCondition, spendsMark } from './spends.js';
 
 /** The column help's prose is wrapped at. */
 export const HELP_WIDTH = 80;
@@ -252,6 +260,19 @@ function commandWord(command: RafaCommand): string {
   return mark === null
     ? command.subject
     : `${command.subject} ${mark}`;
+}
+
+/**
+ * The lines of an action's `Spends:` block: its mark, a colon after a
+ * condition, then `what`; none for an action declaring nothing.
+ */
+function spendsLines(command: RafaCommand): string[] {
+  const { spends } = command;
+  if (spends === undefined) return [];
+  const mark = spendsCondition(spends) === null
+    ? SPENDS_GLYPH
+    : `${spendsMark(spends)}:`;
+  return hangWords(INDENT, [mark, ...wordsOf(spends.what)]);
 }
 
 /** Rows under a heading, their right texts aligned. */
@@ -437,6 +458,7 @@ function renderAction(request: ActionRequest, registry: CommandRegistry): string
       : hang(INDENT, `since ${deprecated.since}; use "rafa ${deprecated.use}"`)),
     block('Usage', hang(INDENT, usage, USAGE_CONTINUATION)),
     block('Description', hang(INDENT, command.description)),
+    block('Spends', spendsLines(command)),
     block('Arguments', table(command.args.map(argRow))),
     block('Flags', table(command.flags.map(flagRow))),
     block('Examples', command.examples.flatMap(exampleLines)),

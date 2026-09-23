@@ -28,6 +28,10 @@ Description:
   its terminal: until phase 6 it refuses `--detached`. With `--runtime` the
   whole run goes on in that installed rafa, never in a `src/` directory.
 
+Spends:
+  🪙 one session per task, one for the wrap-up, and repair sessions while CI is
+  red
+
 Flags:
   --plan            string
       The plan to run, relative to the project root. `PLAN-<stub>.md` is tracked

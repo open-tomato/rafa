@@ -20,6 +20,9 @@ Description:
   nobody to put the question to. With `--output=json` the steps and why the
   chain stopped are the data of the terminal result event.
 
+Spends:
+  🪙 when the step it runs is one of the above
+
 Flags:
   --dry-run   boolean
       Print where the project stands and what to do about it, and stop without

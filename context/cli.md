@@ -1130,7 +1130,8 @@ home and the warnings read before the invocation are options.
   and closes on the spend legend when a visible command declares `spends`.
   `rafa <subject> --help` lists the actions and two examples.
   `rafa <subject> <action> --help` gives the usage line, the description,
-  the argument and flag tables, the examples, the outputs and `See also`.
+  a `Spends:` block when it declares `spends`, the argument and flag
+  tables, the examples, the outputs and `See also`.
 - **Derived where the spec draws by hand.** The quick start is the first
   example of each subject's first visible action, then of each top-level
   command, so it reads `rafa effort collect` where the spec draws
@@ -1149,6 +1150,10 @@ home and the warnings read before the invocation are options.
   top-level command in `Commands:` (`next 🪙`), and bare on a subject's
   line when a visible action of it spends. It wraps as one word, never
   split from its condition.
+- **An action's `Spends:` block** is one line after its description:
+  the mark, then `what` — `🪙 one planning session` for `always` and
+  `through`, `🪙 with --resolve: runs a small fixed plan through the
+  loop` for a form naming a flag. An action declaring nothing has none.
 - **A hidden action** is in no roster, quick start, example list or
   `See also`, and its own help still renders.
 - **Prose wraps at 80 columns.** An example's command is never wrapped.
