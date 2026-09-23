@@ -16,6 +16,13 @@
  * task names `tools=Read`, and the secret's value missing from the
  * output is held beside its name being there, so the environment was
  * read at all.
+ *
+ * The last group is spawned end to end: `bun src/rafa.ts plan risk`,
+ * through {@link runRafa}, in a scratch git repository of its own
+ * (`plantScratchRepo`), with no seam standing in for git or `gh` —
+ * `--strict` over the same two plans, `--output=json` read back through
+ * `eventsOf` to prove the data parses, and a planted `FAKE_TOKEN` read
+ * from the real environment a spawned process inherits.
  */
 import type { RafaCommand } from '../../cli/command.js';
 import type { CliEvent } from '../../ports/index.js';
@@ -28,7 +35,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
 import { EVERY_TOOL, RISK_FOOTER } from '../../plan/risk.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createPlanRiskCommand, riskLine, riskPlanPath, strictRefusal } from './risk.js';
 
@@ -38,6 +45,9 @@ const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-risk-command
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
+
+/** How long a spawned case may run: `bun src/rafa.ts` starting up each time. */
+const SPAWN_TIMEOUT = 30_000;
 
 /** The subject the dispatched cases route under. */
 const SUBJECTS = [{ name: 'plan', summary: 'plans' }];
@@ -241,4 +251,49 @@ describe('the lines the command words', () => {
     expect(strictRefusal({ plan: 'p.md', total: { high: 2, note: 0 }, findings: [] }))
       .toBe('❌ p.md: 2 high findings; --strict refuses a plan with any');
   });
+});
+
+describe('rafa plan risk, spawned', () => {
+  it('exits 1 under --strict over a plan with a high, and 0 over one without, spawned end to end', () => {
+    const scratch = plantScratchRepo(tempBase);
+    mkdirSync(join(scratch.repo, 'plans'));
+    writeFileSync(join(scratch.repo, 'plans', 'open.md'), EVERY_TOOL_PLAN, 'utf8');
+    writeFileSync(join(scratch.repo, 'plans', 'narrow.md'), NARROW_PLAN, 'utf8');
+
+    const high = runRafa(scratch, scratch.repo, ['plan', 'risk', 'plans/open.md', '--strict']);
+    const clean = runRafa(scratch, scratch.repo, ['plan', 'risk', 'plans/narrow.md', '--strict']);
+
+    expect(high.exitCode).toBe(1);
+    expect(high.stderr).toContain('--strict refuses a plan with any');
+    expect([clean.exitCode, clean.stderr]).toEqual([0, '']);
+  }, SPAWN_TIMEOUT);
+
+  it('gives a reading in json mode whose data parses as the report, spawned end to end', () => {
+    const scratch = plantScratchRepo(tempBase);
+    mkdirSync(join(scratch.repo, 'plans'));
+    writeFileSync(join(scratch.repo, 'plans', 'open.md'), EVERY_TOOL_PLAN, 'utf8');
+
+    const run = runRafa(scratch, scratch.repo, ['plan', 'risk', 'plans/open.md', '--output=json']);
+    const events = eventsOf(run.stdout);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    expect(events[1]).toMatchObject({
+      type: 'result',
+      ok: true,
+      data: { plan: 'plans/open.md', total: { high: 1, note: 4 } },
+    });
+  }, SPAWN_TIMEOUT);
+
+  it('names a planted FAKE_TOKEN and prints no value of it, spawned end to end', () => {
+    const scratch = plantScratchRepo(tempBase);
+    mkdirSync(join(scratch.repo, 'plans'));
+    writeFileSync(join(scratch.repo, 'plans', 'open.md'), EVERY_TOOL_PLAN, 'utf8');
+
+    const run = runRafa(scratch, scratch.repo, ['plan', 'risk', 'plans/open.md'], { FAKE_TOKEN: 'abc123' });
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(run.stdout).toContain('FAKE_TOKEN');
+    expect(`${run.stdout}${run.stderr}`).not.toContain('abc123');
+  }, SPAWN_TIMEOUT);
 });
