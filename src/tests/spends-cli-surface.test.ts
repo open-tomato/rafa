@@ -53,7 +53,10 @@ describe('rafa --help, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
     expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain('  plan       create plans from specs; list, show, validate and risk-read them 🪙\n');
+    expect(run.stdout).toContain(
+      '  plan       create plans from specs; list, show and validate them; read their\n'
+      + '             risk and needs 🪙\n',
+    );
     expect(run.stdout).toContain('  loop       start a plan; stop, pause, resume, show and list its sessions 🪙\n');
     expect(run.stdout).toContain('🪙  starts Claude Code sessions, which spend your Claude usage\n');
   }, RUN_TIMEOUT);

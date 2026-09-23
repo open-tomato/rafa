@@ -31,8 +31,9 @@ module's note is the long form.
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate` and `plan risk` share: the plans directory, the config a project resolves (`resolveProjectConfig`), the task counts, an issue as a line, the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share: the plans directory, the config a project resolves (`resolveProjectConfig`), the task counts, an issue as a line, the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value |
 | `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design |
+| `src/commands/plan/needs.ts` | `rafa plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing] [--source=<source>]`: the reading of `src/plan/needs.ts` over one plan or one spec, in code and starting no session, so it declares no `spends`. A plan resolves as `plan risk` resolves its own, the default plan when none is named. `--spec` and `--issue` go through `resolveCreateSpec` (`spec-route.ts`) handed no offer, so a spec is found and an issue checked and snapshotted under `specs.dir` exactly as `plan create` does, and an issue `plan create` refuses is refused with the same code. The inventory is built as `skill list` builds it, `PATH` read off `RafaContext.env`. `--missing` keeps what `isUnmet` reports and the stacks not met, prints nothing at all when nothing is kept, and exits 1 when anything is, json mode writing each kept row as an `error` log event first; `--source` keeps the agents and skills one source holds, so it drops every MCP server, program, missing item and stack row, and refuses only a value written as no source. A plan beside `--spec` or `--issue`, `--spec` beside `--issue`, `--missing` typed ahead of the plan, a plan that is no file, no default plan and a config `loadConfig` refuses are exit code 1. Exit code 0 otherwise, whatever it finds |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
@@ -133,7 +134,7 @@ New; it replaces no earlier text. What a row or an action added to
   `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
   registering `agent search` and `skill search`).
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`,
-  `plan validate` and `plan risk`; `loop start`, aliased `start`; `loop stop`,
+  `plan validate`, `plan risk` and `plan needs`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment`, `issue move`,
   `issue ready` and `issue unblock`;
@@ -912,7 +913,9 @@ New; it replaces no earlier text. What a row or an action added to
   active output, and each now declares `text` and `json`, as
   `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state`, `hidden-from-loop` and `interactive`, aliased `i`, `agent show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
-  `plan validate` the argument `file`, and `plan list` neither; each
+  `plan validate` the argument `file`, `plan risk` the argument `plan`
+  and the flag `strict`, `plan needs` the argument `plan` and the flags
+  `spec`, `issue`, `missing` and `source`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`,
   `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
@@ -969,7 +972,10 @@ New; it replaces no earlier text. What a row or an action added to
   naming no plan or no tracker and a `--tracker` value other than `true`
   or `false`, and `plan validate` also for a path that is no file, for
   a plan with an issue, for a plan naming an agent no loaded scope
-  defines, and for a config `loadConfig` refuses. `init` throws 1 for a positional word, a `--yes`
+  defines, and for a config `loadConfig` refuses. `plan needs` also
+  throws 1 under `--missing` when a need is unmet, and whatever
+  `resolveCreateSpec` throws for `--spec` and `--issue`, 2 for the
+  board's own state included. `init` throws 1 for a positional word, a `--yes`
   value other than `true` or `false`, a `--root` with no path, a refused
   root, no terminal with neither flag given, input ending before a root
   is chosen, a path the scopes cannot be written at, a config

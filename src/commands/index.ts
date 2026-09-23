@@ -13,12 +13,12 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty registered so far wrap a
+ * of each is its command. Five of the fifty-one registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
- * `plan validate` and `plan risk`, which read plan files with
- * `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status` and
+ * `plan validate`, `plan risk` and `plan needs`, which read plan files
+ * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status` and
  * `list`, which act on a run through its session record and share
  * `loop/loop-sessions.ts`, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
@@ -58,9 +58,12 @@
  *   - `plan create`, aliased `plan`, so `rafa plan --spec=<file>` still
  *     runs it.
  *   - `plan list`, `plan show <stub> [--tracker]`,
- *     `plan validate <file>` and `plan risk [<plan>] [--strict]`, which
- *     start no session: the last reads, in code, what a run of the plan
- *     may do on this machine and under the person's accounts.
+ *     `plan validate <file>`, `plan risk [<plan>] [--strict]` and
+ *     `plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing]
+ *     [--source=<source>]`, which start no session: `plan risk` reads, in
+ *     code, what a run of the plan may do on this machine and under the
+ *     person's accounts, and `plan needs` the agents, skills, MCP servers
+ *     and programs a plan or spec needs from it.
  *   - `loop start`, aliased `start`, declaring `-d|--detached` and
  *     refusing it until phase 6, and `--runtime=<path|version>`, which
  *     runs the loop from that installed rafa.
@@ -199,6 +202,7 @@ import moduleList from './module/list.js';
 import next from './next.js';
 import planCreate from './plan/create.js';
 import planList from './plan/list.js';
+import planNeeds from './plan/needs.js';
 import planRisk from './plan/risk.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
@@ -222,7 +226,7 @@ import usage from './usage.js';
 
 /** The core subjects, in roster order. */
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
-  { name: 'plan', summary: 'create plans from specs; list, show, validate and risk-read them' },
+  { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready and unblock it' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
@@ -241,6 +245,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   planShow,
   planValidate,
   planRisk,
+  planNeeds,
   loopStart,
   loopStop,
   loopPause,

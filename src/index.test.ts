@@ -26,15 +26,15 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `self-update`, the four plan readers, `plan list`, `plan show`,
- * `plan validate` and `plan risk`, the five `loop` session actions, `loop stop`,
+ * `doctor`, `self-update`, the five plan readers, `plan list`, `plan show`,
+ * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
  * modules wrapping none. `describe` runs the roster builder
  * of `src/cli/describe.ts`, which is no root export, and each of the first
  * three plan readers imports `parsePlan` from the `./plan` entry, which is
- * one, where `plan risk` imports its reading from `src/plan/risk.ts`,
- * which is not. A binding a module
+ * one, where `plan risk` and `plan needs` import their readings from
+ * `src/plan/risk.ts` and `src/plan/needs.ts`, which are not. A binding a module
  * takes by name, as `loop start` takes the CI defaults its flags show,
  * is a value and not a command, and is not held. Every parsed import list
  * is also held to the spelled one, which is what keeps a parser that
@@ -407,6 +407,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['./plan-files.js', ['expectAtMostOneArgument', 'isFile', 'plural', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
+  ]],
+  ['./commands/plan/needs.js', [
+    ['../../check/references.js', ['pathDirectories']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config.js', ['ConfigError']],
+    ['../../modules/load.js', ['loadModules', 'moduleSettings']],
+    ['../../plan/needs.js', ['isUnmet', 'readPlanNeeds', 'readSpecNeeds']],
+    ['../../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
+    ['../skill/list.js', ['isSourceShape']],
+    ['./plan-files.js', ['expectAtMostOneArgument', 'isFile', 'plural', 'readSwitch', 'requireProject']],
+    ['./spec-route.js', ['resolveCreateSpec']],
   ]],
   ['./commands/loop/start.js', [
     ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
@@ -949,6 +961,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/plan/show.js',
       './commands/plan/validate.js',
       './commands/plan/risk.js',
+      './commands/plan/needs.js',
       './commands/loop/stop.js',
       './commands/loop/pause.js',
       './commands/loop/resume.js',
