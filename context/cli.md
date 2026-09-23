@@ -21,10 +21,11 @@ module's note is the long form.
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help` and `rafa next --help` |
+| `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts`, `confirm.ts` and `page.ts` the five prompts for text input, single selection, multi-selection, confirmation and paged lists in raw mode on standard error |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
-| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, `agent list`, the agents `buildInventory` (`src/inventory/`) reads from every source; `agent show`, one of them through the show view of `src/inventory/show.ts`; and `agent search`, the agents that answer a question, built by `skill/search.ts` |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill show`, one of them through the show view of `src/inventory/show.ts`; `skill search`, the skills that answer a question through the runner of `src/inventory/search/`; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
@@ -581,35 +582,80 @@ New; it replaces no earlier text. What a row or an action added to
   lists every agent definition the inventory holds**
   (`src/commands/agent/list.ts`, over `buildInventory` in
   `src/inventory/index.ts`), built as `skill list` builds it and taking
-  the same three filters, `--tier` alias included, read and matched by
-  the helpers `src/commands/skill/list.ts` exports; its own refusals name
-  its own usage line. A definition is keyed by its frontmatter `name`,
-  as `--agent` resolves it, and each row prints the loop mark, name,
+  the same three filters. `--source` names a whole source string
+  (`project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>`), aliased
+  `--tier` for one release after this one; `--state` takes `enabled`,
+  `shadowed` or `disabled` and matches the prefix; `--hidden-from-loop`
+  keeps `visibleToLoop: false`. A `plugin:` or `addon:` source the
+  inventory does not know is refused. The filters are read and matched
+  by the helpers `src/commands/skill/list.ts` exports. A definition is
+  keyed by its frontmatter `name`, as `--agent` resolves it, and each row
+  prints the loop mark (`●` when a run sees it, `○` when not), name,
   source, state and summary. The Claude Code built-ins are no inventory
   row and are not listed. After the counts and the legend, when a `user`
   row's name is answered by no row visible to the loop, a trailing line
   names those definitions and points at `rafa agent vendor`; a home name
-  the project also holds is not one of them, since the name resolves.
-  The hint reads the whole inventory, so no filter hides it. It spawns
-  nothing and exits 0 whatever the rows say; exit code 1 is kept for a
-  positional word, a `--source` or `--state` it cannot take, and a
-  config `loadConfig` refuses. In json mode the kept records, the
-  filters, the pre-filter total, the agents trees, the vendor names as
-  `unreachable` and the warnings are the result's `data`. `-i` browses
-  the kept rows as `skill list -i` does, through the helpers that
-  module exports, and prints no vendor hint.
+  the project also holds is not one of them, since the name resolves to
+  the project's copy. The vendor hint reads the whole inventory, so no
+  filter hides it. It spawns nothing and exits 0 whatever the rows say;
+  exit code 1 is kept for a positional word, a `--source` or `--state`
+  it cannot take, and a config `loadConfig` refuses. In json mode the
+  kept records, the filters, the pre-filter total, the agents trees, the
+  vendor names as `unreachable` and the warnings are the result's `data`.
+  `-i | --interactive` browses the kept rows instead of printing them,
+  through `browse` (`src/inventory/browse.ts`) on standard error: Enter
+  shows a row, `f` its whole file, Escape goes back, `q` quits, `ctrl-c`
+  is exit code 130. The warnings still go out first, and with no row kept
+  the text listing is printed instead. Exit code 1, before the inventory
+  is built, refuses `-i` when standard input is not a terminal, with a
+  line naming `rafa agent list --output=json`, and refuses it beside
+  `--output=json`.
 - **`agent show <name> [--full]` shows the agent definition a name
   resolves to** (`src/commands/agent/show.ts`, over the show view of
-  `src/inventory/show.ts`), as `skill show` shows a skill. The inventory
-  is built through the `projectInventory` `src/commands/skill/list.ts`
-  exports, the name is the frontmatter `name` `agent list` prints, and it
-  shows its first holder in precedence order (`findShown`), the
-  shadowed copies listed under the other holders. Text mode, `--full`,
-  `--full` read ahead of the name through `readSwitch`, a file that no
-  longer reads, the `warn:` lines, exit code 1 and the json `data` are
-  those of `skill show`, the refusal of a name no agent holds pointing
-  at `rafa skill show` when a skill holds it. The Claude Code built-ins
-  are no inventory row, so no name shows one.
+  `src/inventory/show.ts`). The inventory is built through the
+  `projectInventory` `src/commands/skill/list.ts` exports, the name is
+  the frontmatter `name` `agent list` prints, and it shows its first
+  holder in precedence order (`findShown`): the agent definition that
+  answers, or the disabled one still holding the name. A shadowed holder
+  is listed under the other holders, with its path, rather than shown in
+  its own right. Text mode prints the record, every other agent with its
+  source, state and path, the frontmatter as written and the body's
+  headings with their file lines; `--full` prints the whole file in
+  place of the frontmatter and the headings. `--full` is read ahead of
+  the name through `readSwitch`, so `rafa agent show --full <name>`,
+  which `parseArgs` hands the name as the flag's value, is refused
+  naming the order that works. A file that no longer reads still shows
+  the record and the other holders, with the reason, and exits 0. The
+  inventory's warnings are `warn:` lines. Exit code 1 is kept for no name
+  or two, a value read into `--full`, a name no agent holds — whose
+  refusal points at `rafa skill show` when a skill holds it — and a
+  config `loadConfig` refuses. In json mode every part of the view, the
+  project root, `loop.settingSources` and the warnings are the result's
+  `data`, `text` holding the file under `--full` alone. The Claude Code
+  built-ins are no inventory row, so no name shows one.
+- **`agent search "<question>" [--all] [--no-model]` finds the agent
+  definitions that answer a question** (`src/commands/agent/search.ts`,
+  through `createSearchCommand` of `src/commands/skill/search.ts`). The
+  same command as `skill search` over the inventory's agent rows. An
+  agent is named by its frontmatter `name`, as `rafa agent list` prints
+  it. The Claude Code built-ins are not inventory rows, so no search
+  ranks one. `--all` searches skills as well, agents first, one session
+  per kind. `--no-model` runs the ranking alone, prints it and stops: no
+  session starts and no effort row is written. The command's `spends`
+  declaration is `unless --no-model`, so the spend guard refuses a
+  session a run carrying that flag would start. Text mode prints, per
+  kind, a heading, then each kept match with its quote and its `path:line`
+  and the dropped line, or "not answerable from these files", or the
+  numbered ranking (under `--no-model`, and after a `warn:` notice of a
+  fallback when the session gave no usable answer), or `(no agent ranks
+  for these words)` when no session starts. The parser's issues and an
+  effort row that was not stored are `warn:` lines. The exit code is 0
+  whatever is found; 1 for no question or two, a blank one, a value read
+  into `--all` or `--no-model`, and a config `loadConfig` refuses. The
+  switches are read ahead of the question through `readSwitch`. In json
+  mode the result's `data` holds the project, `loop.settingSources`, the
+  question, `model`, the warnings and one entry per kind: the runner's
+  outcome, or `status: ranked` with the ranking under `--no-model`.
 - **`skill check <dir> [--fix] [--project=<root>]` and
   `instinct check <dir>` run the checker over one tier**
   (`src/commands/skill/check.ts`, `src/commands/instinct/check.ts`,
@@ -681,66 +727,70 @@ New; it replaces no earlier text. What a row or an action added to
   warning names; `--tier` is its alias, marked in the help for removal
   after one release. `--state` takes `enabled`, `shadowed` or `disabled`
   and matches the state's prefix; `--hidden-from-loop` keeps
-  `visibleToLoop: false`. The filters combine. A skills tree whose
-  directory is absent prints its path and `(no such directory)`, and an
-  unreadable plugin record, plugin, add-on manifest, settings file or
-  `skillOverrides` entry is one `warn:` line. The exit code is 0
-  whatever the rows say — the listing reports and `skill check` gates —
-  and exit code 1 is kept for a positional word, a `--source` or
-  `--state` it cannot take, and a config `loadConfig` refuses. In json
-  mode the kept records, each with its `check`, the filters, the
-  pre-filter total, the skills trees and the warnings are the result's
-  `data`. `-i | --interactive` browses the kept rows instead of printing
-  them, through `browse` (`src/inventory/browse.ts`) on standard error:
-  Enter shows a row, `f` its whole file, Escape goes back, `q` quits,
-  `ctrl-c` is exit code 130. The warnings still go out first, and with
-  no row kept the text listing is printed instead. Exit code 1, before
-  the inventory is built, refuses `-i` when standard input is not a
-  terminal, with a line naming `rafa skill list --output=json`, and
-  refuses it beside `--output=json`. The terminal and the keys are the
-  `terminal` and `keys` seams of the factory.
+  `visibleToLoop: false`. The filters combine and are read and matched
+  by helpers the module exports. A skills tree whose directory is absent
+  prints its path and `(no such directory)`, and an unreadable plugin
+  record, plugin, add-on manifest, settings file or `skillOverrides`
+  entry is one `warn:` line. The exit code is 0 whatever the rows say —
+  the listing reports and `skill check` gates — and exit code 1 is kept
+  for a positional word, a `--source` or `--state` it cannot take, and a
+  config `loadConfig` refuses. In json mode the kept records, each with
+  its `check`, the filters, the pre-filter total, the skills trees and
+  the warnings are the result's `data`. `-i | --interactive` browses the
+  kept rows instead of printing them, through `browse` (`src/inventory/browse.ts`)
+  on standard error: Enter shows a row, `f` its whole file, Escape goes
+  back, `q` quits, `ctrl-c` is exit code 130. The warnings still go out
+  first, and with no row kept the text listing is printed instead. Exit
+  code 1, before the inventory is built, refuses `-i` when standard input
+  is not a terminal, with a line naming `rafa skill list --output=json`,
+  and refuses it beside `--output=json`. The terminal and the keys are
+  the `terminal` and `keys` seams of the factory.
 - **`skill show <name> [--full]` shows the skill a name resolves to**
   (`src/commands/skill/show.ts`, over the show view of
   `src/inventory/show.ts`). The inventory is built as `skill list`
   builds it, through the `projectInventory` that module exports, and
   the name shows its first holder in precedence order (`findShown`): the
-  skill that answers, or the disabled one still holding the name. Text
-  mode prints the record, every other skill of that name with its
-  source, state and path, the frontmatter as written and the body's
-  headings with their file lines; `--full` prints the whole file in
-  place of the last two. `--full` is read ahead of the name through
-  `readSwitch`, so `rafa skill show --full <name>`, which `parseArgs`
-  hands the name as the flag's value, is refused naming the order that
-  works. A file that no longer reads still shows the record and the
-  other holders, with the reason, and exits 0. The inventory's warnings
-  are `warn:` lines as `skill list` writes them. Exit code 1 is kept for
-  no name or two, a value read into `--full`, a name no skill holds —
-  whose refusal points at `rafa agent show` when an agent holds it — and
-  a config `loadConfig` refuses. In json mode every part of the view,
-  the project root, `loop.settingSources` and the warnings are the
-  result's `data`, `text` holding the file under `--full` alone.
-- **`skill search "<question>" [--all] [--no-model]` and
-  `agent search` find the items that answer a question**
-  (`src/commands/skill/search.ts`, whose `createSearchCommand` builds
-  both, over `runSearch` and `rankSearch` of `src/inventory/search/`).
-  The inventory is built through `projectInventory`, as `skill list`
-  builds it. Each kind searched is one `runSearch`: the ranking, one
+  skill that answers, or the disabled one still holding the name. A
+  shadowed holder is listed under the other holders, with its path,
+  rather than shown in its own right. Text mode prints the record, every
+  other skill of that name with its source, state and path, the
+  frontmatter as written and the body's headings with their file lines;
+  `--full` prints the whole file in place of the frontmatter and the
+  headings. `--full` is read ahead of the name through `readSwitch`, so
+  `rafa skill show --full <name>`, which `parseArgs` hands the name as
+  the flag's value, is refused naming the order that works. A file that
+  no longer reads still shows the record and the other holders, with the
+  reason, and exits 0. The inventory's warnings are `warn:` lines as
+  `skill list` writes them. Exit code 1 is kept for no name or two, a
+  value read into `--full`, a name no skill holds — whose refusal points
+  at `rafa agent show` when an agent holds it — and a config `loadConfig`
+  refuses. In json mode every part of the view, the project root,
+  `loop.settingSources` and the warnings are the result's `data`, `text`
+  holding the file under `--full` alone.
+- **`skill search "<question>" [--all] [--no-model]` finds the skills that
+  answer a question** (`src/commands/skill/search.ts`, through `runSearch`
+  and `rankSearch` of `src/inventory/search/`). The inventory is built
+  through `projectInventory`, as `skill list` builds it. Each kind
+  searched is one `runSearch`: the ranking by the question's words, one
   `haiku` session in a scratch copy of the top twelve, the quote check
-  and one `search` effort row, stored in the store `selectEffortStore`
-  opens from the project's config. `--all` searches the other kind too,
-  the command's own first, one session per kind, since a candidate is
-  keyed by its name and a skill and an agent may share one.
-  `--no-model` runs `rankSearch` alone and opens no store; both
-  commands declare `spends` `unless --no-model`. Text mode prints, per
-  kind, a heading, then the kept matches with each quote and its
-  `path:line` and the dropped line, or "not answerable from these
-  files", or the numbered ranking (under `--no-model`, and after the
-  `warn:` notice of a fallback), or `(no skill ranks for these words)`,
-  when no session starts. The parser's issues and an effort row that
-  was not stored are `warn:` lines. The exit code is 0 whatever is
+  against the file and one `search` effort row, stored in the store
+  `selectEffortStore` opens from the project's config. `--all` searches
+  agent definitions as well, skills first, one session per kind, since a
+  candidate is keyed by its name and a skill and an agent may share one.
+  `--no-model` runs the ranking alone, prints it and stops: no session
+  starts, no scratch copy is made and no effort row is written. The
+  command's `spends` declaration is `unless --no-model`, so the spend
+  guard refuses a session a run carrying that flag would start. Text mode
+  prints, per kind, a heading naming the kind, the question and the
+  project, then the kept matches with each quote and its `path:line` and
+  the dropped line, or "not answerable from these files", or the numbered
+  ranking (under `--no-model`, and after a `warn:` notice of a fallback
+  when the session gave no usable answer), or `(no skill ranks for these
+  words)` when no session starts. The parser's issues and an effort row
+  that was not stored are `warn:` lines. The exit code is 0 whatever is
   found; 1 for no question or two, a blank one, a value read into
-  `--all` or `--model`, and a config `loadConfig` refuses. The switches
-  are read ahead of the question through `readSwitch`, since
+  `--all` or `--no-model`, and a config `loadConfig` refuses. The
+  switches are read ahead of the question through `readSwitch`, since
   `--all "<question>"` hands the question to `--all`. In json mode the
   result's `data` holds the project, `loop.settingSources`, the
   question, `model`, the warnings and one entry per kind: the runner's
@@ -911,7 +961,7 @@ New; it replaces no earlier text. What a row or an action added to
   it off the parsed context once the phase 0 function has returned. A
   wrapped command's `outputs` is `['text']` until it writes through the
   active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state`, `hidden-from-loop` and `interactive`, aliased `i`, `agent show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` and `skill list` no argument and the flags `source` (aliased `tier`), `state`, `hidden-from-loop` and `interactive` (aliased `i`), `agent show` and `skill show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, `plan risk` the argument `plan`
   and the flag `strict`, `plan needs` the argument `plan` and the flags
