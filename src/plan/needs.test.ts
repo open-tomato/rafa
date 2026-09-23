@@ -20,6 +20,11 @@
  * `settingSources`, so no reading passes only because every item reads
  * alike. A done task and a ticked prerequisite name items the reading
  * must leave out.
+ *
+ * The stack-tools cases plant one small TypeScript project each (a
+ * `tsconfig.json`, a one-task plan, its own home and `PATH` directory),
+ * so `ts-symbols` present, missing, and its skill only at user level
+ * are each read beside the reading that flips them.
  */
 import type { Need, NeedsReading, NeedsSeams } from './needs.js';
 import type { ClaudeSettingSource } from '../config-sections.js';
@@ -38,6 +43,7 @@ import {
   programDirectory,
   readPlanNeeds,
   readSpecNeeds,
+  STACK_TOOLS,
 } from './needs.js';
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-needs-')));
@@ -208,6 +214,7 @@ describe('readPlanNeeds', () => {
       'program present-tool present',
       'program zz-absent-program missing',
     ]);
+    expect(reading.stacks).toEqual([]);
     expect(reading.warnings).toEqual([]);
   });
 
@@ -337,5 +344,147 @@ describe('programDirectory', () => {
   it('answers null for a file with no exec bit, and for a name no directory holds', () => {
     expect(programDirectory('not-executable', [binDir])).toBeNull();
     expect(programDirectory('zz-absent-program', [binDir])).toBeNull();
+  });
+});
+
+/** Where a planted TypeScript project puts the skill naming `ts-symbols`. */
+type SkillPlace = 'project' | 'user' | 'both' | 'none';
+
+/** A TypeScript project under its own directory, and the seams and plan to read it with. */
+function typescriptWorld(
+  label: string,
+  { onPath, skillAt }: { readonly onPath: boolean; readonly skillAt: SkillPlace },
+): { readonly plan: string; readonly seams: (sources: readonly ClaudeSettingSource[]) => NeedsSeams } {
+  const root = join(base, `ts-${label}`);
+  const tsHome = join(root, 'home');
+  const tsProject = join(root, 'project');
+  const tsBin = join(root, 'bin');
+  const plan = join(tsProject, '.rafa', 'plans', 'PLAN-ts.md');
+
+  write(join(tsProject, 'tsconfig.json'), '{}\n');
+  write(plan, '- [ ] One task {agent=project-reviewer}\n');
+  write(join(tsProject, '.claude/agents/project-reviewer.md'), agent('project-reviewer'));
+  mkdirSync(tsBin, { recursive: true });
+  if (onPath) {
+    write(join(tsBin, 'ts-symbols'), '#!/bin/sh\n');
+    chmodSync(join(tsBin, 'ts-symbols'), 0o755);
+  }
+  const symbolSkill = skill('ts-symbols-for-agents', 'Trace a symbol with `ts-symbols refs <name>`, never grep.\n');
+  if (skillAt === 'project' || skillAt === 'both') {
+    write(join(tsProject, '.claude/skills/ts-symbols-for-agents/SKILL.md'), symbolSkill);
+  }
+  if (skillAt === 'user' || skillAt === 'both') {
+    write(join(tsHome, '.claude/skills/ts-symbols-for-agents/SKILL.md'), symbolSkill);
+  }
+  write(join(tsProject, '.claude/skills/unrelated/SKILL.md'), skill('unrelated', 'Mentions ts-symbols-v2 only.\n'));
+
+  return {
+    plan,
+    seams: (sources) => ({
+      home: tsHome,
+      projectRoot: tsProject,
+      entry: join(runtime, 'cli.js'),
+      pathDirs: [tsBin],
+      settingSources: sources,
+      modules: [],
+    }),
+  };
+}
+
+describe('the stack-tools table', () => {
+  it('holds the TypeScript row, marked by tsconfig.json and naming ts-symbols', () => {
+    expect(STACK_TOOLS.map((tool) => [tool.stack, tool.markers, tool.program])).toEqual([
+      ['typescript', ['tsconfig.json'], 'ts-symbols'],
+    ]);
+  });
+
+  it('reads ts-symbols on PATH and a project skill naming it as met', async () => {
+    const world = typescriptWorld('present', { onPath: true, skillAt: 'project' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    const origin = { by: 'stack', stack: 'typescript' };
+    expect(needOf(reading, 'program', 'ts-symbols')).toMatchObject({ status: 'present', origins: [origin] });
+    expect(needOf(reading, 'skill', 'ts-symbols-for-agents')).toMatchObject({
+      status: 'present', source: 'project', visibleToLoop: true, origins: [origin],
+    });
+    expect(reading.stacks).toEqual([{
+      stack: 'typescript',
+      marker: join(base, 'ts-present', 'project', 'tsconfig.json'),
+      program: 'ts-symbols',
+      skill: 'ts-symbols-for-agents',
+      met: true,
+      hint: null,
+    }]);
+    expect(reading.items.filter(isUnmet)).toEqual([]);
+  });
+
+  it('reads ts-symbols off PATH as missing, with a hint naming what to install', async () => {
+    const world = typescriptWorld('missing', { onPath: false, skillAt: 'project' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    const program = needOf(reading, 'program', 'ts-symbols');
+    expect(program).toMatchObject({ status: 'missing', directory: null });
+    expect(isUnmet(program)).toBe(true);
+    expect(reading.stacks[0]).toMatchObject({ met: false, skill: 'ts-symbols-for-agents' });
+    expect(reading.stacks[0]?.hint).toBe(`typescript: ${STACK_TOOLS[0]?.install}`);
+  });
+
+  it('reads the skill present only at user level as present and not visible to a run', async () => {
+    const world = typescriptWorld('user-skill', { onPath: true, skillAt: 'user' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    const need = needOf(reading, 'skill', 'ts-symbols-for-agents');
+    expect(need).toMatchObject({ status: 'present', source: 'user', visibleToLoop: false });
+    expect(isUnmet(need)).toBe(true);
+    expect(reading.stacks[0]?.met).toBe(false);
+    expect(reading.stacks[0]?.hint).toBe(
+      'typescript: make the skill `ts-symbols-for-agents` (user source) visible to a run: '
+      + 'move it under .claude/skills/ in this project, or add `user` to loop.settingSources',
+    );
+  });
+
+  it('reads the same user-level skill as met once the user source is on', async () => {
+    const world = typescriptWorld('user-skill-on', { onPath: true, skillAt: 'user' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITH_USER));
+
+    expect(needOf(reading, 'skill', 'ts-symbols-for-agents')).toMatchObject({ source: 'user', visibleToLoop: true });
+    expect(reading.stacks[0]).toMatchObject({ met: true, hint: null });
+  });
+
+  it('reads a project skill beside the user-level one as met', async () => {
+    const world = typescriptWorld('both', { onPath: true, skillAt: 'both' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    expect(needOf(reading, 'skill', 'ts-symbols-for-agents')).toMatchObject({ source: 'project', visibleToLoop: true });
+    expect(reading.stacks[0]).toMatchObject({ met: true, hint: null });
+  });
+
+  it('adds no skill item when no skill names ts-symbols as a whole word, and says so in the hint', async () => {
+    const world = typescriptWorld('no-skill', { onPath: true, skillAt: 'none' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    expect(reading.items.filter((item) => item.kind === 'skill')).toEqual([]);
+    expect(reading.stacks[0]).toMatchObject({
+      skill: null,
+      met: false,
+      hint: 'typescript: add a skill naming `ts-symbols` under .claude/skills/ in this project',
+    });
+  });
+
+  it('reads no stack for a spec, even in a TypeScript project', async () => {
+    const world = typescriptWorld('spec', { onPath: false, skillAt: 'none' });
+    const spec = join(base, 'ts-spec', 'SPEC.md');
+    write(spec, 'Route it through project-reviewer.\n');
+
+    const reading = await readSpecNeeds(spec, world.seams(WITHOUT_USER));
+
+    expect(reading.stacks).toEqual([]);
+    expect(reading.items.map((item) => item.name)).toEqual(['project-reviewer']);
   });
 });

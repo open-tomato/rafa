@@ -70,6 +70,34 @@
  * {@link isUnmet} is the one test `--missing` applies: missing, or
  * present and not visible to a run.
  *
+ * ## Stack tools
+ *
+ * Beside what the plan names, {@link readPlanNeeds} reads the symbol
+ * tool a shell-only subagent needs for the project's stack: a loop
+ * session's subagents have no LSP tool, and grep misses re-exports and
+ * aliases. {@link STACK_TOOLS} holds one row per stack; TypeScript, read
+ * from a `tsconfig.json` file at the project root, is the only row until
+ * the add-ons of #29. No other stack reading exists, so a marker file
+ * is the whole test, and a reading with no project root has no stack.
+ *
+ * A detected stack needs two things, each added to the items with a
+ * `stack` origin:
+ *
+ *   - its program, looked up on `pathDirs` like any other program;
+ *   - a skill naming that program: a skill whose file (frontmatter
+ *     included, as a `description` is where one usually says it) holds
+ *     the program's name as a whole word, as a spec mention is read. Of
+ *     the skills naming it, one visible to a run is taken first, so a
+ *     project skill beside a user-only one reads as met; with none
+ *     visible, the first by name stands, present and not visible. With
+ *     no skill naming it, no skill item is added, since there is no
+ *     name to list, and the stack's own row says so.
+ *
+ * Each detected stack gets a {@link StackReading} with `met` and, when
+ * not met, one `hint` line naming what to install and where. The stack
+ * tools are read for a plan only: a spec's needs are what its text
+ * mentions.
+ *
  * ## Warnings, never gaps
  *
  * An unreadable plugin, settings file, `skillOverrides` entry or MCP
@@ -127,7 +155,9 @@ export type NeedOrigin =
   /** A shell fence of the named declared skill calls it. */
   | { readonly by: 'skill'; readonly skill: string }
   /** The spec's text mentions it, first on this line. */
-  | { readonly by: 'mentioned'; readonly line: number };
+  | { readonly by: 'mentioned'; readonly line: number }
+  /** The project's stack needs it; see {@link STACK_TOOLS}. */
+  | { readonly by: 'stack'; readonly stack: string };
 
 /** What every need carries. */
 interface NeedBase {
@@ -178,9 +208,50 @@ export interface NeedsWarning {
   readonly reason: string;
 }
 
+/**
+ * One stack's symbol tool: what marks the stack, the program a
+ * shell-only subagent traces symbols with, and where to get it.
+ */
+export interface StackTool {
+  /** The stack, as one lowercase word. */
+  readonly stack: string;
+  /** Files at the project root, any one of which marks the stack. */
+  readonly markers: readonly string[];
+  /** The program, looked up on `PATH`. */
+  readonly program: string;
+  /** What to install when the program is missing, as a sentence fragment. */
+  readonly install: string;
+}
+
+/** One row per stack; see the module note. */
+export const STACK_TOOLS: readonly StackTool[] = [
+  {
+    stack: 'typescript',
+    markers: ['tsconfig.json'],
+    program: 'ts-symbols',
+    install: 'install `ts-symbols` (def, refs, type and outline over the TypeScript language service) on PATH',
+  },
+];
+
+/** One detected stack's symbol tool, read against the machine. */
+export interface StackReading {
+  readonly stack: string;
+  /** The marker file that detected it, an absolute path. */
+  readonly marker: string;
+  readonly program: string;
+  /** The skill naming the program that was taken, or null when none names it. */
+  readonly skill: string | null;
+  /** True when the program is present and the skill is present and visible to a run. */
+  readonly met: boolean;
+  /** One line naming what to install and where, or null when met. */
+  readonly hint: string | null;
+}
+
 /** Every need, by kind in {@link NEED_KINDS} order and then by name. */
 export interface NeedsReading {
   readonly items: readonly Need[];
+  /** One per stack {@link STACK_TOOLS} detects; always empty for a spec. */
+  readonly stacks: readonly StackReading[];
   readonly warnings: readonly NeedsWarning[];
 }
 
@@ -337,7 +408,7 @@ function resolveNeed(kind: NeedKind, name: string, origins: readonly NeedOrigin[
   }
 
   const holder = machine.holders.get(needKey(kind, name));
-  const visibleToLoop = machine.records.some((record) => record.kind === kind && record.name === name && record.visibleToLoop);
+  const visibleToLoop = isVisible(machine, kind, name);
   return {
     kind,
     name,
@@ -374,22 +445,31 @@ function readerWarnings(
   });
 }
 
+/** Needs a reader named, the stacks it detected, and what it could not read. */
+interface NamedWithStacks extends NamedNeeds {
+  readonly stacks: readonly DetectedStack[];
+}
+
 /** The machine read once, and the named needs resolved against it. */
 async function readAgainstMachine(
   seams: NeedsSeams,
-  name: (machine: Machine) => Promise<NamedNeeds>,
+  name: (machine: Machine) => Promise<NamedWithStacks>,
 ): Promise<NeedsReading> {
   const inventory = buildInventory(seams);
   const mcp = readMcpServers(seams);
   const machine: Machine = { holders: holdersOf(inventory.records), records: inventory.records, mcp, seams };
 
-  const { named, warnings } = await name(machine);
+  const { named, stacks, warnings } = await name(machine);
   const items = merged(named).flatMap((group) => {
     const [first] = group;
     if (first === undefined) return [];
     return [resolveNeed(first.kind, first.name, group.map((entry) => entry.origin), machine)];
   });
-  return { items: inListingOrder(items), warnings: readerWarnings(inventory, mcp, warnings) };
+  return {
+    items: inListingOrder(items),
+    stacks: stacks.map((detected) => stackReading(detected, items)),
+    warnings: readerWarnings(inventory, mcp, warnings),
+  };
 }
 
 /** The needs every open task of `markdown` declares. */
@@ -446,10 +526,104 @@ async function skillFenceNeeds(
   return { named, warnings };
 }
 
+/** A stack {@link STACK_TOOLS} detected, and the skill naming its program, if any. */
+interface DetectedStack {
+  readonly tool: StackTool;
+  readonly marker: string;
+  readonly skill: string | null;
+}
+
+/** The marker of `tool` at `projectRoot`, or null when none is a file there. */
+function stackMarker(tool: StackTool, projectRoot: string | null): string | null {
+  if (projectRoot === null) return null;
+  const found = tool.markers.map((marker) => join(projectRoot, marker)).find((path) => {
+    try {
+      return statSync(path).isFile();
+    } catch {
+      return false;
+    }
+  });
+  return found ?? null;
+}
+
+/** Whether a session under `loop.settingSources` resolves any row of this kind and name. */
+function isVisible(machine: Machine, kind: InventoryKind, name: string): boolean {
+  return machine.records.some((record) => record.kind === kind && record.name === name && record.visibleToLoop);
+}
+
+/** Every skill whose holder's file names `program` as a whole word, by name. */
+async function skillsNaming(
+  program: string,
+  machine: Machine,
+): Promise<{ readonly skills: readonly string[]; readonly warnings: readonly NeedsWarning[] }> {
+  const pattern = wholeWord(program);
+  const skills: string[] = [];
+  const warnings: NeedsWarning[] = [];
+  for (const holder of machine.holders.values()) {
+    if (holder.kind !== 'skill') continue;
+    try {
+      if (pattern.test(await Bun.file(holder.path).text())) skills.push(holder.name);
+    } catch (error) {
+      warnings.push({ path: holder.path, reason: `cannot be read (${messageOf(error)})` });
+    }
+  }
+  return { skills, warnings };
+}
+
+/** The stacks the project root marks, and the program and skill each needs. */
+async function stackNeeds(machine: Machine): Promise<NamedWithStacks> {
+  const named: Named[] = [];
+  const stacks: DetectedStack[] = [];
+  const warnings: NeedsWarning[] = [];
+  for (const tool of STACK_TOOLS) {
+    const marker = stackMarker(tool, machine.seams.projectRoot);
+    if (marker === null) continue;
+
+    const origin: NeedOrigin = { by: 'stack', stack: tool.stack };
+    const naming = await skillsNaming(tool.program, machine);
+    const skill = naming.skills.find((name) => isVisible(machine, 'skill', name)) ?? naming.skills[0] ?? null;
+    named.push({ kind: 'program', name: tool.program, origin });
+    if (skill !== null) named.push({ kind: 'skill', name: skill, origin });
+    stacks.push({ tool, marker, skill });
+    warnings.push(...naming.warnings);
+  }
+  return { named, stacks, warnings };
+}
+
+/** The hint for a stack whose program or skill is unmet, as one line. */
+function stackHint(tool: StackTool, program: Need | undefined, skill: Need | undefined): string | null {
+  const parts: string[] = [];
+  if (program === undefined || program.status === 'missing') parts.push(tool.install);
+  if (skill === undefined) {
+    parts.push(`add a skill naming \`${tool.program}\` under .claude/skills/ in this project`);
+  } else if (isUnmet(skill)) {
+    const source = 'source' in skill
+      ? skill.source
+      : null;
+    parts.push(`make the skill \`${skill.name}\` (${source ?? 'unknown'} source) visible to a run: `
+      + 'move it under .claude/skills/ in this project, or add `user` to loop.settingSources');
+  }
+  return parts.length === 0
+    ? null
+    : `${tool.stack}: ${parts.join('; ')}`;
+}
+
+/** A detected stack read against the resolved items. */
+function stackReading(detected: DetectedStack, items: readonly Need[]): StackReading {
+  const { tool, marker, skill } = detected;
+  const program = items.find((item) => item.kind === 'program' && item.name === tool.program);
+  const skillNeed = skill === null
+    ? undefined
+    : items.find((item) => item.kind === 'skill' && item.name === skill);
+  const hint = stackHint(tool, program, skillNeed);
+  return { stack: tool.stack, marker, program: tool.program, skill, met: hint === null, hint };
+}
+
 /**
  * What the plan at `planPath` needs: its open tasks' agents, skills and
  * MCP servers, its PREREQUISITES probes' programs and its declared
- * skills' fence programs, each read against the machine `seams` names.
+ * skills' fence programs, and the stack tools of the project root (see
+ * {@link STACK_TOOLS}), each read against the machine `seams` names.
  * Refuses a plan, or a PREREQUISITES file, that is there and does not
  * read. See the module note.
  */
@@ -464,7 +638,12 @@ export async function readPlanNeeds(planPath: string, seams: NeedsSeams): Promis
     const tasks = taskNeeds(markdown);
     const skills = [...new Set(tasks.filter((entry) => entry.kind === 'skill').map((entry) => entry.name))];
     const fences = await skillFenceNeeds(skills, machine);
-    return { named: [...tasks, ...prerequisiteNeeds(prerequisites), ...fences.named], warnings: fences.warnings };
+    const stacks = await stackNeeds(machine);
+    return {
+      named: [...tasks, ...prerequisiteNeeds(prerequisites), ...fences.named, ...stacks.named],
+      stacks: stacks.stacks,
+      warnings: [...fences.warnings, ...stacks.warnings],
+    };
   });
 }
 
@@ -498,7 +677,7 @@ export async function readSpecNeeds(specPath: string, seams: NeedsSeams): Promis
         ? []
         : [{ kind: holder.kind, name: holder.name, origin: { by: 'mentioned', line } }];
     });
-    return Promise.resolve({ named, warnings: [] });
+    return Promise.resolve({ named, stacks: [], warnings: [] });
   });
 }
 
