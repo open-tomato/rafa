@@ -128,10 +128,40 @@
  *
  * {@link checkUsage} writes through the active output too: each warning
  * through `warn`, and the usage it read through `info`.
+ *
+ * ## The spend guard
+ *
+ * Both doors refuse to start a session for a running command whose
+ * `spends` declaration (`src/cli/spends.ts`) does not cover the run. The
+ * running command is the one the dispatcher recorded with its parsed
+ * flags (`src/cli/running.ts`). The check runs once per session, before
+ * `Bun.spawn`, so a refused run starts no process: {@link spawnClaude}
+ * in json mode hands its session to the same unguarded spawner
+ * {@link spawnClaudeCaptured} uses rather than to that door, and so is
+ * not checked a second time.
+ *
+ * A run is covered when its command declares `always` or `through`, a
+ * `with` declaration and the run carries the flag, or an `unless`
+ * declaration and the run does not. `through` covers a run because the
+ * command runs another's action in-process (`rafa next`,
+ * `src/next/actions.ts`), and the recorded command stays the outer one.
+ * A flag is matched by its name without the dashes, and `--no-<name>`
+ * also as the parser keys it, `<name>` set to `false`; a flag recorded
+ * as `false` is not carried. With no command recorded, as for a caller
+ * that never went through the dispatcher, nothing is refused.
+ *
+ * A refusal throws {@link UndeclaredSpendError}, whose message names
+ * the command as typed after `rafa` and says to declare `spends` on it,
+ * with the flag missing for a `with` form and the flag present for an
+ * `unless` one. Thrown from a command's `run`, it ends the invocation as
+ * `command_error` with exit 1 (`src/cli/dispatch.ts`).
  */
+import type { RunningCommand } from '../cli/running.js';
 import type { ClaudeSettingSource } from '../config.js';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { commandSpelling } from '../cli/command.js';
+import { runningCommand } from '../cli/running.js';
 
 export async function getClaudeUsagePercent(): Promise<number | null> {
   const envPct = process.env['CLAUDE_USAGE_PERCENT'];
@@ -277,6 +307,54 @@ function claudeSessionEnv(): Record<string, string | undefined> {
 }
 
 /**
+ * Refused to start a session: the running command's `spends` declaration
+ * does not cover this run. See "The spend guard" in the module note.
+ */
+export class UndeclaredSpendError extends Error {
+  override readonly name = 'UndeclaredSpendError';
+}
+
+/**
+ * True when `flags` carry `flag`, written as typed with its dashes: its
+ * name is recorded as anything but `false`, or, for a `--no-<name>`
+ * flag, `<name>` is recorded as `false`, which is how the parser keys it.
+ */
+export function carriesFlag(flags: RunningCommand['flags'], flag: string): boolean {
+  const name = flag.replace(/^--/, '');
+  const value = flags[name];
+  if (value !== undefined && value !== false) return true;
+  return name.startsWith('no-') && flags[name.slice(3)] === false;
+}
+
+/**
+ * Why `running` may not start a session, as a sentence, or null when
+ * its declaration covers the run or nothing is recorded.
+ */
+export function spendRefusal(running: RunningCommand | null): string | null {
+  if (running === null) return null;
+  const { command, flags } = running;
+  const spend = command.spends;
+  const named = `rafa ${commandSpelling(command)}`;
+  const remedy = 'declare spends on the command to cover this run';
+  if (spend === undefined) {
+    return `${named} started a Claude session but declares no spends: ${remedy}`;
+  }
+  if (spend.when === 'with' && !carriesFlag(flags, spend.flag)) {
+    return `${named} started a Claude session without ${spend.flag}, and its spends covers only a run with ${spend.flag}: ${remedy}`;
+  }
+  if (spend.when === 'unless' && carriesFlag(flags, spend.flag)) {
+    return `${named} started a Claude session with ${spend.flag}, and its spends covers no run with ${spend.flag}: ${remedy}`;
+  }
+  return null;
+}
+
+/** Throws {@link UndeclaredSpendError} when the running command may not start a session. */
+function guardSpend(): void {
+  const refusal = spendRefusal(runningCommand());
+  if (refusal !== null) throw new UndeclaredSpendError(refusal);
+}
+
+/**
  * The real spawner: `Bun.spawn`, streams inherited so the session's
  * output reaches the operator as it happens.
  *
@@ -288,13 +366,17 @@ function claudeSessionEnv(): Record<string, string | undefined> {
  * An exit code of `undefined` — which is what a signalled process
  * answers — is reported as 1, because every caller here treats a
  * non-zero as a failed session and a killed one is not a success.
+ *
+ * Rejects with {@link UndeclaredSpendError}, spawning nothing, when the
+ * running command's `spends` does not cover the run; see the module note.
  */
 export async function spawnClaude(
   args: readonly string[],
   prompt: string,
 ): Promise<number> {
+  guardSpend();
   if (activeOutputMode() === 'json') {
-    const { exitCode } = await spawnClaudeCaptured(args, prompt);
+    const { exitCode } = await spawnCaptured(args, prompt);
     return exitCode;
   }
   const proc = Bun.spawn([CLAUDE_BIN, ...args], {
@@ -434,8 +516,20 @@ async function teeToOperator(
  * reader had quit kept running, each write failing with `Broken pipe`,
  * until it was killed 3s later. Rejecting at once would hand the loop
  * back a tree that a session is still changing.
+ *
+ * Rejects with {@link UndeclaredSpendError}, spawning nothing, when the
+ * running command's `spends` does not cover the run; see the module note.
  */
 export async function spawnClaudeCaptured(
+  args: readonly string[],
+  prompt: string,
+): Promise<CapturedSession> {
+  guardSpend();
+  return spawnCaptured(args, prompt);
+}
+
+/** {@link spawnClaudeCaptured} past its guard, which both doors spawn through. */
+async function spawnCaptured(
   args: readonly string[],
   prompt: string,
 ): Promise<CapturedSession> {
