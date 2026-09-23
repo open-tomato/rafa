@@ -657,6 +657,12 @@ describe('a loop start run with no open task', () => {
     // first line is there, after the notices.
     expect(firstRunLine).not.toBe('');
     expect(lines.indexOf(firstRunLine)).toBeGreaterThan(lines.findIndex((line) => line.includes('--dangerously-skip-permissions')));
+    // The risk total prints ahead of `requireNoticesAnswered()`
+    // (`start/risk-total.ts`), so it reads before the danger notice even
+    // when the notices are still pending.
+    const riskLine = lines.findIndex((line) => line.startsWith('🛡  Risk:'));
+    expect(riskLine).toBeGreaterThanOrEqual(0);
+    expect(riskLine).toBeLessThan(lines.findIndex((line) => line.includes('--dangerously-skip-permissions')));
   }, RUN_TIMEOUT);
 });
 

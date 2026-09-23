@@ -1377,4 +1377,16 @@ describe('the registered command', () => {
     expect(passed.stdout).toContain('\nPreflight passed: rafa loop start would go on to its first session.\n');
     expect(passed.stdout).toContain(`\nwarn: ${join(passing.home, '.rafa', 'bin')} is not on PATH;`);
   }, SPAWN_TIMEOUT);
+
+  it('spawned with --plan=, prints the risk total line for the named plan', () => {
+    const scratch = plantScratchRepo(tempBase);
+    mkdirSync(join(scratch.repo, '.plans'), { recursive: true });
+    writeFileSync(join(scratch.repo, '.plans', 'PLAN-risk.md'), '# Plan\n\n- [ ] A task\n', 'utf8');
+
+    const run = runRafa(scratch, scratch.repo, ['doctor', '--plan=.plans/PLAN-risk.md']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('🛡  Risk: ');
+    expect(run.stdout).toContain('— rafa plan risk .plans/PLAN-risk.md');
+  }, SPAWN_TIMEOUT);
 });
