@@ -335,6 +335,7 @@ built. A box is ticked by the change that finishes the feature.
 - [x] One command takes you to the next step: merge, clean up, plan,
   branch, start
 - [x] Every command that spends Claude usage says so in its help
+- [x] Before a run, see what it can do on this machine and under your accounts
 - [ ] The right skills reach the right task, chosen when the plan is
   written
 - [ ] Know which skills earn their place and which are ignored
