@@ -9,6 +9,12 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.11.0 — 2026-09-23, Planned under assumptions
+
+- CLI: `rafa plan risk [<plan>]` reads a plan in code, starting no session, and reports what a run of it may do on this machine and under your accounts: each open task's agent, tools, model and budget, destructive commands and writes outside the repository in the shell fences of its skills and the code spans of its task lines, the push remote and its visibility, issue tracker and pull request provider, and the names — never the values — of secret-looking environment variables. Findings are `high` or `note`, `--strict` exits 1 on any `high`, and `--output=json` gives the whole report as data. `rafa loop start` prints the plan's one-line risk total before the standing notices on every run, `rafa doctor --plan=<plan>` prints the same line, and `rafa --help` lists risk-read among the `plan` actions.
+- Docs: the README's "Before you run it" and `context/notices.md` point at `rafa plan risk`, and the README ticks the roadmap item "Before a run, see what it can do on this machine and under your accounts".
+- Tests: spawned runs of `rafa plan risk` pin the `--strict` exit codes, parse the json output, and prove a planted `FAKE_TOKEN` is reported by name while its value appears in no output.
+
 ## 0.10.0 — 2026-09-23, Every command that spends Claude usage says so
 
 - CLI: every command that can start a Claude Code session says so. Help ends its line with 🪙, with the flag a session needs where it needs one (`🪙 with --resolve` on `pr triage`), `rafa --help` closes on a legend line for the mark, and an action's own help gains a `Spends:` block saying what it spends and when. `rafa describe` reports each action's `spends` declaration, or `null`, for core and module actions alike. A command that did not declare what a run spends is refused before any session starts, with an error naming the command and the flag involved.
