@@ -1,8 +1,9 @@
 /**
- * What `rafa plan list`, `rafa plan show` and `rafa plan validate` share:
- * where a plan and its tracker sit, a plan's tasks counted by checkbox,
- * one `parsePlan` issue as a line, and the refusal of a line handing a
- * command the wrong number of arguments.
+ * What `rafa plan list`, `rafa plan show`, `rafa plan validate` and
+ * `rafa plan risk` share: where a plan and its tracker sit, the config
+ * that resolves for the project, a plan's tasks counted by checkbox, one
+ * `parsePlan` issue as a line, the refusal of a line handing a command
+ * the wrong number of arguments, and the read of a flag taking no value.
  *
  * ## Where plans sit
  *
@@ -21,13 +22,25 @@
  * absolute, is the directory read, and `label`, `plan.dir` as the config
  * spells it, is what a path a person reads opens with. A config
  * `loadConfig` refuses is refused with exit code 1, naming the command
- * and every problem.
+ * and every problem; {@link resolveProjectConfig} is that refusal, and
+ * `rafa plan risk` reads the whole config through it.
+ *
+ * ## A flag taking no value
+ *
+ * The parser reads the word after a flag as its value whenever the line
+ * gives that flag none with `=`, a boolean flag included: `--strict
+ * plan.md` reads `plan.md` as the value of `--strict` and hands the
+ * command no argument (measured on 2026-09-23 with `parseArgs` over a
+ * boolean `strict`: `{"positional":[],"flags":{"strict":"plan.md"}}`).
+ * {@link readSwitch} refuses such a value rather than reading the flag
+ * as set and the plan as absent.
  *
  * A stub is one a plan stamp can carry (`utils/plan-stamp.ts`): one or
  * more letters, digits, `.`, `_` and `-`. It holds no slash, so a file
  * named from one never leaves the directory.
  */
 import type { RafaContext } from '../../cli/command.js';
+import type { RafaConfig } from '../../config.js';
 import type { PlanIssue, PlanTask } from '../../plan/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 
@@ -71,9 +84,20 @@ export function resolvePlansDir(
   command: string,
   warn: (message: string) => void,
 ): PlansDir {
+  return plansDirAt(project.root, resolveProjectConfig(project, command, warn).planDir);
+}
+
+/**
+ * The config that resolves for `project`; a refusal with exit code 1
+ * naming `command` and every problem for a config `loadConfig` refuses.
+ */
+export function resolveProjectConfig(
+  project: ProjectFound,
+  command: string,
+  warn: (message: string) => void,
+): RafaConfig {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, warn);
-    return plansDirAt(project.root, config.planDir);
+    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, [
@@ -171,4 +195,27 @@ export function expectOneArgument(args: readonly string[], usage: string): strin
     ? 'none'
     : `${args.length}: ${args.join(' ')}`;
   throw new CommandExit(1, `❌ Expected one argument, got ${got}\nUsage: ${usage}`);
+}
+
+/**
+ * The argument a line hands a command reading at most one, null for a
+ * line handing none, or a refusal with exit code 1 naming the words and
+ * the usage for a line handing more.
+ */
+export function expectAtMostOneArgument(args: readonly string[], usage: string): string | null {
+  const [only] = args;
+  if (only === undefined) return null;
+  if (args.length === 1) return only;
+  throw new CommandExit(1, `❌ Expected at most one argument, got ${args.length}: ${args.join(' ')}\nUsage: ${usage}`);
+}
+
+/**
+ * Whether a flag taking no value was typed: false when absent, true when
+ * bare. A value the parser read into it is refused with exit code 1,
+ * naming the flag, the value and `hint`; see the module note.
+ */
+export function readSwitch(name: string, value: string | boolean | undefined, hint: string): boolean {
+  if (value === undefined || value === false || value === 'false') return false;
+  if (value === true || value === 'true') return true;
+  throw new CommandExit(1, `❌ --${name} takes no value, and read "${value}" as one. ${hint}`);
 }

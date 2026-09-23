@@ -31,7 +31,8 @@ module's note is the long form.
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show` and `plan validate` share: the plans directory, the task counts, an issue as a line and the argument refusals |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate` and `plan risk` share: the plans directory, the config a project resolves (`resolveProjectConfig`), the task counts, an issue as a line, the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value |
+| `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
@@ -115,9 +116,15 @@ New; it replaces no earlier text. What a row or an action added to
   from "register it" across two tasks with the suite green between them.
   Registration itself reddens exactly three: `OWN_DECLARATIONS` and the
   roster expectations in `src/commands/index.test.ts`, `COMMAND_MODULES`
-  in `src/index.test.ts`, and the frozen help snapshots.
-- **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`
-  and `plan validate`; `loop start`, aliased `start`; `loop stop`,
+  in `src/index.test.ts`, and the frozen help snapshots — the last only
+  for a new subject or top-level command, or a subject summary that
+  changes with it. An action registered under a subject already there
+  moves no snapshot: registering `plan risk` left all four byte-identical
+  and `src/cli/help.test.ts` green before the updater ran (measured on
+  2026-09-23); the `plan` summary rewritten beside it is what moved
+  `rafa.txt`.
+- **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`,
+  `plan validate` and `plan risk`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment`, `issue move`,
   `issue ready` and `issue unblock`;
@@ -1230,8 +1237,13 @@ message naming the command as typed after `rafa` and saying to declare
   one of the four that lists subjects; the other three render a single
   command or subtree and are untouched. Read which files actually differ
   off `git status`, never off the assumption that they all move
-  together — registering a command reddens exactly three cases in
-  `src/cli/help.test.ts`, all of them on `rafa.txt`.
+  together — registering a subject or a top-level command reddens
+  exactly three cases in `src/cli/help.test.ts`, all of them on
+  `rafa.txt`. So does rewriting a subject's summary alone: the `plan`
+  summary changed with `plan risk` reddened those three and no other
+  (measured on 2026-09-23). An action under an existing subject reddens
+  none, and its summary shows only in its subject's roster, which is not
+  snapshotted.
 
 ### Describe
 
