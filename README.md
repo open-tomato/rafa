@@ -54,6 +54,8 @@ Read this once; rafa also says it the first time you start a run.
   | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
 
+  The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
+
   Everything else reads files, git and GitHub and spends nothing,
   `rafa usage` included (it reads `CLAUDE_USAGE_PERCENT` and asks
   nobody). `rafa loop resume` starts no session itself, but it lets a
@@ -330,6 +332,7 @@ built. A box is ticked by the change that finishes the feature.
 - [x] Start a plan from the main branch and rafa makes the branch for you
 - [x] One command takes you to the next step: merge, clean up, plan,
   branch, start
+- [x] Every command that spends Claude usage says so in its help
 - [ ] The right skills reach the right task, chosen when the plan is
   written
 - [ ] Know which skills earn their place and which are ignored

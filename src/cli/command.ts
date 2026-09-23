@@ -60,6 +60,11 @@
  * The registry refuses a core command it answers for, and the module
  * loader skips the file of a module command it answers for.
  *
+ * `spends` is checked last, by `spendsProblem` (`./spends.ts`), whose
+ * sentence names the field inside it: `spends.flag is "resolve", expected
+ * a flag as typed, starting with --`. A module entry declaring a
+ * malformed `spends` is therefore skipped like any other bad shape.
+ *
  * ## Deprecated flags
  *
  * A flag a command declares is a {@link RafaFlagSpec}: a `FlagSpec` that
@@ -72,9 +77,12 @@
  */
 import type { CliCommand, CliContext, FlagSpec } from './core/types.js';
 import type { CommandRegistry } from './registry.js';
+import type { CommandSpend } from './spends.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { describeValue } from '../config-sections.js';
+
+import { spendsProblem } from './spends.js';
 
 /** What an action can render: text a person reads, NDJSON events, or the TUI. */
 export const COMMAND_OUTPUTS = ['text', 'json', 'tui'] as const;
@@ -160,6 +168,11 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
    * the command runs inside a project; see the module note.
    */
   readonly needsProject?: boolean;
+  /**
+   * Whether running the command can start a Claude Code session, and
+   * under what condition; absent, it spends nothing. See `./spends.ts`.
+   */
+  readonly spends?: CommandSpend;
   /** Runs the command. Throws {@link CommandExit} to refuse. */
   readonly run: (context: RafaContext) => Promise<void>;
 }
@@ -272,7 +285,7 @@ export function commandProblem(value: unknown): string | null {
     return `a command is ${describeValue(value)}, expected a mapping`;
   }
   const fields = value as CommandFields;
-  const problem = fieldProblem(fields);
+  const problem = fieldProblem(fields) ?? spendsProblem(fields.spends);
   if (problem === null) return null;
   const named = isRoutingWord(fields.subject) && isRoutingWord(fields.action)
     ? `command "${commandSpelling(fields as Pick<RafaCommand, 'subject' | 'action'>)}"`

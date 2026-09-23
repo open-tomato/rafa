@@ -134,6 +134,7 @@ const wrapped = wrapPhaseZeroCommand({
   ],
   aliases: ['plan'],
   outputs: ['text', 'json'],
+  spends: { when: 'always', what: 'one planning session' },
 }, plan);
 
 export default endingWith(wrapped);

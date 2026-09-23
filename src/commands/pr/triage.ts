@@ -633,6 +633,7 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       },
     ],
     outputs: ['text', 'json'],
+    spends: { when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' },
     run: async (context) => {
       const triaged = await runTriage(context, seams);
       if (context.outputMode === 'json') {

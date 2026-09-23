@@ -34,6 +34,13 @@
  * an example longer than the width. Each case reads one block of one
  * level whole, so a line added, dropped or reordered in it is red.
  *
+ * The spending registry holds one command of each `spends` form, a
+ * spender hidden under a subject, and a summary sized so the glyph alone
+ * would fit after it and its condition would not: the case over it is red
+ * for a packer that breaks the mark at its space, as a run on 2026-09-23
+ * with the mark split into words showed (57 pass, 1 fail, `help.ts`
+ * restored byte-identical).
+ *
  * ## How far the cases reach
  *
  * Eighteen mutations were driven on 2026-09-14, one run of this file each
@@ -69,7 +76,7 @@ import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.j
 import { commandSpelling } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
 import { dispatch } from './dispatch.js';
-import { GLOBAL_FLAGS, HELP_WIDTH, renderHelp } from './help.js';
+import { GLOBAL_FLAGS, HELP_WIDTH, renderHelp, SPENDS_LEGEND } from './help.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 
@@ -254,7 +261,7 @@ describe('the frozen help snapshots', () => {
 
     expect(renderHelp({ level: 'root' }, CORE_REGISTRY)).toBe(snapshot);
     expect(renderHelp({ level: 'root' }, lessUsage)).not.toBe(snapshot);
-    expect(blockOf(snapshot, 'Commands')).toEqual(['  next, init, doctor, self-update, usage, describe']);
+    expect(blockOf(snapshot, 'Commands')).toEqual(['  next 🪙, init, doctor, self-update, usage, describe']);
   });
 
   it('holds the root snapshot as what src/rafa.ts prints for --help', () => {
@@ -309,6 +316,124 @@ describe('the root help', () => {
     const bare = createCommandRegistry({ subjects: [{ name: 'loop', summary: 'the loop' }], commands: [command('loop', 'start')] });
 
     expect(headingsOf(helpFor(bare, ''))).toEqual(['Usage:', 'Quick start:', 'Subjects:', 'Global flags:']);
+  });
+});
+
+/** The column an action's summary starts at under `triage`, the longest action of `SPENDING`'s `pr`. */
+const TRIAGE_COLUMN = '  triage   '.length;
+
+/**
+ * A summary sized so that, after it, the glyph alone would still fit on
+ * the first line and ` with` would not: a packer breaking the mark at its
+ * space leaves `🪙` behind its condition.
+ */
+const STRADDLING_SUMMARY = `assess ${'x'.repeat(HELP_WIDTH - TRIAGE_COLUMN - ' 🪙'.length - 'assess '.length)}`;
+
+const SPENDING = createCommandRegistry({
+  subjects: [
+    { name: 'pr', summary: 'pull requests' },
+    { name: 'loop', summary: 'the loop' },
+    { name: 'plan', summary: 'plans' },
+  ],
+  commands: [
+    command('pr', 'show'),
+    command('pr', 'triage', {
+      summary: STRADDLING_SUMMARY,
+      spends: { when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' },
+    }),
+    command('loop', 'start', { spends: { when: 'always', what: 'one session per task' } }),
+    command('loop', 'status'),
+    command('plan', 'draft', { hidden: true, spends: { when: 'always', what: 'one planning session' } }),
+    command('plan', 'list'),
+    command('next', 'next', { spends: { when: 'through', what: 'when the step it runs spends' } }),
+    command('search', 'search', { spends: { when: 'unless', flag: '--no-model', what: 'one ranking session' } }),
+    command('doctor', 'doctor'),
+  ],
+});
+
+describe('the spend mark', () => {
+  it('ends the pr roster\'s triage line with its condition, 🪙 with --resolve', () => {
+    expect(blockOf(helpFor(CORE_REGISTRY, 'pr'), 'Actions').slice(-2)).toEqual([
+      '  triage    assess a pull request: its class, the evidence, and a follow-up',
+      '            prompt 🪙 with --resolve',
+    ]);
+  });
+
+  it('keeps 🪙 with --resolve whole when the summary wraps, never leaving the glyph behind its condition', () => {
+    const triage = blockOf(helpFor(SPENDING, 'pr'), 'Actions').slice(1);
+
+    expect(`${'  triage   '}${STRADDLING_SUMMARY} 🪙`.length).toBe(HELP_WIDTH);
+    expect(triage).toEqual([
+      `  triage   ${STRADDLING_SUMMARY}`,
+      `${' '.repeat(TRIAGE_COLUMN)}🪙 with --resolve`,
+    ]);
+  });
+
+  it('marks an action declaring always bare, and one declaring nothing not at all', () => {
+    expect(blockOf(helpFor(SPENDING, 'loop'), 'Actions')).toEqual(['  start    start things 🪙', '  status   status things']);
+  });
+
+  it('marks a subject bare when a visible action of it spends, and not for a hidden one', () => {
+    expect(blockOf(helpFor(SPENDING, ''), 'Subjects')).toEqual([
+      '  pr     pull requests 🪙',
+      '  loop   the loop 🪙',
+      '  plan   plans',
+    ]);
+  });
+
+  it('marks a top-level command in the Commands list with its condition', () => {
+    expect(blockOf(helpFor(SPENDING, ''), 'Commands')).toEqual(['  next 🪙, search 🪙 unless --no-model, doctor']);
+  });
+
+  it('closes the root help on the legend line when a command spends, and leaves it out when none does', () => {
+    const lines = helpFor(SPENDING, '').split('\n');
+
+    expect(SPENDS_LEGEND).toBe('🪙  starts Claude Code sessions, which spend your Claude usage');
+    expect(lines.slice(-3)).toEqual(['', SPENDS_LEGEND, '']);
+    expect(lines.slice(-6, -3)).toEqual(blockOf(helpFor(SPENDING, ''), 'Global flags'));
+    expect(helpFor(PLANTED, '')).not.toContain('🪙');
+  });
+});
+
+describe('the Spends block of an action help', () => {
+  it('says what plan create spends, after its description, with the bare mark for always', () => {
+    const text = helpFor(CORE_REGISTRY, 'plan create');
+    const headings = headingsOf(text);
+
+    expect(blockOf(text, 'Spends')).toEqual(['  🪙 one planning session']);
+    expect(headings.indexOf('Spends:')).toBe(headings.indexOf('Description:') + 1);
+  });
+
+  it('says what pr triage spends, its condition ahead of the colon', () => {
+    expect(blockOf(helpFor(CORE_REGISTRY, 'pr triage'), 'Spends')).toEqual([
+      '  🪙 with --resolve: runs a small fixed plan through the loop',
+    ]);
+  });
+
+  it('has no Spends block for a command that declares nothing', () => {
+    const text = helpFor(CORE_REGISTRY, 'pr show');
+
+    expect(CORE_REGISTRY.commands().find((entry) => entry.name === 'pr show')?.spends).toBeUndefined();
+    expect(headingsOf(text)).not.toContain('Spends:');
+    expect(text).not.toContain('🪙');
+  });
+
+  it('writes unless with its flag and through bare, over the spending registry', () => {
+    expect(blockOf(helpFor(SPENDING, 'search'), 'Spends')).toEqual(['  🪙 unless --no-model: one ranking session']);
+    expect(blockOf(helpFor(SPENDING, 'next'), 'Spends')).toEqual(['  🪙 when the step it runs spends']);
+  });
+
+  it('wraps a long what at the block indent and never splits the mark from its condition', () => {
+    const what = 'x '.repeat(HELP_WIDTH).trim();
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'pr', summary: 'pull requests' }],
+      commands: [command('pr', 'triage', { spends: { when: 'with', flag: '--resolve', what } })],
+    });
+    const lines = blockOf(helpFor(registry, 'pr triage'), 'Spends');
+
+    expect(lines[0]?.startsWith('  🪙 with --resolve: x x')).toBe(true);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.every((line) => line.startsWith('  ') && line.length <= HELP_WIDTH)).toBe(true);
   });
 });
 

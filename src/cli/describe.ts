@@ -35,6 +35,10 @@
  *   - `deprecated`: `{ since, use }`, or null.
  *   - `module`: the name of the module the action comes from, or null
  *     for a core command.
+ *   - `spends`: the command's `spends` declaration (`./spends.ts`) as
+ *     written, `when` and `what` with `flag` as typed when it has one, or
+ *     null for a command declaring none. A mounted action carries its own
+ *     declaration as a core action does.
  *
  * ## The actions modules provide
  *
@@ -62,6 +66,7 @@
 import type { CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from './command.js';
 import type { ArgSpec, FlagSpec } from './core/types.js';
 import type { CommandRegistry } from './registry.js';
+import type { CommandSpend } from './spends.js';
 
 import { isTopLevel } from './command.js';
 import { mountKey } from './registry.js';
@@ -104,6 +109,8 @@ export interface DescribedAction {
   readonly deprecated: CommandDeprecation | null;
   /** The module the action comes from, or null for a core command. */
   readonly module: string | null;
+  /** What running the command spends, as declared, or null when it declares nothing. */
+  readonly spends: CommandSpend | null;
 }
 
 /** A subject and its actions, as the document describes them. */
@@ -148,7 +155,7 @@ function typedAlias(alias: string): string {
 
 /** A command as the document describes it, under the name given; see the module note. */
 function describeCommand(command: RafaCommand, name: string, module: string | null): DescribedAction {
-  const { deprecated } = command;
+  const { deprecated, spends } = command;
   return {
     name,
     summary: command.summary,
@@ -164,6 +171,9 @@ function describeCommand(command: RafaCommand, name: string, module: string | nu
       ? null
       : { since: deprecated.since, use: deprecated.use },
     module,
+    spends: spends === undefined
+      ? null
+      : { ...spends },
   };
 }
 

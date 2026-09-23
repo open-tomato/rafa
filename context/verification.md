@@ -102,6 +102,17 @@ parity-lineage failures above. Measured at rafa-80's head and at
 no-op, and it would only pull uncommitted work out from under a session
 still editing.
 
+**One case reads the tracked CHANGELOG, and it is red since 0.9.2.**
+`src/tests/default-plan-dirs.test.ts`'s `finds nothing in the live tree`
+reports `CHANGELOG.md: .plans, .specs`: two entries of the 0.9.2
+section name the old directories without a slash, and the sweep catches
+the slashless spelling too. It fails alone as well, so it is not state
+leaking from an earlier file, and with the two parity-lineage cases the
+full run reads `3 fail`, not 2. A plan's session may not touch a
+released section to fix it, so it stays red until a change exempts
+`CHANGELOG.md` or rewords those lines. This paragraph replaces nothing;
+it is the third known failure the pages above did not list.
+
 **One suite prints a model refusal on a clean run.**
 `src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
 `Sorry, this request could not be completed.` and exits 3, and a second

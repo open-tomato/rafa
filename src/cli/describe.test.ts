@@ -124,6 +124,7 @@ const LINEAR_NEXT = command('linear', 'next', {
   aliases: ['next'],
   deprecated: { since: '0.3.0', use: 'module exec linear claim' },
   outputs: ['json'],
+  spends: { when: 'always', what: 'one session per issue' },
 });
 
 const PLANTED = createCommandRegistry({
@@ -146,6 +147,7 @@ const PLANTED = createCommandRegistry({
       ],
       outputs: ['text', 'json', 'tui'],
       aliases: ['start', ' begin   now '],
+      spends: { when: 'with', flag: '--plan', what: 'one session per task' },
     }),
     command('loop', 'secret', { hidden: true }),
     command('loop', 'old', { deprecated: { since: '0.2.0', use: 'loop start' } }),
@@ -229,6 +231,19 @@ describe('the document over the core registry', () => {
         .map((held) => held.action));
     expect(document.commands.map((entry) => entry.name)).toContain('describe');
   });
+
+  it('gives each core command its spends declaration as written, and null for one declaring none', () => {
+    const spendsOf = (subject: string, name: string): DescribedAction['spends'] | undefined => actionOf(document, subject, name)?.spends;
+    const command = (name: string): DescribedAction | undefined => document.commands.find((entry) => entry.name === name);
+
+    expect(spendsOf('plan', 'create')).toStrictEqual({ when: 'always', what: 'one planning session' });
+    expect(spendsOf('pr', 'triage')).toStrictEqual({ when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' });
+    expect(spendsOf('skill', 'backfill')?.when).toBe('with');
+    expect(spendsOf('loop', 'start')?.when).toBe('always');
+    expect(command('next')?.spends?.when).toBe('through');
+    expect(command('describe')?.spends).toBeNull();
+    expect(spendsOf('loop', 'status')).toBeNull();
+  });
 });
 
 describe('the document', () => {
@@ -268,6 +283,7 @@ describe('the document', () => {
       aliases: ['start', 'begin now'],
       deprecated: null,
       module: null,
+      spends: { when: 'with', flag: '--plan', what: 'one session per task' },
     });
   });
 
@@ -283,6 +299,7 @@ describe('the document', () => {
       aliases: [],
       deprecated: null,
       module: null,
+      spends: null,
     });
     expect(actionOf(document, 'loop', 'old')?.deprecated).toStrictEqual({ since: '0.2.0', use: 'loop start' });
   });
@@ -299,8 +316,10 @@ describe('the document', () => {
       aliases: [],
       deprecated: { since: '0.3.0', use: 'module exec linear claim' },
       module: 'linear',
+      spends: { when: 'always', what: 'one session per issue' },
     });
     expect(actionOf(document, 'module', 'exec')?.module).toBeNull();
+    expect(actionOf(document, 'module', 'exec linear claim')?.spends).toBeNull();
   });
 
   it('lists the mounted actions after the top-level commands when the exec action is top-level', () => {

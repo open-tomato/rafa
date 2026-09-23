@@ -9,6 +9,11 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.10.0 — 2026-09-23, Every command that spends Claude usage says so
+
+- CLI: every command that can start a Claude Code session says so. Help ends its line with 🪙, with the flag a session needs where it needs one (`🪙 with --resolve` on `pr triage`), `rafa --help` closes on a legend line for the mark, and an action's own help gains a `Spends:` block saying what it spends and when. `rafa describe` reports each action's `spends` declaration, or `null`, for core and module actions alike. A command that did not declare what a run spends is refused before any session starts, with an error naming the command and the flag involved.
+- Docs: `context/cli.md` covers the `spends` declaration, its four forms, the help marks, the `describe` field and the spend guard; the README ticks the roadmap item and says help and `describe` carry the same 🪙 marks as its "Before you run it" table.
+
 ## 0.9.2 — 2026-09-23, two fixes to the board flow
 
 - `rafa pr merge` ticks the roadmap again: the tick called `gh` with the REST path as its first word, so `gh` answered `unknown command` and every tick failed after two attempts (#99).

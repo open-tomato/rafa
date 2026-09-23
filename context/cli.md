@@ -16,7 +16,7 @@ module's note is the long form.
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
@@ -1121,15 +1121,66 @@ home and the warnings read before the invocation are options.
   events and no text, where `rafa describe` gives the same version as
   data.
 
+### The spends declaration
+
+A command that can start a Claude session declares it with a `spends` field
+of type `CommandSpend` (`src/cli/spends.ts`). The declaration has four forms,
+each named by `when` and carrying `what`, a short phrase describing what the
+session does:
+
+- `always`: the command may start a session on any run (`plan create`,
+  `loop start`).
+- `with`: the command may start a session only when a specific `flag` is
+  typed on the run (`pr triage --resolve`). `flag` is written as typed,
+  with its two leading dashes. `pr triage` itself never spawns: its
+  `--resolve` shells out to a child `rafa loop start`
+  (`resolve-loop.ts`), whose own dispatcher records `loop start`, so the
+  guard checks triage's `with` only against a planted stand-in
+  (`src/tests/spend-guard-dispatch.test.ts`), never a production path.
+- `unless`: the command may start a session on any run except one carrying
+  a specific `flag`. That flag is written as typed, with its two leading
+  dashes.
+- `through`: the command starts no session itself, but runs another command
+  in-process whose own `spends` may apply (`rafa next`, whose actions
+  `sync`, `resume`, `merge`, `plan`, `start` may start a session).
+
+A command without a `spends` declaration declares nothing.
+
+The spend guard in `src/utils/claude.ts` refuses to start a session for a
+running command when its `spends` declaration does not cover the run. The
+running command is the one the dispatcher recorded with its parsed flags
+(`src/cli/running.ts`), checked before `Bun.spawn` so a refused run starts
+no process:
+
+- A command declaring `always` or `through` covers every run.
+- A command declaring `with <flag>` covers only a run carrying that `flag`,
+  matched by name without the dashes. For a `--no-<name>` flag, the parser
+  records `<name>` set to `false`; a run carries the flag when that
+  recorded value is anything but `false`, or when `<name>` is recorded as
+  `false` and the flag is `--no-<name>`.
+- A command declaring `unless <flag>` covers any run that does not carry
+  that `flag`, by the same matching.
+- A run with no recorded command, as for a caller that never went through
+  the dispatcher, is not checked.
+
+A refusal throws `UndeclaredSpendError` (`src/utils/claude.ts`) with a
+message naming the command as typed after `rafa` and saying to declare
+`spends` on it, with the flag missing for a `with` form and present for an
+`unless` one. Thrown from a command's `run`, it ends the invocation as
+`command_error` with exit 1 (`src/cli/dispatch.ts`).
+
 ### Help
 
 - **One renderer for the three levels.** `renderHelp` reads the request
   and the registry it is handed and nothing else, so every command a level
   names is one that dispatches. `rafa --help` lists the usage lines, a
-  quick start, the subjects, the top-level commands and the global flags.
+  quick start, the subjects, the top-level commands and the global flags,
+  and closes on the spend legend when a visible command declares `spends`
+  (see "The spends declaration").
   `rafa <subject> --help` lists the actions and two examples.
   `rafa <subject> <action> --help` gives the usage line, the description,
-  the argument and flag tables, the examples, the outputs and `See also`.
+  a `Spends:` block when it declares `spends`, the argument and flag
+  tables, the examples, the outputs and `See also`.
 - **Derived where the spec draws by hand.** The quick start is the first
   example of each subject's first visible action, then of each top-level
   command, so it reads `rafa effort collect` where the spec draws
@@ -1142,6 +1193,19 @@ home and the warnings read before the invocation are options.
   `loop start` alone reads it and declares it, since a flag typed ahead of
   the subject reaches the context's `flags` and never the `argv` a wrapped
   command is handed.
+- **The spend mark ends a roster line**, after the summary, so the
+  summary column is untouched. The mark is `🪙` for `always` and `through`
+  forms, and `🪙 with --resolve` or `🪙 unless --no-model` for `with` and
+  `unless` forms (showing the `flag`). It appears on an action's line in
+  its subject's roster, on a top-level command in the root `Commands:` list
+  (`next 🪙`), and bare on a subject's line when a visible action of it
+  spends. The mark wraps as one word, never split from its condition.
+- **An action's `Spends:` block** appears after its description, one line
+  wrapped at the block's indent: the mark, then `what`. For `always` and
+  `through` forms the mark is the bare glyph (`🪙 one planning session`),
+  and for `with` and `unless` forms the mark ends in a colon, showing the
+  condition (`🪙 with --resolve: runs a small fixed plan through the loop`).
+  The mark wraps as one word. An action declaring no `spends` has no block.
 - **A hidden action** is in no roster, quick start, example list or
   `See also`, and its own help still renders.
 - **Prose wraps at 80 columns.** An example's command is never wrapped.
@@ -1183,10 +1247,14 @@ home and the warnings read before the invocation are options.
   (each a `name`, a `summary` and its `actions`) and `commands`, the
   top-level ones. An action and a top-level command share one shape:
   `name`, `summary`, `description`, `args`, `flags`, `examples`,
-  `outputs`, `aliases`, `deprecated` and `module`. Every field is on every
-  entry, with `null` or an empty list for what a declaration leaves out.
-  An argument or a flag carries `required` as a boolean and `default` as
-  a value or null, and a flag its `aliases`.
+  `outputs`, `aliases`, `deprecated`, `module` and `spends`. The `spends`
+  field holds the command's `spends` declaration as written (see "The
+  spends declaration"): one of four forms with `when` and `what`, where
+  `with` and `unless` forms carry `flag` as typed with its dashes, or null
+  for a command declaring none. Every field is on every entry, with `null`
+  or an empty list for what a declaration leaves out. An argument or a flag
+  carries `required` as a boolean and `default` as a value or null, and a
+  flag its `aliases`.
 - **A module's action is listed where it is typed**: after the actions of
   the subject whose `exec` action reaches it, or after the top-level
   commands for a top-level `exec`. It is named by the words after the
