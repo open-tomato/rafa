@@ -12,8 +12,11 @@
  * would report those two as having no prompt at all, which reads as a
  * malformed log rather than as a session that started differently.
  *
- * The four shapes below are THIS repo's own, each derived from the
- * source that injects it rather than transcribed from a log. That
+ * The five shapes below are THIS repo's own, each derived from the
+ * source that injects it rather than transcribed from a log. Four are
+ * the loop's; the fifth, `search`, is the one session
+ * `rafa skill search` and `rafa agent search` run, and its prefix is
+ * the first line of the template in `inventory/search/prompt.ts`. That
  * distinction is the whole reason this module exists as code instead of
  * a regex someone carried across: the reference implementation this
  * collector is modelled on matches loop sessions on a phrase-shaped
@@ -22,15 +25,15 @@
  * prefix answers every task session. A port that kept the needle would
  * collect nothing and report a clean, plausible, entirely empty run.
  * The colocated test pins both halves — the foreign needle matching
- * none of the four shapes, and this repo's own prefix matching through
+ * none of the five shapes, and this repo's own prefix matching through
  * the identical matcher, which is what makes that zero a reading rather
  * than a dead needle.
  *
  * A second guard runs in the same test file: every shape's prefix is
  * asserted present in the source file named on its record. The prompts
  * are ordinary string literals in `start/dispatch.ts`,
- * `start/wrap-up.ts`, `start/pr-lifecycle.ts` and `plan-prompt.md` with
- * nothing tying them to this module, so an edit there would otherwise
+ * `start/wrap-up.ts`, `start/pr-lifecycle.ts`, `plan-prompt.md` and
+ * `inventory/search/prompt.ts` with nothing tying them to this module, so an edit there would otherwise
  * silently re-bucket every later session as `other`.
  *
  * Snapshot at the time of writing, over 896 loose session logs — the
@@ -44,6 +47,7 @@
  * question. `ci-repair` at zero is honest rather than broken: its
  * prompt is newer than every session in the tree, so it is the one
  * shape whose only evidence is the drift guard against its source.
+ * `search` postdates that snapshot and so has no count in it.
  *
  * Nothing here puts prompt content into a classification. The kind, the
  * record index and a line count are the whole result, so a store fed
@@ -60,9 +64,13 @@ export type SessionKind =
   | 'plan-generation'
   | 'wrap-up'
   | 'ci-repair'
+  | 'search'
   | 'other';
 
-/** The four kinds the loop itself dispatches; `other` is the residue. */
+/**
+ * The kinds rafa itself dispatches, each with a prompt shape: the loop's
+ * four and the search session. `other` is the residue.
+ */
 export type LoopSessionKind = Exclude<SessionKind, 'other'>;
 
 /** One recognised prompt shape, and where its literal is authored. */
@@ -119,6 +127,13 @@ export const PROMPT_SHAPES: readonly PromptShape[] = [
     prefix: 'The pull request for branch ',
     firstLineInfix: ' is not mergeable: ',
     source: 'src/start/pr-lifecycle.ts',
+  },
+  {
+    kind: 'search',
+    label: 'search',
+    prefix: '# Inventory search instructions',
+    firstLineInfix: null,
+    source: 'src/inventory/search/prompt.ts',
   },
 ];
 
@@ -191,7 +206,7 @@ export function matchesShape(content: string, shape: PromptShape): boolean {
 }
 
 /**
- * Classifies prompt content against the four shapes.
+ * Classifies prompt content against the five shapes.
  *
  * Anything that matches none of them is `other` rather than an error:
  * the log directory holds hand-driven sessions and measurement probes
