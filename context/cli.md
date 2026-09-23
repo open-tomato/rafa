@@ -23,7 +23,7 @@ module's note is the long form.
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help` and `rafa next --help` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
-| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the agents `buildInventory` (`src/inventory/`) reads from every source |
+| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, `agent list`, the agents `buildInventory` (`src/inventory/`) reads from every source; and `agent show`, one of them through the show view of `src/inventory/show.ts` |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills `buildInventory` (`src/inventory/`) reads from every source; `skill show`, one of them through the show view of `src/inventory/show.ts`; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
@@ -134,7 +134,7 @@ New; it replaces no earlier text. What a row or an action added to
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
   `effort collect`, `effort report`, `module list`, `module exec`,
-  `agent vendor`, `agent list`, `skill check`, `skill list`,
+  `agent vendor`, `agent list`, `agent show`, `skill check`, `skill list`,
   `skill show`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `next`, `init`,
   `doctor`, `self-update`, `usage` and
@@ -180,10 +180,10 @@ New; it replaces no earlier text. What a row or an action added to
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `skill show`, `skill demote`, `skill backfill` and the `pr` actions
+  `agent show`, `skill show`, `skill demote`, `skill backfill` and the `pr` actions
   wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `skill show`, `skill demote`,
+  each `issue` action, each checker, each listing, `agent show`, `skill show`, `skill demote`,
   `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
@@ -589,6 +589,18 @@ New; it replaces no earlier text. What a row or an action added to
   config `loadConfig` refuses. In json mode the kept records, the
   filters, the pre-filter total, the agents trees, the vendor names as
   `unreachable` and the warnings are the result's `data`.
+- **`agent show <name> [--full]` shows the agent definition a name
+  resolves to** (`src/commands/agent/show.ts`, over the show view of
+  `src/inventory/show.ts`), as `skill show` shows a skill. The inventory
+  is built through the `projectInventory` `src/commands/skill/list.ts`
+  exports, the name is the frontmatter `name` `agent list` prints, and it
+  shows its first holder in precedence order (`findShown`), the
+  shadowed copies listed under the other holders. Text mode, `--full`,
+  `--full` read ahead of the name through `readSwitch`, a file that no
+  longer reads, the `warn:` lines, exit code 1 and the json `data` are
+  those of `skill show`, the refusal of a name no agent holds pointing
+  at `rafa skill show` when a skill holds it. The Claude Code built-ins
+  are no inventory row, so no name shows one.
 - **`skill check <dir> [--fix] [--project=<root>]` and
   `instinct check <dir>` run the checker over one tier**
   (`src/commands/skill/check.ts`, `src/commands/instinct/check.ts`,
@@ -856,7 +868,7 @@ New; it replaces no earlier text. What a row or an action added to
   it off the parsed context once the phase 0 function has returned. A
   wrapped command's `outputs` is `['text']` until it writes through the
   active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` no argument and the flags `source`, aliased `tier`, `state` and `hidden-from-loop`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` no argument and the flags `source`, aliased `tier`, `state` and `hidden-from-loop`, and `agent show` the argument `name`, required, and the flag `full`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,

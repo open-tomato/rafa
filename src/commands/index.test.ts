@@ -1,12 +1,12 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the forty-seven commands it registers: what the registry
+ * declarations of the forty-eight commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `describe`, `doctor`, `init`, `next`, `self-update`, `plan list`, `plan show`, `plan validate`, `plan risk`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
- * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`,
+ * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`,
  * `skill check`, `skill list`, `skill show`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
  * `release status`, `release tag`,
  * and the seven `pr` actions
@@ -132,6 +132,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'module exec': ['text', 'json'],
   'agent vendor': ['text', 'json'],
   'agent list': ['text', 'json'],
+  'agent show': ['text', 'json'],
   'skill check': ['text', 'json'],
   'skill list': ['text', 'json'],
   'skill show': ['text', 'json'],
@@ -179,6 +180,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
   'agent list': [[], ['source', 'state', 'hidden-from-loop']],
+  'agent show': [['name'], ['full']],
   'skill check': [['dir'], ['fix', 'project']],
   'skill list': [[], ['source', 'state', 'hidden-from-loop']],
   'skill show': [['name'], ['full']],
@@ -254,6 +256,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['modules exec', 'module exec', [], ''],
   ['agent vendor tdd-guide', 'agent vendor', ['tdd-guide'], ''],
   ['agents list', 'agent list', [], ''],
+  ['agent show code-reviewer --full', 'agent show', ['code-reviewer', '--full'], ''],
   ['skill check .claude/skills --fix', 'skill check', ['.claude/skills', '--fix'], ''],
   ['skills check .claude/skills --project=.', 'skill check', ['.claude/skills', '--project=.'], ''],
   ['skill list --tier=user', 'skill list', ['--tier=user'], ''],
@@ -366,7 +369,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the four plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the two agent actions, skill check, skill list, skill show, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the four plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the three agent actions, skill check, skill list, skill show, skill demote and skill backfill, the three instinct actions, the two release actions, next, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -399,6 +402,7 @@ describe('the core roster', () => {
       'module exec',
       'agent vendor',
       'agent list',
+      'agent show',
       'skill check',
       'skill list',
       'skill show',

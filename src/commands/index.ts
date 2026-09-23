@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the forty-seven registered so far wrap a
+ * of each is its command. Five of the forty-eight registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -30,7 +30,8 @@
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
  * definitions through `src/agents/roster.ts`, nor `agent list`, which
- * lists the agents `buildInventory` (`src/inventory/`) reads,
+ * lists the agents `buildInventory` (`src/inventory/`) reads, nor
+ * `agent show`, which shows one of them through `src/inventory/show.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which lists the skills `buildInventory`
@@ -93,7 +94,9 @@
  *     definition copied into the project with a source header, and
  *     `agent list [--source=<source>] [--state=<state>]
  *     [--hidden-from-loop]`, every agent definition the inventory holds
- *     with its source, its state and whether the loop sees it.
+ *     with its source, its state and whether the loop sees it, and
+ *     `agent show <name> [--full]`, the agent definition a name resolves
+ *     to, shown as `skill show` shows a skill.
  *   - `skill check <dir> [--fix] [--project=<root>]` and
  *     `instinct check <dir>`, the checker over one tier, each exiting
  *     with the number of its failing files and running outside a
@@ -155,6 +158,7 @@ import type { SubjectSpec } from '../cli/registry.js';
 import { createCommandRegistry } from '../cli/registry.js';
 
 import agentList from './agent/list.js';
+import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
@@ -249,6 +253,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   moduleExec,
   agentVendor,
   agentList,
+  agentShow,
   skillCheck,
   skillList,
   skillShow,

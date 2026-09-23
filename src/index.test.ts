@@ -630,6 +630,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'warningLines',
     ]],
   ]],
+  ['./commands/agent/show.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../inventory/show.js', ['findShown', 'readShowView', 'renderShowView']],
+    ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch']],
+    ['../skill/list.js', ['projectInventory', 'warningLines']],
+    ['./list.js', ['DEFAULT_AGENT_LIST_SEAMS']],
+  ]],
   ['./commands/skill/check.js', [
     ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'SKILL_CHECK_USAGE']],
   ]],
@@ -950,6 +957,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/module/exec.js',
       './commands/agent/vendor.js',
       './commands/agent/list.js',
+      './commands/agent/show.js',
       './commands/skill/check.js',
       './commands/skill/list.js',
       './commands/skill/show.js',
