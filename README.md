@@ -338,6 +338,7 @@ built. A box is ticked by the change that finishes the feature.
   branch, start
 - [x] Every command that spends Claude usage says so in its help
 - [x] Before a run, see what it can do on this machine and under your accounts
+- [x] See every skill and agent a run would use, browse them, and ask about them in plain language
 - [ ] The right skills reach the right task, chosen when the plan is
   written
 - [ ] Know which skills earn their place and which are ignored
