@@ -177,7 +177,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
-  'agent list': [[], []],
+  'agent list': [[], ['source', 'state', 'hidden-from-loop']],
   'skill check': [['dir'], ['fix', 'project']],
   'skill list': [[], ['source', 'state', 'hidden-from-loop']],
   'skill demote': [['dir'], ['apply']],

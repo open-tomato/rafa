@@ -28,8 +28,9 @@
  * `issue/issue-tracker.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
- * the mounts the dispatcher made, nor `agent vendor` and `agent list`,
- * which copy and read agent definitions through `src/agents/roster.ts`,
+ * the mounts the dispatcher made, nor `agent vendor`, which copies agent
+ * definitions through `src/agents/roster.ts`, nor `agent list`, which
+ * lists the agents `buildInventory` (`src/inventory/`) reads,
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which lists the skills `buildInventory`
@@ -89,7 +90,9 @@
  *     module's mounted commands are reached through.
  *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
  *     definition copied into the project with a source header, and
- *     `agent list`, the names a session this project spawns resolves.
+ *     `agent list [--source=<source>] [--state=<state>]
+ *     [--hidden-from-loop]`, every agent definition the inventory holds
+ *     with its source, its state and whether the loop sees it.
  *   - `skill check <dir> [--fix] [--project=<root>]` and
  *     `instinct check <dir>`, the checker over one tier, each exiting
  *     with the number of its failing files and running outside a
