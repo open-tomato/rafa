@@ -12,12 +12,13 @@
  * `.rafa/status-seen.json`; a second with nothing new prints nothing; the
  * crossing prints exactly one line naming `rafa cleanup`, once; the same
  * crossing under `--output=json` prints none; `status.notice: false`
- * prints none.
+ * prints none; the hook makes no network call (`gh` and `git` wrappers on
+ * the PATH log every argv, `origin` is unreachable).
  */
 import type { ScratchRepo } from './cli-capture.js';
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -164,5 +165,36 @@ describe('the since-last-command notice, spawned', () => {
     expect(run.exitCode).toBe(0);
     expect(noticeLines(run.stderr)).toEqual([]);
     expect(existsSync(join(scratch.repo, SEEN_PATH))).toBe(false);
+  });
+
+  it('makes no network call: no gh call, no git fetch, ls-remote, pull or push', RUN_TIMEOUT, () => {
+    const scratch = plantWorld();
+    git(scratch, scratch.repo, ['remote', 'add', 'origin', 'https://unreachable.invalid/none.git']);
+    const realGit = Bun.which('git');
+    if (realGit === null) throw new Error('git is not on the PATH this suite runs under');
+    const log = join(scratch.home, 'argv.log');
+    for (const [name, body] of [['gh', 'exit 1'], ['git', `exec '${realGit}' "$@"`]] as const) {
+      const file = join(scratch.bin, name);
+      writeFileSync(file, [
+        '#!/bin/sh',
+        `printf '%s' '${name}' >> '${log}'`,
+        `for a in "$@"; do printf ' %s' "$a" >> '${log}'; done`,
+        `printf '\\n' >> '${log}'`,
+        body,
+        '',
+      ].join('\n'), 'utf8');
+      chmodSync(file, 0o755);
+    }
+
+    const first = runRafa(scratch, scratch.repo, PLAIN);
+    const second = runRafa(scratch, scratch.repo, PLAIN);
+
+    expect(first.exitCode).toBe(0);
+    expect(second.exitCode).toBe(0);
+    const calls = readFileSync(log, 'utf8').split('\n')
+      .filter((line) => line !== '');
+    expect(calls.some((line) => line.startsWith('git '))).toBe(true);
+    expect(calls.filter((line) => line.startsWith('gh'))).toEqual([]);
+    expect(calls.filter((line) => /\s(fetch|ls-remote|pull|push)(\s|$)/.test(line))).toEqual([]);
   });
 });
