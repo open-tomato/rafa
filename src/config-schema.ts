@@ -166,6 +166,28 @@
  *   - No `cleanup` setting is a {@link CommandLineSetting}, for the
  *     reason the `pr` section gives.
  *
+ * ## The `dangerous` section
+ *
+ * `.rafa/specs/rafa-151-references-specs-bugs-are.md` names
+ * `dangerous.acceptStaleRefs` as the setting that has check 4 of the
+ * readiness gate accept every dangling and suspect reference of a spec
+ * on every run, where `--accept-refs` does it for one. The section is named for what
+ * its settings waive: each turns a refusal off for every run, where a
+ * flag turns it off for the one run a person typed it on. Three
+ * readings are this module's:
+ *
+ *   - `dangerous.acceptStaleRefs` defaults to `false`, and a boolean
+ *     rather than null: whether the gate refuses a dangling or suspect
+ *     reference is a question with an answer on every run, and the
+ *     answer nobody has overridden is that it does.
+ *   - It goes through `flag`, so `"true"`, `yes` and `1` are refused
+ *     and not read as true, as every `tracking` key refuses them. A
+ *     setting that switches a refusal off is the last one a misread
+ *     spelling should turn on.
+ *   - It is not a {@link CommandLineSetting}. `--accept-refs` is
+ *     `plan create`'s own argument for one run and not a layer over
+ *     this key, for the reason the `pr` section gives.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -336,6 +358,12 @@ export interface RafaConfig {
   cleanupWorktreeIdleDays: number;
   /** Glob patterns naming branches `rafa cleanup` never lists. `cleanup.keep`. */
   cleanupKeep: readonly string[];
+  /**
+   * Whether check 4 of the readiness gate accepts every dangling and
+   * suspect reference of a spec on every run, as `--accept-refs` does
+   * on one. `dangerous.acceptStaleRefs`.
+   */
+  dangerousAcceptStaleRefs: boolean;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -382,6 +410,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
+  dangerousAcceptStaleRefs: false,
 });
 
 /** What the module knows about one setting. */
@@ -493,6 +522,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   cleanupKeep: {
     key: 'cleanup.keep',
     read: listOf(text('a glob pattern'), 'glob patterns'),
+    cli: false,
+  },
+  dangerousAcceptStaleRefs: {
+    key: 'dangerous.acceptStaleRefs',
+    read: flag,
     cli: false,
   },
 };

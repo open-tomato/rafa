@@ -1,8 +1,9 @@
 /**
  * The rows `rafa issue list --roadmap` prints: the Roadmap issue's
  * lines, in its order, each joined to its issue on the board listing
- * and carrying the three readings the plain list has not got — `spec`,
- * `blocked by` and `has` (`.rafa/specs/rafa-123-rafa-issue-list-roadmap.md`).
+ * and carrying the four readings the plain list has not got — `spec`,
+ * `blocked by` and `has` (`.rafa/specs/rafa-123-rafa-issue-list-roadmap.md`),
+ * and `refs` (`.rafa/specs/rafa-151-references-specs-bugs-are.md`).
  *
  * Every reading here is one another module already makes, called and
  * never respelled:
@@ -16,12 +17,16 @@
  *    blocker's state taken off the board listing rather than asked for;
  *  - `has`: {@link stubOfPlanFile} over the plan dir's file names, the
  *    branch scan {@link scanClaimBranches} with {@link branchClaims}, and
- *    the open pull request list with {@link closedIssuesIn}.
+ *    the open pull request list with {@link closedIssuesIn};
+ *  - `refs`: whatever {@link RoadmapRefs} answers, asked once for every
+ *    selected line; `issue list --roadmap` hands in the reading `rafa
+ *    doctor`'s references row makes (`src/commands/doctor-refs.ts`).
  *
  * Nothing here spawns or opens a file on its own account: `gh` arrives
  * through {@link BoardListing}, {@link RoadmapSearch},
  * {@link SpecIssueReader} and {@link OpenPullRequestLister}, git through
- * {@link GitRunner}, and the plan dir through {@link PlanNames}.
+ * {@link GitRunner}, the plan dir through {@link PlanNames}, and the
+ * saved copies under `specs.dir` through {@link RoadmapRefs}.
  * {@link createPlanDirNames} is the one filesystem read, made for the
  * caller that resolved the dir as `resolvePlansDir`
  * (`src/commands/plan/plan-files.ts`) resolves it: `issue list
@@ -86,6 +91,21 @@
  * the issue. `pr #n` for each open pull request whose body closes it,
  * in the list's order. The three are printed in that order.
  *
+ * ## The refs column
+ *
+ * For a line whose issue has a saved copy under `specs.dir`, how many
+ * of the references that copy names read `suspect` or `dangling`, one
+ * number, `0` for a clean copy; two copies of one issue are summed. A
+ * line with no saved copy has no {@link RefsCell}, and its cell is
+ * empty. `unknown` references are carried in {@link RefsCell.unknown}
+ * for json mode and not counted: they could not be checked, and a
+ * number counting them would claim a fault nobody measured. A copy whose
+ * references could not be read makes the cell `?`, since the count
+ * would be short by what was not read, and its reason is a warning
+ * naming `rafa issue check <n>`. The reading writes nothing: a
+ * reference a copy keeps no stamp for is compared as `rafa issue check`
+ * compares it, and is not stamped here.
+ *
  * ## When something cannot be read
  *
  * A Roadmap that cannot be found or read REJECTS: there is no order to
@@ -107,6 +127,9 @@
  *    `plan create --next` warns them (`./spec-source.ts`).
  *  - The pull request list or the plan dir failing: one warning each,
  *    and no `pr` or `plan` marks.
+ *  - {@link RoadmapRefs} rejecting: one warning, and every `refs` cell
+ *    empty. The saved copies are local, so the board being unreachable
+ *    does not stop them being read.
  */
 import type { BlockedReading } from './blocked.js';
 import type { SpecIssueReader } from './issue.js';
@@ -117,6 +140,7 @@ import type { GitRunner } from '../pr/git.js';
 
 import { readdirSync } from 'node:fs';
 
+import { issueCheckCommand } from '../commands/doctor-refs.js';
 import { stubOfPlanFile } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 
@@ -180,7 +204,30 @@ export interface RoadmapRow {
   readonly blockers: readonly BlockerCell[];
   /** The `has` column, in the order plan, branch, pull requests. */
   readonly has: readonly HasMark[];
+  /** The `refs` column, or null when the issue has no saved copy or the copies could not be listed. */
+  readonly refs: RefsCell | null;
 }
+
+/** One issue's saved copies, counted by what their references read: the `refs` column, as data. */
+export interface RefsCell {
+  /** How many saved copies of the issue were found. */
+  readonly copies: number;
+  /** References reading `suspect`, over every copy. */
+  readonly suspect: number;
+  /** References reading `dangling`, over every copy. */
+  readonly dangling: number;
+  /** References reading `unknown`, over every copy; carried, and not printed in the cell. */
+  readonly unknown: number;
+  /** Why each copy whose references could not be read failed; the cell is `?` when any did. */
+  readonly errors: readonly string[];
+}
+
+/**
+ * The `refs` column's reading: for each of `issues`, its saved copies
+ * counted, and no entry for an issue with no saved copy. Rejects only
+ * when the copies cannot be listed at all.
+ */
+export type RoadmapRefs = (issues: readonly number[]) => Promise<ReadonlyMap<number, RefsCell>>;
 
 /** What {@link readRoadmapRows} answers. */
 export interface RoadmapRows {
@@ -213,6 +260,8 @@ export interface RoadmapRowsOptions {
   readonly pullRequests: OpenPullRequestLister;
   /** The plan dir's file names. */
   readonly planNames: PlanNames;
+  /** The saved copies' references, asked once for every selected line. */
+  readonly refs: RoadmapRefs;
   /** Keep the ticked lines too; `--all`. */
   readonly all?: boolean;
 }
@@ -306,6 +355,21 @@ export function hasText(marks: readonly HasMark[]): string {
   }).join(', ');
 }
 
+/** The `refs` cell as printed: the suspect and dangling count, `?` when a copy was not read, empty with no copy. */
+export function refsText(cell: RefsCell | null): string {
+  if (cell === null) return '';
+  if (cell.errors.length > 0) return '?';
+  return String(cell.suspect + cell.dangling);
+}
+
+/** The warning each copy whose references could not be read is carried as. */
+function refsWarnings(cells: ReadonlyMap<number, RefsCell>): readonly string[] {
+  return [...cells].flatMap(([issue, cell]) => cell.errors.map((error) => (
+    `the references of #${String(issue)}'s saved copy could not be read, so its refs cell is ?:`
+    + ` ${error} — run ${issueCheckCommand(issue)}`
+  )));
+}
+
 /** True when a plan file in `names` is issue `issue`'s. */
 export function hasPlanFor(names: readonly string[], issue: number): boolean {
   const id = boardId(issue);
@@ -380,10 +444,10 @@ function viewOf(issues: readonly BoardIssue[] | null): BoardView | null {
 }
 
 /** One row over the board, when there is one. */
-function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark[]): RoadmapRow {
+function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark[], refs: RefsCell | null): RoadmapRow {
   const issue = board?.byNumber.get(line.issue);
   if (board === null || issue === undefined) {
-    return Object.freeze({ line, issue: null, spec: null, blocked: null, blockers: Object.freeze([]), has });
+    return Object.freeze({ line, issue: null, spec: null, blocked: null, blockers: Object.freeze([]), has, refs });
   }
   const blocked = readBlockedBy(issue.number, issue.body, board.known);
   return Object.freeze({
@@ -393,6 +457,7 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
     blocked,
     blockers: readBlockersColumn(blocked, board.states),
     has,
+    refs,
   });
 }
 
@@ -414,12 +479,18 @@ export async function readRoadmapRows(options: RoadmapRowsOptions): Promise<Road
     ? { value: [], warning: null }
     : await readOrWarn(options.pullRequests, [], 'the open pull requests could not be listed, so no pr is shown');
   const plans = await readOrWarn(options.planNames, [], 'the plan dir could not be read, so no plan is shown');
+  const issues = [...new Set(lines.map((line) => line.issue))];
+  const refs = await readOrWarn(
+    () => options.refs(issues),
+    new Map<number, RefsCell>(),
+    'the saved copies could not be read, so the refs column is empty',
+  );
 
   const board = viewOf(listed.issues);
   const sources: HasSources = { planNames: plans.value, refs: scan.refs, pulls: pulls.value };
-  const rows = lines.map((line) => rowOf(line, board, readHasColumn(line.issue, sources)));
+  const rows = lines.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
 
-  const warnings = [listed.warning, ...scan.problems, pulls.warning, plans.warning]
+  const warnings = [listed.warning, ...scan.problems, pulls.warning, plans.warning, refs.warning, ...refsWarnings(refs.value)]
     .filter((warning): warning is string => warning !== null);
   return Object.freeze({ roadmap, rows: Object.freeze(rows), warnings: Object.freeze(warnings) });
 }

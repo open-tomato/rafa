@@ -36,6 +36,24 @@ the shapes the lint config forces.
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
 
+### References
+
+- **`src/refs/` extracts, verifies, stamps and composes references**
+  in spec and bug report bodies. Each reference (an issue, a symbol, a
+  path, a command) is extracted by pattern, verified against its
+  target, and fingerprinted. The fingerprint at the time the spec was
+  read is the reference's STAMP; it is kept in the saved copy under
+  `specs.dir` as an HTML comment, never on the forge. Four states:
+  `ok`; `dangling` (the target does not exist); `suspect` (the
+  target's fingerprint differs from its stamp); `resolved` (a
+  `Blocked by:` target closed since the stamp). A fifth, `unknown`,
+  is a cross-repository target the provider cannot read; it is listed
+  and never refuses. Nothing spawns a process: `gh`, `git` and
+  `ts-symbols` arrive through seams (`GhRunner` from
+  `src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
+  so unit cases drive fakes and planted repositories under `tmpdir`
+  only. Sha256 uses `node:crypto` or `Bun.CryptoHasher`.
+
 ### The size cap no gate reads
 
 **The 800-line cap is a convention only.** `eslint.base.mjs`,
@@ -65,6 +83,20 @@ the tree's own convention and not a thing to split, and no capture reads
 it either way. Splitting one costs the shared world helpers a home, which
 is what keeps `src/commands/doctor.test.ts` (898) and
 `src/commands/init.test.ts` (806) whole.
+
+### Adding a setting
+
+**A new key in `SETTINGS` reaches five files beyond the schema, sections
+and `init` scaffold.** `RafaConfig` literals have to be complete, so the
+layer literal in `src/config.ts` needs it. Both config suites also check
+that every setting appears exactly once: `src/config.test.ts` (`SETTINGS`,
+`DEFAULTS`, `FULL`, `FULL_VALUES`, its cases and `KNOWN`) and
+`src/tests/config-layers.test.ts` (the PROJECT and USER text and values,
+and `SECTION_CASES`). `check-types` never reads the two suites, so only
+`bun run test` shows what is missing. A section appended after the last
+one in the scaffold has to bound any scaffold case that slices from an
+earlier header to the end of the template. This section replaces
+nothing.
 
 ### Shapes the lint config forces
 

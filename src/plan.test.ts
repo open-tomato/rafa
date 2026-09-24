@@ -53,6 +53,17 @@
  * `git` reads, driven over planted runners in
  * `src/board/plan-spec.test.ts` and end to end in the integration suite.
  *
+ * Check 4 is driven through the same `--issue=20` read, over a body
+ * naming `src/gone.ts`, which no scratch repository tracks, so the
+ * reference reads `dangling` through `git` and no third `gh` read is
+ * asked for. Three cases: refused with exit 2 and no session, planned
+ * under `--accept-refs` with the `absent` stamp left in the snapshot,
+ * and planned with `dangerous.acceptStaleRefs: true` in the config,
+ * whose pass line is the run's first. Dropping the `checkCreateRefs`
+ * call from `src/plan.ts` reddened all three, and dropping the
+ * `announceCreateRefs` call reddened the third alone (2026-09-24, 25
+ * and 27 pass of 28, the module restored and checked with `shasum -c`).
+ *
  * That every `--spec` case is green is a reading of its own: the board
  * seams are built for every run (`src/board/plan-spec.ts`) and a file
  * route calls none of them, so a resolution that spawned `gh` eagerly
@@ -160,8 +171,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from './board/naming.js';
+import { acceptStaleRefsPassLine } from './board/refs-gate.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import { buildPlanPrompt, readPlanFormat, runBranchLine } from './plan.js';
+import { projectConfigText } from './project/scaffold.js';
+import { ABSENT, readRefsBlock } from './refs/stamp.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
 
@@ -186,6 +200,12 @@ const ISSUE = {
   body: completeSpecBody('Spec: the board routes', 'Nothing to build.'),
   author: 'octocat',
 };
+
+/**
+ * Issue 20's body naming a file on its fifth line that no scratch
+ * repository tracks, so check 4 reads it `dangling`.
+ */
+const GONE_BODY = completeSpecBody('Spec: the board routes', 'Touches `src/gone.ts`.');
 
 /** The spec content the fixture hands the context's builder. */
 const FIXTURE_SPEC = 'the spec as the fixture hands it to the builder\n';
@@ -329,8 +349,16 @@ interface Scratch {
   readonly env: Record<string, string>;
 }
 
+/** What a case plants over the defaults: the body the stand-in `gh` answers for issue 20, and a line appended to the config. */
+interface ScratchOptions {
+  /** Issue 20's body; {@link ISSUE}'s own when left out. */
+  readonly body?: string;
+  /** Appended to the config `rafa init` writes. */
+  readonly config?: string;
+}
+
 /** A scratch repository holding the spec and `progress.txt`, beside the probe and the stand-in. */
-function plantScratch(): Scratch {
+function plantScratch(options: ScratchOptions = {}): Scratch {
   planted += 1;
   const root = join(tempDir, `run-${planted}`);
   const repo = join(root, 'repo');
@@ -358,7 +386,7 @@ function plantScratch(): Scratch {
     `  printf '%s' '${JSON.stringify({
       number: ISSUE.number,
       title: ISSUE.title,
-      body: ISSUE.body,
+      body: options.body ?? ISSUE.body,
       state: 'OPEN',
       labels: [{ name: 'type:spec' }, { name: 'spec:ready' }],
       author: { login: ISSUE.author },
@@ -379,7 +407,7 @@ function plantScratch(): Scratch {
   if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr.toString()}`);
   writeFileSync(join(repo, 'spec.md'), SPEC, 'utf8');
   writeFileSync(join(repo, 'progress.txt'), PROGRESS, 'utf8');
-  plantProjectConfig(repo);
+  plantProjectConfig(repo, `${projectConfigText()}${options.config ?? ''}`);
   const probe = join(root, 'probe.ts');
   writeFileSync(probe, PROBE, 'utf8');
 
@@ -536,6 +564,45 @@ describe('rafa plan through the adapter registry', () => {
     expect(planned.split('\n').slice(2, 5)).toEqual(['```rafa:plan', 'stub: spec', 'issue: "20"']);
     expect(run.stdout).toContain(`🔖 .rafa/plans/PLAN-${stub}.md records issue: "20", the issue it was planned from.`);
     expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('refuses a snapshot naming a file the repository lacks at check 4, exit 2, before the planner', () => {
+    const scratch = plantScratch({ body: GONE_BODY });
+    const snapshot = specPath('.rafa/specs', ISSUE.number, ISSUE.title);
+
+    const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
+
+    expect(run.exitCode).toBe(2);
+    expect(run.stderr).toContain('❌ issue #20 names references that are missing or changed since the spec was read:');
+    expect(run.stderr).toContain('   • dangling src/gone.ts (line 5)');
+    expect(readFileSync(join(scratch.repo, snapshot), 'utf8')).toBe(GONE_BODY);
+    expect(existsSync(scratch.record)).toBe(false);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
+  it('plans past check 4 under --accept-refs, leaving the absent stamp in the snapshot', () => {
+    const scratch = plantScratch({ body: GONE_BODY });
+    const snapshot = specPath('.rafa/specs', ISSUE.number, ISSUE.title);
+
+    const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress', '--accept-refs']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(run.stdout).toContain('🔖 --accept-refs: re-stamped 1 reference of issue #20 as reviewed.');
+    expect(readRefsBlock(readFileSync(join(scratch.repo, snapshot), 'utf8')).stamps).toEqual([
+      { kind: 'path', text: 'src/gone.ts', fingerprint: ABSENT },
+    ]);
+    expect(readRecord(scratch)).toMatchObject({ request: { specPath: snapshot } });
+  }, 30_000);
+
+  it('prints the dangerous.acceptStaleRefs pass line first and plans past check 4 with the setting on', () => {
+    const scratch = plantScratch({ body: GONE_BODY, config: 'dangerous:\n  acceptStaleRefs: true\n' });
+
+    const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(run.stdout.split('\n')[0]).toBe(`warn: ${acceptStaleRefsPassLine()}`);
+    expect(run.stdout).toContain('🔖 dangerous.acceptStaleRefs: re-stamped 1 reference of issue #20 as reviewed.');
+    expect(existsSync(scratch.record)).toBe(true);
   }, 30_000);
 
   it('refuses a line naming two spec sources, asking for neither a plan nor a board read', () => {
@@ -729,7 +796,7 @@ function labelOf(event: CliEvent): string {
 
 /** The refusal a line naming none of the three spec sources gets. */
 const USAGE_REFUSAL = 'Usage: rafa plan create (--spec=<file>.md | --issue=<n> | --next[=<roadmap-issue>])\n'
-  + '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment]\n'
+  + '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment] [--accept-refs]\n'
   + 'no spec was named: pass --spec=<file>.md, read against the project root or under specs.dir'
   + ' (.rafa/specs), --issue=<n> to plan from an issue, or --next to take the first undone line of the roadmap';
 

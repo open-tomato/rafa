@@ -337,6 +337,7 @@ function readLayer(
     cleanupStaleDays: read('cleanupStaleDays'),
     cleanupWorktreeIdleDays: read('cleanupWorktreeIdleDays'),
     cleanupKeep: read('cleanupKeep'),
+    dangerousAcceptStaleRefs: read('dangerousAcceptStaleRefs'),
   };
   return { layer, problems, extras };
 }

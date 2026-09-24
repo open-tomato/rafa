@@ -1,11 +1,12 @@
 /**
  * Tests for the roadmap table (`src/commands/issue/roadmap-table.ts`):
- * the eight columns in order, the one empty-cell spelling, and the
+ * the nine columns in order, the one empty-cell spelling, and the
  * width rule — a too-narrow terminal cutting `title` to its floor before
  * `labels`, an exact fit cutting nothing, and no width cutting nothing.
  *
  * Every row is planted by hand; the `spec` cell is the row module's own
- * {@link readSpecColumn} over a planted body, so the table is read with
+ * {@link readSpecColumn} over a planted body, and the `refs` cell the
+ * row module's {@link refsText} over a planted count, so the table is read with
  * the spelling it prints and never a copy of it.
  */
 import type { RoadmapRow } from '../../board/roadmap-rows.js';
@@ -41,6 +42,7 @@ function boardRow(issue: number, title: string, labels: readonly string[] = LABE
     blocked: null,
     blockers: [{ reference: '#24', state: 'open' }],
     has: [{ kind: 'plan' }, { kind: 'pr', number: 40 }],
+    refs: { copies: 1, suspect: 1, dangling: 1, unknown: 3, errors: [] },
   };
 }
 
@@ -53,6 +55,7 @@ function bareRow(issue: number, why: string): RoadmapRow {
     blocked: null,
     blockers: [],
     has: [],
+    refs: null,
   };
 }
 
@@ -67,9 +70,9 @@ function naturalWidth(rows: readonly RoadmapRow[]): number {
 }
 
 describe('the columns', () => {
-  it('heads the table with the eight columns, in order', () => {
+  it('heads the table with the nine columns, in order', () => {
     const [head] = renderRoadmapTable([]);
-    expect(ROADMAP_COLUMNS).toEqual(['#', 'state', 'type', 'spec', 'blocked by', 'has', 'labels', 'title']);
+    expect(ROADMAP_COLUMNS).toEqual(['#', 'state', 'type', 'spec', 'blocked by', 'has', 'refs', 'labels', 'title']);
     expect(head?.split(/\s{2,}/).map((name) => name.trim())).toEqual([...ROADMAP_COLUMNS]);
   });
 
@@ -85,6 +88,7 @@ describe('the columns', () => {
       'ready',
       '#24 open',
       'plan, pr #40',
+      '2',
       `type:spec, ${SPEC_READY_LABEL}, module:board`,
       'A title',
     ]);
@@ -108,17 +112,24 @@ describe('the columns', () => {
 
 describe('an empty cell', () => {
   it('is spelled - in every column a row with no issue has nothing for', () => {
-    expect(roadmapCells(bareRow(5, ''))).toEqual(['#5', ...Array.from({ length: 7 }, () => EMPTY_CELL)]);
+    expect(roadmapCells(bareRow(5, ''))).toEqual(['#5', ...Array.from({ length: 8 }, () => EMPTY_CELL)]);
   });
 
   it('takes the Roadmap line\'s why as the title when the row has no issue', () => {
     expect(roadmapCells(bareRow(5, 'read it first')).at(-1)).toBe('read it first');
   });
 
-  it('is spelled - for no blocker, no has mark and no label beside a filled row', () => {
-    const row: RoadmapRow = { ...boardRow(8, 'plain', []), blockers: [], has: [] };
+  it('is spelled - for no blocker, no has mark, no saved copy and no label beside a filled row', () => {
+    const row: RoadmapRow = { ...boardRow(8, 'plain', []), blockers: [], has: [], refs: null };
     const cells = roadmapCells(row);
-    expect([cells[4], cells[5], cells[6]]).toEqual([EMPTY_CELL, EMPTY_CELL, EMPTY_CELL]);
+    expect([cells[4], cells[5], cells[6], cells[7]]).toEqual([EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL]);
+  });
+
+  it('prints 0 in refs for a clean saved copy, not -, and ? for one that could not be read', () => {
+    const clean: RoadmapRow = { ...boardRow(8, 'clean'), refs: { copies: 1, suspect: 0, dangling: 0, unknown: 0, errors: [] } };
+    const unread: RoadmapRow = { ...boardRow(9, 'unread'), refs: { copies: 1, suspect: 0, dangling: 0, unknown: 0, errors: ['no'] } };
+    expect(roadmapCells(clean)[6]).toBe('0');
+    expect(roadmapCells(unread)[6]).toBe('?');
   });
 });
 
@@ -168,25 +179,26 @@ describe('the width rule', () => {
     const row = lines[1] ?? '';
     const cells = row.split(COLUMN_GAP).filter((text) => text !== '');
     expect(widthOf(cells.at(-1) ?? '')).toBe(TITLE_FLOOR);
-    expect(widthOf(cells.at(-2)?.trimEnd() ?? '')).toBe(LABELS_FLOOR);
+    expect(widthOf(cells.at(-2)?.trim() ?? '')).toBe(LABELS_FLOOR);
     expect(widthOf(row)).toBeGreaterThan(40);
     expect(row).toContain('#24 open');
     expect(row).toContain('plan, pr #40');
+    expect(row.split(COLUMN_GAP).map((text) => text.trim())).toContain('2');
   });
 });
 
 describe('fitColumnWidths', () => {
-  const natural = [4, 5, 4, 5, 10, 12, 30, 60];
-  const total = natural.reduce((sum, width) => sum + width, 0) + COLUMN_GAP.length * 7;
+  const natural = [4, 5, 4, 5, 10, 12, 4, 30, 60];
+  const total = natural.reduce((sum, width) => sum + width, 0) + COLUMN_GAP.length * 8;
 
   it('leaves a title already under its floor and cuts the labels', () => {
-    const short = [...natural.slice(0, 7), 10];
+    const short = [...natural.slice(0, 8), 10];
     const shortTotal = total - 50;
-    expect(fitColumnWidths(short, shortTotal - 5)).toEqual([...natural.slice(0, 6), 25, 10]);
+    expect(fitColumnWidths(short, shortTotal - 5)).toEqual([...natural.slice(0, 7), 25, 10]);
   });
 
-  it('never cuts the six reading and key columns', () => {
-    expect(fitColumnWidths(natural, 1).slice(0, 6)).toEqual(natural.slice(0, 6));
+  it('never cuts the seven reading and key columns', () => {
+    expect(fitColumnWidths(natural, 1).slice(0, 7)).toEqual(natural.slice(0, 7));
   });
 });
 

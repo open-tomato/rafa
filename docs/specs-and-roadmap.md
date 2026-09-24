@@ -96,6 +96,7 @@ The change I want: <describe it in a few sentences>
 rafa plan create --issue=42     # plan from issue #42
 rafa plan create --next         # plan from the first undone line of the Roadmap issue
 rafa plan create --next --dry-run
+rafa plan create --issue=42 --accept-refs   # plan even though a reference changed
 ```
 
 `--issue` copies the issue's body to `.rafa/specs/rafa-42-<slug>.md` and
@@ -112,6 +113,64 @@ than fifty previous copies accumulate under `previous/`, `rafa doctor`
 warns that they are safe to delete. The plan, its branch and its pull
 request carry the same name: `rafa-42-<slug>`, `feat/rafa-42-<slug>`,
 `rafa-42: <title>`, with `Closes #42` in the pull request.
+
+Before any planning session starts, rafa also checks the references the
+spec makes: the other issues it names, and the files, exported symbols,
+`rafa` commands, flags and config keys it writes in backticks. The first
+time it reads one it records what the target held then, in a comment at
+the top of the saved copy. On every later run it compares again, and it
+refuses to plan (exit code 2) when a reference is **dangling** — the
+file, symbol or issue does not exist — or **suspect** — it changed
+since the spec was read. Each one is listed with where it sits in the
+issue:
+
+```text
+❌ issue #42 names references that are missing or changed since the spec was read:
+   • dangling src/a.ts (line 12)
+   • suspect #7: heading "Design" changed (line 3)
+   Pass --accept-refs to re-stamp them as reviewed and plan on this run, or edit the issue so the spec names what is there now.
+```
+
+For an issue it names which `##` sections changed, so you know what to
+reread. A reference to a file that does not exist yet is dangling too,
+even the first time: a spec that plans to create `src/a.ts` says so, and
+you accept it once.
+
+There are two ways past the refusal. Edit the issue so the spec names
+what is there now, or, once you have looked and the spec still holds,
+run again with `--accept-refs`: rafa records every reference as reviewed
+and plans. A file you accepted as missing then reads as fine until it
+appears, and reads as changed from then on. A blocker named under
+`Blocked by:` that has closed does not refuse; rafa prints
+`resolved #7 — rafa issue unblock 42` so you can take the spec off its
+blocked line. An issue in another repository that rafa cannot read is
+listed and never refuses. `--dry-run` writes no saved copy, so it skips
+this check.
+
+To skip the refusal on every run, set this in `.rafa/config.yaml`:
+
+```yaml
+dangerous:
+  acceptStaleRefs: true
+```
+
+It does what `--accept-refs` does, on every run from the board, and a
+run with it on starts with a warning saying so. It is meant for a
+project whose specs are too out of date to be blocked on, and it sits
+under `dangerous` because with it on, no spec is ever refused for
+naming something that has gone or changed.
+
+`rafa issue check 42` prints every reference of the saved copy of #42
+with its state, and plans nothing. `rafa doctor` counts the suspect and
+dangling references across every saved copy under `.rafa/specs/` and
+names `rafa issue check <n>` for each copy that holds one. It changes
+no file, and when the board cannot be read it counts those issues as
+unknown rather than failing:
+
+```text
+References: 1 suspect, 1 dangling across 3 saved copies; run rafa issue check <n> to see each:
+  #42 .rafa/specs/rafa-42-export-reports-csv.md: 1 suspect, 1 dangling — rafa issue check 42
+```
 
 ## The roadmap
 
@@ -142,11 +201,18 @@ rafa issue list --roadmap --all    # including done items
 ```
 
 `rafa roadmap` reads the roadmap issue once and prints each line as a table
-row. The table has three columns beyond the item itself: **spec** (readiness,
-whether the issue carries `spec:ready`), **blocked by** (the first blocker if
-any, else empty), and **has** (what already exists: a plan, a branch, or an
-open pull request). This view helps you see at a glance what is ready for
-planning, what is waiting, and what is already in motion. `--all` includes
+row. The table has four columns beyond the item itself: **spec** (readiness,
+whether the issue carries `spec:ready`), **blocked by** (each blocker and
+whether it is open, `-` when there is none), **has** (what already exists: a plan, a branch, or an
+open pull request), and **refs** (how many references in the issue's saved
+copy under `specs.dir` read suspect or dangling: `0` for a clean copy, `-`
+when the issue has no saved copy, `?` when the copy could not be read). A
+non-zero `refs` is the same count `rafa doctor` reports; run
+`rafa issue check <n>` to see which references they are. Reading the column
+writes nothing to the copy. With `--output=json`, each row's `refs` holds the
+counts behind the cell (`copies`, `suspect`, `dangling`, `unknown` and the
+`errors` of copies that could not be read), or `null` with no saved copy. This view helps you see at a glance what is
+ready for planning, what is waiting, and what is already in motion. `--all` includes
 done items, and `rafa issue list --roadmap` offers more output formats and
 filters than `rafa roadmap` does.
 

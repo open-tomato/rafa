@@ -156,7 +156,7 @@ describe('the refusal a line naming no source gets', () => {
   it('carries the usage, its flags and where a --spec file is looked for', () => {
     expect(usageRefusal(SPECS_DIR)).toBe([
       'Usage: rafa plan create (--spec=<file>.md | --issue=<n> | --next[=<roadmap-issue>])',
-      '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment]',
+      '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment] [--accept-refs]',
       noSourceMessage(SPECS_DIR),
     ].join('\n'));
   });

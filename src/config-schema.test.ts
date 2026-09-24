@@ -60,6 +60,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['cleanupStaleDays', 'cleanup.staleDays'],
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
+  ['dangerousAcceptStaleRefs', 'dangerous.acceptStaleRefs'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -93,6 +94,7 @@ const TOP = [
   'roadmap',
   'release',
   'cleanup',
+  'dangerous',
 ];
 
 describe('SETTINGS', () => {
@@ -148,6 +150,7 @@ describe('SECTIONS', () => {
     expect([...SECTIONS].sort()).toEqual([
       'board',
       'cleanup',
+      'dangerous',
       'learning',
       'loop',
       'output',
@@ -182,6 +185,10 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('cleanup.staleDayz')).toEqual([
       'cleanup',
       ['staleDays', 'worktreeIdleDays', 'keep'],
+    ]);
+    expect(knownKeysAbove('dangerous.acceptStaleRef')).toEqual([
+      'dangerous',
+      ['acceptStaleRefs'],
     ]);
   });
 

@@ -84,7 +84,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup)';
+  + 'roadmap, release, cleanup, dangerous)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -118,6 +118,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'cleanupStaleDays',
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
+  'dangerousAcceptStaleRefs',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -152,6 +153,7 @@ const DEFAULTS: RafaConfig = {
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
+  dangerousAcceptStaleRefs: false,
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -209,6 +211,8 @@ const FULL = [
   '  staleDays: 60',
   '  worktreeIdleDays: 14',
   '  keep: ["release/*", keep-me]',
+  'dangerous:',
+  '  acceptStaleRefs: true',
   '',
 ].join('\n');
 
@@ -258,6 +262,7 @@ const FULL_VALUES: RafaConfig = {
   cleanupStaleDays: 60,
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
+  dangerousAcceptStaleRefs: true,
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -611,6 +616,11 @@ describe('parseConfigText', () => {
         'cleanup.keep', 'cleanup:\n  keep: "release/*"',
         'cleanup.keep is "release/*", expected a list of glob patterns',
         'cleanup:\n  keep: ["hotfix/*"]', 'cleanupKeep', ['hotfix/*'],
+      ],
+      [
+        'dangerous.acceptStaleRefs', 'dangerous:\n  acceptStaleRefs: yes',
+        'dangerous.acceptStaleRefs is "yes", expected true or false',
+        'dangerous:\n  acceptStaleRefs: true', 'dangerousAcceptStaleRefs', true,
       ],
     ];
 

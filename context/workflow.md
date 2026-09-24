@@ -145,7 +145,7 @@ The command is offered automatically by `plan create --issue` and
 `plan create --next` in a terminal, where a yes labels the issue with
 `spec:ready` and proceeds to plan it, or a no exits with the check result.
 A spec without the label cannot be planned from the board routes. See
-`context/pull-requests.md` for the readiness gate's four checks and how
+`context/pull-requests.md` for the readiness gate's five checks and how
 the planner's own review can keep a plan when assumptions are named.
 
 ### The interaction rule

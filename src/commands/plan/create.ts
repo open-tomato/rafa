@@ -8,14 +8,14 @@
  * whose next word is no action of it, `rafa plan` alone included
  * (`src/cli/route.ts`). `src/plan.ts` reads its own flags, and the ones
  * declared here are those it reads: `--spec`, `--stub` and
- * `--no-progress` in that module, and the board's seven words in
+ * `--no-progress` in that module, and the board's eight words in
  * `src/board/flags.ts`, which records why they sit in one module.
  *
  * Three of them name the one spec a run plans from and are mutually
  * exclusive — `--spec`, `--issue` and `--next` — so none is `required`
  * and a line naming none is refused by the command with its usage.
  *
- * The tenth flag is read by neither: `hint` is this tree's own
+ * The eleventh flag is read by neither: `hint` is this tree's own
  * ({@link HINT_FLAG_SPEC}), and `endingWith` reads it AFTER `src/plan.ts`
  * has returned, to end a run that wrote a plan by naming the one step
  * that follows — the loop on the plan it has just written
@@ -43,7 +43,9 @@ const wrapped = wrapPhaseZeroCommand({
     + ' first undone line of the roadmap issue (`--next`); the two board routes write the issue body to a'
     + ' snapshot under `specs.dir`, plan from that file, and record `issue: <n>` in the plan. The stub is'
     + ' the basename of the spec unless `--stub` names one, and the command refuses when that plan already'
-    + ' exists. The findings in `progress.txt` are handed to the session as advisory context unless'
+    + ' exists. On the two board routes the references the snapshot names are read against the stamps its'
+    + ' saved copy keeps, and one missing or changed since the spec was read refuses the run before any'
+    + ' session starts unless `--accept-refs` re-stamps them. The findings in `progress.txt` are handed to the session as advisory context unless'
     + ' `--no-progress` is given. The session loads the setting sources `loop.settingSources` names, and a'
     + ' config the loop cannot run on refuses the command before any session starts.',
   args: [],
@@ -83,6 +85,13 @@ const wrapped = wrapPhaseZeroCommand({
       name: 'skip-review',
       description: 'Plans without the planner judging the spec first. The label and the code checks still'
         + ' run, and the plan records `review: skipped`.',
+      type: 'boolean',
+    },
+    {
+      name: 'accept-refs',
+      description: 'Re-stamps every reference the spec names as reviewed and plans past the dangling and'
+        + ' suspect ones check 4 would refuse, on this run only; `dangerous.acceptStaleRefs: true` in the'
+        + ' config does it on every run.',
       type: 'boolean',
     },
     {

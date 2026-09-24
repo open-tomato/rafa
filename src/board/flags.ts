@@ -1,7 +1,7 @@
 /**
  * The command-line words the board routes of `rafa plan create` are read
- * with, in one module: the three spec sources, `--refresh`, `--dry-run`
- * and the readiness gate's two.
+ * with, in one module: the three spec sources, `--refresh`, `--dry-run`,
+ * the two of check 3 of the readiness gate and the one of check 4.
  *
  * `plan create` is a wrapped phase 0 command, so `src/plan.ts` and the
  * modules it delegates to read its flags, and the flags
@@ -21,7 +21,7 @@
  * already published, so nothing that imported one had to move, and the
  * parity case names `src/plan.ts` and this module alone.
  *
- * Nothing here reads, decides or defaults: it is seven strings. The
+ * Nothing here reads, decides or defaults: it is eight strings. The
  * module that acts on each is named beside it.
  */
 
@@ -49,3 +49,9 @@ export const SKIP_REVIEW_FLAG = '--skip-review';
 
 /** The flag that keeps the gaps off the board; read in `./gate.ts`. */
 export const NO_COMMENT_FLAG = '--no-comment';
+
+/**
+ * The flag that re-stamps every reference of the spec as reviewed, so
+ * check 4 refuses none of them on this run; read in `./refs-gate.ts`.
+ */
+export const ACCEPT_REFS_FLAG = '--accept-refs';

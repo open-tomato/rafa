@@ -30,7 +30,7 @@ Subjects:
              risk and needs 🪙
   loop       start a plan; stop, pause, resume, show and list its sessions 🪙
   issue      the tracker: list, show, create, comment on and move issues; mark
-             one ready and unblock it
+             one ready, unblock it and check its references
   pr         the pull request of a branch: one line, in full or in the browser;
              list, wait on, merge and triage them 🪙
   effort     collect session and commit rows; report per plan

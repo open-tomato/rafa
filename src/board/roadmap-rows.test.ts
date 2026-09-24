@@ -1,22 +1,24 @@
 /**
  * Tests for the roadmap rows (`src/board/roadmap-rows.ts`): the Roadmap's
  * lines joined to one planted board listing, each row's `spec`,
- * `blocked by` and `has` readings, the unticked and `all` selections,
+ * `blocked by`, `has` and `refs` readings, the unticked and `all` selections,
  * and what each failed reading degrades to.
  *
  * Every read is planted: the board is a {@link BoardListing} answering a
  * fixed list, the Roadmap a reader answering one body, git a runner
- * answering fixed refs, the pull requests a fixed list and the plan dir
- * a fixed list of names. Only {@link createPlanDirNames} touches a disk,
+ * answering fixed refs, the pull requests a fixed list, the plan dir
+ * a fixed list of names and the saved copies a fixed map of counts. Only {@link createPlanDirNames} touches a disk,
  * under a temporary directory of its own.
  *
  * The planted board holds one row per state: `spec` ready, gaps,
  * outline, a stale label and a missing label; `blocked by` open, closed,
- * off the board and on another repository; `has` plan, branch and pr.
+ * off the board and on another repository; `has` plan, branch and pr;
+ * `refs` a clean copy (#11), a copy with faults (#16), an unread copy
+ * (#17) and no copy at all (every other line).
  */
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
-import type { RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
+import type { RefsCell, RoadmapRefs, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
@@ -38,6 +40,7 @@ import {
   OUTLINE_HEADINGS,
   readRoadmapRows,
   readSpecColumn,
+  refsText,
   specText,
 } from './roadmap-rows.js';
 
@@ -114,6 +117,18 @@ const PULLS: readonly RoadmapPullRequest[] = [
 /** The plan dir: #11's plan, a tracker alone for #17, and #110's plan, which is not #11's. */
 const PLAN_NAMES = ['PLAN-rafa-11-ready-plan.md', 'PLAN_TRACKER-rafa-17-with-pr.md', 'PLAN-rafa-110-other.md'];
 
+/** A `refs` cell with `fields` laid over one clean copy. */
+function refsCell(fields: Partial<RefsCell> = {}): RefsCell {
+  return { copies: 1, suspect: 0, dangling: 0, unknown: 0, errors: [], ...fields };
+}
+
+/** The saved copies: #11 clean, #16 one suspect, two dangling and one unknown, #17 not read; none for the rest. */
+const REFS: ReadonlyMap<number, RefsCell> = new Map([
+  [11, refsCell()],
+  [16, refsCell({ copies: 2, suspect: 1, dangling: 2, unknown: 1 })],
+  [17, refsCell({ errors: ['.rafa/specs/rafa-17-with-pr.md: the refs block is not YAML'] })],
+]);
+
 /** A git answering `for-each-ref` with `refs` and `ls-remote` with `remote`. */
 function plantedGit(refs: readonly string[], remote: GitResult = { ok: true, stdout: '', stderr: '' }): GitRunner {
   return (args) => args[0] === 'ls-remote'
@@ -127,11 +142,12 @@ interface Counts {
   roadmap: readonly number[];
   pulls: number;
   search: number;
+  refs: readonly (readonly number[])[];
 }
 
 /** The options over the planted board, with `overrides` laid over them, and the counts. */
 function planted(overrides: Partial<RoadmapRowsOptions> = {}): { options: RoadmapRowsOptions; counts: Counts } {
-  const counts: Counts = { board: 0, roadmap: [], pulls: 0, search: 0 };
+  const counts: Counts = { board: 0, roadmap: [], pulls: 0, search: 0, refs: [] };
   const board: BoardListing = () => {
     counts.board += 1;
     return Promise.resolve(BOARD);
@@ -149,6 +165,10 @@ function planted(overrides: Partial<RoadmapRowsOptions> = {}): { options: Roadma
     counts.pulls += 1;
     return Promise.resolve(PULLS);
   };
+  const refs: RoadmapRefs = (issues) => {
+    counts.refs = [...counts.refs, issues];
+    return Promise.resolve(REFS);
+  };
   const options: RoadmapRowsOptions = {
     configured: ROADMAP,
     search,
@@ -157,6 +177,7 @@ function planted(overrides: Partial<RoadmapRowsOptions> = {}): { options: Roadma
     git: plantedGit(['refs/heads/main', 'refs/heads/feat/rafa-16-blocked-branch']),
     pullRequests,
     planNames: () => PLAN_NAMES,
+    refs,
     ...overrides,
   };
   return { options, counts };
@@ -169,10 +190,20 @@ function rowFor(rows: readonly RoadmapRow[], number: number): RoadmapRow {
   return found;
 }
 
-/** Each row as the three printed cells. */
-function cells(rows: readonly RoadmapRow[]): readonly (readonly [number, string, string, string])[] {
-  return rows.map((row) => [row.line.issue, specText(row.spec), blockersText(row.blockers), hasText(row.has)]);
+/** Each row as the four printed cells. */
+function cells(rows: readonly RoadmapRow[]): readonly (readonly [number, string, string, string, string])[] {
+  return rows.map((row) => [
+    row.line.issue,
+    specText(row.spec),
+    blockersText(row.blockers),
+    hasText(row.has),
+    refsText(row.refs),
+  ]);
 }
+
+/** The warning #17's unread copy is carried as. */
+const UNREAD_COPY_WARNING = 'the references of #17\'s saved copy could not be read, so its refs cell is ?:'
+  + ' .rafa/specs/rafa-17-with-pr.md: the refs block is not YAML — run rafa issue check 17';
 
 describe('the rows over a planted board', () => {
   it('prints the unticked lines in the Roadmap\'s order with every column as planted', async () => {
@@ -180,23 +211,23 @@ describe('the rows over a planted board', () => {
     const read = await readRoadmapRows(options);
 
     expect(read.roadmap).toBe(ROADMAP);
-    expect(read.warnings).toEqual([]);
+    expect(read.warnings).toEqual([UNREAD_COPY_WARNING]);
     expect(cells(read.rows)).toEqual([
-      [11, 'ready', '', 'plan'],
-      [12, 'gaps: What can go wrong, Tasks the plan must carry, Definition of done', '', ''],
-      [13, 'outline', '', ''],
-      [14, 'label: ready, gate: gaps', '', ''],
-      [15, 'label: none, gate: ready', '', ''],
-      [16, 'ready', '#20 open, #21 closed, #99 unknown, open-tomato/agentic-research#3 unknown', 'branch'],
-      [17, 'ready', '', 'pr #40'],
-      [18, '', '', ''],
+      [11, 'ready', '', 'plan', '0'],
+      [12, 'gaps: What can go wrong, Tasks the plan must carry, Definition of done', '', '', ''],
+      [13, 'outline', '', '', ''],
+      [14, 'label: ready, gate: gaps', '', '', ''],
+      [15, 'label: none, gate: ready', '', '', ''],
+      [16, 'ready', '#20 open, #21 closed, #99 unknown, open-tomato/agentic-research#3 unknown', 'branch', '3'],
+      [17, 'ready', '', 'pr #40', '?'],
+      [18, '', '', '', ''],
     ]);
   });
 
-  it('reads the board once, the Roadmap once and the pull requests once, and searches nothing when configured', async () => {
+  it('reads the board, the Roadmap, the pull requests and the saved copies once each, and searches nothing when configured', async () => {
     const { options, counts } = planted();
     await readRoadmapRows(options);
-    expect(counts).toEqual({ board: 1, roadmap: [ROADMAP], pulls: 1, search: 0 });
+    expect(counts).toEqual({ board: 1, roadmap: [ROADMAP], pulls: 1, search: 0, refs: [[11, 12, 13, 14, 15, 16, 17, 18]] });
   });
 
   it('finds the Roadmap by its title when nothing is configured', async () => {
@@ -220,12 +251,12 @@ describe('the rows over a planted board', () => {
     expect(rowFor(read.rows, 11).issue?.type).toBe('code');
   });
 
-  it('leaves a line the listing lacks with no issue, spec or reading, and warns nothing', async () => {
+  it('leaves a line the listing lacks with no issue, spec or reading, and warns nothing of it', async () => {
     const { options } = planted();
     const read = await readRoadmapRows(options);
     const row = rowFor(read.rows, 18);
-    expect(row).toMatchObject({ issue: null, spec: null, blocked: null, blockers: [] });
-    expect(read.warnings).toEqual([]);
+    expect(row).toMatchObject({ issue: null, spec: null, blocked: null, blockers: [], refs: null });
+    expect(read.warnings).toEqual([UNREAD_COPY_WARNING]);
   });
 
   it('carries the blocked reading itself, with the board as known', async () => {
@@ -243,7 +274,10 @@ describe('the rows over a planted board', () => {
 
 describe('the board unreachable', () => {
   it('warns once, keeps the order, empties spec and blocked by, and asks no pull request', async () => {
-    const { options, counts } = planted({ board: () => Promise.reject(new Error('gh: could not connect')) });
+    const { options, counts } = planted({
+      board: () => Promise.reject(new Error('gh: could not connect')),
+      refs: () => Promise.resolve(new Map()),
+    });
     const read = await readRoadmapRows(options);
 
     expect(read.warnings).toHaveLength(1);
@@ -263,13 +297,19 @@ describe('the board unreachable', () => {
     expect(hasText(rowFor(read.rows, 16).has)).toBe('branch');
     expect(hasText(rowFor(read.rows, 17).has)).toBe('');
   });
+
+  it('still reads refs from the saved copies, which are local', async () => {
+    const { options } = planted({ board: () => Promise.reject(new Error('offline')) });
+    const read = await readRoadmapRows(options);
+    expect(read.rows.map((row) => refsText(row.refs))).toEqual(['0', '', '', '', '', '3', '?', '']);
+  });
 });
 
 describe('the other readings failing', () => {
   it('warns about a pull request list that failed and shows no pr, the rest intact', async () => {
     const { options } = planted({ pullRequests: () => Promise.reject(new Error('rate limited')) });
     const read = await readRoadmapRows(options);
-    expect(read.warnings).toEqual(['the open pull requests could not be listed, so no pr is shown: rate limited']);
+    expect(read.warnings).toEqual(['the open pull requests could not be listed, so no pr is shown: rate limited', UNREAD_COPY_WARNING]);
     expect(hasText(rowFor(read.rows, 17).has)).toBe('');
     expect(specText(rowFor(read.rows, 17).spec)).toBe('ready');
   });
@@ -280,23 +320,31 @@ describe('the other readings failing', () => {
     };
     const { options } = planted({ planNames });
     const read = await readRoadmapRows(options);
-    expect(read.warnings).toEqual(['the plan dir could not be read, so no plan is shown: EACCES: permission denied']);
+    expect(read.warnings).toEqual(['the plan dir could not be read, so no plan is shown: EACCES: permission denied', UNREAD_COPY_WARNING]);
     expect(hasText(rowFor(read.rows, 11).has)).toBe('');
   });
 
   it('carries the branch scan\'s problems as warnings and keeps the local refs', async () => {
     const remote: GitResult = { ok: false, stdout: '', stderr: 'fatal: no remote' };
-    const { options } = planted({ git: plantedGit(['refs/heads/feat/rafa-16-blocked-branch'], remote) });
+    const { options } = planted({ git: plantedGit(['refs/heads/feat/rafa-16-blocked-branch'], remote), refs: () => Promise.resolve(new Map()) });
     const read = await readRoadmapRows(options);
     expect(read.warnings).toHaveLength(1);
     expect(read.warnings[0]).toContain('fatal: no remote');
     expect(hasText(rowFor(read.rows, 16).has)).toBe('branch');
   });
 
+  it('warns about saved copies that could not be listed and leaves every refs cell empty, the rest intact', async () => {
+    const { options } = planted({ refs: () => Promise.reject(new Error('EACCES: .rafa/specs')) });
+    const read = await readRoadmapRows(options);
+    expect(read.warnings).toEqual(['the saved copies could not be read, so the refs column is empty: EACCES: .rafa/specs']);
+    expect(read.rows.every((row) => row.refs === null)).toBe(true);
+    expect(hasText(rowFor(read.rows, 11).has)).toBe('plan');
+  });
+
   it('rejects when the Roadmap cannot be read, having listed nothing', async () => {
     const { options, counts } = planted({ issues: () => Promise.reject(new Error('gh issue view failed')) });
     await expect(readRoadmapRows(options)).rejects.toThrow('gh issue view failed');
-    expect(counts.board).toBe(0);
+    expect(counts).toMatchObject({ board: 0, refs: [] });
   });
 
   it('rejects with the roadmap refusal when no issue is titled Roadmap', async () => {
@@ -334,6 +382,41 @@ describe('the spec column', () => {
 
   it('prints nothing with no reading', () => {
     expect(specText(null)).toBe('');
+  });
+});
+
+describe('the refs column', () => {
+  it('prints the suspect and dangling count, leaving unknown out', () => {
+    expect(refsText(refsCell({ suspect: 1, dangling: 2, unknown: 5 }))).toBe('3');
+  });
+
+  it('prints 0 for a clean copy and nothing with no copy', () => {
+    expect(refsText(refsCell())).toBe('0');
+    expect(refsText(refsCell({ unknown: 4 }))).toBe('0');
+    expect(refsText(null)).toBe('');
+  });
+
+  it('prints ? when a copy could not be read, whatever the others counted', () => {
+    expect(refsText(refsCell({ copies: 2, suspect: 1, errors: ['unreadable'] }))).toBe('?');
+  });
+
+  it('asks the saved copies once, for each selected issue once, the ticked lines only under all', async () => {
+    const twice = [
+      '- [x] #10 — done already',
+      '- [ ] #11 — first',
+      '- [ ] #11 — again',
+      '',
+    ].join('\n');
+    const read: SpecIssueReader = (number) => Promise.resolve({ number, title: 'Roadmap', body: twice, state: 'OPEN', labels: [], author: 'owner' });
+    const unticked = planted({ issues: read });
+    const all = planted({ issues: read, all: true });
+
+    const rows = await readRoadmapRows(unticked.options);
+    await readRoadmapRows(all.options);
+
+    expect(unticked.counts.refs).toEqual([[11]]);
+    expect(all.counts.refs).toEqual([[10, 11]]);
+    expect(rows.rows.map((row) => refsText(row.refs))).toEqual(['0', '0']);
   });
 });
 

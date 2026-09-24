@@ -149,7 +149,10 @@ describe('the config files', () => {
   });
 
   it('carries the cleanup section at its defaults, which resolve from the file once uncommented', () => {
-    const cleanup = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# cleanup:'));
+    const cleanup = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# cleanup:'),
+      CONFIG_SETTINGS_LINES.indexOf('# dangerous:'),
+    );
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...cleanup].join('\n')), 'c.yaml') });
 
     expect(cleanup.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
@@ -177,6 +180,27 @@ describe('the config files', () => {
       ['cleanupWorktreeIdleDays', 'default'],
       ['cleanupKeep', 'default'],
     ]);
+  });
+
+  it('closes on the dangerous section, off by default, which resolves from the file once uncommented', () => {
+    const dangerous = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# dangerous:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dangerous].join('\n')), 'c.yaml') });
+
+    expect(dangerous.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# dangerous:',
+      '#   acceptStaleRefs: false',
+    ]);
+    expect([resolved.config.dangerousAcceptStaleRefs, resolved.sources.dangerousAcceptStaleRefs]).toEqual([false, 'file']);
+  });
+
+  it('turns acceptStaleRefs on once its line is uncommented with true, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}acceptStaleRefs:) false/, '$1 true'));
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   acceptStaleRefs:'));
+    const flipped = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+    const absent = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dropped].join('\n')), 'c.yaml') });
+
+    expect([flipped.config.dangerousAcceptStaleRefs, flipped.sources.dangerousAcceptStaleRefs]).toEqual([true, 'file']);
+    expect([absent.config.dangerousAcceptStaleRefs, absent.sources.dangerousAcceptStaleRefs]).toEqual([false, 'default']);
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

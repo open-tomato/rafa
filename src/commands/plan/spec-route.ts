@@ -136,7 +136,7 @@ export function findSpec(repoRoot: string, specArg: string, specsDir: string): s
 export function usageRefusal(specsDir: string): string {
   return [
     'Usage: rafa plan create (--spec=<file>.md | --issue=<n> | --next[=<roadmap-issue>])',
-    '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment]',
+    '  [--stub=<name>] [--no-progress] [--refresh] [--dry-run] [--skip-review] [--no-comment] [--accept-refs]',
     noSourceMessage(specsDir),
   ].join('\n');
 }

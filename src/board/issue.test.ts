@@ -134,10 +134,21 @@
  *    1 fail, the case that refuses it.
  *  - the saved copy moved before the refusal is thrown: 2 fail, the two
  *    refusals that assert `previous/` was never made.
+ *
+ * Two mutations of the refs block handling were driven on 2026-09-24
+ * over the same command, restored from a scratch copy and verified with
+ * `shasum -c` after each. 56 cases either side:
+ *
+ *  - `readSnapshotChange` comparing the copy with its block left in:
+ *    5 fail, the three block readings, the unchanged copy left alone and
+ *    the notes rebuild, which the unstripped block turns into a refusal.
+ *  - `writeSpecSnapshot` writing the fresh text without carrying the
+ *    block: 3 fail, the refresh, the notes rebuild and the empty block.
  */
 import type { SnapshotChange, SpecIssue } from './issue.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { RefStamp } from '../refs/stamp.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -147,8 +158,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createFakeGh } from '../adapters/tracker/github-fake.js';
 import { CommandExit } from '../cli/command.js';
+import { blobFingerprint, readRefsBlock, REFS_BLOCK_OPEN, RefsBlockError, writeRefsBlock } from '../refs/stamp.js';
 
 import {
+  changedHeadings,
   closedIssueMessage,
   createGhSpecIssueReader,
   hasSpecLabel,
@@ -584,6 +597,43 @@ describe('readSnapshotChange', () => {
   });
 });
 
+describe('readSnapshotChange over a copy carrying a refs block', () => {
+  const NOTES = notesPath(SPECS_DIR, 20);
+  const stamps: readonly RefStamp[] = [{ kind: 'path', text: 'src/a.ts', fingerprint: blobFingerprint('a'.repeat(40)) }];
+
+  it('reads unchanged for a copy whose body and notes match, whatever its block holds', () => {
+    const saved = writeRefsBlock(snapshotText('# Spec\n\nBody.\n', 'A note.'), stamps);
+
+    expect(saved.startsWith(`${REFS_BLOCK_OPEN}\n`)).toBe(true);
+    expect(readSnapshotChange({ saved, body: '# Spec\n\nBody.\n', notes: 'A note.\n', notesPath: NOTES }))
+      .toEqual({ kind: 'unchanged', bodyLine: null, notesLine: null });
+  });
+
+  it('counts none of the block\'s lines in a body change, and still tells a notes change apart', () => {
+    const saved = writeRefsBlock(snapshotText('# Spec\n\nOld.\n', 'A note.'), stamps);
+
+    expect(readSnapshotChange({ saved, body: '# Spec\n\nNew.\n', notes: 'A note.', notesPath: NOTES }).bodyLine)
+      .toBe('issue body: +1 -1 lines; headings changed: Spec');
+    expect(readSnapshotChange({ saved, body: '# Spec\n\nOld.\n', notes: 'Another.', notesPath: NOTES }).kind)
+      .toBe('notes');
+  });
+
+  it('throws for a block that does not close, rather than reading it as body text', () => {
+    expect(() => readSnapshotChange({ saved: `${REFS_BLOCK_OPEN}\n# Spec\n`, body: '# Spec\n', notes: null, notesPath: NOTES }))
+      .toThrow(RefsBlockError);
+  });
+});
+
+describe('changedHeadings', () => {
+  it('names the headings whose text changed, and each one only one side has, the new order first', () => {
+    const before = ['## Design', 'Old.', '## Gone', 'x'];
+    const after = ['## Added', 'y', '## Design', 'New.'];
+
+    expect(changedHeadings(before, after)).toEqual(['Added', 'Design', 'Gone']);
+    expect(changedHeadings(before, before)).toEqual([]);
+  });
+});
+
 describe('writeSpecSnapshot', () => {
   it('writes the body under specs.dir, named from the id and the slug', () => {
     const issue = issueOf({ body: '# Spec\n\nBody.\n' });
@@ -823,6 +873,93 @@ describe('writeSpecSnapshot', () => {
     expect(written.absolute).toBe(join(absolute, `${STUB}.md`));
     expect(written.absolute.startsWith(root)).toBe(true);
     expect(readFileSync(written.absolute, 'utf8')).toBe('# Spec\n');
+  });
+});
+
+describe('writeSpecSnapshot over a copy carrying a refs block', () => {
+  const stamps: readonly RefStamp[] = [{ kind: 'path', text: 'src/a.ts', fingerprint: blobFingerprint('b'.repeat(40)) }];
+
+  /** A fresh root holding the saved copy `text`, and its path under it. */
+  const plant = (text: string): { root2: string; file: string } => {
+    const root2 = mkdtempSync(join(tmpdir(), 'rafa-board-refs-'));
+    mkdirSync(join(root2, SPECS_DIR), { recursive: true });
+    const file = join(root2, snapshotAt());
+    writeFileSync(file, text);
+    return { root2, file };
+  };
+
+  it('leaves a matching copy and its block alone, and answers the text the file holds', () => {
+    const saved = writeRefsBlock('# Spec\n', stamps);
+    const { root2, file } = plant(saved);
+    const stamp = statSync(file).mtimeMs;
+
+    const written = writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue: issueOf({ body: '# Spec\n' }), refresh: false });
+
+    expect(written.action).toBe('unchanged');
+    expect(written.text).toBe(saved);
+    expect(readFileSync(file, 'utf8')).toBe(saved);
+    expect(statSync(file).mtimeMs).toBe(stamp);
+    expect(existsSync(join(root2, previousDir(SPECS_DIR)))).toBe(false);
+    rmSync(root2, { recursive: true, force: true });
+  });
+
+  it('carries the stamps across a refresh, and the copy moved to previous/ keeps its block', () => {
+    const saved = writeRefsBlock('# Spec\n\nOld.\n', stamps);
+    const { root2, file } = plant(saved);
+
+    const written = writeSpecSnapshot({
+      repoRoot: root2,
+      specsDir: SPECS_DIR,
+      issue: issueOf({ body: '# Spec\n\nNew.\n' }),
+      refresh: true,
+    });
+
+    expect(written.action).toBe('refreshed');
+    expect(readFileSync(file, 'utf8')).toBe(writeRefsBlock('# Spec\n\nNew.\n', stamps));
+    expect(written.text).toBe(readFileSync(file, 'utf8'));
+    expect(readFileSync(join(root2, written.previous ?? ''), 'utf8')).toBe(saved);
+    rmSync(root2, { recursive: true, force: true });
+  });
+
+  it('carries the stamps across a notes rebuild', () => {
+    const { root2, file } = plant(writeRefsBlock(snapshotText('# Spec\n', 'The first note.'), stamps));
+    writeFileSync(join(root2, notesPath(SPECS_DIR, 20)), 'A second note.\n');
+
+    const written = writeSpecSnapshot({ repoRoot: root2, specsDir: SPECS_DIR, issue: issueOf({ body: '# Spec\n' }), refresh: false });
+
+    expect(written.action).toBe('notes-rebuilt');
+    expect(readRefsBlock(readFileSync(file, 'utf8')))
+      .toEqual({ stamps, body: snapshotText('# Spec\n', 'A second note.') });
+    rmSync(root2, { recursive: true, force: true });
+  });
+
+  it('keeps an empty block empty and writes no block on a copy that had none', () => {
+    const empty = plant(writeRefsBlock('# Spec\n\nOld.\n', []));
+    const none = plant('# Spec\n\nOld.\n');
+    const issue = issueOf({ body: '# Spec\n\nNew.\n' });
+
+    writeSpecSnapshot({ repoRoot: empty.root2, specsDir: SPECS_DIR, issue, refresh: true });
+    writeSpecSnapshot({ repoRoot: none.root2, specsDir: SPECS_DIR, issue, refresh: true });
+
+    expect(readFileSync(empty.file, 'utf8')).toBe(writeRefsBlock('# Spec\n\nNew.\n', []));
+    expect(readFileSync(none.file, 'utf8')).toBe('# Spec\n\nNew.\n');
+    rmSync(empty.root2, { recursive: true, force: true });
+    rmSync(none.root2, { recursive: true, force: true });
+  });
+
+  it('throws for a block it will not read, and moves nothing to previous/', () => {
+    const broken = `${REFS_BLOCK_OPEN}\nrefs: [\n-->\n\n# Spec\n`;
+    const { root2, file } = plant(broken);
+
+    expect(() => writeSpecSnapshot({
+      repoRoot: root2,
+      specsDir: SPECS_DIR,
+      issue: issueOf({ body: '# Spec\n' }),
+      refresh: true,
+    })).toThrow(RefsBlockError);
+    expect(readFileSync(file, 'utf8')).toBe(broken);
+    expect(existsSync(join(root2, previousDir(SPECS_DIR)))).toBe(false);
+    rmSync(root2, { recursive: true, force: true });
   });
 });
 

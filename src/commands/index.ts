@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-three registered so far wrap a
+ * of each is its command. Five of the fifty-four registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -22,9 +22,10 @@
  * `list`, which act on a run through its session record and share
  * `loop/loop-sessions.ts`, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
- * `src/preflight/` and starts no run, nor the seven `issue` actions,
+ * `src/preflight/` and starts no run, nor the eight `issue` actions,
  * five of which act on the tracker the chain resolves while `ready` and
- * `unblock` read and label issues on the GitHub board, all seven sharing
+ * `unblock` read and label issues on the GitHub board and `check` reads
+ * the references of a spec's saved copy, all eight sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
@@ -81,6 +82,9 @@
  *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
  *     whose `Blocked by:` line names only closed issues. Both read the
  *     GitHub board rather than the tracker chain, and both always ask.
+ *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
+ *     copy names, each with its state, re-stamped under `--stamp`; it
+ *     exits 0 whatever the states are and plans nothing.
  *   - `pr current`, the open pull request of the branch checked out at the
  *     project root on one line; `pr show [<n>]`, that pull request in full
  *     with its checks and its last triage; `pr view [<n>]`, it opened in
@@ -195,6 +199,7 @@ import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctList from './instinct/list.js';
 import instinctShow from './instinct/show.js';
+import issueCheck from './issue/check.js';
 import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
 import issueList from './issue/list.js';
@@ -240,7 +245,7 @@ import usage from './usage.js';
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
-  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready and unblock it' },
+  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
@@ -271,6 +276,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   issueMove,
   issueReady,
   issueUnblock,
+  issueCheck,
   prCurrent,
   prShow,
   prView,

@@ -53,6 +53,7 @@
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
 import type { FindingsDispatch } from '../effort/store/findings.js';
 import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
+import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
 import {
@@ -1025,3 +1026,90 @@ describe('named secrets in what is filed', () => {
   });
 });
 
+describe('the Refs section', () => {
+  /** An artifact naming one path and one symbol in code spans. */
+  const NAMING = 'TypeError at `src/a.ts` in `readFoo()`';
+  const SHA = 'b'.repeat(40);
+
+  /** A verifier stamping every path with {@link SHA} and every symbol present; records what it was asked. */
+  function stamping(): { readonly verify: RefVerifier; readonly asked: string[] } {
+    const asked: string[] = [];
+    const verify: RefVerifier = async (ref) => {
+      asked.push(`${ref.kind}:${ref.text}`);
+      return ref.kind === 'path'
+        ? { kind: 'blob', sha: SHA }
+        : { kind: 'present' };
+    };
+    return { verify, asked };
+  }
+
+  const REFS = [
+    '## Refs',
+    'The paths and symbols the artifact names, each with its target\'s fingerprint when this bug was filed.',
+    `- path \`src/a.ts\`: \`blob:${SHA}\`\n- symbol \`readFoo\`: \`present\``,
+  ].join('\n\n');
+
+  it('is filed between the artifact and the recurrence key, each reference stamped', async () => {
+    const f = fixture();
+    const { verify, asked } = stamping();
+
+    await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', NAMING, false)] }), { verifyRefs: verify });
+
+    const key = bugKeyOf(TRACKER_FILE, NAMING);
+    expect(onlyIssue(f.publicDir).draft.body)
+      .toContain(`## Artifact\n\n${fence(NAMING)}\n\n${REFS}\n\n## Recurrence key\n\n${fence(key)}`);
+    expect(asked).toEqual(['path:src/a.ts', 'symbol:readFoo']);
+  });
+
+  it('is left out, with nothing read, when the artifact names no path and no symbol', async () => {
+    const f = fixture();
+    const { verify, asked } = stamping();
+
+    await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }), { verifyRefs: verify });
+
+    const { body } = onlyIssue(f.publicDir).draft;
+    expect(body).not.toContain('## Refs');
+    expect(body).toContain(`## Artifact\n\n${fence(ARTIFACT)}\n\n## Recurrence key`);
+    expect(asked).toEqual([]);
+  });
+
+  it('is left out when the report gives no artifact', async () => {
+    const f = fixture();
+    const { verify, asked } = stamping();
+
+    await triage(f, reportWith({ outOfScopeBugs: [bug('No artifact given', null, false)] }), { verifyRefs: verify });
+
+    expect(onlyIssue(f.publicDir).draft.body).not.toContain('## Refs');
+    expect(asked).toEqual([]);
+  });
+
+  it('is carried by a recurrence\'s comment', async () => {
+    const f = fixture();
+    const { verify } = stamping();
+    const report = reportWith({ outOfScopeBugs: [bug('Parser drops the last line', NAMING, false)] });
+    await triage(f, report, { verifyRefs: verify });
+
+    await triage(f, report, { verifyRefs: verify, dispatch: SECOND });
+
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.comments).toHaveLength(1);
+    expect(issue.comments[0]).toContain(`\n\n${REFS}\n\n## Recurrence key`);
+  });
+
+  it('reads the redacted artifact, so a secret spelled as a path is neither read nor shown', async () => {
+    const secret = 'src/s3cret-token.ts';
+    const redacted = fixture();
+    const plain = fixture();
+    const report = reportWith({ outOfScopeBugs: [bug('Leaks a path', `opened \`${secret}\``, false)] });
+    const onRedacted = stamping();
+    const onPlain = stamping();
+
+    await triage(redacted, report, { verifyRefs: onRedacted.verify, secrets: [{ name: 'S', value: secret }] });
+    await triage(plain, report, { verifyRefs: onPlain.verify });
+
+    expect(onRedacted.asked).toEqual([]);
+    expect(onlyIssue(redacted.publicDir).draft.body).not.toContain('## Refs');
+    // Control: unredacted, the same artifact names the path and it is read.
+    expect(onPlain.asked).toEqual([`path:${secret}`]);
+  });
+});

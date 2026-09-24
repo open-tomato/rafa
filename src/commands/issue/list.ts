@@ -28,13 +28,20 @@
  * (`board/roadmap-rows.ts`), which owns every reading on them: which
  * issue is the Roadmap (`roadmap.issue`, else the one open issue titled
  * `Roadmap`), the unticked lines in body order — every line under
- * `--all` — and the `spec`, `blocked by` and `has` columns. This module
- * resolves what it is handed and prints what it answers.
+ * `--all` — and the `spec`, `blocked by`, `has` and `refs` columns. This
+ * module resolves what it is handed and prints what it answers.
+ *
+ * The `refs` column is read by `readDoctorRefs` (`../doctor-refs.ts`),
+ * the reading behind `rafa doctor`'s references row, narrowed to the
+ * selected lines' issues and folded by `roadmapRefsCells`: the saved
+ * copies under `specs.dir`, resolved against the project root, each
+ * issue a copy names read once for the run through the same `gh`
+ * runner. It writes nothing.
  *
  * The Roadmap and the board are GitHub's, so `--roadmap` resolves no
  * tracker, runs no preflight and reads the board whatever
  * `tracker.default` names: the config is read for `roadmap.issue` and
- * for `plan.dir`, the directory the `plan` mark is read in, resolved
+ * for `specs.dir`, where the saved copies are, and for `plan.dir`, the directory the `plan` mark is read in, resolved
  * against the project root as `resolvePlansDir`
  * (`commands/plan/plan-files.ts`) resolves it. The config is read once,
  * through `issueSubjectConfig`, so its warnings are written once.
@@ -87,7 +94,7 @@
  * code for the same: there is no order to print.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
-import type { RoadmapRow } from '../../board/roadmap-rows.js';
+import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
 import type { Issue, IssueQuery, TrackerKind } from '../../ports/index.js';
 
@@ -100,6 +107,7 @@ import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT }
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
+import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, plansDirAt, readSwitch } from '../plan/plan-files.js';
 
 import {
@@ -267,6 +275,10 @@ export async function listRoadmap(
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const plans = plansDirAt(project.root, config.planDir);
   const planNames = (seams.planNames ?? createPlanDirNames)(plans.path);
+  const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
+    { root: project.root, specsDir: config.specsDir, gh, env: context.env, issues },
+    { refsVerifier: seams.refsVerifier },
+  ));
 
   let read;
   try {
@@ -278,6 +290,7 @@ export async function listRoadmap(
       git: seams.git ?? createGitRunner(project.root),
       pullRequests: createGhOpenPullRequests({ gh }),
       planNames,
+      refs,
       all,
     });
   } catch (error) {
@@ -335,8 +348,8 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
 export const ISSUE_LIST_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
   {
     name: 'roadmap',
-    description: 'List the unticked lines of the Roadmap issue instead, in its order, with the spec, blocked by'
-      + ' and has columns. Reads the GitHub board whatever tracker the chain lands on.',
+    description: 'List the unticked lines of the Roadmap issue instead, in its order, with the spec, blocked by,'
+      + ' has and refs columns. Reads the GitHub board whatever tracker the chain lands on.',
     type: 'boolean',
   },
   {
@@ -386,9 +399,10 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       + ' list, and a flag left out narrows by nothing. The github tracker holds an issue open or closed, so'
       + ' it refuses `--state`, and lists 30 issues unless `--limit` says otherwise. With `--roadmap` it lists'
       + ' the unticked lines of the Roadmap issue (`roadmap.issue`, else the open issue titled Roadmap) in its'
-      + ' order instead, read off the GitHub board, as a table adding three columns: spec, whether the body'
-      + ' passes the readiness gate; blocked by, each blocker and whether it is open; and has, a plan, a branch'
-      + ' or a pull request already made for it. `--type`, `--module`, `--search` and `--limit` then narrow'
+      + ' order instead, read off the GitHub board, as a table adding four columns: spec, whether the body'
+      + ' passes the readiness gate; blocked by, each blocker and whether it is open; has, a plan, a branch'
+      + ' or a pull request already made for it; and refs, how many references of the issue\'s saved copy under'
+      + ' `specs.dir` read suspect or dangling, `-` with no copy. `--type`, `--module`, `--search` and `--limit` then narrow'
       + ' those rows, keeping their order, and an unreachable board is warned about with the rows still'
       + ' printed. With `--output=json` the tracker, the query and every issue, or under `--roadmap` the'
       + ' roadmap, the rows and the warnings, are the data of the terminal result event.',
@@ -409,7 +423,7 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       },
       {
         cmd: 'rafa issue list --roadmap',
-        note: 'Prints the Roadmap\'s unticked lines in its order, with the spec, blocked by and has of each.',
+        note: 'Prints the Roadmap\'s unticked lines in its order, with the spec, blocked by, has and refs of each.',
       },
       {
         cmd: 'rafa issue list --roadmap --all --type=bug',
