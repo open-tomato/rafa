@@ -74,6 +74,10 @@ is what keeps `src/commands/doctor.test.ts` (898) and
 - **`eslint --fix` spreads a nested ternary over one line per branch**
   (`@stylistic/multiline-ternary`). Sort with `a.localeCompare(b)` rather
   than an `a < b ? -1 : a > b ? 1 : 0` comparator.
+- **`NodeJS.*` types fail `no-undef` outside test files**: the config
+  declares no `NodeJS` global. Type an environment as
+  `Record<string, string>` rather than `NodeJS.ProcessEnv`. This bullet
+  replaces nothing.
 - **An apostrophe in a test title is written backslash-escaped inside
   single quotes**, as `describe('the hint\'s own timeout', ...)`.
   Reaching for double quotes is refused by `@stylistic/quotes`

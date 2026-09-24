@@ -76,6 +76,15 @@
  *     — the recorded 403 and 404, an outage, a payload whose
  *     `total_count` is not a whole number — answers null, as the port
  *     declares, rather than throwing like the other reads.
+ *   - **The merged list is the recent merges, not every merge.**
+ *     `gh pr list --state merged --limit 100` answered 100 rows of
+ *     `cli/cli` newest CREATED first — number descending, and NOT in
+ *     `mergedAt` order — so `listMerged` answers `gh`'s order as it
+ *     came and a caller that wants merge order sorts on `mergedAt`
+ *     itself. `headRefName` was still answered for `open-tomato/rafa`
+ *     pull requests whose remote branch had been deleted. An open pull
+ *     request answers `mergedAt` null, so a merged row carrying null is
+ *     refused rather than read, like any field of the wrong type.
  *
  * ## What is refused, and what is narrowed
  *
@@ -110,6 +119,7 @@ import type {
   ChecksReading,
   MergeMethod,
   Mergeability,
+  MergedPullRequest,
   MergeOutcome,
   PullRequestAuthor,
   PullRequestComment,
@@ -141,11 +151,22 @@ const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus
 /** The fields a check row is read from; `parseChecks` reads exactly these. */
 const CHECK_FIELDS = 'name,state,link';
 
+/** The fields a merged pull request is read from. */
+const MERGED_FIELDS = 'headRefName,headRefOid,mergedAt,number';
+
 /** The path the workflow count is read from. */
 const WORKFLOWS_PATH = `repos/${REPO_PATH}/actions/workflows`;
 
 /** How many pull requests `list` asks for: `gh pr list`'s own default. */
 const LIST_LIMIT = 30;
+
+/**
+ * How many merged pull requests `listMerged` asks for: the most one
+ * request answers. Under `GH_DEBUG=api` on 2026-09-24, `--limit 100`
+ * sent one GraphQL request for `cli/cli`'s merged list and `--limit 101`
+ * sent two.
+ */
+const MERGED_LIMIT = 100;
 
 /** How many `findOpen` asks for. It answers the first, and `gh` lists newest first. */
 const FIND_LIMIT = 1;
@@ -296,6 +317,17 @@ function readDetail(value: unknown, command: string, where: string): PullRequest
   };
 }
 
+/** One merged pull request as `gh pr list --state merged` writes its fields. */
+function readMerged(value: unknown, command: string, where: string): MergedPullRequest {
+  const pull = readMapping(value, command, where);
+  return {
+    number: readWholeNumber(pull['number'], command, `${where}.number`),
+    headRefName: readString(pull['headRefName'], command, `${where}.headRefName`),
+    headRefOid: readString(pull['headRefOid'], command, `${where}.headRefOid`),
+    mergedAt: readString(pull['mergedAt'], command, `${where}.mergedAt`),
+  };
+}
+
 /** One comment as `gh api` writes the REST resource; see the module note. */
 function readComment(value: unknown, command: string, where: string): PullRequestComment {
   const comment = readMapping(value, command, where);
@@ -422,6 +454,16 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       );
       const rows = readList(parseJson(stdout, command), command, 'its output');
       return rows.map((row, index) => readSummary(row, command, `row ${index}`));
+    },
+
+    listMerged: async (): Promise<readonly MergedPullRequest[]> => {
+      const command = 'gh pr list --state merged';
+      const stdout = await succeed(
+        ['pr', 'list', '--state', 'merged', '--limit', String(MERGED_LIMIT), '--json', MERGED_FIELDS],
+        command,
+      );
+      const rows = readList(parseJson(stdout, command), command, 'its output');
+      return rows.map((row, index) => readMerged(row, command, `row ${index}`));
     },
 
     get: async (number: number): Promise<PullRequestDetail | null> => {

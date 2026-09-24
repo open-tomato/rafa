@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `self-update`, `roadmap`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `self-update`, `roadmap`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -800,22 +800,31 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-load.js', ['loadConfig']],
     ['../config-sections.js', ['messageOf']],
     ['../config.js', ['ConfigError']],
-    ['../effort/store/legacy.js', ['readLegacyStore']],
     ['../pr/preflight-items.js', ['ghPreflightItems']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../preflight/first-dispatch.js', ['isFirstDispatch']],
     ['../preflight/prerequisites-md.js', ['loadPlanPrerequisites', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
     ['../preflight/run.js', ['PROBE_TIMEOUT_MS', 'runPreflight']],
-    ['../project/bin-path.js', ['readBinPath']],
-    ['../project/pre-init-dirs.js', ['readPreInitDirs']],
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../start/risk-total.js', ['announceRiskTotal']],
     ['../utils/tracker.js', ['trackerPathFor']],
     ['./doctor-blocked.js', ['readBlockedIssues', 'renderBlockedIssues']],
+    ['./doctor-cleanup.js', ['readDoctorCleanup', 'renderDoctorCleanup']],
     ['./doctor-deep.js', ['readDeep', 'renderDeep']],
-    ['./doctor-previous.js', ['readPreviousCopies']],
+    ['./doctor-install.js', ['readInstall', 'writeInstall']],
     ['./doctor-render.js', ['renderBoard', 'renderDoctor']],
     ['./plan/plan-files.js', ['isFile']],
+  ]],
+  ['./commands/cleanup.js', [
+    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
+    ['../cli/command.js', ['CommandExit']],
+    ['../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../cli/prompt/multi-select.js', ['multiSelect']],
+    ['../cli/prompt/terminal.js', ['processTerminal']],
+    ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
+    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'renderCleanup', 'worktreeRowLine']],
+    ['./issue/ready.js', ['lazyPrompter']],
+    ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
   ['./commands/self-update.js', [
     ['../cli/command.js', ['CommandExit']],
@@ -1025,6 +1034,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/roadmap.js',
       './commands/init.js',
       './commands/doctor.js',
+      './commands/cleanup.js',
       './commands/self-update.js',
       './commands/describe.js',
     ]);

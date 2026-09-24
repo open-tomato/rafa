@@ -327,6 +327,22 @@ export const issueNumber: Reader<number> = (raw, at) => typeof raw === 'number'
   : refused(at, raw, 'an issue number, a whole number above zero');
 
 /**
+ * Accepts a number of days as the `cleanup` thresholds take one: a
+ * whole number above zero, and no string spelled like one.
+ *
+ * Zero is refused and not read as "off": a zero-day threshold would put
+ * every branch under Stale and every worktree under idle, which is a
+ * listing nobody asks for by writing a number. A fraction is refused
+ * as `issueNumber` refuses one: the setting counts whole days, and
+ * `2.5` would be a precision nobody has said the reading keeps.
+ */
+export const dayCount: Reader<number> = (raw, at) => typeof raw === 'number'
+  && Number.isSafeInteger(raw)
+  && raw > 0
+  ? accepted(raw)
+  : refused(at, raw, 'a number of days, a whole number above zero');
+
+/**
  * Accepts `true`, `false` or `auto`, each as itself. A string spelled
  * like a boolean is refused; see {@link ReleaseEnabled}.
  */

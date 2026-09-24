@@ -74,6 +74,20 @@ describe('the pull request a --json read answers', () => {
     });
   });
 
+  it('writes the merged-list fields in the recorded order, mergedAt null for a pull request not merged', () => {
+    const fields = ['number', 'mergedAt', 'headRefOid', 'headRefName'];
+    const merged = renderPull(pull({ state: 'MERGED', mergedAt: '2026-09-23T16:38:29Z' }), fields, REPO);
+
+    expect(Object.keys(merged)).toEqual(['headRefName', 'headRefOid', 'mergedAt', 'number']);
+    expect(merged).toEqual({
+      headRefName: 'feat/pr-7',
+      headRefOid: '0000000000000000000000000000000000000007',
+      mergedAt: '2026-09-23T16:38:29Z',
+      number: 7,
+    });
+    expect(renderPull(pull(), ['mergedAt'], REPO)).toEqual({ mergedAt: null });
+  });
+
   it('writes a person as id, is_bot, login and name, and a bot as is_bot and login alone', () => {
     const person = renderPull(pull(), ['author'], REPO)['author'];
     const bot = renderPull(
@@ -353,8 +367,21 @@ describe('the pull request a seed fills out', () => {
       mergeStateStatus: 'CLEAN',
       labels: [],
       updatedAt: '2026-09-18T11:00:00Z',
+      mergedAt: '2026-09-18T11:00:00Z',
       checks: [],
       comments: [],
     });
+  });
+
+  it('merges a MERGED seed at its own updatedAt, and any other state at null', () => {
+    expect(fillSeed({ number: 3, state: 'MERGED', updatedAt: '2026-09-20T08:00:00Z' }).mergedAt)
+      .toBe('2026-09-20T08:00:00Z');
+    expect(fillSeed({ number: 3 }).mergedAt).toBeNull();
+    expect(fillSeed({ number: 3, state: 'CLOSED' }).mergedAt).toBeNull();
+  });
+
+  it('keeps a mergedAt the seed names over the one its state would give', () => {
+    expect(fillSeed({ number: 3, state: 'MERGED', mergedAt: '2026-09-19T09:00:00Z' }).mergedAt)
+      .toBe('2026-09-19T09:00:00Z');
   });
 });

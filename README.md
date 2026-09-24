@@ -202,6 +202,33 @@ Every command has help at three levels (`rafa --help`,
 `rafa loop --help`, `rafa loop start --help`), and
 `rafa describe --output=json` is the same roster for a tool or an agent.
 
+## Configuration
+
+Settings live in `.rafa/config.yaml` in the project, and in
+`~/.rafa/config.yaml` for every project on the machine; a setting in the
+project's file outranks the same one in yours. `rafa init` writes both
+with every setting commented out at its default, so uncomment a line,
+with its section line, to change it.
+
+### `cleanup`
+
+Three settings shape what `rafa cleanup` lists.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `cleanup.staleDays` | `30` | the age in days past which a branch is listed as Stale |
+| `cleanup.worktreeIdleDays` | `7` | the idle days past which a worktree is listed |
+| `cleanup.keep` | `[]` | glob patterns naming branches that are never listed |
+
+Both day counts take a whole number above zero.
+
+```yaml
+cleanup:
+  staleDays: 30
+  worktreeIdleDays: 7
+  keep: ["release/*"]
+```
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want
@@ -348,7 +375,7 @@ and a line here is ticked by the change that finishes the feature.
   already has a plan, a branch or a pull request
 - ✅ `rafa doctor --deep`: what a loop session and its subagents can
   actually reach — settings, `PATH`, providers and the tools its stack needs
-- ⬜ Clean up merged, stale and unpushed branches and idle worktrees
+- ✅ Clean up merged, stale and unpushed branches and idle worktrees
 - ⬜ `rafa status`: everything in one snapshot, and one line about what
   changed since you last looked
 - ⬜ The right skills reach the right task, chosen when the plan is

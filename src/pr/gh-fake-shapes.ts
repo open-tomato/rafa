@@ -110,6 +110,22 @@
  *     other status. The message it carries is the `actions/permissions`
  *     one verbatim, beside the workflows documentation URL.
  *
+ * Read the same way on 2026-09-24, again off `gh` 2.100.0 with read-only
+ * commands, for the merged list:
+ *
+ *   - `gh pr list --state merged --limit <n> --json
+ *     headRefName,headRefOid,mergedAt,number` writes those four keys in
+ *     that order and ends with a newline, `mergedAt` an ISO 8601 instant
+ *     such as `2026-09-23T16:38:29Z`. Its rows came newest CREATED first
+ *     — `createdAt` and `number` both descending over 100 rows of
+ *     `cli/cli` — and NOT in `mergedAt` order: `cli/cli#14509` was merged
+ *     at 16:38 and listed ahead of `#14507`, merged at 21:21 the same day.
+ *   - An OPEN pull request answers `mergedAt` null (`cli/cli#14485`).
+ *   - `open-tomato/rafa`'s merged rows still answered `headRefName` for
+ *     heads the remote no longer held, `git ls-remote` finding neither
+ *     `feat/rafa-100-rafa-doctor-deep` nor
+ *     `feat/rafa-123-rafa-issue-list-roadmap`.
+ *
  * NOT recorded, because reading one would write to a repository: what
  * `gh pr merge`, `gh pr edit`, a comment POST and a comment PATCH write
  * when they succeed, and what any of them writes when it fails. So the
@@ -177,6 +193,13 @@ export interface FakePullRequest {
   readonly headRefOid: string;
   readonly isCrossRepository: boolean;
   readonly state: 'OPEN' | 'CLOSED' | 'MERGED';
+  /**
+   * When the pull request was merged, ISO 8601; null for one that is
+   * not, as recorded for an open one. A case that turns a pull request
+   * `MERGED` through `update` sets this too, or the merged list writes
+   * the null a real merged row never carries.
+   */
+  readonly mergedAt: string | null;
   readonly mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   /** `CLEAN`, `BLOCKED`, `DIRTY`, `BEHIND` or `UNKNOWN`, verbatim. */
   readonly mergeStateStatus: string;
@@ -203,6 +226,7 @@ export const PULL_FIELDS: ReadonlySet<string> = new Set([
   'labels',
   'mergeStateStatus',
   'mergeable',
+  'mergedAt',
   'number',
   'state',
   'statusCheckRollup',
@@ -242,7 +266,7 @@ const IN_FLIGHT_STATES: ReadonlySet<string> = new Set([
 /** A finished check's `completedAt` is a real instant; a running one's is this. */
 const NEVER_COMPLETED = '0001-01-01T00:00:00Z';
 
-/** What a seed leaves out, minus the number, the author and the head. */
+/** What a seed leaves out, minus the number, the author, the head and the merge instant. */
 const PULL_DEFAULTS = {
   title: 'a pull request',
   body: '',
@@ -255,7 +279,7 @@ const PULL_DEFAULTS = {
   updatedAt: '2026-09-18T11:00:00Z',
   checks: [],
   comments: [],
-} as const satisfies Omit<FakePullRequest, 'number' | 'author' | 'headRefName' | 'headRefOid'>;
+} as const satisfies Omit<FakePullRequest, 'number' | 'author' | 'headRefName' | 'headRefOid' | 'mergedAt'>;
 
 /** The author a seed that names none carries. */
 const DEFAULT_AUTHOR: FakePrAuthor = Object.freeze({ login: 'octo', isBot: false, name: 'Octo Cat' });
@@ -329,13 +353,23 @@ export function pullUrl(repo: string, number: number): string {
   return `https://github.com/${repo}/pull/${number}`;
 }
 
-/** A seed filled out into the pull request the repository holds. */
+/**
+ * A seed filled out into the pull request the repository holds.
+ *
+ * A `MERGED` seed that names no `mergedAt` is merged at its `updatedAt`,
+ * a merge being the last time a merged pull request moved; any other
+ * state is merged at null.
+ */
 export function fillSeed(seed: FakePullRequestSeed): FakePullRequest {
+  const updatedAt = seed.updatedAt ?? PULL_DEFAULTS.updatedAt;
   return {
     ...PULL_DEFAULTS,
     author: DEFAULT_AUTHOR,
     headRefName: `feat/pr-${seed.number}`,
     headRefOid: String(seed.number).padStart(40, '0'),
+    mergedAt: seed.state === 'MERGED'
+      ? updatedAt
+      : null,
     ...seed,
   };
 }
@@ -417,6 +451,7 @@ export function renderPull(
     labels: pull.labels.map((name, index) => ({ id: `LA_fake${index}`, name, description: '', color: 'ededed' })),
     mergeStateStatus: pull.mergeStateStatus,
     mergeable: pull.mergeable,
+    mergedAt: pull.mergedAt,
     number: pull.number,
     state: pull.state,
     statusCheckRollup: pull.checks.map((check) => renderRollupEntry(check, pull.updatedAt)),

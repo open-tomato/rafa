@@ -148,6 +148,37 @@ describe('the config files', () => {
     ]);
   });
 
+  it('carries the cleanup section at its defaults, which resolve from the file once uncommented', () => {
+    const cleanup = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# cleanup:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...cleanup].join('\n')), 'c.yaml') });
+
+    expect(cleanup.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# cleanup:',
+      '#   staleDays: 30',
+      '#   worktreeIdleDays: 7',
+      '#   keep: []',
+    ]);
+    expect([resolved.config.cleanupStaleDays, resolved.config.cleanupWorktreeIdleDays, resolved.config.cleanupKeep])
+      .toEqual([30, 7, []]);
+    expect([resolved.sources.cleanupStaleDays, resolved.sources.cleanupWorktreeIdleDays, resolved.sources.cleanupKeep])
+      .toEqual(['file', 'file', 'file']);
+  });
+
+  it('answers each cleanup setting from the default once its line is dropped, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:staleDays|worktreeIdleDays|keep):/.test(line));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 3);
+    expect(['cleanupStaleDays', 'cleanupWorktreeIdleDays', 'cleanupKeep'].map((setting) => [
+      setting,
+      resolved.sources[setting as keyof typeof resolved.sources],
+    ])).toEqual([
+      ['cleanupStaleDays', 'default'],
+      ['cleanupWorktreeIdleDays', 'default'],
+      ['cleanupKeep', 'default'],
+    ]);
+  });
+
   it('opens each file with its own header and ends it with a line break', () => {
     expect(projectConfigText().split('\n')[0]).toBe('# rafa project config, written by rafa init and left as it is on a rerun.');
     expect(userConfigText().split('\n')[0]).toBe('# rafa user config, read under every project on this machine, written by');

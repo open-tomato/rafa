@@ -334,6 +334,9 @@ function readLayer(
     releaseVersionFile: read('releaseVersionFile'),
     releaseChangelog: read('releaseChangelog'),
     releaseHeading: read('releaseHeading'),
+    cleanupStaleDays: read('cleanupStaleDays'),
+    cleanupWorktreeIdleDays: read('cleanupWorktreeIdleDays'),
+    cleanupKeep: read('cleanupKeep'),
   };
   return { layer, problems, extras };
 }

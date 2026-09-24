@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-two registered so far wrap a
+ * of each is its command. Five of the fifty-three registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -52,7 +52,8 @@
  * through `src/release/` and share `release/status.ts`'s readers, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
- * does it.
+ * does it, nor `cleanup`, which reads the branches and worktrees through
+ * `src/cleanup/` and removes the ticked ones through its steps.
  *
  * ## What is registered
  *
@@ -156,6 +157,10 @@
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
  *     checks, checked and printed with no run started, beside two
  *     warnings about the install.
+ *   - `cleanup [--dry-run]`, top-level: the local branches and
+ *     worktrees that have piled up, in four groups, and the ones ticked
+ *     removed after one question; listed only, removing nothing, without
+ *     a terminal or with `--output=json`. It starts no session.
  *   - `self-update [--force]`, top-level: builds the rafa checkout and
  *     installs it as `~/.rafa/bin/rafa`, refusing while a tracker in
  *     `plan.dir` holds a task and while this version's runtime directory
@@ -181,6 +186,7 @@ import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
+import cleanup from './cleanup.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
@@ -295,6 +301,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   roadmap,
   init,
   doctor,
+  cleanup,
   selfUpdate,
   usage,
   describe,

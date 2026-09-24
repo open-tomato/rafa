@@ -157,6 +157,25 @@ export interface PullRequestDetail extends PullRequestSummary {
   readonly labels: readonly string[];
 }
 
+/**
+ * One merged pull request, as {@link PullRequests.listMerged} answers it:
+ * which head was merged, at which commit, and when.
+ *
+ * Only what telling a local branch's fate needs. `headRefOid` is the head
+ * commit the pull request was merged AT, which a squash merge leaves
+ * unreachable from the base, so a caller compares it with a local tip
+ * rather than asking git whether the branch is merged.
+ */
+export interface MergedPullRequest {
+  readonly number: number;
+  /** The branch the PR was FROM. Still answered after the branch is deleted. */
+  readonly headRefName: string;
+  /** The head commit when the PR was merged. */
+  readonly headRefOid: string;
+  /** When the PR was merged, ISO 8601. Never null: the PR is merged. */
+  readonly mergedAt: string;
+}
+
 /** A PR's checks, and the one verdict over them. */
 export interface ChecksReading {
   readonly rows: readonly CheckRow[];
@@ -212,6 +231,13 @@ export interface PullRequests {
   findOpen: (branch: string) => Promise<PullRequestSummary | null>;
   /** Every open PR, newest first. */
   list: () => Promise<readonly PullRequestSummary[]>;
+  /**
+   * The most recent merged PRs, newest CREATED first — not newest merged,
+   * which is `gh`'s own order — up to a fixed limit the provider names.
+   * A merged PR past that limit is not answered, so an absent head is
+   * "not among the recent merges" and never "never merged".
+   */
+  listMerged: () => Promise<readonly MergedPullRequest[]>;
   /** One PR in full, or null when the repository has no such PR. */
   get: (number: number) => Promise<PullRequestDetail | null>;
   /** The PR's checks now. One poll: the waiting is the caller's. */

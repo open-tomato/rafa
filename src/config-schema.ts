@@ -145,6 +145,27 @@
  *     settings beside their own arguments, and a global flag nobody
  *     typed would be one this module invented.
  *
+ * ## The `cleanup` section
+ *
+ * The `rafa cleanup` command rafa-94 builds lists local branches and
+ * worktrees for a person to delete, and these three settings shape what
+ * it lists. Three readings are this module's:
+ *
+ *   - `cleanup.staleDays` defaults to 30 and `cleanup.worktreeIdleDays`
+ *     to 7. Both are numbers and never null: each is a threshold the
+ *     listing compares against, and a listing with no threshold is not
+ *     a state either can be left in. Both go through `dayCount`, which
+ *     refuses zero, a fraction and a quoted number.
+ *   - `cleanup.keep` defaults to the EMPTY list, as
+ *     `board.trustedAuthors` does: with nothing kept, no branch is
+ *     spared by name, and inventing a pattern as a default would spare
+ *     a branch nobody named. Each entry is a glob pattern kept as
+ *     written, through `text`; what a pattern matches is
+ *     the cleanup command's to say, so nothing here refuses one for its
+ *     syntax.
+ *   - No `cleanup` setting is a {@link CommandLineSetting}, for the
+ *     reason the `pr` section gives.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -189,6 +210,7 @@ import { join } from 'node:path';
 import {
   CLAUDE_SETTING_SOURCES,
   CONFIG_VERSIONS,
+  dayCount,
   flag,
   githubLogin,
   INJECT_MODES,
@@ -302,6 +324,18 @@ export interface RafaConfig {
   releaseChangelog: string;
   /** The template one entry's heading is rendered from. `release.heading`. */
   releaseHeading: string;
+  /**
+   * The age in days past which `rafa cleanup` lists a branch as Stale.
+   * `cleanup.staleDays`.
+   */
+  cleanupStaleDays: number;
+  /**
+   * The idle days past which `rafa cleanup` lists a worktree.
+   * `cleanup.worktreeIdleDays`.
+   */
+  cleanupWorktreeIdleDays: number;
+  /** Glob patterns naming branches `rafa cleanup` never lists. `cleanup.keep`. */
+  cleanupKeep: readonly string[];
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -345,6 +379,9 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
   releaseHeading: '## {version} — {date}, {title}',
+  cleanupStaleDays: 30,
+  cleanupWorktreeIdleDays: 7,
+  cleanupKeep: Object.freeze([]),
 });
 
 /** What the module knows about one setting. */
@@ -445,6 +482,17 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   releaseHeading: {
     key: 'release.heading',
     read: text('a changelog heading template'),
+    cli: false,
+  },
+  cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
+  cleanupWorktreeIdleDays: {
+    key: 'cleanup.worktreeIdleDays',
+    read: dayCount,
+    cli: false,
+  },
+  cleanupKeep: {
+    key: 'cleanup.keep',
+    read: listOf(text('a glob pattern'), 'glob patterns'),
     cli: false,
   },
 };

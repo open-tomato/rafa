@@ -114,6 +114,10 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   versionFile: ${CONFIG_DEFAULTS.releaseVersionFile}`,
   `#   changelog: ${CONFIG_DEFAULTS.releaseChangelog}`,
   `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
+  '# cleanup:',
+  `#   staleDays: ${String(CONFIG_DEFAULTS.cleanupStaleDays)}                # days before rafa cleanup lists a branch as Stale`,
+  `#   worktreeIdleDays: ${String(CONFIG_DEFAULTS.cleanupWorktreeIdleDays)}          # days before rafa cleanup lists a worktree as idle`,
+  '#   keep: []                     # glob patterns naming branches rafa cleanup never lists',
 ]);
 
 /** The line every file opens its settings with. */

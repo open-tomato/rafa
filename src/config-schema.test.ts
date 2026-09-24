@@ -57,6 +57,9 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseVersionFile', 'release.versionFile'],
   ['releaseChangelog', 'release.changelog'],
   ['releaseHeading', 'release.heading'],
+  ['cleanupStaleDays', 'cleanup.staleDays'],
+  ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
+  ['cleanupKeep', 'cleanup.keep'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -89,6 +92,7 @@ const TOP = [
   'board',
   'roadmap',
   'release',
+  'cleanup',
 ];
 
 describe('SETTINGS', () => {
@@ -143,6 +147,7 @@ describe('SECTIONS', () => {
   it('holds every dotted prefix a setting sits under, and no setting key', () => {
     expect([...SECTIONS].sort()).toEqual([
       'board',
+      'cleanup',
       'learning',
       'loop',
       'output',
@@ -173,6 +178,10 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('release.bump')).toEqual([
       'release',
       ['enabled', 'versionFile', 'changelog', 'heading'],
+    ]);
+    expect(knownKeysAbove('cleanup.staleDayz')).toEqual([
+      'cleanup',
+      ['staleDays', 'worktreeIdleDays', 'keep'],
     ]);
   });
 
