@@ -2,13 +2,13 @@
  * Every agent the routing table names resolves to something.
  *
  * `context/workflow.md` carries the task-shape routing table, and its
- * THIRD column is the load-bearing one. Each row holds either the
- * tracked `.claude/agents/<name>.md` path that travels with a clone,
- * or the literal `user-level`, which is a portability warning that the
- * name resolves against whatever the machine happens to hold. That is
- * what lets a routed name be checked as portable-or-marked without a
- * hardcoded roster living in this file: the table declares which of
- * the two it is, and this file holds the declaration to the tree.
+ * THIRD column is the load-bearing one: the rafa-tier file,
+ * `src/bundled/agents/<name>.md`, that ships with the package. The
+ * table is generated from rafa's routing defaults
+ * (`src/tiers/routing-table.ts`), and `src/tiers/routing-table.test.ts`
+ * holds the page equal to the generator. This file holds what the
+ * generated rows claim against the tree: every path is tracked, on
+ * disk, and named after the agent of its row.
  *
  * A wrong row is worth a test because of what the CLI does with one.
  * An unresolvable `--agent` name exits 1 with NO JSON at all and the
@@ -28,27 +28,24 @@
  *
  * ## The claim is two-sided
  *
- * A project row owes two readings that are not the same reading. `git
+ * A row owes two readings that are not the same reading. `git
  * ls-files` reads the INDEX, so it answers whether the file travels;
  * `existsSync` answers whether it is there to be read. A file deleted
  * from the worktree but still staged passes the first and fails the
  * second, and only the second is what a dispatch actually opens.
  *
- * A `user-level` row owes the NEGATIVE half, and it is the one that
- * goes stale silently. A project file of the same name REPLACES the
- * user-level agent rather than merging with it, and the CLI roster is
- * blind to the difference — a shadowed name appears exactly ONCE in
- * the list of available agents. So the day someone lands
- * `.claude/agents/tdd-guide.md`, the table's `user-level` marker is
- * false and nothing else in the tree reports it.
+ * ## No user-level bucket
  *
- * Nothing here reads a user-level agent file: it lives outside the
- * repo by definition, and this file spawns no `claude`. The whole
- * claim about that bucket is the shadow one.
+ * The table once had a second form in its third column, the literal
+ * `user-level`, for agents that live outside the repo, and this file
+ * held those rows to the negative claim that no tracked project file
+ * shadowed them. The routing defaults name no such agent
+ * (`src/tiers/routing.ts`), so the generated table has no such row,
+ * and a third column in that form now reads as unrecognised.
  *
  * ## Reading tracked-ness
  *
- * `git ls-files -z -- .claude/agents` once, read as a LISTING, and
+ * `git ls-files -z -- src/bundled/agents` once, read as a LISTING, and
  * never per path as an exit code: `git ls-files <path>` exits 0 with
  * EMPTY stdout for a path git has never seen, so the reflexive
  * `ls-files "$p" && echo tracked` idiom answers "tracked" for a
@@ -59,20 +56,21 @@
  *
  * ## The prose pin
  *
- * The paragraph under the table states both bucket counts in words,
- * which is the only other statement in the tree that moves when a row
- * is added. Pinning it turns "the table grew and the prose did not"
- * into a red instead of a sentence nobody re-reads. The phrase
- * crosses a hand wrap (`The three tracked rows` ends a line and
- * `travel.` opens the next), so the match runs over whitespace-
+ * The paragraph under the table states the row count in words, which
+ * is the only statement outside the generated region that moves when
+ * a row is added. Pinning it turns "the table grew and the prose did
+ * not" into a red instead of a sentence nobody re-reads. The phrase
+ * crosses a hand wrap (`The five tracked rows` ends a line and
+ * `travel` opens the next), so the match runs over whitespace-
  * normalised text — a line-based search finds one of the two and
  * reports the other as missing.
  *
- * Landing this file corrected both numbers. The table has carried
- * nine rows, three tracked and six user-level, since the commit that
- * added it, while the prose said five and four — and so did that
- * commit's own message. Two arithmetic slips in prose, invisible to
- * every gate, which is exactly the shape this pin exists for.
+ * When this file first landed it corrected the page's counts. The
+ * table had carried nine rows, three tracked and six user-level,
+ * since the commit that added it, while the prose said five and four
+ * — and so did that commit's own message. Two arithmetic slips in
+ * prose, invisible to every gate, which is exactly the shape this pin
+ * exists for.
  *
  * ## The controls
  *
@@ -80,15 +78,15 @@
  * is what a matcher that has stopped matching also answers. Seven
  * plants carry those zeros, each built by rewriting the LIVE page in
  * memory so the matcher under test is the real one: a third column
- * that is neither form, a project row pointing at an untracked path,
- * a project row pointing at a tracked file belonging to ANOTHER agent
- * (which holds the name claim apart from the tracked one — the
- * planted path is still tracked), a prose count moved off the table's
- * own, a prose count written as a word the reader cannot parse, a
- * bare `|` inside a cell, and a header line with no alignment row
- * under it. Every plant asserts its target appeared exactly ONCE on
- * the line it rewrote, so a mis-transcribed target reads as a failed
- * plant rather than as a clean tree.
+ * that is not a rafa-tier path, a row pointing at an untracked path,
+ * a row pointing at a tracked file belonging to ANOTHER agent (which
+ * holds the name claim apart from the tracked one — the planted path
+ * is still tracked), a prose count moved off the table's own, a prose
+ * count written as a word the reader cannot parse, a bare `|` inside a
+ * cell, and a header line with no alignment row under it. Every plant
+ * asserts its target appeared exactly ONCE on the line it rewrote, so
+ * a mis-transcribed target reads as a failed plant rather than as a
+ * clean tree.
  *
  * The last two exist because their rules have no violator on a
  * well-formed page. A pipe count compared against the header's own
@@ -99,10 +97,12 @@
  *
  * ## The mutation grid
  *
- * Twenty-three legs over this file's own helpers, each asked for case
- * NAMES through `--reporter=json` and restored from a captured copy.
- * All 23 applied, all 23 reddened, the union covers all 21 cases and
- * the file came back bytes-identical.
+ * A reading taken when the file first landed, over its user-level
+ * form, and not re-run since the file moved to the rafa tier:
+ * twenty-three legs over its own helpers, each asked for case NAMES
+ * through `--reporter=json` and restored from a captured copy. All 23
+ * applied, all 23 reddened, the union covered all 21 cases of that
+ * form, and the file came back bytes-identical.
  *
  * The first pass is the reading worth keeping. It ran 22 legs with 3
  * green and the union at 17 of 18, and every one of the four holes
@@ -127,8 +127,7 @@ import { describe, expect, it } from 'bun:test';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PAGE_PATH = 'context/workflow.md';
-const AGENT_DIR = '.claude/agents';
-const USER_LEVEL_MARKER = 'user-level';
+const AGENT_DIR = 'src/bundled/agents';
 
 /** The header that identifies the routing table wherever it sits. */
 const ROUTING_HEADER = ['Task shape', 'Agent', 'Where it lives'] as const;
@@ -139,11 +138,10 @@ const DELIMITER_ROW = /^\|(?:\s*:?-+:?\s*\|)+$/;
 /** The agent column: one code span holding a slug and nothing else. */
 const AGENT_CELL = /^`([a-z0-9]+(?:-[a-z0-9]+)*)`$/;
 
-/** The home column's project form: one code span holding the path. */
-const AGENT_PATH_CELL = /^`(\.claude\/agents\/([a-z0-9]+(?:-[a-z0-9]+)*)\.md)`$/;
+/** The home column: one code span holding the rafa-tier path. */
+const AGENT_PATH_CELL = /^`(src\/bundled\/agents\/([a-z0-9]+(?:-[a-z0-9]+)*)\.md)`$/;
 
-/** The two count sentences, matched over whitespace-normalised prose. */
-const USER_LEVEL_COUNT = /Those ([a-z]+) definitions live outside the repo/;
+/** The count sentence, matched over whitespace-normalised prose. */
 const PROJECT_COUNT = /The ([a-z]+) tracked rows travel/;
 
 const NUMBER_WORDS: Readonly<Record<string, number>> = {
@@ -180,7 +178,6 @@ export interface MarkdownTable {
 
 export type AgentHome =
   | { readonly kind: 'project'; readonly path: string; readonly name: string }
-  | { readonly kind: 'user-level' }
   | { readonly kind: 'unrecognised'; readonly cell: string };
 
 export interface RoutingEntry {
@@ -256,9 +253,8 @@ export function findRoutingTables(text: string): MarkdownTable[] {
   return tables;
 }
 
-/** Which of the two declared forms the home column carries. */
+/** Whether the home column carries the rafa-tier path form. */
 export function classifyHome(cell: string): AgentHome {
-  if (cell === USER_LEVEL_MARKER) return { kind: 'user-level' };
   const path = AGENT_PATH_CELL.exec(cell);
   if (path !== null) return { kind: 'project', path: path[1] ?? '', name: path[2] ?? '' };
   return { kind: 'unrecognised', cell };
@@ -286,11 +282,6 @@ export function projectRows(entries: readonly RoutingEntry[]): ProjectRow[] {
   return rows;
 }
 
-/** The rows that declare themselves outside the repo. */
-export function userLevelRows(entries: readonly RoutingEntry[]): RoutingEntry[] {
-  return entries.filter((entry) => entry.home.kind === 'user-level');
-}
-
 /**
  * The offender rules, each a named function rather than a filter
  * inlined into the case that asserts it is empty.
@@ -302,7 +293,7 @@ export function userLevelRows(entries: readonly RoutingEntry[]): RoutingEntry[] 
  * implementations agreeing with each other.
  */
 
-/** Rows whose home column is neither declared form. */
+/** Rows whose home column is not a rafa-tier path. */
 export function unrecognisedRows(entries: readonly RoutingEntry[]): RoutingEntry[] {
   return entries.filter((entry) => entry.home.kind === 'unrecognised');
 }
@@ -338,17 +329,8 @@ export function mismatchedProjectRows(entries: readonly RoutingEntry[]): Project
   return projectRows(entries).filter((row) => row.name !== row.entry.agent);
 }
 
-/** User-level rows a tracked project file of the same name would shadow. */
-export function shadowedUserLevelRows(
-  entries: readonly RoutingEntry[],
-  tracked: ReadonlySet<string>,
-): RoutingEntry[] {
-  return userLevelRows(entries)
-    .filter((entry) => tracked.has(`${AGENT_DIR}/${entry.agent ?? ''}.md`));
-}
-
 /**
- * Everything git tracks under `.claude/agents`, as a listing.
+ * Everything git tracks under `src/bundled/agents`, as a listing.
  *
  * A failure to RUN is thrown rather than answered as an empty set: an
  * empty set would make every membership claim in this file pass, which
@@ -368,8 +350,8 @@ export function trackedAgentFiles(root: string): string[] {
   return result.stdout.split('\0').filter((path) => path !== '');
 }
 
-/** Both stated counts, read off whitespace-normalised prose. */
-export function proseCounts(text: string): { userLevel: ProseCount; project: ProseCount } {
+/** The stated row count, read off whitespace-normalised prose. */
+export function proseCounts(text: string): { project: ProseCount } {
   const joined = text.replace(/\s+/g, ' ');
   const read = (pattern: RegExp): ProseCount => {
     const word = pattern.exec(joined)?.[1] ?? null;
@@ -380,7 +362,7 @@ export function proseCounts(text: string): { userLevel: ProseCount; project: Pro
         : NUMBER_WORDS[word] ?? null,
     };
   };
-  return { userLevel: read(USER_LEVEL_COUNT), project: read(PROJECT_COUNT) };
+  return { project: read(PROJECT_COUNT) };
 }
 
 const PAGE_TEXT = readFileSync(join(REPO_ROOT, PAGE_PATH), 'utf8');
@@ -451,18 +433,15 @@ describe('the workflow routing table names agents that resolve', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('gives every row a tracked project path or the user-level marker', () => {
+  it('gives every row a rafa-tier path', () => {
     const offenders = unrecognisedRows(ENTRIES)
       .map((entry) => `${PAGE_PATH}:${entry.line} ${entry.agent ?? entry.agentCell}`);
     expect(offenders).toEqual([]);
   });
 
-  it('has a live subject in both buckets', () => {
-    // Without this the claim above is one-sided: a table of nothing but
-    // user-level rows satisfies it while proving nothing about paths.
+  it('has a live subject: every row carries a path', () => {
     expect(projectRows(ENTRIES).length).toBeGreaterThan(0);
-    expect(userLevelRows(ENTRIES).length).toBeGreaterThan(0);
-    expect(projectRows(ENTRIES).length + userLevelRows(ENTRIES).length).toBe(ENTRIES.length);
+    expect(projectRows(ENTRIES).length).toBe(ENTRIES.length);
   });
 
   it('reads a live tracked listing that refuses a fabricated member', () => {
@@ -471,46 +450,40 @@ describe('the workflow routing table names agents that resolve', () => {
     expect(TRACKED.has(FABRICATED)).toBe(false);
   });
 
-  it('names a file git tracks for every project row', () => {
+  it('names a file git tracks for every row', () => {
     const untracked = untrackedProjectRows(ENTRIES, TRACKED)
       .map((row) => `${PAGE_PATH}:${row.entry.line} ${row.path}`);
     expect(untracked).toEqual([]);
   });
 
-  it('has every project row on disk as well as in the index', () => {
+  it('has the file of every row on disk as well as in the index', () => {
     const missing = missingProjectFiles(ENTRIES, REPO_ROOT)
       .map((row) => `${PAGE_PATH}:${row.entry.line} ${row.path}`);
     expect(missing).toEqual([]);
     expect(existsSync(join(REPO_ROOT, FABRICATED))).toBe(false);
   });
 
-  it('names each project file after the agent of the row holding it', () => {
+  it('names each file after the agent of the row holding it', () => {
     const mismatched = mismatchedProjectRows(ENTRIES)
       .map((row) => `${PAGE_PATH}:${row.entry.line} ${row.entry.agent ?? ''} -> ${row.path}`);
     expect(mismatched).toEqual([]);
   });
 
-  it('leaves no user-level row shadowed by a tracked project file', () => {
-    const shadowed = shadowedUserLevelRows(ENTRIES, TRACKED)
-      .map((entry) => `${PAGE_PATH}:${entry.line} ${entry.agent ?? ''}`);
-    expect(shadowed).toEqual([]);
-  });
-
-  it('states both bucket counts in the prose under the table', () => {
+  it('states the row count in the prose under the table', () => {
     const counts = proseCounts(PAGE_TEXT);
-    expect(counts.userLevel.word).not.toBeNull();
     expect(counts.project.word).not.toBeNull();
-    expect(counts.userLevel.value).toBe(userLevelRows(ENTRIES).length);
     expect(counts.project.value).toBe(projectRows(ENTRIES).length);
   });
 
-  it('reports a third column that is neither declared form', () => {
-    const target = firstOr(userLevelRows(ENTRIES), 'user-level row');
-    const planted = plantOnRow(target, USER_LEVEL_MARKER, 'whatever the machine holds');
+  it('reports a third column that is not a rafa-tier path', () => {
+    // The retired form is the plant: a `user-level` row no longer reads
+    // as a declared home, so a hand edit bringing one back is refused.
+    const target = firstOr(projectRows(ENTRIES), 'project row');
+    const planted = plantOnRow(target.entry, `\`${target.path}\``, 'user-level');
     expect(planted).not.toEqual(PAGE_TEXT);
     const offenders = unrecognisedRows(readRoutingEntries(tableOf(planted)))
       .map((entry) => entry.line);
-    expect(offenders).toEqual([target.line]);
+    expect(offenders).toEqual([target.entry.line]);
   });
 
   it('reports a row carrying a pipe inside one of its cells', () => {
@@ -538,7 +511,7 @@ describe('the workflow routing table names agents that resolve', () => {
     expect(findRoutingTables(`${loose}|---|---|---|\n`)).toHaveLength(2);
   });
 
-  it('reports a project row pointing at a path git does not track', () => {
+  it('reports a row pointing at a path git does not track', () => {
     const target = firstOr(projectRows(ENTRIES), 'project row');
     const planted = plantOnRow(target.entry, `\`${target.path}\``, `\`${FABRICATED}\``);
     const untracked = untrackedProjectRows(readRoutingEntries(tableOf(planted)), TRACKED)
@@ -546,7 +519,7 @@ describe('the workflow routing table names agents that resolve', () => {
     expect(untracked).toEqual([FABRICATED]);
   });
 
-  it('reports a project row pointing at a tracked file of another agent', () => {
+  it('reports a row pointing at a tracked file of another agent', () => {
     const target = firstOr(projectRows(ENTRIES), 'project row');
     const other = firstOr(
       [...TRACKED].sort().filter((path) => path !== target.path),
@@ -589,13 +562,13 @@ describe('the workflow routing table names agents that resolve', () => {
 
   it('reports a prose count that has drifted off the table', () => {
     const counts = proseCounts(PAGE_TEXT);
-    const word = counts.userLevel.word;
-    if (word === null) throw new Error('no user-level count sentence to plant on');
+    const word = counts.project.word;
+    if (word === null) throw new Error('no tracked-row count sentence to plant on');
     const wrong = Object.keys(NUMBER_WORDS)
-      .filter((candidate) => NUMBER_WORDS[candidate] !== counts.userLevel.value);
+      .filter((candidate) => NUMBER_WORDS[candidate] !== counts.project.value);
     const replacement = firstOr(wrong, 'number word differing from the table');
-    const planted = plantOnce(PAGE_TEXT, `Those ${word} definitions`, `Those ${replacement} definitions`);
-    expect(proseCounts(planted).userLevel.value).not.toBe(userLevelRows(ENTRIES).length);
+    const planted = plantOnce(PAGE_TEXT, `The ${word} tracked rows`, `The ${replacement} tracked rows`);
+    expect(proseCounts(planted).project.value).not.toBe(projectRows(ENTRIES).length);
   });
 
   it('reports a prose count written as a word it cannot read', () => {
