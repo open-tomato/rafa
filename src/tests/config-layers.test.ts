@@ -169,6 +169,8 @@ const PROJECT_TEXT = [
   '  staleDays: 45',
   '  worktreeIdleDays: 10',
   '  keep: ["project/*"]',
+  'dangerous:',
+  '  acceptStaleRefs: true',
   '',
 ].join('\n');
 
@@ -218,6 +220,7 @@ const PROJECT_VALUES: RafaConfig = {
   cleanupStaleDays: 45,
   cleanupWorktreeIdleDays: 10,
   cleanupKeep: ['project/*'],
+  dangerousAcceptStaleRefs: true,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -269,6 +272,8 @@ const USER_TEXT = [
   '  staleDays: 90',
   '  worktreeIdleDays: 2',
   '  keep: ["user/*", scratch]',
+  'dangerous:',
+  '  acceptStaleRefs: false',
   '',
 ].join('\n');
 
@@ -308,6 +313,7 @@ const USER_VALUES: RafaConfig = {
   cleanupStaleDays: 90,
   cleanupWorktreeIdleDays: 2,
   cleanupKeep: ['user/*', 'scratch'],
+  dangerousAcceptStaleRefs: false,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -543,6 +549,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'cleanup.keep', 'cleanup:\n  keep: [""]',
     'cleanup.keep[0] is "", expected a glob pattern',
     'cleanup:\n  keep: [main-*]', 'cleanupKeep', ['main-*'],
+  ],
+  [
+    'dangerous.acceptStaleRefs', 'dangerous:\n  acceptStaleRefs: "true"',
+    'dangerous.acceptStaleRefs is "true", expected true or false',
+    'dangerous:\n  acceptStaleRefs: true', 'dangerousAcceptStaleRefs', true,
   ],
 ];
 

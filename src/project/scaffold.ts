@@ -118,6 +118,8 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   staleDays: ${String(CONFIG_DEFAULTS.cleanupStaleDays)}                # days before rafa cleanup lists a branch as Stale`,
   `#   worktreeIdleDays: ${String(CONFIG_DEFAULTS.cleanupWorktreeIdleDays)}          # days before rafa cleanup lists a worktree as idle`,
   '#   keep: []                     # glob patterns naming branches rafa cleanup never lists',
+  '# dangerous:',
+  `#   acceptStaleRefs: ${String(CONFIG_DEFAULTS.dangerousAcceptStaleRefs)}       # true plans past dangling and suspect spec references on every run`,
 ]);
 
 /** The line every file opens its settings with. */

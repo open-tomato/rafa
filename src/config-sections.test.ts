@@ -147,6 +147,23 @@ describe('flag', () => {
   ])('refuses %s', (_label, raw, found) => {
     expect(problemsOf(flag, raw)).toEqual([`F: s is ${found}, expected true or false`]);
   });
+
+  it('reads dangerous.acceptStaleRefs as a file spells it, the boolean alone turning it on', () => {
+    const parsed = Bun.YAML.parse([
+      'on: true',
+      'off: false',
+      'yes: yes',
+      'quoted: "true"',
+      'one: 1',
+    ].join('\n')) as Record<string, unknown>;
+
+    expect([valueOf(flag, parsed.on), valueOf(flag, parsed.off)]).toEqual([true, false]);
+    expect([parsed.yes, parsed.quoted, parsed.one].map((raw) => problemsOf(flag, raw))).toEqual([
+      ['F: s is "yes", expected true or false'],
+      ['F: s is "true", expected true or false'],
+      ['F: s is 1, expected true or false'],
+    ]);
+  });
 });
 
 describe('listOf', () => {

@@ -68,6 +68,17 @@
  * "by source". This module accepts all three. Whether a source kind can
  * be loaded is the module loader's answer, not the config's.
  *
+ * ## The `dangerous` section
+ *
+ * A setting under `dangerous:` turns a refusal off on every run, so it
+ * is read as strictly as any: `dangerous.acceptStaleRefs` goes through
+ * {@link flag}, the reader every `tracking` key takes, and no reader of
+ * its own. That is on purpose. A reader that took `yes`, `"true"` or
+ * `1` as true would let a spelling nobody meant as an answer switch
+ * check 4 of the readiness gate off, which is the one reading this
+ * section must never make by guessing. The section holds no closed
+ * list and no item shape, so nothing else here names it.
+ *
  * ## The two lists this module does not own
  *
  * Every other closed list here is declared here. Two of the `pr`
