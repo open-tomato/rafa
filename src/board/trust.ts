@@ -59,6 +59,13 @@
  * reading refuses is passed over, reported and left alone, and the
  * readiness gate posts its gaps beside it.
  *
+ * A SEVENTH caller reads no board text, and so is no route of the
+ * roster: the Providers reading of `rafa doctor --deep`
+ * (`src/commands/doctor-deep-providers.ts`) runs {@link readAuthorTrust}
+ * with an empty allow-list over the login `gh` is authenticated as, to
+ * say whether a loop session could push and merge. It gates nothing; it
+ * comes here so which permissions are write access is spelled once.
+ *
  * `context/pull-requests.md` carries the roster.
  *
  * ## What a planted spec-review comment can take

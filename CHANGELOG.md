@@ -9,6 +9,11 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.14.0 — 2026-09-24, `rafa doctor --deep` — what a loop session can actually reach
+
+- CLI: `rafa doctor --deep` reads the machine the way a loop session sees it, in code and starting no session, and prints four sections: Environment (how the session's environment differs from your shell's once the loaded settings files' `env` is applied, `PATH` compared entry by entry, and the directory sessions run in), Settings (the setting sources a session loads, and each agent, skill and MCP server configured but hidden from sessions, with the fix), Providers (whether `gh` is found, logged in and has write access under the session's environment) and Stack tools (the project's unmet stack tools, with the install hint), plus Plan needs for a plan `--plan` names. Every row is `ok`, `warn` or `note`, so `--deep` never changes doctor's exit code, and `--output=json` gives the reading as the result's `deep` field, `null` without the flag.
+- Docs: `context/cli.md` covers `--deep`, its section modules and `src/utils/session-env.ts`, the one function both spawn doors now build a session's environment with; the README adds `rafa doctor --deep` to the getting-started steps and ticks the roadmap item.
+
 ## 0.13.0 — 2026-09-24, The roadmap in one table — `rafa issue list --roadmap` and `rafa roadmap`
 
 - CLI: `rafa issue list --roadmap` prints the Roadmap issue's unticked lines in its order as a table with three new columns — `spec` (the readiness gate's reading: `ready`, `gaps: <headings>`, `outline`, or where label and gate disagree), `blocked by` (each blocker with its state) and `has` (`plan`, `branch`, `pr #<n>`) — from one read of the board; `--all` keeps the ticked lines, `--type`, `--module`, `--search` and `--limit` narrow the rows, `--state` beside it is refused, and `--output=json` gives the rows as data. An unreachable board prints a warning and the Roadmap's order alone, exiting 0. New top-level `rafa roadmap` prints the same table.

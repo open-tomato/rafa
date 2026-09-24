@@ -95,7 +95,8 @@
  *
  * Each detected stack gets a {@link StackReading} with `met` and, when
  * not met, one `hint` line naming what to install and where. The stack
- * tools are read for a plan only: a spec's needs are what its text
+ * tools are read for a plan, or on their own by {@link readStackNeeds}
+ * with no plan at all; never for a spec, whose needs are what its text
  * mentions.
  *
  * ## Warnings, never gaps
@@ -645,6 +646,18 @@ export async function readPlanNeeds(planPath: string, seams: NeedsSeams): Promis
       warnings: [...fences.warnings, ...stacks.warnings],
     };
   });
+}
+
+/**
+ * The stack tools of the project root alone (see {@link STACK_TOOLS}),
+ * read against the machine `seams` names with no plan: the items are
+ * each detected stack's program and the skill naming it, both of origin
+ * `stack`, and `stacks` holds one reading per detected stack. A project
+ * root that marks no stack, or none at all, reads as no items and no
+ * stacks. Reads no plan and so refuses nothing a plan could.
+ */
+export async function readStackNeeds(seams: NeedsSeams): Promise<NeedsReading> {
+  return readAgainstMachine(seams, stackNeeds);
 }
 
 /** `name` as a pattern matching it as a whole word; see the module note. */

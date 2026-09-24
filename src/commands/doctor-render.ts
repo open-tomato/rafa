@@ -4,7 +4,9 @@
  * and the PREREQUISITES file merged in; one line per check; the line
  * naming the start-only items a resume passed over; the steps that file
  * names and nothing checks; and the verdict with any `known-missing:`
- * lines. A halt has no verdict line: it is the refusal, on stderr.
+ * lines. A halt has no verdict line: it is the refusal, on stderr. It
+ * also words the GitHub board's lines: the heading, a row each, and the
+ * fix when any row is not present.
  *
  * A module of its own so `doctor.ts` stays under the 800-line cap
  * (`context/source.md`) while it grows the plan's risk total. What the
@@ -12,10 +14,14 @@
  * words them.
  */
 import type { DoctorPreflight, DoctorStartTier } from './doctor.js';
+import type { BoardRow, BoardStatus } from '../board/status.js';
 import type { PreflightCheck, PreflightReport } from '../preflight/run.js';
 
 import { basename, relative, sep } from 'node:path';
 
+import { boardGaps } from '../board/status.js';
+
+import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 import { plural } from './plan/plan-files.js';
 
 /** A path as a line shows it: relative under the root, absolute elsewhere. */
@@ -105,4 +111,36 @@ export function renderDoctor(preflight: DoctorPreflight): readonly string[] {
     ...reminderLines(preflight),
     ...verdictLines(preflight.report),
   ];
+}
+
+/** How wide a board row's outcome column is: `present`, `missing` and `unknown` are each seven. */
+const OUTCOME_WIDTH = 7;
+
+/** A row as a line names it: a label under `label <name>`, anything else under its own name. */
+function rowName(row: BoardRow): string {
+  return row.kind === 'label'
+    ? `label ${row.name}`
+    : row.name;
+}
+
+/**
+ * One board row as a line. A row that is present says nothing more —
+ * "present" is the whole of it — and every other carries the sentence
+ * that made it: what was not there, or what could not be read.
+ */
+export function boardRowLine(row: BoardRow): string {
+  const line = `  ${row.outcome.padEnd(OUTCOME_WIDTH, ' ')}  ${rowName(row)}`;
+  return row.outcome === 'present'
+    ? line
+    : `${line}: ${row.detail}`;
+}
+
+/** The lines text mode writes for the board: the heading, a row each, and the fix when any row is not present. */
+export function renderBoard(board: BoardStatus | null): readonly string[] {
+  if (board === null) return [];
+  const gaps = boardGaps(board);
+  const fix = gaps.length === 0
+    ? []
+    : [`Run ${BOARD_FIX} to set up ${plural(gaps.length, 'part')} of the board this run did not find.`];
+  return [BOARD_HEADING, ...board.rows.map(boardRowLine), ...fix];
 }

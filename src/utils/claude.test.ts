@@ -193,6 +193,7 @@ import {
   UndeclaredSpendError,
 } from './claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from './declaration.js';
+import { sessionSpawnEnv } from './session-env.js';
 
 /** No agent definition here declares an effort of its own. */
 const NO_OWN_EFFORT: AgentEffortLookup = () => false;
@@ -838,6 +839,106 @@ describe('interruptClaudeSessions against a stand-in claude on PATH', () => {
     expect(run.exitCode).not.toBe(0);
     expect(run.elapsedMs).toBeLessThan(ENDED_WITHIN_MS);
   }, CASE_TIMEOUT);
+});
+
+/**
+ * The environment each door spawns with, read back by a stand-in that is a
+ * BUN script rather than `/bin/sh`: measured under bun 1.3.14, a `/bin/sh`
+ * stand-in running `/usr/bin/env` reads back `PWD` and `SHLVL` it was never
+ * handed, while a bun script dumping `process.env` reads back exactly the
+ * mapping `Bun.spawn` was given. The dump is compared whole against
+ * `sessionSpawnEnv(process.env)` taken at the moment of the call, so a door
+ * that added, dropped or rewrote any entry beside the function reddens. The
+ * control in each case is that the same dump is NOT the bare `process.env`:
+ * the entrypoint is set to a sentinel first, so the comparison could have
+ * failed, and a sentinel entry of the case's own is read back, so the dump is
+ * of the environment this call handed over.
+ *
+ * Three mutations were driven against this file and `session-env.test.ts`
+ * on 2026-09-24, each restored sha256-identical: the inherited door adding
+ * one entry beside the function's answer reddened this section's inherited
+ * case and nothing else (1 of 66), so no earlier case reads that; the
+ * captured door handing over the bare `process.env` reddened 3, this
+ * section's captured case among them; and the function dropping its base
+ * reddened 29.
+ */
+describe('the environment both doors spawn with, against a stand-in claude on PATH', () => {
+  /** An entry set for the case alone, read back from the dump. */
+  const CASE_ENTRY = 'RAFA_SESSION_ENV_DRIFT';
+
+  let savedCaseEntry: string | undefined;
+
+  beforeEach(() => {
+    binDir = mkdtempSync(join(tmpdir(), 'rafa-claude-stand-in-'));
+    savedEnv = {
+      PATH: process.env['PATH'],
+      CLAUDE_CODE_ENTRYPOINT: process.env['CLAUDE_CODE_ENTRYPOINT'],
+    };
+    savedCaseEntry = process.env[CASE_ENTRY];
+    process.env['CLAUDE_CODE_ENTRYPOINT'] = 'rafa-test-sentinel';
+    process.env[CASE_ENTRY] = 'planted';
+  });
+
+  afterEach(() => {
+    restoreEnv('PATH', savedEnv.PATH);
+    restoreEnv('CLAUDE_CODE_ENTRYPOINT', savedEnv.CLAUDE_CODE_ENTRYPOINT);
+    if (savedCaseEntry === undefined) {
+      delete process.env[CASE_ENTRY];
+    } else {
+      process.env[CASE_ENTRY] = savedCaseEntry;
+    }
+    rmSync(binDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Installs a bun script as the only `claude` on PATH, dumping its
+   * environment as JSON, and answers the dump's path.
+   */
+  function envDumpingClaude(): string {
+    const dump = join(binDir, 'env.json');
+    const path = join(binDir, 'claude');
+    writeFileSync(path, [
+      `#!${process.execPath}`,
+      `require('node:fs').writeFileSync(${JSON.stringify(dump)}, JSON.stringify(process.env));`,
+      '',
+    ].join('\n'));
+    chmodSync(path, 0o755);
+    process.env['PATH'] = binDir;
+    return dump;
+  }
+
+  /** Runs `run` against the dumping stand-in, answering what it read and what the function answered. */
+  async function spawnedAndExpected(run: () => Promise<number>): Promise<{
+    readonly spawned: Record<string, string>;
+    readonly expected: Record<string, string | undefined>;
+    readonly base: Record<string, string | undefined>;
+    readonly exitCode: number;
+  }> {
+    const dump = envDumpingClaude();
+    const base = { ...process.env };
+    const expected = sessionSpawnEnv(process.env);
+    const exitCode = await run();
+    const spawned = JSON.parse(readFileSync(dump, 'utf8')) as Record<string, string>;
+    return { spawned, expected, base, exitCode };
+  }
+
+  it('hands the inherited door exactly what sessionSpawnEnv answers for process.env', async () => {
+    const read = await spawnedAndExpected(() => runClaude('read my env', DEFAULT_SOURCES));
+
+    expect(read.exitCode).toBe(0);
+    expect(read.spawned).toEqual(read.expected);
+    expect(read.spawned[CASE_ENTRY]).toBe('planted');
+    expect(read.spawned).not.toEqual(read.base);
+  });
+
+  it('hands the captured door exactly what sessionSpawnEnv answers for process.env', async () => {
+    const read = await spawnedAndExpected(async () => (await runClaudeCaptured('read my env', DEFAULT_SOURCES)).exitCode);
+
+    expect(read.exitCode).toBe(0);
+    expect(read.spawned).toEqual(read.expected);
+    expect(read.spawned[CASE_ENTRY]).toBe('planted');
+    expect(read.spawned).not.toEqual(read.base);
+  });
 });
 
 describe('both doors in json mode, against a stand-in claude on PATH', () => {

@@ -114,3 +114,16 @@ its settings file's source is on, while `disabledMcpServers` in
 This section replaces the former "Search and plan needs" paragraphs, which
 said both commands offered only visible items; neither filters on
 `visibleToLoop`.
+
+**Settings files are read against the project root, sessions read them
+against their cwd.** `overrideSettingsPath` joins `.claude/settings.json`
+and `.claude/settings.local.json` onto `projectRoot`, while Claude Code
+resolves them from the session's working directory, so for a session
+started from a subdirectory every reader here — `visibleToLoop`, the MCP
+switches and `rafa doctor --deep`'s Environment overlay — can name a file
+that session never loads. The deep reading carries both directories and
+notes the mismatch rather than resolving it. It also leaves out the `env`
+of `~/.claude.json`, which Claude Code applies before any settings file,
+and the keys Claude Code drops from a project-scoped `env`; its module
+note in `src/commands/doctor-deep-env.ts` lists both. This paragraph
+replaces nothing.

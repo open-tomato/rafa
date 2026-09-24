@@ -100,6 +100,18 @@
  * that throws is a warning naming the plan. Neither changes the exit code.
  * The default plan gets no line: `--plan` is how a plan asks for one.
  *
+ * ## The deep sections
+ *
+ * `--deep` adds the machine as a loop session sees it, read once per run
+ * by `readDeep` (`./doctor-deep.ts`, which holds what each section reads
+ * and under which environment): Environment, Settings, Providers and
+ * Stack tools, and Plan needs for a plan `--plan` names, the default plan
+ * getting none. They are read after the blocked issues and printed after
+ * them, a halt's included, so a halt prints them before its refusal. It
+ * is code alone and starts no Claude session. Every row is `ok`, `warn`
+ * or `note`, none is a preflight item, and none changes the exit code.
+ * Without the flag nothing of it is read.
+ *
  * ## What it does not do
  *
  * It starts no run. No run id is generated, no row goes to the store's
@@ -136,7 +148,7 @@
  * opens with the runner's halt, which names each such item, its probe,
  * and its exit code with the first line of stderr. 1 as well, each
  * ending `Nothing was checked.`, for a positional word, a `--plan` with
- * no file, a plan named that is no file, a plan path that cannot be
+ * no file, a `--deep` holding a value, a plan named that is no file, a plan path that cannot be
  * checked, such as one under a file (`stat` answers `ENOTDIR`, measured
  * on bun 1.3.14), a config `loadConfig` refuses, and a PREREQUISITES
  * file that cannot be read.
@@ -151,10 +163,10 @@
  * line naming the start-only items a resume passed over; the steps that
  * file names and nothing checks; and the verdict with any
  * `known-missing:` lines; then the risk total of a plan `--plan` names;
- * then {@link renderBoard}'s lines for a repository that has a GitHub board,
+ * then `renderBoard`'s lines (`./doctor-render.ts`) for a repository that has a GitHub board,
  * and none for one that has not; then {@link renderBlockedIssues}'s
  * lines, which a board holding no issue labelled `spec:blocked` has
- * none of either. A halt
+ * none of either; then, under `--deep`, `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
@@ -172,15 +184,17 @@
  * `origin` probe the provider is read through, the runner the board rows
  * and the blocked issues are read with, and the git and `gh` the risk
  * total reads the accounts through are {@link DoctorSeams},
- * each left out being the runner's own.
+ * each left out being the runner's own, and so are the `--deep` reading's
+ * (`DeepDoctorSeams`).
  */
 import type { BlockedIssuesReport } from './doctor-blocked.js';
+import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRow, BoardStatus } from '../board/status.js';
+import type { BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { PrProvider } from '../config-sections.js';
-import type { PrerequisiteItem, RafaConfig } from '../config.js';
+import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '../config.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
@@ -193,7 +207,7 @@ import type { ProjectFound } from '../project/scope.js';
 import { basename, resolve } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { boardGaps, readBoardStatus } from '../board/status.js';
+import { readBoardStatus } from '../board/status.js';
 import { CommandExit } from '../cli/command.js';
 import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
@@ -212,13 +226,18 @@ import { announceRiskTotal } from '../start/risk-total.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
+import { readDeep, renderDeep } from './doctor-deep.js';
 import { readPreviousCopies } from './doctor-previous.js';
-import { renderDoctor } from './doctor-render.js';
-import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
-import { isFile, plural } from './plan/plan-files.js';
+import { renderBoard, renderDoctor } from './doctor-render.js';
+import { isFile } from './plan/plan-files.js';
 
-/** How the checks run; see the module note. Each left out is the runner's own. */
-export interface DoctorSeams {
+/**
+ * How the checks run; see the module note. Each left out is the
+ * runner's own. The `--deep` reading's own seams — the directory a
+ * session runs in, the runner its provider probes go through, and how
+ * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
+ */
+export interface DoctorSeams extends DeepDoctorSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -266,6 +285,10 @@ export interface DoctorPreflight {
   readonly reminders: readonly PrerequisiteReminder[];
   /** The config the preflight resolved, which the plan's risk total reads too. */
   readonly config: RafaConfig;
+  /** That config with where each key came from, which the `--deep` reading reads. */
+  readonly resolved: ResolvedConfig;
+  /** Whether the line asked for the `--deep` sections. */
+  readonly deep: boolean;
 }
 
 /** What json mode gives as the terminal result's `data`, for a preflight that did not halt. */
@@ -298,6 +321,8 @@ export interface DoctorResult {
   readonly board: BoardStatus | null;
   /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board. */
   readonly blocked: BlockedIssuesReport | null;
+  /** Every `--deep` section as it was read; null without `--deep`. */
+  readonly deep: DeepReading | null;
 }
 
 /** Both readings of the GitHub board, each null for a project that has none. */
@@ -340,10 +365,17 @@ export function readPlanFlag(value: string | boolean | undefined): string | null
   throw refusal(['rafa doctor: --plan needs a file: --plan=<file>']);
 }
 
+/** Whether the line asks for the `--deep` sections, refusing `--deep` holding a value. */
+export function readDeepFlag(value: string | boolean | undefined): boolean {
+  if (value === undefined || value === false || value === 'false') return false;
+  if (value === true || value === 'true') return true;
+  throw refusal([`rafa doctor: --deep takes no value, and read "${value}" as one; name a plan with --plan=<file>`]);
+}
+
 /** The config as it resolves for the project, refusing one `loadConfig` refuses. */
-function resolvedConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
+function resolvedConfig(project: ProjectFound, warn: (message: string) => void): ResolvedConfig {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return loadConfig({ root: project.root, home: project.home }, {}, warn);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw refusal(['rafa doctor: the config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)]);
@@ -443,10 +475,12 @@ function readStartTier(plan: string | null, items: PreflightItems): StartReading
 async function checkPreflight(context: RafaContext, project: ProjectFound, seams: DoctorSeams): Promise<DoctorPreflight> {
   expectNoArgument(context.args);
   const named = readPlanFlag(context.flags['plan']);
+  const deep = readDeepFlag(context.flags['deep']);
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = resolvedConfig(project, warn);
+  const resolved = resolvedConfig(project, warn);
+  const { config } = resolved;
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
   const automatic = readProvider(project.root, config, seams);
@@ -467,6 +501,8 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
     report,
     reminders: items.reminders,
     config,
+    resolved,
+    deep,
   });
 }
 
@@ -554,38 +590,6 @@ function writeInstall(context: RafaContext, install: InstallReadings): void {
   }
 }
 
-/** How wide a board row's outcome column is: `present`, `missing` and `unknown` are each seven. */
-const OUTCOME_WIDTH = 7;
-
-/** A row as a line names it: a label under `label <name>`, anything else under its own name. */
-function rowName(row: BoardRow): string {
-  return row.kind === 'label'
-    ? `label ${row.name}`
-    : row.name;
-}
-
-/**
- * One board row as a line. A row that is present says nothing more —
- * "present" is the whole of it — and every other carries the sentence
- * that made it: what was not there, or what could not be read.
- */
-export function boardRowLine(row: BoardRow): string {
-  const line = `  ${row.outcome.padEnd(OUTCOME_WIDTH, ' ')}  ${rowName(row)}`;
-  return row.outcome === 'present'
-    ? line
-    : `${line}: ${row.detail}`;
-}
-
-/** The lines text mode writes for the board: the heading, a row each, and the fix when any row is not present. */
-export function renderBoard(board: BoardStatus | null): readonly string[] {
-  if (board === null) return [];
-  const gaps = boardGaps(board);
-  const fix = gaps.length === 0
-    ? []
-    : [`Run ${BOARD_FIX} to set up ${plural(gaps.length, 'part')} of the board this run did not find.`];
-  return [BOARD_HEADING, ...board.rows.map(boardRowLine), ...fix];
-}
-
 /** The refusal for a halt: the runner's own text, then what `loop start` would do. */
 function haltRefusal(halt: string): CommandExit {
   return new CommandExit(1, [
@@ -594,8 +598,21 @@ function haltRefusal(halt: string): CommandExit {
   ].join('\n'));
 }
 
+/**
+ * Every `--deep` section, read once, or null without the flag; see
+ * `./doctor-deep.ts`. The plan is the one `--plan` names alone, as the
+ * default plan gets no Plan needs section.
+ */
+async function checkDeep(context: RafaContext, preflight: DoctorPreflight, seams: DoctorSeams): Promise<DeepReading | null> {
+  if (!preflight.deep) return null;
+  const plan = context.flags['plan'] === undefined
+    ? null
+    : preflight.plan;
+  return readDeep({ project: projectOf(context), env: context.env, resolved: preflight.resolved, plan }, seams);
+}
+
 /** The data json mode gives for a preflight that did not halt. */
-function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings: BoardReadings): DoctorResult {
+function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings: BoardReadings, deep: DeepReading | null): DoctorResult {
   return {
     root: preflight.root,
     plan: preflight.plan,
@@ -611,6 +628,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     previousCopies: install.previousCopies,
     board: readings.board,
     blocked: readings.blocked,
+    deep,
   };
 }
 
@@ -651,8 +669,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     writeText(context, [...renderBoard(readings.board), ...renderBlockedIssues(readings.blocked)]);
+    const deep = await checkDeep(context, preflight, seams);
+    writeText(context, deep === null
+      ? []
+      : renderDeep(deep));
     if (preflight.report.halt !== null) throw haltRefusal(preflight.report.halt);
-    if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings));
+    if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings, deep));
   } finally {
     writeInstall(context, install);
   }
@@ -690,7 +712,13 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' it; that reading writes nothing and never changes the exit code either. With `--output=json` the'
       + ' checks, both readings, those rows and those issues are the data of the terminal result event,'
       + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
-      + ' `rafa loop start` prints before its notices, which never changes the exit code.',
+      + ' `rafa loop start` prints before its notices, which never changes the exit code. With `--deep` it'
+      + ' also prints the machine as a loop session sees it, starting no session: the session\'s'
+      + ' Environment and working directory against the shell\'s, the Settings each agent, skill and MCP'
+      + ' server is read from and whether a session sees it, the Providers `gh` answers under the session\'s'
+      + ' environment, and the Stack tools the project\'s stack needs, with Plan needs for a plan `--plan`'
+      + ' names; each row is ok, warn or note with its fix, printed after the blocked issues and before a'
+      + ' refusal, and none changes the exit code. With `--output=json` they are the `deep` of the data.',
     args: [],
     flags: [
       {
@@ -698,6 +726,12 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
         description: 'The plan whose `PREREQUISITES-<stub>.md` is merged in and whose risk total is printed,'
           + ' relative to the project root. The default plan `rafa loop start` runs when left out.',
         type: 'string',
+      },
+      {
+        name: 'deep',
+        description: 'Also print the Environment, Settings, Providers and Stack tools a loop session sees, and'
+          + ' Plan needs for a plan `--plan` names. Starts no session and never changes the exit code.',
+        type: 'boolean',
       },
     ],
     examples: [
@@ -708,6 +742,14 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       {
         cmd: 'rafa doctor --plan=.rafa/plans/PLAN-my-feature.md',
         note: 'Also checks the items of `PREREQUISITES-my-feature.md` beside the plan, and lists its other steps.',
+      },
+      {
+        cmd: 'rafa doctor --deep',
+        note: 'Also reads the environment, settings, providers and stack tools as a loop session sees them.',
+      },
+      {
+        cmd: 'rafa doctor --deep --plan=.rafa/plans/PLAN-my-feature.md',
+        note: 'Also lists what that plan needs that a loop session would not have.',
       },
     ],
     outputs: ['text', 'json'],

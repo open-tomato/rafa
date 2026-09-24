@@ -201,7 +201,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'next': [[], ['dry-run', 'yes']],
   'roadmap': [[], ['all', 'type', 'module', 'search', 'limit']],
   'init': [[], ['root', 'yes', 'board', 'release']],
-  'doctor': [[], ['plan']],
+  'doctor': [[], ['plan', 'deep']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };

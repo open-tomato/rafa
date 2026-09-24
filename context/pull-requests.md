@@ -89,7 +89,12 @@ the fake `gh`.** `createFakePrGh()` — imported from `../pr/gh-fake.js`,
 never from the barrel — plus `createGhPullRequests({ gh: fake.run })`
 gives a genuine `PullRequests` implementation backed by an in-memory `gh`,
 so a read-modify-write such as the release stage's body edit runs
-unmocked. Register the route row the call needs on the fake.
+unmocked. Register the route row the call needs on the fake. The fake
+models `pr`, `run` and `api` only and refuses `gh auth status` as an
+unhandled command, so a case that also probes the login (as the
+Providers reading of `rafa doctor --deep` does) wraps `fake.run` in a
+runner that answers the `auth` forms itself and hands the rest on. This
+sentence replaces nothing.
 
 ### The merge flow
 
@@ -301,6 +306,13 @@ trusted account wrote; the refused ones are reported by id and author
 through the gate's warnings and left alone, and the gaps go in a comment
 posted beside them. The trust is the one check 0 already built, carried on
 `GateIssue` beside the number and the board.
+
+One more reader calls `readAuthorTrust` and is no route, since it reads
+no board text: the Providers reading of `rafa doctor --deep`
+(`src/commands/doctor-deep-providers.ts`) asks it, with an empty
+allow-list, about the login `gh` is authenticated as, to report whether a
+loop session could push and merge. It gates nothing, and goes through the
+rule so write access is spelled once.
 
 The repository a plan refusal names is a LABEL read from `origin` through
 the `git` seam (`boardRepoLabel`), never an input to the lookup: `gh`
