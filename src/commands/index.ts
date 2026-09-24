@@ -103,8 +103,9 @@
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
- *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
- *     definition copied into the project with a source header, and
+ *   - `agent vendor <name>... [--force]`, each named rafa-tier or
+ *     `~/.claude/agents` definition copied into the project with a source
+ *     header, naming the tier it came from, and
  *     `agent list [--source=<source>] [--state=<state>]
  *     [--hidden-from-loop] [-i]`, every agent definition the inventory
  *     holds with its source, its state and whether the loop sees it,

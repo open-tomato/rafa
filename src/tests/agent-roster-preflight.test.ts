@@ -390,7 +390,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       const vendored = runRafa(scratch, ['agent', 'vendor', AGENT]);
 
       expect(vendored.exitCode).toBe(0);
-      expect(vendored.stdout).toBe(`✅ ${AGENT}: ${vendoredAgentFile(scratch)}\n`);
+      expect(vendored.stdout).toBe(`✅ ${AGENT}: ${vendoredAgentFile(scratch)} (from the user tier)\n`);
       expect(existsSync(vendoredAgentFile(scratch))).toBe(true);
       const firstCopy = readFileSync(vendoredAgentFile(scratch), 'utf8');
       expect(firstCopy).toContain('<!-- vendored by rafa from');

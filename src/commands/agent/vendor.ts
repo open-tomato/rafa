@@ -1,7 +1,8 @@
 /**
- * `rafa agent vendor <name>... [--force]`: an agent definition the home
- * carries copied into the project, so a session spawned under the loop's
- * default `loop.settingSources` resolves the name.
+ * `rafa agent vendor <name>... [--force]`: an agent definition the rafa
+ * tier or the home carries copied into the project, so a session spawned
+ * under the loop's default `loop.settingSources` resolves the name, and
+ * so a project can edit its own copy of one rafa ships.
  *
  * This is the fix command the roster names (`agents/roster.ts`,
  * `VENDOR_COMMAND`). A task routed `agent=tdd-guide` is dispatched with
@@ -14,24 +15,38 @@
  * `<root>/.claude/agents/`. Copying it is the fix, and this command is
  * the copy.
  *
+ * ## Which tier a name is copied from
+ *
+ * Two tiers are read, in the one order rafa resolves every name in
+ * (`schema/tiers.ts`, `SKILL_TIERS`) with the project left out, since the
+ * project is the destination: {@link VENDOR_TIERS}, the rafa tier's
+ * `bundled/agents` beside the entry first, then the home's
+ * `~/.claude/agents`. A name both hold is copied from the rafa tier, the
+ * holder a session loading both would be served. Each copy names the
+ * tier it came from: the text line says `(from the rafa tier)` or
+ * `(from the user tier)`, and json mode's row carries `tier`.
+ *
+ * The entry is a seam, `Bun.main` for the registered command: under
+ * `bun test` that is the test file, so a case hands an entry of its own
+ * and plants the rafa tier beside it.
+ *
  * ## Which file is copied where
  *
  * A name is the frontmatter `name` of a definition, never its file stem,
  * because that is what `--agent` resolves by
- * (`utils/agent-definition.ts`). So the source is the
- * `~/.claude/agents/*.md` whose frontmatter carries the name asked for,
- * as `readAgentDefinitions` reads the directory, and the destination
- * keeps that file's own name: a `~/.claude/agents/weird-file.md`
- * carrying `name: renamed-agent` is vendored to
- * `<root>/.claude/agents/weird-file.md`, and resolves as
- * `renamed-agent` there as it did at home. Two home files carrying one
- * name leave the first in directory order the one copied, as
- * `resolveAgentRoster` takes the first.
+ * (`utils/agent-definition.ts`). So the source is the tier's `*.md`
+ * whose frontmatter carries the name asked for, as `readAgentDirectory`
+ * reads the directory, and the destination keeps that file's own name:
+ * a `~/.claude/agents/weird-file.md` carrying `name: renamed-agent` is
+ * vendored to `<root>/.claude/agents/weird-file.md`, and resolves as
+ * `renamed-agent` there as it did at home. Two files of one tier
+ * carrying one name leave the first in directory order the one copied,
+ * as `resolveAgentRoster` takes the first.
  *
  * The home is the project's, the dispatcher's, and the command reads no
- * config: which scopes a session loads decides nothing about where a
- * definition may be copied from or to, and `rafa agent list` is where
- * the sources are read.
+ * config: which tiers a session loads, `tiers.rafa: off` included,
+ * decides nothing about where a definition may be copied from or to,
+ * and `rafa agent list` is where the sources are read.
  *
  * ## The source header
  *
@@ -53,7 +68,7 @@
  * Every name is checked before the first byte is copied, so a line
  * naming one name that cannot be vendored copies none of the others: the
  * refusal ends with `Nothing was written.` as `rafa init`'s refusals do.
- * A name no home file carries is refused, and so is one whose
+ * A name neither tier carries is refused, naming both directories, and so is one whose
  * destination file is already there, unless `--force` is on the line,
  * which overwrites it. The overwrite is whole, and what the project file
  * held is not kept: a project definition is the shadowing one
@@ -75,19 +90,21 @@
  * ## The exit code
  *
  * 0 copied. 1 for a `--force` value that is neither `true` nor `false`,
- * for a line naming no name, for a name no home definition carries, for
+ * for a line naming no name, for a name neither tier carries, for
  * a destination already there without `--force`, and for a copy that
  * failed, the message naming the file and what the error said.
  */
 import type { AgentDefinitionFile } from '../../agents/roster.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { SkillTier } from '../../schema/tiers.js';
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { readAgentDefinitions } from '../../agents/roster.js';
+import { readAgentDirectory } from '../../agents/roster.js';
 import { CommandExit } from '../../cli/command.js';
+import { bundledAgentsDirectory } from '../../inventory/trees.js';
 import { AGENT_DEFINITION_DIR, readFrontmatter } from '../../utils/agent-definition.js';
 
 /** The usage line a refusal names. */
@@ -99,11 +116,29 @@ export const NOTHING_WRITTEN = 'Nothing was written.';
 /** Answers the day the source header is stamped with. */
 export type Clock = () => Date;
 
+/** Answers the entry the rafa tier's `bundled/agents` sits beside. */
+export type Entry = () => string;
+
+/** A tier a definition may be vendored from: every tier but the project, which is the destination. */
+export type VendorTier = Exclude<SkillTier, 'project'>;
+
+/** The tiers read for a name, in the order the first holder wins. See the module note. */
+export const VENDOR_TIERS: readonly VendorTier[] = Object.freeze(['rafa', 'user']);
+
+/** Where one tier's definitions were read from, and what it holds by name. */
+interface TierDefinitions {
+  readonly tier: VendorTier;
+  readonly dir: string;
+  readonly byName: ReadonlyMap<string, AgentDefinitionFile>;
+}
+
 /** One definition copied. */
 export interface VendoredAgent {
   /** The frontmatter `name` the copy resolves under. */
   readonly name: string;
-  /** The `~/.claude/agents` file it was read from. */
+  /** The tier it was copied from. */
+  readonly tier: VendorTier;
+  /** The file it was read from, under that tier's agents directory. */
   readonly from: string;
   /** The `<root>/.claude/agents` file it was written to. */
   readonly to: string;
@@ -142,13 +177,33 @@ export function readNames(args: readonly string[]): readonly string[] {
   return args;
 }
 
-/** The home's definitions, the first file answering for each name it carries. */
-function homeDefinitions(home: string): ReadonlyMap<string, AgentDefinitionFile> {
+/** The agents directory `tier` is read from. */
+export function vendorTierDirectory(tier: VendorTier, home: string, entry: string): string {
+  return tier === 'rafa'
+    ? bundledAgentsDirectory(entry)
+    : join(home, AGENT_DEFINITION_DIR);
+}
+
+/** One tier's definitions, the first file answering for each name it carries. */
+function tierDefinitions(tier: VendorTier, home: string, entry: string): TierDefinitions {
+  const dir = vendorTierDirectory(tier, home, entry);
   const byName = new Map<string, AgentDefinitionFile>();
-  for (const definition of readAgentDefinitions(home)) {
+  for (const definition of readAgentDirectory(dir)) {
     if (!byName.has(definition.name)) byName.set(definition.name, definition);
   }
-  return byName;
+  return { tier, dir, byName };
+}
+
+/** The first tier in {@link VENDOR_TIERS} order holding `name`, with its file, or null. */
+function firstHolder(
+  tiers: readonly TierDefinitions[],
+  name: string,
+): { readonly tier: VendorTier; readonly definition: AgentDefinitionFile } | null {
+  for (const { tier, byName } of tiers) {
+    const definition = byName.get(name);
+    if (definition !== undefined) return { tier, definition };
+  }
+  return null;
 }
 
 /** A date as `YYYY-MM-DD`, the day the header names. */
@@ -175,30 +230,32 @@ export function withSourceHeader(text: string, from: string, date: Date): string
   return [...lines.slice(0, close + 1), header, ...lines.slice(close + 1)].join('\n');
 }
 
-/** Each name with the home file that answers for it, or every refusal there is. */
+/** Each name with the tier file that answers for it, or every refusal there is. */
 function planCopies(
   names: readonly string[],
   project: ProjectFound,
   force: boolean,
+  entry: string,
 ): readonly VendoredAgent[] {
-  const definitions = homeDefinitions(project.home);
+  const tiers = VENDOR_TIERS.map((tier) => tierDefinitions(tier, project.home, entry));
+  const searched = tiers.map(({ tier, dir }) => `the ${tier} tier (${dir})`).join(' or ');
   const dir = join(project.root, AGENT_DEFINITION_DIR);
   const problems: string[] = [];
   const copies: VendoredAgent[] = [];
 
   for (const name of names) {
-    const definition = definitions.get(name);
-    if (definition === undefined) {
-      problems.push(`   agent "${name}": no definition under ${join(project.home, AGENT_DEFINITION_DIR)} carries that name`);
+    const holder = firstHolder(tiers, name);
+    if (holder === null) {
+      problems.push(`   agent "${name}": no definition under ${searched} carries that name`);
       continue;
     }
-    const to = join(dir, basename(definition.path));
+    const to = join(dir, basename(holder.definition.path));
     const replaced = existsSync(to);
     if (replaced && !force) {
       problems.push(`   agent "${name}": ${to} is already there; pass --force to replace it`);
       continue;
     }
-    copies.push({ name, from: definition.path, to, replaced });
+    copies.push({ name, tier: holder.tier, from: holder.definition.path, to, replaced });
   }
 
   if (problems.length > 0) {
@@ -217,11 +274,11 @@ function copyOne(copy: VendoredAgent, date: Date): void {
   }
 }
 
-/** The line text mode writes for one copy. */
+/** The line text mode writes for one copy, naming the tier it came from. */
 export function vendoredLine(copy: VendoredAgent): string {
-  return `✅ ${copy.name}: ${copy.to}${copy.replaced
-    ? ' (replaced)'
-    : ''}`;
+  return `✅ ${copy.name}: ${copy.to} (from the ${copy.tier} tier${copy.replaced
+    ? ', replaced'
+    : ''})`;
 }
 
 function projectOf(context: RafaContext): ProjectFound {
@@ -230,11 +287,11 @@ function projectOf(context: RafaContext): ProjectFound {
 }
 
 /** Vendors each named definition. See the module note. */
-function runVendor(context: RafaContext, now: Clock): void {
+function runVendor(context: RafaContext, now: Clock, entry: Entry): void {
   const force = readForce(context.flags['force']);
   const names = readNames(context.args);
   const project = projectOf(context);
-  const copies = planCopies(names, project, force);
+  const copies = planCopies(names, project, force, entry());
   const dir = join(project.root, AGENT_DEFINITION_DIR);
   const date = now();
 
@@ -249,27 +306,35 @@ function runVendor(context: RafaContext, now: Clock): void {
   for (const copy of copies) context.output.info(vendoredLine(copy));
 }
 
-/** The command, stamping its headers from `now`. See the module note. */
-export function createAgentVendorCommand(now: Clock = () => new Date()): RafaCommand {
+/**
+ * The command, stamping its headers from `now` and reading the rafa tier
+ * beside `entry`. See the module note.
+ */
+export function createAgentVendorCommand(
+  now: Clock = () => new Date(),
+  entry: Entry = () => Bun.main,
+): RafaCommand {
   const command: RafaCommand = {
     name: 'agent vendor',
     subject: 'agent',
     action: 'vendor',
-    summary: 'copy an agent definition from ~/.claude/agents into this project, so the loop resolves its name',
-    description: 'Copies each named definition from `~/.claude/agents` into `<root>/.claude/agents`, keeping'
+    summary: 'copy an agent definition from the rafa tier or ~/.claude/agents into this project',
+    description: 'Copies each named definition from the rafa tier (`bundled/agents` beside the running'
+      + ' entry) or, when rafa ships no definition of that name, from `~/.claude/agents` into'
+      + ' `<root>/.claude/agents`, naming the tier each copy came from, keeping'
       + ' the source file\'s own name and writing one HTML comment after its frontmatter naming the file it'
       + ' came from and the day. A name is a definition\'s frontmatter `name`, which is what `--agent`'
       + ' resolves by, not its file stem. Under the loop\'s default `loop.settingSources` of'
       + ' `project,local` the home is out of reach, so a task routed `agent=<name>` exits 1 before any'
       + ' model call until the definition sits in the project: this is the fix `rafa loop start` and'
       + ' `rafa plan validate` name when they refuse one. Every name is checked before the first byte is'
-      + ' copied, and the command refuses a name no home definition carries and a destination already'
+      + ' copied, and the command refuses a name neither tier carries and a destination already'
       + ' there, which `--force` replaces whole. With `--output=json` the copies are the data of the'
       + ' terminal result event.',
     args: [
       {
         name: 'name',
-        description: 'The frontmatter `name` of a definition under `~/.claude/agents`; more than one may be named.',
+        description: 'The frontmatter `name` of a definition the rafa tier or `~/.claude/agents` holds; more than one may be named.',
         type: 'string',
         required: true,
       },
@@ -293,7 +358,7 @@ export function createAgentVendorCommand(now: Clock = () => new Date()): RafaCom
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      runVendor(context, now);
+      runVendor(context, now, entry);
     },
   };
   return Object.freeze(command);

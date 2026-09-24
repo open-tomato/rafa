@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts`, `confirm.ts` and `page.ts` the five prompts for text input, single selection, multi-selection, confirmation and paged lists in raw mode on standard error |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
-| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
+| `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
@@ -672,13 +672,17 @@ New; it replaces no earlier text. What a row or an action added to
   `~/.bun/bin` on the context's `PATH` (`readBinPath`). In json mode the
   result's `data` holds the root, the version, the runtime directory, the
   link, where it resolves, the files copied and that reading.
-- **`agent vendor <name>... [--force]` copies a home definition into the
-  project** (`src/commands/agent/vendor.ts`), which is the fix
-  `loop start`'s preflight and `plan validate` name for an `agent=` no
-  loaded scope defines. A name is a definition's frontmatter `name`, what
-  `--agent` resolves by, so the source is the `~/.claude/agents/*.md`
-  carrying it, whatever its stem, and the copy keeps that file's own name
-  under `<root>/.claude/agents/`. The copy carries one line the original
+- **`agent vendor <name>... [--force]` copies a rafa-tier or home
+  definition into the project** (`src/commands/agent/vendor.ts`), which
+  is the fix `loop start`'s preflight and `plan validate` name for an
+  `agent=` only the user tier holds. It reads the rafa tier
+  (`bundled/agents` beside the running entry) first and `~/.claude/agents`
+  second, the resolution order with the project left out, so a name both
+  hold is copied from the rafa tier; each copy's text line ends
+  `(from the rafa tier)` or `(from the user tier)`. A name is a
+  definition's frontmatter `name`, what `--agent` resolves by, so the
+  source is the tier's `*.md` carrying it, whatever its stem, and the copy
+  keeps that file's own name under `<root>/.claude/agents/`. The copy carries one line the original
   does not, an HTML comment naming the source file and the day, written
   directly after the frontmatter's closing `---` — never ahead of the
   opening one, which would leave the file carrying no frontmatter at all
@@ -688,12 +692,12 @@ New; it replaces no earlier text. What a row or an action added to
   It throws exit code 1 for a `--force` value that is neither `true` nor
   `false`, read ahead of the names so `--force` typed first, which
   `parseArgs` hands the next word as its value, meets that refusal; for a
-  line naming no name; for a name no `~/.claude/agents` definition
-  carries; and for a destination already there, which `--force` replaces
+  line naming no name; for a name neither tier carries, the refusal
+  naming both directories; and for a destination already there, which `--force` replaces
   whole. Each refusal ends with the line `Nothing was written.` In json
   mode the result's `data` holds the root, `<root>/.claude/agents` and
-  one row per copy: the name, the file it came from, the file written and
-  whether one was replaced. A declaration has no variadic spelling, so
+  one row per copy: the name, the tier and the file it came from, the
+  file written and whether one was replaced. A declaration has no variadic spelling, so
   `rafa agent vendor --help` renders the argument as `<name>` where the
   refusals' usage line says `<name>...`.
 - **`agent list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
