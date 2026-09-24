@@ -33,7 +33,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
+  BUNDLED_BIN_DIR,
   BUNDLED_SKILLS_DIR,
+  bundledBinDirectory,
   bundledSkillsDirectory,
   INSTINCT_SCOPES,
   instinctScopeDirectory,
@@ -113,6 +115,7 @@ describe('the skill tiers', () => {
 
     expect(answered).toBe(join(runtime, 'bundled', 'skills'));
     expect(answered).not.toBe(join(bin, 'bundled', 'skills'));
+    expect(bundledBinDirectory(join(bin, 'rafa'))).toBe(join(runtime, 'bundled', 'bin'));
   });
 
   it('answers a path that is not there as it was given', () => {
@@ -124,6 +127,14 @@ describe('the skill tiers', () => {
 
   it('measures the entry off Bun.main when the caller names none', () => {
     expect(bundledSkillsDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'bundled', 'skills'));
+    expect(bundledBinDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'bundled', 'bin'));
+  });
+
+  it('puts the rafa tier programs in bundled/bin, beside its skills', () => {
+    const absent = join(tempBase, 'no-such', 'cli.js');
+
+    expect(BUNDLED_BIN_DIR).toBe(join('bundled', 'bin'));
+    expect(bundledBinDirectory(absent)).toBe(join(dirname(bundledSkillsDirectory(absent)), 'bin'));
   });
 });
 

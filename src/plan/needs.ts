@@ -64,8 +64,13 @@
  *     of its declarations (`mcpServerFor`).
  *   - A program is present when a directory of `pathDirs`, in order,
  *     holds an executable file of its name (any exec bit, the checker's
- *     rule). The loop's sessions inherit that `PATH`, so a program has
- *     no separate visibility.
+ *     rule), or, for a program rafa ships, when the rafa tier's
+ *     `bundled/bin` holds one first (see Stack tools). The loop's
+ *     sessions inherit that `PATH`, so a program has no separate
+ *     visibility. `sessionSpawnEnv` does not yet put `bundled/bin` on
+ *     a session's `PATH` (measured 2026-09-24: `src/utils/session-env.ts`
+ *     names neither), so a program found only there is present to this
+ *     reading before a session can run it by name.
  *
  * {@link isUnmet} is the one test `--missing` applies: missing, or
  * present and not visible to a run.
@@ -83,7 +88,14 @@
  * A detected stack needs two things, each added to the items with a
  * `stack` origin:
  *
- *   - its program, looked up on `pathDirs` like any other program;
+ *   - its program. A row rafa ships (`bundled`, as the TypeScript
+ *     row's `ts-symbols` is) is looked up first in the rafa tier's
+ *     `bundled/bin` beside the entry (`bundledBinDirectory`), then on
+ *     `pathDirs`; a row that is not, on `pathDirs` alone. The lookup
+ *     goes by name, so a program a plan names as well is found in the
+ *     same place. A build carries `bundled/bin/ts-symbols`; a checkout
+ *     run (`bun src/rafa.ts`) has no `src/bundled/bin`, so there the
+ *     program is present only when `PATH` holds one;
  *   - a skill naming that program: a skill whose file (frontmatter
  *     included, as a `description` is where one usually says it) holds
  *     the program's name as a whole word, as a spec mention is read. Of
@@ -126,6 +138,7 @@ import { buildInventory } from '../inventory/index.js';
 import { mcpDeclarationsOf, mcpServerFor, readMcpServers } from '../inventory/mcp.js';
 import { parsePrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { readFrontmatterDocument } from '../schema/frontmatter.js';
+import { bundledBinDirectory } from '../schema/tiers.js';
 
 import { parsePlan } from './parse.js';
 
@@ -192,10 +205,10 @@ export interface McpNeed extends NeedBase {
   readonly visibleToLoop: boolean;
 }
 
-/** A program, read against `PATH`. */
+/** A program, read against `PATH`, and `bundled/bin` for one rafa ships. */
 export interface ProgramNeed extends NeedBase {
   readonly kind: 'program';
-  /** The first `pathDirs` directory holding it, or null when missing. */
+  /** The first directory holding it, `bundled/bin` before `pathDirs` when rafa ships it; null when missing. */
   readonly directory: string | null;
 }
 
@@ -218,8 +231,10 @@ export interface StackTool {
   readonly stack: string;
   /** Files at the project root, any one of which marks the stack. */
   readonly markers: readonly string[];
-  /** The program, looked up on `PATH`. */
+  /** The program, looked up on `PATH`, or first in `bundled/bin` when {@link StackTool.bundled}. */
   readonly program: string;
+  /** Whether rafa ships the program in its tier's `bundled/bin`. */
+  readonly bundled: boolean;
   /** What to install when the program is missing, as a sentence fragment. */
   readonly install: string;
 }
@@ -230,7 +245,9 @@ export const STACK_TOOLS: readonly StackTool[] = [
     stack: 'typescript',
     markers: ['tsconfig.json'],
     program: 'ts-symbols',
-    install: 'install `ts-symbols` (def, refs, type and outline over the TypeScript language service) on PATH',
+    bundled: true,
+    install: 'run a built or installed rafa, which ships `ts-symbols` in bundled/bin beside its cli.js, '
+      + 'or install `ts-symbols` (def, refs, type and outline over the TypeScript language service) on PATH',
   },
 ];
 
@@ -393,7 +410,7 @@ interface Machine {
 /** One named need read against the machine. */
 function resolveNeed(kind: NeedKind, name: string, origins: readonly NeedOrigin[], machine: Machine): Need {
   if (kind === 'program') {
-    const directory = programDirectory(name, machine.seams.pathDirs);
+    const directory = programDirectory(name, programSearchPath(name, machine.seams));
     const status: NeedStatus = directory === null
       ? 'missing'
       : 'present';
@@ -525,6 +542,22 @@ async function skillFenceNeeds(
     }
   }
   return { named, warnings };
+}
+
+/** Whether a {@link STACK_TOOLS} row rafa ships names `program`. */
+export function isBundledProgram(program: string): boolean {
+  return STACK_TOOLS.some((tool) => tool.bundled && tool.program === program);
+}
+
+/**
+ * The directories `program` is looked up in: the rafa tier's
+ * `bundled/bin` then `pathDirs` for a program rafa ships, `pathDirs`
+ * alone for any other. See the module note.
+ */
+export function programSearchPath(program: string, seams: Pick<NeedsSeams, 'entry' | 'pathDirs'>): readonly string[] {
+  return isBundledProgram(program)
+    ? [bundledBinDirectory(seams.entry), ...seams.pathDirs]
+    : seams.pathDirs;
 }
 
 /** A stack {@link STACK_TOOLS} detected, and the skill naming its program, if any. */

@@ -40,10 +40,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   fencePrograms,
+  isBundledProgram,
   isUnmet,
   mcpServerOfTool,
   probePrograms,
   programDirectory,
+  programSearchPath,
   readPlanNeeds,
   readSpecNeeds,
   readStackNeeds,
@@ -351,19 +353,61 @@ describe('programDirectory', () => {
   });
 });
 
+describe('programSearchPath', () => {
+  const seams = { entry: join(runtime, 'cli.js'), pathDirs: [binDir] };
+
+  it('puts bundled/bin beside the entry before PATH for a program rafa ships', () => {
+    expect(isBundledProgram('ts-symbols')).toBe(true);
+    expect(programSearchPath('ts-symbols', seams)).toEqual([join(runtime, 'bundled', 'bin'), binDir]);
+  });
+
+  it('looks up any other program on PATH alone', () => {
+    expect(isBundledProgram('present-tool')).toBe(false);
+    expect(programSearchPath('present-tool', seams)).toEqual([binDir]);
+  });
+});
+
 /** Where a planted TypeScript project puts the skill naming `ts-symbols`. */
 type SkillPlace = 'project' | 'user' | 'both' | 'none';
+
+/** What the world's rafa entry carries in its `bundled/bin`: nothing, an executable, or a file with no exec bit. */
+type BundledPlace = 'none' | 'executable' | 'plain';
+
+/** Where a planted world's program sits and where its skill does. */
+interface WorldShape {
+  readonly onPath: boolean;
+  readonly skillAt: SkillPlace;
+  /** What `bundled/bin/ts-symbols` beside the world's own entry is; `none` when left out. */
+  readonly inBundle?: BundledPlace;
+}
 
 /** A TypeScript project under its own directory, and the seams and plan to read it with. */
 function typescriptWorld(
   label: string,
-  { onPath, skillAt }: { readonly onPath: boolean; readonly skillAt: SkillPlace },
-): { readonly plan: string; readonly seams: (sources: readonly ClaudeSettingSource[]) => NeedsSeams } {
+  { onPath, skillAt, inBundle = 'none' }: WorldShape,
+): {
+  readonly plan: string;
+  readonly bin: string;
+  readonly bundledBin: string;
+  readonly seams: (sources: readonly ClaudeSettingSource[]) => NeedsSeams;
+} {
   const root = join(base, `ts-${label}`);
   const tsHome = join(root, 'home');
   const tsProject = join(root, 'project');
   const tsBin = join(root, 'bin');
+  const tsRuntime = join(root, 'runtime');
+  const bundledBin = join(tsRuntime, 'bundled', 'bin');
   const plan = join(tsProject, '.rafa', 'plans', 'PLAN-ts.md');
+
+  write(join(tsRuntime, 'cli.js'), '');
+  if (inBundle !== 'none') {
+    write(join(bundledBin, 'ts-symbols'), '#!/bin/sh\n');
+    chmodSync(join(bundledBin, 'ts-symbols'), inBundle === 'executable'
+      ? 0o755
+      : 0o644);
+    write(join(bundledBin, 'present-tool'), '#!/bin/sh\n');
+    chmodSync(join(bundledBin, 'present-tool'), 0o755);
+  }
 
   write(join(tsProject, 'tsconfig.json'), '{}\n');
   write(plan, '- [ ] One task {agent=project-reviewer}\n');
@@ -384,10 +428,12 @@ function typescriptWorld(
 
   return {
     plan,
+    bin: tsBin,
+    bundledBin,
     seams: (sources) => ({
       home: tsHome,
       projectRoot: tsProject,
-      entry: join(runtime, 'cli.js'),
+      entry: join(tsRuntime, 'cli.js'),
       pathDirs: [tsBin],
       settingSources: sources,
       modules: [],
@@ -397,9 +443,57 @@ function typescriptWorld(
 
 describe('the stack-tools table', () => {
   it('holds the TypeScript row, marked by tsconfig.json and naming ts-symbols', () => {
-    expect(STACK_TOOLS.map((tool) => [tool.stack, tool.markers, tool.program])).toEqual([
-      ['typescript', ['tsconfig.json'], 'ts-symbols'],
+    expect(STACK_TOOLS.map((tool) => [tool.stack, tool.markers, tool.program, tool.bundled])).toEqual([
+      ['typescript', ['tsconfig.json'], 'ts-symbols', true],
     ]);
+  });
+
+  it('reads the ts-symbols rafa ships in bundled/bin as present with nothing on PATH', async () => {
+    const world = typescriptWorld('bundled', { onPath: false, skillAt: 'project', inBundle: 'executable' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    const program = needOf(reading, 'program', 'ts-symbols');
+    expect(program).toMatchObject({ status: 'present', directory: world.bundledBin });
+    expect(isUnmet(program)).toBe(false);
+    expect(reading.stacks[0]).toMatchObject({ met: true, hint: null });
+  });
+
+  it('takes bundled/bin before PATH when both hold ts-symbols', async () => {
+    const world = typescriptWorld('bundled-and-path', { onPath: true, skillAt: 'project', inBundle: 'executable' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    expect(needOf(reading, 'program', 'ts-symbols')).toMatchObject({ status: 'present', directory: world.bundledBin });
+  });
+
+  it('leaves bundled/bin out of the lookup of a program rafa does not ship', async () => {
+    const world = typescriptWorld('bundled-other', { onPath: false, skillAt: 'project', inBundle: 'executable' });
+    write(join(dirname(world.plan), 'PREREQUISITES-ts.md'), [
+      '# Prerequisites',
+      '',
+      '## Checks [auto]',
+      '',
+      '- [ ] The tool is on PATH: `command -v present-tool`',
+      '',
+    ].join('\n'));
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    expect(needOf(reading, 'program', 'present-tool')).toMatchObject({ status: 'missing', directory: null });
+    expect(needOf(reading, 'program', 'ts-symbols')).toMatchObject({ status: 'present', directory: world.bundledBin });
+  });
+
+  it('reads a bundled ts-symbols with no exec bit as missing, falling through to PATH', async () => {
+    const world = typescriptWorld('bundled-plain', { onPath: false, skillAt: 'project', inBundle: 'plain' });
+    const onPath = typescriptWorld('bundled-plain-path', { onPath: true, skillAt: 'project', inBundle: 'plain' });
+
+    const reading = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+    const control = await readPlanNeeds(onPath.plan, onPath.seams(WITHOUT_USER));
+
+    expect(needOf(reading, 'program', 'ts-symbols')).toMatchObject({ status: 'missing', directory: null });
+    expect(reading.stacks[0]).toMatchObject({ met: false, hint: `typescript: ${STACK_TOOLS[0]?.install}` });
+    expect(needOf(control, 'program', 'ts-symbols')).toMatchObject({ status: 'present', directory: onPath.bin });
   });
 
   it('reads ts-symbols on PATH and a project skill naming it as met', async () => {

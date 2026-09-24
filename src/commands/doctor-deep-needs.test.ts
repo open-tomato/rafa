@@ -5,13 +5,16 @@
  * TypeScript project (a `tsconfig.json` at its root), a home holding a
  * user-only skill `symbols` whose description names `ts-symbols`, a rafa
  * entry with one skill of its own beside it, and one `PATH` directory
- * holding `ts-symbols`. A second project root holds no marker.
+ * holding `ts-symbols`. A second rafa entry holds `ts-symbols` in its
+ * `bundled/bin`, as a build does. A second project root holds no marker.
  *
  * Every reading is taken beside the one that flips it, so no row passes
  * only because every row reads alike:
  *
  *   - the stack is `ok` with the user source and `ts-symbols` on `PATH`,
- *     and `warn` without the user source, or with an empty `PATH`;
+ *     and `warn` without the user source, or with an empty `PATH`,
+ *     unless the entry carries `bundled/bin/ts-symbols`, when it is `ok`
+ *     with that directory named;
  *   - the plan's user-only agent is a row without the user source and
  *     none with it, while its project agent is never one;
  *   - a plan with nothing unmet is one `ok` row.
@@ -26,7 +29,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readStackNeeds } from '../plan/needs.js';
+import { readStackNeeds, STACK_TOOLS } from '../plan/needs.js';
 
 import {
   PLAN_NEEDS_SECTION_TITLE,
@@ -48,6 +51,8 @@ const home = join(base, 'home');
 const projectRoot = join(base, 'project');
 const bareRoot = join(base, 'bare');
 const runtime = join(base, 'runtime');
+const builtRuntime = join(base, 'built-runtime');
+const builtBin = join(builtRuntime, 'bundled', 'bin');
 const binDir = join(base, 'bin');
 const plansDir = join(projectRoot, '.rafa', 'plans');
 const planPath = join(plansDir, 'PLAN-demo.md');
@@ -82,6 +87,9 @@ mkdirSync(bareRoot, { recursive: true });
 
 write(join(binDir, 'ts-symbols'), '#!/bin/sh\n');
 chmodSync(join(binDir, 'ts-symbols'), 0o755);
+write(join(builtRuntime, 'cli.js'), '');
+write(join(builtBin, 'ts-symbols'), '#!/bin/sh\n');
+chmodSync(join(builtBin, 'ts-symbols'), 0o755);
 
 write(planPath, [
   '# Plan',
@@ -109,8 +117,9 @@ function seams(
   settingSources: readonly ClaudeSettingSource[],
   pathDirs: readonly string[] = [binDir],
   root: string | null = projectRoot,
+  entryDir: string = runtime,
 ): DeepNeedsSeams {
-  return { home, projectRoot: root, entry: join(runtime, 'cli.js'), pathDirs, settingSources, modules: [] };
+  return { home, projectRoot: root, entry: join(entryDir, 'cli.js'), pathDirs, settingSources, modules: [] };
 }
 
 /** The Stack tools section of this world under `options`. */
@@ -153,14 +162,31 @@ describe('stackToolsSection', () => {
     expect(row?.fix).toContain('add `user` to loop.settingSources');
   });
 
-  it('reads ts-symbols off PATH as a warn naming what to install', async () => {
+  it('reads ts-symbols off PATH and out of bundled/bin as a warn naming what to install', async () => {
     const [row] = (await stackSection(WITH_USER, [])).rows;
 
     expect(row).toMatchObject({
       status: 'warn',
-      detail: 'ts-symbols not on PATH; skill symbols visible to a run',
+      detail: 'ts-symbols neither in bundled/bin nor on PATH; skill symbols visible to a run',
     });
+    expect(row?.fix).toContain('run a built or installed rafa');
     expect(row?.fix).toContain('install `ts-symbols`');
+  });
+
+  it('reads the ts-symbols a built rafa ships in bundled/bin as ok with nothing on PATH', async () => {
+    const [row] = (await stackSection(WITH_USER, [], projectRoot, builtRuntime)).rows;
+
+    expect(row).toEqual({
+      status: 'ok',
+      name: 'typescript',
+      detail: `ts-symbols in ${builtBin}; skill symbols visible to a run`,
+    });
+  });
+
+  it('names bundled/bin before PATH when both hold ts-symbols', async () => {
+    const [row] = (await stackSection(WITH_USER, [binDir], projectRoot, builtRuntime)).rows;
+
+    expect(row?.detail).toBe(`ts-symbols in ${builtBin}; skill symbols visible to a run`);
   });
 
   it('reads a project root with no marker as one note naming the marker', async () => {
@@ -183,8 +209,10 @@ describe('stackToolsSection', () => {
     const lines = renderDeepSection(await stackSection(WITHOUT_USER, []));
 
     expect(lines[0]).toBe('Stack tools:');
-    expect(lines[1]).toBe('  warn  typescript: ts-symbols not on PATH; skill symbols not visible to a run');
-    expect(lines[2]).toStartWith('        fix: typescript: install `ts-symbols`');
+    expect(lines[1]).toBe(
+      '  warn  typescript: ts-symbols neither in bundled/bin nor on PATH; skill symbols not visible to a run',
+    );
+    expect(lines[2]).toStartWith('        fix: typescript: run a built or installed rafa');
   });
 });
 
@@ -292,6 +320,23 @@ describe('planNeedsSection', () => {
       detail: 'not on PATH (prerequisite line 5)',
       fix: 'install zz-absent-program on PATH',
     });
+  });
+
+  it('reads the stack program as a row off PATH, and as none when bundled/bin holds it', async () => {
+    const off = planNeedsSection(await readDeepPlanNeeds(metPlanPath, 'PLAN.md', seams(WITH_USER, []))).rows;
+    const built = planNeedsSection(
+      await readDeepPlanNeeds(metPlanPath, 'PLAN.md', seams(WITH_USER, [], projectRoot, builtRuntime)),
+    ).rows;
+
+    expect(off).toEqual([{
+      status: 'warn',
+      name: 'program ts-symbols',
+      detail: 'neither in bundled/bin nor on PATH (stack typescript)',
+      fix: STACK_TOOLS[0]?.install ?? 'no install text',
+    }]);
+    expect(built).toEqual([
+      { status: 'ok', name: 'plan', detail: 'nothing it needs is missing or hidden from a run' },
+    ]);
   });
 
   it('reads a plan with nothing unmet as one ok row', async () => {

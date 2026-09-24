@@ -152,7 +152,7 @@ describe('the four deep sections over one TypeScript project', () => {
     expect(stack.rows[0]).toMatchObject({
       status: 'warn',
       name: 'typescript',
-      detail: 'ts-symbols not on PATH; skill symbols not visible to a run',
+      detail: 'ts-symbols neither in bundled/bin nor on PATH; skill symbols not visible to a run',
     });
     expect(stack.rows[0]?.fix).toContain('install `ts-symbols`');
   });

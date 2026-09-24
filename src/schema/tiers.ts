@@ -95,6 +95,9 @@ export const RAFA_INSTINCTS_PATH = join('.rafa', 'instincts');
 /** The directory rafa's own skills sit in, relative to the running `cli.js`. */
 export const BUNDLED_SKILLS_DIR = join('bundled', 'skills');
 
+/** The directory rafa's own programs sit in, relative to the running `cli.js`. */
+export const BUNDLED_BIN_DIR = join('bundled', 'bin');
+
 /** What a tier is resolved against. Each seam is given; none is read from the environment. */
 export interface TierSeams {
   /** The home directory, an absolute path. */
@@ -146,6 +149,17 @@ export function realEntry(entry: string): string {
  */
 export function bundledSkillsDirectory(entry?: string): string {
   return join(dirname(realEntry(entry ?? Bun.main)), BUNDLED_SKILLS_DIR);
+}
+
+/**
+ * The directory rafa's own programs sit in: `bundled/bin` beside the
+ * running `cli.js`, links resolved, as {@link bundledSkillsDirectory}
+ * resolves its skills. A build writes `ts-symbols` there; a checkout's
+ * `src/bundled/` holds no `bin/`, so run as `bun src/rafa.ts` it names
+ * a directory that is not there.
+ */
+export function bundledBinDirectory(entry?: string): string {
+  return join(dirname(realEntry(entry ?? Bun.main)), BUNDLED_BIN_DIR);
 }
 
 /**

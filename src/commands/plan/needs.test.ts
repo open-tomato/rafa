@@ -339,7 +339,7 @@ describe('rafa plan needs, over a TypeScript project', () => {
 
     expect(run.exitCode).toBe(1);
     expect(rowOf(run.stdout, 'ts-symbols')).toMatch(new RegExp(`^  ${UNMET_MARK} program +ts-symbols +missing +stack typescript$`));
-    expect(run.stdout).toContain(`  ${UNMET_MARK} stack typescript: install \`ts-symbols\``);
+    expect(run.stdout).toContain(`  ${UNMET_MARK} stack typescript: run a built or installed rafa, which ships \`ts-symbols\``);
     expect(control).toEqual({ exitCode: 0, stdout: '', stderr: '' });
   });
 });

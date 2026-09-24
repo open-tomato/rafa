@@ -35,7 +35,8 @@
  * config, which decides `visibleToLoop` and which MCP server a run
  * starts, the config's loaded modules as add-on sources, the rafa tier
  * beside {@link PlanNeedsSeams.entry}, and `PATH` from
- * `RafaContext.env`, which is also where a program is looked up.
+ * `RafaContext.env`, which is also where a program is looked up, after
+ * the rafa tier's `bundled/bin` for a program rafa ships (`ts-symbols`).
  *
  * ## The two filters
  *
