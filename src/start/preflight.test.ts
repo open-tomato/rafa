@@ -1036,6 +1036,7 @@ async function promptFor(knownMissing: readonly string[] | undefined): Promise<s
       repoRoot: tempRoot,
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
+      serving: null,
       run: (prompt) => {
         prompts.push(prompt);
         return Promise.resolve({ exitCode: 0, stdout: '' });

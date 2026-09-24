@@ -30,8 +30,14 @@
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
  * when there are any.
+ *
+ * Before each session the dispatch serves it the rafa-tier winners
+ * (`start/serving.ts`) when its caller names a
+ * {@link TaskDispatchOptions.serving}, and warns once per winner left
+ * out, with the sentence `tiers/serve.ts` wrote for it.
  */
 import type { ClaudeSettingSource, InjectMode } from '../config.js';
+import type { SessionServing } from './serving.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { PlanInjection } from '../plan/index.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
@@ -51,6 +57,7 @@ import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
 
 import { knownMissingNotice } from './preflight.js';
+import { serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
@@ -58,15 +65,17 @@ export const SESSION_ID_FLAG = '--session-id';
 
 /**
  * How one task's Claude session is spawned: `prompt` on stdin, the
- * `flags` its declaration resolved to, `sessionId` as its id, and
- * settings loaded from `settingSources`. It answers the exit code
- * together with everything the session wrote to stdout.
+ * `flags` its declaration resolved to, `sessionId` as its id, settings
+ * loaded from `settingSources`, and the `served` flags handing it the
+ * run's served directory. It answers the exit code together with
+ * everything the session wrote to stdout.
  */
 export type TaskSessionRunner = (
   prompt: string,
   flags: readonly string[],
   sessionId: string,
   settingSources: readonly ClaudeSettingSource[],
+  served: readonly string[],
 ) => Promise<CapturedSession>;
 
 /**
@@ -74,9 +83,11 @@ export type TaskSessionRunner = (
  * run under the id the dispatch picked and the run's setting sources.
  *
  * The id goes AHEAD of the declaration's flags, and `runClaudeCaptured`
- * puts the setting sources ahead of both. `--tools` is variadic and is
- * the last flag a declaration resolves to (`utils/claude.ts`), so a
- * `--session-id` placed after it would be read as a tool name.
+ * puts the setting sources, then the `served` flags, ahead of both.
+ * `--tools` is variadic and is the last flag a declaration resolves to
+ * (`utils/claude.ts`), so a `--session-id` placed after it would be read
+ * as a tool name. `--add-dir`, which the served flags may carry, is
+ * variadic too, and stops at the dash of the `--session-id` after it.
  *
  * The loop picks the id rather than reading it back, because nothing
  * would tell it: under `claude -p` stdout is the session's final message
@@ -91,9 +102,10 @@ export function runTaskSession(
   flags: readonly string[],
   sessionId: string,
   settingSources: readonly ClaudeSettingSource[],
+  served: readonly string[] = [],
   spawn?: CapturingSpawner,
 ): Promise<CapturedSession> {
-  return runClaudeCaptured(prompt, settingSources, [SESSION_ID_FLAG, sessionId, ...flags], spawn);
+  return runClaudeCaptured(prompt, settingSources, [SESSION_ID_FLAG, sessionId, ...flags], spawn, served);
 }
 
 /** What {@link dispatchTask} needs to run one task. */
@@ -139,6 +151,15 @@ export interface TaskDispatchOptions {
    * an item is. None when left out, which leaves the prompt as it was.
    */
   knownMissing?: readonly string[];
+  /**
+   * What the session is served against (`start/serving.ts`): the run's
+   * served directory is filled before the session spawns, and its flags
+   * reach the spawn. Null serves nothing, which a test driving the
+   * `run` seam names. Required for the reason `inject` is: a default of
+   * nothing would let a caller that forgot it spawn every session
+   * without the rafa tier and nothing would say so.
+   */
+  serving: SessionServing | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -157,6 +178,8 @@ export interface TaskDispatch {
   injection: PlanInjection;
   /** Flags the declaration resolved to. Empty without one. */
   flags: readonly string[];
+  /** The flags handing the session its served directory. Empty when nothing was served. */
+  served: readonly string[];
   /** What the block declared, or null when there was none. */
   declaration: TaskDeclaration | null;
   /** The id the session ran under, which also names its log. */
@@ -245,8 +268,8 @@ export function buildTaskPrompt(
  * the text before the prompt is built, and the flags it resolved to go
  * to the spawn. A task carrying no block resolves to no flags at all,
  * so its session is spawned with the base arguments, the run's setting
- * sources and its session id and nothing else, the arguments every task
- * session shares. That is
+ * sources, its served flags and its session id and nothing else, the
+ * arguments every task session shares. That is
  * the compatibility promise, and it is kept by the resolver rather than
  * by a branch here. Both halves are driven through the real `claudeArgs`
  * in `tests/declaration-dispatch.test.ts`, which is the only place the
@@ -288,6 +311,10 @@ export function buildTaskPrompt(
  * In json mode the dispatch opens with its one `step` event, named by
  * the sentence the prompt quotes and stamped from `now`, before any line
  * about the task; see the module note.
+ *
+ * The session is served last, after the prompt is built and just
+ * before the spawn, so the served directory holds what the tiers hold
+ * when that session starts.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -341,19 +368,32 @@ export async function dispatchTask(
     taskInfo.blocker ?? null,
   ));
 
+  const served = serveForSession(options.serving);
   const sessionId = (options.newSessionId ?? randomUUID)();
-  const session = await run(prompt, flags, sessionId, options.settingSources);
+  const session = await run(prompt, flags, sessionId, options.settingSources, served);
 
   return {
     taskText,
     prompt,
     flags,
+    served,
     declaration,
     injection,
     sessionId,
     exitCode: session.exitCode,
     output: session.stdout,
   };
+}
+
+/**
+ * Serves one task session and answers its flags, warning once per
+ * rafa-tier winner left out; none for a null `serving`.
+ */
+function serveForSession(serving: SessionServing | null): readonly string[] {
+  if (serving === null) return [];
+  const served = serveSession(serving);
+  for (const skipped of served.skipped) activeOutput().warn(`   ${skipped.message}`);
+  return served.flags;
 }
 
 /** An error's message, or the thrown value itself when it is no error. */

@@ -405,6 +405,7 @@ describe('a blocker comment on its way downstream', () => {
       repoRoot: join(tempRoot, 'no-definitions', 'repo'),
       home: join(tempRoot, 'no-definitions', 'home'),
       settingSources: ['project', 'local'],
+      serving: null,
       run,
       newSessionId: () => 'session-under-test',
     });

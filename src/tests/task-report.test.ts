@@ -117,6 +117,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -169,7 +170,7 @@ describe('the task session runner', () => {
       calls.push([...args]);
       return Promise.resolve({ exitCode: 3, stdout: 'the final message' });
     };
-    const session = await runTaskSession('do the task', flags, 'aaaa-1111', ['local', 'user'], spawn);
+    const session = await runTaskSession('do the task', flags, 'aaaa-1111', ['local', 'user'], [], spawn);
 
     expect(session).toEqual({ exitCode: 3, stdout: 'the final message' });
     return calls;
@@ -226,6 +227,7 @@ describe('a dispatched task session', () => {
       repoRoot: tempRoot,
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
+      serving: null,
       run,
       newSessionId,
     });
@@ -592,10 +594,54 @@ function callCount(scratch: Scratch): number {
     : 0;
 }
 
-/** The arguments of the `n`th call, one per element. */
-function argsOf(scratch: Scratch, n: number): string[] {
+/** The arguments of the `n`th call, one per element, as the stand-in recorded them. */
+function rawArgsOf(scratch: Scratch, n: number): string[] {
   const lines = readFileSync(join(scratch.calls, `${n}.args`), 'utf8').split('\n');
   return lines.slice(0, -1);
+}
+
+/**
+ * Where the served flags of a call start: after the base arguments and
+ * the two setting-source tokens (`claudeArgs` in `utils/claude.ts`).
+ */
+const SERVED_AT = CLAUDE_BASE_ARGS.length + 2;
+
+/**
+ * The served flags of the `n`th call: from {@link SERVED_AT} up to its
+ * `--session-id`, or to the end for the wrap-up, which carries none.
+ */
+function servedOf(scratch: Scratch, n: number): string[] {
+  const args = rawArgsOf(scratch, n);
+  const at = args.indexOf('--session-id');
+  return args.slice(SERVED_AT, at === -1
+    ? args.length
+    : at);
+}
+
+/**
+ * The arguments of the `n`th call with its served flags taken out, which
+ * {@link expectServed} reads on their own. Every run here serves the
+ * checkout's `src/bundled` tier, so each session carries them.
+ */
+function argsOf(scratch: Scratch, n: number): string[] {
+  const args = rawArgsOf(scratch, n);
+  return [...args.slice(0, SERVED_AT), ...args.slice(SERVED_AT + servedOf(scratch, n).length)];
+}
+
+/**
+ * Holds that the `n`th call was handed the run's served directory and
+ * the rafa-tier agents (`start/serving.ts`): `--add-dir` naming
+ * `.rafa/runs/<run>/served` under the scratch repository, then `--agents`
+ * with one JSON value.
+ */
+function expectServed(scratch: Scratch, n: number): void {
+  const served = servedOf(scratch, n);
+  expect(served).toHaveLength(4);
+  expect(served[0]).toBe('--add-dir');
+  expect(served[1]).toMatch(/\/\.rafa\/runs\/[^/]+\/served$/);
+  expect(realpathSync(served[1] ?? '')).toStartWith(realpathSync(scratch.repo));
+  expect(served[2]).toBe('--agents');
+  expect(Object.keys(JSON.parse(served[3] ?? '{}') as object).length).toBeGreaterThan(0);
 }
 
 /** The first line of the prompt of the `n`th call. */
@@ -725,6 +771,9 @@ describe('rafa start, over a stand-in claude', () => {
 
     // The wrap-up is the fourth call: no id, and nothing stored for it.
     expect(argsOf(scratch, 4)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS]);
+
+    // Every session, the wrap-up's included, is served the rafa tier.
+    for (const n of [1, 2, 3, 4]) expectServed(scratch, n);
     expect(promptHeadOf(scratch, 4)).toBe('* Read `@progress.txt` in full.');
 
     // Rendered before every dispatch: empty before the first task, the
@@ -918,6 +967,10 @@ describe('rafa start, over a stand-in claude', () => {
     expect(argsOf(withUser, 2)).toEqual([...userArgs(2), '--agent', 'tdd-guide']);
     expect(argsOf(withUser, 3)).toEqual([...userArgs(3), '--agent', 'statusline-setup', '--effort', 'medium']);
     expect(argsOf(withUser, 4)).toEqual([...CLAUDE_BASE_ARGS, ...userSourceArgs]);
+    for (const n of [1, 2, 3, 4]) {
+      expectServed(byDefault, n);
+      expectServed(withUser, n);
+    }
   }, { timeout: 2 * RUN_TIMEOUT.timeout });
 });
 

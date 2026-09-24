@@ -8,7 +8,8 @@
  * wrap-up session, and never write under the project's `.claude/`.
  * {@link serveResolution} does the copying and answers the flags. Putting
  * the flags into `claudeArgs` and calling this before a session are the
- * spawning doors' work, not this module's.
+ * spawning doors' work, not this module's: both the task door and the
+ * wrap-up door call it through `start/serving.ts`.
  *
  * ## What is served
  *

@@ -196,6 +196,7 @@
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { BranchSeams } from './start/branch.js';
+import type { SessionServing } from './start/serving.js';
 
 import fs from 'fs';
 import { homedir } from 'os';
@@ -496,6 +497,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       agents: { settingSources, home: homedir() },
     });
 
+    // What each session, task and wrap-up alike, is served against: the
+    // run's `.rafa/runs/<id>/served/`, refilled before every session
+    // (`start/serving.ts`).
+    const serving: SessionServing = { root: repoRoot, run: session.id, home: homedir(), settings: runConfig.config };
+
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
@@ -542,7 +548,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           planStub,
           planContent,
         });
-        await preserveProgress(planContent, settingSources, release);
+        await preserveProgress(planContent, settingSources, release, serving);
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
         // refusal, the `chore: release` commit and its push. A release
@@ -594,6 +600,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         home: homedir(),
         settingSources,
         knownMissing,
+        serving,
       });
       const { exitCode } = dispatch;
 
