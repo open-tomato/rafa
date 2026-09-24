@@ -45,6 +45,9 @@ import {
   STORE_BACKENDS,
   subsetOf,
   text,
+  TIER_SWITCHES,
+  tierPin,
+  tierSwitch,
   usdAmount,
 } from './config-sections.js';
 
@@ -411,6 +414,51 @@ describe('releaseEnabled', () => {
     expect([parsed.a, parsed.b, parsed.c]).toEqual([RELEASE_AUTO, RELEASE_AUTO, true]);
     expect([valueOf(releaseEnabled, parsed.a), valueOf(releaseEnabled, parsed.c)])
       .toEqual([RELEASE_AUTO, true]);
+  });
+});
+
+describe('tierSwitch', () => {
+  it('accepts on and off, each as itself', () => {
+    expect(TIER_SWITCHES.map((word) => valueOf(tierSwitch, word))).toEqual(['on', 'off']);
+  });
+
+  it('accepts the words a file spells unquoted, which the parser answers as strings', () => {
+    // Measured on bun 1.3.14: `Bun.YAML.parse` answers `on` and `off` as
+    // the words, so an unquoted `rafa: off` reaches the reader as `off`.
+    const parsed = Bun.YAML.parse('a: on\nb: off\n') as Record<string, unknown>;
+
+    expect([parsed.a, parsed.b]).toEqual(['on', 'off']);
+    expect([valueOf(tierSwitch, parsed.a), valueOf(tierSwitch, parsed.b)]).toEqual(['on', 'off']);
+  });
+
+  it.each([
+    ['the boolean false, which nothing here coerces', false, 'false'],
+    ['the boolean true', true, 'true'],
+    ['a different case', 'Off', '"Off"'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(tierSwitch, raw)).toEqual([`F: s is ${found}, expected one of: on, off`]);
+  });
+});
+
+describe('tierPin', () => {
+  it('accepts false and each of the three tiers, each as itself', () => {
+    expect(tierPin(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+    expect(['project', 'rafa', 'user'].map((tier) => valueOf(tierPin, tier)))
+      .toEqual(['project', 'rafa', 'user']);
+  });
+
+  it.each([
+    ['true, which would say nothing', true, 'true'],
+    ['null, a name that pins nothing', null, 'null'],
+    ['the string false, which nothing here coerces', 'false', '"false"'],
+    ['a different case of a tier', 'Rafa', '"Rafa"'],
+    ['a source outside the three tiers', 'plugin', '"plugin"'],
+    ['a list', ['user'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(tierPin, raw)).toEqual([
+      `F: s is ${found}, expected false or one of: project, rafa, user`,
+    ]);
   });
 });
 

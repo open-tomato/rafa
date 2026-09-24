@@ -60,6 +60,7 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
+  TierPin,
 } from './config.js';
 
 import { join } from 'node:path';
@@ -84,7 +85,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup, dangerous, status)';
+  + 'roadmap, release, cleanup, dangerous, status, tiers)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -120,6 +121,9 @@ const SETTINGS: readonly ConfigSetting[] = [
   'cleanupKeep',
   'dangerousAcceptStaleRefs',
   'statusNotice',
+  'tiersRafa',
+  'tiersSkills',
+  'tiersAgents',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -156,6 +160,9 @@ const DEFAULTS: RafaConfig = {
   cleanupKeep: [],
   dangerousAcceptStaleRefs: false,
   statusNotice: true,
+  tiersRafa: 'on',
+  tiersSkills: new Map(),
+  tiersAgents: new Map(),
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -217,6 +224,10 @@ const FULL = [
   '  acceptStaleRefs: true',
   'status:',
   '  notice: false',
+  'tiers:',
+  '  rafa: off',
+  '  skills: { react-query: false, documentation: project }',
+  '  agents: { tdd-guide: user }',
   '',
 ].join('\n');
 
@@ -268,6 +279,9 @@ const FULL_VALUES: RafaConfig = {
   cleanupKeep: ['release/*', 'keep-me'],
   dangerousAcceptStaleRefs: true,
   statusNotice: false,
+  tiersRafa: 'off',
+  tiersSkills: new Map<string, TierPin>([['react-query', false], ['documentation', 'project']]),
+  tiersAgents: new Map([['tdd-guide', 'user']]),
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -632,6 +646,21 @@ describe('parseConfigText', () => {
         'status.notice is "no", expected true or false',
         'status:\n  notice: false', 'statusNotice', false,
       ],
+      [
+        'tiers.rafa', 'tiers:\n  rafa: false',
+        'tiers.rafa is false, expected one of: on, off',
+        'tiers:\n  rafa: off', 'tiersRafa', 'off',
+      ],
+      [
+        'tiers.skills', 'tiers:\n  skills: { react-query: true }',
+        'tiers.skills.react-query is true, expected false or one of: project, rafa, user',
+        'tiers:\n  skills: { react-query: false }', 'tiersSkills', new Map([['react-query', false]]),
+      ],
+      [
+        'tiers.agents', 'tiers:\n  agents: [tdd-guide]',
+        'tiers.agents is a list, expected a mapping of names to false or a tier',
+        'tiers:\n  agents: { tdd-guide: rafa }', 'tiersAgents', new Map([['tdd-guide', 'rafa']]),
+      ],
     ];
 
     it('covers every setting once', () => {
@@ -675,6 +704,15 @@ describe('parseConfigText', () => {
     expect(refusal(() => fileOf(`${section}: linear\n`)).problems).toEqual([
       `${PATH}: ${section} must be a mapping, found "linear"`,
     ]);
+  });
+
+  it('retains a tiers map name spelled flat as an unknown key, not as a pin', () => {
+    const file = fileOf('tiers.skills.tdd-guide: false\n');
+
+    expect(file.extras).toEqual([{ key: 'tiers.skills.tdd-guide', value: false }]);
+    expect(file.values.tiersSkills).toBeUndefined();
+    expect(fileOf('tiers:\n  skills:\n    tdd-guide: false\n').values.tiersSkills)
+      .toEqual(new Map([['tdd-guide', false]]));
   });
 
   it.each([

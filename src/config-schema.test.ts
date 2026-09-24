@@ -68,6 +68,9 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['cleanupKeep', 'cleanup.keep'],
   ['dangerousAcceptStaleRefs', 'dangerous.acceptStaleRefs'],
   ['statusNotice', 'status.notice'],
+  ['tiersRafa', 'tiers.rafa'],
+  ['tiersSkills', 'tiers.skills'],
+  ['tiersAgents', 'tiers.agents'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -103,6 +106,7 @@ const TOP = [
   'cleanup',
   'dangerous',
   'status',
+  'tiers',
 ];
 
 describe('SETTINGS', () => {
@@ -169,6 +173,7 @@ describe('SECTIONS', () => {
       'roadmap',
       'specs',
       'status',
+      'tiers',
       'tracker',
       'tracking',
     ]);
@@ -200,6 +205,15 @@ describe('knownKeysAbove', () => {
       ['acceptStaleRefs'],
     ]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
+    expect(knownKeysAbove('tiers.lessons')).toEqual(['tiers', ['rafa', 'skills', 'agents']]);
+  });
+
+  it('answers the tiers section for a map name spelled flat, which no setting reads', () => {
+    expect(SETTING_BY_KEY.get('tiers.skills.tdd-guide')).toBeUndefined();
+    expect(knownKeysAbove('tiers.skills.tdd-guide')).toEqual([
+      'tiers',
+      ['rafa', 'skills', 'agents'],
+    ]);
   });
 
   it('collapses a list index, so an item key answers the item shape', () => {

@@ -206,6 +206,34 @@
  *     not a {@link CommandLineSetting}, for the reason the `pr` section
  *     gives.
  *
+ * ## The `tiers` section
+ *
+ * `.rafa/specs/rafa-26-skill-tiers.md` names three keys that decide which
+ * skills and agents a loop session is served: `tiers.rafa`, whether the
+ * tier rafa ships is loaded at all, and `tiers.skills` and
+ * `tiers.agents`, which turn one item off or pin the tier that serves
+ * it. What each VALUE may be is `config-sections.ts`'s to say. Five
+ * readings are this module's:
+ *
+ *   - `tiers.rafa` defaults to `on`: a project that has said nothing is
+ *     served rafa's core roster, which is the point of shipping it.
+ *   - Both maps default to EMPTY, as `board.trustedAuthors` does: with
+ *     nothing pinned and nothing turned off, the fixed order project →
+ *     rafa → user decides alone, and a pin as a default would override
+ *     a holder nobody named.
+ *   - Each map is read by {@link mapOf} whole, as one setting's value.
+ *     `tiers` is a section and `tiers.skills` is not, so the names under
+ *     `skills:` reach the reader rather than the unknown-key warning. A
+ *     name spelled flat at the top level, `tiers.skills.tdd-guide:`, is
+ *     not a setting's key and is retained as an unknown one.
+ *   - The spec has maps merge by key across layers, a `false` removing
+ *     the item. Nothing here merges yet: a layer that names a map
+ *     answers it whole, as any other setting's layer does, so a project
+ *     file's `tiers.skills` replaces the user file's. Only the shape is
+ *     settled here, so the merge can apply to it without a special case.
+ *   - No `tiers` setting is a {@link CommandLineSetting}, for the reason
+ *     the `pr` section gives.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -249,7 +277,9 @@
  * ## Defaults
  *
  * {@link CONFIG_DEFAULTS} spells every default once, frozen, with each
- * list in it frozen too. The cutover runs one plan under `full` and
+ * list in it frozen too. A map cannot be frozen, as "Map settings" says,
+ * so each empty map default is one shared `Map`, and the promise that
+ * no caller edits it rests on its `ReadonlyMap` type. The cutover runs one plan under `full` and
  * again under `stage`; should that comparison argue for `full`, the
  * change is that one line.
  */
@@ -267,6 +297,8 @@ import type {
   Reading,
   ReleaseEnabled,
   StoreBackend,
+  TierPin,
+  TierSwitch,
 } from './config-sections.js';
 
 import { join } from 'node:path';
@@ -297,6 +329,8 @@ import {
   STORE_BACKENDS,
   subsetOf,
   text,
+  tierPin,
+  tierSwitch,
   usdAmount,
 } from './config-sections.js';
 
@@ -452,6 +486,18 @@ export interface RafaConfig {
    * since-last-command notice on stderr. `status.notice`.
    */
   statusNotice: boolean;
+  /** Whether the tier rafa ships is loaded. `tiers.rafa`. */
+  tiersRafa: TierSwitch;
+  /**
+   * Skills turned off (`false`) or pinned to the tier that serves them,
+   * by name. `tiers.skills`.
+   */
+  tiersSkills: ReadonlyMap<string, TierPin>;
+  /**
+   * Agents turned off (`false`) or pinned to the tier that serves them,
+   * by name. `tiers.agents`.
+   */
+  tiersAgents: ReadonlyMap<string, TierPin>;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -500,6 +546,9 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
   statusNotice: true,
+  tiersRafa: 'on',
+  tiersSkills: new Map<string, TierPin>(),
+  tiersAgents: new Map<string, TierPin>(),
 });
 
 /** What the module knows about one setting. */
@@ -524,6 +573,9 @@ const trackerKind = text('a tracker kind name');
 
 /** The reader both `release` file settings share. */
 const releaseFile = text('a file path');
+
+/** The reader both `tiers` maps share. */
+const tierPins = mapOf(tierPin, 'false or a tier');
 
 /**
  * Every setting, by name, in the order problems are reported.
@@ -619,6 +671,9 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: false,
   },
   statusNotice: { key: 'status.notice', read: flag, cli: false },
+  tiersRafa: { key: 'tiers.rafa', read: tierSwitch, cli: false },
+  tiersSkills: { key: 'tiers.skills', read: tierPins, cli: false },
+  tiersAgents: { key: 'tiers.agents', read: tierPins, cli: false },
 };
 
 /** Every setting name, read off the closed record above. */

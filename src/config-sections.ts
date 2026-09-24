@@ -79,12 +79,39 @@
  * section must never make by guessing. The section holds no closed
  * list and no item shape, so nothing else here names it.
  *
- * ## The two lists this module does not own
+ * ## The `tiers` section
  *
- * Every other closed list here is declared here. Two of the `pr`
- * section's are not, because another module is already their authority
- * and a second spelling could disagree with it:
+ * `.rafa/specs/rafa-26-skill-tiers.md` spells `tiers.rafa` as `on` or
+ * `off`, and `tiers.skills` and `tiers.agents` as maps of a name to
+ * `false` or a tier. {@link tierSwitch} reads the first and
+ * {@link tierPin} one value of the other two; the map around it is
+ * `config-schema.ts`'s `mapOf`, because what that reader rules on is a
+ * key. Three readings are this module's:
  *
+ *   - `tiers.rafa` takes the WORDS `on` and `off`, as the spec writes
+ *     them, and not the booleans. `Bun.YAML.parse` answers both words
+ *     as strings (see {@link ReleaseEnabled}), so a file spelling
+ *     `rafa: off` reaches the reader as `off`, and `rafa: false` is
+ *     refused and told what to write, since nothing is coerced.
+ *   - A pin is the boolean `false`, which turns the item off in every
+ *     tier, or one of the three tiers, which names the holder that
+ *     serves it. `true` is refused: an item is on unless something
+ *     turns it off, so `true` would say nothing, and a value that says
+ *     nothing is not one a person meant to write.
+ *   - A null pin, a name written with nothing after it, is refused and
+ *     not read as silence. It is the `- tool:` of a map: a name that
+ *     pins nothing, where silence is the name left out.
+ *
+ * ## The lists this module does not own
+ *
+ * Every other closed list here is declared here. Three are not,
+ * because another module is already their authority and a second
+ * spelling could disagree with it:
+ *
+ *   - The three tiers a pin names are `schema/tiers.ts`'s
+ *     {@link SKILL_TIERS}, the order a listing reads them in. That
+ *     module imports `node:fs` and `node:path` alone, so reaching it
+ *     here is no cycle.
  *   - {@link MergeMethod} and the three methods behind
  *     {@link mergeMethod} are the pull request port's
  *     (`pr/types.ts`), which spells them to match what `gh pr merge`
@@ -100,9 +127,9 @@
  *     each a number the parser returns and `String` writes as something
  *     the flag never takes.
  *
- * Neither import is a cycle. `pr/types.ts` imports types alone and
- * `utils/declaration.ts` imports nothing, so this module reaches both
- * without either reaching back. The port is reached at `./pr/types.js`
+ * Neither of the other two imports is a cycle. `pr/types.ts` imports
+ * types alone and `utils/declaration.ts` imports nothing, so this
+ * module reaches both without either reaching back. The port is reached at `./pr/types.js`
  * and not through the `./pr/index.js` barrel a caller outside `src/pr/`
  * would normally use, because the barrel carries `pr/gh.ts`, which
  * imports THIS module and the `gh` spawner behind it: importing it here
@@ -115,8 +142,10 @@
  * is the graph this module wants, not a fix for an observed failure.
  */
 import type { MergeMethod } from './pr/types.js';
+import type { SkillTier } from './schema/tiers.js';
 
 import { MERGE_METHODS } from './pr/types.js';
+import { SKILL_TIERS } from './schema/tiers.js';
 import { parseBudgetUsd } from './utils/declaration.js';
 
 export type { MergeMethod } from './pr/types.js';
@@ -242,6 +271,18 @@ export type ReleaseEnabled = boolean | 'auto';
 /** The value of `release.enabled` that defers to the two files. */
 export const RELEASE_AUTO = 'auto';
 
+/** What `tiers.rafa` takes: the words, not the booleans. */
+export const TIER_SWITCHES = ['on', 'off'] as const;
+
+/** One of {@link TIER_SWITCHES}. */
+export type TierSwitch = (typeof TIER_SWITCHES)[number];
+
+/**
+ * One value of `tiers.skills` or `tiers.agents`: `false` to turn the
+ * item off in every tier, or the tier whose holder serves it.
+ */
+export type TierPin = false | SkillTier;
+
 /** A reading of `value` with nothing wrong. */
 function accepted<T>(value: T): Reading<T> {
   return { value, problems: [], extras: [] };
@@ -361,6 +402,21 @@ export const releaseEnabled: Reader<ReleaseEnabled> = (raw, at) => typeof raw ==
   || raw === RELEASE_AUTO
   ? accepted(raw)
   : refused(at, raw, `true, false or ${RELEASE_AUTO}`);
+
+/** Accepts `on` or `off`, as words; see "The `tiers` section". */
+export const tierSwitch: Reader<TierSwitch> = oneOf(TIER_SWITCHES);
+
+/**
+ * Accepts `false` or one of the three tiers, each as itself; see "The
+ * `tiers` section" for why `true` and null are refused.
+ */
+export const tierPin: Reader<TierPin> = (raw, at) => {
+  if (raw === false) return accepted(false);
+  const tier = SKILL_TIERS.find((name) => name === raw);
+  return tier === undefined
+    ? refused(at, raw, `false or one of: ${SKILL_TIERS.join(', ')}`)
+    : accepted(tier);
+};
 
 /**
  * A GitHub account login as the collaborators endpoint takes one in a

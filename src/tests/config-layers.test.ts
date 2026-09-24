@@ -36,7 +36,13 @@
  * with the real path of the scratch project file it read.
  */
 import type { ConfigRoots } from '../config-load.js';
-import type { ConfigOverrides, ConfigSetting, ConfigSource, RafaConfig } from '../config.js';
+import type {
+  ConfigOverrides,
+  ConfigSetting,
+  ConfigSource,
+  RafaConfig,
+  TierPin,
+} from '../config.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -173,6 +179,13 @@ const PROJECT_TEXT = [
   '  acceptStaleRefs: true',
   'status:',
   '  notice: false',
+  'tiers:',
+  '  rafa: off',
+  '  skills:',
+  '    documentation: project',
+  '    react-query: false',
+  '  agents:',
+  '    tdd-guide: rafa',
   '',
 ].join('\n');
 
@@ -224,6 +237,9 @@ const PROJECT_VALUES: RafaConfig = {
   cleanupKeep: ['project/*'],
   dangerousAcceptStaleRefs: true,
   statusNotice: false,
+  tiersRafa: 'off',
+  tiersSkills: new Map<string, TierPin>([['documentation', 'project'], ['react-query', false]]),
+  tiersAgents: new Map([['tdd-guide', 'rafa']]),
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -279,6 +295,10 @@ const USER_TEXT = [
   '  acceptStaleRefs: false',
   'status:',
   '  notice: true',
+  'tiers:',
+  '  rafa: on',
+  '  skills: { documentation: user }',
+  '  agents: { tdd-guide: user, code-reviewer: false }',
   '',
 ].join('\n');
 
@@ -320,6 +340,9 @@ const USER_VALUES: RafaConfig = {
   cleanupKeep: ['user/*', 'scratch'],
   dangerousAcceptStaleRefs: false,
   statusNotice: true,
+  tiersRafa: 'on',
+  tiersSkills: new Map([['documentation', 'user']]),
+  tiersAgents: new Map<string, TierPin>([['tdd-guide', 'user'], ['code-reviewer', false]]),
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -565,6 +588,21 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'status.notice', 'status:\n  notice: "false"',
     'status.notice is "false", expected true or false',
     'status:\n  notice: false', 'statusNotice', false,
+  ],
+  [
+    'tiers.rafa', 'tiers:\n  rafa: true',
+    'tiers.rafa is true, expected one of: on, off',
+    'tiers:\n  rafa: on', 'tiersRafa', 'on',
+  ],
+  [
+    'tiers.skills', 'tiers:\n  skills: { documentation: }',
+    'tiers.skills.documentation is null, expected false or one of: project, rafa, user',
+    'tiers:\n  skills: { documentation: user }', 'tiersSkills', new Map([['documentation', 'user']]),
+  ],
+  [
+    'tiers.agents', 'tiers:\n  agents: { tdd-guide: Project }',
+    'tiers.agents.tdd-guide is "Project", expected false or one of: project, rafa, user',
+    'tiers:\n  agents: { tdd-guide: false }', 'tiersAgents', new Map([['tdd-guide', false]]),
   ],
 ];
 

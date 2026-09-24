@@ -179,6 +179,8 @@ export type {
   PrProvider,
   ReleaseEnabled,
   StoreBackend,
+  TierPin,
+  TierSwitch,
 } from './config-sections.js';
 export {
   CLAUDE_SETTING_SOURCES,
@@ -339,6 +341,9 @@ function readLayer(
     cleanupKeep: read('cleanupKeep'),
     dangerousAcceptStaleRefs: read('dangerousAcceptStaleRefs'),
     statusNotice: read('statusNotice'),
+    tiersRafa: read('tiersRafa'),
+    tiersSkills: read('tiersSkills'),
+    tiersAgents: read('tiersAgents'),
   };
   return { layer, problems, extras };
 }
