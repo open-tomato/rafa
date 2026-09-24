@@ -126,6 +126,18 @@
  * `planCommand` also runs from the library bundle, `dist/index.js`,
  * where `Bun.main` is the importing program and not rafa's `cli.js`.
  *
+ * ## The routing table
+ *
+ * The template carries a `{ROUTING}` slot beside `{PLAN_FORMAT}`, and
+ * {@link buildPlanPrompt} fills it with {@link formatRoutingSection}:
+ * the resolved `routing` setting (`tiers/routing.ts` holds its
+ * defaults) as a shape → agent table, so the planner routes tasks by the
+ * map this project's config resolved rather than by a table written into
+ * a page. A `false` row is the setting's removal and is left out; a map
+ * with no row left renders a sentence saying so, so the slot never
+ * vanishes silently. The command hands over `config.routing` as it
+ * resolved it for the rest of the run.
+ *
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
@@ -136,6 +148,7 @@
  */
 import type { AdapterRegistry } from './adapters/registry.js';
 import type { GateBase } from './commands/plan/review-gate.js';
+import type { RouteTarget } from './config-sections.js';
 import type { RafaConfig } from './config.js';
 
 import fs from 'fs';
@@ -157,6 +170,7 @@ import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';
+import { DEFAULT_ROUTING } from './tiers/routing.js';
 import { checkUsage } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 
@@ -235,12 +249,66 @@ export function planFormatBody(skill: string): string {
   return skill.replace(FRONTMATTER, '').trimEnd();
 }
 
+/** The heading {@link formatRoutingSection} opens the `{ROUTING}` slot with. */
+export const ROUTING_HEADING = '## Task shape to agent (the `routing` setting)';
+
+/**
+ * One table cell as a code span: whitespace runs collapsed to one space,
+ * `|` escaped so it cannot end the cell, and a backtick fence one longer
+ * than the longest backtick run inside, padded when the value touches a
+ * backtick, so any name the setting accepts renders as written.
+ */
+function codeCell(value: string): string {
+  const flat = value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replaceAll('|', '\\|');
+  const longestRun = Math.max(0, ...(flat.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = '`'.repeat(longestRun + 1);
+  const pad = flat.startsWith('`') || flat.endsWith('`')
+    ? ' '
+    : '';
+  return `${fence}${pad}${flat}${pad}${fence}`;
+}
+
+/**
+ * Renders the resolved `routing` setting for the `{ROUTING}` slot: a
+ * heading, one sentence on how to use it, and a `Shape | Agent` table in
+ * the map's order. A `false` row is removed and not listed; a map with
+ * no row left says that no shape is routed. Exported for tests.
+ */
+export function formatRoutingSection(routing: ReadonlyMap<string, RouteTarget>): string {
+  const rows = [...routing].flatMap(([shape, agent]) => agent === false
+    ? []
+    : [`| ${codeCell(shape)} | ${codeCell(agent)} |`]);
+  if (rows.length === 0) {
+    return [
+      ROUTING_HEADING,
+      '',
+      'This project\'s `routing` setting routes no task shape to an agent. Declare the granular keys',
+      'on each task instead of `agent=`.',
+    ].join('\n');
+  }
+  return [
+    ROUTING_HEADING,
+    '',
+    'Route each task by its SHAPE to the agent this project\'s `routing` setting names for it,',
+    'written as `{agent=<name>}` on the task line. Where no row fits, declare the granular keys',
+    'instead of an agent.',
+    '',
+    '| Shape | Agent |',
+    '| --- | --- |',
+    ...rows,
+  ].join('\n');
+}
+
 /** The slots a plan-prompt template carries. */
 export const PLAN_PROMPT_SLOTS = [
   'PLAN_FILE',
   'PREREQUISITES_FILE',
   'PROGRESS_SECTION',
   'PLAN_FORMAT',
+  'ROUTING',
   'SPEC_CONTENT',
 ] as const;
 
@@ -257,7 +325,9 @@ const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
  * its frontmatter is dropped here ({@link planFormatBody}). `planDir` is
  * the directory the plan is written into, the run's resolved `plan.dir`,
  * and both files are named in it through `planFilePath`, as the adapter
- * names the files it looks for.
+ * names the files it looks for. `routing` is the resolved `routing`
+ * setting the `{ROUTING}` slot renders ({@link formatRoutingSection}),
+ * rafa's defaults unless one is handed over.
  *
  * Every slot is filled in ONE pass over the template, through a replacer
  * function. Filled text is never scanned again, so a spec, a progress
@@ -274,12 +344,14 @@ export function buildPlanPrompt(
   stub: string,
   planDir: string,
   progressContent?: string,
+  routing: ReadonlyMap<string, RouteTarget> = DEFAULT_ROUTING,
 ): string {
   const values: Record<PlanPromptSlot, string> = {
     PLAN_FILE: planFilePath(planDir, `PLAN-${stub}.md`),
     PREREQUISITES_FILE: planFilePath(planDir, `PREREQUISITES-${stub}.md`),
     PROGRESS_SECTION: formatProgressSection(progressContent),
     PLAN_FORMAT: planFormatBody(planFormat),
+    ROUTING: formatRoutingSection(routing),
     SPEC_CONTENT: specContent,
   };
   return template.replace(SLOT_PATTERN, (_slot: string, name: PlanPromptSlot) => values[name]);
@@ -338,6 +410,7 @@ export default async function plan(
 ): Promise<void> {
   const {
     settingSources,
+    routing,
     planDir,
     specsDir,
     roadmapIssue,
@@ -400,6 +473,7 @@ export default async function plan(
       planStub,
       planDir,
       progressContent,
+      routing,
     ),
   });
 

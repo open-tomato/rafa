@@ -32,11 +32,14 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import {
   buildPlanPrompt,
   formatProgressSection,
+  formatRoutingSection,
   planFormatBody,
   planFormatPath,
   readPlanFormat,
+  ROUTING_HEADING,
   stubFromSpecPath,
 } from '../plan.js';
+import { DEFAULT_ROUTES, DEFAULT_ROUTING } from '../tiers/routing.js';
 import { deferUntil, msUntil } from '../utils/schedule.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
@@ -154,6 +157,66 @@ describe('buildPlanPrompt', () => {
   it('reads no replacement pattern in filled text, so a dollar sequence stays as written', () => {
     const out = buildPlanPrompt('[{PLAN_FORMAT}] [{SPEC_CONTENT}]', 'format $& $1 $$', 'spec $` $<name>', 'x', '.rafa/plans');
     expect(out).toBe('[format $& $1 $$] [spec $` $<name>]');
+  });
+
+  it('fills the routing slot from rafa\'s defaults when no routing is handed over', () => {
+    const out = buildPlanPrompt('[{ROUTING}]', format, '', 'x', '.rafa/plans');
+    expect(out).toBe(`[${formatRoutingSection(DEFAULT_ROUTING)}]`);
+    expect(out).not.toContain('{ROUTING}');
+  });
+
+  it('fills the routing slot from the routing it is handed, not the defaults', () => {
+    const routing = new Map<string, string | false>([['cleanup', 'refactor-cleaner']]);
+    const out = buildPlanPrompt('[{ROUTING}]', format, '', 'x', '.rafa/plans', undefined, routing);
+    expect(out).toContain('| `cleanup` | `refactor-cleaner` |');
+    expect(out).not.toContain('`doc-updater`');
+  });
+
+  it('never rescans the routing table, so a shape naming a slot stays as written', () => {
+    const routing = new Map<string, string | false>([['{SPEC_CONTENT}', 'doc-updater']]);
+    const out = buildPlanPrompt('{ROUTING}\n{SPEC_CONTENT}', format, 'the spec', 'x', '.rafa/plans', undefined, routing);
+    expect(out).toContain('| `{SPEC_CONTENT}` | `doc-updater` |');
+    expect(out.endsWith('\nthe spec')).toBe(true);
+  });
+});
+
+describe('formatRoutingSection', () => {
+  it('lists every default row, in the defaults\' order, under its heading', () => {
+    const lines = formatRoutingSection(DEFAULT_ROUTING).split('\n');
+    expect(lines[0]).toBe(ROUTING_HEADING);
+    const table = lines.slice(lines.indexOf('| Shape | Agent |'));
+    expect(table).toEqual([
+      '| Shape | Agent |',
+      '| --- | --- |',
+      ...DEFAULT_ROUTES.map(([shape, agent]) => `| \`${shape}\` | \`${agent}\` |`),
+    ]);
+  });
+
+  it('leaves out a row the setting turns off with false, and keeps the rest', () => {
+    const routing = new Map<string, string | false>([['prose', false], ['tests', 'tdd-guide']]);
+    const out = formatRoutingSection(routing);
+    expect(out).toContain('| `tests` | `tdd-guide` |');
+    expect(out).not.toContain('prose');
+  });
+
+  it('says no shape is routed when every row is off, and prints no empty table', () => {
+    const out = formatRoutingSection(new Map<string, string | false>([['prose', false]]));
+    expect(out.startsWith(`${ROUTING_HEADING}\n`)).toBe(true);
+    expect(out).toContain('routes no task shape to an agent');
+    expect(out).not.toContain('| Shape | Agent |');
+    expect(formatRoutingSection(new Map())).toBe(out);
+  });
+
+  it('escapes a pipe and fences a backtick, so a cell cannot end early or close its span', () => {
+    const routing = new Map<string, string | false>([['a|b', 'x`y'], ['`edge', 'plain']]);
+    const out = formatRoutingSection(routing);
+    expect(out).toContain('| `a\\|b` | ``x`y`` |');
+    expect(out).toContain('| `` `edge `` | `plain` |');
+  });
+
+  it('keeps the table on one line per row when a name holds a line break', () => {
+    const out = formatRoutingSection(new Map<string, string | false>([['two\nlines', 'agent']]));
+    expect(out).toContain('| `two lines` | `agent` |');
   });
 });
 
