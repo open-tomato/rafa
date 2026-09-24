@@ -16,6 +16,10 @@
  * links entirely would still answer a path ending in `skills`. So it is
  * held to the runtime's directory AND held apart from the link's own,
  * which is the answer an unresolved entry gives.
+ *
+ * The shadowing cases hand the user record first, so a resolver that
+ * kept the order it was handed instead of the scope order would answer
+ * the user's record and fail them.
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,6 +36,7 @@ import {
   realEntry,
   resolveInstinctScopes,
   resolveSkillTiers,
+  shadowLessonsById,
   SKILL_TIERS,
   skillTierDirectory,
   tierExists,
@@ -123,6 +128,51 @@ describe('the instinct scopes', () => {
     expect(resolveInstinctScopes(seamsWith('/x/cli.js')).map((scope) => scope.scope)).toEqual(['project', 'user']);
     expect(without.map((scope) => scope.scope)).toEqual(['user']);
     expect(instinctScopeDirectory('project', { home: HOME, projectRoot: null })).toBeNull();
+  });
+});
+
+describe('lesson shadowing by id', () => {
+  const lesson = (scope: 'project' | 'user', id: string, path: string) => ({ scope, id, path });
+
+  it('serves the project record and shadows the user one of the same id', () => {
+    const user = lesson('user', 'retry-flaky', '/home/retry-flaky.md');
+    const project = lesson('project', 'retry-flaky', '/root/retry-flaky.md');
+
+    const answered = shadowLessonsById([user, project]);
+
+    expect(answered.winners).toEqual([project]);
+    expect(answered.shadowed).toEqual([{ record: user, by: project }]);
+  });
+
+  it('keeps every record whose id only one scope holds, in scope order', () => {
+    const userOnly = lesson('user', 'only-user', '/home/only-user.md');
+    const projectOnly = lesson('project', 'only-project', '/root/only-project.md');
+
+    const answered = shadowLessonsById([userOnly, projectOnly]);
+
+    expect(answered.winners).toEqual([projectOnly, userOnly]);
+    expect(answered.shadowed).toEqual([]);
+  });
+
+  it('shadows a second record of one id inside one scope by the first it was handed', () => {
+    const first = lesson('user', 'twice', '/home/a/twice.md');
+    const second = lesson('user', 'twice', '/home/b/twice.md');
+
+    const answered = shadowLessonsById([first, second]);
+
+    expect(answered.winners).toEqual([first]);
+    expect(answered.shadowed).toEqual([{ record: second, by: first }]);
+  });
+
+  it('answers nothing for no records', () => {
+    expect(shadowLessonsById([])).toEqual({ winners: [], shadowed: [] });
+  });
+
+  it('refuses a record in the rafa tier, which holds no lessons', () => {
+    const rafa = { scope: 'rafa', id: 'shipped', path: '/install/shipped.md' } as unknown as ReturnType<typeof lesson>;
+
+    expect(() => shadowLessonsById([lesson('project', 'shipped', '/root/shipped.md'), rafa]))
+      .toThrow('lesson shipped names scope rafa, which holds no lessons');
   });
 });
 

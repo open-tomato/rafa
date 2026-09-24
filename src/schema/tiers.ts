@@ -47,6 +47,19 @@
  * both kinds carries one vocabulary ({@link InstinctScope} is a subset
  * of {@link SkillTier}).
  *
+ * ## A nearer scope shadows a record of the same id
+ *
+ * {@link shadowLessonsById} decides which record a reader takes when
+ * both scopes hold one `id`: the project's, and the user's is shadowed
+ * by it. It is pure over records a caller already read, keyed by
+ * whatever `id` the caller hands (`src/commands/instinct/
+ * instinct-records.ts` files a record under its file stem). Two scopes
+ * holding one trigger under different ids is not shadowing: that is a
+ * conflict for the conflict table, and both records stand. A record
+ * naming a scope outside {@link INSTINCT_SCOPES}, `rafa` above all,
+ * is refused with a throw rather than ranked, since rafa holds no
+ * lessons and a record claiming it came from a caller's cast.
+ *
  * ## No directory is read here
  *
  * Every function is path arithmetic over its seams, apart from the one
@@ -176,6 +189,59 @@ export function resolveInstinctScopes(seams: TierSeams): readonly InstinctScopeL
     if (dir !== null) located.push({ scope, dir });
   }
   return located;
+}
+
+/** What {@link shadowLessonsById} ranks: a record, the scope holding it, and its id. */
+export interface ScopedLesson {
+  /** The scope that holds it. */
+  readonly scope: InstinctScope;
+  /** The id a nearer scope shadows it by. */
+  readonly id: string;
+}
+
+/** A record that lost to a nearer one of the same id. */
+export interface ShadowedLesson<T extends ScopedLesson> {
+  /** The record that lost. */
+  readonly record: T;
+  /** The record that shadows it, in a nearer scope or first in the same one. */
+  readonly by: T;
+}
+
+/** What {@link shadowLessonsById} answers. */
+export interface LessonShadowing<T extends ScopedLesson> {
+  /** One record per id, in {@link INSTINCT_SCOPES} order, then the order handed. */
+  readonly winners: readonly T[];
+  /** Every other record, each beside the winner that shadows it. */
+  readonly shadowed: readonly ShadowedLesson<T>[];
+}
+
+/**
+ * The record a reader takes for each `id` across the instinct scopes:
+ * the project scope's before the user scope's. Records may come in any
+ * order and are taken in scope order, stably, so a second record of
+ * one id inside one scope is shadowed by the first that scope was
+ * handed. Throws on a record whose scope is not an instinct scope:
+ * the rafa tier holds no lessons (see the module note).
+ */
+export function shadowLessonsById<T extends ScopedLesson>(records: readonly T[]): LessonShadowing<T> {
+  const foreign = records.find((record) => !isInstinctScope(record.scope));
+  if (foreign !== undefined) {
+    throw new TypeError(`lesson ${foreign.id} names scope ${foreign.scope}, which holds no lessons; the scopes are ${INSTINCT_SCOPES.join(', ')}`);
+  }
+  const ordered = INSTINCT_SCOPES.flatMap((scope) => records.filter((record) => record.scope === scope));
+  const byId = new Map<string, T>();
+  const winners: T[] = [];
+  const shadowed: ShadowedLesson<T>[] = [];
+  for (const record of ordered) {
+    const nearer = byId.get(record.id);
+    if (nearer === undefined) {
+      byId.set(record.id, record);
+      winners.push(record);
+    } else {
+      shadowed.push({ record, by: nearer });
+    }
+  }
+  return { winners, shadowed };
 }
 
 /** Whether a resolved tier or scope directory is there at all. */
