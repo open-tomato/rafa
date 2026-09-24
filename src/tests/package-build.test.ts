@@ -50,7 +50,16 @@
  *     carries no copy of its own. The copy is whole, not `*.md`, because
  *     a skill is a directory that may hold more than its `SKILL.md`, and
  *     a case holds `dist/bundled/` to exactly the files `src/bundled/`
- *     holds, byte for byte, so a stray file in either is seen.
+ *     holds, byte for byte, plus the one program built into it below, so
+ *     a stray file in either is seen.
+ *   - `src/tools/ts-symbols/cli.ts` is built to `dist/bundled/bin/ts-symbols`,
+ *     the rafa tier's `bin`. Like `cli.js`, the build keeps the
+ *     `#!/usr/bin/env bun` line and writes the file executable, so it
+ *     runs by path. The clause comes AFTER the tier copy: with
+ *     `dist/bundled/` already there, `cp -R src/bundled dist/bundled`
+ *     copies into it, as `dist/bundled/bundled/`. Its `typescript` is
+ *     the project's, found from the working directory (see the module),
+ *     so the bundle carries no copy of its own.
  *
  * ## The template cases
  *
@@ -234,6 +243,14 @@
  * 101 across those files and `src/plan.test.ts`: the tier copy carries
  * a `provenance` line the `.claude` one does not.
  *
+ * When ts-symbols joined the build, two mutations of its clause were
+ * driven on 2026-09-24, one run of this file each, 48 pass before and
+ * after and the manifest restored byte-identical (sha256). Dropping it
+ * reddened 4 of 48: the tier case and the three ts-symbols cases.
+ * Moving it before the tier copy reddened 6 of 48, the tier case and the
+ * five cases reading the dev-planner skill from the build, which the copy
+ * had written under `dist/bundled/bundled/`.
+ *
  * `check-types` skips this file. Checked through a tsconfig outside the
  * repo, it compiled clean, and a planted TS2322 in a second file of the
  * same program was reported.
@@ -326,6 +343,12 @@ const DEPENDENCY_KEYS = [
 
 /** The rafa tier in a checkout, from the repository root, and where the build copies it under `dist/`. */
 const BUNDLED = ['src/bundled', 'bundled'] as const;
+
+/** The ts-symbols program: its source, from the repository root, and where the build writes it under `dist/`. */
+const TS_SYMBOLS = ['src/tools/ts-symbols/cli.ts', 'bundled/bin/ts-symbols'] as const;
+
+/** The ts-symbols runs held to the source's answer: neither needs a `typescript` package. */
+const TS_SYMBOLS_RUNS: [string, string[]][] = [['`help`', ['help']], ['no arguments', []]];
 
 /** The dev-planner skill under the tier: the plan format. */
 const PLAN_FORMAT_IN_TIER = 'bundled/skills/dev-planner/SKILL.md';
@@ -904,14 +927,35 @@ describe('the rafa tier in the build', () => {
         || readFileSync(join(builtDir, file), 'utf8') !== readFileSync(join(sourceDir, file), 'utf8'),
     );
 
+    const built = TS_SYMBOLS[1].slice(`${name}/`.length);
+
     expect(names).toContain(PLAN_FORMAT_IN_TIER.slice(`${name}/`.length));
+    expect(names).not.toContain(built);
     expect(differing).toEqual([]);
-    expect(filesUnder(builtDir)).toEqual(names);
+    expect(filesUnder(builtDir)).toEqual([...names, built].sort());
   });
 
   it('writes no dev-planner copy beside the bundles, so the tier is the only one read', () => {
     expect(existsSync(join(DIST, 'SKILL.md'))).toBe(false);
   });
+});
+
+describe('the ts-symbols program in the build', () => {
+  it('keeps the bun shebang and is written executable', () => {
+    const program = join(DIST, TS_SYMBOLS[1]);
+
+    expect(existsSync(program)).toBe(true);
+    expect(readFileSync(program, 'utf8').split('\n')[0]).toBe('#!/usr/bin/env bun');
+    expect(statSync(program).mode & 0o111).toBe(0o111);
+  });
+
+  it.each(TS_SYMBOLS_RUNS)('runs by path and answers %s as its source does', (_label, args) => {
+    const fromSource = run([process.execPath, join(REPO_ROOT, TS_SYMBOLS[0]), ...args], tempRoot, withBunOnPath());
+    const fromBuild = run([join(DIST, TS_SYMBOLS[1]), ...args], tempRoot, withBunOnPath());
+
+    expect(fromSource.stdout).toContain('usage: ts-symbols <command> <target>');
+    expect(fromBuild).toEqual(fromSource);
+  }, 30_000);
 });
 
 describe('the asset trees in the build', () => {
