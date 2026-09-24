@@ -89,7 +89,12 @@ the fake `gh`.** `createFakePrGh()` — imported from `../pr/gh-fake.js`,
 never from the barrel — plus `createGhPullRequests({ gh: fake.run })`
 gives a genuine `PullRequests` implementation backed by an in-memory `gh`,
 so a read-modify-write such as the release stage's body edit runs
-unmocked. Register the route row the call needs on the fake.
+unmocked. Register the route row the call needs on the fake. The fake
+models `pr`, `run` and `api` only and refuses `gh auth status` as an
+unhandled command, so a case that also probes the login (as the
+Providers reading of `rafa doctor --deep` does) wraps `fake.run` in a
+runner that answers the `auth` forms itself and hands the rest on. This
+sentence replaces nothing.
 
 ### The merge flow
 

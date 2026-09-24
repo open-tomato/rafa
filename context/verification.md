@@ -48,6 +48,13 @@ pass/fail counts after all tests complete, and its order is
 deterministic, so two runs of the same tree move only where a case reads
 an input the tree does not own — which two cases do, below.
 
+**The full suite outlasts a 120-second tool call.** `bun run test` runs
+its 390-odd files one after another in one process, about 175s at
+rafa-100's head, so a foreground call with the default timeout is cut
+off before the summary line. Run it in the background with the output
+redirected to a file, and read the exit code and the `Ran N tests`
+line once it ends. This replaces nothing on this page.
+
 **One case reads a frozen copy of session logs.**
 `src/tests/parity-differential.test.ts` runs the collector twice, once
 per backend, over a frozen snapshot of logs from the sibling's session
