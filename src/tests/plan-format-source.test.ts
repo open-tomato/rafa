@@ -1,9 +1,18 @@
 /**
- * The dev-planner skill (`.claude/skills/dev-planner/SKILL.md`) is the
- * single source of the plan format: `src/plan-prompt.md` carries only a
- * `{PLAN_FORMAT}` slot, and {@link buildPlanPrompt} (`src/plan.ts`) fills
- * it with the skill's body verbatim. This file pins that invariant two
- * ways.
+ * The dev-planner skill in the rafa tier
+ * (`src/bundled/skills/dev-planner/SKILL.md`) is the single source of the
+ * plan format: `src/plan-prompt.md` carries only a `{PLAN_FORMAT}` slot,
+ * and {@link buildPlanPrompt} (`src/plan.ts`) fills it with the skill's
+ * body verbatim. This file pins that invariant three ways.
+ *
+ * ## The source the prompt reads
+ *
+ * {@link readPlanFormat}, handed `src/` as a checkout run hands it, is
+ * held to the tier file's bytes and its path to {@link SKILL_PATH},
+ * spelled here, so the reader drifting to another copy (the
+ * `.claude/skills` one this repository also carries, or a `SKILL.md`
+ * beside the module as the build once wrote) fails a case rather than
+ * agreeing with itself. Every other case below reads the same file.
  *
  * ## The restatement check
  *
@@ -39,10 +48,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { buildPlanPrompt, planFormatBody } from '../plan.js';
+import { buildPlanPrompt, planFormatBody, planFormatPath, readPlanFormat } from '../plan.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const SKILL_PATH = '.claude/skills/dev-planner/SKILL.md';
+const SKILL_PATH = 'src/bundled/skills/dev-planner/SKILL.md';
 const PROMPT_PATH = 'src/plan-prompt.md';
 
 /** The heading naming the section {@link buildPlanPrompt}'s output is pinned against. */
@@ -145,6 +154,15 @@ export function extractSection(body: string, heading: string): string {
   }
   return lines.slice(start, end).join('\n');
 }
+
+describe('the plan format\'s source', () => {
+  it('is the rafa tier\'s dev-planner skill, read from src as a checkout run reads it', () => {
+    const src = join(REPO_ROOT, 'src');
+
+    expect(planFormatPath(src)).toBe(join(REPO_ROOT, SKILL_PATH));
+    expect(readPlanFormat(src)).toBe(SKILL_RAW);
+  });
+});
 
 describe('the plan prompt restates no plan-format rule', () => {
   it('has rule bullets to check against, so an empty offender list is not vacuous', () => {

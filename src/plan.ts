@@ -114,14 +114,17 @@
  *
  * ## One source for the plan format
  *
- * `.claude/skills/dev-planner/SKILL.md` is the only file the plan format
- * is written in. The template carries a `{PLAN_FORMAT}` slot where the
- * format goes, and {@link buildPlanPrompt} fills it with the skill's body.
- * A project running an installed rafa has no copy of the skill, so the
- * build copies it into `dist/` beside `plan-prompt.md`, and
- * {@link readPlanFormat} looks there first: beside this module, which is
- * `dist/` in a build, then at the checkout's own skill, which is what this
- * module finds when it runs from `src/`.
+ * `src/bundled/skills/dev-planner/SKILL.md`, the rafa tier's copy, is the
+ * only file the plan format is written in. The template carries a
+ * `{PLAN_FORMAT}` slot where the format goes, and {@link buildPlanPrompt}
+ * fills it with the skill's body. {@link readPlanFormat} reads it at
+ * {@link PLAN_FORMAT_SKILL} under this module's directory, which is
+ * `src/` in a checkout and `dist/` in a build, where the build copies
+ * `src/bundled/` whole; a project running an installed rafa has no copy
+ * of its own. The directory is this module's `import.meta.url`, not the
+ * entry `bundledSkillsDirectory` measures from (`src/schema/tiers.ts`):
+ * `planCommand` also runs from the library bundle, `dist/index.js`,
+ * where `Bun.main` is the importing program and not rafa's `cli.js`.
  *
  * ## The settings the session loads
  *
@@ -152,6 +155,7 @@ import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { loadConfig } from './config-load.js';
 import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
+import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';
 import { checkUsage } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
@@ -193,35 +197,30 @@ export function formatProgressSection(progressContent: string | undefined): stri
   ].join('\n');
 }
 
-/** The dev-planner skill, relative to the root of a rafa checkout. */
-export const PLAN_FORMAT_SKILL = path.join('.claude', 'skills', 'dev-planner', 'SKILL.md');
+/** The dev-planner skill in the rafa tier, relative to the directory holding the entry. */
+export const PLAN_FORMAT_SKILL = path.join(BUNDLED_SKILLS_DIR, 'dev-planner', 'SKILL.md');
 
 /**
- * Where {@link readPlanFormat} looks for the skill, in order: beside the
- * module, where the build copies it, then the checkout's own skill one
- * directory up, where a module running from `src/` finds it.
+ * Where {@link readPlanFormat} reads the skill: {@link PLAN_FORMAT_SKILL}
+ * under `moduleDir`, `src/` from the checkout and `dist/` in a build.
  */
-export function planFormatCandidates(moduleDir: string): string[] {
-  return [
-    path.join(moduleDir, path.basename(PLAN_FORMAT_SKILL)),
-    path.join(moduleDir, '..', PLAN_FORMAT_SKILL),
-  ];
+export function planFormatPath(moduleDir: string): string {
+  return path.join(moduleDir, PLAN_FORMAT_SKILL);
 }
 
 /**
- * Reads the dev-planner skill the plan prompt inlines, from the first of
- * {@link planFormatCandidates} that exists.
+ * Reads the dev-planner skill the plan prompt inlines, from
+ * {@link planFormatPath}.
  *
- * @throws Error when none exists, naming every path it looked at, so a
- * build that lost its copy refuses before any session starts.
+ * @throws Error when it is not there, naming the path, so a build that
+ * lost its copy refuses before any session starts.
  */
 export function readPlanFormat(moduleDir: string): string {
-  const candidates = planFormatCandidates(moduleDir);
-  const found = candidates.find((candidate) => fs.existsSync(candidate));
-  if (found === undefined) {
-    throw new Error(`The plan format is missing: no dev-planner SKILL.md at ${candidates.join(' or ')}`);
+  const skill = planFormatPath(moduleDir);
+  if (!fs.existsSync(skill)) {
+    throw new Error(`The plan format is missing: no dev-planner SKILL.md at ${skill}`);
   }
-  return fs.readFileSync(found, 'utf8');
+  return fs.readFileSync(skill, 'utf8');
 }
 
 /** A YAML frontmatter block opening a file, and the blank lines after it. */

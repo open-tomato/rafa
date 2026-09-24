@@ -14,9 +14,10 @@
  *
  * ## Where a plan is looked for, and why in that order
  *
- * `src/plan.ts`'s `readPlanFormat` is the shape this copies, for the
- * same reason. `bun build` bundles TypeScript only, so the markdown has
- * to be COPIED into `dist/` by the build script, and a module inlined
+ * `src/plan.ts`'s `readPlanFormat` answers the same constraint, reading
+ * the rafa tier under the bundle's directory. `bun build` bundles
+ * TypeScript only, so the markdown has to be COPIED into `dist/` by the
+ * build script, and a module inlined
  * into a bundle answers the BUNDLE's directory from `import.meta.url` —
  * `dist/`, where `cli.js` sits, and not `dist/pr/plans/`. So:
  *

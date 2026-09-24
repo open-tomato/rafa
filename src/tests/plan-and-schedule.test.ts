@@ -5,7 +5,11 @@
  *
  * Every file a `readPlanFormat` case plants sits under this file's own
  * temporary directory. The one case reading outside it reads this
- * checkout's dev-planner skill, and writes nothing.
+ * checkout's dev-planner skill, the rafa tier's copy under
+ * `src/bundled/skills`, and writes nothing. The case planting the two
+ * copies the build used to read, `dist/SKILL.md` and the checkout's
+ * `.claude/skills/dev-planner/SKILL.md`, and no tier copy holds that
+ * neither is read any more.
  *
  * The rescan and dollar-sequence cases were shown to fail: with
  * `buildPlanPrompt` put back to chained `replaceAll` calls, one per slot,
@@ -29,7 +33,7 @@ import {
   buildPlanPrompt,
   formatProgressSection,
   planFormatBody,
-  planFormatCandidates,
+  planFormatPath,
   readPlanFormat,
   stubFromSpecPath,
 } from '../plan.js';
@@ -186,38 +190,29 @@ describe('readPlanFormat', () => {
     return moduleDir;
   }
 
-  it('looks beside the module first, then at the checkout skill one directory up', () => {
-    expect(planFormatCandidates('/pkg/dist')).toEqual([
-      '/pkg/dist/SKILL.md',
-      '/pkg/.claude/skills/dev-planner/SKILL.md',
-    ]);
+  it('reads the rafa tier under the module directory, and nowhere else', () => {
+    expect(planFormatPath('/pkg/dist')).toBe('/pkg/dist/bundled/skills/dev-planner/SKILL.md');
   });
 
-  it('reads the copy beside the module when both exist', () => {
-    const moduleDir = plantPackage('both', {
+  it('reads the tier copy under the module directory', () => {
+    const moduleDir = plantPackage('tier', { 'dist/bundled/skills/dev-planner/SKILL.md': 'tier' });
+    expect(moduleDir.startsWith(root)).toBe(true);
+    expect(readPlanFormat(moduleDir)).toBe('tier');
+  });
+
+  it('ignores the copies the build used to leave, beside the module and in the checkout', () => {
+    const moduleDir = plantPackage('stale', {
       'dist/SKILL.md': 'beside',
       '.claude/skills/dev-planner/SKILL.md': 'checkout',
     });
-    expect(moduleDir.startsWith(root)).toBe(true);
-    expect(readPlanFormat(moduleDir)).toBe('beside');
+    const skill = planFormatPath(moduleDir);
+    expect(skill.startsWith(root)).toBe(true);
+    expect(() => readPlanFormat(moduleDir)).toThrow(`The plan format is missing: no dev-planner SKILL.md at ${skill}`);
   });
 
-  it('falls back to the checkout skill when nothing sits beside the module', () => {
-    const moduleDir = plantPackage('checkout', { '.claude/skills/dev-planner/SKILL.md': 'checkout' });
-    expect(readPlanFormat(moduleDir)).toBe('checkout');
-  });
-
-  it('throws naming both paths when neither exists', () => {
-    const moduleDir = plantPackage('none', {});
-    const [beside, checkout] = planFormatCandidates(moduleDir);
-    expect(beside?.startsWith(root)).toBe(true);
-    expect(checkout?.startsWith(root)).toBe(true);
-    expect(() => readPlanFormat(moduleDir)).toThrow(`${beside} or ${checkout}`);
-  });
-
-  it('finds this checkout skill from src, where the module runs from source', () => {
+  it('finds this checkout\'s rafa tier from src, where the module runs from source', () => {
     const src = fileURLToPath(new URL('../', import.meta.url));
-    const skill = fileURLToPath(new URL('../../.claude/skills/dev-planner/SKILL.md', import.meta.url));
+    const skill = fileURLToPath(new URL('../bundled/skills/dev-planner/SKILL.md', import.meta.url));
     expect(readPlanFormat(src)).toBe(readFileSync(skill, 'utf8'));
   });
 });
