@@ -8,14 +8,14 @@
  * whose next word is no action of it, `rafa plan` alone included
  * (`src/cli/route.ts`). `src/plan.ts` reads its own flags, and the ones
  * declared here are those it reads: `--spec`, `--stub` and
- * `--no-progress` in that module, and the board's seven words in
+ * `--no-progress` in that module, and the board's eight words in
  * `src/board/flags.ts`, which records why they sit in one module.
  *
  * Three of them name the one spec a run plans from and are mutually
  * exclusive — `--spec`, `--issue` and `--next` — so none is `required`
  * and a line naming none is refused by the command with its usage.
  *
- * The tenth flag is read by neither: `hint` is this tree's own
+ * The eleventh flag is read by neither: `hint` is this tree's own
  * ({@link HINT_FLAG_SPEC}), and `endingWith` reads it AFTER `src/plan.ts`
  * has returned, to end a run that wrote a plan by naming the one step
  * that follows — the loop on the plan it has just written
@@ -83,6 +83,13 @@ const wrapped = wrapPhaseZeroCommand({
       name: 'skip-review',
       description: 'Plans without the planner judging the spec first. The label and the code checks still'
         + ' run, and the plan records `review: skipped`.',
+      type: 'boolean',
+    },
+    {
+      name: 'accept-refs',
+      description: 'Re-stamps every reference the spec names as reviewed and plans past the dangling and'
+        + ' suspect ones check 4 would refuse, on this run only; `dangerous.acceptStaleRefs: true` in the'
+        + ' config does it on every run.',
       type: 'boolean',
     },
     {

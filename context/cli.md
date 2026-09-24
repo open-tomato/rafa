@@ -423,7 +423,7 @@ New; it replaces no earlier text. What a row or an action added to
   readiness reading recognises. `src/tests/spec-template-source.test.ts`
   holds the file to the code and the filled template to no gap.
 - **The words `plan create` reads live in `src/board/flags.ts`**, the
-  seven of the board routes and the gate, because
+  eight of the board routes and the gate, because
   `src/commands/index.test.ts` holds the command's declared flags equal
   to the quoted `--` literals of the modules named for it and a module
   that also quotes a `gh` argument, as `src/board/issue.ts` does, cannot
@@ -1047,8 +1047,8 @@ New; it replaces no earlier text. What a row or an action added to
   and the flag `strict`, `plan needs` the argument `plan` and the flags
   `spec`, `issue`, `missing` and `source`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,
-  `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`,
-  `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
+  `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `accept-refs`,
+  `comment`, `stub`, `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
   flags `roadmap`, `all`, `state`, `type`, `module`, `search` and `limit`,
   `show` the argument `id`, `create` the flags `title`, `body`, `type`,
