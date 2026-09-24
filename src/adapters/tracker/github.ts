@@ -27,7 +27,8 @@
  * no `--repo` of its own: `gh` resolves the repository of the directory
  * the runner runs in, which the registry makes the repository root.
  * `gh help environment` names `GH_REPO` as the override, and the runner
- * hands `gh` the environment it inherits. A close goes through `gh api`
+ * hands `gh` the environment it inherits, or the one its `env` option
+ * names. A close goes through `gh api`
  * over `repos/{owner}/{repo}/issues/<number>`, and `gh api --help` says
  * those placeholders are filled from the same repository.
  *
@@ -157,8 +158,19 @@ export type GhRunner = (args: readonly string[]) => Promise<GhResult>;
 export interface GhRunnerOptions {
   /** The directory `gh` runs in, whose repository it resolves. */
   readonly cwd: string;
-  /** The executable spawned. `gh`, looked up on `PATH`, when left out. */
+  /**
+   * The executable spawned: `gh` when left out. A bare name is looked up
+   * on `PATH` — the rafa process's, or `env.PATH` when `env` is given.
+   */
   readonly command?: string;
+  /**
+   * The whole environment `gh` is spawned with, in place of the rafa
+   * process's own, and the one whose `PATH` the command is looked up on.
+   * An `env` with no `PATH` finds a bare command nowhere: nothing falls
+   * back to the rafa process's `PATH`. Left out, `gh` inherits
+   * `process.env`, as before this option existed.
+   */
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 /** The label names a draft is projected onto: the source's defaults, fixed. */
@@ -215,13 +227,32 @@ const REST_STATES = {
  * $PATH`, code `ENOENT`) and when `cwd` does not exist, and that second
  * message names the executable rather than the directory. Either throw
  * is answered as `ok` false with a stderr naming both.
+ *
+ * With `options.env`, the command is resolved by `Bun.which` on
+ * `env.PATH` (relative to `cwd`) before anything is spawned, and spawned
+ * by the path found, with `env` as its whole environment. A command not
+ * found there answers `ok` false, with a stderr naming the command, the
+ * directory, the `PATH` searched and `ENOENT`, and spawns nothing. The
+ * lookup is made here rather than left to `Bun.spawn`: bun 1.3.14 does
+ * look a bare name up on `env.PATH` without falling back to its own, but
+ * a lookup made here keeps that reading, and the message a missing `gh`
+ * answers, independent of the bun version.
  */
 export function createGhRunner(options: GhRunnerOptions): GhRunner {
-  const { cwd, command = 'gh' } = options;
+  const { cwd, command = 'gh', env } = options;
   return async (args) => {
+    const executable = env === undefined
+      ? command
+      : Bun.which(command, { PATH: env.PATH ?? '', cwd });
+    if (executable === null) {
+      return { ok: false, stdout: '', stderr: notOnPath(command, cwd, env?.PATH) };
+    }
     try {
-      const proc = Bun.spawn([command, ...args], {
+      const proc = Bun.spawn([executable, ...args], {
         cwd,
+        ...(env === undefined
+          ? {}
+          : { env: { ...env } }),
         stdin: 'ignore',
         stdout: 'pipe',
         stderr: 'pipe',
@@ -236,6 +267,14 @@ export function createGhRunner(options: GhRunnerOptions): GhRunner {
       return { ok: false, stdout: '', stderr: `could not run ${command} in ${cwd}: ${messageOf(error)}` };
     }
   };
+}
+
+/** What the runner answers for a command its `env.PATH` does not hold. */
+function notOnPath(command: string, cwd: string, path: string | undefined): string {
+  const searched = path === undefined
+    ? 'an environment with no PATH'
+    : `PATH ${JSON.stringify(path)}`;
+  return `could not run ${command} in ${cwd}: not found on ${searched} (ENOENT)`;
 }
 
 /** True when `value` is one of `members`. */

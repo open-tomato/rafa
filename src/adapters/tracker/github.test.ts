@@ -60,12 +60,19 @@
  *     grid ran the suite with a line on its stdin: under a suite whose
  *     stdin is already empty, `inherit` and `ignore` read the same, so
  *     that case cannot redden for it in every run.
+ *
+ * The `env` option's cases were driven on 2026-09-24, restored
+ * byte-identical (sha256) after each. Spawning without `env` reddened
+ * the bare-name and absolute-command cases. Dropping the `Bun.which`
+ * lookup reddened the two not-found cases alone: bun 1.3.14 looks a bare
+ * name up on `env.PATH` itself, so the bare-name case passes either way
+ * and the lookup is held by the message a missing command answers.
  */
 import type { FakeGh, FakeGhOptions } from './github-fake.js';
 import type { GhResult, GhRunner } from './github.js';
 import type { IssueRef, IssueState, Tracker } from '../../ports/index.js';
 
-import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -785,5 +792,93 @@ describe('the gh runner', () => {
     expect(noCommand.stderr).toContain('ENOENT');
     expect(noDir.ok).toBe(false);
     expect(noDir.stderr).toStartWith(`could not run ${standIn} in ${missingDir}: `);
+  });
+});
+
+describe('the gh runner with an env', () => {
+  /** A name no `PATH` of this machine holds, so only a planted directory finds it. */
+  const STAND_IN_NAME = 'rafa-gh-env-stand-in';
+  let tempDir = '';
+  let binDir = '';
+  let emptyDir = '';
+
+  beforeAll(() => {
+    tempDir = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-gh-env-')));
+    binDir = join(tempDir, 'bin');
+    emptyDir = join(tempDir, 'empty');
+    mkdirSync(binDir);
+    mkdirSync(emptyDir);
+    const standIn = join(binDir, STAND_IN_NAME);
+    writeFileSync(standIn, [
+      '#!/bin/sh',
+      'printf "probe=%s\\n" "$RAFA_GH_PROBE"',
+      'printf "home=%s\\n" "$HOME"',
+      'printf "path=%s\\n" "$PATH"',
+      'for arg in "$@"; do printf "arg=%s\\n" "$arg"; done',
+      '',
+    ].join('\n'));
+    chmodSync(standIn, 0o755);
+  });
+
+  afterAll(() => {
+    if (tempDir !== '') rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('resolves a bare command on the env PATH and spawns it with that env alone', async () => {
+    const env = { PATH: binDir, RAFA_GH_PROBE: 'session' };
+
+    const result = await createGhRunner({ cwd: tempDir, command: STAND_IN_NAME, env })(['auth', 'status']);
+
+    // Control: the process has a HOME, so an empty one below was not inherited.
+    expect(process.env.HOME ?? '').not.toBe('');
+    expect(result).toEqual({
+      ok: true,
+      stdout: `probe=session\nhome=\npath=${binDir}\narg=auth\narg=status\n`,
+      stderr: '',
+    });
+  });
+
+  it('finds nothing the env PATH lacks, where the process PATH holds the command', async () => {
+    // Control: `sh` runs through the same runner under the process's own PATH.
+    const inherited = await createGhRunner({ cwd: tempDir, command: 'sh' })(['-c', 'printf ran']);
+
+    const narrowed = await createGhRunner({ cwd: tempDir, command: 'sh', env: { PATH: emptyDir } })(['-c', 'printf ran']);
+
+    expect(inherited).toEqual({ ok: true, stdout: 'ran', stderr: '' });
+    expect(narrowed).toEqual({
+      ok: false,
+      stdout: '',
+      stderr: `could not run sh in ${tempDir}: not found on PATH ${JSON.stringify(emptyDir)} (ENOENT)`,
+    });
+  });
+
+  it('finds a bare command nowhere under an env with no PATH', async () => {
+    const result = await createGhRunner({ cwd: tempDir, command: 'sh', env: { HOME: tempDir } })(['-c', 'printf ran']);
+
+    expect(result).toEqual({
+      ok: false,
+      stdout: '',
+      stderr: `could not run sh in ${tempDir}: not found on an environment with no PATH (ENOENT)`,
+    });
+  });
+
+  it('spawns an absolute command under the env whatever its PATH holds', async () => {
+    const command = join(binDir, STAND_IN_NAME);
+
+    const result = await createGhRunner({ cwd: tempDir, command, env: { PATH: emptyDir } })([]);
+
+    expect(result).toEqual({ ok: true, stdout: `probe=\nhome=\npath=${emptyDir}\n`, stderr: '' });
+  });
+
+  it('inherits the process env when no env is given, and so misses a command only a planted PATH holds', async () => {
+    const inherited = await createGhRunner({ cwd: tempDir, command: join(binDir, STAND_IN_NAME) })([]);
+    const bare = await createGhRunner({ cwd: tempDir, command: STAND_IN_NAME })([]);
+
+    expect(inherited.ok).toBe(true);
+    expect(inherited.stdout).toContain(`home=${process.env.HOME ?? ''}\n`);
+    expect(inherited.stdout).toContain(`path=${process.env.PATH ?? ''}\n`);
+    // Bun's own lookup answers a bare name with no `ENOENT` in its message.
+    expect(bare.ok).toBe(false);
+    expect(bare.stderr).toStartWith(`could not run ${STAND_IN_NAME} in ${tempDir}: `);
   });
 });
