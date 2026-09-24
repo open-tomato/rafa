@@ -8,7 +8,9 @@
  * {@link RafaConfig}, {@link CONFIG_DEFAULTS} and {@link CONFIG_FILE},
  * so nothing outside the pair imports this file. `config-sections.ts`
  * holds every rule about a VALUE: the readers, the closed lists, the
- * item shapes, and why nothing is coerced.
+ * item shapes, and why nothing is coerced. The one reader here is
+ * {@link mapOf}, because what it rules on is a KEY: the names a map
+ * setting's file spells below its own key.
  *
  * The trio sits under the 800-line cap of `context/source.md`, which no
  * gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -221,6 +223,29 @@
  * `toString` or `__proto__` as an ordinary own key, and an object
  * lookup would match it against `Object.prototype` instead.
  *
+ * ## Map settings
+ *
+ * A map setting holds names the schema cannot list — a skill, an agent,
+ * a task shape — each with a value an inner reader checks, and
+ * {@link mapOf} reads one. Three readings are this module's:
+ *
+ *   - A name is a key the FILE spells, not one the schema knows, so it
+ *     is kept in a `Map` and never in a plain object: a skill named
+ *     `constructor` or `__proto__` is an ordinary name, and an object
+ *     would match it against `Object.prototype` or reset the
+ *     prototype. A name, like any string that names something, holds a
+ *     character other than whitespace, and is kept as written.
+ *   - Every entry is read, so a map with two unusable values names both,
+ *     as `listOf` does for a list. An entry's label and key gain its
+ *     name, `tiers.skills.tdd-guide`. A null value is handed to the
+ *     inner reader like any other, which is what a map whose values
+ *     include `false` needs: whether `false`, or null, means anything is
+ *     the inner reader's answer.
+ *   - The answer is a fresh `Map` per read, typed as a `ReadonlyMap`. A
+ *     `Map` cannot be frozen the way a list is — `Object.freeze` leaves
+ *     `set` working — so the promise that no caller edits a value for
+ *     the next is kept by building a new one each time.
+ *
  * ## Defaults
  *
  * {@link CONFIG_DEFAULTS} spells every default once, frozen, with each
@@ -239,6 +264,7 @@ import type {
   PrerequisiteItem,
   PrProvider,
   Reader,
+  Reading,
   ReleaseEnabled,
   StoreBackend,
 } from './config-sections.js';
@@ -249,9 +275,11 @@ import {
   CLAUDE_SETTING_SOURCES,
   CONFIG_VERSIONS,
   dayCount,
+  describeValue,
   flag,
   githubLogin,
   INJECT_MODES,
+  isMapping,
   issueNumber,
   listOf,
   mergeMethod,
@@ -281,6 +309,45 @@ import {
  * with `join` of its own.
  */
 export const CONFIG_FILE = join('.rafa', 'config.yaml');
+
+/**
+ * Accepts a mapping of names to values `value` accepts, answered as a
+ * fresh `Map` in the order written; see "Map settings" in the module
+ * note. Every entry is read, so a map with two unusable entries names
+ * both. `expected` names the values, in the refusal of a value that is
+ * not a mapping.
+ */
+export function mapOf<T>(
+  value: Reader<T>,
+  expected: string,
+): Reader<ReadonlyMap<string, T>> {
+  return (raw, at) => {
+    if (!isMapping(raw)) {
+      const problem = `${at.label} is ${describeValue(raw)}, expected a mapping of names to ${expected}`;
+      return { value: undefined, problems: [problem], extras: [] };
+    }
+
+    const readings = Object.entries(raw).map(([name, entry]): [string, Reading<T>] => [
+      name,
+      name.trim() === ''
+        ? {
+          value: undefined,
+          problems: [`${at.label} names ${JSON.stringify(name)}, expected a non-empty name`],
+          extras: [],
+        }
+        : value(entry, { label: `${at.label}.${name}`, key: `${at.key}.${name}` }),
+    ]);
+    const problems = readings.flatMap(([, reading]) => reading.problems);
+    const extras = readings.flatMap(([, reading]) => reading.extras);
+    if (problems.length > 0) return { value: undefined, problems, extras };
+
+    const read = new Map<string, T>();
+    for (const [name, reading] of readings) {
+      if (reading.value !== undefined) read.set(name, reading.value);
+    }
+    return { value: read, problems, extras };
+  };
+}
 
 /** Every setting, resolved. The module note maps each to its file key. */
 export interface RafaConfig {
