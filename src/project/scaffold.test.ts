@@ -182,8 +182,11 @@ describe('the config files', () => {
     ]);
   });
 
-  it('closes on the dangerous section, off by default, which resolves from the file once uncommented', () => {
-    const dangerous = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# dangerous:'));
+  it('carries the dangerous section, off by default, which resolves from the file once uncommented', () => {
+    const dangerous = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# dangerous:'),
+      CONFIG_SETTINGS_LINES.indexOf('# status:'),
+    );
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dangerous].join('\n')), 'c.yaml') });
 
     expect(dangerous.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
@@ -201,6 +204,27 @@ describe('the config files', () => {
 
     expect([flipped.config.dangerousAcceptStaleRefs, flipped.sources.dangerousAcceptStaleRefs]).toEqual([true, 'file']);
     expect([absent.config.dangerousAcceptStaleRefs, absent.sources.dangerousAcceptStaleRefs]).toEqual([false, 'default']);
+  });
+
+  it('closes on the status section, the notice on by default, which resolves from the file once uncommented', () => {
+    const status = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# status:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...status].join('\n')), 'c.yaml') });
+
+    expect(status.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# status:',
+      '#   notice: true',
+    ]);
+    expect([resolved.config.statusNotice, resolved.sources.statusNotice]).toEqual([true, 'file']);
+  });
+
+  it('turns the notice off once its line is uncommented with false, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}notice:) true/, '$1 false'));
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   notice:'));
+    const flipped = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+    const absent = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dropped].join('\n')), 'c.yaml') });
+
+    expect([flipped.config.statusNotice, flipped.sources.statusNotice]).toEqual([false, 'file']);
+    expect([absent.config.statusNotice, absent.sources.statusNotice]).toEqual([true, 'default']);
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-four registered so far wrap a
+ * of each is its command. Five of the fifty-five registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -54,7 +54,8 @@
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
- * `src/cleanup/` and removes the ticked ones through its steps.
+ * `src/cleanup/` and removes the ticked ones through its steps, nor
+ * `status`, which reads the five sections through `src/status/`.
  *
  * ## What is registered
  *
@@ -148,6 +149,10 @@
  *     publish lines rather than running them, refusing on another
  *     branch, on a tag already there, and where the two release files
  *     disagree.
+ *   - `status`, top-level: where the project stands in five sections,
+ *     branch and plan, loops, pull request, board and housekeeping, a
+ *     section that cannot be read one warning; exit code 1 only for a
+ *     config that cannot be used. It starts no session.
  *   - `next [--dry-run] [--yes[=<action ids>]]`, top-level: where the
  *     project stands on one line, the one thing to do about it on the
  *     next, that action run on a yes through the command that does it,
@@ -239,6 +244,7 @@ import skillDemote from './skill/demote.js';
 import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
+import status from './status.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -303,6 +309,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctShow,
   releaseStatus,
   releaseTag,
+  status,
   next,
   roadmap,
   init,

@@ -86,9 +86,11 @@ is what keeps `src/commands/doctor.test.ts` (898) and
 
 ### Adding a setting
 
-**A new key in `SETTINGS` reaches five files beyond the schema, sections
+**A new key in `SETTINGS` reaches six files beyond the schema, sections
 and `init` scaffold.** `RafaConfig` literals have to be complete, so the
-layer literal in `src/config.ts` needs it. Both config suites also check
+layer literal in `src/config.ts` needs it. `src/config-schema.test.ts`
+pins the key set as closed lists (`KEYS`, `TOP`, `SECTIONS`,
+`knownKeysAbove`). Both config suites also check
 that every setting appears exactly once: `src/config.test.ts` (`SETTINGS`,
 `DEFAULTS`, `FULL`, `FULL_VALUES`, its cases and `KNOWN`) and
 `src/tests/config-layers.test.ts` (the PROJECT and USER text and values,

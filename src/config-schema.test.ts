@@ -61,6 +61,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
   ['dangerousAcceptStaleRefs', 'dangerous.acceptStaleRefs'],
+  ['statusNotice', 'status.notice'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -95,6 +96,7 @@ const TOP = [
   'release',
   'cleanup',
   'dangerous',
+  'status',
 ];
 
 describe('SETTINGS', () => {
@@ -160,6 +162,7 @@ describe('SECTIONS', () => {
       'release',
       'roadmap',
       'specs',
+      'status',
       'tracker',
       'tracking',
     ]);
@@ -190,6 +193,7 @@ describe('knownKeysAbove', () => {
       'dangerous',
       ['acceptStaleRefs'],
     ]);
+    expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
   });
 
   it('collapses a list index, so an item key answers the item shape', () => {

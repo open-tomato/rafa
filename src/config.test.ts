@@ -84,7 +84,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup, dangerous)';
+  + 'roadmap, release, cleanup, dangerous, status)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -119,6 +119,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
   'dangerousAcceptStaleRefs',
+  'statusNotice',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -154,6 +155,7 @@ const DEFAULTS: RafaConfig = {
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
   dangerousAcceptStaleRefs: false,
+  statusNotice: true,
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -213,6 +215,8 @@ const FULL = [
   '  keep: ["release/*", keep-me]',
   'dangerous:',
   '  acceptStaleRefs: true',
+  'status:',
+  '  notice: false',
   '',
 ].join('\n');
 
@@ -263,6 +267,7 @@ const FULL_VALUES: RafaConfig = {
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
   dangerousAcceptStaleRefs: true,
+  statusNotice: false,
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -621,6 +626,11 @@ describe('parseConfigText', () => {
         'dangerous.acceptStaleRefs', 'dangerous:\n  acceptStaleRefs: yes',
         'dangerous.acceptStaleRefs is "yes", expected true or false',
         'dangerous:\n  acceptStaleRefs: true', 'dangerousAcceptStaleRefs', true,
+      ],
+      [
+        'status.notice', 'status:\n  notice: no',
+        'status.notice is "no", expected true or false',
+        'status:\n  notice: false', 'statusNotice', false,
       ],
     ];
 

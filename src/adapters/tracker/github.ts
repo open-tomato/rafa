@@ -171,6 +171,13 @@ export interface GhRunnerOptions {
    * `process.env`, as before this option existed.
    */
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * How long one command may run, in milliseconds. Past it the spawned
+   * process is sent `SIGKILL` and the command answers `ok` false with a
+   * stderr naming the timeout. Left out, a command runs as long as it
+   * takes, as before this option existed.
+   */
+  readonly timeoutMs?: number;
 }
 
 /** The label names a draft is projected onto: the source's defaults, fixed. */
@@ -237,9 +244,16 @@ const REST_STATES = {
  * look a bare name up on `env.PATH` without falling back to its own, but
  * a lookup made here keeps that reading, and the message a missing `gh`
  * answers, independent of the bun version.
+ *
+ * With `options.timeoutMs`, a command still running at the deadline is
+ * killed and answered as `ok` false, with empty stdout and a stderr naming
+ * the command, the directory and the timeout. The runner waits for the
+ * killed process to exit but not for its pipes to close: a process it
+ * started (a shell's `sleep`, say) survives the kill holding them open,
+ * and reading them to their end would wait on it.
  */
 export function createGhRunner(options: GhRunnerOptions): GhRunner {
-  const { cwd, command = 'gh', env } = options;
+  const { cwd, command = 'gh', env, timeoutMs } = options;
   return async (args) => {
     const executable = env === undefined
       ? command
@@ -257,16 +271,43 @@ export function createGhRunner(options: GhRunnerOptions): GhRunner {
         stdout: 'pipe',
         stderr: 'pipe',
       });
-      const [stdout, stderr, exitCode] = await Promise.all([
+      const finished = Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
         proc.exited,
       ]);
+      const outcome = await withDeadline(finished, timeoutMs);
+      if (outcome === TIMED_OUT) {
+        proc.kill('SIGKILL');
+        await proc.exited;
+        return { ok: false, stdout: '', stderr: `${command} in ${cwd} timed out after ${timeoutMs}ms and was killed` };
+      }
+      const [stdout, stderr, exitCode] = outcome;
       return { ok: exitCode === 0, stdout, stderr };
     } catch (error) {
       return { ok: false, stdout: '', stderr: `could not run ${command} in ${cwd}: ${messageOf(error)}` };
     }
   };
+}
+
+/** What {@link withDeadline} answers when the deadline passed first. */
+const TIMED_OUT = Symbol('timed out');
+
+/**
+ * `work`'s value, or {@link TIMED_OUT} when `timeoutMs` passes first; with
+ * no `timeoutMs`, `work` alone. The timer is cleared either way.
+ */
+async function withDeadline<T>(work: Promise<T>, timeoutMs: number | undefined): Promise<T | typeof TIMED_OUT> {
+  if (timeoutMs === undefined) return work;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** What the runner answers for a command its `env.PATH` does not hold. */

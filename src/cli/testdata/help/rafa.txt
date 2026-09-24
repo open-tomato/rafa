@@ -16,6 +16,7 @@ Quick start:
   rafa skill check .claude/skills --project=.
   rafa instinct check .rafa/instincts
   rafa release status
+  rafa status
   rafa next
   rafa roadmap
   rafa init
@@ -43,7 +44,7 @@ Subjects:
              HEAD
 
 Commands:
-  next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe
+  status, next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)

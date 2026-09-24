@@ -34,6 +34,10 @@
  *      it, and its `project` the project resolved for it.
  *   6. The terminal result event is written, and the exit code answered.
  *
+ * A command that runs inside a project in text mode runs between the two
+ * calls of the command hook, when the caller hands one in (see "The
+ * command hook").
+ *
  * The dispatcher sets no `process.exitCode` and calls no
  * `process.exit`: it answers the exit code, and its caller ends the
  * process with it.
@@ -96,6 +100,28 @@
  * directory nor the home, so each answers outside a project as it does inside one, and
  * such a command runs with `project` null.
  *
+ * ## The command hook
+ *
+ * {@link DispatchOptions.commandHook} is called around a command that
+ * runs inside a project, in text mode, and around nothing else: help, a
+ * version request, a routing refusal, `invalid_spec`, `no_project`, a
+ * command declaring `needsProject: false` and every invocation in json
+ * mode call neither half. Its `before` is awaited once the project is
+ * resolved and ahead of the deprecation lines, and a line it answers is
+ * written to stderr as it is, followed by a newline; null writes nothing.
+ * Its `after` is awaited once the command ends, however it ends, and
+ * ahead of the terminal event, so what it reads includes what the
+ * command did. `src/rafa.ts` hands in the since-last-command notice
+ * (`src/status/hook.ts`), which decides for itself which commands print
+ * a line.
+ *
+ * A hook never changes how an invocation ends. A half that throws or
+ * rejects is swallowed into one `debug` line,
+ * `command hook <before|after>: <message>`, and the invocation goes on as
+ * though it had answered null: a failed `before` still runs the command,
+ * and a failed `after` leaves its exit code and terminal event as they
+ * were. With no hook handed in, nothing is called.
+ *
  * ## Deprecation lines
  *
  * A command reached through one of its aliases, or declaring
@@ -153,6 +179,17 @@ export const DISPATCH_ERROR_CODES = [
 /** One of the codes a failed terminal event carries. */
 export type DispatchErrorCode = (typeof DISPATCH_ERROR_CODES)[number];
 
+/**
+ * Called around a command that runs inside a project in text mode; see
+ * the module note.
+ */
+export interface CommandHook {
+  /** Awaited before the command runs; a line it answers is written to stderr. */
+  readonly before: (route: CommandRoute, project: ProjectFound) => Promise<string | null>;
+  /** Awaited once the command ends, however it ended. */
+  readonly after: (route: CommandRoute, project: ProjectFound) => Promise<void>;
+}
+
 /** Renders the text a help request writes. */
 export type HelpRenderer = (request: HelpRequest, registry: CommandRegistry) => string;
 
@@ -193,6 +230,11 @@ export interface DispatchOptions {
    * read only for a command running inside a project.
    */
   readonly home?: string;
+  /**
+   * Called around a command that runs inside a project in text mode.
+   * Defaults to none; see the module note.
+   */
+  readonly commandHook?: CommandHook;
 }
 
 /** How an invocation ended: its exit code and its terminal event, written or not. */
@@ -213,6 +255,8 @@ interface Settings {
   readonly cwd: () => string;
   /** The home, read only when a command needs a project. */
   readonly home: () => string;
+  /** The command hook, or null when none was handed in. */
+  readonly commandHook: CommandHook | null;
 }
 
 /** How a route settled, before its terminal event is built. */
@@ -447,6 +491,16 @@ function placeCommand(command: RafaCommand, settings: Settings): Placement {
   }
 }
 
+/** Awaits one half of the command hook, a throw swallowed into a `debug` line; see the module note. */
+async function callHook<T>(half: 'before' | 'after', call: () => Promise<T>, base: CliContext): Promise<T | null> {
+  try {
+    return await call();
+  } catch (error) {
+    base.output.debug(`command hook ${half}: ${messageOf(error)}`);
+    return null;
+  }
+}
+
 /** Runs a command whose spec was read in the project it needs, or ends as `no_project`; see the module note. */
 async function settleCommand(
   route: CommandRoute,
@@ -455,9 +509,20 @@ async function settleCommand(
   settings: Settings,
 ): Promise<Ending> {
   const placement = placeCommand(route.command, settings);
-  return placement.kind === 'refused'
-    ? failure('no_project', placement.message)
-    : runCommand(route, base, registry, placement.project, settings);
+  if (placement.kind === 'refused') return failure('no_project', placement.message);
+  const { project } = placement;
+  const hook = base.outputMode === 'text'
+    ? settings.commandHook
+    : null;
+  if (hook === null || project === null) return runCommand(route, base, registry, project, settings);
+
+  const line = await callHook('before', async () => hook.before(route, project), base);
+  if (line !== null) settings.stderr.write(`${line}\n`);
+  try {
+    return await runCommand(route, base, registry, project, settings);
+  } finally {
+    await callHook('after', async () => hook.after(route, project), base);
+  }
 }
 
 /** Settles a route into how the invocation ends; see the module note. */
@@ -532,6 +597,7 @@ export async function dispatch(argv: readonly string[], options: DispatchOptions
     renderHelp: options.renderHelp ?? renderUsage,
     cwd: () => options.cwd ?? process.cwd(),
     home: () => options.home ?? homedir(),
+    commandHook: options.commandHook ?? null,
   };
   const loaded = await loadModuleCommands(options.registry, options.modules ?? [], options.importModule);
   const route = routeLine(loaded.registry, argv);

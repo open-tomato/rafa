@@ -229,6 +229,22 @@ cleanup:
   keep: ["release/*"]
 ```
 
+### `status`
+
+One setting turns off the line rafa prints on stderr, before a command
+that runs inside a project, when something is new since the last one.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `status.notice` | `true` | whether that one line, naming `rafa status` or `rafa cleanup`, is printed |
+
+It takes `true` or `false` as written; a quoted `"false"` is refused.
+
+```yaml
+status:
+  notice: false
+```
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want
@@ -379,7 +395,7 @@ and a line here is ticked by the change that finishes the feature.
   names is extracted by pattern, verified against its target, and
   fingerprinted so changes are caught when the spec is refreshed
 - ✅ Clean up merged, stale and unpushed branches and idle worktrees
-- ⬜ `rafa status`: everything in one snapshot, and one line about what
+- ✅ `rafa status`: everything in one snapshot, and one line about what
   changed since you last looked
 - ⬜ The right skills reach the right task, chosen when the plan is
   written
