@@ -81,8 +81,12 @@ import { readSpecSourceFlags } from '../../board/spec-source.js';
 import { createGitRunner } from '../../pr/git.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 
-/** The core roster commands and flags are read against; see the module note for why it is loaded late. */
-async function coreRoster(): Promise<DescribeDocument> {
+/**
+ * The core roster commands and flags are read against; see the module
+ * note for why it is loaded late. `rafa doctor`'s references row
+ * (`../doctor-refs.ts`) reads against the same one.
+ */
+export async function coreRoster(): Promise<DescribeDocument> {
   const [{ CORE_REGISTRY }, { describeRegistry }] = await Promise.all([
     import('../index.js'),
     import('../../cli/describe.js'),

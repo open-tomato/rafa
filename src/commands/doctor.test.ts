@@ -122,6 +122,14 @@
  * prints the line too, reddened 1; and the line moved after the board
  * rows reddened 1.
  *
+ * ## The references row
+ *
+ * Its case hands in a `refsVerifier` answering from a table, so no
+ * case reads git or `gh` for it: one saved copy naming a missing file
+ * and one naming a present one, beside the same world with no copy,
+ * which prints no `References:` line and gives `refs` with no copy. What
+ * the row counts and how it reads issues is `./doctor-refs.test.ts`'s.
+ *
  * ## Spawned
  *
  * One case runs `bun src/rafa.ts doctor` in two scratch repositories
@@ -163,6 +171,7 @@ import {
 } from '../pr/preflight-items.js';
 import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
+import { ABSENT, PRESENT } from '../refs/stamp.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
@@ -171,6 +180,7 @@ import { PROVIDERS_SECTION_TITLE } from './doctor-deep-providers.js';
 import { SETTINGS_SECTION_TITLE } from './doctor-deep-settings.js';
 import { ENVIRONMENT_SECTION_TITLE } from './doctor-deep.js';
 import { readPreviousCopies } from './doctor-previous.js';
+import { issueCheckCommand } from './doctor-refs.js';
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readDeepFlag, readPlanFlag } from './doctor.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
@@ -1394,6 +1404,49 @@ function resultData(stdout: string): DoctorResult | undefined {
   const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
   return result?.data;
 }
+
+/** `seams` with a references verifier reading `src/gone.ts` as missing and every other target as present. */
+function refsSeams(seams: DoctorSeams): DoctorSeams {
+  return {
+    ...seams,
+    refsVerifier: () => async (ref) => ref.text === 'src/gone.ts'
+      ? ABSENT
+      : PRESENT,
+  };
+}
+
+describe('the references row', () => {
+  it('prints the counts naming rafa issue check <n> for the dangling copy, and gives them as refs, where no copy prints none', async () => {
+    const world = plantWorld();
+    const bare = plantWorld();
+    plant(world.root, join('.rafa', 'specs', 'rafa-4-clean-spec.md'), 'Reads `src/here.ts`.\n');
+    plant(world.root, join('.rafa', 'specs', 'rafa-5-gone-spec.md'), 'Reads `src/gone.ts`.\n');
+    const copy = join('.rafa', 'specs', 'rafa-5-gone-spec.md');
+
+    const text = await doctor(world, [], { seams: refsSeams(STILL_CLOCK) });
+    const json = await doctor(world, ['--output=json'], { seams: refsSeams(STILL_CLOCK) });
+    const none = await doctor(bare, ['--output=json'], { seams: refsSeams(STILL_CLOCK) });
+    const noneText = await doctor(bare, [], { seams: refsSeams(STILL_CLOCK) });
+
+    expect(text.exitCode).toBe(0);
+    expect(lines(text.stdout).filter((line) => line.startsWith('References:') || line.startsWith('  #'))).toEqual([
+      'References: 1 dangling across 2 saved copies; run rafa issue check <n> to see each:',
+      `  #5 ${copy}: 1 dangling — ${issueCheckCommand(5)}`,
+    ]);
+    expect(resultData(json.stdout)?.refs).toEqual({
+      ok: true,
+      copies: [
+        { issue: 4, path: join('.rafa', 'specs', 'rafa-4-clean-spec.md'), suspect: 0, dangling: 0, unknown: 0, error: null },
+        { issue: 5, path: copy, suspect: 0, dangling: 1, unknown: 0, error: null },
+      ],
+      suspect: 0,
+      dangling: 1,
+      unknown: 0,
+    });
+    expect(resultData(none.stdout)?.refs).toEqual({ ok: true, copies: [], suspect: 0, dangling: 0, unknown: 0 });
+    expect(noneText.stdout).not.toContain('References:');
+  });
+});
 
 describe('the deep sections', () => {
   it('prints every section after the blocked issues and before the install line, where no --deep prints none', async () => {

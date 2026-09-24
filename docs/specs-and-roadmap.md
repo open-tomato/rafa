@@ -160,6 +160,18 @@ project whose specs are too out of date to be blocked on, and it sits
 under `dangerous` because with it on, no spec is ever refused for
 naming something that has gone or changed.
 
+`rafa issue check 42` prints every reference of the saved copy of #42
+with its state, and plans nothing. `rafa doctor` counts the suspect and
+dangling references across every saved copy under `.rafa/specs/` and
+names `rafa issue check <n>` for each copy that holds one. It changes
+no file, and when the board cannot be read it counts those issues as
+unknown rather than failing:
+
+```text
+References: 1 suspect, 1 dangling across 3 saved copies; run rafa issue check <n> to see each:
+  #42 .rafa/specs/rafa-42-export-reports-csv.md: 1 suspect, 1 dangling — rafa issue check 42
+```
+
 ## The roadmap
 
 The pinned "Roadmap" issue is an ordered task list, one spec per line:
