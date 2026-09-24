@@ -375,6 +375,9 @@ and a line here is ticked by the change that finishes the feature.
   already has a plan, a branch or a pull request
 - ✅ `rafa doctor --deep`: what a loop session and its subagents can
   actually reach — settings, `PATH`, providers and the tools its stack needs
+- ✅ Verified and stamped references in specs: each reference the spec
+  names is extracted by pattern, verified against its target, and
+  fingerprinted so changes are caught when the spec is refreshed
 - ✅ Clean up merged, stale and unpushed branches and idle worktrees
 - ⬜ `rafa status`: everything in one snapshot, and one line about what
   changed since you last looked

@@ -36,6 +36,24 @@ the shapes the lint config forces.
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
 
+### References
+
+- **`src/refs/` extracts, verifies, stamps and composes references**
+  in spec and bug report bodies. Each reference (an issue, a symbol, a
+  path, a command) is extracted by pattern, verified against its
+  target, and fingerprinted. The fingerprint at the time the spec was
+  read is the reference's STAMP; it is kept in the saved copy under
+  `specs.dir` as an HTML comment, never on the forge. Four states:
+  `ok`; `dangling` (the target does not exist); `suspect` (the
+  target's fingerprint differs from its stamp); `resolved` (a
+  `Blocked by:` target closed since the stamp). A fifth, `unknown`,
+  is a cross-repository target the provider cannot read; it is listed
+  and never refuses. Nothing spawns a process: `gh`, `git` and
+  `ts-symbols` arrive through seams (`GhRunner` from
+  `src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
+  so unit cases drive fakes and planted repositories under `tmpdir`
+  only. Sha256 uses `node:crypto` or `Bun.CryptoHasher`.
+
 ### The size cap no gate reads
 
 **The 800-line cap is a convention only.** `eslint.base.mjs`,
