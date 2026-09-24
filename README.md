@@ -179,21 +179,27 @@ it.
 
 - `agent=` routes the task to a Claude Code subagent. The planner picks
   by the task's SHAPE: implementation, tests, prose, a red build, a
-  review. This repository's own roster is in `.claude/agents/` and its
-  routing table in `context/workflow.md`; yours is whatever your project
-  holds.
-- Sessions load the project's agents and skills only
-  (`--setting-sources project,local`), which keeps each turn smaller and
-  makes a run behave the same on every machine. So an agent that exists
-  only in `~/.claude/agents` is invisible to a run: `rafa agent list`
-  shows what a run sees, `rafa agent vendor <name>` copies one in, and
-  `loop start` refuses a plan that names an agent it cannot resolve,
-  before any session is paid for.
-- The plan format itself is a skill, `dev-planner`, shipped inside the
-  package and used when the project has none of its own.
-- `rafa skill check .claude/skills --project=.` refuses a skill an agent
-  could not follow (a path that does not resolve, a missing field)
-  before it costs a task.
+  review. Agents and skills come from three tiers in order: project
+  (`.claude/agents` and `.claude/skills`), rafa (bundled with the package
+  in `bundled/agents` and `bundled/skills`), and user (`~/.claude/agents`
+  and `~/.claude/skills`). Earlier tiers shadow later ones; this
+  repository's routing table is in `context/workflow.md`, and yours is
+  whatever your project holds.
+- The rafa tier is served by default. Turn `tiers.rafa: off` in
+  `.rafa/config.yaml` to load only project and user items. Use
+  `tiers.agents: {name: false}` or `tiers.skills: {name: false}` to turn
+  a single item off entirely. When two tiers hold different items under
+  the same name, the loop refuses it unless a config pin (for example,
+  `tiers.agents: {name: project}`) declares which tier to use. `loop start`
+  refuses a plan that names an agent it cannot resolve before any session is
+  paid for.
+- User-tier items are invisible unless `loop.settingSources` includes
+  `user`. `rafa agent list` shows what a run sees, `rafa agent vendor
+  <name>` copies one in or updates it, and `rafa skill check .claude/skills
+  --project=.` refuses a skill an agent could not follow (a path that does
+  not resolve, a missing field) before it costs a task.
+- The plan format itself is a skill, `dev-planner`, shipped in the rafa
+  tier and used when the project has none of its own.
 - `model=`, `effort=`, `tools=` and `budget=` on a task line set the
   session's model, reasoning effort, tool list and spending cap when no
   agent decides them.
@@ -397,7 +403,7 @@ and a line here is ticked by the change that finishes the feature.
 - ✅ Clean up merged, stale and unpushed branches and idle worktrees
 - ✅ `rafa status`: everything in one snapshot, and one line about what
   changed since you last looked
-- ⬜ The right skills reach the right task, chosen when the plan is
+- ✅ The right skills reach the right task, chosen when the plan is
   written
 - ⬜ Know which skills earn their place and which are ignored
 - ⬜ rafa learns from its own runs: what one task works out is handed
