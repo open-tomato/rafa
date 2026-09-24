@@ -264,7 +264,9 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  realpathSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -955,6 +957,39 @@ describe('the ts-symbols program in the build', () => {
 
     expect(fromSource.stdout).toContain('usage: ts-symbols <command> <target>');
     expect(fromBuild).toEqual(fromSource);
+  }, 30_000);
+});
+
+describe('the built ts-symbols over a project', () => {
+  /** A copy of the ts-symbols fixture under the temp root, so resolution never walks into rafa's own node_modules. */
+  function plantProject(name: string): string {
+    const root = realpathSync(mkdtempSync(join(tempRoot, `${name}-`)));
+    cpSync(join(REPO_ROOT, 'src/tools/ts-symbols/fixtures/proj'), root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), '{ "name": "fixture", "private": true }\n');
+    return root;
+  }
+
+  it('outlines a TypeScript fixture that has typescript, exiting 0', () => {
+    const root = plantProject('with-ts');
+    const typescript = dirname(Bun.resolveSync('typescript/package.json', REPO_ROOT));
+    mkdirSync(join(root, 'node_modules'), { recursive: true });
+    symlinkSync(typescript, join(root, 'node_modules', 'typescript'), 'dir');
+
+    const result = run([join(DIST, TS_SYMBOLS[1]), 'outline', 'src/util.ts'], root, withBunOnPath());
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('7: export function makeChunk');
+    expect(result.stdout).toContain('11: export class ChunkStore');
+  }, 30_000);
+
+  it('exits 3 naming the root in a temp project without typescript', () => {
+    const root = plantProject('no-ts');
+
+    const result = run([join(DIST, TS_SYMBOLS[1]), 'outline', 'src/util.ts'], root, withBunOnPath());
+
+    expect(result.exitCode).toBe(3);
+    expect(result.stderr).toContain(`no typescript under ${root}: add it to the project`);
+    expect(result.stdout).toBe('');
   }, 30_000);
 });
 
