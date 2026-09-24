@@ -28,6 +28,7 @@ import { extractRefs } from './extract.js';
 import {
   ABSENT,
   blobFingerprint,
+  carryRefsBlock,
   compareToStamp,
   findStamp,
   fingerprintText,
@@ -416,5 +417,26 @@ describe('the refs block codec: what it refuses', () => {
     const entry = ['  - kind: symbol', '    text: "X"', '    stamp: present'];
 
     expect(refusal(copyWith('refs:', ...entry, ...entry))).toContain('symbol X is stamped twice');
+  });
+});
+
+describe('carryRefsBlock', () => {
+  const stamps: readonly RefStamp[] = [{ kind: 'path', text: 'src/a.ts', fingerprint: blobFingerprint(SHA1) }];
+
+  it('puts the block an old copy carries on the new text, and reads back the new body', () => {
+    const carried = carryRefsBlock(writeRefsBlock('# Old\n', stamps), '# New\n');
+
+    expect(carried).toBe(writeRefsBlock('# New\n', stamps));
+    expect(readRefsBlock(carried)).toEqual({ stamps, body: '# New\n' });
+  });
+
+  it('writes the new text as it is when there is no copy, or the copy carries no block', () => {
+    expect(carryRefsBlock(null, '# New\n')).toBe('# New\n');
+    expect(carryRefsBlock('# Old\n', '# New\n')).toBe('# New\n');
+    expect(carryRefsBlock(writeRefsBlock('# Old\n', []), '# New\n')).toBe(writeRefsBlock('# New\n', []));
+  });
+
+  it('throws for a block it will not read, rather than dropping the stamps', () => {
+    expect(() => carryRefsBlock(`${REFS_BLOCK_OPEN}\nrefs: []\n# Old\n`, '# New\n')).toThrow(RefsBlockError);
   });
 });

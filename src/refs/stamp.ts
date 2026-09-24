@@ -119,6 +119,13 @@
  * opens and does not close, is not YAML, or holds an entry this module
  * would not have written throws {@link RefsBlockError}: reading it as
  * no stamps would stamp every target afresh and hide what changed.
+ *
+ * `src/board/issue.ts` is where the saved copy is read and written, and
+ * it uses this codec both ways: `readSnapshotChange` compares the copy
+ * with its block stripped, and `writeSpecSnapshot` writes a refresh or
+ * a notes rebuild through {@link carryRefsBlock}, so the stamps survive
+ * the new text. A copy moved to `previous/` is moved whole, block and
+ * all.
  */
 import type { RefKind } from './extract.js';
 
@@ -549,4 +556,18 @@ export function readRefsBlock(copy: string): RefsBlockReading {
     ? copy.slice(after + 1)
     : copy.slice(after);
   return Object.freeze({ stamps: parseStamps(copy.slice(inner, end + 1)), body });
+}
+
+/**
+ * `text` with the block the saved copy `copy` carries, or `text` as it
+ * is when there is no copy or it carries none: what a rewrite of a
+ * saved copy keeps, so a refresh or a notes rebuild moves the stamps
+ * across unchanged and the next check reads them against the new text.
+ * Throws {@link RefsBlockError} as {@link readRefsBlock} does, before
+ * the caller has touched anything.
+ */
+export function carryRefsBlock(copy: string | null, text: string): string {
+  return writeRefsBlock(text, copy === null
+    ? null
+    : readRefsBlock(copy).stamps);
 }

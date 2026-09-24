@@ -194,6 +194,17 @@
  * (`rafa-20-notes.md`). Writing the snapshot there would overwrite
  * somebody's notes with a copy of the issue body, silently, so
  * {@link writeSpecSnapshot} refuses the pair and names them.
+ *
+ * ## The refs block
+ *
+ * A saved copy may open with the `<!-- rafa:refs` block that keeps the
+ * stamps of what the spec points at (`src/refs/stamp.ts`, which holds
+ * the codec). It is this machine's reading, not the issue's text, so
+ * {@link readSnapshotChange} strips it before comparing, and a copy
+ * whose body and notes match is `unchanged` whatever its block holds.
+ * A refresh or a notes rebuild writes the new text under the block the
+ * old copy carried, and the copy moved to `previous/` keeps its own. A
+ * block the codec will not read throws before anything is moved.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
@@ -202,6 +213,7 @@ import { dirname, resolve } from 'node:path';
 
 import { CommandExit } from '../cli/command.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { carryRefsBlock, readRefsBlock } from '../refs/stamp.js';
 
 import { REFRESH_FLAG } from './flags.js';
 import { notesPath, specPath } from './naming.js';
@@ -512,8 +524,12 @@ function headingSections(lines: readonly string[]): Map<string, string[]> {
   return sections;
 }
 
-/** The names of the headings whose text differs, or that one body has and the other does not. */
-function changedHeadings(before: readonly string[], after: readonly string[]): readonly string[] {
+/**
+ * The names of the headings whose text differs between the lines of two
+ * bodies, or that one has and the other does not: the new body's order
+ * first. The module note holds what a heading is.
+ */
+export function changedHeadings(before: readonly string[], after: readonly string[]): readonly string[] {
   const old = headingSections(before);
   const now = headingSections(after);
   const keys = [...now.keys(), ...[...old.keys()].filter((key) => !now.has(key))];
@@ -543,14 +559,18 @@ function notesChangeLine(path: string): string {
  * {@link snapshotText} writes for `options.body` and `options.notes`,
  * answering which parts changed and one line for each that did.
  *
- * `unchanged` is the saved copy equal to that text, byte for byte, as
- * {@link writeSpecSnapshot} compares it. `notes` is the body the same
+ * `unchanged` is the saved copy less its refs block equal to that text,
+ * byte for byte, which is what {@link writeSpecSnapshot} leaves alone.
+ * `notes` is the body the same
  * and the notes not, `body` the reverse, and `both` both; the module
  * note holds how the two parts are told apart in a copy that holds
- * them joined, and where that reading can be fooled.
+ * them joined, and where that reading can be fooled. The refs block is
+ * stripped from the saved copy first, and one the codec will not read
+ * throws its `RefsBlockError`.
  */
 export function readSnapshotChange(options: SnapshotChangeOptions): SnapshotChange {
-  const { saved, body, notes, notesPath: path } = options;
+  const { body, notes, notesPath: path } = options;
+  const saved = readRefsBlock(options.saved).body;
   if (saved === snapshotText(body, notes)) return { kind: 'unchanged', bodyLine: null, notesLine: null };
 
   const now = normalise(body);
@@ -649,7 +669,8 @@ export interface SpecSnapshot {
  * with its local notes appended, and answers where it went and what the
  * write did.
  *
- * A saved copy that matches is left alone (`unchanged`). One whose
+ * A saved copy that matches, its refs block aside, is left alone
+ * (`unchanged`), and every rewrite keeps the block it carried. One whose
  * local notes alone differ is rebuilt (`notes-rebuilt`), and one whose
  * issue body differs is rebuilt only under `options.refresh`
  * (`refreshed`); before either rewrite the saved copy is moved to
@@ -671,9 +692,9 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
   }
 
   const local = readLocalNotes(repoRoot, specsDir, issue.number);
-  const text = snapshotText(issue.body, local);
   const absolute = resolve(repoRoot, path);
   const existing = readIfFile(absolute, 'the spec snapshot');
+  const text = carryRefsBlock(existing, snapshotText(issue.body, local));
   const written: SpecSnapshot = {
     path,
     absolute,
@@ -685,9 +706,8 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
     text,
   };
 
-  if (existing === text) return { ...written, action: 'unchanged' };
-
   const action = rewriteAction(existing, issue.body, local, notes, refresh);
+  if (action === 'unchanged') return { ...written, action, text: existing ?? text };
   if (action === null) {
     throw new CommandExit(ISSUE_REFUSAL_EXIT, snapshotDiffersMessage(path, issue.number));
   }
@@ -706,10 +726,10 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
 }
 
 /**
- * What a write over the saved copy `existing`, which differs from what
- * this run would write, is to do: `created` when there is none,
- * `notes-rebuilt` when only the local notes differ, `refreshed` when the
- * issue body differs under `--refresh`, and null for the refusal.
+ * What a write over the saved copy `existing` is to do: `created` when
+ * there is none, `unchanged` when it matches, `notes-rebuilt` when only
+ * the local notes differ, `refreshed` when the issue body differs under
+ * `--refresh`, and null for the refusal.
  */
 function rewriteAction(
   existing: string | null,
@@ -717,9 +737,10 @@ function rewriteAction(
   notes: string | null,
   notesFile: string,
   refresh: boolean,
-): Exclude<SnapshotAction, 'unchanged'> | null {
+): SnapshotAction | null {
   if (existing === null) return 'created';
   const { kind } = readSnapshotChange({ saved: existing, body, notes, notesPath: notesFile });
+  if (kind === 'unchanged') return 'unchanged';
   if (kind === 'notes') return 'notes-rebuilt';
   return refresh
     ? 'refreshed'
