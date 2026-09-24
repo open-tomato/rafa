@@ -347,11 +347,10 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   prompt, the operator log and the commit message: a declaration is a
   planning annotation, never an instruction.
 * Pick the agent by the task's SHAPE — not its subject or its verb —
-  from the `### Task shape to agent` table in `context/workflow.md`.
-  Prefer a row whose third column names a tracked
-  `.claude/agents/<name>.md` file, since a `user-level` row does not
-  travel with a fresh clone. Where no row fits, declare the granular
-  keys instead of an agent.
+  from the task routing table below in this prompt. Prefer a row whose
+  third column names a tracked `.claude/agents/<name>.md` file, since a
+  `user-level` row does not travel with a fresh clone. Where no row fits,
+  declare the granular keys instead of an agent.
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
