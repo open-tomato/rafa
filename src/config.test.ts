@@ -84,7 +84,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release)';
+  + 'roadmap, release, cleanup)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -115,6 +115,9 @@ const SETTINGS: readonly ConfigSetting[] = [
   'releaseVersionFile',
   'releaseChangelog',
   'releaseHeading',
+  'cleanupStaleDays',
+  'cleanupWorktreeIdleDays',
+  'cleanupKeep',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -146,6 +149,9 @@ const DEFAULTS: RafaConfig = {
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
   releaseHeading: '## {version} — {date}, {title}',
+  cleanupStaleDays: 30,
+  cleanupWorktreeIdleDays: 7,
+  cleanupKeep: [],
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -199,6 +205,10 @@ const FULL = [
   '  versionFile: deno.json',
   '  changelog: docs/CHANGES.md',
   '  heading: "### {version} on {date}"',
+  'cleanup:',
+  '  staleDays: 60',
+  '  worktreeIdleDays: 14',
+  '  keep: ["release/*", keep-me]',
   '',
 ].join('\n');
 
@@ -245,6 +255,9 @@ const FULL_VALUES: RafaConfig = {
   releaseVersionFile: 'deno.json',
   releaseChangelog: 'docs/CHANGES.md',
   releaseHeading: '### {version} on {date}',
+  cleanupStaleDays: 60,
+  cleanupWorktreeIdleDays: 14,
+  cleanupKeep: ['release/*', 'keep-me'],
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -296,7 +309,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(7);
+    expect(lists).toHaveLength(8);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -583,6 +596,21 @@ describe('parseConfigText', () => {
         'release.heading', 'release:\n  heading: 2',
         'release.heading is 2, expected a changelog heading template',
         'release:\n  heading: "### {version}"', 'releaseHeading', '### {version}',
+      ],
+      [
+        'cleanup.staleDays', 'cleanup:\n  staleDays: 0',
+        'cleanup.staleDays is 0, expected a number of days, a whole number above zero',
+        'cleanup:\n  staleDays: 90', 'cleanupStaleDays', 90,
+      ],
+      [
+        'cleanup.worktreeIdleDays', 'cleanup:\n  worktreeIdleDays: "7"',
+        'cleanup.worktreeIdleDays is "7", expected a number of days, a whole number above zero',
+        'cleanup:\n  worktreeIdleDays: 3', 'cleanupWorktreeIdleDays', 3,
+      ],
+      [
+        'cleanup.keep', 'cleanup:\n  keep: "release/*"',
+        'cleanup.keep is "release/*", expected a list of glob patterns',
+        'cleanup:\n  keep: ["hotfix/*"]', 'cleanupKeep', ['hotfix/*'],
       ],
     ];
 

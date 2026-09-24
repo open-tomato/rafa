@@ -165,6 +165,10 @@ const PROJECT_TEXT = [
   '  versionFile: project.json',
   '  changelog: docs/PROJECT-CHANGES.md',
   '  heading: "### {version} on {date}"',
+  'cleanup:',
+  '  staleDays: 45',
+  '  worktreeIdleDays: 10',
+  '  keep: ["project/*"]',
   '',
 ].join('\n');
 
@@ -211,6 +215,9 @@ const PROJECT_VALUES: RafaConfig = {
   releaseVersionFile: 'project.json',
   releaseChangelog: 'docs/PROJECT-CHANGES.md',
   releaseHeading: '### {version} on {date}',
+  cleanupStaleDays: 45,
+  cleanupWorktreeIdleDays: 10,
+  cleanupKeep: ['project/*'],
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -258,6 +265,10 @@ const USER_TEXT = [
   '  versionFile: user.json',
   '  changelog: docs/USER-CHANGES.md',
   '  heading: "## {version}, {title}"',
+  'cleanup:',
+  '  staleDays: 90',
+  '  worktreeIdleDays: 2',
+  '  keep: ["user/*", scratch]',
   '',
 ].join('\n');
 
@@ -294,6 +305,9 @@ const USER_VALUES: RafaConfig = {
   releaseVersionFile: 'user.json',
   releaseChangelog: 'docs/USER-CHANGES.md',
   releaseHeading: '## {version}, {title}',
+  cleanupStaleDays: 90,
+  cleanupWorktreeIdleDays: 2,
+  cleanupKeep: ['user/*', 'scratch'],
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -514,6 +528,21 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'release.heading', 'release:\n  heading: []',
     'release.heading is a list, expected a changelog heading template',
     'release:\n  heading: "## {version}"', 'releaseHeading', '## {version}',
+  ],
+  [
+    'cleanup.staleDays', 'cleanup:\n  staleDays: 2.5',
+    'cleanup.staleDays is 2.5, expected a number of days, a whole number above zero',
+    'cleanup:\n  staleDays: 14', 'cleanupStaleDays', 14,
+  ],
+  [
+    'cleanup.worktreeIdleDays', 'cleanup:\n  worktreeIdleDays: -1',
+    'cleanup.worktreeIdleDays is -1, expected a number of days, a whole number above zero',
+    'cleanup:\n  worktreeIdleDays: 1', 'cleanupWorktreeIdleDays', 1,
+  ],
+  [
+    'cleanup.keep', 'cleanup:\n  keep: [""]',
+    'cleanup.keep[0] is "", expected a glob pattern',
+    'cleanup:\n  keep: [main-*]', 'cleanupKeep', ['main-*'],
   ],
 ];
 

@@ -25,6 +25,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   CLAUDE_SETTING_SOURCES,
+  dayCount,
   describeValue,
   flag,
   githubLogin,
@@ -322,6 +323,34 @@ describe('usdAmount', () => {
 
     expect(valueOf(usdAmount, parsed.a)).toBe(1.5);
     expect(problemsOf(usdAmount, parsed.b)).toEqual([`F: s is "1.50", expected ${USD_EXPECTED}`]);
+  });
+});
+
+describe('dayCount', () => {
+  it('accepts a whole number of days above zero as itself', () => {
+    expect([valueOf(dayCount, 1), valueOf(dayCount, 30)]).toEqual([1, 30]);
+  });
+
+  it.each([
+    ['zero, which is not read as off', 0, '0'],
+    ['a negative count', -7, '-7'],
+    ['a fraction', 2.5, '2.5'],
+    ['a count quoted as a string', '30', '"30"'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [30], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(dayCount, raw)).toEqual([
+      `F: s is ${found}, expected a number of days, a whole number above zero`,
+    ]);
+  });
+
+  it('accepts the count a file spells unquoted, and refuses the same count quoted', () => {
+    const parsed = Bun.YAML.parse('a: 30\nb: "30"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(dayCount, parsed.a)).toBe(30);
+    expect(problemsOf(dayCount, parsed.b)).toEqual([
+      'F: s is "30", expected a number of days, a whole number above zero',
+    ]);
   });
 });
 

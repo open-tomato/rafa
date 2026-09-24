@@ -202,6 +202,35 @@ Every command has help at three levels (`rafa --help`,
 `rafa loop --help`, `rafa loop start --help`), and
 `rafa describe --output=json` is the same roster for a tool or an agent.
 
+## Configuration
+
+Settings live in `.rafa/config.yaml` in the project, and in
+`~/.rafa/config.yaml` for every project on the machine; a setting in the
+project's file outranks the same one in yours. `rafa init` writes both
+with every setting commented out at its default, so uncomment a line,
+with its section line, to change it.
+
+### `cleanup`
+
+Three settings shape what `rafa cleanup` lists. The command is being
+built under rafa-94 and has not shipped yet, so until it does these
+keys are read and checked but change nothing.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `cleanup.staleDays` | `30` | the age in days past which a branch is listed as Stale |
+| `cleanup.worktreeIdleDays` | `7` | the idle days past which a worktree is listed |
+| `cleanup.keep` | `[]` | glob patterns naming branches that are never listed |
+
+Both day counts take a whole number above zero.
+
+```yaml
+cleanup:
+  staleDays: 30
+  worktreeIdleDays: 7
+  keep: ["release/*"]
+```
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want
