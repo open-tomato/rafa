@@ -130,7 +130,11 @@ one. Once a blocker closes, `rafa issue unblock [<n>]` checks the line,
 asks when every blocker is closed, and removes the label. `pr merge`
 runs that same `issue unblock` logic after a clean merge, so closing
 issue #24 automatically unblocks any issue naming it in a `Blocked by:`
-line, with no extra commands needed.
+line, with no extra commands needed. An `owner/repo#<n>` token on the
+line is kept as written in `BlockedReading.foreign`
+(`src/board/blocked.ts`) and never read as local `#<n>`; a line naming
+only such tokens reads as the `no-ids` fault, so `issue unblock` never
+takes a foreign-only line for "every blocker closed" and drops the label.
 
 ### Marking a spec ready
 
