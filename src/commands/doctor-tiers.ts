@@ -10,8 +10,18 @@
  * gives the unreviewed items, and `SERVE_CLI_VERSION`
  * (`tiers/delivery.ts`) gives the pin. The module lives beside
  * `./doctor.ts`, not inside it, because that file is near the 800-line
- * cap (`context/source.md`). Wiring it into `rafa doctor` is left to
- * that command.
+ * cap (`context/source.md`). `rafa doctor` calls {@link checkDoctorTiers}
+ * on every run, `--deep` or not, after the references row and before the
+ * deep sections; json mode gives the reading as the data's `tiers`.
+ *
+ * ## What one doctor run reads under
+ *
+ * {@link checkDoctorTiers} builds the inventory over the seams `--deep`
+ * builds its own over (`inventorySeams`, `./doctor-deep.ts`): the
+ * project, the home, the resolved config's tier keys and modules, and
+ * the session's `PATH`. `claude --version` runs under the environment
+ * `readSessionEnv` gives a session (`./doctor-deep-env.ts`), in the
+ * project root, so the version read is the one a session would spawn.
  *
  * ## The rows
  *
@@ -85,6 +95,7 @@
  * planted world and a stand-in version.
  */
 import type { DeepRow, DeepRowStatus } from './doctor-deep-row.js';
+import type { DeepDoctorSeams, DeepInput } from './doctor-deep.js';
 import type { Inventory, InventorySeams } from '../inventory/index.js';
 import type { InventoryRecord } from '../inventory/record.js';
 import type { ServedItem, TierCollision, TierRow } from '../tiers/resolve.js';
@@ -100,7 +111,9 @@ import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 import { provenanceBlock, SKILL_FILE } from '../tiers/serve.js';
 import { CLAUDE_BIN } from '../utils/claude.js';
 
+import { PATH_KEY, readSessionEnv } from './doctor-deep-env.js';
 import { renderDeepSection } from './doctor-deep-row.js';
+import { inventorySeams } from './doctor-deep.js';
 
 /** The title the rows are printed under. */
 export const TIERS_SECTION_TITLE = 'Skill tiers';
@@ -350,6 +363,31 @@ export async function readDoctorTiers(seams: DoctorTiersSeams): Promise<DoctorTi
     pinnedVersion: SERVE_CLI_VERSION,
     rows: doctorTierRows(inventory, cliVersion, seams),
   };
+}
+
+/** What `rafa doctor` adds for the tier rows: the inventory `--deep` builds, and the version reading. */
+export interface DoctorTiersRunSeams extends Pick<DeepDoctorSeams, 'sessionCwd' | 'inventory'> {
+  /** The installed version under the session's environment; {@link readClaudeVersion} when left out. */
+  readonly readClaudeVersion?: DoctorTiersSeams['readClaudeVersion'];
+}
+
+/**
+ * The tier reading of one `rafa doctor` run, read under what a session
+ * would run with; see "What one doctor run reads under".
+ */
+export async function checkDoctorTiers(input: DeepInput, seams: DoctorTiersRunSeams = {}): Promise<DoctorTiersReading> {
+  const { project, resolved } = input;
+  const cwd = (seams.sessionCwd ?? ((): string => process.cwd()))();
+  const session = readSessionEnv({
+    env: input.env,
+    settingSources: resolved.config.settingSources,
+    home: project.home,
+    projectRoot: project.root,
+    cwd,
+  });
+  const inventory = await inventorySeams(input, session.env[PATH_KEY], seams.inventory ?? {});
+  const env = Object.fromEntries(Object.entries(session.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
+  return readDoctorTiers({ inventory, cwd: project.root, env, readClaudeVersion: seams.readClaudeVersion });
 }
 
 /** The lines text mode writes: the titled rows, or nothing when there is no row. */

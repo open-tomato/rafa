@@ -173,6 +173,7 @@ import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { ABSENT, PRESENT } from '../refs/stamp.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
 import { PLAN_NEEDS_SECTION_TITLE, STACK_TOOLS_SECTION_TITLE } from './doctor-deep-needs.js';
@@ -181,6 +182,7 @@ import { SETTINGS_SECTION_TITLE } from './doctor-deep-settings.js';
 import { ENVIRONMENT_SECTION_TITLE } from './doctor-deep.js';
 import { readPreviousCopies } from './doctor-previous.js';
 import { issueCheckCommand } from './doctor-refs.js';
+import { TIERS_SECTION_TITLE } from './doctor-tiers.js';
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readDeepFlag, readPlanFlag } from './doctor.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
@@ -303,12 +305,26 @@ interface DoctorOptions {
   readonly env?: Readonly<Record<string, string>>;
 }
 
+/**
+ * `seams` with the tier rows' own where the case gave none: the rafa tier
+ * under the home's `runtime/`, which a case plants in or leaves empty, and
+ * a Claude Code answering {@link SERVE_CLI_VERSION}, so no case spawns
+ * `claude` and a world with nothing planted prints no `Skill tiers` row.
+ */
+function tierSeams(world: World, seams: DoctorSeams): DoctorSeams {
+  return {
+    readClaudeVersion: () => Promise.resolve(SERVE_CLI_VERSION),
+    inventory: { entry: () => join(world.home, 'runtime', 'cli.js') },
+    ...seams,
+  };
+}
+
 /** Dispatches `rafa doctor` with `words` in `world`; see the module note. */
 async function doctor(world: World, words: readonly string[] = [], options: DoctorOptions = {}): Promise<DoctorRun> {
   const stdout = memoryStream();
   const stderr = memoryStream();
   const { exitCode } = await dispatch(['doctor', ...words], {
-    registry: createCommandRegistry({ subjects: [], commands: [createDoctorCommand(options.seams ?? STILL_CLOCK)] }),
+    registry: createCommandRegistry({ subjects: [], commands: [createDoctorCommand(tierSeams(world, options.seams ?? STILL_CLOCK))] }),
     env: options.env ?? { PATH: world.rafaBin },
     stdout: stdout.stream,
     stderr: stderr.stream,
@@ -1599,4 +1615,44 @@ describe('the registered command', () => {
     expect(run.stdout).toContain('🛡  Risk: ');
     expect(run.stdout).toContain('— rafa plan risk .plans/PLAN-risk.md');
   }, SPAWN_TIMEOUT);
+});
+
+describe('the skill tier rows', () => {
+  /** A skill named `clash` in the project and, with another body, in the rafa tier under the home. */
+  function plantCollision(world: World): void {
+    plant(world.root, '.claude/skills/clash/SKILL.md', '---\nname: clash\ndescription: project\n---\nproject body\n');
+    plant(world.home, 'runtime/bundled/skills/clash/SKILL.md', '---\nname: clash\ndescription: rafa\n---\nrafa body\n');
+  }
+
+  it('prints a collision under Skill tiers and gives the reading as json tiers, where an unplanted world prints none', async () => {
+    const world = plantWorld(requiredTool('exit 0'));
+    const control = plantWorld(requiredTool('exit 0'));
+    plantCollision(world);
+
+    const text = await doctor(world, []);
+    const json = await doctor(world, ['--output=json']);
+    const controlText = await doctor(control, []);
+    const controlJson = await doctor(control, ['--output=json']);
+
+    expect(text.exitCode).toBe(0);
+    expect(lines(text.stdout)).toContain(`${TIERS_SECTION_TITLE}:`);
+    expect(text.stdout).toContain('skill clash');
+    const tiers = resultData(json.stdout)?.tiers;
+    expect(tiers?.pinnedVersion).toBe(SERVE_CLI_VERSION);
+    expect(tiers?.rows.map((row) => [row.kind, row.name])).toEqual([['collision', 'skill clash']]);
+    expect(controlText.exitCode).toBe(0);
+    expect(lines(controlText.stdout)).not.toContain(`${TIERS_SECTION_TITLE}:`);
+    expect(resultData(controlJson.stdout)?.tiers.rows).toEqual([]);
+  });
+
+  it('warns for an installed Claude Code other than the pin, and leaves the exit code alone', async () => {
+    const world = plantWorld(requiredTool('exit 0'));
+    const seams: DoctorSeams = { ...STILL_CLOCK, readClaudeVersion: () => Promise.resolve('0.0.1') };
+
+    const run = await doctor(world, [], { seams });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).toContain(`${TIERS_SECTION_TITLE}:`);
+    expect(run.stdout).toContain('0.0.1');
+  });
 });

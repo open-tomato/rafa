@@ -246,8 +246,12 @@ export function environmentSection(reading: SessionEnvReading, shown: readonly N
   };
 }
 
-/** The inventory seams both inventory sections read, under the session's `PATH`; see the module note. */
-async function inventorySeams(input: DeepInput, sessionPath: string | undefined, seams: DeepInventorySeams): Promise<NeedsSeams> {
+/**
+ * The inventory seams both inventory sections read, under the session's
+ * `PATH`; see the module note. `./doctor-tiers.ts` builds its inventory
+ * over the same seams, so the tier rows and Settings read one world.
+ */
+export async function inventorySeams(input: DeepInput, sessionPath: string | undefined, seams: DeepInventorySeams): Promise<NeedsSeams> {
   const { project, resolved } = input;
   const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
   const entry = seams.entry ?? ((): string => Bun.main);
