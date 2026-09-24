@@ -146,10 +146,19 @@
  * `Recurrence key` (the key step 2 searches for), `Plan` (the plan stub),
  * `Task` (the task text, as the dispatch quoted it) and `Feedback` (the
  * report's feedback). A missing artifact, key, stub or feedback is a
- * sentence saying so. A recurrence's comment carries the same six sections
- * under its own opening sentence, so an issue filed before this rafa, with
- * no key section of its own, gains one from the first recurrence commented
- * on it.
+ * sentence saying so.
+ *
+ * Between `Artifact` and `Recurrence key` goes a seventh, `Refs`, when the
+ * redacted artifact names a path or a symbol: each one listed with its
+ * target's fingerprint as {@link TriageOptions.verifyRefs} read it at
+ * filing time. An artifact that names neither, and a missing one, have no
+ * `Refs` section at all. `./refs-section.ts` holds what is read and how a
+ * reading that fails is shown.
+ *
+ * A recurrence's comment carries the same sections under its own opening
+ * sentence, its `Refs` stamped when the comment is written, so an issue
+ * filed before this rafa, with no key section of its own, gains one from
+ * the first recurrence commented on it.
  *
  * ## Named secrets
  *
@@ -185,6 +194,7 @@ import type {
 } from '../effort/store/findings.js';
 import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
 import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
+import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
 import { basename, join } from 'node:path';
@@ -196,6 +206,7 @@ import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
+import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR = join('.rafa', 'triage', 'private');
@@ -318,6 +329,11 @@ export interface TriageOptions {
    * unredacted text by leaving them out.
    */
   readonly secrets: readonly NamedSecret[];
+  /**
+   * Reads the paths and symbols a bug's artifact names, for its `Refs`
+   * section. `createArtifactRefsVerifier` over `repoRoot` when left out.
+   */
+  readonly verifyRefs?: RefVerifier;
   /** Seams for the reference write. */
   readonly seams?: FindingsWriterSeams;
 }
@@ -472,6 +488,8 @@ interface BugValues {
   readonly artifact: string | null;
   /** The key `find` is asked for, redacted, or null for a bug with none. */
   readonly key: string | null;
+  /** The `Refs` section, heading included and already redacted, or null for none. */
+  readonly refs: string | null;
   readonly planStub: string | null;
   readonly taskText: string;
   readonly feedback: string | null;
@@ -490,12 +508,15 @@ function section(
   return `## ${heading}\n\n${shown}`;
 }
 
-/** An issue body or a comment: `opening`, then the six sections; see the module note. */
+/** An issue body or a comment: `opening`, then the sections; see the module note. */
 function issueText(opening: string, values: BugValues, redact: (text: string) => string): string {
   return [
     opening,
     section('What', values.what, '', redact),
     section('Artifact', values.artifact, 'The report gave no artifact, so a recurrence files again.', redact),
+    ...values.refs === null
+      ? []
+      : [values.refs],
     section('Recurrence key', values.key, 'The report gave no artifact, so this bug has no key.', redact),
     section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
     section('Task', values.taskText, '', redact),
@@ -513,21 +534,26 @@ interface Filing {
   readonly key: string | null;
 }
 
-/** The filing for one bug. */
-function filingFor(
+/** The filing for one bug, its `Refs` read through `verifyRefs`. */
+async function filingFor(
   what: string,
   bug: ReportBug,
   options: TriageOptions,
   redact: (text: string) => string,
-): Filing {
+  verifyRefs: RefVerifier,
+): Promise<Filing> {
   const artifact = artifactOf(bug);
   const searchText = artifact === null
     ? null
     : bugKeyOf(options.trackerPath, redact(artifact));
+  const refs = await buildRefsSection(artifact === null
+    ? null
+    : redact(artifact), verifyRefs);
   const values: BugValues = {
     what,
     artifact,
     key: searchText,
+    refs,
     planStub: options.dispatch.planStub,
     taskText: options.dispatch.taskLine,
     feedback: options.report.feedback,
@@ -708,6 +734,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
 
   const blocker = triageBlockers(options);
   const redact = (text: string): string => redactSecrets(text, options.secrets);
+  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(repoRoot);
   const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
       channel: 'public',
@@ -738,7 +765,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       bugs.push(skippedRow(index, route.channel, `out_of_scope_bugs[${index}] has no what to file`));
       continue;
     }
-    const filing = filingFor(what, bug, options, redact);
+    const filing = await filingFor(what, bug, options, redact, verifyRefs);
     bugs.push(await triageBug({ route, index, filing, redact }));
   }
   return { blocker, bugs };
