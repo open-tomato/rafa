@@ -998,8 +998,8 @@ New; it replaces no earlier text. What a row or an action added to
   the `github` preflight.
 - **`issue list --roadmap` prints the Roadmap in a table**
   (`src/board/roadmap-rows.ts`, `src/commands/issue/roadmap-table.ts`)
-  with three new columns over the plain list. `--all` includes ticked
-  lines; without it, only unticked lines are shown. The three columns:
+  with four new columns over the plain list. `--all` includes ticked
+  lines; without it, only unticked lines are shown. The four columns:
   `spec` is the readiness gate's reading of the body — `ready`, `gaps:
   <heading>, …`, `outline` (fewer than three template headings, no
   label), or a disagreement with the label, `label: ready, gate: gaps`
@@ -1008,7 +1008,13 @@ New; it replaces no earlier text. What a row or an action added to
   open`, `#<n> closed`, `#<n> unknown` (not on the board listing), or
   `owner/repo#<n> unknown` for one on another repository, else blank.
   `has` is every one of `plan`, `branch` and `pr #<n>` that exists,
-  joined with `, `. One `gh` read of the board and one of the Roadmap
+  joined with `, `. `refs` is how many references of the issue's saved
+  copies under `specs.dir` read `suspect` or `dangling`, `0` for a clean
+  copy, `?` for a copy that could not be read (with a warning naming
+  `rafa issue check <n>`), and `-` with no copy; it is `rafa doctor`'s
+  references reading (`readDoctorRefs`, `src/commands/doctor-refs.ts`)
+  narrowed to the selected lines' issues, reads a same-repository issue
+  through the same `gh` runner, and writes nothing. One `gh` read of the board and one of the Roadmap
   body itself: when the board is unreachable, a `warn:` line is printed
   on stdout ahead of the rows in text mode, the rows read from the
   Roadmap body alone with `spec` and `blocked by` empty and `has` still

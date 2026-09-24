@@ -1,7 +1,8 @@
 /**
  * The table `rafa issue list --roadmap` prints: one line per
  * {@link RoadmapRow}, in the order the rows arrive, under a header line
- * naming the eight columns (`.rafa/specs/rafa-123-rafa-issue-list-roadmap.md`).
+ * naming the nine columns (`.rafa/specs/rafa-123-rafa-issue-list-roadmap.md`,
+ * and `.rafa/specs/rafa-151-references-specs-bugs-are.md` for `refs`).
  *
  * ## The columns
  *
@@ -13,12 +14,15 @@
  *  - `spec` — {@link specText}, the spelling the row reading owns.
  *  - `blocked by` — {@link blockersText}: `#24 open, #26 closed`.
  *  - `has` — {@link hasText}: `plan, branch, pr #40`.
+ *  - `refs` — {@link refsText}: how many references of the issue's saved
+ *    copy read `suspect` or `dangling`, `0` for a clean copy, `?` for a
+ *    copy that could not be read.
  *  - `labels` — every label on the issue, joined with `, `.
  *  - `title` — the issue's title; with no issue on the row, the Roadmap
  *    line's own `why`, so a row read while the board was unreachable
  *    still says what it is.
  *
- * The three reading columns are spelled by the functions the row module
+ * The four reading columns are spelled by the functions the row module
  * exports and never here, so `issue list --roadmap` and any later caller
  * cannot spell one reading two ways.
  *
@@ -27,9 +31,9 @@
  * A cell with nothing to print is {@link EMPTY_CELL}, `-`, in every
  * column alike: no issue on the row (the board unreachable, or the
  * listing not holding it), no `Blocked by:` line, nothing in `has`, no
- * labels, and a title-less row with no `why`. A blank cell would leave
- * a gap that reads as a misaligned column, and one spelling for all
- * eight keeps "nothing here" one thing to look for.
+ * saved copy for `refs`, no labels, and a title-less row with no `why`.
+ * A blank cell would leave a gap that reads as a misaligned column, and
+ * one spelling for all nine keeps "nothing here" one thing to look for.
  *
  * ## The width rule
  *
@@ -45,7 +49,7 @@
  *
  * With a width and a table wider than it, `title` is cut first, down to
  * {@link TITLE_FLOOR}, and only then `labels`, down to
- * {@link LABELS_FLOOR}; a cut cell ends with `…`. The other six columns
+ * {@link LABELS_FLOOR}; a cut cell ends with `…`. The other seven columns
  * are never cut: they are short by construction and are the reason the
  * table is printed. A table still wider than the terminal with both at
  * their floors is printed as it then stands and wraps; a column cut
@@ -54,7 +58,7 @@
  */
 import type { RoadmapRow } from '../../board/roadmap-rows.js';
 
-import { blockersText, hasText, specText } from '../../board/roadmap-rows.js';
+import { blockersText, hasText, refsText, specText } from '../../board/roadmap-rows.js';
 
 /** What a cell with nothing to print holds; see the module note. */
 export const EMPTY_CELL = '-';
@@ -71,7 +75,7 @@ export const LABELS_FLOOR = 12;
 /** What ends a cut cell. */
 const ELLIPSIS = '…';
 
-/** The eight columns, in order, as the header line spells them. */
+/** The nine columns, in order, as the header line spells them. */
 export const ROADMAP_COLUMNS = Object.freeze([
   '#',
   'state',
@@ -79,14 +83,15 @@ export const ROADMAP_COLUMNS = Object.freeze([
   'spec',
   'blocked by',
   'has',
+  'refs',
   'labels',
   'title',
 ] as const);
 
 /** Where each column the width rule touches sits in {@link ROADMAP_COLUMNS}. */
 const NUMBER_COLUMN = 0;
-const LABELS_COLUMN = 6;
-const TITLE_COLUMN = 7;
+const LABELS_COLUMN = 7;
+const TITLE_COLUMN = 8;
 
 /** `text`, or {@link EMPTY_CELL} when it is empty. */
 function cell(text: string): string {
@@ -107,7 +112,7 @@ function titleOf(row: RoadmapRow): string {
     : row.issue.title;
 }
 
-/** One row's eight cells, uncut and unpadded. */
+/** One row's nine cells, uncut and unpadded. */
 export function roadmapCells(row: RoadmapRow): readonly string[] {
   const state = row.issue === null
     ? ''
@@ -119,6 +124,7 @@ export function roadmapCells(row: RoadmapRow): readonly string[] {
     cell(specText(row.spec)),
     cell(blockersText(row.blockers)),
     cell(hasText(row.has)),
+    cell(refsText(row.refs)),
     cell(row.issue?.labels.join(', ') ?? ''),
     cell(titleOf(row)),
   ]);

@@ -16,7 +16,9 @@
  * `git` and a real plan dir in the project. Its refusals come first,
  * each held to run no `gh` beside a line the same `gh` answers, then the
  * rows: in the Roadmap's order, narrowed after the selection, with the
- * board unreachable, and in json mode.
+ * board unreachable, and in json mode. The `refs` column is read over
+ * saved copies planted under the project's `specs.dir` with a verifier
+ * answering by the reference's text, so no git or `gh` is asked for it.
  */
 import type { LineFlags } from './issue-tracker.js';
 import type { RoadmapListResult } from './list.js';
@@ -24,6 +26,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { Issue, IssueDraft } from '../../ports/index.js';
 import type { GitRunner } from '../../pr/git.js';
+import type { LiveReading } from '../../refs/stamp.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,6 +41,7 @@ import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
+import { ABSENT, PRESENT, UNREADABLE } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 
@@ -368,29 +372,29 @@ function roadmapCommand(plant: GhPlant, calls: string[][], width?: number): Rafa
 /** What text mode prints for the three unticked lines, with no terminal to cut them. */
 const UNTICKED_TABLE = [
   'Roadmap: #1',
-  '  #  state  type  spec                      blocked by            has           labels                  title',
-  '#13  open   bug   label: none, gate: ready  #20 open, #21 closed  pr #40        type:bug, module:board  Blocked bug',
-  '#11  open   code  ready                     -                     -             spec:ready, module:cli  Ready spec',
-  '#14  open   bug   outline                   -                     plan, branch  type:bug                Planned bug',
+  '  #  state  type  spec                      blocked by            has           refs  labels                  title',
+  '#13  open   bug   label: none, gate: ready  #20 open, #21 closed  pr #40        -     type:bug, module:board  Blocked bug',
+  '#11  open   code  ready                     -                     -             -     spec:ready, module:cli  Ready spec',
+  '#14  open   bug   outline                   -                     plan, branch  -     type:bug                Planned bug',
 ];
 
 /** What text mode prints under `--all`: the ticked #12 in its place, the state and type columns wider for it. */
 const ALL_TABLE = [
   'Roadmap: #1',
-  '  #  state   type   spec                      blocked by            has           labels                  title',
-  '#13  open    bug    label: none, gate: ready  #20 open, #21 closed  pr #40        type:bug, module:board  Blocked bug',
-  '#12  closed  chore  outline                   -                     -             type:chore              Shipped chore',
-  '#11  open    code   ready                     -                     -             spec:ready, module:cli  Ready spec',
-  '#14  open    bug    outline                   -                     plan, branch  type:bug                Planned bug',
+  '  #  state   type   spec                      blocked by            has           refs  labels                  title',
+  '#13  open    bug    label: none, gate: ready  #20 open, #21 closed  pr #40        -     type:bug, module:board  Blocked bug',
+  '#12  closed  chore  outline                   -                     -             -     type:chore              Shipped chore',
+  '#11  open    code   ready                     -                     -             -     spec:ready, module:cli  Ready spec',
+  '#14  open    bug    outline                   -                     plan, branch  -     type:bug                Planned bug',
 ];
 
 /** What text mode prints with the board unreachable: the lines' own words as titles, the plan and branch still read. */
 const UNREACHABLE_TABLE = [
   'Roadmap: #1',
-  '  #  state  type  spec  blocked by  has           labels  title',
-  '#13  -      -     -     -           -             -       blocked bug',
-  '#11  -      -     -     -           -             -       ready spec',
-  '#14  -      -     -     -           plan, branch  -       planned bug',
+  '  #  state  type  spec  blocked by  has           refs  labels  title',
+  '#13  -      -     -     -           -             -     -       blocked bug',
+  '#11  -      -     -     -           -             -     -       ready spec',
+  '#14  -      -     -     -           plan, branch  -     -       planned bug',
 ];
 
 /** A board listing that fails as a network outage does. */
@@ -587,10 +591,10 @@ describe('rafa issue list --roadmap', () => {
   it('cuts labels toward their floor on a narrow terminal, and nothing with no terminal', async () => {
     const project = plantRoadmapCase();
 
-    const narrow = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({}, [], 100));
+    const narrow = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({}, [], 106));
     const uncut = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({}, []));
 
-    expect(narrow.stdout).toContain('#20 open, #21 closed  pr #40        type:bug, m…  Blocked bug\n');
+    expect(narrow.stdout).toContain('#20 open, #21 closed  pr #40        -     type:bug, m…  Blocked bug\n');
     expect(uncut.stdout).toContain('type:bug, module:board  Blocked bug\n');
   });
 
@@ -611,7 +615,50 @@ describe('rafa issue list --roadmap', () => {
       [14, 'OPEN', 'outline', [{ kind: 'plan' }, { kind: 'branch', ref: 'refs/heads/feat/rafa-14-planned-bug' }]],
     ]);
     expect(data?.rows[0]?.blockers).toEqual([{ reference: '#20', state: 'open' }, { reference: '#21', state: 'closed' }]);
+    expect(data?.rows.map((row) => row.refs)).toEqual([null, null]);
     expect(`${renderRoadmapList(data ?? { roadmap: 0, rows: [] }).join('\n')}\n`).toBe(text.stdout);
+  });
+
+  it('prints each saved copy\'s suspect and dangling count in refs, - with no copy, and reads no copy off the Roadmap', async () => {
+    const calls: string[][] = [];
+    const asked: string[] = [];
+    const project = plantRoadmapCase();
+    const specs = join(project.root, '.rafa', 'specs');
+    mkdirSync(specs, { recursive: true });
+    writeFileSync(join(specs, 'rafa-13-blocked-bug.md'), '# Blocked bug\n\nTouches `src/here.ts`, `src/gone.ts` and `src/far.ts`.\n');
+    writeFileSync(join(specs, 'rafa-11-ready-spec.md'), '# Ready spec\n\nTouches `src/here.ts`.\n');
+    writeFileSync(join(specs, 'rafa-30-off-roadmap.md'), '# Off the Roadmap\n\nTouches `src/off.ts`.\n');
+    const live: Readonly<Record<string, LiveReading>> = { 'src/here.ts': PRESENT, 'src/far.ts': UNREADABLE };
+    const command = createIssueListCommand({
+      gh: plantedGh({}, calls),
+      git: plantedGit,
+      terminalWidth: () => undefined,
+      refsVerifier: () => async (ref) => {
+        asked.push(ref.text);
+        return live[ref.text] ?? ABSENT;
+      },
+    });
+
+    const text = await run(['issue', 'list', '--roadmap'], project, command);
+    const json = await run(['issue', 'list', '--roadmap', '--output=json'], project, command);
+    const data = (eventsOf(json.stdout).at(-1) as { data: RoadmapListResult } | undefined)?.data;
+
+    expect([text.exitCode, text.stderr]).toEqual([0, '']);
+    expect(text.stdout).toBe(`${[
+      'Roadmap: #1',
+      '  #  state  type  spec                      blocked by            has           refs  labels                  title',
+      '#13  open   bug   label: none, gate: ready  #20 open, #21 closed  pr #40        1     type:bug, module:board  Blocked bug',
+      '#11  open   code  ready                     -                     -             0     spec:ready, module:cli  Ready spec',
+      '#14  open   bug   outline                   -                     plan, branch  -     type:bug                Planned bug',
+    ].join('\n')}\n`);
+    expect(data?.rows.map((row) => [row.line.issue, row.refs])).toEqual([
+      [13, { copies: 1, suspect: 0, dangling: 1, unknown: 1, errors: [] }],
+      [11, { copies: 1, suspect: 0, dangling: 0, unknown: 0, errors: [] }],
+      [14, null],
+    ]);
+    expect(asked).toContain('src/gone.ts');
+    expect(asked).not.toContain('src/off.ts');
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view', 'issue list', 'pr list', 'issue view', 'issue list', 'pr list']);
   });
 
   it('carries the unreachable board as a warning in json mode, a warn log event ahead of the result', async () => {

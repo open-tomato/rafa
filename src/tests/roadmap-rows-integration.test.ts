@@ -121,6 +121,7 @@ function planted(board: GhResult): {
     git,
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: createPlanDirNames(dir),
+    refs: () => Promise.resolve(new Map()),
   };
   return { options, ghCalls, roadmapReads };
 }

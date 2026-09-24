@@ -150,14 +150,14 @@ describe('rafa issue list --roadmap, spawned', () => {
     expect(run.stdout + run.stderr).toContain('--all keeps the ticked Roadmap lines, so it needs --roadmap');
   });
 
-  it('prints the four rows in the Roadmap\'s order with spec, blocked by and has as planted', () => {
+  it('prints the four rows in the Roadmap\'s order with spec, blocked by, has and refs as planted', () => {
     const run = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap']);
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain('Roadmap: #1');
     expect(numbersOf(run.stdout)).toEqual(ORDER);
     const [third, first, second, fourth] = cellsOf(run.stdout);
-    expect(third).toEqual(['#13', 'open', 'bug', 'label: none, gate: ready', '-', '-', 'type:bug', 'Third thing']);
-    expect(first).toEqual(['#11', 'open', 'bug', 'ready', '-', 'plan', 'spec:ready, type:bug', 'First thing']);
+    expect(third).toEqual(['#13', 'open', 'bug', 'label: none, gate: ready', '-', '-', '-', 'type:bug', 'Third thing']);
+    expect(first).toEqual(['#11', 'open', 'bug', 'ready', '-', 'plan', '-', 'spec:ready, type:bug', 'First thing']);
     expect(second?.slice(0, 6)).toEqual(['#12', 'open', 'code', 'outline', '#11 open', 'branch']);
     expect(fourth?.slice(0, 6)).toEqual(['#14', 'open', 'bug', 'outline', '-', 'pr #40']);
   });

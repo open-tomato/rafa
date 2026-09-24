@@ -69,11 +69,14 @@
  * spawning `gh` in the project root.
  *
  * `issue list --roadmap` reaches no tracker either (`./list.ts`), and
- * takes three seams more: the `git` its branch scan runs, spawning `git`
+ * takes four seams more: the `git` its branch scan runs, spawning `git`
  * in the project root when left out; what reads the plan dir's file
  * names, `createPlanDirNames` (`board/roadmap-rows.ts`) when left out;
- * and the terminal's width, `process.stdout.columns` when left out. The
- * same `gh` runner reads the Roadmap and the board.
+ * what makes the verifier its `refs` column reads the saved copies with,
+ * `rafa doctor`'s own when left out (`../doctor-refs.ts`); and the
+ * terminal's width, `process.stdout.columns` when left out. The same
+ * `gh` runner reads the Roadmap, the board and the issues a saved copy
+ * names.
  */
 import type { AdapterRegistry } from '../../adapters/registry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -84,6 +87,7 @@ import type { RafaConfig } from '../../config.js';
 import type { IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
 import type { GitRunner } from '../../pr/git.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { DoctorRefsSeams } from '../doctor-refs.js';
 
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { CommandExit } from '../../cli/command.js';
@@ -101,6 +105,8 @@ export interface IssueSeams {
   readonly git?: GitRunner;
   /** What reads the file names in the plan dir `issue list --roadmap` resolved. `createPlanDirNames` when left out. */
   readonly planNames?: (dir: string) => PlanNames;
+  /** What makes the verifier `issue list --roadmap`'s `refs` column reads with. `rafa doctor`'s own when left out. */
+  readonly refsVerifier?: DoctorRefsSeams['refsVerifier'];
   /** The terminal's width in columns, or undefined for none. `process.stdout.columns` when left out. */
   readonly terminalWidth?: () => number | undefined;
 }

@@ -201,11 +201,18 @@ rafa issue list --roadmap --all    # including done items
 ```
 
 `rafa roadmap` reads the roadmap issue once and prints each line as a table
-row. The table has three columns beyond the item itself: **spec** (readiness,
-whether the issue carries `spec:ready`), **blocked by** (the first blocker if
-any, else empty), and **has** (what already exists: a plan, a branch, or an
-open pull request). This view helps you see at a glance what is ready for
-planning, what is waiting, and what is already in motion. `--all` includes
+row. The table has four columns beyond the item itself: **spec** (readiness,
+whether the issue carries `spec:ready`), **blocked by** (each blocker and
+whether it is open, `-` when there is none), **has** (what already exists: a plan, a branch, or an
+open pull request), and **refs** (how many references in the issue's saved
+copy under `specs.dir` read suspect or dangling: `0` for a clean copy, `-`
+when the issue has no saved copy, `?` when the copy could not be read). A
+non-zero `refs` is the same count `rafa doctor` reports; run
+`rafa issue check <n>` to see which references they are. Reading the column
+writes nothing to the copy. With `--output=json`, each row's `refs` holds the
+counts behind the cell (`copies`, `suspect`, `dangling`, `unknown` and the
+`errors` of copies that could not be read), or `null` with no saved copy. This view helps you see at a glance what is
+ready for planning, what is waiting, and what is already in motion. `--all` includes
 done items, and `rafa issue list --roadmap` offers more output formats and
 filters than `rafa roadmap` does.
 

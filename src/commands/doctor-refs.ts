@@ -52,8 +52,17 @@
  * read, then gets a line naming `rafa issue check <n>`; a copy holding
  * only unknown references gets a line saying why they were not
  * checked. Nothing here changes `doctor`'s exit code.
+ *
+ * ## The roadmap's refs column
+ *
+ * `rafa issue list --roadmap` reads the same copies the same way for its
+ * `refs` column (`../board/roadmap-rows.ts`): {@link DoctorRefsInput.issues}
+ * narrows the copies read to the Roadmap's selected lines, so a copy of
+ * an issue off the Roadmap costs no read, and {@link roadmapRefsCells}
+ * folds the copies into one cell per issue.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { RefsCell } from '../board/roadmap-rows.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
 
@@ -101,6 +110,8 @@ export interface DoctorRefsInput {
   readonly gh: GhRunner | null;
   /** The environment `ts-symbols` is looked up on; `process.env` when left out. */
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /** Read only the copies of these issues; every copy when left out. */
+  readonly issues?: readonly number[];
 }
 
 /** One saved copy's counts. */
@@ -237,7 +248,11 @@ function total(copies: readonly DoctorRefsCopy[], field: 'suspect' | 'dangling' 
 export async function readDoctorRefs(input: DoctorRefsInput, seams: DoctorRefsSeams = {}): Promise<DoctorRefsReading> {
   let files: readonly CopyFile[];
   try {
-    files = listCopies(resolve(input.root, input.specsDir));
+    const listed = listCopies(resolve(input.root, input.specsDir));
+    const only = input.issues === undefined
+      ? null
+      : new Set(input.issues);
+    files = listed.filter((file) => only === null || only.has(file.issue));
   } catch (error) {
     return { ok: false, detail: messageOf(error) };
   }
@@ -261,6 +276,30 @@ export async function readDoctorRefs(input: DoctorRefsInput, seams: DoctorRefsSe
     dangling: total(copies, 'dangling'),
     unknown: total(copies, 'unknown'),
   };
+}
+
+/**
+ * One `refs` cell per issue `reading` holds a copy of, its copies summed,
+ * each copy that could not be read giving its reason; throws the
+ * detail of a `specs.dir` that could not be listed. See the module note.
+ */
+export function roadmapRefsCells(reading: DoctorRefsReading): ReadonlyMap<number, RefsCell> {
+  if (!reading.ok) throw new Error(reading.detail);
+  const cells = new Map<number, RefsCell>();
+  for (const copy of reading.copies) {
+    const held = cells.get(copy.issue);
+    const errors = copy.error === null
+      ? []
+      : [`${copy.path}: ${copy.error}`];
+    cells.set(copy.issue, Object.freeze({
+      copies: (held?.copies ?? 0) + 1,
+      suspect: (held?.suspect ?? 0) + copy.suspect,
+      dangling: (held?.dangling ?? 0) + copy.dangling,
+      unknown: (held?.unknown ?? 0) + copy.unknown,
+      errors: Object.freeze([...(held?.errors ?? []), ...errors]),
+    }));
+  }
+  return cells;
 }
 
 /** `1 suspect, 2 dangling`, naming only the states some reference reads. */

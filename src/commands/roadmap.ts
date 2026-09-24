@@ -43,12 +43,13 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
     name: 'roadmap',
     subject: 'roadmap',
     action: 'roadmap',
-    summary: 'list the Roadmap\'s lines in its order, with spec, blocked by and has',
+    summary: 'list the Roadmap\'s lines in its order, with spec, blocked by, has and refs',
     description: 'Runs `rafa issue list --roadmap` with the flags typed: the unticked lines of the Roadmap issue'
       + ' (`roadmap.issue`, else the open issue titled Roadmap) in its order, read off the GitHub board, as a'
-      + ' table with three columns the plain list has not got: spec, whether the body passes the readiness'
-      + ' gate; blocked by, each blocker and whether it is open; and has, a plan, a branch or a pull request'
-      + ' already made for it. `--all` keeps the ticked lines, and `--type`, `--module`, `--search` and'
+      + ' table with four columns the plain list has not got: spec, whether the body passes the readiness'
+      + ' gate; blocked by, each blocker and whether it is open; has, a plan, a branch or a pull request'
+      + ' already made for it; and refs, how many references of the issue\'s saved copy under `specs.dir` read'
+      + ' suspect or dangling, `-` with no copy. `--all` keeps the ticked lines, and `--type`, `--module`, `--search` and'
       + ' `--limit` narrow the rows, keeping their order. An unreachable board is warned about with the rows'
       + ' still printed. With `--output=json` the roadmap, the rows and the warnings are the data of the'
       + ' terminal result event.',

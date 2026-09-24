@@ -471,6 +471,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/git.js', ['createGitRunner']],
+    ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../plan/plan-files.js', ['expectNoArgument', 'plansDirAt', 'readSwitch']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',

@@ -3,7 +3,9 @@
  * which saved copies under `specs.dir` are read, the suspect, dangling
  * and unknown counts per copy and in total, that an issue is read once
  * per run, that an unreadable board reads `unknown` instead of failing
- * the row, that nothing is written, and the lines the row renders.
+ * the row, that nothing is written, and the lines the row renders; and
+ * the roadmap's `refs` column over the same reading: the copies narrowed
+ * to the Roadmap's issues, and folded into one cell per issue.
  *
  * Paths are read through a real git over a repository planted under the
  * temp directory; issues through a fake `gh` runner answering
@@ -35,7 +37,14 @@ import { readRefsText } from '../refs/reading.js';
 import { issueFingerprint, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 
-import { issueCheckCommand, memoiseIssueReader, NO_BOARD_DETAIL, readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
+import {
+  issueCheckCommand,
+  memoiseIssueReader,
+  NO_BOARD_DETAIL,
+  readDoctorRefs,
+  renderDoctorRefs,
+  roadmapRefsCells,
+} from './doctor-refs.js';
 
 import { CORE_REGISTRY } from './index.js';
 
@@ -217,6 +226,44 @@ describe('readDoctorRefs', () => {
 
     expect(missing).toEqual({ ok: true, copies: [], suspect: 0, dangling: 0, unknown: 0 });
     expect(file.ok).toBe(false);
+  });
+});
+
+describe('the roadmap\'s refs column', () => {
+  it('reads only the copies of the issues named, and every copy with none named', async () => {
+    const root = plantRepository('narrowed');
+    plantCopy(root, 'rafa-1-on-roadmap.md', 'Reads `src/missing.ts`.\n');
+    plantCopy(root, 'rafa-2-off-roadmap.md', 'Reads `src/gone.ts`.\n');
+    const gh = fakeGh({});
+
+    const narrowed = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: gh.run, issues: [1, 5] }, SEAMS));
+    const whole = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: gh.run }, SEAMS));
+
+    expect(narrowed.copies.map((copy) => copy.issue)).toEqual([1]);
+    expect(whole.copies.map((copy) => copy.issue)).toEqual([1, 2]);
+  });
+
+  it('folds the copies into one cell per issue, summing two copies of one issue and keeping each failure', () => {
+    const cells = roadmapRefsCells({
+      ok: true,
+      copies: [
+        { issue: 1, path: 'a.md', suspect: 1, dangling: 0, unknown: 2, error: null },
+        { issue: 1, path: 'b.md', suspect: 0, dangling: 3, unknown: 0, error: 'not YAML' },
+        { issue: 4, path: 'c.md', suspect: 0, dangling: 0, unknown: 0, error: null },
+      ],
+      suspect: 1,
+      dangling: 3,
+      unknown: 2,
+    });
+
+    expect([...cells]).toEqual([
+      [1, { copies: 2, suspect: 1, dangling: 3, unknown: 2, errors: ['b.md: not YAML'] }],
+      [4, { copies: 1, suspect: 0, dangling: 0, unknown: 0, errors: [] }],
+    ]);
+  });
+
+  it('throws the detail of a specs.dir that could not be listed', () => {
+    expect(() => roadmapRefsCells({ ok: false, detail: 'EACCES: permission denied' })).toThrow('EACCES: permission denied');
   });
 });
 
