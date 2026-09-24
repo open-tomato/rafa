@@ -106,8 +106,15 @@ never guess one.
 
 **5. Draft the issue.** Write the body to a file (e.g. `/tmp/bug.md`) with these
 sections: Context, Reproduction, Expected, Actual, Environment, Regression range
-(when known), Source agent output (verbatim, in a fence), Owner verdict (only
+(when known), Artifact (the verbatim output), Refs (paths and symbols from the
+Artifact), Source agent output (verbatim, in a fence), Owner verdict (only
 when someone gave you one). Title as `Fix {noun} — {context}`.
+
+The **Refs** section lists paths (e.g. `src/a.ts`) and symbols (code-shaped
+names like `handleClick`, `BUFFER_SIZE`, or `serve()`) extracted from the
+Artifact. Omit the Refs section if the Artifact names none. Each ref carries a
+fingerprint taken at filing time; do not add them yourself — the tracking system
+computes and maintains them.
 
 Then **redact the evidence before the draft is final.** Scan the verbatim block
 for tokens, API keys, `Authorization`/`Bearer` values, connection strings, `.env`
