@@ -302,6 +302,13 @@ through the gate's warnings and left alone, and the gaps go in a comment
 posted beside them. The trust is the one check 0 already built, carried on
 `GateIssue` beside the number and the board.
 
+One more reader calls `readAuthorTrust` and is no route, since it reads
+no board text: the Providers reading of `rafa doctor --deep`
+(`src/commands/doctor-deep-providers.ts`) asks it, with an empty
+allow-list, about the login `gh` is authenticated as, to report whether a
+loop session could push and merge. It gates nothing, and goes through the
+rule so write access is spelled once.
+
 The repository a plan refusal names is a LABEL read from `origin` through
 the `git` seam (`boardRepoLabel`), never an input to the lookup: `gh`
 resolves the repository from the directory it runs in. It is read on the
