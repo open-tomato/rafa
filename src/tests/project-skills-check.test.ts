@@ -102,7 +102,7 @@ describe('a planted failing copy of the same tier', () => {
   it('reddens once a required field is stripped from one copied file', () => {
     const seamRoot = mkdtempSync(join(tempBase, 'planted-'));
     const copyRoot = join(seamRoot, 'skills');
-    cpSync(SKILLS_DIR, copyRoot, { recursive: true });
+    cpSync(SKILLS_DIR, copyRoot, { recursive: true, dereference: true });
 
     const target = join(copyRoot, 'api', 'SKILL.md');
     const before = readFileSync(target, 'utf8');
@@ -130,7 +130,7 @@ describe('a planted body naming a tool no PATH directory holds', () => {
   it('reddens with a missing-tool failure once one copied file names it', () => {
     const seamRoot = mkdtempSync(join(tempBase, 'planted-tool-'));
     const copyRoot = join(seamRoot, 'skills');
-    cpSync(SKILLS_DIR, copyRoot, { recursive: true });
+    cpSync(SKILLS_DIR, copyRoot, { recursive: true, dereference: true });
 
     const target = join(copyRoot, 'api', 'SKILL.md');
     const before = readFileSync(target, 'utf8');

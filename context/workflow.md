@@ -21,6 +21,12 @@ the shape discriminates where the verb does not.
 | Review of a change as a whole | `code-reviewer` | `.claude/agents/code-reviewer.md` |
 | Implementation — a module plus its TSDoc plus its colocated tests | `loop-implementer` | `.claude/agents/loop-implementer.md` |
 
+Each `.claude/agents/<name>.md` the table names is a symbolic link into
+`src/bundled/agents/`, the rafa tier that ships with the package, so the
+bundled file is the one to edit; `dev-planner`, `git-workflow` and the
+`documentation` skill's `SKILL.md` under `.claude/skills/` are linked the
+same way into `src/bundled/skills/`.
+
 **`user-level` in the third column is a portability warning and not a
 footnote.** Those two definitions live outside the repo, so a fresh
 clone receives none of them and the name resolves against whatever that

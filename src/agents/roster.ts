@@ -108,8 +108,9 @@
  * it.
  */
 import type { ClaudeSettingSource } from '../config.js';
+import type { Dirent } from 'node:fs';
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { parsePlan } from '../plan/parse.js';
@@ -212,6 +213,17 @@ function readText(path: string): string | null {
   }
 }
 
+/**
+ * Whether `entry` under `dir` is a file, following a symbolic link the way
+ * Claude Code does: this repository's `.claude/agents/` links into
+ * `src/bundled/agents/`, and a dangling link counts as no file.
+ */
+function isFileEntry(dir: string, entry: Dirent): boolean {
+  if (entry.isFile()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  return statSync(join(dir, entry.name), { throwIfNoEntry: false })?.isFile() === true;
+}
+
 /** The `.md` file names under `dir`, sorted, or none when it is unreadable. */
 function markdownFiles(dir: string): readonly string[] {
   let entries;
@@ -222,7 +234,7 @@ function markdownFiles(dir: string): readonly string[] {
   }
 
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .filter((entry) => entry.name.endsWith('.md') && isFileEntry(dir, entry))
     .map((entry) => entry.name)
     .sort((a, b) => a.localeCompare(b));
 }

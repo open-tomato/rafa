@@ -28,7 +28,7 @@
 import type { AgentRosterRoots } from './roster.js';
 import type { ClaudeSettingSource } from '../config.js';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -138,6 +138,20 @@ describe('readAgentDefinitions', () => {
     mkdirSync(join(roots.repoRoot, '.claude', 'agents', 'nested.md'), { recursive: true });
 
     expect(readAgentDefinitions(roots.repoRoot)).toEqual([{ name: 'doc-updater', path: usable }]);
+  });
+
+  it('follows a link to a definition and passes over a dangling one', () => {
+    const roots = freshRoots();
+    const target = join(roots.repoRoot, 'bundled', 'linked-agent.md');
+    mkdirSync(join(roots.repoRoot, 'bundled'), { recursive: true });
+    writeFileSync(target, definitionText('name: linked-agent'), 'utf8');
+    const dir = join(roots.repoRoot, '.claude', 'agents');
+    mkdirSync(dir, { recursive: true });
+    const linked = join(dir, 'linked-agent.md');
+    symlinkSync('../../bundled/linked-agent.md', linked);
+    symlinkSync('../../bundled/absent.md', join(dir, 'dangling.md'));
+
+    expect(readAgentDefinitions(roots.repoRoot)).toEqual([{ name: 'linked-agent', path: linked }]);
   });
 
   it('answers both files carrying one name, sorted by name', () => {
