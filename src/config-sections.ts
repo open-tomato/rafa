@@ -102,6 +102,23 @@
  *     not read as silence. It is the `- tool:` of a map: a name that
  *     pins nothing, where silence is the name left out.
  *
+ * ## The `routing` setting
+ *
+ * The spec spells `routing` as a map of a task shape to an agent.
+ * {@link routeTarget} reads one value; the map around it is `mapOf`
+ * again, and the defaults are `tiers/routing.ts`'s. Two readings are
+ * this module's:
+ *
+ *   - A value is an agent name, any non-empty string, or `false`, a
+ *     shape routed nowhere, as `false` turns an item off in
+ *     `tiers.skills`. Whether the name is an agent anything defines is
+ *     a question for the tier resolver the spec plans, never for a
+ *     reader. So a quoted `"false"` is read as a name and not coerced
+ *     to `false`.
+ *   - `true` and null are refused, as for a pin: `true` names no agent,
+ *     and a shape with nothing after it routes nothing, where silence
+ *     is the shape left out.
+ *
  * ## The lists this module does not own
  *
  * Every other closed list here is declared here. Three are not,
@@ -283,6 +300,12 @@ export type TierSwitch = (typeof TIER_SWITCHES)[number];
  */
 export type TierPin = false | SkillTier;
 
+/**
+ * One value of `routing`: the agent a task of that shape goes to, or
+ * `false` for a shape routed nowhere.
+ */
+export type RouteTarget = false | string;
+
 /** A reading of `value` with nothing wrong. */
 function accepted<T>(value: T): Reading<T> {
   return { value, problems: [], extras: [] };
@@ -417,6 +440,15 @@ export const tierPin: Reader<TierPin> = (raw, at) => {
     ? refused(at, raw, `false or one of: ${SKILL_TIERS.join(', ')}`)
     : accepted(tier);
 };
+
+/**
+ * Accepts `false` or an agent name, each as itself; see "The `routing`
+ * setting" for why `true` and null are refused.
+ */
+export const routeTarget: Reader<RouteTarget> = (raw, at) => raw === false
+  || (typeof raw === 'string' && raw.trim() !== '')
+  ? accepted(raw)
+  : refused(at, raw, 'false or an agent name');
 
 /**
  * A GitHub account login as the collaborators endpoint takes one in a

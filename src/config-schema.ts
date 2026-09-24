@@ -234,6 +234,23 @@
  *   - No `tiers` setting is a {@link CommandLineSetting}, for the reason
  *     the `pr` section gives.
  *
+ * ## The `routing` setting
+ *
+ * The same spec makes the routing table a setting: `routing`, a map of
+ * a task shape to the agent that takes it, read by {@link mapOf} as the
+ * `tiers` maps are. Three readings are this module's:
+ *
+ *   - It sits at the top level, like `modules`, so it opens no section
+ *     and adds `routing` alone to the keys a warning lists. A shape
+ *     spelled flat, `routing.prose:`, is an unknown top-level key.
+ *   - Its default is NOT empty: it is `tiers/routing.ts`'s
+ *     `DEFAULT_ROUTING`, the spec's five rows, so a project that has
+ *     said nothing still routes every shape the planner uses.
+ *   - A layer naming it answers the map whole, as the `tiers` maps do,
+ *     so today a file's one row REPLACES the five defaults rather than
+ *     joining them. The merge by key the spec names is what changes
+ *     that; see that module's note.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -278,8 +295,9 @@
  *
  * {@link CONFIG_DEFAULTS} spells every default once, frozen, with each
  * list in it frozen too. A map cannot be frozen, as "Map settings" says,
- * so each empty map default is one shared `Map`, and the promise that
- * no caller edits it rests on its `ReadonlyMap` type. The cutover runs one plan under `full` and
+ * so each map default is one shared `Map` — the empty `tiers` maps and
+ * the `routing` table alike — and the promise that no caller edits it
+ * rests on its `ReadonlyMap` type. The cutover runs one plan under `full` and
  * again under `stage`; should that comparison argue for `full`, the
  * change is that one line.
  */
@@ -296,6 +314,7 @@ import type {
   Reader,
   Reading,
   ReleaseEnabled,
+  RouteTarget,
   StoreBackend,
   TierPin,
   TierSwitch,
@@ -326,6 +345,7 @@ import {
   releaseEnabled,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
+  routeTarget,
   STORE_BACKENDS,
   subsetOf,
   text,
@@ -333,6 +353,7 @@ import {
   tierSwitch,
   usdAmount,
 } from './config-sections.js';
+import { DEFAULT_ROUTING } from './tiers/routing.js';
 
 /**
  * The config file, relative to the directory it sits under: the project
@@ -498,6 +519,11 @@ export interface RafaConfig {
    * by name. `tiers.agents`.
    */
   tiersAgents: ReadonlyMap<string, TierPin>;
+  /**
+   * The agent each task shape is routed to, or `false` for a shape
+   * routed nowhere. `routing`.
+   */
+  routing: ReadonlyMap<string, RouteTarget>;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -549,6 +575,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   tiersRafa: 'on',
   tiersSkills: new Map<string, TierPin>(),
   tiersAgents: new Map<string, TierPin>(),
+  routing: DEFAULT_ROUTING,
 });
 
 /** What the module knows about one setting. */
@@ -674,6 +701,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   tiersRafa: { key: 'tiers.rafa', read: tierSwitch, cli: false },
   tiersSkills: { key: 'tiers.skills', read: tierPins, cli: false },
   tiersAgents: { key: 'tiers.agents', read: tierPins, cli: false },
+  routing: {
+    key: 'routing',
+    read: mapOf(routeTarget, 'false or an agent name'),
+    cli: false,
+  },
 };
 
 /** Every setting name, read off the closed record above. */

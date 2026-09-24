@@ -41,6 +41,7 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
+  RouteTarget,
   TierPin,
 } from '../config.js';
 
@@ -186,6 +187,9 @@ const PROJECT_TEXT = [
   '    react-query: false',
   '  agents:',
   '    tdd-guide: rafa',
+  'routing:',
+  '  cleanup: refactor-cleaner',
+  '  review: false',
   '',
 ].join('\n');
 
@@ -240,6 +244,7 @@ const PROJECT_VALUES: RafaConfig = {
   tiersRafa: 'off',
   tiersSkills: new Map<string, TierPin>([['documentation', 'project'], ['react-query', false]]),
   tiersAgents: new Map([['tdd-guide', 'rafa']]),
+  routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -299,6 +304,7 @@ const USER_TEXT = [
   '  rafa: on',
   '  skills: { documentation: user }',
   '  agents: { tdd-guide: user, code-reviewer: false }',
+  'routing: { review: typescript-reviewer }',
   '',
 ].join('\n');
 
@@ -343,6 +349,7 @@ const USER_VALUES: RafaConfig = {
   tiersRafa: 'on',
   tiersSkills: new Map([['documentation', 'user']]),
   tiersAgents: new Map<string, TierPin>([['tdd-guide', 'user'], ['code-reviewer', false]]),
+  routing: new Map([['review', 'typescript-reviewer']]),
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -603,6 +610,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tiers.agents', 'tiers:\n  agents: { tdd-guide: Project }',
     'tiers.agents.tdd-guide is "Project", expected false or one of: project, rafa, user',
     'tiers:\n  agents: { tdd-guide: false }', 'tiersAgents', new Map([['tdd-guide', false]]),
+  ],
+  [
+    'routing', 'routing: { tests: }',
+    'routing.tests is null, expected false or an agent name',
+    'routing: { tests: false }', 'routing', new Map([['tests', false]]),
   ],
 ];
 

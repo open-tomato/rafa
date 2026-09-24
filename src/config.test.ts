@@ -60,6 +60,7 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
+  RouteTarget,
   TierPin,
 } from './config.js';
 
@@ -85,7 +86,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup, dangerous, status, tiers)';
+  + 'roadmap, release, cleanup, dangerous, status, tiers, routing)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -124,6 +125,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'tiersRafa',
   'tiersSkills',
   'tiersAgents',
+  'routing',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -163,6 +165,13 @@ const DEFAULTS: RafaConfig = {
   tiersRafa: 'on',
   tiersSkills: new Map(),
   tiersAgents: new Map(),
+  routing: new Map([
+    ['prose', 'doc-updater'],
+    ['tests', 'tdd-guide'],
+    ['repair', 'build-error-resolver'],
+    ['review', 'code-reviewer'],
+    ['implementation', 'loop-implementer'],
+  ]),
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -228,6 +237,7 @@ const FULL = [
   '  rafa: off',
   '  skills: { react-query: false, documentation: project }',
   '  agents: { tdd-guide: user }',
+  'routing: { cleanup: refactor-cleaner, review: false }',
   '',
 ].join('\n');
 
@@ -282,6 +292,7 @@ const FULL_VALUES: RafaConfig = {
   tiersRafa: 'off',
   tiersSkills: new Map<string, TierPin>([['react-query', false], ['documentation', 'project']]),
   tiersAgents: new Map([['tdd-guide', 'user']]),
+  routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -661,6 +672,11 @@ describe('parseConfigText', () => {
         'tiers.agents is a list, expected a mapping of names to false or a tier',
         'tiers:\n  agents: { tdd-guide: rafa }', 'tiersAgents', new Map([['tdd-guide', 'rafa']]),
       ],
+      [
+        'routing', 'routing: { prose: true }',
+        'routing.prose is true, expected false or an agent name',
+        'routing: { prose: tdd-guide }', 'routing', new Map([['prose', 'tdd-guide']]),
+      ],
     ];
 
     it('covers every setting once', () => {
@@ -715,6 +731,13 @@ describe('parseConfigText', () => {
       .toEqual(new Map([['tdd-guide', false]]));
   });
 
+  it('retains a routing shape spelled flat as an unknown key, not as a row', () => {
+    const file = fileOf('routing.cleanup: refactor-cleaner\n');
+
+    expect(file.extras).toEqual([{ key: 'routing.cleanup', value: 'refactor-cleaner' }]);
+    expect(file.values.routing).toBeUndefined();
+  });
+
   it.each([
     ['plan.inject', 'plan.inject: full\nplan:\n  inject: task\n'],
     ['loop.settingSources', 'loop.settingSources: user\nloop:\n  settingSources: local\n'],
@@ -726,6 +749,17 @@ describe('parseConfigText', () => {
 });
 
 describe('resolveConfig', () => {
+  it('answers a file\'s routing whole, so one row replaces the five defaults', () => {
+    // Nothing merges by key yet; see "The `routing` setting" in
+    // config-schema.ts. The control is the same resolve without the row.
+    const file = fileOf('routing: { cleanup: refactor-cleaner }\n');
+
+    expect(resolveConfig({ file }).config.routing)
+      .toEqual(new Map([['cleanup', 'refactor-cleaner']]));
+    expect(resolveConfig({ file: fileOf('store: sqlite\n') }).config.routing)
+      .toEqual(DEFAULTS.routing);
+  });
+
   it('answers the defaults when no layer names a setting', () => {
     expect(resolveConfig()).toEqual({
       config: DEFAULTS,

@@ -71,6 +71,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['tiersRafa', 'tiers.rafa'],
   ['tiersSkills', 'tiers.skills'],
   ['tiersAgents', 'tiers.agents'],
+  ['routing', 'routing'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -107,6 +108,7 @@ const TOP = [
   'dangerous',
   'status',
   'tiers',
+  'routing',
 ];
 
 describe('SETTINGS', () => {
@@ -214,6 +216,12 @@ describe('knownKeysAbove', () => {
       'tiers',
       ['rafa', 'skills', 'agents'],
     ]);
+  });
+
+  it('answers the top level for a routing shape spelled flat, which no setting reads', () => {
+    expect(SETTING_BY_KEY.get('routing.prose')).toBeUndefined();
+    expect(SECTIONS.has('routing')).toBe(false);
+    expect(knownKeysAbove('routing.prose')).toEqual(['', TOP]);
   });
 
   it('collapses a list index, so an item key answers the item shape', () => {

@@ -42,6 +42,7 @@ import {
   RELEASE_AUTO,
   releaseEnabled,
   requiredPrerequisite,
+  routeTarget,
   STORE_BACKENDS,
   subsetOf,
   text,
@@ -458,6 +459,30 @@ describe('tierPin', () => {
   ])('refuses %s', (_label, raw, found) => {
     expect(problemsOf(tierPin, raw)).toEqual([
       `F: s is ${found}, expected false or one of: project, rafa, user`,
+    ]);
+  });
+});
+
+describe('routeTarget', () => {
+  it('accepts false and an agent name, each as itself', () => {
+    expect(routeTarget(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+    expect(['loop-implementer', 'refactor-cleaner'].map((name) => valueOf(routeTarget, name)))
+      .toEqual(['loop-implementer', 'refactor-cleaner']);
+  });
+
+  it('reads the string false as a name, not as false, since nothing here coerces', () => {
+    expect(valueOf(routeTarget, 'false')).toBe('false');
+  });
+
+  it.each([
+    ['true, which names no agent', true, 'true'],
+    ['null, a shape that routes nothing', null, 'null'],
+    ['an empty name', '', '""'],
+    ['a blank name', '  ', '"  "'],
+    ['a list of agents', ['tdd-guide'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(routeTarget, raw)).toEqual([
+      `F: s is ${found}, expected false or an agent name`,
     ]);
   });
 });

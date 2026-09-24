@@ -178,6 +178,7 @@ export type {
   PrerequisiteKind,
   PrProvider,
   ReleaseEnabled,
+  RouteTarget,
   StoreBackend,
   TierPin,
   TierSwitch,
@@ -344,6 +345,7 @@ function readLayer(
     tiersRafa: read('tiersRafa'),
     tiersSkills: read('tiersSkills'),
     tiersAgents: read('tiersAgents'),
+    routing: read('routing'),
   };
   return { layer, problems, extras };
 }
