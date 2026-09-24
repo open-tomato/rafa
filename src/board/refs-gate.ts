@@ -219,8 +219,12 @@ function listPassingRows(rows: readonly RefRow[], output: Output): void {
   }
 }
 
-/** `verify`, reading each kind and text once however often it is asked. */
-function memoised(verify: RefVerifier): RefVerifier {
+/**
+ * `verify`, reading each kind and text once however often it is asked:
+ * what lets one run read a copy against its old stamps and then
+ * re-stamp it with a single `gh issue view` per issue.
+ */
+export function memoiseVerifier(verify: RefVerifier): RefVerifier {
   const read = new Map<string, Promise<LiveReading>>();
   return (ref) => {
     const key = `${ref.kind}\u0000${ref.text}`;
@@ -234,7 +238,7 @@ function memoised(verify: RefVerifier): RefVerifier {
 
 /** The rows read against the stamps the copy holds, and the copy re-stamped; see the module note. */
 async function acceptAll(options: RefsGateOptions, acceptance: Exclude<RefsAcceptance, 'none'>, output: Output): Promise<RefsGateAnswer> {
-  const verify = memoised(options.verify);
+  const verify = memoiseVerifier(options.verify);
   const before: RefsReading = await readRefsText({ copy: readFileSync(options.path, 'utf8'), issue: options.issue, verify });
   const after = await restampCopyRefs({ path: options.path, issue: options.issue, verify });
   const accepted = before.rows.filter(isRefusedRow);
