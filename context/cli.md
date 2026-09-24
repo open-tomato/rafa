@@ -1337,7 +1337,9 @@ say nothing of why.
 `dispatch(argv, { registry })` answers `{ exitCode, result }` and sets
 no exit code: its caller ends the process. The streams, the environment,
 the clock, the importer, the help renderer, the working directory, the
-home and the warnings read before the invocation are options.
+home, the warnings read before the invocation and the command hook
+(`commandHook`, called around a command that runs inside a project in
+text mode; see `src/cli/dispatch.ts`'s module note) are options.
 
 - **A command runs inside a project, or not at all.** Once the spec of a
   command needing a project is read, `resolveScope` walks up from the

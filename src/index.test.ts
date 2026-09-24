@@ -18,8 +18,8 @@
  * neither grows the root unseen.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
- * dispatcher, the help renderer, the core registry and the module loader
- * alone, and that
+ * dispatcher, the help renderer, the core registry, the module loader
+ * and the since-last-command notice's command hook alone, and that
  * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
  * a command registered and not spelled goes red. Each of those modules
@@ -350,6 +350,7 @@ const CLI_IMPORTS: ImportList = [
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
   ['./modules/load.js', ['loadInvocationModules']],
+  ['./status/hook.js', ['createStatusHook']],
 ];
 
 /**

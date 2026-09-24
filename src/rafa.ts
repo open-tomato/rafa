@@ -19,17 +19,20 @@
  * `rafa plan --spec=` still run, each after one deprecation line on
  * stderr.
  *
- * The module holds nothing but the dispatch and the modules loaded for
- * it. It first loads the modules of the project the working directory is
+ * The module holds nothing but the dispatch, the modules loaded for it
+ * and the command hook handed to it. It first loads the modules of the project the working directory is
  * in (`src/modules/load.ts`), so a module's actions route, render help
  * and are described, and hands the dispatcher their command entries and
  * the loader's warnings. `src/commands/index.ts`
  * holds the roster, `src/cli/help.ts` renders `rafa --help` and the help
  * of each subject and action from it, and `src/cli/dispatch.ts` routes
  * the line, runs the command, writes its events and answers the exit
- * code, which this module sets on the process. It sets `process.exitCode`
- * rather than calling `process.exit`, so nothing a command wrote is
- * truncated mid-flush.
+ * code, which this module sets on the process. It hands the dispatcher
+ * the since-last-command notice as its command hook
+ * (`src/status/hook.ts`), which `src/tests/cli-capture.ts` does not, so
+ * an in-process test prints no notice and writes no snapshot. It sets
+ * `process.exitCode` rather than calling `process.exit`, so nothing a
+ * command wrote is truncated mid-flush.
  *
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
@@ -40,6 +43,7 @@ import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { CORE_REGISTRY } from './commands/index.js';
 import { loadInvocationModules } from './modules/load.js';
+import { createStatusHook } from './status/hook.js';
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
 const { exitCode } = await dispatch(process.argv.slice(2), {
@@ -47,5 +51,6 @@ const { exitCode } = await dispatch(process.argv.slice(2), {
   renderHelp,
   modules: modules.commands,
   warnings: modules.warnings,
+  commandHook: createStatusHook(),
 });
 process.exitCode = exitCode;
