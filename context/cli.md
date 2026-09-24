@@ -130,6 +130,9 @@ New; it replaces no earlier text. What a row or an action added to
   spells them. That is how the bundle's reach is held to a list rather
   than to a habit, so `reads the imports <path> takes as the ones spelled
   here` goes red the moment a module gains, drops or renames one import.
+  `src/rafa.ts` is held the same way by `CLI_IMPORTS` in the same file,
+  whose note also names those imports in words, so an import added to
+  the entry point moves the list and the sentence.
   Adding an import to a command module is therefore a two-file change,
   the module and that roster — the sibling of the declared-flag roster
   `src/commands/index.test.ts` holds. Its `IMPORT_PATTERN` matches
@@ -143,8 +146,10 @@ New; it replaces no earlier text. What a row or an action added to
   against `CORE_REGISTRY`, so a module added under `src/commands/` and not
   yet registered reddens neither, and a plan can split "add the module"
   from "register it" across two tasks with the suite green between them.
-  Registration itself reddens exactly three: `OWN_DECLARATIONS`, `OUTPUTS`
-  and the roster expectations in `src/commands/index.test.ts`,
+  Registration itself reddens exactly three: `OWN_DECLARATIONS`, `OUTPUTS`,
+  the roster expectations and `the module note's count word` (the note's
+  number spelled in words, equal to `CORE_COMMANDS.length`) in
+  `src/commands/index.test.ts`,
   `COMMAND_MODULES` in `src/index.test.ts`, and the frozen help snapshots — the last only
   for a new subject or top-level command, or a subject summary that
   changes with it. A spending subject's changed summary or a new top-level command

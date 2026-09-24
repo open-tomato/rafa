@@ -122,6 +122,18 @@ session may not touch a released section to fix it, so it stays red
 until a change exempts `CHANGELOG.md` or rewords those lines. This paragraph replaces nothing;
 it is the third known failure the pages above did not list.
 
+**Three cleanup cases are red since 2026-09-24T12:00Z.**
+`src/cleanup/scratch-repository.test.ts` reads its worktrees at the fixed
+`SCRATCH_NOW` (2026-09-24T12:00Z), but the worktrees carry their real
+modification time. Once the wall clock passes `SCRATCH_NOW` that time is
+later than the reading's clock, so every worktree carries a `recent`
+blocker (`modified today, within cleanup.worktreeIdleDays (0)`) and three
+`readCleanup over a scratch repository` cases fail: `6 pass`, `3 fail`,
+identically on `origin/main`. It stays red until the fixture dates its
+worktrees relative to `SCRATCH_NOW`. A test that needs an idle worktree
+from that fixture scripts `modifiedAt` rather than reading the disk, as
+`src/status/seen.test.ts` does. This paragraph replaces nothing.
+
 **One suite prints a model refusal on a clean run.**
 `src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
 `Sorry, this request could not be completed.` and exits 3, and a second
@@ -139,12 +151,19 @@ code do not change. `env -u CLAUDECODE bun test` prints every case.
 **`check-types` never reads a test file.** `tsconfig.json` excludes
 `**/*.test.ts`, and `bun test` strips types without checking them, so a type
 error in a test is green on every gate. To check one by hand, point a
-tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`,
+tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
+by absolute path (a bare `tsconfig.json` is looked up as a package, the
+repo's options are never applied, and hundreds of TS2802 errors follow),
 never `tsconfig.base.json`, which leaves `module` unset and fails
 `src/plan.ts` and `src/start.ts` on `import.meta` (TS1343), `files` holding
 the test's absolute path, `include` empty, `typeRoots` naming
-`<repo>/node_modules/@types` absolutely — and run
-`./node_modules/.bin/tsc -p` on it. A type-level claim that must stay
+`<repo>/node_modules/@types` absolutely (left out, every file reports
+`Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc -p`
+on it. Test files already carry errors no gate ever reported, so compare
+against the base before attributing one to the diff: TS2769 where a
+`readonly` array reaches `toEqual` (`src/config-schema.test.ts`,
+`src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on the
+`it(name, { timeout }, fn)` form in the spawned suites. A type-level claim that must stay
 checked belongs in the suite instead, as in `src/ports/index.test.ts`,
 which runs `ts.createProgram` over probe files.
 
@@ -212,5 +231,13 @@ the reference example. This section replaces nothing.
 - The same `PATH` means a stand-in `claude` script cannot rely on `cat` or
   other coreutils where git lives outside `/usr/bin`. Print a file with
   shell builtins: `while IFS= read -r l; do printf '%s\n' "$l"; done < f`.
+  A stand-in that must hang cannot `sleep` either: the call fails at once
+  and a deadline test passes without waiting. Have it
+  `exec "<process.execPath>" -e 'setTimeout(() => {}, 600000)'` instead.
+- A scratch project's `origin` is a bare path, so `resolvePrProvider`
+  answers `none` and no `gh` stand-in is ever called. Plant
+  `pr.provider: gh` in `.rafa/config.yaml`, and `roadmap.issue` too when
+  the test needs the board read (`rafa status`, `rafa next`); without it
+  the board section warns without calling `gh`.
 - A `ROUTES` case in `src/commands/index.test.ts` splits its route line on
   spaces, so a quoted multi-word argument does not group; use one word.
