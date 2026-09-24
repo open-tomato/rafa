@@ -74,6 +74,12 @@ module's note is the long form.
 | `src/cleanup/steps.ts` | turning the ticked rows into deletion steps: one step per branch and one per worktree; a withheld row (one the deletion cannot run) is one warning each; both the force guard and the refusal to delete remote are here |
 | `src/cleanup/scratch-repository.ts` | the test fixture, not a reader: a bare remote and a clone holding one merged, one squash-merged, one stale, one unpushed and one `[gone]` branch, and a clean merged, a dirty and a locked worktree under `.claude/worktrees/`. Not a test file so `check-types` opens it, and not re-exported from `./index.js`; the `readCleanup`, `rafa cleanup` and `rafa doctor` integration tests build it |
 | `src/commands/cleanup-render.ts` | rendering the four groups as lines: `renderCleanup` prints the listing, `branchRowLine` and `worktreeRowLine` each row as name, date and reason, and `cleanupNameWidth` measures the longest name for column alignment |
+| `src/status/sections.ts` | the five readers `readStatusSections` holds and calls: branch and plan, loops, pull request, board, housekeeping, each with its own seams to the git, session, plan, pull request and GitHub providers |
+| `src/status/render.ts` | `renderStatus` and `statusData`, the text and json output formats of `rafa status` |
+| `src/status/seen.ts` | the local reading `takeSeenSnapshot` takes at the start of every command and writes for the next, held in `<root>/.rafa/status-seen.json`, through `readSeenFile` and `writeSeenFile` |
+| `src/status/notice.ts` | the since-last-command notice: `compareSeen` finds what changed between two snapshots (`idleWorktrees`, `mergedBranches`, `stoppedSessions`, `blockedSessions`), and `noticeLine` answers the one stderr line naming `rafa status` or `rafa cleanup` |
+| `src/status/hook.ts` | the since-last-command notice as the dispatcher's command hook: `before` compares snapshots and returns the line, `after` writes the current snapshot so the next command finds what this one did |
+| `src/commands/status.ts` | `rafa status`: where the project stands in five sections — branch and plan, loops, pull request, board, housekeeping — read by the five readers of `src/status/sections.ts` and worded by `src/status/render.ts`. It is all code: it starts no Claude session and declares no `spends`. The five sections are run in order and the pull request and board are read through `gh` under a short deadline with no fetch. A section that could not be read is one `warn` line saying why; everything else is `info`. Exit code 1 only for a config `loadConfig` refuses; 2 for a positional word; 0 otherwise |
 | `src/commands/cleanup.ts` | `rafa cleanup [--dry-run]`: the reading of `src/cleanup/` (`git fetch --prune` first, `pr.base`, the three `cleanup.*` settings, git run in the directory the command runs from, the provider `resolvePrProvider` resolves at the project root, or none) shown in four groups, in code and starting no session, so it declares no `spends`. With a terminal the groups are one grouped `multiSelect`, each row the line `./cleanup-render.ts` prints and ticked as the reading ticks it; each ticked Not-pushed row then asks a second `[y/N]` naming its commit count, and `Delete <n> branches and remove <m> worktrees? [y/N]` asks before `src/cleanup/steps.ts` runs the steps. The questions go through a line `Prompter` opened only after the checklist answers, so the two readers never share standard input. `--dry-run` asks the same checklist and second questions, then prints each step's command line in place of the final question. Without a terminal, or with `--output=json`, it prints the four groups (the json data being `cleanupData`), asks nothing and removes nothing, `--dry-run` included. Exit code 0 for every run that removed what was answered or nothing; 1 for an argument, a value typed after `--dry-run`, a config `loadConfig` refuses, a repository git cannot read, and a step that did not run clean |
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
@@ -178,7 +184,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
-  `doctor`, `cleanup`, `status`, `self-update`, `usage` and
+  `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
   declared with its first action, never ahead of it.
@@ -218,12 +224,12 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `cleanup`, `status`, `self-update`, the plan readers, the
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `status`, `cleanup`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
   `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
   `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
-  `doctor`, `cleanup`, `status`, `self-update`, each plan reader, each `loop` session action,
+  `doctor`, `status`, `cleanup`, `self-update`, each plan reader, each `loop` session action,
   each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
   `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
@@ -600,6 +606,29 @@ New; it replaces no earlier text. What a row or an action added to
   `specs.dir` that cannot be listed), the `--deep` sections as its `deep`,
   null without the flag, and a
   halt gives the `command_exit` error and no `data`.
+- **`status` reads where the project stands in five sections**
+  (`src/commands/status.ts`, `src/status/sections.ts`, `src/status/render.ts`).
+  Each section is read in order: branch and plan (git at the project root,
+  the plans directory named by the config, the task counts and stub if a
+  branch is a feature branch); loops (the session records under `.rafa/runs/`,
+  how many run and how many are blocked, each running or blocked one named);
+  pull request (the branch's open pull request if any, whether it can be merged,
+  its checks); board (the Roadmap's next unblocked issue if the provider is `gh`,
+  whether it is ready, how many issues carry `spec:blocked`); housekeeping
+  (the branches and worktrees `rafa cleanup` would list, counted per group,
+  nothing fetched). The first three are read with no network; the pull request
+  and board are read through `gh` with a short deadline. A section that could
+  not be read — git refusing, `gh` timing out, a provider that is not `gh` —
+  is one `warn` line saying why; everything else is `info`. A reading that
+  answers `{ ok: false }` is thrown as an error and swallowed into a `warn`
+  line, so nothing changes the exit code. Exit code 1 only for a config
+  `loadConfig` refuses; 2 for a positional word, since it takes none;
+  0 otherwise, whether it read everything or not. Text mode prints each line
+  the level it names; json mode gives the five sections as data, each with
+  `read` (true or false) and its reading or the problem.
+  `createStatusHook` reads the project's config (with warnings dropped) and
+  calls `createStatusCommand` by default, so a command can run with seams for
+  the sections and the whole hook. No test needs a command factory seam.
 - **`self-update` installs the checkout it runs in**
   (`src/commands/self-update.ts`), as `bun run snapshot` does: both call
   `installRuntime` (`src/runtime/install.ts`), the script from the

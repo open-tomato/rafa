@@ -395,7 +395,7 @@ and a line here is ticked by the change that finishes the feature.
   names is extracted by pattern, verified against its target, and
   fingerprinted so changes are caught when the spec is refreshed
 - ✅ Clean up merged, stale and unpushed branches and idle worktrees
-- ⬜ `rafa status`: everything in one snapshot, and one line about what
+- ✅ `rafa status`: everything in one snapshot, and one line about what
   changed since you last looked
 - ⬜ The right skills reach the right task, chosen when the plan is
   written
