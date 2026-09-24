@@ -175,6 +175,7 @@
  * each left out being the runner's own.
  */
 import type { BlockedIssuesReport } from './doctor-blocked.js';
+import type { DeepDoctorSeams } from './doctor-deep.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardStatus } from '../board/status.js';
@@ -216,8 +217,13 @@ import { readPreviousCopies } from './doctor-previous.js';
 import { renderBoard, renderDoctor } from './doctor-render.js';
 import { isFile } from './plan/plan-files.js';
 
-/** How the checks run; see the module note. Each left out is the runner's own. */
-export interface DoctorSeams {
+/**
+ * How the checks run; see the module note. Each left out is the
+ * runner's own. The `--deep` reading's own seams — the directory a
+ * session runs in, the runner its provider probes go through, and how
+ * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
+ */
+export interface DoctorSeams extends DeepDoctorSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
