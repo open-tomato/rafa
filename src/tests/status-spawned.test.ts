@@ -23,6 +23,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { STATUS_NETWORK_TIMEOUT_MS } from '../status/sections.js';
+
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -50,6 +52,12 @@ const STAND_IN_GH = [
   'exit 1',
   '',
 ].join('\n');
+
+/** A `gh` that never answers: the scratch PATH holds no `sleep`, so bun itself waits. */
+const HANGING_GH = `#!/bin/sh\nexec "${process.execPath}" -e "setTimeout(() => {}, 300000)"\n`;
+
+/** How far past the network deadline the whole command may run: the local readings and process start-up. */
+const DEADLINE_MARGIN_MS = 10_000;
 
 /** Writes `text` to `path`, making its directories. */
 function plant(path: string, text: string): void {
@@ -80,12 +88,12 @@ function git(scratch: ScratchRepo, cwd: string, args: readonly string[]): string
 const TRACKER_TEXT = `# Plan\n\n- [x] Lay the groundwork\n- [BLOCKED] ${BLOCKED_TEXT}\n- [ ] Ship it\n`;
 
 /** Plants the scratch project described in the module note. */
-function plantWorld(): ScratchRepo {
+function plantWorld(ghScript: string = STAND_IN_GH, config = 'pr:\n  provider: gh\n'): ScratchRepo {
   const scratch = plantScratchRepo(scratchBase);
   const { repo } = scratch;
-  plantProjectConfig(repo, 'pr:\n  provider: gh\n');
+  plantProjectConfig(repo, config);
   const gh = join(scratch.bin, 'gh');
-  plant(gh, STAND_IN_GH);
+  plant(gh, ghScript);
   chmodSync(gh, 0o755);
 
   const bare = join(dirname(repo), 'origin.git');
@@ -162,5 +170,22 @@ describe('rafa status, spawned', () => {
     expect(blocked).toHaveLength(1);
     expect(blocked[0]?.tasks).toEqual([expect.objectContaining({ line: 4, text: BLOCKED_TEXT })]);
     expect((data['housekeeping']?.['counts'] as { merged: number }).merged).toBe(1);
+  });
+
+  it('warns for the pull request and the board when gh never answers, and still prints the local sections', RUN_TIMEOUT, () => {
+    const scratch = plantWorld(HANGING_GH, 'pr:\n  provider: gh\nroadmap:\n  issue: 1\n');
+
+    const started = Date.now();
+    const run = runRafa(scratch, scratch.repo, ['status']);
+    const elapsed = Date.now() - started;
+
+    expect(run.exitCode).toBe(0);
+    expect(elapsed).toBeLessThan(STATUS_NETWORK_TIMEOUT_MS + DEADLINE_MARGIN_MS);
+    const output = `${run.stdout}${run.stderr}`;
+    expect(output.match(/^.*Pull request: not read:.*$/gm)).toHaveLength(1);
+    expect(output.match(/^.*Board: not read:.*$/gm)).toHaveLength(1);
+    expect(output).toContain(`Branch: \`${BRANCH}\`, plan \`${STUB}\``);
+    expect(output).toContain('Loops: 0 running, 1 task blocked');
+    expect(output).toMatch(/Housekeeping: 1 merged,/);
   });
 });
