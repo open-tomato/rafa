@@ -84,6 +84,20 @@ it either way. Splitting one costs the shared world helpers a home, which
 is what keeps `src/commands/doctor.test.ts` (898) and
 `src/commands/init.test.ts` (806) whole.
 
+### Adding a setting
+
+**A new key in `SETTINGS` reaches five files beyond the schema, sections
+and `init` scaffold.** `RafaConfig` literals have to be complete, so the
+layer literal in `src/config.ts` needs it. Both config suites also check
+that every setting appears exactly once: `src/config.test.ts` (`SETTINGS`,
+`DEFAULTS`, `FULL`, `FULL_VALUES`, its cases and `KNOWN`) and
+`src/tests/config-layers.test.ts` (the PROJECT and USER text and values,
+and `SECTION_CASES`). `check-types` never reads the two suites, so only
+`bun run test` shows what is missing. A section appended after the last
+one in the scaffold has to bound any scaffold case that slices from an
+earlier header to the end of the template. This section replaces
+nothing.
+
 ### Shapes the lint config forces
 
 - **`@typescript-eslint/no-unused-vars` has no ignore pattern and no
