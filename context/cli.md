@@ -57,7 +57,7 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, and the two install warnings; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -67,6 +67,8 @@ module's note is the long form.
 | `src/utils/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, and every other entry handed on as it is |
 | `src/commands/cleanup.ts` | `rafa cleanup [--dry-run]`: the reading of `src/cleanup/` (`git fetch --prune` first, `pr.base`, the three `cleanup.*` settings, git run in the directory the command runs from, the provider `resolvePrProvider` resolves at the project root, or none) shown in four groups, in code and starting no session, so it declares no `spends`. With a terminal the groups are one grouped `multiSelect`, each row the line `./cleanup-render.ts` prints and ticked as the reading ticks it; each ticked Not-pushed row then asks a second `[y/N]` naming its commit count, and `Delete <n> branches and remove <m> worktrees? [y/N]` asks before `src/cleanup/steps.ts` runs the steps. The questions go through a line `Prompter` opened only after the checklist answers, so the two readers never share standard input. `--dry-run` asks the same checklist and second questions, then prints each step's command line in place of the final question. Without a terminal, or with `--output=json`, it prints the four groups (the json data being `cleanupData`), asks nothing and removes nothing, `--dry-run` included. Exit code 0 for every run that removed what was answered or nothing; 1 for an argument, a value typed after `--dry-run`, a config `loadConfig` refuses, a repository git cannot read, and a step that did not run clean |
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
+| `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
+| `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
@@ -536,7 +538,15 @@ New; it replaces no earlier text. What a row or an action added to
   all. An id is called unknown only when the whole board was read: a
   numbers listing that failed or came back full leaves every id
   unchecked and says so in a line of its own. That reading writes
-  nothing and never changes the exit code either. Under the boolean
+  nothing and never changes the exit code either. Every repository
+  then gets one row counting the branches and worktrees `rafa cleanup`
+  would list, `Cleanup: <n> merged, <n> stale, <n> not pushed, <n>
+  worktrees; run rafa cleanup to review and remove them.`
+  (`src/commands/doctor-cleanup.ts`), read with no `git fetch`, git
+  run in the project root, and the provider's merged listing sent only
+  through the board's `gh` runner; it prints only when any count is
+  above zero, prints nothing for a repository git cannot read, and
+  never changes the exit code. Under the boolean
   `--deep` it then reads and prints the Environment, Settings,
   Providers and Stack tools sections, and Plan needs for a plan
   `--plan` names (`src/commands/doctor-deep.ts`), a halt's included,
@@ -550,7 +560,9 @@ New; it replaces no earlier text. What a row or an action added to
   preflight that did not halt gives the checks, the `known-missing:`
   lines, the reminders, both readings, those rows and those blocked
   issues as the result's `data`, the rows and the issues null for a
-  project with no GitHub board, the `--deep` sections as its `deep`,
+  project with no GitHub board, the cleanup counts as its `cleanup`
+  (`{ ok: false, detail }` for a repository git cannot read), the
+  `--deep` sections as its `deep`,
   null without the flag, and a
   halt gives the `command_exit` error and no `data`.
 - **`self-update` installs the checkout it runs in**

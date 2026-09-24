@@ -89,6 +89,14 @@
  * dependency the spec keeps as data and refuses to guess at, and like a
  * board row it writes nothing and never changes the exit code.
  *
+ * ## The cleanup row
+ *
+ * Every repository then gets the counts `rafa cleanup` would list, read
+ * without fetching (`./doctor-cleanup.ts`, which holds what is read and
+ * where), as one row pointing at that command, printed after the
+ * blocked issues and only when any count is above zero. It never
+ * changes the exit code.
+ *
  * ## The risk total
  *
  * A plan `--plan` names also gets the one line `loop start` prints before
@@ -122,7 +130,7 @@
  * ## The three warnings
  *
  * Each is read before the preflight and written after it, whatever it
- * did, a refusal included:
+ * did, a refusal included, by `./doctor-install.ts`:
  *
  *   - `readLegacyStore` (`effort/store/legacy.ts`): `.ralph/effort/` under
  *     the project root holds a store file and `.rafa/effort/` holds none.
@@ -166,7 +174,8 @@
  * then `renderBoard`'s lines (`./doctor-render.ts`) for a repository that has a GitHub board,
  * and none for one that has not; then {@link renderBlockedIssues}'s
  * lines, which a board holding no issue labelled `spec:blocked` has
- * none of either; then, under `--deep`, `renderDeep`'s sections. A halt
+ * none of either; then the cleanup row, when there is anything to
+ * clean; then, under `--deep`, `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
@@ -188,7 +197,9 @@
  * (`DeepDoctorSeams`).
  */
 import type { BlockedIssuesReport } from './doctor-blocked.js';
+import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
+import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardStatus } from '../board/status.js';
@@ -213,21 +224,19 @@ import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError } from '../config.js';
-import { readLegacyStore } from '../effort/store/legacy.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import { loadPlanPrerequisites, mergePlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
-import { readBinPath } from '../project/bin-path.js';
-import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { announceRiskTotal } from '../start/risk-total.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
+import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
-import { readPreviousCopies } from './doctor-previous.js';
+import { readInstall, writeInstall } from './doctor-install.js';
 import { renderBoard, renderDoctor } from './doctor-render.js';
 import { isFile } from './plan/plan-files.js';
 
@@ -237,7 +246,7 @@ import { isFile } from './plan/plan-files.js';
  * session runs in, the runner its provider probes go through, and how
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
-export interface DoctorSeams extends DeepDoctorSeams {
+export interface DoctorSeams extends DeepDoctorSeams, DoctorCleanupSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -321,26 +330,17 @@ export interface DoctorResult {
   readonly board: BoardStatus | null;
   /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board. */
   readonly blocked: BlockedIssuesReport | null;
+  /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
+  readonly cleanup: DoctorCleanupReading;
   /** Every `--deep` section as it was read; null without `--deep`. */
   readonly deep: DeepReading | null;
 }
 
-/** Both readings of the GitHub board, each null for a project that has none. */
+/** Both readings of the GitHub board, each null for a project that has none, and the cleanup counts. */
 interface BoardReadings {
   readonly board: BoardStatus | null;
   readonly blocked: BlockedIssuesReport | null;
-}
-
-/** The three readings about the install, read before the preflight. */
-interface InstallReadings {
-  readonly binPath: BinPathReading;
-  readonly legacyStore: LegacyStoreReading | null;
-  /** Which of `plan.dir` and `specs.dir` still name a pre-init directory; null for a config that could not be loaded. */
-  readonly preInitDirs: PreInitDirsReading | null;
-  /** How many previous copies `previous/` under `specs.dir` holds; null when they could not be counted. */
-  readonly previousCopies: PreviousCopiesReading | null;
-  /** Why the effort directories could not be checked, as a warning; null when they were. */
-  readonly storeProblem: string | null;
+  readonly cleanup: DoctorCleanupReading;
 }
 
 /** The line every refusal before a check ends with. */
@@ -535,61 +535,6 @@ async function checkBlocked(gh: GhRunner | null): Promise<BlockedIssuesReport | 
   return readBlockedIssues({ gh });
 }
 
-/**
- * Which of `plan.dir` and `specs.dir` still name a pre-init directory,
- * or null for a config that cannot be loaded, which the preflight
- * refuses on its own. The config is loaded a second time here, before
- * the preflight loads it, with the warnings dropped so a person reads
- * each of them once: `resolvedConfig` writes them.
- */
-function readPreInit(project: ProjectFound): PreInitDirsReading | null {
-  try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
-    return readPreInitDirs(config);
-  } catch {
-    return null;
-  }
-}
-
-/** The previous-copy count under `specs.dir`; null for a config that could not be loaded or a `previous/` that could not be read. */
-function readPrevious(project: ProjectFound): PreviousCopiesReading | null {
-  try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
-    return readPreviousCopies(project.root, config);
-  } catch {
-    return null;
-  }
-}
-
-/** Every reading about the install; a store that cannot be checked is a warning, not a failure. */
-function readInstall(context: RafaContext, project: ProjectFound): InstallReadings {
-  const binPath = readBinPath(context.env['PATH'], project.home);
-  const preInitDirs = readPreInit(project);
-  const previousCopies = readPrevious(project);
-  try {
-    return { binPath, legacyStore: readLegacyStore(project.root), preInitDirs, previousCopies, storeProblem: null };
-  } catch (error) {
-    const storeProblem = `rafa doctor: the effort store directories could not be checked: ${messageOf(error)}`;
-    return { binPath, legacyStore: null, preInitDirs, previousCopies, storeProblem };
-  }
-}
-
-/** Writes each warning the readings carry, and in text mode the line saying the `PATH` order holds. */
-function writeInstall(context: RafaContext, install: InstallReadings): void {
-  const { binPath, legacyStore, preInitDirs, previousCopies, storeProblem } = install;
-  if (storeProblem !== null) context.output.warn(storeProblem);
-  if (legacyStore !== null && legacyStore.warning !== null) context.output.warn(legacyStore.warning);
-  if (preInitDirs !== null && preInitDirs.warning !== null) context.output.warn(preInitDirs.warning);
-  if (previousCopies !== null && previousCopies.warning !== null) context.output.warn(previousCopies.warning);
-  if (binPath.warning !== null) {
-    context.output.warn(binPath.warning);
-    return;
-  }
-  if (context.outputMode !== 'json') {
-    context.output.info(`${binPath.rafaBin} is on PATH, and ${binPath.bunBin} is not ahead of it.`);
-  }
-}
-
 /** The refusal for a halt: the runner's own text, then what `loop start` would do. */
 function haltRefusal(halt: string): CommandExit {
   return new CommandExit(1, [
@@ -628,6 +573,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     previousCopies: install.previousCopies,
     board: readings.board,
     blocked: readings.blocked,
+    cleanup: readings.cleanup,
     deep,
   };
 }
@@ -665,10 +611,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
   try {
     const preflight = await checkPreflight(context, project, seams);
     const gh = boardRunner(preflight, seams);
-    const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh) };
+    const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
+    const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh), cleanup };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
-    writeText(context, [...renderBoard(readings.board), ...renderBlockedIssues(readings.blocked)]);
+    const repository = [...renderBoard(readings.board), ...renderBlockedIssues(readings.blocked)];
+    writeText(context, [...repository, ...renderDoctorCleanup(readings.cleanup)]);
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
@@ -709,7 +657,9 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' nothing to the board and a row never changes the exit code. It then names, under `Blocked'
       + ' issues:`, every open issue labelled `spec:blocked` whose `Blocked by:` line is missing, names no'
       + ' issue, names itself, or names an id the board has no issue for, with what an author does about'
-      + ' it; that reading writes nothing and never changes the exit code either. With `--output=json` the'
+      + ' it; that reading writes nothing and never changes the exit code either. It then counts, without'
+      + ' fetching, the branches and worktrees `rafa cleanup` would list, and prints them in one row naming'
+      + ' `rafa cleanup` when any group holds one. With `--output=json` the'
       + ' checks, both readings, those rows and those issues are the data of the terminal result event,'
       + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
       + ' `rafa loop start` prints before its notices, which never changes the exit code. With `--deep` it'
