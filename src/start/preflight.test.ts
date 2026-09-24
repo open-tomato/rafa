@@ -76,6 +76,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -104,6 +105,7 @@ import { findNextTask, trackerPathFor } from '../utils/tracker.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';
+import { serveSession } from './serving.js';
 import { setActivePlanStub } from './stamp.js';
 
 /** This file's scratch directory. */
@@ -1041,6 +1043,13 @@ describe('the agent roster check', () => {
     expect(collided.probes).toEqual([]);
     expect(pinned.refusal).toBeNull();
     expect(pinned.probes).toEqual([`bun --version in ${root}`]);
+    // Started under the pin, the session is served the rafa copy.
+    const served = serveSession({ root, run: RUN_ID, home, entry, settings: { settingSources: ['project', 'local'], tiersRafa: 'on', tiersSkills: new Map([['documentation', 'rafa']]), tiersAgents: new Map() } });
+    expect(served.skills.map((copy) => copy.name)).toEqual(['documentation']);
+    expect(readFileSync(join(served.dir, '.claude', 'skills', 'documentation', 'SKILL.md'), 'utf8')).toContain('The rafa body.');
+    // Refused, the collision serves nothing.
+    const unpinned = serveSession({ root, run: RUN_ID, home, entry, settings: { settingSources: ['project', 'local'], tiersRafa: 'on', tiersSkills: new Map(), tiersAgents: new Map() } });
+    expect(unpinned.skills).toEqual([]);
     expect(both.refusal?.message.split('\n').slice(0, 3)).toEqual([
       `❌ Refusing to start: PLAN-${STUB}.md names 1 agent(s) no loaded tier serves and 1 skill(s) two loaded`
         + ' tiers hold with different contents (loop.settingSources: project, local; tiers.rafa: on).',

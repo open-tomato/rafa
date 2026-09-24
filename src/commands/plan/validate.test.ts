@@ -374,6 +374,24 @@ describe('the agents rafa plan validate checks', () => {
     expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
   });
 
+  it('refuses a plan routing to an agent tiers.agents switches off with false, until the entry is dropped', async () => {
+    const plan = '- [ ] Write the tests  {agent=tdd-guide}\n';
+    const off = plantRoutedProject(plan, 'version: 1\ntiers:\n  agents: { tdd-guide: false }\n');
+    const control = plantRoutedProject(plan);
+    plantAgent(off.root, 'tdd-guide');
+    plantAgent(control.root, 'tdd-guide');
+
+    const refused = await validateIn(off);
+    const passed = await validateIn(control);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toContain('error: plan.md: agent "tdd-guide" (line 1) cannot be dispatched:'
+      + ' agent tdd-guide is switched off by tiers.agents: { tdd-guide: false }');
+    expect(refused.stderr).toBe('❌ plan.md: 1 unresolvable agent; no session would be dispatched\n');
+    // The control differs in the config's pin alone.
+    expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
+  });
+
   it('counts the issues and the agents together in the refusal of a plan carrying both', async () => {
     const routed = BROKEN_PLAN.replace('- [ ] a task', '- [ ] a task  {agent=no-such-agent}');
     const project = plantRoutedProject(routed);
