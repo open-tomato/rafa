@@ -149,10 +149,11 @@ import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { RafaConfig } from '../config.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
-import type { ChosenRoot, Prompter, RootReading, RootSource } from '../project/root-choice.js';
+import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
 import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '../project/roots.js';
 import type { ScopeWrite, ScopeWriteChange } from '../project/scaffold.js';
 
@@ -163,6 +164,7 @@ import { join, relative, sep } from 'node:path';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
 import { CommandExit } from '../cli/command.js';
+import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError, configFilePath } from '../config.js';
@@ -175,13 +177,7 @@ import {
   TRACKING_DIGEST_FILE,
   withTrackingBlock,
 } from '../project/gitignore.js';
-import {
-  candidateLines,
-  createLinePrompter,
-  firstCandidate,
-  namedRoot,
-  promptForRoot,
-} from '../project/root-choice.js';
+import { candidateLines, firstCandidate, namedRoot, promptForRoot } from '../project/root-choice.js';
 import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/roots.js';
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
 import { gitRemoteUrl } from '../schema/project-id.js';

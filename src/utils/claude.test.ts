@@ -169,7 +169,7 @@ import type { RafaCommand } from '../cli/command.js';
 import type { CommandSpend } from '../cli/spends.js';
 import type { ClaudeSettingSource } from '../config.js';
 
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -695,6 +695,21 @@ describe('runClaudeCaptured against a stand-in claude on PATH', () => {
 
     await expect(runClaudeCaptured('fail after writing', DEFAULT_SOURCES))
       .resolves.toEqual({ exitCode: 3, stdout: 'partial report\n' });
+  });
+
+  it('runs in the working directory an option names, and in its own without one', async () => {
+    standInClaude(['/bin/pwd -P']);
+    const elsewhere = mkdtempSync(join(tmpdir(), 'rafa-claude-cwd-'));
+
+    try {
+      const moved = await spawnClaudeCaptured(['-p'], 'where', { cwd: elsewhere });
+      const stayed = await spawnClaudeCaptured(['-p'], 'where');
+
+      expect(moved.stdout).toBe(`${realpathSync(elsewhere)}\n`);
+      expect(stayed.stdout).toBe(`${realpathSync(process.cwd())}\n`);
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
   });
 
   it('answers a killed session as 128 plus the signal number', async () => {

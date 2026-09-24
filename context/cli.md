@@ -21,18 +21,20 @@ module's note is the long form.
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help` and `rafa next --help` |
+| `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts`, `confirm.ts` and `page.ts` the five prompts for text input, single selection, multi-selection, confirmation and paged lists in raw mode on standard error |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
-| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header, and `agent list`, the roster a session resolves |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills each tier of `src/schema/tiers.ts` registers; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate` and `plan risk` share: the plans directory, the config a project resolves (`resolveProjectConfig`), the task counts, an issue as a line, the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share: the plans directory, the config a project resolves (`resolveProjectConfig`), the task counts, an issue as a line, the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value |
 | `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design |
+| `src/commands/plan/needs.ts` | `rafa plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing] [--source=<source>]`: the reading of `src/plan/needs.ts` over one plan or one spec, in code and starting no session, so it declares no `spends`. A plan resolves as `plan risk` resolves its own, the default plan when none is named. `--spec` and `--issue` go through `resolveCreateSpec` (`spec-route.ts`) handed no offer, so a spec is found and an issue checked and snapshotted under `specs.dir` exactly as `plan create` does, and an issue `plan create` refuses is refused with the same code. The inventory is built as `skill list` builds it, `PATH` read off `RafaContext.env`. `--missing` keeps what `isUnmet` reports and the stacks not met, prints nothing at all when nothing is kept, and exits 1 when anything is, json mode writing each kept row as an `error` log event first; `--source` keeps the agents and skills one source holds, so it drops every MCP server, program, missing item and stack row, and refuses only a value written as no source. A plan beside `--spec` or `--issue`, `--spec` beside `--issue`, `--missing` typed ahead of the plan, a plan that is no file, no default plan and a config `loadConfig` refuses are exit code 1. Exit code 0 otherwise, whatever it finds |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
@@ -125,17 +127,23 @@ New; it replaces no earlier text. What a row or an action added to
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
-  `rafa.txt`.
+  `rafa.txt`. The exception is an action declaring `spends` under a
+  subject none of whose actions did: its subject's line gains the `🪙`
+  mark, which moves `rafa.txt`. A new spender also reddens the spender
+  rosters, `src/cli/spends-roster.test.ts`, the spawned `describe` case
+  of `src/tests/spends-cli-surface.test.ts` and the README table
+  `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
+  registering `agent search` and `skill search`).
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`,
-  `plan validate` and `plan risk`; `loop start`, aliased `start`; `loop stop`,
+  `plan validate`, `plan risk` and `plan needs`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,
   `issue show`, `issue create`, `issue comment`, `issue move`,
   `issue ready` and `issue unblock`;
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
   `effort collect`, `effort report`, `module list`, `module exec`,
-  `agent vendor`, `agent list`, `skill check`, `skill list`,
-  `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
+  `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
+  `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `next`, `init`,
   `doctor`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
@@ -180,11 +188,11 @@ New; it replaces no earlier text. What a row or an action added to
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `skill demote`, `skill backfill` and the `pr` actions
-  wrap none: `describe` reads the registry off its context, and `init`,
+  `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
+  `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `skill demote`,
-  `skill backfill` and each `pr` action their `args` and `flags`.
+  each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
+  `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -570,21 +578,84 @@ New; it replaces no earlier text. What a row or an action added to
   whether one was replaced. A declaration has no variadic spelling, so
   `rafa agent vendor --help` renders the argument as `<name>` where the
   refusals' usage line says `<name>...`.
-- **`agent list` prints the roster a session resolves**
-  (`src/commands/agent/list.ts`), from `src/agents/roster.ts` over the
-  project the dispatcher found and the `loop.settingSources` of the
-  config that resolves there — the reading `loop start` halts on. One row
-  per name, each once and in the order the CLI resolves them: the
-  project's definitions, then `~/.claude/agents` when the sources name
-  `user`, then the measured built-ins, each row naming the scope, the
-  file, and the user-level file a project definition shadows. It spawns
-  nothing. When the home carries a name no row resolves, a trailing line
-  counts those names and points at `rafa agent vendor`; a home name the
-  project also carries is not one of them, since the name resolves. It
-  throws exit code 1 for a positional word and for a config `loadConfig`
-  refuses. In json mode the sources, the rows and those names are the
-  result's `data`, and `AgentRoster.userDefinitions`, a map, is not
-  given.
+- **`agent list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
+  lists every agent definition the inventory holds**
+  (`src/commands/agent/list.ts`, over `buildInventory` in
+  `src/inventory/index.ts`), built as `skill list` builds it and taking
+  the same three filters. `--source` names a whole source string
+  (`project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>`), aliased
+  `--tier` for one release after this one; `--state` takes `enabled`,
+  `shadowed` or `disabled` and matches the prefix; `--hidden-from-loop`
+  keeps `visibleToLoop: false`. A `plugin:` or `addon:` source the
+  inventory does not know is refused. The filters are read and matched
+  by the helpers `src/commands/skill/list.ts` exports. A definition is
+  keyed by its frontmatter `name`, as `--agent` resolves it, and each row
+  prints the loop mark (`●` when a run sees it, `○` when not), name,
+  source, state and summary. The Claude Code built-ins are no inventory
+  row and are not listed. After the counts and the legend, when a `user`
+  row's name is answered by no row visible to the loop, a trailing line
+  names those definitions and points at `rafa agent vendor`; a home name
+  the project also holds is not one of them, since the name resolves to
+  the project's copy. The vendor hint reads the whole inventory, so no
+  filter hides it. It spawns nothing and exits 0 whatever the rows say;
+  exit code 1 is kept for a positional word, a `--source` or `--state`
+  it cannot take, and a config `loadConfig` refuses. In json mode the
+  kept records, the filters, the pre-filter total, the agents trees, the
+  vendor names as `unreachable` and the warnings are the result's `data`.
+  `-i | --interactive` browses the kept rows instead of printing them,
+  through `browse` (`src/inventory/browse.ts`) on standard error: Enter
+  shows a row, `f` its whole file, Escape goes back, `q` quits, `ctrl-c`
+  is exit code 130. The warnings still go out first, and with no row kept
+  the text listing is printed instead. Exit code 1, before the inventory
+  is built, refuses `-i` when standard input is not a terminal, with a
+  line naming `rafa agent list --output=json`, and refuses it beside
+  `--output=json`.
+- **`agent show <name> [--full]` shows the agent definition a name
+  resolves to** (`src/commands/agent/show.ts`, over the show view of
+  `src/inventory/show.ts`). The inventory is built through the
+  `projectInventory` `src/commands/skill/list.ts` exports, the name is
+  the frontmatter `name` `agent list` prints, and it shows its first
+  holder in precedence order (`findShown`): the agent definition that
+  answers, or the disabled one still holding the name. A shadowed holder
+  is listed under the other holders, with its path, rather than shown in
+  its own right. Text mode prints the record, every other agent with its
+  source, state and path, the frontmatter as written and the body's
+  headings with their file lines; `--full` prints the whole file in
+  place of the frontmatter and the headings. `--full` is read ahead of
+  the name through `readSwitch`, so `rafa agent show --full <name>`,
+  which `parseArgs` hands the name as the flag's value, is refused
+  naming the order that works. A file that no longer reads still shows
+  the record and the other holders, with the reason, and exits 0. The
+  inventory's warnings are `warn:` lines. Exit code 1 is kept for no name
+  or two, a value read into `--full`, a name no agent holds — whose
+  refusal points at `rafa skill show` when a skill holds it — and a
+  config `loadConfig` refuses. In json mode every part of the view, the
+  project root, `loop.settingSources` and the warnings are the result's
+  `data`, `text` holding the file under `--full` alone. The Claude Code
+  built-ins are no inventory row, so no name shows one.
+- **`agent search "<question>" [--all] [--no-model]` finds the agent
+  definitions that answer a question** (`src/commands/agent/search.ts`,
+  through `createSearchCommand` of `src/commands/skill/search.ts`). The
+  same command as `skill search` over the inventory's agent rows. An
+  agent is named by its frontmatter `name`, as `rafa agent list` prints
+  it. The Claude Code built-ins are not inventory rows, so no search
+  ranks one. `--all` searches skills as well, agents first, one session
+  per kind. `--no-model` runs the ranking alone, prints it and stops: no
+  session starts and no effort row is written. The command's `spends`
+  declaration is `unless --no-model`, so the spend guard refuses a
+  session a run carrying that flag would start. Text mode prints, per
+  kind, a heading, then each kept match with its quote and its `path:line`
+  and the dropped line, or "not answerable from these files", or the
+  numbered ranking (under `--no-model`, and after a `warn:` notice of a
+  fallback when the session gave no usable answer), or `(no agent ranks
+  for these words)` when no session starts. The parser's issues and an
+  effort row that was not stored are `warn:` lines. The exit code is 0
+  whatever is found; 1 for no question or two, a blank one, a value read
+  into `--all` or `--no-model`, and a config `loadConfig` refuses. The
+  switches are read ahead of the question through `readSwitch`. In json
+  mode the result's `data` holds the project, `loop.settingSources`, the
+  question, `model`, the warnings and one entry per kind: the runner's
+  outcome, or `status: ranked` with the ranking under `--no-model`.
 - **`skill check <dir> [--fix] [--project=<root>]` and
   `instinct check <dir>` run the checker over one tier**
   (`src/commands/skill/check.ts`, `src/commands/instinct/check.ts`,
@@ -640,23 +711,90 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa skill check --help` draws `[--project=<string>]` where the
   refusals' usage line says `[--project=<root>]`, as `agent vendor`
   draws `<name>` where its own says `<name>...`.
-- **`skill list [--tier=project|rafa|user]` lists what each tier
-  registers** (`src/commands/skill/list.ts`). The tiers are
-  `src/schema/tiers.ts`'s — `<root>/.claude/skills`, `skills/` beside
-  the running `cli.js`, and `~/.claude/skills`, in that order — and one
-  row per skill names its tier, the `stack` its frontmatter carries and
-  whether it passes `checkDirectory`, with the number of failures beside
-  a row that does not. Unlike the two checkers it runs INSIDE a project,
-  since the project tier is one of the three, and it reads the home off
-  the project the dispatcher resolved; the rafa tier is measured from
-  `Bun.main`, which is the command factory's one seam. The project tier
-  is checked against the project and the other two against none, so a
-  body naming a project path is a warning there rather than a failure.
-  A tier whose directory is absent prints its path and
-  `(no such directory)`. The exit code is 0 whatever the rows say — the
-  listing reports and `skill check` gates — and exit code 1 is kept for
-  a positional word and a `--tier` that is no tier. In json mode the
-  tiers, their rows and the two counts are the result's `data`.
+- **`skill list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
+  lists every skill the inventory holds** (`src/commands/skill/list.ts`,
+  over `buildInventory` in `src/inventory/index.ts`). The inventory is
+  built against the project the dispatcher resolved, its home, the
+  config's `loop.settingSources` and the modules `loadModules` answers
+  `loaded`; the rafa tier is measured from `Bun.main`, and the entry and
+  the module loader's seams are the command factory's two seams. One row
+  per skill, of every source (`project`, `rafa`, `user`, `addon:<name>`,
+  `plugin:<name>`), prints `●` when a loop session resolves it and `○`
+  when not, then its name, source, state (`enabled`,
+  `shadowed-by:<source>` or `disabled:<how>`) and summary, the columns
+  padded to the widest cell. `--source` keeps the rows of one whole
+  source string and refuses a `plugin:` or `addon:` source no row or
+  warning names; `--tier` is its alias, marked in the help for removal
+  after one release. `--state` takes `enabled`, `shadowed` or `disabled`
+  and matches the state's prefix; `--hidden-from-loop` keeps
+  `visibleToLoop: false`. The filters combine and are read and matched
+  by helpers the module exports. A skills tree whose directory is absent
+  prints its path and `(no such directory)`, and an unreadable plugin
+  record, plugin, add-on manifest, settings file or `skillOverrides`
+  entry is one `warn:` line. The exit code is 0 whatever the rows say —
+  the listing reports and `skill check` gates — and exit code 1 is kept
+  for a positional word, a `--source` or `--state` it cannot take, and a
+  config `loadConfig` refuses. In json mode the kept records, each with
+  its `check`, the filters, the pre-filter total, the skills trees and
+  the warnings are the result's `data`. `-i | --interactive` browses the
+  kept rows instead of printing them, through `browse` (`src/inventory/browse.ts`)
+  on standard error: Enter shows a row, `f` its whole file, Escape goes
+  back, `q` quits, `ctrl-c` is exit code 130. The warnings still go out
+  first, and with no row kept the text listing is printed instead. Exit
+  code 1, before the inventory is built, refuses `-i` when standard input
+  is not a terminal, with a line naming `rafa skill list --output=json`,
+  and refuses it beside `--output=json`. The terminal and the keys are
+  the `terminal` and `keys` seams of the factory.
+- **`skill show <name> [--full]` shows the skill a name resolves to**
+  (`src/commands/skill/show.ts`, over the show view of
+  `src/inventory/show.ts`). The inventory is built as `skill list`
+  builds it, through the `projectInventory` that module exports, and
+  the name shows its first holder in precedence order (`findShown`): the
+  skill that answers, or the disabled one still holding the name. A
+  shadowed holder is listed under the other holders, with its path,
+  rather than shown in its own right. Text mode prints the record, every
+  other skill of that name with its source, state and path, the
+  frontmatter as written and the body's headings with their file lines;
+  `--full` prints the whole file in place of the frontmatter and the
+  headings. `--full` is read ahead of the name through `readSwitch`, so
+  `rafa skill show --full <name>`, which `parseArgs` hands the name as
+  the flag's value, is refused naming the order that works. A file that
+  no longer reads still shows the record and the other holders, with the
+  reason, and exits 0. The inventory's warnings are `warn:` lines as
+  `skill list` writes them. Exit code 1 is kept for no name or two, a
+  value read into `--full`, a name no skill holds — whose refusal points
+  at `rafa agent show` when an agent holds it — and a config `loadConfig`
+  refuses. In json mode every part of the view, the project root,
+  `loop.settingSources` and the warnings are the result's `data`, `text`
+  holding the file under `--full` alone.
+- **`skill search "<question>" [--all] [--no-model]` finds the skills that
+  answer a question** (`src/commands/skill/search.ts`, through `runSearch`
+  and `rankSearch` of `src/inventory/search/`). The inventory is built
+  through `projectInventory`, as `skill list` builds it. Each kind
+  searched is one `runSearch`: the ranking by the question's words, one
+  `haiku` session in a scratch copy of the top twelve, the quote check
+  against the file and one `search` effort row, stored in the store
+  `selectEffortStore` opens from the project's config. `--all` searches
+  agent definitions as well, skills first, one session per kind, since a
+  candidate is keyed by its name and a skill and an agent may share one.
+  `--no-model` runs the ranking alone, prints it and stops: no session
+  starts, no scratch copy is made and no effort row is written. The
+  command's `spends` declaration is `unless --no-model`, so the spend
+  guard refuses a session a run carrying that flag would start. Text mode
+  prints, per kind, a heading naming the kind, the question and the
+  project, then the kept matches with each quote and its `path:line` and
+  the dropped line, or "not answerable from these files", or the numbered
+  ranking (under `--no-model`, and after a `warn:` notice of a fallback
+  when the session gave no usable answer), or `(no skill ranks for these
+  words)` when no session starts. The parser's issues and an effort row
+  that was not stored are `warn:` lines. The exit code is 0 whatever is
+  found; 1 for no question or two, a blank one, a value read into
+  `--all` or `--no-model`, and a config `loadConfig` refuses. The
+  switches are read ahead of the question through `readSwitch`, since
+  `--all "<question>"` hands the question to `--all`. In json mode the
+  result's `data` holds the project, `loop.settingSources`, the
+  question, `model`, the warnings and one entry per kind: the runner's
+  outcome, or `status: ranked` with the ranking under `--no-model`.
 - **`skill demote <dir> [--apply]` runs the demotion pass over one
   skills directory** (`src/commands/skill/demote.ts`, over
   `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and
@@ -823,9 +961,11 @@ New; it replaces no earlier text. What a row or an action added to
   it off the parsed context once the phase 0 function has returned. A
   wrapped command's `outputs` is `['text']` until it writes through the
   active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, and `agent list` neither, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` and `skill list` no argument and the flags `source` (aliased `tier`), `state`, `hidden-from-loop` and `interactive` (aliased `i`), `agent show` and `skill show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
-  `plan validate` the argument `file`, and `plan list` neither; each
+  `plan validate` the argument `file`, `plan risk` the argument `plan`
+  and the flag `strict`, `plan needs` the argument `plan` and the flags
+  `spec`, `issue`, `missing` and `source`, and `plan list` neither; each
   declares `text` and `json`. `plan create` declares the flags `spec`,
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`,
   `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
@@ -882,7 +1022,10 @@ New; it replaces no earlier text. What a row or an action added to
   naming no plan or no tracker and a `--tracker` value other than `true`
   or `false`, and `plan validate` also for a path that is no file, for
   a plan with an issue, for a plan naming an agent no loaded scope
-  defines, and for a config `loadConfig` refuses. `init` throws 1 for a positional word, a `--yes`
+  defines, and for a config `loadConfig` refuses. `plan needs` also
+  throws 1 under `--missing` when a need is unmet, and whatever
+  `resolveCreateSpec` throws for `--spec` and `--issue`, 2 for the
+  board's own state included. `init` throws 1 for a positional word, a `--yes`
   value other than `true` or `false`, a `--root` with no path, a refused
   root, no terminal with neither flag given, input ending before a root
   is chosen, a path the scopes cannot be written at, a config

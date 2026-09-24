@@ -14,8 +14,8 @@
  * conditional rather than unconditional.
  */
 import type { UncheckedMerge, UncheckedMergeOptions } from './merge-unchecked.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PullRequestComment } from '../../pr/index.js';
-import type { Prompter } from '../../project/root-choice.js';
 
 import { describe, expect, it } from 'bun:test';
 

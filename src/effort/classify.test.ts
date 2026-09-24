@@ -4,8 +4,9 @@
  * Every prompt here is PLANTED — assembled the way the loop assembles
  * it, never copied out of a real log. Two cases reach outside that: the
  * drift guard reads `start/dispatch.ts`, `start/wrap-up.ts`,
- * `start/pr-lifecycle.ts` and `plan-prompt.md`, which is the point of
- * it, and neither reads a session log.
+ * `start/pr-lifecycle.ts`, `plan-prompt.md` and
+ * `inventory/search/prompt.ts`, which is the point of it, and neither
+ * reads a session log.
  *
  * The foreign needle is built from fragments in the same style
  * `naming-patterns.ts` uses for the de-origination set, for the same
@@ -71,6 +72,13 @@ const CI_PROMPT = [
   '* Diagnose the ACTUAL cause before changing anything.',
 ].join('\n');
 
+/** A search prompt, headed as `renderSearchPrompt` heads it. */
+const SEARCH_PROMPT = [
+  '# Inventory search instructions',
+  '',
+  'A person is looking for the skills that answer the question below.',
+].join('\n');
+
 /** Hand-driven traffic: what the residue bucket actually looks like. */
 const RESIDUE_PROMPT = 'Reply with exactly the word: ok';
 
@@ -118,7 +126,7 @@ function plantLog(name: string, lines: readonly string[]): string {
   return path;
 }
 
-describe('classifyPromptContent over the four shapes', () => {
+describe('classifyPromptContent over the five shapes', () => {
   it('reads a scoped-task prompt as a task session', () => {
     expect(classifyPromptContent(TASK_PROMPT)).toBe('task');
   });
@@ -133,6 +141,10 @@ describe('classifyPromptContent over the four shapes', () => {
 
   it('reads the mergeability prompt as a CI-repair session', () => {
     expect(classifyPromptContent(CI_PROMPT)).toBe('ci-repair');
+  });
+
+  it('reads the inventory search template as a search session', () => {
+    expect(classifyPromptContent(SEARCH_PROMPT)).toBe('search');
   });
 
   it('buckets hand-driven traffic as other, not as a fault', () => {
@@ -157,7 +169,7 @@ describe('the shape table', () => {
     const kinds = PROMPT_SHAPES.map((shape) => shape.kind);
 
     expect(new Set(kinds).size).toBe(kinds.length);
-    expect(kinds).toHaveLength(4);
+    expect(kinds).toHaveLength(5);
   });
 
   it('holds no prefix that is a prefix of another', () => {
@@ -256,6 +268,7 @@ describe('the reference implementation loop needle', () => {
     expect(classifyPromptContent(PLAN_PROMPT)).toBe('plan-generation');
     expect(classifyPromptContent(WRAPUP_PROMPT)).toBe('wrap-up');
     expect(classifyPromptContent(CI_PROMPT)).toBe('ci-repair');
+    expect(classifyPromptContent(SEARCH_PROMPT)).toBe('search');
   });
 });
 

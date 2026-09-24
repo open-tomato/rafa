@@ -1,228 +1,513 @@
 /**
- * Tests for `rafa agent list` (`list.ts`): the rows a roster renders,
- * what the sources leave out of reach, both output modes and the
- * refusals.
+ * Tests for `rafa agent list` (`src/commands/agent/list.ts`): the
+ * filters a line is read as, the agent rows `buildInventory` gives and
+ * how `--source`, `--state` and `--hidden-from-loop` narrow them, the
+ * `--tier` alias, the text rows and the json result, the vendor hint,
+ * and the refusals.
  *
- * Every case plants its definitions under the project and the home of a
- * temporary project of its own, never under this machine's, and the
- * first case asserts both roots resolve under this file's own directory:
- * in the loop the home is the real one, and a case that lost it would
- * list this machine's 60-odd definitions and pass on whatever they
- * happen to be.
+ * Every dispatched case plants a project, a home and a runtime of its
+ * own under a temporary directory of this file's own, and dispatches
+ * the command in-process (`src/tests/cli-capture.ts`). The rafa tier is
+ * measured from a planted `cli.js` handed in as the entry seam, so
+ * nothing reads the real home or `~/.claude/agents`: in the loop the
+ * home is the real one, and a case that lost it would list this
+ * machine's definitions and pass on whatever they happen to be.
  *
- * The claims about `loop.settingSources` are a scope NOT loaded, which a
- * roster holding nothing but the built-ins satisfies too. So each reads
- * the SAME plantings twice, once under a config naming `user` and once
- * under the default, and asserts the name is listed in the first: a rule
- * dropped reddens the leg that expects the row and a rule applied to
- * everything reddens the leg that expects it gone.
+ * ## The controls
  *
- * The built-ins are `agents/roster.ts`'s measured constant, so what is
- * read here is that they are listed as `built-in` with no file, not what
- * they are.
+ * Each filter could read as working because it drops everything, so
+ * every narrowing case holds the row it must KEEP. That a user agent is
+ * hidden from the loop, and named by the vendor hint, is held beside
+ * the same tree under a config whose `loop.settingSources` includes
+ * `user`, where it is visible and the hint is gone: a command that
+ * marked every user row hidden, or printed the hint always, would fail
+ * that half.
+ *
+ * ## `-i`
+ *
+ * The browse runs over a recording terminal and scripted keys handed in
+ * as the `terminal` and `keys` seams. The no-terminal refusal is held
+ * beside the same line over a terminal that is one, which browses and
+ * exits 0, so a command refusing `-i` always would fail that half.
  */
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { AgentListSeams } from './list.js';
+import type { Key, Terminal } from '../../cli/prompt/terminal.js';
+import type { InventoryRecord } from '../../inventory/record.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BUILT_IN_AGENTS, resolveAgentRoster } from '../../agents/roster.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { CommandExit } from '../../cli/command.js';
+import { NO_TERMINAL_TEXT } from '../../cli/prompt/terminal.js';
+import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
-import agentList, { agentRow, renderAgentList, unreachableUserAgents } from './list.js';
+import {
+  agentListHeading,
+  createAgentListCommand,
+  expectKnownAgentSource,
+  readAgentFilters,
+  renderAgentList,
+  unreachableUserAgents,
+  vendorHintLines,
+} from './list.js';
 
-/** A temporary directory of this file's own. */
+/** The subject the dispatched cases route through. */
+const SUBJECTS = [{ name: 'agent', summary: 'agents' }];
+
+/** A temporary directory of this file's own, its path resolved through every link. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-agent-list-')));
+let planted = 0;
 
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
 
-/** The subject the dispatched cases route under. */
-const SUBJECTS = [{ name: 'agent', summary: 'agents' }];
-
-/** A config bringing `~/.claude/agents` into reach. */
-const WITH_USER = 'version: 1\nloop:\n  settingSources: user,project,local\n';
-
-/** Writes `<root>/.claude/agents/<name>.md` carrying that name, and answers its path. */
-function plantDefinition(root: string, name: string, body = `The ${name} body.`): string {
-  const dir = join(root, '.claude', 'agents');
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, `${name}.md`);
-  writeFileSync(path, `---\nname: ${name}\n---\n${body}\n`, 'utf8');
-  return path;
+/** An agent definition carrying `name` in its frontmatter and the description given. */
+function agentText(name: string, description: string): string {
+  return `---\nname: ${name}\ndescription: ${description}\n---\n\nThe ${name} body.\n`;
 }
 
-/** A fresh project of this file's own, written with `config` when one is given. */
-function plantScope(config?: string): PlantedProject {
-  const scope = mkdtempSync(join(tempBase, 'scope-'));
-  return config === undefined
-    ? plantProject(scope)
-    : plantProject(scope, config);
+/** What one case plants: a project, a home and a runtime. */
+interface Planted {
+  readonly root: string;
+  readonly home: string;
+  readonly entry: string;
+  readonly scope: string;
 }
 
-/** Dispatches `agent list` in `project`, with `words` added to the line. */
-async function listIn(
-  project: PlantedProject,
-  words: readonly string[] = [],
-): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
-  return dispatchInProject(['agent', 'list', ...words], SUBJECTS, [agentList], project);
+/** Plants one case's tree, each key a path under the case's directory. */
+function plant(files: Readonly<Record<string, string>>, settingSources = 'project,local'): Planted {
+  planted += 1;
+  const scope = join(tempBase, `case-${String(planted)}`);
+  const root = join(scope, 'project');
+  const home = join(scope, 'home');
+  const entry = join(scope, 'runtime', 'cli.js');
+  plantProjectConfig(root, `version: 1\nloop:\n  settingSources: ${settingSources}\n`);
+  mkdirSync(home, { recursive: true });
+  mkdirSync(dirname(entry), { recursive: true });
+  writeFileSync(entry, '// the runtime\n', 'utf8');
+  for (const [name, text] of Object.entries(files)) {
+    const path = join(scope, name);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, 'utf8');
+  }
+  return { root, home, entry, scope };
 }
 
-/** The `data` of the one result event of a json-mode run. */
-function resultOf(stdout: string): Record<string, unknown> {
-  const events = eventsOf(stdout);
-  const last = events[events.length - 1];
-  if (last === undefined || last.type !== 'result') throw new Error(`no result event in ${stdout}`);
-  return (last.data ?? {}) as Record<string, unknown>;
+/**
+ * The tree most cases list: a project agent shadowing a user agent of
+ * the same name, a user-only agent, and a plugin agent.
+ */
+function standardTree(settingSources = 'project,local'): Planted {
+  const scope = join(tempBase, `case-${String(planted + 1)}`);
+  const record = {
+    version: 2,
+    plugins: { 'alpha@market': [{ scope: 'user', installPath: join(scope, 'plugins', 'alpha'), version: '1.0.0' }] },
+  };
+  return plant({
+    'project/.claude/agents/tdd-guide.md': agentText('tdd-guide', 'Writes the test first'),
+    'home/.claude/agents/tdd-guide.md': agentText('tdd-guide', 'The home copy'),
+    'home/.claude/agents/home-only.md': agentText('home-only', 'Held by the home alone'),
+    'home/.claude/plugins/installed_plugins.json': JSON.stringify(record),
+    'plugins/alpha/agents/reviewer.md': agentText('reviewer', 'A plugin agent'),
+  }, settingSources);
 }
 
-describe('the rows rafa agent list renders', () => {
-  it('plants its home and its project under this file\'s own directory', () => {
-    const project = plantScope();
+/** Dispatches `words` over the command, with the planted tree's seams and any `-i` seams given. */
+async function run(words: readonly string[], tree: Planted, browsing: Pick<AgentListSeams, 'terminal' | 'keys'> = {}) {
+  const command = createAgentListCommand({ entry: () => tree.entry, modules: {}, ...browsing });
+  return dispatchInProject(words, SUBJECTS, [command], { root: tree.root, home: tree.home }, { PATH: '' });
+}
 
-    expect(project.root.startsWith(tempBase)).toBe(true);
-    expect(project.home.startsWith(tempBase)).toBe(true);
+/** The json result's data of a run. */
+interface ResultData {
+  readonly agents: readonly InventoryRecord[];
+  readonly total: number;
+  readonly trees: readonly { source: string; exists: boolean }[];
+  readonly unreachable: readonly string[];
+  readonly warnings: readonly string[];
+  readonly settingSources: readonly string[];
+}
+
+/** The data of the result event a json run ends with. */
+function resultData(stdout: string): ResultData {
+  const result = eventsOf(stdout).find((event) => event.type === 'result') as unknown as { data: ResultData };
+  return result.data;
+}
+
+/** Each row of a json run as `[name, source, state, visibleToLoop]`. */
+function rowsOf(stdout: string): readonly (readonly [string, string, string, boolean])[] {
+  return resultData(stdout).agents.map((row) => [row.name, row.source, row.state, row.visibleToLoop] as const);
+}
+
+/** The exit code and the message a call refused with. */
+function refusal(call: () => unknown): [number, string] {
+  try {
+    call();
+  } catch (error) {
+    if (error instanceof CommandExit) return [error.exitCode, error.message];
+    throw error;
+  }
+  throw new Error('expected a CommandExit, and the call returned');
+}
+
+/** One agent row, filled with values no case here reads unless it sets them. */
+function record(fields: Partial<InventoryRecord>): InventoryRecord {
+  return {
+    kind: 'agent',
+    name: 'a',
+    source: 'project',
+    path: '/p/.claude/agents/a.md',
+    summary: '',
+    whenToUse: null,
+    prevents: null,
+    stack: [],
+    tags: [],
+    check: null,
+    state: 'enabled',
+    visibleToLoop: true,
+    ...fields,
+  };
+}
+
+describe('the words an agent list line is read as', () => {
+  it('reads the three filters, and nothing when each is left out', () => {
+    expect(readAgentFilters({})).toEqual({ source: null, state: null, hiddenFromLoop: false });
+    expect(readAgentFilters({ 'source': 'plugin:alpha', 'state': 'shadowed', 'hidden-from-loop': true }))
+      .toEqual({ source: 'plugin:alpha', state: 'shadowed', hiddenFromLoop: true });
   });
 
-  it('names the scope and the file of a row, and the file a project row shadows', () => {
-    expect(agentRow({ name: 'tdd-guide', scope: 'project', path: '/p/.claude/agents/tdd-guide.md', shadows: null }))
-      .toBe('  tdd-guide: project /p/.claude/agents/tdd-guide.md');
-    expect(agentRow({ name: 'tdd-guide', scope: 'project', path: '/p/a.md', shadows: '/h/a.md' }))
-      .toBe('  tdd-guide: project /p/a.md (shadows /h/a.md)');
-    expect(agentRow({ name: 'Explore', scope: 'built-in', path: null, shadows: null }))
-      .toBe('  Explore: built-in');
+  it('refuses a source written as none is, a state it cannot take and a flag with no value, naming its own usage', () => {
+    const [sourceCode, source] = refusal(() => readAgentFilters({ source: 'users' }));
+    const [stateCode, state] = refusal(() => readAgentFilters({ state: 'shadowed-by:project' }));
+
+    expect(sourceCode).toBe(1);
+    expect(source).toContain('--source is "users", expected one of: project, rafa, user, plugin:<name>, addon:<name>');
+    expect(source).toContain('Usage: rafa agent list');
+    expect(stateCode).toBe(1);
+    expect(state).toContain('--state is "shadowed-by:project", expected one of: enabled, shadowed, disabled');
+    expect(refusal(() => readAgentFilters({ source: true }))[1]).toContain('--source needs a value');
   });
 
-  it('opens with the sources and lists the built-ins with no file', async () => {
-    const project = plantScope();
+  it('refuses a plugin source the inventory does not know, and takes one it does', () => {
+    const inventory = { records: [record({ source: 'plugin:beta' })], trees: [], warnings: [], overrideWarnings: [] };
 
-    const run = await listIn(project);
-    const lines = run.stdout.split('\n').filter((line) => line !== '');
-
-    expect([run.exitCode, run.stderr]).toEqual([0, '']);
-    expect(lines[0]).toBe('Agents a session resolves (loop.settingSources: project, local):');
-    expect(lines.slice(1)).toEqual(BUILT_IN_AGENTS.map((name) => `  ${name}: built-in`));
-  });
-
-  it('lists a project definition ahead of the built-ins, under the name its frontmatter carries', async () => {
-    const project = plantScope();
-    const path = plantDefinition(project.root, 'renamed-agent');
-
-    const run = await listIn(project);
-    const lines = run.stdout.split('\n').filter((line) => line !== '');
-
-    expect(lines[1]).toBe(`  renamed-agent: project ${path}`);
-    expect(lines).toHaveLength(BUILT_IN_AGENTS.length + 2);
-  });
-
-  it('lists a home definition only under sources naming user, and says which file a project one shadows', async () => {
-    const withUser = plantScope(WITH_USER);
-    const withoutUser = plantScope();
-    const paths = [withUser, withoutUser].map((project) => ({
-      home: plantDefinition(project.home, 'home-only'),
-      shadowed: plantDefinition(project.home, 'tdd-guide', 'The home body.'),
-      project: plantDefinition(project.root, 'tdd-guide', 'The project body.'),
-    }));
-
-    const listed = await listIn(withUser);
-    const hidden = await listIn(withoutUser);
-
-    expect(listed.stdout).toContain(`  home-only: user ${paths[0]?.home ?? ''}`);
-    expect(listed.stdout).toContain(`  tdd-guide: project ${paths[0]?.project ?? ''} (shadows ${paths[0]?.shadowed ?? ''})`);
-    expect(hidden.stdout).not.toContain('  home-only: ');
-    expect(hidden.stdout).toContain(`  tdd-guide: project ${paths[1]?.project ?? ''}\n`);
+    expect(() => expectKnownAgentSource('plugin:beta', inventory)).not.toThrow();
+    expect(() => expectKnownAgentSource(null, inventory)).not.toThrow();
+    const [code, message] = refusal(() => expectKnownAgentSource('plugin:alpha', inventory));
+    expect(code).toBe(1);
+    expect(message).toContain('known sources: project, rafa, user, plugin:beta');
+    expect(message).toContain('Usage: rafa agent list');
   });
 });
 
-describe('the home definitions rafa agent list cannot reach', () => {
-  it('answers the home names no row resolves, sorted, the shadowed one left out', () => {
-    const project = plantScope();
-    plantDefinition(project.home, 'second');
-    plantDefinition(project.home, 'first');
-    plantDefinition(project.root, 'second');
-    const roots = { repoRoot: project.root, home: project.home };
+describe('the home definitions a run cannot reach', () => {
+  it('names the user rows no visible row answers, sorted, once each', () => {
+    const agents = [
+      record({ name: 'second', source: 'user', visibleToLoop: false }),
+      record({ name: 'first', source: 'user', visibleToLoop: false }),
+      record({ name: 'first', source: 'plugin:alpha', visibleToLoop: false }),
+    ];
 
-    expect(unreachableUserAgents(resolveAgentRoster(roots, ['project', 'local']))).toEqual(['first']);
-    expect(unreachableUserAgents(resolveAgentRoster(roots, ['user', 'project', 'local']))).toEqual([]);
+    expect(unreachableUserAgents(agents)).toEqual(['first', 'second']);
   });
 
-  it('counts a home name the project shadows as reached, since the name resolves', () => {
-    const project = plantScope();
-    plantDefinition(project.home, 'tdd-guide');
-    const shadowed = resolveAgentRoster({ repoRoot: project.root, home: project.home }, ['project', 'local']);
-    plantDefinition(project.root, 'tdd-guide');
-    const reached = resolveAgentRoster({ repoRoot: project.root, home: project.home }, ['project', 'local']);
+  it('leaves out a home name a visible row answers, and a visible user row', () => {
+    const agents = [
+      record({ name: 'tdd-guide' }),
+      record({ name: 'tdd-guide', source: 'user', state: 'shadowed-by:project', visibleToLoop: false }),
+      record({ name: 'visible', source: 'user' }),
+    ];
 
-    expect(unreachableUserAgents(shadowed)).toEqual(['tdd-guide']);
-    expect(unreachableUserAgents(reached)).toEqual([]);
+    expect(unreachableUserAgents(agents)).toEqual([]);
   });
 
-  it('counts them and points at rafa agent vendor, and says nothing when there are none', async () => {
-    const unreachable = plantScope();
-    const reachable = plantScope(WITH_USER);
-    for (const project of [unreachable, reachable]) plantDefinition(project.home, 'home-only');
-
-    const counted = await listIn(unreachable);
-    const none = await listIn(reachable);
-
-    expect(counted.stdout).toContain('1 definition(s) under ~/.claude/agents resolve under none of these sources: home-only');
-    expect(counted.stdout).toContain('Run `rafa agent vendor <name>` to copy one into this project.');
-    expect(none.stdout).not.toContain('rafa agent vendor');
-  });
-
-  it('renders no unreachable block for an empty list', () => {
-    const rendered = renderAgentList({ settingSources: ['project'], agents: [], unreachable: [] });
-
-    expect(rendered).toEqual(['Agents a session resolves (loop.settingSources: project):']);
+  it('writes the count and the vendor command, and nothing for no name', () => {
+    expect(vendorHintLines(['a', 'b'])).toEqual([
+      '2 definition(s) under ~/.claude/agents resolve under none of these sources: a, b',
+      'Run `rafa agent vendor <name>` to copy one into this project.',
+    ]);
+    expect(vendorHintLines([])).toEqual([]);
   });
 });
 
-describe('rafa agent list in json mode, and how it refuses', () => {
-  it('gives the sources, the rows and the unreachable names as the data of the result event', async () => {
-    const project = plantScope();
-    const path = plantDefinition(project.root, 'tdd-guide');
-    plantDefinition(project.home, 'home-only');
+describe('what text mode writes', () => {
+  const base = {
+    projectRoot: '/p',
+    settingSources: ['project' as const, 'local' as const],
+    total: 2,
+    trees: [],
+    warnings: [],
+  };
 
-    const run = await listIn(project, ['--output=json']);
-    const data = resultOf(run.stdout);
+  it('names each filter given in the heading, and none when none is', () => {
+    const empty = { ...base, agents: [], unreachable: [] };
 
-    expect([run.exitCode, run.stderr]).toEqual([0, '']);
-    expect(eventsOf(run.stdout).map((event) => event.type)).toEqual(['start', 'result']);
-    expect(data['settingSources']).toEqual(['project', 'local']);
-    expect(data['unreachable']).toEqual(['home-only']);
-    expect((data['agents'] as unknown[])[0]).toEqual({
-      name: 'tdd-guide',
-      scope: 'project',
-      path,
-      shadows: null,
+    expect(agentListHeading({ ...empty, filters: { source: null, state: null, hiddenFromLoop: false } }))
+      .toBe('Agents (project: /p):');
+    expect(agentListHeading({ ...empty, filters: { source: 'user', state: 'enabled', hiddenFromLoop: true } }))
+      .toBe('Agents (project: /p; source user, state enabled, hidden from the loop):');
+  });
+
+  it('writes the rows, the counts, the legend and then the vendor hint', () => {
+    const lines = renderAgentList({
+      ...base,
+      filters: { source: null, state: null, hiddenFromLoop: false },
+      agents: [
+        record({ name: 'tdd-guide', summary: 'Writes the test first' }),
+        record({ name: 'home-only', source: 'user', visibleToLoop: false }),
+      ],
+      trees: [{ source: 'rafa', dir: '/install/agents', exists: false }],
+      unreachable: ['home-only'],
     });
+
+    expect(lines).toEqual([
+      'Agents (project: /p):',
+      '  ● tdd-guide  project  enabled  Writes the test first',
+      '  ○ home-only  user     enabled',
+      '  rafa  /install/agents  (no such directory)',
+      '2 of 2 agent(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
+      '● a loop session resolves it, ○ it does not',
+      '1 definition(s) under ~/.claude/agents resolve under none of these sources: home-only',
+      'Run `rafa agent vendor <name>` to copy one into this project.',
+    ]);
   });
 
-  it('refuses a positional word with exit code 1, where the same line without it passes', async () => {
-    const project = plantScope();
+  it('says so when no row matches', () => {
+    const lines = renderAgentList({
+      ...base,
+      filters: { source: 'rafa', state: null, hiddenFromLoop: false },
+      agents: [],
+      unreachable: [],
+    });
 
-    const refused = await listIn(project, ['tdd-guide']);
-    const passed = await listIn(project);
+    expect(lines[1]).toBe('  (no agent matches)');
+  });
+});
 
-    expect(refused.exitCode).toBe(1);
-    expect(refused.stderr).toContain('Expected no argument, got 1: tdd-guide');
-    expect(refused.stderr).toContain('Usage: rafa agent list');
-    expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
+describe('rafa agent list over planted sources', () => {
+  it('plants its home and its project under this file\'s own directory', () => {
+    const tree = standardTree();
+
+    expect(tree.root.startsWith(tempBase)).toBe(true);
+    expect(tree.home.startsWith(tempBase)).toBe(true);
   });
 
-  it('refuses a config the loader refuses with exit code 1, where the same project passes under a usable one', async () => {
-    const refusedConfig = plantScope('version: 1\nloop:\n  settingSources: nowhere\n');
-    const usable = plantScope();
+  it('lists every agent with its source, state and loop mark, then the vendor hint, and exits 0', async () => {
+    const tree = standardTree();
 
-    const refused = await listIn(refusedConfig);
-    const passed = await listIn(usable);
+    const answered = await run(['agent', 'list'], tree);
 
-    expect(refused.exitCode).toBe(1);
-    expect(refused.stderr).toContain('rafa agent list: the config cannot be used:');
+    expect([answered.exitCode, answered.stderr]).toEqual([0, '']);
+    expect(answered.stdout.split('\n').filter((line) => line !== '')).toEqual([
+      `Agents (project: ${tree.root}):`,
+      '  ○ alpha:reviewer  plugin:alpha  enabled              A plugin agent',
+      '  ○ home-only       user          enabled              Held by the home alone',
+      '  ● tdd-guide       project       enabled              Writes the test first',
+      '  ○ tdd-guide       user          shadowed-by:project  The home copy',
+      `  rafa  ${join(dirname(tree.entry), 'agents')}  (no such directory)`,
+      '4 of 4 agent(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
+      '● a loop session resolves it, ○ it does not',
+      '1 definition(s) under ~/.claude/agents resolve under none of these sources: home-only',
+      'Run `rafa agent vendor <name>` to copy one into this project.',
+    ]);
+  });
+
+  it('marks the user agent visible and drops the vendor hint when loop.settingSources includes user', async () => {
+    const tree = standardTree('project,local,user');
+
+    const json = await run(['agent', 'list', '--output=json'], tree);
+    const text = await run(['agent', 'list'], tree);
+
+    expect(rowsOf(json.stdout)).toEqual([
+      ['alpha:reviewer', 'plugin:alpha', 'enabled', true],
+      ['home-only', 'user', 'enabled', true],
+      ['tdd-guide', 'project', 'enabled', true],
+      ['tdd-guide', 'user', 'shadowed-by:project', false],
+    ]);
+    expect(resultData(json.stdout).unreachable).toEqual([]);
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).not.toContain('rafa agent vendor');
+  });
+
+  it('gives every row, the trees and the vendor names as the json result', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['agent', 'list', '--output=json'], tree);
+    const data = resultData(answered.stdout);
+
+    expect([answered.exitCode, answered.stderr]).toEqual([0, '']);
+    expect(eventsOf(answered.stdout).map((event) => event.type)).toEqual(['start', 'result']);
+    expect(data.agents.every((row) => row.kind === 'agent' && row.check === null)).toBe(true);
+    expect(data.agents[2]?.path).toBe(join(tree.root, '.claude', 'agents', 'tdd-guide.md'));
+    expect(data.total).toBe(4);
+    expect(data.settingSources).toEqual(['project', 'local']);
+    expect(data.unreachable).toEqual(['home-only']);
+    expect(data.trees.map((listing) => [listing.source, listing.exists]))
+      .toEqual([['project', true], ['rafa', false], ['user', true]]);
+  });
+
+  it('narrows to one source under --source, a plugin one included, and reads --tier as --source', async () => {
+    const tree = standardTree();
+
+    const user = await run(['agent', 'list', '--source=user', '--output=json'], tree);
+    const plugin = await run(['agent', 'list', '--source=plugin:alpha', '--output=json'], tree);
+    const tier = await run(['agent', 'list', '--tier=project', '--output=json'], tree);
+    const source = await run(['agent', 'list', '--source=project', '--output=json'], tree);
+
+    expect(rowsOf(user.stdout)).toEqual([
+      ['home-only', 'user', 'enabled', false],
+      ['tdd-guide', 'user', 'shadowed-by:project', false],
+    ]);
+    expect(resultData(user.stdout).unreachable).toEqual(['home-only']);
+    expect(rowsOf(plugin.stdout)).toEqual([['alpha:reviewer', 'plugin:alpha', 'enabled', false]]);
+    expect(tier.exitCode).toBe(0);
+    expect(resultData(tier.stdout)).toEqual(resultData(source.stdout));
+    expect(rowsOf(tier.stdout)).toEqual([['tdd-guide', 'project', 'enabled', true]]);
+  });
+
+  it('narrows on the state prefix under --state, and to the hidden rows under --hidden-from-loop', async () => {
+    const tree = standardTree();
+
+    const shadowed = await run(['agent', 'list', '--state=shadowed', '--output=json'], tree);
+    const disabled = await run(['agent', 'list', '--state=disabled', '--output=json'], tree);
+    const hidden = await run(['agent', 'list', '--hidden-from-loop', '--output=json'], tree);
+    const both = await run(['agent', 'list', '--hidden-from-loop', '--source=user', '--state=enabled', '--output=json'], tree);
+
+    expect(rowsOf(shadowed.stdout)).toEqual([['tdd-guide', 'user', 'shadowed-by:project', false]]);
+    expect(rowsOf(disabled.stdout)).toEqual([]);
+    expect(rowsOf(hidden.stdout).map(([name, source]) => `${source}/${name}`))
+      .toEqual(['plugin:alpha/alpha:reviewer', 'user/home-only', 'user/tdd-guide']);
+    expect(rowsOf(both.stdout)).toEqual([['home-only', 'user', 'enabled', false]]);
+  });
+
+  it('keeps the vendor hint in text mode whatever the filters keep', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['agent', 'list', '--source=project'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stdout).toContain(`Agents (project: ${tree.root}; source project):`);
+    expect(answered.stdout).not.toContain('home-only  user');
+    expect(answered.stdout).toContain('resolve under none of these sources: home-only');
+  });
+
+  it('refuses a positional word, a source written as none is, an unknown plugin and a wrong state', async () => {
+    const tree = standardTree();
+
+    const worded = await run(['agent', 'list', 'tdd-guide'], tree);
+    const shape = await run(['agent', 'list', '--source=users'], tree);
+    const unknown = await run(['agent', 'list', '--source=plugin:beta'], tree);
+    const state = await run(['agent', 'list', '--state=hidden'], tree);
+    const passed = await run(['agent', 'list'], tree);
+
+    expect(worded.exitCode).toBe(1);
+    expect(worded.stderr).toContain('Expected no argument, got 1: tdd-guide');
+    expect(shape.exitCode).toBe(1);
+    expect(shape.stderr).toContain('expected one of: project, rafa, user, plugin:<name>, addon:<name>');
+    expect(unknown.exitCode).toBe(1);
+    expect(unknown.stderr).toContain('known sources: project, rafa, user, plugin:alpha');
+    expect(state.exitCode).toBe(1);
+    expect(state.stderr).toContain('--state is "hidden", expected one of: enabled, shadowed, disabled');
     expect(passed.exitCode).toBe(0);
+  });
+
+  it('refuses a config that cannot be used', async () => {
+    const tree = plant({});
+    plantProjectConfig(tree.root, 'version: 1\nloop:\n  settingSources: nowhere\n');
+
+    const answered = await run(['agent', 'list'], tree);
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stderr).toContain('rafa agent list: the config cannot be used:');
+  });
+});
+
+/** A terminal recording what the browse writes; a terminal only when `isTTY`. */
+function recordingTerminal(isTTY = true): { readonly terminal: Terminal; readonly written: () => string } {
+  const writes: string[] = [];
+  const terminal: Terminal = {
+    isTTY,
+    setRawMode: () => undefined,
+    write: (text) => {
+      writes.push(text);
+    },
+    onInterrupt: () => () => undefined,
+    exit: () => undefined,
+  };
+  return { terminal, written: () => writes.join('') };
+}
+
+/** A key source yielding `keys` then ending, counting how often it is opened. */
+function scriptedKeys(keys: readonly Key[]): { readonly keys: () => AsyncIterable<Key>; readonly opened: () => number } {
+  let opened = 0;
+  return {
+    keys: () => {
+      opened += 1;
+      return (async function* yieldKeys() {
+        yield* keys;
+      })();
+    },
+    opened: () => opened,
+  };
+}
+
+/** The key for typing `typed`. */
+function char(typed: string): Key {
+  return { name: 'char', char: typed };
+}
+
+describe('rafa agent list -i over planted sources', () => {
+  it('refuses without a terminal, naming its own --output=json, before a key is read', async () => {
+    const tree = standardTree();
+    const script = scriptedKeys([char('q')]);
+
+    const answered = await run(['agent', 'list', '-i'], tree, { terminal: () => recordingTerminal(false).terminal, keys: script.keys });
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stderr).toContain(NO_TERMINAL_TEXT);
+    expect(answered.stderr).toContain('Run `rafa agent list --output=json` to read the rows without one.');
+    expect(script.opened()).toBe(0);
+  });
+
+  it('browses and exits 0 on the same line over a terminal, the control on the refusal', async () => {
+    const tree = standardTree();
+    const { terminal, written } = recordingTerminal();
+
+    const answered = await run(['agent', 'list', '-i'], tree, { terminal: () => terminal, keys: scriptedKeys([char('q')]).keys });
+
+    expect(answered.exitCode).toBe(0);
+    expect(written()).toContain(`Agents (project: ${tree.root})`);
+    expect(written()).toContain('tdd-guide');
+  });
+
+  it('shows a definition, opens its full context and quits, printing neither a row nor the vendor hint', async () => {
+    const tree = standardTree();
+    const keys: readonly Key[] = [{ name: 'down' }, { name: 'enter' }, char('f'), { name: 'escape' }, char('q')];
+    const { terminal, written } = recordingTerminal();
+
+    const text = await run(['agent', 'list'], tree);
+    const answered = await run(['agent', 'list', '--interactive'], tree, { terminal: () => terminal, keys: scriptedKeys(keys).keys });
+
+    expect(text.stdout).toContain('rafa agent vendor');
+    expect(answered.exitCode).toBe(0);
+    expect(answered.stdout).not.toContain('rafa agent vendor');
+    expect(answered.stdout).not.toContain('home-only');
+    expect(written()).toContain('[show] agent home-only (user)');
+    expect(written()).toContain('[full context] agent home-only (user)');
+    expect(written()).toContain('The home-only body.');
+  });
+
+  it('refuses -i beside --output=json', async () => {
+    const tree = standardTree();
+
+    const answered = await run(['agent', 'list', '-i', '--output=json'], tree, { terminal: () => recordingTerminal().terminal });
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stdout).toContain('--output=json writes them as data');
+    expect(answered.stdout).toContain('Usage: rafa agent list');
   });
 });

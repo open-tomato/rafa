@@ -13,12 +13,12 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the forty-six registered so far wrap a
+ * of each is its command. Five of the fifty-one registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
- * `plan validate` and `plan risk`, which read plan files with
- * `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status` and
+ * `plan validate`, `plan risk` and `plan needs`, which read plan files
+ * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status` and
  * `list`, which act on a run through its session record and share
  * `loop/loop-sessions.ts`, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
@@ -28,12 +28,18 @@
  * `issue/issue-tracker.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
- * the mounts the dispatcher made, nor `agent vendor` and `agent list`,
- * which copy and read agent definitions through `src/agents/roster.ts`,
+ * the mounts the dispatcher made, nor `agent vendor`, which copies agent
+ * definitions through `src/agents/roster.ts`, nor `agent list`, which
+ * lists the agents `buildInventory` (`src/inventory/`) reads, nor
+ * `agent show`, which shows one of them through `src/inventory/show.ts`,
+ * nor `agent search` and `skill search`, which find the items that
+ * answer a question through `src/inventory/search/`, the agent one
+ * built by `skill/search.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
  * through `src/check/run.ts` and share `commands/check-report.ts`, nor
- * `skill list`, which runs those checks over the tiers
- * `src/schema/tiers.ts` resolves, nor `skill demote` and
+ * `skill list`, which lists the skills `buildInventory`
+ * (`src/inventory/`) reads from every source, nor `skill show`, which
+ * shows one of them through `src/inventory/show.ts`, nor `skill demote` and
  * `skill backfill`, which run the demotion pass of `src/demote/` and the
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
@@ -52,9 +58,12 @@
  *   - `plan create`, aliased `plan`, so `rafa plan --spec=<file>` still
  *     runs it.
  *   - `plan list`, `plan show <stub> [--tracker]`,
- *     `plan validate <file>` and `plan risk [<plan>] [--strict]`, which
- *     start no session: the last reads, in code, what a run of the plan
- *     may do on this machine and under the person's accounts.
+ *     `plan validate <file>`, `plan risk [<plan>] [--strict]` and
+ *     `plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing]
+ *     [--source=<source>]`, which start no session: `plan risk` reads, in
+ *     code, what a run of the plan may do on this machine and under the
+ *     person's accounts, and `plan needs` the agents, skills, MCP servers
+ *     and programs a plan or spec needs from it.
  *   - `loop start`, aliased `start`, declaring `-d|--detached` and
  *     refusing it until phase 6, and `--runtime=<path|version>`, which
  *     runs the loop from that installed rafa.
@@ -89,15 +98,33 @@
  *     module's mounted commands are reached through.
  *   - `agent vendor <name>... [--force]`, each named `~/.claude/agents`
  *     definition copied into the project with a source header, and
- *     `agent list`, the names a session this project spawns resolves.
+ *     `agent list [--source=<source>] [--state=<state>]
+ *     [--hidden-from-loop] [-i]`, every agent definition the inventory
+ *     holds with its source, its state and whether the loop sees it,
+ *     browsed in the terminal under `-i`, and
+ *     `agent show <name> [--full]`, the agent definition a name resolves
+ *     to, shown as `skill show` shows a skill, and
+ *     `agent search "<question>" [--all] [--no-model]`, found as
+ *     `skill search` finds skills.
  *   - `skill check <dir> [--fix] [--project=<root>]` and
  *     `instinct check <dir>`, the checker over one tier, each exiting
  *     with the number of its failing files and running outside a
  *     project, since `--project` is its only project seam.
- *   - `skill list [--tier=<tier>]`, every skill the three tiers
- *     register with its stack and its verdict, and `instinct list` and
+ *   - `skill list [--source=<source>] [--state=<state>]
+ *     [--hidden-from-loop] [-i]`, every skill the inventory holds with
+ *     its source, its state and whether the loop sees it, browsed in the
+ *     terminal under `-i`, and `instinct list` and
  *     `instinct show <id>`, the records the project and user instinct
  *     scopes hold, each listing exiting 0 whatever its rows say.
+ *   - `skill show <name> [--full]`, the skill a name resolves to: its
+ *     record, its frontmatter, every other holder of the name and its
+ *     headings, or its whole file under `--full`, refusing a name no
+ *     skill holds.
+ *   - `skill search "<question>" [--all] [--no-model]`, the skills that
+ *     answer a question: the inventory ranked by its words, one `haiku`
+ *     session over the top twelve, and each match kept on a quote found
+ *     in its file, or the ranking alone under `--no-model`, which starts
+ *     no session; `--all` searches agent definitions too.
  *   - `skill demote <dir> [--apply]`, the demotion pass over one skills
  *     directory: the report written with nothing moved, and a report the
  *     review marked `reviewed` applied, exiting with the rows it refused.
@@ -146,6 +173,8 @@ import type { SubjectSpec } from '../cli/registry.js';
 import { createCommandRegistry } from '../cli/registry.js';
 
 import agentList from './agent/list.js';
+import agentSearch from './agent/search.js';
+import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
@@ -173,6 +202,7 @@ import moduleList from './module/list.js';
 import next from './next.js';
 import planCreate from './plan/create.js';
 import planList from './plan/list.js';
+import planNeeds from './plan/needs.js';
 import planRisk from './plan/risk.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
@@ -190,11 +220,13 @@ import skillBackfill from './skill/backfill.js';
 import skillCheck from './skill/check.js';
 import skillDemote from './skill/demote.js';
 import skillList from './skill/list.js';
+import skillSearch from './skill/search.js';
+import skillShow from './skill/show.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
-  { name: 'plan', summary: 'create plans from specs; list, show, validate and risk-read them' },
+  { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready and unblock it' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
@@ -213,6 +245,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   planShow,
   planValidate,
   planRisk,
+  planNeeds,
   loopStart,
   loopStop,
   loopPause,
@@ -239,8 +272,12 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   moduleExec,
   agentVendor,
   agentList,
+  agentShow,
+  agentSearch,
   skillCheck,
   skillList,
+  skillShow,
+  skillSearch,
   skillDemote,
   skillBackfill,
   instinctCheck,

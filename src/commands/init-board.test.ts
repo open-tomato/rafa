@@ -40,7 +40,7 @@
  *    alone sets it up: the decline case here and `init.test.ts`'s.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../project/root-choice.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

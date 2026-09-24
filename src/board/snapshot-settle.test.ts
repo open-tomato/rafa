@@ -49,7 +49,7 @@
  */
 import type { SpecIssue } from './issue.js';
 import type { RefreshOffer, RefreshOfferRequest } from './snapshot-settle.js';
-import type { Prompter } from '../project/root-choice.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

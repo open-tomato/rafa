@@ -50,7 +50,7 @@
  * damaged file errs toward telling. A write that fails is reported and
  * the run continues, since the person did answer yes.
  */
-import type { Prompter } from '../project/root-choice.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

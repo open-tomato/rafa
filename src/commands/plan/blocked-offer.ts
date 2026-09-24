@@ -45,10 +45,10 @@
  * drives a fake and none of them opens a terminal or waits on an answer.
  */
 import type { AlternativeOffer, AlternativeOfferRequest } from '../../board/blocked-line.js';
-import type { Prompter } from '../../project/root-choice.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 
 import { alternativeQuestion } from '../../board/blocked-line.js';
-import { createLinePrompter } from '../../project/root-choice.js';
+import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { lazyPrompter } from '../issue/ready.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */

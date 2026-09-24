@@ -239,14 +239,14 @@ function definitionName(text: string): string | null {
 }
 
 /**
- * Every definition under `<root>/.claude/agents`, by the name its
- * frontmatter carries, sorted by that name. A file with no readable
- * text, no frontmatter, or no usable `name` is passed over, and two
- * files carrying one name are both answered — {@link resolveAgentRoster}
- * is where a name is taken once.
+ * Every definition directly under `dir`, by the name its frontmatter
+ * carries, sorted by that name. A file with no readable text, no
+ * frontmatter, or no usable `name` is passed over, and two files
+ * carrying one name are both answered — {@link resolveAgentRoster} is
+ * where a name is taken once. `src/inventory/trees.ts` reads rafa's own
+ * `agents/` through this, which is no `.claude/agents` under any root.
  */
-export function readAgentDefinitions(root: string): readonly AgentDefinitionFile[] {
-  const dir = join(root, AGENT_DEFINITION_DIR);
+export function readAgentDirectory(dir: string): readonly AgentDefinitionFile[] {
   const found: AgentDefinitionFile[] = [];
 
   for (const file of markdownFiles(dir)) {
@@ -261,6 +261,11 @@ export function readAgentDefinitions(root: string): readonly AgentDefinitionFile
   }
 
   return found.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** {@link readAgentDirectory} over `<root>/.claude/agents`. */
+export function readAgentDefinitions(root: string): readonly AgentDefinitionFile[] {
+  return readAgentDirectory(join(root, AGENT_DEFINITION_DIR));
 }
 
 /** The first file answering for each name, in the order they were read. */

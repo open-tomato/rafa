@@ -8,7 +8,7 @@
  * `roots.ts` answers the candidates and each refusal; this module reads a
  * choice among them. {@link firstCandidate} is `--yes`, {@link namedRoot}
  * is `--root=<path>`, and {@link promptForRoot} lists the candidates
- * through a {@link Prompter} and reads answers until one names a root a
+ * through a {@link Prompter} (`src/cli/prompt/confirm.ts`) and reads answers until one names a root a
  * project may take, or the input ends. Whether to prompt at all is the
  * command's decision, since only a terminal can answer.
  *
@@ -35,17 +35,6 @@
  * refusal check has found it resolves. The walk in `scope.ts` answers a
  * project root as a real path too, so the root `init` writes under is the
  * root every later command resolves.
- *
- * ## The prompter
- *
- * {@link createLinePrompter} reads lines from a stream with `readline`'s
- * `line` and `close` events, and writes the list and each question to
- * another stream. It does not use `readline/promises`: measured on bun
- * 1.3.14, a `question` pending when its input ends never settles, where
- * the `close` event fires. The final line of an input that ends without a
- * line break is still delivered as a line, measured the same way.
- * readline is given no output and `terminal: false`, so on a terminal the
- * terminal's own line discipline echoes and edits what is typed.
  */
 import type {
   CandidateSource,
@@ -53,10 +42,9 @@ import type {
   RootCandidate,
   RootCandidates,
 } from './roots.js';
-import type { Readable } from 'node:stream';
+import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { resolve } from 'node:path';
-import { createInterface } from 'node:readline';
 
 import { DISK_ROOTS_FILE_SYSTEM, rootRefusal } from './roots.js';
 
@@ -74,21 +62,6 @@ export interface ChosenRoot {
 export type RootReading =
   | { readonly root: ChosenRoot; readonly problem: null }
   | { readonly root: null; readonly problem: string };
-
-/** Asks an operator, and tells them what went wrong. */
-export interface Prompter {
-  /** Writes `text` and a line break. */
-  readonly say: (text: string) => void;
-  /** Writes `question` and answers the next line typed, or null once the input has ended. */
-  readonly ask: (question: string) => Promise<string | null>;
-  /** Stops reading the input. */
-  readonly close: () => void;
-}
-
-/** A stream the prompter writes to: `process.stderr`, or a test's own. */
-export interface PromptOutput {
-  readonly write: (chunk: string) => unknown;
-}
 
 /** A reading of a root. */
 function chosen(path: string, source: RootSource): RootReading {
@@ -217,43 +190,4 @@ export async function promptForRoot(
 ): Promise<ChosenRoot | null> {
   prompter.say(candidateLines(found).join('\n'));
   return askUntilChosen(found, prompter, seams);
-}
-
-/**
- * A {@link Prompter} reading lines from `input` and writing to `output`;
- * see the module note. A line typed before it is asked for is kept for
- * the next question.
- */
-export function createLinePrompter(input: Readable, output: PromptOutput): Prompter {
-  const buffered: string[] = [];
-  const waiting: ((line: string | null) => void)[] = [];
-  let ended = false;
-  const lines = createInterface({ input, terminal: false, crlfDelay: Infinity });
-  lines.on('line', (line: string) => {
-    const reader = waiting.shift();
-    if (reader === undefined) buffered.push(line);
-    else reader(line);
-  });
-  lines.on('close', () => {
-    ended = true;
-    for (const reader of waiting.splice(0)) reader(null);
-  });
-
-  return {
-    say: (text) => {
-      output.write(`${text}\n`);
-    },
-    ask: async (question) => {
-      output.write(question);
-      const next = buffered.shift();
-      if (next !== undefined) return next;
-      if (ended) return null;
-      return new Promise((settle) => {
-        waiting.push(settle);
-      });
-    },
-    close: () => {
-      lines.close();
-    },
-  };
 }

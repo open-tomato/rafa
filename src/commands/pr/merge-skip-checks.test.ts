@@ -20,6 +20,7 @@
  */
 import type { MergeSeams } from './merge.js';
 import type { RafaCommand } from '../../cli/command.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   CheckRow,
@@ -30,7 +31,6 @@ import type {
   PullRequestDetail,
 } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
-import type { Prompter } from '../../project/root-choice.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';

@@ -23,12 +23,15 @@ the shapes the lint config forces.
   hand-rolled `Expected no arguments` is beside `plan-files.ts`'s shared
   `expectNoArgument`, which says `Expected no argument`.
 - **Every `import type` line forms one `import/order` group**
-  (`sharedRules.mjs`), sorted by path depth first: a specifier with fewer
-  `/` segments comes first, and at equal depth `./` ranks ahead of `../`.
-  So `src/plan/risk.ts` spells `./parse.js`, `../config.js`,
-  `./risk/accounts.js`, `../utils/declaration.js` — neither plain name
-  order nor "every sibling before every parent", which is how this bullet
-  read until 2026-09-23. Take the order from the lint message when unsure.
+  (`sharedRules.mjs`), and no short rule predicts its order: neither plain
+  name order, "every sibling before every parent", nor path depth first,
+  as this bullet read until 2026-09-24. `src/plan/risk.ts` spells
+  `./parse.js`, `../config.js`, `./risk/accounts.js`,
+  `../utils/declaration.js`, while `src/inventory/search/index.ts` puts
+  `../record.js` after `../../utils/claude.js`. Take the order from
+  `bunx eslint --fix-dry-run --format json <file>`, not from this page.
+  Value imports differ: the `parent` group (`../`) comes before the
+  `sibling` group (`./`), a blank line between them.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.

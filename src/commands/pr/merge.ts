@@ -154,10 +154,10 @@ import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { ChecksReading, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { UncheckedCase } from '../../pr/unchecked.js';
-import type { Prompter } from '../../project/root-choice.js';
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -166,6 +166,7 @@ import { join } from 'node:path';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { CommandExit } from '../../cli/command.js';
+import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import {
   cleanUpSteps,
@@ -179,7 +180,6 @@ import {
   readMergeRefusal,
   remainingFrom,
 } from '../../pr/index.js';
-import { createLinePrompter } from '../../project/root-choice.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';

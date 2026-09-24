@@ -192,3 +192,18 @@ from the worktree but still staged in the index passes `git ls-files`
 while failing `existsSync`. Every gate that opens the file by path will
 fail, so stage the deletion and re-run — a gate's refusal to open a staged
 delete is not a fault.
+
+### Spawned CLI tests
+
+`src/tests/cli-capture.ts` (`plantScratchRepo`, `plantProjectConfig`,
+`runRafa`) runs the CLI as a child; `src/commands/plan/validate.test.ts` is
+the reference example. This section replaces nothing.
+
+- `runRafa` gives the child a `PATH` of `scratch.bin` then git's directory
+  and nothing else. Plant an executable (mode 755) in `scratch.bin` to make
+  a program present; leave it out to make it absent.
+- The same `PATH` means a stand-in `claude` script cannot rely on `cat` or
+  other coreutils where git lives outside `/usr/bin`. Print a file with
+  shell builtins: `while IFS= read -r l; do printf '%s\n' "$l"; done < f`.
+- A `ROUTES` case in `src/commands/index.test.ts` splits its route line on
+  spaces, so a quoted multi-word argument does not group; use one word.

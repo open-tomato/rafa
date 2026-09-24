@@ -40,7 +40,7 @@
  *    here, each of the three a case that reads the setting back out of
  *    a config the step had written.
  */
-import type { Prompter } from '../project/root-choice.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { ReleaseFileSettings } from '../release/enabled.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

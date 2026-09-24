@@ -66,8 +66,8 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { PrProvider } from '../config-sections.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { boardChanged, setUpBoard } from '../board/setup.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';

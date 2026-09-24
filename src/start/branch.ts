@@ -66,13 +66,13 @@
  * spoken again.
  */
 import type { BranchOffer, BranchPlan, BranchRoute, BranchStep, StandAsideReason } from './branch-decision.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { GitRunner, WorkingTreeStatus } from '../pr/index.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { createGitRunner, gitSaid, parseWorkingTree } from '../pr/index.js';
-import { createLinePrompter } from '../project/root-choice.js';
 
 import {
   answeredYes,

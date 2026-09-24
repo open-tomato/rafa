@@ -35,8 +35,8 @@
  * `readNextState(sources.answer())` — reddens both.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

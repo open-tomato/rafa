@@ -54,6 +54,8 @@ your accounts.
   | `rafa loop start` | 🪙 one session per task, one for the wrap-up, and repair sessions while CI is red |
   | `rafa pr triage --resolve` | 🪙 runs a small fixed plan through the loop; without `--resolve`, nothing |
   | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
+  | `rafa skill search` | 🪙 one `haiku` session reading the twelve best-ranked files, one per kind with `--all`; with `--no-model`, nothing |
+  | `rafa agent search` | 🪙 the same as `rafa skill search`, over agent definitions |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
@@ -338,7 +340,7 @@ and a line here is ticked by the change that finishes the feature.
   branch, start
 - ✅ Every command that spends Claude usage says so in its help
 - ✅ Before a run, see what it can do on this machine and under your accounts
-- ⬜ See every skill and agent a run would use, browse them, and ask
+- ✅ See every skill and agent a run would use, browse them, and ask
   about them in plain language
 - ⬜ The roadmap in one table: what is ready, what blocks it, and what
   already has a plan, a branch or a pull request

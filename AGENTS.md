@@ -19,6 +19,9 @@ back into every turn and the split would save nothing.
   SQLite-only tables, and what a new kind or field has to touch.
 - `context/source.md` — import paths under `src/` and the shapes the lint
   config forces.
+- `context/inventory.md` — the record, sources and precedence, disabled
+  readings, `visibleToLoop`, plugin discovery, and how search and plan needs
+  use the inventory.
 - `context/cli.md` — `RafaCommand`, the command registry, routing, module
   command entries, the core roster, the dispatcher's events and exit code,
   the help levels with their snapshots, and the `describe` roster.

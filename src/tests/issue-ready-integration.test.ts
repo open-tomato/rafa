@@ -33,9 +33,9 @@
  * repository everywhere.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
 import type { GitRunner } from '../pr/git.js';
-import type { Prompter } from '../project/root-choice.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
