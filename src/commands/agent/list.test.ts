@@ -23,6 +23,16 @@
  * marked every user row hidden, or printed the hint always, would fail
  * that half.
  *
+ * ## The rafa tier
+ *
+ * Definitions planted under `bundled/agents` beside the entry list as
+ * `source: rafa`, a reviewed one marked visible and an unreviewed
+ * third-party one hidden, so a command marking every rafa row either
+ * way fails one of the two. The collision of a rafa and a different
+ * home definition under a loaded `user` tier is held beside the same
+ * tree without `user`, where the rafa copy serves the name, and beside
+ * a `tiers.agents` pin that settles it.
+ *
  * ## `-i`
  *
  * The browse runs over a recording terminal and scripted keys handed in
@@ -180,6 +190,7 @@ const NO_RESOLUTION: Resolution = { loadedTiers: [], items: [], collisions: [] }
 describe('the words an agent list line is read as', () => {
   it('reads the three filters, and nothing when each is left out', () => {
     expect(readAgentFilters({})).toEqual({ source: null, state: null, hiddenFromLoop: false });
+    expect(readAgentFilters({ state: 'collision' })).toEqual({ source: null, state: 'collision', hiddenFromLoop: false });
     expect(readAgentFilters({ 'source': 'plugin:alpha', 'state': 'shadowed', 'hidden-from-loop': true }))
       .toEqual({ source: 'plugin:alpha', state: 'shadowed', hiddenFromLoop: true });
   });
@@ -192,7 +203,7 @@ describe('the words an agent list line is read as', () => {
     expect(source).toContain('--source is "users", expected one of: project, rafa, user, plugin:<name>, addon:<name>');
     expect(source).toContain('Usage: rafa agent list');
     expect(stateCode).toBe(1);
-    expect(state).toContain('--state is "shadowed-by:project", expected one of: enabled, shadowed, disabled');
+    expect(state).toContain('--state is "shadowed-by:project", expected one of: enabled, collision, shadowed, disabled');
     expect(refusal(() => readAgentFilters({ source: true }))[1]).toContain('--source needs a value');
   });
 
@@ -429,7 +440,7 @@ describe('rafa agent list over planted sources', () => {
     expect(unknown.exitCode).toBe(1);
     expect(unknown.stderr).toContain('known sources: project, rafa, user, plugin:alpha');
     expect(state.exitCode).toBe(1);
-    expect(state.stderr).toContain('--state is "hidden", expected one of: enabled, shadowed, disabled');
+    expect(state.stderr).toContain('--state is "hidden", expected one of: enabled, collision, shadowed, disabled');
     expect(passed.exitCode).toBe(0);
   });
 
@@ -441,6 +452,104 @@ describe('rafa agent list over planted sources', () => {
 
     expect(answered.exitCode).toBe(1);
     expect(answered.stderr).toContain('rafa agent list: the config cannot be used:');
+  });
+});
+
+/** A rafa-tier agent definition: {@link agentText} with the `provenance` lines given in its frontmatter. */
+function rafaAgentText(name: string, description: string, provenance: readonly string[]): string {
+  return agentText(name, description).replace('\n---\n\n', `\n${provenance.join('\n')}\n---\n\n`);
+}
+
+/** A reviewed third-party rafa agent, which the serving check admits. */
+function servedAgent(name: string, description: string): string {
+  return rafaAgentText(name, description, [
+    'provenance:',
+    '  origin: "https://example.com/agents"',
+    '  license: "MIT"',
+    '  reviewed: "rafa-system 2026-09-24"',
+  ]);
+}
+
+/** Where the rafa tier's agent `name` is planted, beside the planted entry. */
+function bundled(name: string): string {
+  return `runtime/bundled/agents/${name}.md`;
+}
+
+describe('rafa agent list over a planted rafa tier', () => {
+  it('lists bundled agents as source rafa, marking the served one and not the unreviewed one', async () => {
+    const tree = plant({
+      [bundled('tdd-guide')]: servedAgent('tdd-guide', 'Writes the test first'),
+      [bundled('borrowed')]: rafaAgentText('borrowed', 'Someone else\'s agent', [
+        'provenance:',
+        '  origin: "https://example.com/agents"',
+        '  license: "MIT"',
+      ]),
+    });
+
+    const json = await run(['agent', 'list', '--source=rafa', '--output=json'], tree);
+    const text = await run(['agent', 'list', '--source=rafa'], tree);
+
+    expect(json.exitCode).toBe(0);
+    expect(rowsOf(json.stdout)).toEqual([
+      ['borrowed', 'rafa', 'enabled', false],
+      ['tdd-guide', 'rafa', 'enabled', true],
+    ]);
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain('  ○ borrowed   rafa  enabled  Someone else\'s agent\n');
+    expect(text.stdout).toContain('  ● tdd-guide  rafa  enabled  Writes the test first\n');
+    expect(text.stdout).toContain('2 of 2 agent(s) listed, 1 visible to the loop');
+  });
+
+  it('shows a different home definition as a collision with the rafa one once user is loaded, and names it in no vendor hint', async () => {
+    const files = {
+      [bundled('tdd-guide')]: servedAgent('tdd-guide', 'Writes the test first'),
+      'home/.claude/agents/tdd-guide.md': agentText('tdd-guide', 'The home copy'),
+      'project/.claude/agents/planner.md': agentText('planner', 'Plans the work'),
+    };
+    const loaded = plant(files, 'project,local,user');
+    // Control: the same tree without the user tier loaded, where the rafa copy serves the name.
+    const unloaded = plant(files);
+
+    const colliding = await run(['agent', 'list', '--output=json'], loaded);
+    const kept = await run(['agent', 'list', '--state=collision', '--output=json'], loaded);
+    const served = await run(['agent', 'list', '--output=json'], unloaded);
+
+    expect(colliding.exitCode).toBe(0);
+    expect(rowsOf(colliding.stdout)).toEqual([
+      ['planner', 'project', 'enabled', true],
+      ['tdd-guide', 'rafa', 'collision', false],
+      ['tdd-guide', 'user', 'collision', false],
+    ]);
+    expect(resultData(colliding.stdout).unreachable).toEqual([]);
+    expect(rowsOf(kept.stdout)).toEqual([
+      ['tdd-guide', 'rafa', 'collision', false],
+      ['tdd-guide', 'user', 'collision', false],
+    ]);
+    expect(rowsOf(served.stdout)).toEqual([
+      ['planner', 'project', 'enabled', true],
+      ['tdd-guide', 'rafa', 'enabled', true],
+      ['tdd-guide', 'user', 'shadowed-by:rafa', false],
+    ]);
+    expect(resultData(served.stdout).unreachable).toEqual([]);
+  });
+
+  it('serves the home definition once tiers.agents pins the name to user, the rafa one shadowed', async () => {
+    const tree = plant({
+      [bundled('tdd-guide')]: servedAgent('tdd-guide', 'Writes the test first'),
+      'home/.claude/agents/tdd-guide.md': agentText('tdd-guide', 'The home copy'),
+    }, 'project,local,user');
+    plantProjectConfig(
+      tree.root,
+      'version: 1\nloop:\n  settingSources: project,local,user\ntiers:\n  agents:\n    tdd-guide: user\n',
+    );
+
+    const answered = await run(['agent', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(rowsOf(answered.stdout)).toEqual([
+      ['tdd-guide', 'rafa', 'shadowed-by:user', false],
+      ['tdd-guide', 'user', 'enabled', true],
+    ]);
   });
 });
 

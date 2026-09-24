@@ -7,8 +7,14 @@
  *
  * Every row is an {@link InventoryRecord} of kind `agent` as
  * `buildInventory` (`src/inventory/index.ts`) decides it, so
- * precedence, `shadowed-by:` and `visibleToLoop` are decided there and
- * only there, and this command filters and prints them. An agents tree
+ * precedence, `collision`, `shadowed-by:` and `visibleToLoop` are
+ * decided there and only there, and this command filters and prints
+ * them. A `collision` row is one of two loaded tiers' different
+ * definitions under one name, which the loop serves neither of until a
+ * `tiers.agents` pin settles it. A `rafa` row, from the
+ * `bundled/agents` directory beside the running rafa, is visible when
+ * it is served to a loop session (the winner of its name, admitted by
+ * `serveVerdict`), and hidden otherwise. An agents tree
  * is read by its definitions' frontmatter `name`, the way Claude Code
  * resolves `--agent`, so a row names what a task routed
  * `agent=<name>` would reach. The Claude Code built-ins are not
@@ -34,7 +40,7 @@
  * matched by the same `matchesFilters`: `--source=<source>` on the
  * whole source string (`plugin:<name>` and `addon:<name>` included,
  * `--tier` its alias for one release after this one), `--state` on the
- * state's prefix (`enabled`, `shadowed`, `disabled`), and
+ * state's prefix (`enabled`, `collision`, `shadowed`, `disabled`), and
  * `--hidden-from-loop` on `visibleToLoop: false`. A `plugin:` or
  * `addon:` source the inventory does not know is refused, so a typo
  * never reads as an empty source.
@@ -116,7 +122,7 @@ export const DEFAULT_AGENT_LIST_SEAMS: AgentListSeams = Object.freeze({
 const COMMAND_NAME = 'rafa agent list';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa agent list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop] [-i]';
+const USAGE = 'rafa agent list [--source=<source>] [--state=enabled|collision|shadowed|disabled] [--hidden-from-loop] [-i]';
 
 /** What json mode gives as the terminal result's `data`. */
 export interface AgentListResult {
@@ -330,12 +336,14 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
     description: 'Lists every agent definition the inventory holds — the project\'s `.claude/agents`, the'
       + ' `bundled/agents` directory beside the running rafa, `~/.claude/agents`, each loaded add-on\'s and each'
       + ' installed plugin\'s — one row each, under the frontmatter `name` a task routes to: a mark saying'
-      + ' whether a session the loop spawns under `loop.settingSources` resolves it, its name, its source,'
-      + ' its state (`enabled`, or `shadowed-by:<source>` when a nearer source holds the same name) and its'
-      + ' own description as the summary. The Claude Code built-ins are not listed. `--source=<source>`'
-      + ' keeps one source, `plugin:<name>` and `addon:<name>` included; `--state=<state>` keeps `enabled`,'
-      + ' `shadowed` or `disabled` rows; `--hidden-from-loop` keeps the rows no loop session resolves. The'
-      + ' filters combine. When `~/.claude/agents` holds a name no visible row answers, a trailing line'
+      + ' whether a session the loop spawns under `loop.settingSources` resolves it or is served it from the'
+      + ' rafa tier, its name, its source, its state (`enabled`, `collision` when two loaded tiers hold'
+      + ' different definitions under the name and a `tiers.agents` pin must settle it,'
+      + ' `shadowed-by:<source>` when another source serves the name, or `disabled:<how>`) and its own'
+      + ' description as the summary. The Claude Code built-ins are not listed. `--source=<source>` keeps'
+      + ' one source, `plugin:<name>` and `addon:<name>` included; `--state=<state>` keeps `enabled`,'
+      + ' `collision`, `shadowed` or `disabled` rows; `--hidden-from-loop` keeps the rows no loop session'
+      + ' resolves. The filters combine. When `~/.claude/agents` holds a name no visible row answers, a trailing line'
       + ' names it and points at `rafa agent vendor`. It spawns no session and exits 0 whatever the rows'
       + ' say. With `--output=json` the rows, the vendor names and the warnings are the data of the'
       + ' terminal result event. `-i` browses the listed rows in the terminal instead of printing them,'
@@ -369,6 +377,10 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
       {
         cmd: 'rafa agent list --hidden-from-loop --source=user',
         note: 'Lists the `~/.claude/agents` definitions a loop session does not resolve.',
+      },
+      {
+        cmd: 'rafa agent list --state=collision',
+        note: 'Lists the holders of every name two loaded tiers hold different definitions under, which a pin settles.',
       },
       {
         cmd: 'rafa agent list -i',

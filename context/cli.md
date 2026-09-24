@@ -688,10 +688,11 @@ New; it replaces no earlier text. What a row or an action added to
   the same three filters. `--source` names a whole source string
   (`project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>`), aliased
   `--tier` for one release after this one; `--state` takes `enabled`,
-  `shadowed` or `disabled` and matches the prefix; `--hidden-from-loop`
-  keeps `visibleToLoop: false`. A `plugin:` or `addon:` source the
-  inventory does not know is refused. The filters are read and matched
-  by the helpers `src/commands/skill/list.ts` exports. A definition is
+  `collision`, `shadowed` or `disabled` and matches the prefix;
+  `--hidden-from-loop` keeps `visibleToLoop: false`. A `plugin:` or
+  `addon:` source the inventory does not know is refused. The filters
+  are read and matched by the helpers `src/commands/skill/list.ts`
+  exports. A definition is
   keyed by its frontmatter `name`, as `--agent` resolves it, and each row
   prints the loop mark (`●` when a run sees it, `○` when not), name,
   source, state and summary. The Claude Code built-ins are no inventory
@@ -829,16 +830,20 @@ New; it replaces no earlier text. What a row or an action added to
   padded to the widest cell. `--source` keeps the rows of one whole
   source string and refuses a `plugin:` or `addon:` source no row or
   warning names; `--tier` is its alias, marked in the help for removal
-  after one release. `--state` takes `enabled`, `shadowed` or `disabled`
-  and matches the state's prefix; `--hidden-from-loop` keeps
-  `visibleToLoop: false`. The filters combine and are read and matched
-  by helpers the module exports. A skills tree whose directory is absent
-  prints its path and `(no such directory)`, and an unreadable plugin
-  record, plugin, add-on manifest, settings file or `skillOverrides`
-  entry is one `warn:` line. The exit code is 0 whatever the rows say —
-  the listing reports and `skill check` gates — and exit code 1 is kept
-  for a positional word, a `--source` or `--state` it cannot take, and a
-  config `loadConfig` refuses. In json mode the kept records, each with
+  after one release. `--state` takes `enabled`, `collision`, `shadowed`
+  or `disabled` and matches the state's prefix, `collision` keeping the
+  holders of every name two loaded tiers hold different items under;
+  `--hidden-from-loop` keeps `visibleToLoop: false`. A `rafa` row is
+  marked `●` when it is served to a loop session and `○` when not
+  (`sourceVisibleToLoop`, `context/inventory.md`). The filters combine
+  and are read and matched by helpers the module exports. A skills tree
+  whose directory is absent prints its path and `(no such directory)`,
+  and an unreadable plugin record, plugin, add-on manifest, settings
+  file or `skillOverrides` entry is one `warn:` line. The exit code is
+  0 whatever the rows say — the listing reports and `skill check`
+  gates — and exit code 1 is kept for a positional word, a `--source`
+  or `--state` it cannot take, and a config `loadConfig` refuses. In
+  json mode the kept records, each with
   its `check`, the filters, the pre-filter total, the skills trees and
   the warnings are the result's `data`. `-i | --interactive` browses the
   kept rows instead of printing them, through `browse` (`src/inventory/browse.ts`)
