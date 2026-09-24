@@ -37,8 +37,8 @@
  *     options it takes and the report it answers.
  *   - The PREREQUISITES parser: {@link parsePrerequisites}, which reads
  *     the unticked items of a plan's `PREREQUISITES-<stub>.md`,
- *     {@link planPrerequisites}, which maps them onto required items and
- *     reminders, {@link mergePlanPrerequisites} and
+ *     {@link planPrerequisites}, which maps them onto required items,
+ *     reminders and malformed items, {@link mergePlanPrerequisites} and
  *     {@link loadPlanPrerequisites}, which merge them into the config's
  *     items for one plan, and {@link prerequisitesPathForPlan}, which
  *     names that file for a plan.
@@ -75,6 +75,7 @@
  */
 export type { InjectMode } from '../config.js';
 export type {
+  MalformedPrerequisite,
   MarkdownPrerequisite,
   PlanPrerequisites,
   PreflightItems,

@@ -860,6 +860,25 @@ describe('its refusals', () => {
     expect(broken.stderr).toEndWith('\nNothing was checked.\n');
     expect(fine.exitCode).toBe(0);
   });
+
+  it('refuses a malformed [auto] item by its line before any probe, as loop start would, beside the item written right', async () => {
+    const world = plantWorld();
+    plant(world.root, '.plans/PLAN-quoted.md', '# Plan\n');
+    plant(world.root, '.plans/PREREQUISITES-quoted.md', '# Prerequisites\n\n- [ ] [auto] `exit 0` answers\n');
+    plant(world.root, '.plans/PLAN-fine.md', '# Plan\n');
+    plant(world.root, '.plans/PREREQUISITES-fine.md', '# Prerequisites\n\n- [ ] [auto] It answers: `exit 0`\n');
+
+    const quoted = await doctor(world, ['--plan=.plans/PLAN-quoted.md'], { seams: NO_PROBE });
+    const fine = await doctor(world, ['--plan=.plans/PLAN-fine.md']);
+
+    expect(quoted.exitCode).toBe(1);
+    expect(quoted.stderr).toStartWith('rafa doctor: PREREQUISITES-quoted.md holds 1 malformed [auto] or [start] item(s):'
+      + ' no command ends the item after a final ": ".\n'
+      + '  line 3 [auto]: `exit 0` answers\n');
+    expect(quoted.stderr).toContain('rafa loop start would refuse here, before any probe.');
+    expect(quoted.stderr).toEndWith('\nNothing was checked.\n');
+    expect(fine.exitCode).toBe(0);
+  });
 });
 
 describe('the warnings beside the report', () => {

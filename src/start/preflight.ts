@@ -35,7 +35,10 @@
  *   3. **Reads the items** through `loadPlanPrerequisites`: the config's
  *      two tiers, with the plan's `PREREQUISITES-<stub>.md` merged in for
  *      this plan alone (`preflight/prerequisites-md.ts`). A file there
- *      that cannot be read refuses the run before any probe runs.
+ *      that cannot be read refuses the run before any probe runs, and
+ *      so does one holding a MALFORMED item: an `auto` or `start` item
+ *      no command ends after a final `: `, which asked for a check and
+ *      names none to run.
  *   4. **Adds the pull request provider's automatic items**, through
  *      `pr/preflight-items.ts`: `gh` on `PATH` and `gh auth status` for
  *      `origin`'s host, both REQUIRED, when the provider resolves to
@@ -43,7 +46,7 @@
  *      run whose pull request could never be opened should halt at its
  *      cheapest check rather than after the tiers a repository added.
  *   5. **Prints the reminders** that file carries, through `info`: each
- *      `human` item, and each `auto` item with no probe, by its line.
+ *      `human` item, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing.
  *   6. **Decides the start-only tier**, through `isFirstDispatch`
@@ -96,6 +99,18 @@
  *        loaded scope defines (loop.settingSources: project, local).
  *        agent "tdd-guide" (line 7) resolves under no loaded scope:
  *        run `rafa agent vendor tdd-guide`
+ *        Nothing was checked and nothing was dispatched.
+ *
+ * A malformed item in the plan's PREREQUISITES file refuses before any
+ * probe too, naming each by its line and the one shape a probed item
+ * takes (`malformedPrerequisiteLines`), so a quoted name is never run
+ * in place of the command (#140):
+ *
+ *     ❌ Refusing to start: PREREQUISITES-demo.md holds 1 malformed
+ *        [auto] or [start] item(s): no command ends the item after a
+ *        final ": ".
+ *          line 4 [auto]: `gh --version` — the GitHub CLI on PATH
+ *        Write each as - [ ] uv installed: `uvx --version`, ...
  *        Nothing was checked and nothing was dispatched.
  *
  * ## The notice
@@ -175,7 +190,11 @@ import { writePreflightChecks } from '../effort/store/preflight.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
-import { loadPlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
+import {
+  loadPlanPrerequisites,
+  malformedPrerequisiteLines,
+  prerequisitesPathForPlan,
+} from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
@@ -321,6 +340,22 @@ async function loadItems(options: StartPreflightOptions): Promise<PreflightItems
   }
 }
 
+/**
+ * Refuses the run when the plan's PREREQUISITES file holds an `auto` or
+ * `start` item with no command to probe, naming each by its line; see
+ * the module note.
+ */
+function refuseMalformedItems(planPath: string, items: PreflightItems): void {
+  if (items.malformed.length === 0) return;
+  const file = basename(prerequisitesPathForPlan(planPath) ?? planPath);
+  const [head = '', ...rest] = malformedPrerequisiteLines(file, items.malformed);
+  throw new CommandExit(1, [
+    `❌ Refusing to start: ${head}`,
+    ...rest.map((line) => `   ${line}`),
+    '   Nothing was checked and nothing was dispatched.',
+  ].join('\n'));
+}
+
 /** The line naming one start-only item a resume passed over, and why. */
 function skippedStartLine(item: PrerequisiteItem, tracker: string): string {
   return `⏭ start-only item ${item.kind} ${JSON.stringify(item.name)} was not checked:`
@@ -396,6 +431,7 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
   const runId = (options.newRunId ?? randomUUID)();
   refuseUnresolvableAgents(options);
   const items = await loadItems(options);
+  refuseMalformedItems(options.planPath, items);
   announceReminders(options.planPath, items.reminders);
 
   const tiers: PreflightTiers = {

@@ -376,7 +376,7 @@ const PREREQUISITES = [
   '# Prerequisites',
   '',
   '## Toolchain [auto]',
-  '- [ ] [auto] Bun is installed (`bun --version`)',
+  '- [ ] [auto] Bun is installed: `bun --version`',
   '',
   '## Operator steps after the plan merges',
   '- [ ] Publish with `npm publish` once the close-out is green',
@@ -400,7 +400,7 @@ describe('the PREREQUISITES file of the plan', () => {
     const control = await drive(controlRoot, settingsOf([], []), { 'bun --version': answered(0) });
 
     expect(run.refusal?.exitCode).toBe(1);
-    expect(run.refusal?.message).toContain('\n  tool "Bun is installed (`bun --version`)": probe `bun --version` exited 1: bun: broken\n');
+    expect(run.refusal?.message).toContain('\n  tool "Bun is installed: `bun --version`": probe `bun --version` exited 1: bun: broken\n');
     expect(run.probes).toEqual([`bun --version in ${root}`]);
     expect(run.info).toEqual([...REMINDER_LINES, CHECKING_ONE]);
 
@@ -410,6 +410,35 @@ describe('the PREREQUISITES file of the plan', () => {
       { description: 'Publish with `npm publish` once the close-out is green', tag: 'human', line: 7 },
     ]);
     expect(control.info).toEqual([...REMINDER_LINES, CHECKING_ONE, '   Preflight passed.']);
+  });
+
+  it('refuses a malformed auto item by its line before any probe, where the file written right runs its probe', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const malformed = PREREQUISITES.replace(
+      'Bun is installed: `bun --version`',
+      '`@open-tomato/define-config` reachable (`npm view @open-tomato/define-config`)',
+    );
+    writeFileSync(prerequisitesPathIn(root), malformed, 'utf8');
+    writeFileSync(prerequisitesPathIn(controlRoot), PREREQUISITES, 'utf8');
+
+    const run = await drive(root, settingsOf([], []), {});
+    const control = await drive(controlRoot, settingsOf([], []), { 'bun --version': answered(0) });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message.split('\n')).toEqual([
+      `❌ Refusing to start: PREREQUISITES-${STUB}.md holds 1 malformed [auto] or [start] item(s):`
+        + ' no command ends the item after a final ": ".',
+      '     line 4 [auto]: `@open-tomato/define-config` reachable (`npm view @open-tomato/define-config`)',
+      '   Write each as - [ ] uv installed: `uvx --version`, its one backticked span a complete command run as'
+        + ' written; prove a tool is there with `<tool> --version`, `<tool> --help` or `which <tool>`.',
+      '   Nothing was checked and nothing was dispatched.',
+    ]);
+    expect([run.probes, run.info]).toEqual([[], []]);
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+
+    expect(control.refusal).toBeNull();
+    expect(control.probes).toEqual([`bun --version in ${controlRoot}`]);
   });
 
   it('merges the file for its own plan alone, running nothing for a plan beside it', async () => {
@@ -611,12 +640,12 @@ const START_PREREQUISITES = [
   '# Prerequisites',
   '',
   '## Starting state [start]',
-  '- [ ] The sibling checkout is clean (`git status --porcelain`)',
+  '- [ ] The sibling checkout is clean: `git status --porcelain`',
   '',
 ].join('\n');
 
 /** The one start-only item {@link START_PREREQUISITES} names. */
-const CLEAN_CHECKOUT = 'The sibling checkout is clean (`git status --porcelain`)';
+const CLEAN_CHECKOUT = 'The sibling checkout is clean: `git status --porcelain`';
 
 /** Its probe. */
 const CLEAN_PROBE = 'git status --porcelain';
@@ -670,7 +699,7 @@ describe('the start-only tier of the plan', () => {
   });
 
   it('names every skipped item in one line of its own, where the same file on a first dispatch prints none', async () => {
-    const second = 'The branch is fresh (`git rev-parse --abbrev-ref HEAD`)';
+    const second = 'The branch is fresh: `git rev-parse --abbrev-ref HEAD`';
     const prerequisites = START_PREREQUISITES.replace(
       `- [ ] ${CLEAN_CHECKOUT}\n`,
       `- [ ] ${CLEAN_CHECKOUT}\n- [ ] ${second}\n`,

@@ -23,7 +23,8 @@
  *      config's items are checked alone. A plan named `PLAN-<stub>.md` has
  *      its `PREREQUISITES-<stub>.md` merged in
  *      (`preflight/prerequisites-md.ts`), and one that cannot be read is
- *      refused. The default plan is named `PLAN.md`, which carries no stub
+ *      refused, as is one holding a malformed `auto` or `start` item, in
+ *      the words `loop start` refuses it with. The default plan is named `PLAN.md`, which carries no stub
  *      and so no PREREQUISITES file: `--plan` is how a plan's items reach
  *      the report.
  *   3. **The pull request provider's automatic items**
@@ -227,7 +228,12 @@ import { ConfigError } from '../config.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
-import { loadPlanPrerequisites, mergePlanPrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
+import {
+  loadPlanPrerequisites,
+  malformedPrerequisiteLines,
+  mergePlanPrerequisites,
+  prerequisitesPathForPlan,
+} from '../preflight/prerequisites-md.js';
 import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { announceRiskTotal } from '../start/risk-total.js';
@@ -414,6 +420,22 @@ async function loadItems(plan: string | null, config: RafaConfig): Promise<Prefl
   }
 }
 
+/**
+ * Refuses a plan whose PREREQUISITES file holds a malformed `auto` or
+ * `start` item, in the words `loop start` refuses it with; see the
+ * module note.
+ */
+function refuseMalformedItems(plan: string | null, items: PreflightItems): void {
+  if (plan === null || items.malformed.length === 0) return;
+  const file = basename(prerequisitesPathForPlan(plan) ?? plan);
+  const [head = '', ...rest] = malformedPrerequisiteLines(file, items.malformed);
+  throw refusal([
+    `rafa doctor: ${head}`,
+    ...rest,
+    'rafa loop start would refuse here, before any probe. No run was started and nothing was stored.',
+  ]);
+}
+
 /** The PREREQUISITES file merged in for `plan`, or null when there is none. */
 function mergedFile(plan: string | null): string | null {
   const file = plan === null
@@ -483,6 +505,7 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   const { config } = resolved;
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
+  refuseMalformedItems(plan, items);
   const automatic = readProvider(project.root, config, seams);
   const start = readStartTier(plan, items);
   const tiers: PreflightTiers = {
