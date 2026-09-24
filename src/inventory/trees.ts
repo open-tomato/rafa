@@ -60,8 +60,9 @@
  * An agents tree is read through `readAgentDirectory`
  * (`agents/roster.ts`), so a definition is keyed by its frontmatter
  * `name`, the way Claude Code resolves `--agent`, and a file carrying
- * no usable `name` is passed over as the roster passes it over. The
- * checker does not read agents, so an agent row's `check` is null.
+ * no usable `name` is passed over as the roster passes it over.
+ * `checkDirectory` does not read agents, and the agent check
+ * (`schema/agent.ts`) is not run here, so an agent row's `check` is null.
  *
  * Nothing here throws on a missing directory, and nothing reads the
  * real home unless it is handed it: every path comes from
