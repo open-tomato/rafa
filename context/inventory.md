@@ -127,3 +127,52 @@ of `~/.claude.json`, which Claude Code applies before any settings file,
 and the keys Claude Code drops from a project-scoped `env`; its module
 note in `src/commands/doctor-deep-env.ts` lists both. This paragraph
 replaces nothing.
+
+### Serving
+
+A winner Claude Code would not load by itself reaches a loop session
+through a session-only flag. Which flag keeps a skill's bare name was
+measured, not read from documentation. The probe ran on 2026-09-24
+against Claude Code 2.1.280. That is the installed CLI; the plan named
+2.1.281. There was one `claude -p --dangerously-skip-permissions
+--setting-sources project,local` session per flag, started in an empty
+git repository outside this one with the nested-session variables
+unset. Each run read the `skills` and `agents` of the stream-json
+`init` message, and the session was asked to list both. Every planted
+name began `zqprobe-`, which nothing installed carries.
+
+| Flag and argument | Planted | Listed as |
+|---|---|---|
+| none (negative control) | nothing | no probe name |
+| none, skill in the cwd's `.claude/skills/` (positive control) | skill | bare |
+| `--agents '<inline JSON object>'` | agent | bare |
+| `--agents <path to that JSON>` | agent | exit 1, `Invalid --agents configuration` |
+| `--add-dir <dir>` | `<dir>/.claude/skills/<n>/SKILL.md` | bare |
+| `--add-dir <dir>` | `<dir>/.claude/agents/<n>.md` | bare |
+| `--add-dir <dir>` | `<dir>/skills/<n>/SKILL.md` | not listed |
+| `--plugin-dir <dir>` with `.claude-plugin/plugin.json` | skill, agent | `<plugin>:<n>` |
+
+So `SKILL_DELIVERY` is `add-dir`, pinned with `SERVE_CLI_VERSION` in
+`src/tiers/delivery.ts`. `src/tiers/delivery.test.ts` reads this section
+and fails when the section and the constants disagree. What the reading
+implies for the served directory:
+
+- It keeps the `.claude/` layout. A bare `skills/` directory under an
+  added directory is not loaded.
+- `--add-dir` carries agents as well, under their bare names, so
+  `--agents` is not the only route for agents. The plan did not predict
+  this.
+- `--plugin-dir` namespaces agents as well as skills, and this probe
+  measured it. The note in `src/inventory/plugins.ts` still calls the
+  agent prefix documented rather than measured.
+- The CLI's help lists `--add-dir <directories...>` as variadic, as
+  `--tools` is, so the flag must not come before a token it would
+  swallow. `--agents <json>` takes one value. `--plugin-dir` is
+  repeatable. This was read from the help, not measured.
+
+Not measured: delivery under setting sources other than
+`project,local`, a served name that collides with a project or user
+name, and whether an added directory's own settings or `CLAUDE.md` load
+alongside its skills. A CLI version other than `SERVE_CLI_VERSION` means
+running the probe again before trusting the pin. This section replaces
+nothing.
