@@ -375,7 +375,7 @@ and a line here is ticked by the change that finishes the feature.
   already has a plan, a branch or a pull request
 - ✅ `rafa doctor --deep`: what a loop session and its subagents can
   actually reach — settings, `PATH`, providers and the tools its stack needs
-- ⬜ Clean up merged, stale and unpushed branches and idle worktrees
+- ✅ Clean up merged, stale and unpushed branches and idle worktrees
 - ⬜ `rafa status`: everything in one snapshot, and one line about what
   changed since you last looked
 - ⬜ The right skills reach the right task, chosen when the plan is
