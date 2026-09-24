@@ -227,10 +227,9 @@
  *     name spelled flat at the top level, `tiers.skills.tdd-guide:`, is
  *     not a setting's key and is retained as an unknown one.
  *   - The spec has maps merge by key across layers, a `false` removing
- *     the item. Nothing here merges yet: a layer that names a map
- *     answers it whole, as any other setting's layer does, so a project
- *     file's `tiers.skills` replaces the user file's. Only the shape is
- *     settled here, so the merge can apply to it without a special case.
+ *     the item. `resolveConfig` merges the three maps by key, the
+ *     project over the user over the default, and keeps a `false` as
+ *     the key's answer so it shadows a lower layer's entry.
  *   - No `tiers` setting is a {@link CommandLineSetting}, for the reason
  *     the `pr` section gives.
  *

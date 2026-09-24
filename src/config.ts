@@ -456,6 +456,44 @@ export function parseConfigText(text: string, path: string): ConfigFile {
   return { path, values: read.layer, extras: [...sorted.extras, ...read.extras] };
 }
 
+/** The settings whose value is a map, merged by key across layers. */
+const MAP_SETTINGS: ReadonlySet<ConfigSetting> = new Set<ConfigSetting>([
+  'tiersSkills',
+  'tiersAgents',
+  'routing',
+]);
+
+/**
+ * Merges map layers by key, later layers over earlier ones. A `false`
+ * is kept as the answer for its key, so it shadows a lower layer's
+ * entry instead of leaving it standing.
+ */
+function mergeMaps(...layers: unknown[]): ReadonlyMap<string, unknown> {
+  const merged = new Map<string, unknown>();
+  for (const layer of layers) {
+    if (!(layer instanceof Map)) continue;
+    for (const [name, value] of layer) merged.set(name, value);
+  }
+  return merged;
+}
+
+/**
+ * One warning per pin in `layer` naming the rafa tier while `tiers.rafa`
+ * is off. A pin to a tier that is not loaded cannot win, which is worth
+ * saying, but is no reason to refuse the file: the operator may switch
+ * the tier back on.
+ */
+function unloadedPinWarnings(layer: ConfigFile): string[] {
+  const pins = [
+    ['tiers.skills', layer.values.tiersSkills],
+    ['tiers.agents', layer.values.tiersAgents],
+  ] as const;
+  return pins.flatMap(([key, map]) => [...(map ?? [])]
+    .filter(([, pin]) => pin === 'rafa')
+    .map(([name]) => `rafa config: ${key}.${name} in ${layer.path} pins the rafa tier, `
+      + 'which is not loaded (tiers.rafa is off), so the pin has no effect'));
+}
+
 /** One setting's answer, and the layer that gave it. */
 interface Ranked<K extends ConfigSetting> {
   value: RafaConfig[K];
@@ -501,15 +539,30 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     const fromCli = cli[setting];
     if (fromCli !== undefined) return { value: fromCli, source: 'cli' };
     const fromFile = file?.values[setting];
-    if (fromFile !== undefined) return { value: fromFile, source: 'file' };
     const fromUser = user?.values[setting];
+    if (MAP_SETTINGS.has(setting)) {
+      const merged = mergeMaps(CONFIG_DEFAULTS[setting], fromUser, fromFile);
+      const source = fromFile !== undefined
+        ? 'file'
+        : fromUser !== undefined
+          ? 'user'
+          : 'default';
+      return { value: merged as RafaConfig[K], source };
+    }
+    if (fromFile !== undefined) return { value: fromFile, source: 'file' };
     if (fromUser !== undefined) return { value: fromUser, source: 'user' };
     return { value: CONFIG_DEFAULTS[setting], source: 'default' };
   };
   const ranked = SETTING_NAMES.map((setting) => [setting, rank(setting)] as const);
+  const rafaLoaded = ranked.find(([setting]) => setting === 'tiersRafa')?.[1].value !== 'off';
   const warnings = [user, file].flatMap((layer) => layer === null
     ? []
-    : layer.extras.map((extra) => unknownKeyWarning(extra.key, layer.path)));
+    : [
+      ...layer.extras.map((extra) => unknownKeyWarning(extra.key, layer.path)),
+      ...(rafaLoaded
+        ? []
+        : unloadedPinWarnings(layer)),
+    ]);
 
   return {
     config: Object.fromEntries(

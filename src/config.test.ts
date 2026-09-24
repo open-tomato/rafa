@@ -295,6 +295,19 @@ const FULL_VALUES: RafaConfig = {
   routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
 };
 
+/**
+ * What {@link FULL} resolves to: maps merge by key over the defaults, so
+ * the file's `false` shadows the default review row rather than dropping it.
+ */
+const FULL_RESOLVED: RafaConfig = {
+  ...FULL_VALUES,
+  routing: new Map<string, RouteTarget>([
+    ...DEFAULTS.routing,
+    ['cleanup', 'refactor-cleaner'],
+    ['review', false],
+  ]),
+};
+
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
 function fileOf(text: string, path = PATH) {
   return parseConfigText(text, path);
@@ -749,13 +762,11 @@ describe('parseConfigText', () => {
 });
 
 describe('resolveConfig', () => {
-  it('answers a file\'s routing whole, so one row replaces the five defaults', () => {
-    // Nothing merges by key yet; see "The `routing` setting" in
-    // config-schema.ts. The control is the same resolve without the row.
+  it('merges a file\'s routing rows by key over the five defaults', () => {
     const file = fileOf('routing: { cleanup: refactor-cleaner }\n');
 
     expect(resolveConfig({ file }).config.routing)
-      .toEqual(new Map([['cleanup', 'refactor-cleaner']]));
+      .toEqual(new Map([...DEFAULTS.routing, ['cleanup', 'refactor-cleaner']]));
     expect(resolveConfig({ file: fileOf('store: sqlite\n') }).config.routing)
       .toEqual(DEFAULTS.routing);
   });
@@ -775,7 +786,7 @@ describe('resolveConfig', () => {
   it('lets the file outrank the default, for every setting', () => {
     const resolved = resolveConfig({ file: fileOf(FULL) });
 
-    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.config).toEqual(FULL_RESOLVED);
     expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
     expect(resolved.path).toBe(PATH);
   });
@@ -783,7 +794,7 @@ describe('resolveConfig', () => {
   it('lets the user file outrank the default, for every setting', () => {
     const resolved = resolveConfig({ user: fileOf(FULL, USER_PATH) });
 
-    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.config).toEqual(FULL_RESOLVED);
     expect(resolved.sources).toEqual(sourcesWith({}, 'user'));
     expect([resolved.path, resolved.userPath]).toEqual([null, USER_PATH]);
   });
@@ -793,7 +804,7 @@ describe('resolveConfig', () => {
     const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
     const resolved = resolveConfig({ file, user });
 
-    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'project-plans' });
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'project-plans' });
     expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'file' }, 'user'));
     expect([resolved.path, resolved.userPath]).toEqual([PATH, USER_PATH]);
   });
@@ -803,7 +814,7 @@ describe('resolveConfig', () => {
     const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
     const resolved = resolveConfig({ file, user, cli: { planDir: 'cli-plans' } });
 
-    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'cli-plans' });
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'cli-plans' });
     expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'cli' }, 'user'));
   });
 
@@ -835,7 +846,7 @@ describe('resolveConfig', () => {
     const resolved = resolveConfig({ file: fileOf(FULL), cli });
 
     expect(resolved.config).toEqual({
-      ...FULL_VALUES,
+      ...FULL_RESOLVED,
       store: 'sqlite',
       inject: 'task',
       planDir: 'cli-plans',

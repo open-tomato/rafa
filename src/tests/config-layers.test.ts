@@ -243,8 +243,12 @@ const PROJECT_VALUES: RafaConfig = {
   statusNotice: false,
   tiersRafa: 'off',
   tiersSkills: new Map<string, TierPin>([['documentation', 'project'], ['react-query', false]]),
-  tiersAgents: new Map([['tdd-guide', 'rafa']]),
-  routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
+  tiersAgents: new Map<string, TierPin>([['tdd-guide', 'rafa'], ['code-reviewer', false]]),
+  routing: new Map<string, RouteTarget>([
+    ...CONFIG_DEFAULTS.routing,
+    ['cleanup', 'refactor-cleaner'],
+    ['review', false],
+  ]),
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -349,7 +353,7 @@ const USER_VALUES: RafaConfig = {
   tiersRafa: 'on',
   tiersSkills: new Map([['documentation', 'user']]),
   tiersAgents: new Map<string, TierPin>([['tdd-guide', 'user'], ['code-reviewer', false]]),
-  routing: new Map([['review', 'typescript-reviewer']]),
+  routing: new Map([...CONFIG_DEFAULTS.routing, ['review', 'typescript-reviewer']]),
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -614,7 +618,7 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
   [
     'routing', 'routing: { tests: }',
     'routing.tests is null, expected false or an agent name',
-    'routing: { tests: false }', 'routing', new Map([['tests', false]]),
+    'routing: { tests: false }', 'routing', new Map([...CONFIG_DEFAULTS.routing, ['tests', false]]),
   ],
 ];
 
@@ -644,4 +648,71 @@ describe('each section, an unusable value refused by name beside an accepting co
       expect(resolved.sources[setting]).toBe('file');
     },
   );
+});
+
+describe('maps merged across the user and project layers', () => {
+  it('merges tiers.skills by key, the project outranking the user on a shared name', () => {
+    const roots = scopes(
+      'tiers:\n  skills: { documentation: project, lint: rafa }\n',
+      'tiers:\n  skills: { documentation: user, react-query: user }\n',
+    );
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config.tiersSkills).toEqual(new Map<string, TierPin>([
+      ['documentation', 'project'],
+      ['react-query', 'user'],
+      ['lint', 'rafa'],
+    ]));
+    expect(resolved.sources.tiersSkills).toBe('file');
+  });
+
+  it('merges routing by key over the defaults, user rows then project rows', () => {
+    const roots = scopes(
+      'routing: { cleanup: refactor-cleaner }\n',
+      'routing: { review: typescript-reviewer, cleanup: user-cleaner }\n',
+    );
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config.routing).toEqual(new Map<string, RouteTarget>([
+      ...CONFIG_DEFAULTS.routing,
+      ['review', 'typescript-reviewer'],
+      ['cleanup', 'refactor-cleaner'],
+    ]));
+  });
+
+  it('lets a project false shadow the user pin and a user false shadow a default row', () => {
+    const roots = scopes(
+      'tiers:\n  skills: { documentation: false }\n',
+      'tiers:\n  skills: { documentation: user }\nrouting: { tests: false }\n',
+    );
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config.tiersSkills.get('documentation')).toBe(false);
+    expect(resolved.config.routing.get('tests')).toBe(false);
+    expect(resolved.config.routing.get('prose')).toBe('doc-updater');
+  });
+});
+
+describe('a user-level pin naming an unloaded tier', () => {
+  const USER_PIN = 'tiers:\n  rafa: off\n  skills: { documentation: rafa }\n';
+
+  it('warns naming the pin and the file, and still loads the config', () => {
+    const roots = scopes(null, USER_PIN);
+    const { lines, warn } = sink();
+    const resolved = loadConfig(roots, {}, warn);
+
+    expect(resolved.config.tiersSkills.get('documentation')).toBe('rafa');
+    expect(lines).toEqual([
+      `rafa config: tiers.skills.documentation in ${literalPath(roots.home)} pins the rafa tier, `
+        + 'which is not loaded (tiers.rafa is off), so the pin has no effect',
+    ]);
+  });
+
+  it('does not warn while the rafa tier is loaded', () => {
+    const roots = scopes(null, 'tiers:\n  skills: { documentation: rafa }\n');
+    const { lines, warn } = sink();
+    loadConfig(roots, {}, warn);
+
+    expect(lines).toEqual([]);
+  });
 });
