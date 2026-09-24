@@ -144,7 +144,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `release status`, `release tag`, `next`, `init`,
+  `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
   `doctor`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
@@ -927,6 +927,24 @@ New; it replaces no earlier text. What a row or an action added to
   are seams of each command's factory. `src/commands/issue/create.test.ts`
   spawns `issue create` and `issues list` under a stand-in `gh` failing
   the `github` preflight.
+- **`issue list --roadmap` prints the Roadmap in a table** with three new
+  columns over the plain list. `--all` includes ticked lines; without it,
+  only unticked lines are shown. The three columns are `spec` (whether the
+  issue passes the readiness gate's checks: `ready`, or with gaps: `gaps:
+  <heading>...`, or with fewer than three headings: `outline`, or with a
+  mismatch: `label: ready, gate: gaps`), `blocked by` (each open blocker
+  as `#<n> open`, each closed one as `#<n> closed`, a blocker on another
+  repository as written with state `unknown`, or blank), and `has`
+  (the first of `plan`, `branch`, or `pr #<n>` that exists). One `gh`
+  read of the board and one of the Roadmap body itself: when the board
+  is unreachable, a `warn` line is printed, the rows read from the
+  Roadmap body alone with `spec` and `blocked by` empty, and the command
+  exits 0. The other flags narrow after the Roadmap's selection keeps
+  its order: `--type` and `--module` by the issue's labels, `--search`
+  by text case-folded in the title or body, and `--limit` keeps the
+  first that many. `rafa roadmap` is a top-level command that runs
+  `issue list --roadmap` and is not an alias so help, `describe` and the
+  spends reading name one place rather than two.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -970,10 +988,12 @@ New; it replaces no earlier text. What a row or an action added to
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`,
   `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
-  flags `state`, `type`, `module`, `search` and `limit`, `show` the
-  argument `id`, `create` the flags `title`, `body`, `type`, `module` and
-  `priority`, `comment` the argument `id` and the flag `body`, and `move`
-  the arguments `id` and `state`; each declares `text` and `json`. Of the `pr` actions, `pr current` and `pr list`
+  flags `roadmap`, `all`, `state`, `type`, `module`, `search` and `limit`,
+  `show` the argument `id`, `create` the flags `title`, `body`, `type`,
+  `module` and `priority`, `comment` the argument `id` and the flag `body`,
+  and `move` the arguments `id` and `state`; each declares `text` and
+  `json`. `roadmap` is also a top-level command that runs `list` with
+  `--roadmap` set. Of the `pr` actions, `pr current` and `pr list`
   declare no argument and no flag, each with `text` and `json`. `pr show` and `pr view`
   declare the argument `n` and no flag. `pr merge`
   declares the argument `n` and the flags `yes`, `skip-checks`, `method` and `hint`, and
