@@ -58,7 +58,7 @@ const SUBJECTS = [{ name: 'plan', summary: 'plans' }];
 /** The `PATH` every case runs under: one directory holding `present-tool` alone. */
 const BIN_DIR = join(tempBase, 'bin');
 
-/** The rafa entry, beside which no `skills/` or `agents/` directory sits. */
+/** The rafa entry, beside which no `bundled/skills` or `bundled/agents` directory sits. */
 const ENTRY = join(tempBase, 'rafa', 'cli.js');
 
 /** The config a case wanting the user scope visible writes. */

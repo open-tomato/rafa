@@ -43,7 +43,7 @@ function skill(name: string, body: string): string {
 }
 
 const projectPath = join(projectRoot, '.claude/skills');
-const rafaPath = join(runtime, 'skills');
+const rafaPath = join(runtime, 'bundled/skills');
 const userPath = join(home, '.claude/skills');
 
 write(join(runtime, 'cli.js'), '');

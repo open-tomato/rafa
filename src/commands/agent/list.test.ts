@@ -308,7 +308,7 @@ describe('rafa agent list over planted sources', () => {
       '  ○ home-only       user          enabled              Held by the home alone',
       '  ● tdd-guide       project       enabled              Writes the test first',
       '  ○ tdd-guide       user          shadowed-by:project  The home copy',
-      `  rafa  ${join(dirname(tree.entry), 'agents')}  (no such directory)`,
+      `  rafa  ${join(dirname(tree.entry), 'bundled', 'agents')}  (no such directory)`,
       '4 of 4 agent(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
       '● a loop session resolves it, ○ it does not',
       '1 definition(s) under ~/.claude/agents resolve under none of these sources: home-only',

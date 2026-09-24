@@ -89,7 +89,7 @@ write(join(projectRoot, '.mcp.json'), JSON.stringify({
 
 // rafa, beside its entry.
 write(join(runtime, 'cli.js'), '');
-write(join(runtime, 'skills/rafa-only/SKILL.md'), skill('rafa-only'));
+write(join(runtime, 'bundled/skills/rafa-only/SKILL.md'), skill('rafa-only'));
 
 // The home.
 write(join(home, '.claude/skills/gate-order/SKILL.md'), skill('gate-order'));

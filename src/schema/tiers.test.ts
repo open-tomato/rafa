@@ -13,9 +13,14 @@
  * ## The control
  *
  * The link case could be a false negative: a resolver that ignored
- * links entirely would still answer a path ending in `skills`. So it is
- * held to the runtime's directory AND held apart from the link's own,
- * which is the answer an unresolved entry gives.
+ * links entirely would still answer a path ending in `bundled/skills`.
+ * So it is held to the runtime's directory AND held apart from the
+ * link's own, which is the answer an unresolved entry gives.
+ *
+ * The rafa tier's path is written out as `bundled/skills` rather than
+ * read off `BUNDLED_SKILLS_DIR`, so a constant that moved back would
+ * fail here instead of carrying the test with it; and it is held apart
+ * from `skills/` beside the entry, where the tier sat before.
  *
  * The shadowing cases hand the user record first, so a resolver that
  * kept the order it was handed instead of the scope order would answer
@@ -28,6 +33,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
+  BUNDLED_SKILLS_DIR,
   bundledSkillsDirectory,
   INSTINCT_SCOPES,
   instinctScopeDirectory,
@@ -68,7 +74,15 @@ describe('the skill tiers', () => {
 
     expect(skillTierDirectory('user', seams)).toBe(join(HOME, '.claude', 'skills'));
     expect(skillTierDirectory('project', seams)).toBe(join(ROOT, '.claude', 'skills'));
-    expect(skillTierDirectory('rafa', seams)).toBe(join('/install/runtime', 'skills'));
+    expect(skillTierDirectory('rafa', seams)).toBe(join('/install/runtime', 'bundled', 'skills'));
+  });
+
+  it('puts the rafa tier under bundled/, not in a bare skills/ beside the entry', () => {
+    const answered = skillTierDirectory('rafa', seamsWith('/install/runtime/cli.js'));
+
+    expect(BUNDLED_SKILLS_DIR).toBe(join('bundled', 'skills'));
+    // Control: the old place is a different answer.
+    expect(answered).not.toBe(join('/install/runtime', 'skills'));
   });
 
   it('answers no directory for the project tier without a project root', () => {
@@ -97,19 +111,19 @@ describe('the skill tiers', () => {
 
     const answered = bundledSkillsDirectory(join(bin, 'rafa'));
 
-    expect(answered).toBe(join(runtime, 'skills'));
-    expect(answered).not.toBe(join(bin, 'skills'));
+    expect(answered).toBe(join(runtime, 'bundled', 'skills'));
+    expect(answered).not.toBe(join(bin, 'bundled', 'skills'));
   });
 
   it('answers a path that is not there as it was given', () => {
     const absent = join(tempBase, 'no-such', 'cli.js');
 
     expect(realEntry(absent)).toBe(absent);
-    expect(bundledSkillsDirectory(absent)).toBe(join(dirname(absent), 'skills'));
+    expect(bundledSkillsDirectory(absent)).toBe(join(dirname(absent), 'bundled', 'skills'));
   });
 
   it('measures the entry off Bun.main when the caller names none', () => {
-    expect(bundledSkillsDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'skills'));
+    expect(bundledSkillsDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'bundled', 'skills'));
   });
 });
 

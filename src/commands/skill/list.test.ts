@@ -374,7 +374,7 @@ describe('rafa skill list over planted sources', () => {
       '  ○ user-only          user          enabled                  Held by the home alone',
       '  ● verification-loop  project       enabled                  Run the gates in order',
       '  ○ verification-loop  user          shadowed-by:project      The home copy of the gates',
-      `  rafa  ${join(dirname(tree.entry), 'skills')}  (no such directory)`,
+      `  rafa  ${join(dirname(tree.entry), 'bundled', 'skills')}  (no such directory)`,
       '5 of 5 skill(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
       '● a loop session resolves it, ○ it does not',
     ]);

@@ -77,8 +77,8 @@ write(join(projectRoot, '.claude/settings.json'), JSON.stringify({ skillOverride
 
 // rafa, beside its entry.
 write(join(runtime, 'cli.js'), '');
-write(join(runtime, 'skills/rafa-only/SKILL.md'), skill('rafa-only'));
-write(join(runtime, 'agents/reviewer.md'), agent('reviewer'));
+write(join(runtime, 'bundled/skills/rafa-only/SKILL.md'), skill('rafa-only'));
+write(join(runtime, 'bundled/agents/reviewer.md'), agent('reviewer'));
 
 // The home.
 write(join(home, '.claude/skills/gate-order/SKILL.md'), skill('gate-order'));

@@ -77,7 +77,7 @@ write(join(projectRoot, '.claude/agents/project-reviewer.md'), agent('project-re
 write(join(home, '.claude/agents/user-reviewer.md'), agent('user-reviewer'));
 write(join(home, '.claude/skills/symbols/SKILL.md'), skill('symbols', 'Trace TypeScript symbols with ts-symbols'));
 write(join(runtime, 'cli.js'), '');
-write(join(runtime, 'skills/rafa-only/SKILL.md'), skill('rafa-only', 'A skill rafa ships'));
+write(join(runtime, 'bundled/skills/rafa-only/SKILL.md'), skill('rafa-only', 'A skill rafa ships'));
 mkdirSync(bareRoot, { recursive: true });
 
 write(join(binDir, 'ts-symbols'), '#!/bin/sh\n');

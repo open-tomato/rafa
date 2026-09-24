@@ -16,15 +16,16 @@
  * | Tier | Skills | Agents |
  * | --- | --- | --- |
  * | `project` | `<root>/.claude/skills` | `<root>/.claude/agents` |
- * | `rafa` | `skills/` beside the running `cli.js` | `agents/` beside it |
+ * | `rafa` | `bundled/skills` beside the running `cli.js` | `bundled/agents` beside it |
  * | `user` | `~/.claude/skills` | `~/.claude/agents` |
  *
  * The skills column is `skillTierDirectory`'s, unchanged. The agents
  * column mirrors it: `AGENT_DEFINITION_DIR` under a root or the home,
  * and {@link BUNDLED_AGENTS_DIR} beside the entry with its links
- * resolved, which is where an add-on's `agents/` sits beside its
- * `skills/` (the add-on spec checks the two together). rafa ships no
- * agents today, so that tree is ordinarily absent.
+ * resolved, so rafa's `bundled/agents` sits beside its `bundled/skills`
+ * as an add-on's `agents/` sits beside its `skills/` (the add-on spec
+ * checks the two together). Until the bundle is populated that tree is
+ * ordinarily absent.
  *
  * ## An absent tier is a listing, never a gap
  *
@@ -80,8 +81,8 @@ import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 
 import { checkVerdict, EMPTY_FRONTMATTER, readInventoryText, summarize } from './record.js';
 
-/** The directory rafa's own agents sit in, beside the running `cli.js`. */
-export const BUNDLED_AGENTS_DIR = 'agents';
+/** The directory rafa's own agents sit in, relative to the running `cli.js`. */
+export const BUNDLED_AGENTS_DIR = join('bundled', 'agents');
 
 /**
  * One row as a source reads it: everything an {@link InventoryRecord}
@@ -108,7 +109,7 @@ export interface TreeListing {
   readonly items: readonly SourceItem[];
 }
 
-/** The directory rafa's own agents sit in: `agents/` beside the entry, links resolved. */
+/** The directory rafa's own agents sit in: `bundled/agents` beside the entry, links resolved. */
 export function bundledAgentsDirectory(entry?: string): string {
   return join(dirname(realEntry(entry ?? Bun.main)), BUNDLED_AGENTS_DIR);
 }

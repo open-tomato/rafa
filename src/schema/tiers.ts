@@ -13,8 +13,8 @@
  *
  *   - `project`: `<root>/.claude/skills`, the checkout's own, which
  *     Claude Code loads for a session started in it.
- *   - `rafa`: `skills/` beside the running `cli.js`, the skills rafa
- *     ships. Phase 6 populates it; until then the directory is
+ *   - `rafa`: `bundled/skills` beside the running `cli.js`, the skills
+ *     rafa ships. Until the bundle is populated the directory is
  *     ordinarily absent, which {@link resolveSkillTiers} reports
  *     rather than hides.
  *   - `user`: `~/.claude/skills`, the machine's own.
@@ -25,8 +25,11 @@
  *
  * ## The rafa tier is measured from the entry, with its links resolved
  *
- * The bundle is `dist/cli.js` and its skills sit beside it, so the tier
- * is `dirname(entry)/skills`. The entry is resolved through
+ * The bundle is `dist/cli.js` and its skills sit in `dist/bundled/`
+ * beside it, so the tier is `dirname(entry)/bundled/skills`. The
+ * `bundled/` parent keeps the tier apart from `src/agents/`, which
+ * holds TypeScript, and gives the rafa tier's agents and programs
+ * (`bundled/agents`, `bundled/bin`) one home beside its skills. The entry is resolved through
  * {@link realEntry} because the installed rafa is reached through a
  * link — `~/.rafa/bin/rafa` points into `~/.rafa/runtime/<version>/` —
  * and the skills of a runtime sit in that runtime's directory, not in
@@ -34,10 +37,10 @@
  * the same reason.
  *
  * Run from the checkout as `bun src/rafa.ts`, the entry is
- * `src/rafa.ts` and the tier resolves to `src/skills`, which the
- * repository does not have. That is the honest answer for a checkout:
- * the tier is what the RUNNING build carries, and a checkout run
- * carries whatever sits beside the file bun was handed.
+ * `src/rafa.ts` and the tier resolves to `src/bundled/skills`, the
+ * checkout's own copy of what a build ships. The tier is what the
+ * RUNNING entry carries, and a checkout run carries whatever sits
+ * beside the file bun was handed.
  *
  * ## The two instinct scopes
  *
@@ -89,8 +92,8 @@ export const CLAUDE_SKILLS_PATH = join('.claude', 'skills');
 /** The instincts directory a scope holds, under a project root or the home. */
 export const RAFA_INSTINCTS_PATH = join('.rafa', 'instincts');
 
-/** The directory rafa's own skills sit in, beside the running `cli.js`. */
-export const BUNDLED_SKILLS_DIR = 'skills';
+/** The directory rafa's own skills sit in, relative to the running `cli.js`. */
+export const BUNDLED_SKILLS_DIR = join('bundled', 'skills');
 
 /** What a tier is resolved against. Each seam is given; none is read from the environment. */
 export interface TierSeams {
@@ -138,8 +141,8 @@ export function realEntry(entry: string): string {
 }
 
 /**
- * The directory rafa's own skills sit in: `skills/` beside the running
- * `cli.js`, links resolved. See the module note.
+ * The directory rafa's own skills sit in: `bundled/skills` beside the
+ * running `cli.js`, links resolved. See the module note.
  */
 export function bundledSkillsDirectory(entry?: string): string {
   return join(dirname(realEntry(entry ?? Bun.main)), BUNDLED_SKILLS_DIR);

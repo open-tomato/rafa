@@ -499,7 +499,7 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
     subject: 'skill',
     action: 'list',
     summary: 'list every skill with its source, its state and whether the loop sees it',
-    description: 'Lists every skill the inventory holds — the project\'s `.claude/skills`, the `skills/`'
+    description: 'Lists every skill the inventory holds — the project\'s `.claude/skills`, the `bundled/skills`'
       + ' directory beside the running rafa, `~/.claude/skills`, each loaded add-on\'s and each installed'
       + ' plugin\'s — one row each: a mark saying whether a session the loop spawns under'
       + ' `loop.settingSources` resolves it, its name, its source, its state (`enabled`,'

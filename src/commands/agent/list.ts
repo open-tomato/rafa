@@ -321,7 +321,7 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
     action: 'list',
     summary: 'list every agent definition with its source, its state and whether the loop sees it',
     description: 'Lists every agent definition the inventory holds — the project\'s `.claude/agents`, the'
-      + ' `agents/` directory beside the running rafa, `~/.claude/agents`, each loaded add-on\'s and each'
+      + ' `bundled/agents` directory beside the running rafa, `~/.claude/agents`, each loaded add-on\'s and each'
       + ' installed plugin\'s — one row each, under the frontmatter `name` a task routes to: a mark saying'
       + ' whether a session the loop spawns under `loop.settingSources` resolves it, its name, its source,'
       + ' its state (`enabled`, or `shadowed-by:<source>` when a nearer source holds the same name) and its'
