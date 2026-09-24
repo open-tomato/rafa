@@ -67,13 +67,22 @@
  * through, and the `gh` runner the `github` adapter is made with. Left
  * out, they are the chain's own: `CORE_ADAPTER_REGISTRY`, and a runner
  * spawning `gh` in the project root.
+ *
+ * `issue list --roadmap` reaches no tracker either (`./list.ts`), and
+ * takes three seams more: the `git` its branch scan runs, spawning `git`
+ * in the project root when left out; what reads the plan dir's file
+ * names, `createPlanDirNames` (`board/roadmap-rows.ts`) when left out;
+ * and the terminal's width, `process.stdout.columns` when left out. The
+ * same `gh` runner reads the Roadmap and the board.
  */
 import type { AdapterRegistry } from '../../adapters/registry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { TrackerResolution } from '../../adapters/tracker/resolve.js';
+import type { PlanNames } from '../../board/roadmap-rows.js';
 import type { RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
+import type { GitRunner } from '../../pr/git.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
@@ -88,6 +97,12 @@ export interface IssueSeams {
   readonly registry?: AdapterRegistry;
   /** What the `github` adapter runs `gh` through. A runner spawning `gh` in the project root when left out. */
   readonly gh?: GhRunner;
+  /** What `issue list --roadmap`'s branch scan runs `git` through. A runner spawning `git` in the project root when left out. */
+  readonly git?: GitRunner;
+  /** What reads the file names in the plan dir `issue list --roadmap` resolved. `createPlanDirNames` when left out. */
+  readonly planNames?: (dir: string) => PlanNames;
+  /** The terminal's width in columns, or undefined for none. `process.stdout.columns` when left out. */
+  readonly terminalWidth?: () => number | undefined;
 }
 
 /** The seams the registered commands run with: the chain's own, every one. */

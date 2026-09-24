@@ -23,8 +23,10 @@
  * {@link SpecIssueReader} and {@link OpenPullRequestLister}, git through
  * {@link GitRunner}, and the plan dir through {@link PlanNames}.
  * {@link createPlanDirNames} is the one filesystem read, made for the
- * caller that resolved the dir with `resolvePlansDir`
- * (`src/commands/plan/plan-files.ts`); this module never loads a config.
+ * caller that resolved the dir as `resolvePlansDir`
+ * (`src/commands/plan/plan-files.ts`) resolves it: `issue list
+ * --roadmap` takes `plan.dir` off the config it already loaded and
+ * hands it to `plansDirAt`. This module never loads a config.
  *
  * ## What is read, and how often
  *

@@ -166,7 +166,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'loop resume': [[], ['session-id']],
   'loop status': [[], ['session-id']],
   'loop list': [[], []],
-  'issue list': [[], ['state', 'type', 'module', 'search', 'limit']],
+  'issue list': [[], ['roadmap', 'all', 'state', 'type', 'module', 'search', 'limit']],
   'issue show': [['id'], []],
   'issue create': [[], ['title', 'body', 'type', 'module', 'priority']],
   'issue comment': [['id'], ['body']],
