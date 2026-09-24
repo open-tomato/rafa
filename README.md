@@ -305,50 +305,80 @@ the root of `exports` names. The package ships no type declarations:
 ## Roadmap
 
 What rafa does today and what is planned, in the order it is being
-built. A box is ticked by the change that finishes the feature.
+built. ✅ is shipped, ⬜ is next; the order and each issue's state live
+in the pinned [Roadmap issue](https://github.com/open-tomato/rafa/issues/31),
+and a line here is ticked by the change that finishes the feature.
 
-- [x] Run a plan task by task: one Claude Code session per task, one
+- ✅ Run a plan task by task: one Claude Code session per task, one
   commit per task, then a pull request and a wait for CI
-- [x] Plans that carry their own background, so each task reads only the
+- ✅ Plans that carry their own background, so each task reads only the
   part of the plan it needs
-- [x] Every task reports back what it did, what it found and what
+- ✅ Every task reports back what it did, what it found and what
   blocked it, and rafa keeps the record
-- [x] See what each plan cost: sessions, tokens and commits per plan
-- [x] Install once, set up any project with `rafa init`
-- [x] Checks before a run: a missing tool or key stops the run with its
+- ✅ See what each plan cost: sessions, tokens and commits per plan
+- ✅ Install once, set up any project with `rafa init`
+- ✅ Checks before a run: a missing tool or key stops the run with its
   name, before any session is paid for
-- [x] A spending cap per task
-- [x] One consistent command line, with help at every level that people
+- ✅ A spending cap per task
+- ✅ One consistent command line, with help at every level that people
   and agents can both read
-- [x] Stop, pause, resume and check on a running plan
-- [x] Blockers and unrelated bugs found along the way are filed as
+- ✅ Stop, pause, resume and check on a running plan
+- ✅ Blockers and unrelated bugs found along the way are filed as
   issues, once each
-- [x] rafa can safely work on its own code and update itself
-- [x] Usable as a library inside other services, not only as a command
-- [x] A health check for skills: one format, and a checker that refuses
+- ✅ rafa can safely work on its own code and update itself
+- ✅ Usable as a library inside other services, not only as a command
+- ✅ A health check for skills: one format, and a checker that refuses
   a broken skill before an agent can follow it
-- [x] The agents a plan needs are checked before the run, and copied
+- ✅ The agents a plan needs are checked before the run, and copied
   into the project with one command
-- [x] Plan straight from the issue board, or from whatever is next on the roadmap
-- [x] Review, merge and clean up pull requests from the command line
-- [x] A failing pull request is diagnosed, and fixed when the fix is simple
-- [x] A version bump and a changelog entry with every pull request
-- [x] Start a plan from the main branch and rafa makes the branch for you
-- [x] One command takes you to the next step: merge, clean up, plan,
+- ✅ Plan straight from the issue board, or from whatever is next on the roadmap
+- ✅ Review, merge and clean up pull requests from the command line
+- ✅ A failing pull request is diagnosed, and fixed when the fix is simple
+- ✅ A version bump and a changelog entry with every pull request
+- ✅ Start a plan from the main branch and rafa makes the branch for you
+- ✅ One command takes you to the next step: merge, clean up, plan,
   branch, start
-- [x] Every command that spends Claude usage says so in its help
-- [x] Before a run, see what it can do on this machine and under your accounts
-- [x] See every skill and agent a run would use, browse them, and ask about them in plain language
-- [ ] The right skills reach the right task, chosen when the plan is
+- ✅ Every command that spends Claude usage says so in its help
+- ✅ Before a run, see what it can do on this machine and under your accounts
+- ✅ See every skill and agent a run would use, browse them, and ask
+  about them in plain language
+- ⬜ The roadmap in one table: what is ready, what blocks it, and what
+  already has a plan, a branch or a pull request
+- ⬜ `rafa doctor --deep`: what a loop session and its subagents can
+  actually reach — settings, `PATH`, providers and the tools its stack needs
+- ⬜ Clean up merged, stale and unpushed branches and idle worktrees
+- ⬜ `rafa status`: everything in one snapshot, and one line about what
+  changed since you last looked
+- ⬜ The right skills reach the right task, chosen when the plan is
   written
-- [ ] Know which skills earn their place and which are ignored
-- [ ] rafa learns from its own runs: what one task works out is handed
+- ⬜ Know which skills earn their place and which are ignored
+- ⬜ rafa learns from its own runs: what one task works out is handed
   to the tasks that need it later
-- [ ] Skills and lessons shared across projects and machines
-- [ ] Work on several issues or specs at the same time
-- [ ] Add-ons: install a tracker, an output or a set of skills (Linear,
+- ⬜ Skills and lessons shared across projects and machines
+- ⬜ Config as code: a typed `rafa.config.ts` holding your settings, your
+  passes and your flows, with today's behaviour as the default
+- ⬜ Every check rafa runs has a class you can see, and your workflow can
+  move the rest: one question per decision, and a dry run that walks the
+  whole flow
+- ⬜ Every outside call doubled in tests, every outcome produced, and each
+  past incident kept out for good
+- ⬜ Find skills and agents that overlap or contradict, and refine one
+  without losing the original
+- ⬜ A retrospective: evidence, independent conclusions, a ranked action
+  plan
+- ⬜ Work on several issues or specs at the same time
+- ⬜ Team retrospective and a project status check in server mode
+- ⬜ Feedback from outside projects reaches the rafa board through triage
+- ⬜ Add-ons: install a tracker, an output or a set of skills (Linear,
   Obsidian and others) without changing rafa
-- [ ] A live terminal dashboard
+- ⬜ A live terminal dashboard
+- ⬜ Change how rafa works without changing rafa: settings, prompts and
+  steps live in your project
+- ⬜ Other coding agents: run a plan without Claude Code
+- ⬜ Run a plan with enforced permissions instead of
+  `--dangerously-skip-permissions`
+- ⬜ `rafa doctor --security`: an outside scan of your Claude Code setup,
+  with what rafa itself does stated first
 
 ## Attribution
 
