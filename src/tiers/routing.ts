@@ -37,7 +37,7 @@
  *     while {@link DEFAULT_ROUTES}, a list, is frozen outright.
  *
  * Whether each row's agent RESOLVES through the tiers is a question for
- * the resolver the spec plans in `tiers/resolve.ts`, not this module.
+ * `resolveTiers` in `tiers/resolve.ts`, not this module.
  */
 import type { RouteTarget } from '../config-sections.js';
 
