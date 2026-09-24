@@ -178,7 +178,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
-  `doctor`, `cleanup`, `self-update`, `usage` and
+  `doctor`, `cleanup`, `status`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
   declared with its first action, never ahead of it.
@@ -218,12 +218,12 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `cleanup`, `self-update`, the plan readers, the
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `cleanup`, `status`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
   `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
   `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
-  `doctor`, `cleanup`, `self-update`, each plan reader, each `loop` session action,
+  `doctor`, `cleanup`, `status`, `self-update`, each plan reader, each `loop` session action,
   each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
   `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every

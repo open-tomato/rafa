@@ -67,7 +67,7 @@ describe('rafa --help, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
     expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain('Commands:\n  next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe\n');
+    expect(run.stdout).toContain('Commands:\n  status, next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe\n');
   }, RUN_TIMEOUT);
 });
 
@@ -111,5 +111,6 @@ describe('rafa describe --output=json, spawned', () => {
     expect(spendersOf(document).sort()).toEqual(['agent search', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
     expect(document.commands.find((command) => command.name === 'roadmap')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'cleanup')?.spends).toBeNull();
+    expect(document.commands.find((command) => command.name === 'status')?.spends).toBeNull();
   }, RUN_TIMEOUT);
 });

@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `self-update`, `roadmap`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -769,6 +769,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../pr/merge-followups.js', ['versionTag']],
     ['./status.js', ['changelogVersions', 'DEFAULT_RELEASE_SEAMS', 'readTags']],
   ]],
+  ['./commands/status.js', [
+    ['../cli/command.js', ['CommandExit']],
+    ['../status/render.js', ['renderStatus', 'statusData']],
+    ['../status/sections.js', ['readStatusSections']],
+    ['./plan/plan-files.js', ['resolveProjectConfig']],
+  ]],
   ['./commands/next.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
@@ -1045,6 +1051,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/instinct/show.js',
       './commands/release/status.js',
       './commands/release/tag.js',
+      './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',
       './commands/init.js',

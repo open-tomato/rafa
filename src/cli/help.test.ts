@@ -261,7 +261,7 @@ describe('the frozen help snapshots', () => {
 
     expect(renderHelp({ level: 'root' }, CORE_REGISTRY)).toBe(snapshot);
     expect(renderHelp({ level: 'root' }, lessUsage)).not.toBe(snapshot);
-    expect(blockOf(snapshot, 'Commands')).toEqual(['  next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe']);
+    expect(blockOf(snapshot, 'Commands')).toEqual(['  status, next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe']);
   });
 
   it('holds the root snapshot as what src/rafa.ts prints for --help', () => {

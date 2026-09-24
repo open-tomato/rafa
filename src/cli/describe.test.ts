@@ -232,6 +232,7 @@ describe('the document over the core registry', () => {
     expect(document.commands.map((entry) => entry.name)).toContain('describe');
     expect(document.commands.map((entry) => entry.name)).toContain('roadmap');
     expect(document.commands.map((entry) => entry.name)).toContain('cleanup');
+    expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
   });
 
@@ -247,6 +248,7 @@ describe('the document over the core registry', () => {
     expect(command('describe')?.spends).toBeNull();
     expect(command('roadmap')?.spends).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
+    expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();
     expect(spendsOf('loop', 'status')).toBeNull();
   });
