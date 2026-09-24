@@ -17,6 +17,7 @@ Quick start:
   rafa instinct check .rafa/instincts
   rafa release status
   rafa next
+  rafa roadmap
   rafa init
   rafa doctor
   rafa self-update
@@ -41,7 +42,7 @@ Subjects:
              HEAD
 
 Commands:
-  next 🪙, init, doctor, self-update, usage, describe
+  next 🪙, roadmap, init, doctor, self-update, usage, describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)

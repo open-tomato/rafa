@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `self-update`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `self-update`, `roadmap`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -770,6 +770,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
+  ['./commands/roadmap.js', [
+    ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
+    ['./issue/list.js', ['ISSUE_LIST_FLAGS', 'runIssueList']],
+  ]],
   ['./commands/init.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
@@ -1018,6 +1022,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/release/status.js',
       './commands/release/tag.js',
       './commands/next.js',
+      './commands/roadmap.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/self-update.js',

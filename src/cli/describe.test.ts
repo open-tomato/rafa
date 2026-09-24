@@ -230,6 +230,7 @@ describe('the document over the core registry', () => {
         .filter(isTopLevel)
         .map((held) => held.action));
     expect(document.commands.map((entry) => entry.name)).toContain('describe');
+    expect(document.commands.map((entry) => entry.name)).toContain('roadmap');
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -242,6 +243,7 @@ describe('the document over the core registry', () => {
     expect(spendsOf('loop', 'start')?.when).toBe('always');
     expect(command('next')?.spends?.when).toBe('through');
     expect(command('describe')?.spends).toBeNull();
+    expect(command('roadmap')?.spends).toBeNull();
     expect(spendsOf('loop', 'status')).toBeNull();
   });
 });

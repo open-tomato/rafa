@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-one registered so far wrap a
+ * of each is its command. Five of the fifty-two registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -25,7 +25,8 @@
  * `src/preflight/` and starts no run, nor the seven `issue` actions,
  * five of which act on the tracker the chain resolves while `ready` and
  * `unblock` read and label issues on the GitHub board, all seven sharing
- * `issue/issue-tracker.ts`, nor `self-update`, which installs the
+ * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
+ * run with `--roadmap` set, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -146,6 +147,10 @@
  *     project stands on one line, the one thing to do about it on the
  *     next, that action run on a yes through the command that does it,
  *     and then the same again for what follows.
+ *   - `roadmap [--all] [--type=<type>] [--module=<name>]
+ *     [--search=<text>] [--limit=<n>]`, top-level: the Roadmap issue's
+ *     lines in its order as a table, `issue list --roadmap` under a word
+ *     of its own. Not an alias, since an alias prints a deprecation line.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -215,6 +220,7 @@ import prView from './pr/view.js';
 import prWait from './pr/wait.js';
 import releaseStatus from './release/status.js';
 import releaseTag from './release/tag.js';
+import roadmap from './roadmap.js';
 import selfUpdate from './self-update.js';
 import skillBackfill from './skill/backfill.js';
 import skillCheck from './skill/check.js';
@@ -286,6 +292,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseStatus,
   releaseTag,
   next,
+  roadmap,
   init,
   doctor,
   selfUpdate,
