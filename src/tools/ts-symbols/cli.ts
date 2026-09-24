@@ -9,17 +9,28 @@
  *   ts-symbols type    <file>:<line>:<col> resolved type at a position (--full expands aliases)
  *
  * Flags: --json (structured output), --full (type: no-truncation expansion)
- * Exit codes: 0 results, 1 usage/error, 2 valid query but no results.
+ * Exit codes: 0 results, 1 usage/error, 2 valid query but no results,
+ * 3 no `typescript` package under the project root.
+ *
+ * The `typescript` package is the project's own, found from the project root
+ * (the working directory) the way `tsc` is: see {@link loadTypeScript}.
  */
-import * as path from 'node:path';
+import type TypeScript from 'typescript';
 
-import ts from 'typescript';
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import * as path from 'node:path';
 
 const USAGE = `usage: ts-symbols <command> <target> [--json]
   outline <file>               exported + top-level symbols with kinds and lines
   def     <file>:<line>:<col>  definition location of the symbol at position (1-based)
   refs    <file>:<line>:<col>  references across the nearest tsconfig project
   type    <file>:<line>:<col>  resolved type text at position (--full to expand)`;
+
+const COMMANDS = new Set(['outline', 'def', 'refs', 'type']);
+
+/** Exit code when the project root has no `typescript` package to load. */
+const NO_TYPESCRIPT_EXIT = 3;
 
 function fail(msg: string): never {
   console.error(`ts-symbols: ${msg}`);
@@ -30,6 +41,73 @@ function noResults(msg: string): never {
   console.error(`ts-symbols: ${msg}`);
   process.exit(2);
 }
+
+interface Request {
+  command: string;
+  rawTarget: string;
+  json: boolean;
+  full: boolean;
+}
+
+/**
+ * Read the command line, answering `help`, a missing target and an unknown
+ * command here, so none of them needs a `typescript` package to be present.
+ */
+function readRequest(argv: string[]): Request {
+  const json = argv.includes('--json');
+  const full = argv.includes('--full');
+  const args = argv.filter((a) => !a.startsWith('--'));
+  const [command, rawTarget] = args;
+
+  if (!command || command === 'help') {
+    console.log(USAGE);
+    process.exit(command
+      ? 0
+      : 1);
+  }
+  if (!rawTarget) fail(`missing target\n${USAGE}`);
+  if (!COMMANDS.has(command)) fail(`unknown command "${command}"\n${USAGE}`);
+  return { command, rawTarget, json, full };
+}
+
+/**
+ * The nearest `node_modules/typescript` at or above `dir`, the directory
+ * Node's resolution would settle on for a bare `typescript` from `dir`.
+ */
+function typescriptDirectory(dir: string): string | undefined {
+  const candidate = path.join(dir, 'node_modules', 'typescript');
+  if (existsSync(path.join(candidate, 'package.json'))) return candidate;
+  const parent = path.dirname(dir);
+  return parent === dir
+    ? undefined
+    : typescriptDirectory(parent);
+}
+
+/**
+ * Load the `typescript` package the project at `root` compiles with, or exit
+ * 3 naming `root` when there is none.
+ *
+ * The walk is by hand, not a bare `import 'typescript'`: built into rafa's
+ * `dist/bundled/bin/`, a bare specifier resolves from this file and so finds
+ * rafa's own copy instead of the project's. Nor does it go through bun's
+ * resolver (`createRequire(root)`): where no `node_modules` sits above `root`,
+ * bun auto-installs, and in an empty temp directory it answered
+ * `typescript@7.0.2` from `~/.bun/install/cache`. Requiring the absolute
+ * directory found here installs nothing.
+ */
+function loadTypeScript(root: string): typeof TypeScript {
+  const directory = typescriptDirectory(root);
+  if (!directory) {
+    console.error(`ts-symbols: no typescript under ${root}: add it to the project`);
+    process.exit(NO_TYPESCRIPT_EXIT);
+  }
+  return createRequire(import.meta.url)(directory) as typeof TypeScript;
+}
+
+// Both run before anything below reads `ts`: a usage error is answered
+// without a `typescript` package, and every later use finds `ts` loaded.
+const request = readRequest(process.argv.slice(2));
+const ts = loadTypeScript(process.cwd());
 
 interface Target {
   file: string;
@@ -53,7 +131,7 @@ function relPath(file: string): string {
 }
 
 // Fallback options when no tsconfig.json exists above the target file.
-const LOOSE_OPTIONS: ts.CompilerOptions = {
+const LOOSE_OPTIONS: TypeScript.CompilerOptions = {
   allowJs: true,
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.ESNext,
@@ -61,7 +139,7 @@ const LOOSE_OPTIONS: ts.CompilerOptions = {
 };
 
 interface Project {
-  service: ts.LanguageService;
+  service: TypeScript.LanguageService;
   configPath: string | undefined;
 }
 
@@ -89,7 +167,7 @@ function createProject(absFile: string, singleFile: boolean): Project {
     }
   }
 
-  const host: ts.LanguageServiceHost = {
+  const host: TypeScript.LanguageServiceHost = {
     getScriptFileNames: () => rootNames,
     getScriptVersion: () => '0',
     getScriptSnapshot: (file) => {
@@ -110,7 +188,7 @@ function createProject(absFile: string, singleFile: boolean): Project {
   return { service: ts.createLanguageService(host, ts.createDocumentRegistry()), configPath };
 }
 
-function sourceFileOf(project: Project, file: string): ts.SourceFile {
+function sourceFileOf(project: Project, file: string): TypeScript.SourceFile {
   const program = project.service.getProgram();
   const fromProgram = program?.getSourceFile(file);
   if (fromProgram) return fromProgram;
@@ -118,7 +196,7 @@ function sourceFileOf(project: Project, file: string): ts.SourceFile {
   return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
 }
 
-function offsetOf(sf: ts.SourceFile, target: Target): number {
+function offsetOf(sf: TypeScript.SourceFile, target: Target): number {
   try {
     return sf.getPositionOfLineAndCharacter(target.line - 1, target.col - 1);
   } catch {
@@ -163,7 +241,7 @@ interface OutlineItem {
 // literals and closures — noise at outline granularity.
 const CONTAINER_KINDS = new Set<string>(['class', 'interface', 'enum', 'module', 'type']);
 
-function navToOutline(sf: ts.SourceFile, node: ts.NavigationTree, depth: number): OutlineItem {
+function navToOutline(sf: TypeScript.SourceFile, node: TypeScript.NavigationTree, depth: number): OutlineItem {
   const span = node.nameSpan ?? node.spans[0];
   if (!span) fail(`no source span for symbol "${node.text}"`);
   const lc = sf.getLineAndCharacterOfPosition(span.start);
@@ -263,8 +341,8 @@ function cmdRefs(target: Target, json: boolean): void {
 
 // ------------------------------------------------------------------- type ---
 
-function tokenAt(sf: ts.SourceFile, pos: number): ts.Node {
-  function descend(node: ts.Node): ts.Node {
+function tokenAt(sf: TypeScript.SourceFile, pos: number): TypeScript.Node {
+  function descend(node: TypeScript.Node): TypeScript.Node {
     for (const child of node.getChildren(sf)) {
       if (pos >= child.getStart(sf) && pos < child.getEnd()) return descend(child);
     }
@@ -303,20 +381,7 @@ function cmdType(target: Target, json: boolean, full: boolean): void {
 
 // ------------------------------------------------------------------- main ---
 
-function main(argv: string[]): void {
-  const json = argv.includes('--json');
-  const full = argv.includes('--full');
-  const args = argv.filter((a) => !a.startsWith('--'));
-  const [command, rawTarget] = args;
-
-  if (!command || command === 'help') {
-    console.log(USAGE);
-    process.exit(command
-      ? 0
-      : 1);
-  }
-  if (!rawTarget) fail(`missing target\n${USAGE}`);
-
+function main({ command, rawTarget, json, full }: Request): void {
   switch (command) {
     case 'outline':
       return cmdOutline(rawTarget, json);
@@ -331,4 +396,4 @@ function main(argv: string[]): void {
   }
 }
 
-main(process.argv.slice(2));
+main(request);
