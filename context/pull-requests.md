@@ -69,6 +69,21 @@ stage resolves is `gh`. The port is NOT in
 learning, output and planner only), so adding a method to it bumps no
 version.
 
+`listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
+merged pull requests as `MergedPullRequest` rows — `number`,
+`headRefName`, `headRefOid`, `mergedAt` — through `gh pr list --state
+merged --limit 100`. The port touches no git: whether a local branch's
+tip is that `headRefOid` is the caller's own reading. The rows come in
+`gh`'s order, newest CREATED first and not newest merged. 100 is the
+most one GraphQL request answers (`GH_DEBUG=api` showed one request at
+100, two at 101), so a merge older than the newest hundred is not
+answered, and a head missing from the list is "not among the recent
+merges", never "never merged". `gh` still answers the `headRefName` after
+the remote branch is deleted. An outage throws, as the other reads do,
+and a row with a null `mergedAt` is refused. The fake stamps
+`mergedAt` on `pr merge` from its clock. A `MERGED` seed with no
+`mergedAt` is merged at its `updatedAt`.
+
 **For a test whose subject is the CALLER, build the provider with
 `createPullRequestsDouble()`** — imported from
 `../pr/pull-requests-double.js`, never from the barrel, which keeps a

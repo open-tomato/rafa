@@ -156,6 +156,23 @@ describe('gh pr list', () => {
     expect(JSON.parse(result.stdout)).toEqual([{ number: 9 }, { number: 3 }]);
   });
 
+  it('writes merged pull requests alone under --state merged, each with its mergedAt', async () => {
+    const fake = createFakePrGh();
+    fake.plant({ number: 3, state: 'MERGED', updatedAt: '2026-09-20T08:00:00Z' });
+    fake.plant({ number: 9 });
+    fake.plant({ number: 5, state: 'CLOSED' });
+    fake.plant({ number: 6, state: 'MERGED', mergedAt: '2026-09-19T09:00:00Z' });
+
+    expect(await json(fake, ['pr', 'list', '--state', 'merged', '--json', 'number,mergedAt'])).toEqual([
+      { mergedAt: '2026-09-19T09:00:00Z', number: 6 },
+      { mergedAt: '2026-09-20T08:00:00Z', number: 3 },
+    ]);
+    // Control: the same read under --state open answers the one open pull
+    // request, with the null mergedAt recorded for one.
+    expect(await json(fake, ['pr', 'list', '--state', 'open', '--json', 'number,mergedAt']))
+      .toEqual([{ mergedAt: null, number: 9 }]);
+  });
+
   it('answers an empty array for a branch with no open pull request', async () => {
     const fake = withOnePull();
 
@@ -241,6 +258,16 @@ describe('gh pr merge', () => {
     expect(await withOnePull().run(args)).toEqual(failure(
       `fake gh: pr merge models exactly one of --squash, --merge and --rebase, and was handed ${String(count)}\n`,
     ));
+  });
+
+  it('stamps the merge with the fake\'s clock, where the pull request was merged at null before', async () => {
+    const fake = createFakePrGh({ now: () => '2026-09-24T10:00:00Z' });
+    fake.plant({ number: 7 });
+
+    expect(fake.pull(7)?.mergedAt).toBeNull();
+    await fake.run(['pr', 'merge', '7', '--squash']);
+
+    expect(fake.pull(7)?.mergedAt).toBe('2026-09-24T10:00:00Z');
   });
 
   it('fails with the refusal a case planted, leaving the pull request open', async () => {

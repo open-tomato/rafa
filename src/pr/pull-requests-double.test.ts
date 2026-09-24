@@ -130,6 +130,16 @@ describe('the pull request double', () => {
     await expect(composed.pulls.list()).rejects.toThrow('which this case did not name');
   });
 
+  it('answers the merged list a case names, and spells the call with no arguments', async () => {
+    const merged = [{ number: 41, headRefName: 'feat/a', headRefOid: 'abc123', mergedAt: '2026-09-24T10:00:00Z' }];
+    const double = createPullRequestsDouble({ listMerged: () => Promise.resolve(merged) });
+
+    expect(await double.pulls.listMerged()).toEqual(merged);
+    expect(double.sent()).toEqual(['listMerged']);
+    // Control: a double that did not name it refuses the same call.
+    await expect(createPullRequestsDouble().pulls.listMerged()).rejects.toThrow('was sent listMerged');
+  });
+
   it('answers the null workflowCount a case names, and spells the call with no arguments', async () => {
     const double = createPullRequestsDouble({ workflowCount: () => Promise.resolve(null) });
 

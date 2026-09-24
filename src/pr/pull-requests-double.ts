@@ -158,6 +158,7 @@ export function createPullRequestsDouble(
     kind: 'gh',
     findOpen: bind('findOpen'),
     list: bind('list'),
+    listMerged: bind('listMerged'),
     get: bind('get'),
     checks: bind('checks'),
     browse: bind('browse'),

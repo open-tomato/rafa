@@ -193,6 +193,85 @@ describe('list', () => {
   });
 });
 
+/** The fields a merged-list read asks for. */
+const MERGED_FIELDS = 'headRefName,headRefOid,mergedAt,number';
+
+/** One merged row, valid, as `gh pr list --state merged` writes it. */
+const MERGED_ROW: Record<string, unknown> = {
+  headRefName: BRANCH,
+  headRefOid: '411f004d93d61f3292286b1a7f3a84339020417f',
+  mergedAt: '2026-09-23T16:38:29Z',
+  number: 7,
+};
+
+describe('listMerged', () => {
+  it('answers merged pull requests alone, in gh\'s order, asking for a fixed hundred of them', async () => {
+    const fake = createFakePrGh();
+    fake.plant({ number: 3, headRefName: 'feat/three', headRefOid: 'aaa', state: 'MERGED', updatedAt: '2026-09-23T21:00:00Z' });
+    fake.plant({ number: 9, headRefName: 'feat/nine', headRefOid: 'bbb', state: 'MERGED', updatedAt: '2026-09-22T10:00:00Z' });
+    fake.plant({ number: 5, headRefName: 'feat/five' });
+    fake.plant({ number: 4, state: 'CLOSED' });
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    const merged = await pr.listMerged();
+
+    // Newest created first, which is NOT newest merged: #9 merged a day
+    // before #3 and is still listed ahead of it, as recorded off cli/cli.
+    expect(merged).toEqual([
+      { number: 9, headRefName: 'feat/nine', headRefOid: 'bbb', mergedAt: '2026-09-22T10:00:00Z' },
+      { number: 3, headRefName: 'feat/three', headRefOid: 'aaa', mergedAt: '2026-09-23T21:00:00Z' },
+    ]);
+    expect(fake.calls()).toEqual([
+      ['pr', 'list', '--state', 'merged', '--limit', '100', '--json', MERGED_FIELDS],
+    ]);
+  });
+
+  it('answers a pull request the fake merged, at the fake\'s clock', async () => {
+    const fake = createFakePrGh({ now: () => '2026-09-24T10:00:00Z' });
+    fake.plant({ number: 7, headRefName: BRANCH, headRefOid: 'deadbeef' });
+    const pr = createGhPullRequests({ gh: fake.run });
+
+    expect(await pr.listMerged()).toEqual([]);
+    await pr.merge(7, 'squash');
+
+    expect(await pr.listMerged())
+      .toEqual([{ number: 7, headRefName: BRANCH, headRefOid: 'deadbeef', mergedAt: '2026-09-24T10:00:00Z' }]);
+  });
+
+  it('throws what gh wrote when the command failed, so an outage never reads as no merges', async () => {
+    await expect(answering(OUTAGE).listMerged()).rejects.toThrow(
+      'gh pull requests: gh pr list --state merged failed: error connecting to api.github.com',
+    );
+    await expect(createGhPullRequests({ gh: createFakePrGh({ repo: null }).run }).listMerged())
+      .rejects.toThrow('gh pull requests: gh pr list --state merged failed: no git remotes found');
+  });
+
+  it('reads a well-formed row, the control on the refusals below', async () => {
+    expect(await writing([MERGED_ROW]).listMerged()).toEqual([{
+      number: 7,
+      headRefName: BRANCH,
+      headRefOid: '411f004d93d61f3292286b1a7f3a84339020417f',
+      mergedAt: '2026-09-23T16:38:29Z',
+    }]);
+  });
+
+  it.each([
+    ['a null mergedAt, which only a pull request not merged answers', { mergedAt: null }, 'row 0.mergedAt is null, expected a string'],
+    ['no headRefOid', { headRefOid: undefined }, 'row 0.headRefOid is undefined, expected a string'],
+    ['a number written as a string', { number: '7' }, 'row 0.number is "7", expected a positive whole number'],
+    ['a numeric headRefName', { headRefName: 7 }, 'row 0.headRefName is 7, expected a string'],
+  ])('refuses a row carrying %s, naming the field', async (_label, change, problem) => {
+    await expect(writing([{ ...MERGED_ROW, ...change }]).listMerged())
+      .rejects.toThrow(`gh pull requests: gh pr list --state merged answered ${problem}`);
+  });
+
+  it('refuses a payload that is not a list', async () => {
+    await expect(writing(MERGED_ROW).listMerged()).rejects.toThrow(
+      'gh pull requests: gh pr list --state merged answered its output is a mapping, expected a list',
+    );
+  });
+});
+
 describe('get', () => {
   it('answers one pull request in full, narrowing its state and mergeability', async () => {
     const { fake, pr } = withOnePull();

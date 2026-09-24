@@ -24,7 +24,7 @@
  *
  * | Command | For |
  * |---|---|
- * | `pr list --json <fields> [--state --limit --head --repo]` | `list`, and `findOpen` through `--head` |
+ * | `pr list --json <fields> [--state --limit --head --repo]` | `list`, `listMerged` through `--state merged`, and `findOpen` through `--head` |
  * | `pr view <n> --json <fields> [--repo]` | `get` |
  * | `pr view <n> --web [--repo]` | `browse` |
  * | `pr checks <n> --json <fields> [--repo]` | `checks` |
@@ -129,9 +129,9 @@ export interface FakePrGhOptions {
    */
   readonly repo?: string | null;
   /**
-   * The clock a written comment is stamped with. A fixed instant when
-   * left out, so a case that wants an edit to move `updated_at` hands
-   * over a clock that advances.
+   * The clock a written comment and a merge are stamped with. A fixed
+   * instant when left out, so a case that wants an edit to move
+   * `updated_at` hands over a clock that advances.
    */
   readonly now?: () => string;
 }
@@ -379,8 +379,9 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     if (pull.state !== 'OPEN') {
       return failed(`fake gh: pull request ${pull.number} is ${pull.state}, and a merge is modelled for an open one alone\n`);
     }
-    // A merged pull request answers UNKNOWN for both merge fields, as recorded.
-    store({ ...pull, state: 'MERGED', mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' });
+    // A merged pull request answers UNKNOWN for both merge fields, as recorded,
+    // and is merged at the fake's clock, which a comment is stamped with too.
+    store({ ...pull, state: 'MERGED', mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN', mergedAt: now() });
     return ok();
   };
 

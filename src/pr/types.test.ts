@@ -100,6 +100,7 @@ const MEMBERS: readonly Member[] = [
   { name: 'kind', lines: ['  kind: "gh",'] },
   { name: 'findOpen', lines: ['  findOpen: async (branch: string) => (branch === "" ? null : summary),'] },
   { name: 'list', lines: ['  list: async () => [summary],'] },
+  { name: 'listMerged', lines: ['  listMerged: async () => [merged],'] },
   { name: 'get', lines: ['  get: async (n: number) => (n === 0 ? null : detail),'] },
   {
     name: 'checks',
@@ -135,6 +136,12 @@ const RECORDS = [
   'const detail: T.PullRequestDetail = {',
   '  ...summary, body: "Closes #20", headRefOid: "deadbeef",',
   '  mergeable: "mergeable", mergeStateStatus: "CLEAN", labels: ["type:spec"],',
+  '};',
+  // Exported so the probe omitting `listMerged`, its one reader, draws no
+  // unused-local diagnostic beside the one it is held to.
+  'export const merged: T.MergedPullRequest = {',
+  '  number: 33, headRefName: "feat/rafa-20-pr-commands", headRefOid: "deadbeef",',
+  '  mergedAt: "2026-09-18T10:00:00Z",',
   '};',
   'const comment: T.PullRequestComment = {',
   '  id: "IC_1", author, body: "<!-- rafa:pr-triage v1 -->",',
@@ -190,6 +197,7 @@ const CONFORMING_PROBE = probeSource(
   'export const mergeableIsExact: Equals<T.Mergeability, "mergeable" | "conflicting" | "unknown"> = true;',
   'export const kindIsExact: Equals<T.PullRequests["kind"], "gh"> = true;',
   'export const detailIsASummary: T.PullRequestSummary = detail;',
+  'export const mergedAtIsNeverNull: Equals<T.MergedPullRequest["mergedAt"], string> = true;',
   'export const countIsNullable: Equals<Awaited<ReturnType<T.PullRequests["workflowCount"]>>, number | null> = true;',
   'export const rowsAreTheCheckRows: Equals<T.ChecksReading["rows"], readonly T.CheckRow[]> = true;',
   'export async function verdictOfPr(pr: T.PullRequests): Promise<T.ChecksVerdict> {',
@@ -210,7 +218,7 @@ const BIVARIANCE_CONTROL = probeSource(
   'export const bivariant: MethodSpelled = {',
   '  merge: async (_n: number, method: "squash") => ({ merged: true, detail: method }),',
   '};',
-  'export const used = [author, summary, detail, comment];',
+  'export const used = [author, summary, detail, merged, comment];',
 );
 
 /** One probe changing one thing, and the one diagnostic it must draw. */
@@ -266,6 +274,27 @@ const REFUSALS: readonly Refusal[] = [
     source: probeSource(...adapterSource({ omit: 'workflowCount' })),
     code: 2741,
     names: '\'workflowCount\'',
+  },
+  {
+    title: 'an adapter with no listMerged',
+    file: 'omits-list-merged.ts',
+    source: probeSource(...adapterSource({ omit: 'listMerged' })),
+    code: 2741,
+    names: '\'listMerged\'',
+  },
+  {
+    title: 'an adapter whose listMerged answers a row merged at null',
+    file: 'list-merged-null-at.ts',
+    source: probeSource(...adapterSource({
+      rewrite: {
+        name: 'listMerged',
+        lines: ['  listMerged: async () => [{ ...merged, mergedAt: null }],'],
+      },
+    })),
+    code: 2322,
+    // A merged row always has its instant; null is what `gh` answers for
+    // a pull request that is NOT merged, which this list never holds.
+    names: 'Type \'null\' is not assignable to type \'string\'',
   },
   {
     title: 'an adapter whose workflowCount answers undefined when it could not read one',
