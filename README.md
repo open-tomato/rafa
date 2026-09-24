@@ -229,6 +229,22 @@ cleanup:
   keep: ["release/*"]
 ```
 
+### `status`
+
+One setting turns off the line rafa prints on stderr, before a command
+that runs inside a project, when something is new since the last one.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `status.notice` | `true` | whether that one line, naming `rafa status` or `rafa cleanup`, is printed |
+
+It takes `true` or `false` as written; a quoted `"false"` is refused.
+
+```yaml
+status:
+  notice: false
+```
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want

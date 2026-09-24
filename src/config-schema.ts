@@ -188,6 +188,22 @@
  *     `plan create`'s own argument for one run and not a layer over
  *     this key, for the reason the `pr` section gives.
  *
+ * ## The `status` section
+ *
+ * `rafa status` prints where a project stands, and the since-last-command
+ * notice is the one line on stderr, before a command that runs inside a
+ * project, naming `rafa status` or `rafa cleanup` when something is new
+ * since the last such command. `status.notice` turns that line off. Two
+ * readings are this module's:
+ *
+ *   - It defaults to `true`, and a boolean rather than null: whether the
+ *     line is printed is a question with an answer on every command, and
+ *     the answer nobody has overridden is that it is.
+ *   - It goes through `flag`, so `"false"`, `no` and `0` are refused and
+ *     not read as false, as every `tracking` key refuses them, and it is
+ *     not a {@link CommandLineSetting}, for the reason the `pr` section
+ *     gives.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -364,6 +380,11 @@ export interface RafaConfig {
    * on one. `dangerous.acceptStaleRefs`.
    */
   dangerousAcceptStaleRefs: boolean;
+  /**
+   * Whether a command that runs inside a project prints the one-line
+   * since-last-command notice on stderr. `status.notice`.
+   */
+  statusNotice: boolean;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -411,6 +432,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
+  statusNotice: true,
 });
 
 /** What the module knows about one setting. */
@@ -529,6 +551,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: flag,
     cli: false,
   },
+  statusNotice: { key: 'status.notice', read: flag, cli: false },
 };
 
 /** Every setting name, read off the closed record above. */
