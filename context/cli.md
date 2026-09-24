@@ -70,7 +70,7 @@ module's note is the long form.
 | `src/cleanup/worktrees.ts` | reading idle worktrees: under `.claude/worktrees/` and `~/.rafa/worktrees/`, filtering the current worktree, the ones locked or dirty, the ones running a loop session, and the ones modified within `cleanup.worktreeIdleDays`; each row carries its path, its last access time and what stops it from being ticked |
 | `src/cleanup/groups.ts` | grouping the merged, stale, not-pushed and worktree rows as one reading: each row carries its ticked state, which is true for every merged row, every clean worktree on a merged branch, and nothing else, as the command's description names |
 | `src/cleanup/steps.ts` | turning the ticked rows into deletion steps: one step per branch and one per worktree; a withheld row (one the deletion cannot run) is one warning each; both the force guard and the refusal to delete remote are here |
-| `src/cleanup/scratch-repository.ts` | helper to read whether a worktree holds a scratch repository, which marks every worktree there as not tickable when its parent branch is not merged |
+| `src/cleanup/scratch-repository.ts` | the test fixture, not a reader: a bare remote and a clone holding one merged, one squash-merged, one stale, one unpushed and one `[gone]` branch, and a clean merged, a dirty and a locked worktree under `.claude/worktrees/`. Not a test file so `check-types` opens it, and not re-exported from `./index.js`; the `readCleanup`, `rafa cleanup` and `rafa doctor` integration tests build it |
 | `src/commands/cleanup-render.ts` | rendering the four groups as lines: `renderCleanup` prints the listing, `branchRowLine` and `worktreeRowLine` each row as name, date and reason, and `cleanupNameWidth` measures the longest name for column alignment |
 | `src/commands/cleanup.ts` | `rafa cleanup [--dry-run]`: the reading of `src/cleanup/` (`git fetch --prune` first, `pr.base`, the three `cleanup.*` settings, git run in the directory the command runs from, the provider `resolvePrProvider` resolves at the project root, or none) shown in four groups, in code and starting no session, so it declares no `spends`. With a terminal the groups are one grouped `multiSelect`, each row the line `./cleanup-render.ts` prints and ticked as the reading ticks it; each ticked Not-pushed row then asks a second `[y/N]` naming its commit count, and `Delete <n> branches and remove <m> worktrees? [y/N]` asks before `src/cleanup/steps.ts` runs the steps. The questions go through a line `Prompter` opened only after the checklist answers, so the two readers never share standard input. `--dry-run` asks the same checklist and second questions, then prints each step's command line in place of the final question. Without a terminal, or with `--output=json`, it prints the four groups (the json data being `cleanupData`), asks nothing and removes nothing, `--dry-run` included. Exit code 0 for every run that removed what was answered or nothing; 1 for an argument, a value typed after `--dry-run`, a config `loadConfig` refuses, a repository git cannot read, and a step that did not run clean |
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
@@ -134,9 +134,9 @@ New; it replaces no earlier text. What a row or an action added to
   against `CORE_REGISTRY`, so a module added under `src/commands/` and not
   yet registered reddens neither, and a plan can split "add the module"
   from "register it" across two tasks with the suite green between them.
-  Registration itself reddens exactly three: `OWN_DECLARATIONS` and the
-  roster expectations in `src/commands/index.test.ts`, `COMMAND_MODULES`
-  in `src/index.test.ts`, and the frozen help snapshots — the last only
+  Registration itself reddens exactly three: `OWN_DECLARATIONS`, `OUTPUTS`
+  and the roster expectations in `src/commands/index.test.ts`,
+  `COMMAND_MODULES` in `src/index.test.ts`, and the frozen help snapshots — the last only
   for a new subject or top-level command, or a subject summary that
   changes with it. A changed subject summary or a new top-level command
   reddens `src/tests/spends-cli-surface.test.ts` as well, whose spawned
@@ -155,7 +155,12 @@ New; it replaces no earlier text. What a row or an action added to
   rosters, `src/cli/spends-roster.test.ts`, the spawned `describe` case
   of `src/tests/spends-cli-surface.test.ts` and the README table
   `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
-  registering `agent search` and `skill search`).
+  registering `agent search` and `skill search`). The `describe` roster
+  reddens for no registration: `src/cli/describe.test.ts` checks every
+  command against the registry itself, so a new command passes it
+  unseen. Add an explicit `toContain` and a `spends` null expectation for
+  the command there, and prove them red by unregistering it once
+  (measured on 2026-09-24, registering `cleanup`).
 - **Registered**: `plan create`, aliased `plan`; `plan list`, `plan show`,
   `plan validate`, `plan risk` and `plan needs`; `loop start`, aliased `start`; `loop stop`,
   `loop pause`, `loop resume`, `loop status` and `loop list`; `issue list`,

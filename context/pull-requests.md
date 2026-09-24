@@ -91,7 +91,9 @@ test helper out of the loop's import graph as `./gh-fake.js` is kept out.
 It answers the members the case names, refuses every other one, and
 records each call either way, refusals included, so "it refused and
 merged nothing" is read off `calls()` rather than inferred from a
-message; `sent()` spells one line per call, a squash merge of #41 as
+message. It answers a `PullRequestsDouble`, not the port: hand the seam
+its `.pulls` (only a scratch type-check of the test file notices the
+difference, since `bun test` checks no types); `sent()` spells one line per call, a squash merge of #41 as
 `merge 41 squash`, and `{ refusal }` gives a case its own refusal
 wording. Reach for it rather than writing a `PullRequests` literal in
 the test file: `check-types` opens no `*.test.ts`, so a hand-built
