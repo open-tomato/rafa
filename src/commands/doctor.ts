@@ -151,7 +151,7 @@
  * line naming the start-only items a resume passed over; the steps that
  * file names and nothing checks; and the verdict with any
  * `known-missing:` lines; then the risk total of a plan `--plan` names;
- * then {@link renderBoard}'s lines for a repository that has a GitHub board,
+ * then `renderBoard`'s lines (`./doctor-render.ts`) for a repository that has a GitHub board,
  * and none for one that has not; then {@link renderBlockedIssues}'s
  * lines, which a board holding no issue labelled `spec:blocked` has
  * none of either. A halt
@@ -177,7 +177,7 @@
 import type { BlockedIssuesReport } from './doctor-blocked.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRow, BoardStatus } from '../board/status.js';
+import type { BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { PrProvider } from '../config-sections.js';
 import type { PrerequisiteItem, RafaConfig } from '../config.js';
@@ -193,7 +193,7 @@ import type { ProjectFound } from '../project/scope.js';
 import { basename, resolve } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { boardGaps, readBoardStatus } from '../board/status.js';
+import { readBoardStatus } from '../board/status.js';
 import { CommandExit } from '../cli/command.js';
 import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
@@ -213,9 +213,8 @@ import { trackerPathFor } from '../utils/tracker.js';
 
 import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
 import { readPreviousCopies } from './doctor-previous.js';
-import { renderDoctor } from './doctor-render.js';
-import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
-import { isFile, plural } from './plan/plan-files.js';
+import { renderBoard, renderDoctor } from './doctor-render.js';
+import { isFile } from './plan/plan-files.js';
 
 /** How the checks run; see the module note. Each left out is the runner's own. */
 export interface DoctorSeams {
@@ -552,38 +551,6 @@ function writeInstall(context: RafaContext, install: InstallReadings): void {
   if (context.outputMode !== 'json') {
     context.output.info(`${binPath.rafaBin} is on PATH, and ${binPath.bunBin} is not ahead of it.`);
   }
-}
-
-/** How wide a board row's outcome column is: `present`, `missing` and `unknown` are each seven. */
-const OUTCOME_WIDTH = 7;
-
-/** A row as a line names it: a label under `label <name>`, anything else under its own name. */
-function rowName(row: BoardRow): string {
-  return row.kind === 'label'
-    ? `label ${row.name}`
-    : row.name;
-}
-
-/**
- * One board row as a line. A row that is present says nothing more —
- * "present" is the whole of it — and every other carries the sentence
- * that made it: what was not there, or what could not be read.
- */
-export function boardRowLine(row: BoardRow): string {
-  const line = `  ${row.outcome.padEnd(OUTCOME_WIDTH, ' ')}  ${rowName(row)}`;
-  return row.outcome === 'present'
-    ? line
-    : `${line}: ${row.detail}`;
-}
-
-/** The lines text mode writes for the board: the heading, a row each, and the fix when any row is not present. */
-export function renderBoard(board: BoardStatus | null): readonly string[] {
-  if (board === null) return [];
-  const gaps = boardGaps(board);
-  const fix = gaps.length === 0
-    ? []
-    : [`Run ${BOARD_FIX} to set up ${plural(gaps.length, 'part')} of the board this run did not find.`];
-  return [BOARD_HEADING, ...board.rows.map(boardRowLine), ...fix];
 }
 
 /** The refusal for a halt: the runner's own text, then what `loop start` would do. */

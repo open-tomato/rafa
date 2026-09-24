@@ -794,7 +794,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/doctor.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
-    ['../board/status.js', ['boardGaps', 'readBoardStatus']],
+    ['../board/status.js', ['readBoardStatus']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/version.js', ['versionLine']],
     ['../config-load.js', ['loadConfig']],
@@ -813,9 +813,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../utils/tracker.js', ['trackerPathFor']],
     ['./doctor-blocked.js', ['readBlockedIssues', 'renderBlockedIssues']],
     ['./doctor-previous.js', ['readPreviousCopies']],
-    ['./doctor-render.js', ['renderDoctor']],
-    ['./init-board.js', ['BOARD_FIX', 'BOARD_HEADING']],
-    ['./plan/plan-files.js', ['isFile', 'plural']],
+    ['./doctor-render.js', ['renderBoard', 'renderDoctor']],
+    ['./plan/plan-files.js', ['isFile']],
   ]],
   ['./commands/self-update.js', [
     ['../cli/command.js', ['CommandExit']],
