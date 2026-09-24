@@ -94,16 +94,23 @@
  * misses is caught by the planner's pass, which reads for meaning.
  *
  * The check has to survive being pointed at a spec ABOUT it. This
- * repository's specs quote `TBD`, `TODO` and `???` as literals while
- * describing the gate, and a check that refused those would make the
- * gate unable to read its own spec. So two exemptions, each with a
- * control in the test file:
+ * repository's specs quote `TBD`, `TODO`, `???` and template comments
+ * as literals while describing the gate, and a check that refused those
+ * would make the gate unable to read its own spec. So two exemptions,
+ * each with a control in the test file:
  *
  *  - A fenced block is skipped whole. A spec showing an example body,
  *    an example template or an example refusal puts it in a fence, and
  *    what is quoted there is not what the author left behind.
  *  - An inline code span is skipped. `` `TODO` `` in a sentence is the
  *    word being named, not a marker being left.
+ *
+ * Both exemptions cover BOTH rules, the words and the comments. A
+ * comment in backticks or in a fence is named, not left behind, and
+ * the cost is nil: a real leftover template comment is never inside
+ * either, because the template writes its guidance bare. Comments are
+ * not even looked for inside a fence, so one quoted there half-way
+ * cannot run on past the fence and hide the sections after it.
  *
  * The word forms are matched UPPER-CASE and whole: `TODO` is the
  * convention for an unfinished note, and `the todo list` in a sentence
@@ -114,12 +121,13 @@
  * is any run of three or more question marks, which has no prose form
  * worth keeping.
  *
- * An HTML comment surviving in the body is an unfilled template comment,
- * whatever it says, because every comment in the template is guidance
- * the author is asked to delete — the first one included, the one that
- * says no local paths or credentials. The one exemption is a comment
- * opening `rafa:`, the marker shape rafa writes itself, so a body
- * carrying a machine-written marker is not refused for it.
+ * An HTML comment surviving in the body, outside a fence or code span,
+ * is an unfilled template comment, whatever it says, because every
+ * comment in the template is guidance the author is asked to delete —
+ * the first one included, the one that says no local paths or
+ * credentials. The one further exemption is a comment opening `rafa:`,
+ * the marker shape rafa writes itself, so a body carrying a
+ * machine-written marker is not refused for it.
  *
  * A section already reported EMPTY does not also report the placeholders
  * inside it. A section holding nothing but the template's comment is one
@@ -197,6 +205,9 @@ const LIST_ITEM = /^ {0,3}(?:[-*+]|\d+[.)])\s+\S/u;
 /** An inline code span, whose contents are quoted rather than written. */
 const CODE_SPAN = /`[^`]*`/gu;
 
+/** What opens and closes a code span, as {@link CODE_SPAN} reads one. */
+const CODE_TICK = '`';
+
 /** Emphasis and code characters a heading may be dressed in. */
 const HEADING_DRESS = /[*_`]/gu;
 
@@ -225,9 +236,9 @@ interface BodyLine {
   readonly number: number;
   /** True when it is inside a fenced block, or is a fence itself. */
   readonly fenced: boolean;
-  /** The line with its HTML comments removed. */
+  /** The line with its HTML comments removed; a fenced line as written. */
   readonly visible: string;
-  /** The text of each comment that OPENED on this line. */
+  /** The text of each comment that OPENED on this line; none when fenced. */
   readonly comments: readonly string[];
   /** Its heading, when it is one outside a fence. */
   readonly heading: { readonly level: number; readonly title: string } | null;
@@ -256,10 +267,26 @@ interface StrippedLine {
 }
 
 /**
+ * Where a code span that opens before `limit` in `text` ends, just past
+ * its closing backtick, or -1 when none does. A span is read as
+ * {@link CODE_SPAN} reads it, so the comment rule and the word rule
+ * agree on what is quoted.
+ */
+function codeSpanEnd(text: string, limit: number): number {
+  const open = text.indexOf(CODE_TICK);
+  if (open === -1 || open > limit) return -1;
+
+  const close = text.indexOf(CODE_TICK, open + 1);
+  if (close === -1) return -1;
+  return close + 1;
+}
+
+/**
  * `line` with its HTML comments removed, carrying the text of each
  * comment that opened on it. A comment carried over from an earlier line
  * contributes no text, so a comment spanning five lines is one finding
- * on the line it started, not five.
+ * on the line it started, not five. A `<!--` inside a code span opens no
+ * comment and stays in the visible text, quoted.
  */
 function stripComments(line: string, carried: boolean): StrippedLine {
   const comments: string[] = [];
@@ -280,6 +307,13 @@ function stripComments(line: string, carried: boolean): StrippedLine {
     if (start === -1) {
       visible += rest;
       break;
+    }
+
+    const quoted = codeSpanEnd(rest, start);
+    if (quoted !== -1) {
+      visible += rest.slice(0, quoted);
+      rest = rest.slice(quoted);
+      continue;
     }
 
     visible += rest.slice(0, start);
@@ -307,7 +341,18 @@ function headingOf(visible: string): BodyLine['heading'] {
   return { level: hashes.length, title: title.replace(/\s+#+\s*$/u, '').trim() };
 }
 
-/** Every line of `body`, with its comments, its fence state and its heading. */
+/** A line inside a fenced block, or a fence itself: quoted, read as written. */
+function fencedLine(number: number, text: string): BodyLine {
+  return { number, fenced: true, visible: text, comments: [], heading: null };
+}
+
+/**
+ * Every line of `body`, with its comments, its fence state and its
+ * heading. Comments are not looked for inside a fence, so one quoted
+ * there is no finding, and one quoted half-way cannot run on past the
+ * closing fence and hide the body after it. A fence line inside a
+ * comment opens no fence, since the comment has hidden it.
+ */
 function readLines(body: string): readonly BodyLine[] {
   const raw = body.split('\n').map((line) => line.replace(/\r$/u, ''));
   const lines: BodyLine[] = [];
@@ -315,21 +360,22 @@ function readLines(body: string): readonly BodyLine[] {
   let fenced = false;
 
   raw.forEach((text, index) => {
+    const number = index + 1;
+    const isFence = FENCE_LINE.test(text);
+    if (fenced || (!carried && isFence)) {
+      fenced = !fenced || !isFence;
+      lines.push(fencedLine(number, text));
+      return;
+    }
+
     const stripped = stripComments(text, carried);
     carried = stripped.open;
-
-    const isFence = FENCE_LINE.test(stripped.visible);
-    const inFence = fenced || isFence;
-    if (isFence) fenced = !fenced;
-
     lines.push({
-      number: index + 1,
-      fenced: inFence,
+      number,
+      fenced: false,
       visible: stripped.visible,
       comments: stripped.comments,
-      heading: inFence
-        ? null
-        : headingOf(stripped.visible),
+      heading: headingOf(stripped.visible),
     });
   });
 
@@ -397,13 +443,13 @@ function gapAt(kind: ReadinessGapKind, heading: string, what: string, line: numb
 
 /** Every placeholder in one line, named under `heading`. */
 function placeholdersInLine(heading: string, line: BodyLine): readonly ReadinessGap[] {
+  if (line.fenced) return [];
+
   const found: ReadinessGap[] = [];
   const unfilled = line.comments.some((comment) => !comment.trim().startsWith(MARKER_PREFIX));
   if (unfilled) {
     found.push(gapAt('placeholder', heading, `holds an unfilled template comment on line ${String(line.number)}`, line.number));
   }
-
-  if (line.fenced) return found;
 
   const prose = line.visible.replace(CODE_SPAN, ' ');
   for (const shape of PLACEHOLDER_SHAPES) {

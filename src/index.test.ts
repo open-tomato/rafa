@@ -823,7 +823,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../pr/preflight-items.js', ['ghPreflightItems']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../preflight/first-dispatch.js', ['isFirstDispatch']],
-    ['../preflight/prerequisites-md.js', ['loadPlanPrerequisites', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
+    ['../preflight/prerequisites-md.js', ['loadPlanPrerequisites', 'malformedPrerequisiteLines', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
     ['../preflight/run.js', ['PROBE_TIMEOUT_MS', 'runPreflight']],
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../start/risk-total.js', ['announceRiskTotal']],

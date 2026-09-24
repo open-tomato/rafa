@@ -439,14 +439,17 @@ The wrap-up session always receives `full` regardless of the configured mode.
 How the file is read:
 - An item is a line opening with `- [ ] `, continued by the indented lines directly below it that open no list item of their own. A ticked `- [x]` item and a `- [BLOCKED]` item are skipped, and nothing inside a fenced code block is read.
 - An item's tag is the `[auto]`, `[human]`, or `[start]` written right after its box. Without one it takes its section's tag: a heading carrying `[auto]` tags its section `auto`, one carrying `[human]` or naming `manual`, `human`, `sign-off` or `team` tags it `human`, and one carrying `[start]` tags it `start`. A heading's tag reaches the deeper headings under it and ends at the next heading of its own level or shallower. An item under no tagged heading is `human`.
-- An `auto` item's first backticked span is its probe. The item merges as a required prerequisite, the tier whose failure halts a run.
-- A `human` item, and an `auto` item with no backticked span, is a reminder: named to the operator, never probed, and never halting a run.
-- A `start` item's first backticked span is its probe. The item is probed on first dispatch only (skipped on resume), and failure halts a run on first dispatch.
+- An `auto` item's probe is the backticked span that ends it, after its final `: `. The item merges as a required prerequisite, the tier whose failure halts a run.
+- A `start` item's probe is read the same way. The item is probed on first dispatch only (skipped on resume), and failure halts a run on first dispatch.
+- A `human` item is a reminder: named to the operator, never probed, and never halting a run.
+- An `auto` or `start` item that does not end with `: ` and its command — the command first, text after it, or no span at all — is malformed: `rafa loop start` and `rafa doctor` refuse the plan, naming its line, and run nothing.
 
 Rules:
 - Only include prerequisites that are genuinely non-automatable (installed services, external credentials, manual env var setup).
-- Tag an item `auto` only when a shell command proves it, and write that command as the item's first backticked span, with nothing quoted before it. The command asks for no input and changes nothing.
-- Tag an item `start` only when a shell command proves it and it should only be checked on the first dispatch of a plan (not on resume). Write the command as the item's first backticked span, with nothing quoted before it.
+- An `[auto]` item holds exactly one backticked span, and that span is its command. The preflight runs it as written, so put no package name, path or other command in backticks anywhere in the item.
+- Tag an item `auto` only when a shell command proves it, and end the item with `: ` and that command. The command asks for no input and changes nothing.
+- Tag an item `start` only when a shell command proves it and it should only be checked on the first dispatch of a plan (not on resume). End it with `: ` and the command, one span, as for `auto`.
+- Make the command complete: it exits 0 when the prerequisite holds. To prove a tool is installed, probe `<tool> --version`, `<tool> --help` or `which <tool>` — never a bare subcommand such as `uvx check-jsonschema`, which exits non-zero for want of arguments.
 - Tag every step for after the plan merges `human`, as the heading above does, so no run ever executes one as a probe.
 - Do not duplicate steps already documented in the repo's contributor docs (README, CONTRIBUTING, and the like).
 - For example: do not mark `bun install` as a prerequisite if it is already documented as a required step for all development work.

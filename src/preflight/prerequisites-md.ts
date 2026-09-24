@@ -24,7 +24,8 @@
  *     naming `manual`, `human`, `sign-off` or `team` gives it `human`.
  *     Both tests ignore case.
  *   - An `auto` item's probe is its first backticked span, trimmed. A
- *     `human` item has none, whatever it quotes.
+ *     `human` item has none, whatever it quotes. The copy reads the
+ *     probe elsewhere; see below.
  *
  * ## What the copy changes
  *
@@ -49,6 +50,20 @@
  *     item, and a `# install manually` comment in a shell block is no
  *     heading: the source read it as one, and every item below it as
  *     `human`.
+ *   - **A probe is the span that ENDS the item, after its final `: `.**
+ *     The item is written `<description>: \`<command>\``, and the probe
+ *     is that last span, trimmed. The source took the FIRST span, so an
+ *     item quoting a name ahead of its command ran the name: a package,
+ *     `@open-tomato/define-config`, which exited 127, or a command that
+ *     is on `PATH` and wants arguments, `uvx check-jsonschema`, which
+ *     exited 2 (#140). A `: ` inside the span is the command's own. An
+ *     `auto` or `start` item that does not end so — the command first,
+ *     text after the span, no span at all — is MALFORMED: its probe is
+ *     null, nothing is run for it, and it lands on
+ *     {@link PlanPrerequisites.malformed}, named by its line, for a
+ *     caller to refuse the run with ({@link malformedPrerequisiteLines}).
+ *     Guessing which span is the command is what #140 was, so none is
+ *     guessed.
  *   - **The names follow this package.** The source's `PrerequisiteItem`
  *     is {@link MarkdownPrerequisite}, the config already naming its own
  *     item `PrerequisiteItem`, and `probeCommand?: string` is
@@ -88,9 +103,11 @@
  *   - A `human` item is a {@link PrerequisiteReminder}: a line to print,
  *     held in neither tier, so it cannot halt a run. Plans carry unticked
  *     steps for after the merge, and those must not stop one.
- *   - An `auto` or `start` item with no probe is a reminder too, carrying
- *     its own tag. With nothing to run the source's checker asked a
- *     human, and here the item is named rather than dropped.
+ *   - An `auto` or `start` item with no probe is a
+ *     {@link MalformedPrerequisite}, in neither tier and not a reminder:
+ *     it asked for a check and names none, so a caller refuses the run
+ *     before any probe rather than let a required check go unmade. With
+ *     nothing to run the source's checker asked a human.
  *
  * Nothing becomes an OPTIONAL item: the markdown has no spelling for one.
  *
@@ -98,8 +115,8 @@
  *
  * {@link mergePlanPrerequisites} answers a new set: the config's required
  * items followed by the plan's, the config's optional items, and the
- * plan's start-only items and reminders. The config has no spelling for a
- * start-only item, so that list is the plan's alone. The settings handed
+ * plan's start-only items, reminders and malformed items. The config has
+ * no spelling for any of those three, so each list is the plan's alone. The settings handed
  * in are never written to, so a merge for one plan leaves nothing behind
  * for the next.
  *
@@ -139,7 +156,11 @@ export interface MarkdownPrerequisite {
   tag: PrerequisiteTag;
   /** Where its first line sits, counted from 0. */
   lineIndex: number;
-  /** The first backticked span of a probed item, trimmed; else null. */
+  /**
+   * A probed item's command: the backticked span ending it after its
+   * final `: `, trimmed. Null for a `human` item, and for a probed one
+   * not ending so, which is malformed.
+   */
   probe: string | null;
 }
 
@@ -147,7 +168,20 @@ export interface MarkdownPrerequisite {
 export interface PrerequisiteReminder {
   /** The item's text, as {@link MarkdownPrerequisite.description}. */
   description: string;
-  /** `human`, or `auto`/`start` for an item with no probe to run. */
+  /** Always `human`: a probed item with no probe is malformed instead. */
+  tag: PrerequisiteTag;
+  /** Where the item's first line sits, counted from 1 as `grep -n` does. */
+  line: number;
+}
+
+/**
+ * An `auto` or `start` item with no command where one belongs, which a
+ * run refuses rather than guess at; see the module note.
+ */
+export interface MalformedPrerequisite {
+  /** The item's text, as {@link MarkdownPrerequisite.description}. */
+  description: string;
+  /** `auto` or `start`: the tag that asked for a probe. */
   tag: PrerequisiteTag;
   /** Where the item's first line sits, counted from 1 as `grep -n` does. */
   line: number;
@@ -159,8 +193,10 @@ export interface PlanPrerequisites {
   required: readonly PrerequisiteItem[];
   /** Its `start` items that carry a probe; see the module note. */
   startRequired: readonly PrerequisiteItem[];
-  /** Its other unticked items. */
+  /** Its `human` items. */
   reminders: readonly PrerequisiteReminder[];
+  /** Its `auto` and `start` items that carry no probe. */
+  malformed: readonly MalformedPrerequisite[];
 }
 
 /** The items a preflight checks for one plan, and the ones it only names. */
@@ -186,7 +222,7 @@ const ITEM_RE = /^-\s+\[\s*\]\s+/;
 const INLINE_AUTO_RE = /^-\s+\[\s*\]\s+\[auto\]\s+/i;
 const INLINE_HUMAN_RE = /^-\s+\[\s*\]\s+\[human\]\s+/i;
 const INLINE_START_RE = /^-\s+\[\s*\]\s+\[start\]\s+/i;
-const BACKTICK_RE = /`([^`]+)`/;
+const PROBE_RE = /:\s+`([^`]+)`\s*$/;
 
 const HEADING_MARKS_RE = /^#+/;
 const FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
@@ -272,9 +308,12 @@ function isProbedTag(tag: PrerequisiteTag): boolean {
   return tag === 'auto' || tag === 'start';
 }
 
-/** The first backticked span of `description`, trimmed, or null. */
+/**
+ * The backticked span that ends `description` after its final `: `,
+ * trimmed, or null when it does not end so; see the module note.
+ */
 function extractProbe(description: string): string | null {
-  const probe = BACKTICK_RE.exec(description)?.[1]?.trim();
+  const probe = PROBE_RE.exec(description)?.[1]?.trim();
   return probe || null;
 }
 
@@ -343,24 +382,48 @@ function requiredItemsTagged(
   return Object.freeze(probed.map(requiredItem));
 }
 
-/** An item the preflight only names. */
-function reminderOf(item: MarkdownPrerequisite): PrerequisiteReminder {
+/** An item named by its text, its tag and its line: a reminder, or a malformed item. */
+function namedItemOf(item: MarkdownPrerequisite): PrerequisiteReminder & MalformedPrerequisite {
   return Object.freeze({ description: item.description, tag: item.tag, line: item.lineIndex + 1 });
+}
+
+/** True when a probed tag's item carries no probe to run. */
+function isMalformed(item: MarkdownPrerequisite): boolean {
+  return isProbedTag(item.tag) && item.probe === null;
 }
 
 /**
  * What a PREREQUISITES file adds to a run: its probed `auto` items as
  * required items, its probed `start` items as start-only required items,
- * and its other unticked items as reminders, each list in file order and
- * frozen.
+ * its `human` items as reminders, and its `auto` and `start` items with
+ * no probe as malformed, each list in file order and frozen.
  */
 export function planPrerequisites(content: string): PlanPrerequisites {
   const items = parsePrerequisites(content);
   return Object.freeze({
     required: requiredItemsTagged(items, 'auto'),
     startRequired: requiredItemsTagged(items, 'start'),
-    reminders: Object.freeze(items.filter((item) => !isProbed(item)).map(reminderOf)),
+    reminders: Object.freeze(items.filter((item) => !isProbedTag(item.tag)).map(namedItemOf)),
+    malformed: Object.freeze(items.filter(isMalformed).map(namedItemOf)),
   });
+}
+
+/** A probed item written as the one shape the parser reads a probe from. */
+export const PROBE_ITEM_EXAMPLE = '- [ ] uv installed: `uvx --version`';
+
+/**
+ * The lines a PREREQUISITES file holding malformed items is refused
+ * with, `file` naming it: what is wrong, each item by its line, then the
+ * shape to write it in. `loop start` and `rafa doctor` both refuse with
+ * them, so the two say the same thing about the same file.
+ */
+export function malformedPrerequisiteLines(file: string, malformed: readonly MalformedPrerequisite[]): readonly string[] {
+  return [
+    `${file} holds ${malformed.length} malformed [auto] or [start] item(s): no command ends the item after a final ": ".`,
+    ...malformed.map((item) => `  line ${item.line} [${item.tag}]: ${item.description}`),
+    `Write each as ${PROBE_ITEM_EXAMPLE}, its one backticked span a complete command run as written;`
+      + ' prove a tool is there with `<tool> --version`, `<tool> --help` or `which <tool>`.',
+  ];
 }
 
 /**
@@ -379,6 +442,7 @@ export function mergePlanPrerequisites(
     startRequired: plan.startRequired,
     optional: Object.freeze([...settings.prerequisitesOptional]),
     reminders: plan.reminders,
+    malformed: plan.malformed,
   });
 }
 

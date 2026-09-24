@@ -17,6 +17,14 @@
  * `[auto]`, and a heading naming a start without brackets beside one
  * carrying them.
  *
+ * The copy reads a probe from the span ENDING the item after its final
+ * `: `, where the source took the first span, so every probed fixture
+ * here, the ported cases included, is written `<description>:
+ * \`<command>\``. Both repros of #140 sit under "the probe", each beside
+ * the same item quoting nothing else: a package name quoted ahead of the
+ * command, and a command on `PATH` quoted ahead of it, which no check of
+ * the probe's first word would catch.
+ *
  * The mapping, the merge and the loader follow. The merge reads a config
  * resolved by the real config reader. No case reads a plan under
  * `.plans/`, which a fresh clone does not hold: the operator steps fixture
@@ -110,10 +118,10 @@ describe('parsePrerequisites: the source rules', () => {
   });
 
   it('respects explicit [auto] inline tag', () => {
-    const content = '- [ ] [auto] Bun is installed (`bun --version`)\n';
+    const content = '- [ ] [auto] Bun is installed: `bun --version`\n';
     const items = parsePrerequisites(content);
     expect(items[0]?.tag).toBe('auto');
-    expect(items[0]?.description).toBe('Bun is installed (`bun --version`)');
+    expect(items[0]?.description).toBe('Bun is installed: `bun --version`');
     expect(items[0]?.probe).toBe('bun --version');
   });
 
@@ -125,7 +133,7 @@ describe('parsePrerequisites: the source rules', () => {
   });
 
   it('inherits auto tag from [auto] section header', () => {
-    const content = '## Automated Checks [auto]\n\n- [ ] Node ≥ 20 installed (`node --version`)\n';
+    const content = '## Automated Checks [auto]\n\n- [ ] Node ≥ 20 installed: `node --version`\n';
     const items = parsePrerequisites(content);
     expect(items[0]?.tag).toBe('auto');
     expect(items[0]?.probe).toBe('node --version');
@@ -150,7 +158,7 @@ describe('parsePrerequisites: the source rules', () => {
   });
 
   it('extracts probe command from backtick-wrapped token', () => {
-    const content = '- [ ] [auto] Docker is running (`docker info`)\n';
+    const content = '- [ ] [auto] Docker is running: `docker info`\n';
     const items = parsePrerequisites(content);
     expect(items[0]?.probe).toBe('docker info');
   });
@@ -174,7 +182,7 @@ describe('parsePrerequisites: the source rules', () => {
       '## Automated Checks [auto]',
       '',
       '- [x] Already done',
-      '- [ ] Bun installed (`bun --version`)',
+      '- [ ] Bun installed: `bun --version`',
       '- [ ] [human] Override to human',
       '',
       '## Manual Steps',
@@ -197,7 +205,7 @@ describe('parsePrerequisites: the source rules', () => {
   });
 
   it('preserves the original raw line', () => {
-    const raw = '- [ ] [auto] Raw line (`cmd`)';
+    const raw = '- [ ] [auto] Raw line: `cmd`';
     const items = parsePrerequisites(raw);
     expect(items[0]?.raw).toBe(raw);
   });
@@ -208,7 +216,7 @@ describe('parsePrerequisites: what the copy changes', () => {
     const content = [
       '## Checks [auto]',
       '',
-      '- [ ] Bun (`bun --version`)',
+      '- [ ] Bun: `bun --version`',
       '',
       '## Operator steps after the plan merges',
       '',
@@ -223,7 +231,7 @@ describe('parsePrerequisites: what the copy changes', () => {
   });
 
   it('keeps an auto section over a deeper heading with no tag of its own', () => {
-    const content = '## Checks [auto]\n\n### Publishing\n\n- [ ] Registry reachable (`npm ping`)\n';
+    const content = '## Checks [auto]\n\n### Publishing\n\n- [ ] Registry reachable: `npm ping`\n';
     const items = parsePrerequisites(content);
     expect(items.map((item) => [item.tag, item.probe])).toEqual([['auto', 'npm ping']]);
   });
@@ -234,11 +242,11 @@ describe('parsePrerequisites: what the copy changes', () => {
       '',
       '### Sign-off',
       '',
-      '- [ ] Lead approves (`echo deep`)',
+      '- [ ] Lead approves: `echo deep`',
       '',
       '## Toolchain',
       '',
-      '- [ ] Bun (`bun --version`)',
+      '- [ ] Bun: `bun --version`',
     ].join('\n');
 
     const items = parsePrerequisites(content);
@@ -249,10 +257,10 @@ describe('parsePrerequisites: what the copy changes', () => {
   });
 
   it('reads a probe quoted on the second line of a wrapped item', () => {
-    const content = '## Checks [auto]\n\n- [ ] Tracker clean:\n      `grep -c task .plans` exits 1\n';
+    const content = '## Checks [auto]\n\n- [ ] Tracker clean:\n      `grep -c task .plans`\n';
     const items = parsePrerequisites(content);
     expect(items).toHaveLength(1);
-    expect(items[0]?.description).toBe('Tracker clean: `grep -c task .plans` exits 1');
+    expect(items[0]?.description).toBe('Tracker clean: `grep -c task .plans`');
     expect(items[0]?.probe).toBe('grep -c task .plans');
     expect(items[0]?.raw).toBe('- [ ] Tracker clean:');
     expect(items[0]?.lineIndex).toBe(2);
@@ -260,22 +268,22 @@ describe('parsePrerequisites: what the copy changes', () => {
 
   it('does not run an item on over a blank line or one holding only spaces', () => {
     for (const blank of ['', '   ']) {
-      const content = `- [ ] [auto] Tracker clean:\n${blank}\n      \`grep -c task .plans\` exits 1\n`;
+      const content = `- [ ] [auto] Tracker clean:\n${blank}\n      \`grep -c task .plans\`\n`;
       const items = parsePrerequisites(content);
       expect(items.map((item) => [item.description, item.probe])).toEqual([['Tracker clean:', null]]);
     }
   });
 
   it('joins a probe wrapped across a line break with one space', () => {
-    const content = '- [ ] [auto] No tracker has a task left: `grep -c task\n      .plans/PLAN_TRACKER-*.md` exits 1\n';
+    const content = '- [ ] [auto] No tracker has a task left: `grep -c task\n      .plans/PLAN_TRACKER-*.md`\n';
     const items = parsePrerequisites(content);
     expect(items[0]?.probe).toBe('grep -c task .plans/PLAN_TRACKER-*.md');
   });
 
   it('does not join a nested list item into the item above it', () => {
-    const content = '- [ ] [auto] Bun (`bun --version`)\n  - [ ] [auto] nested (`echo nested`)\n  1. numbered\n';
+    const content = '- [ ] [auto] Bun: `bun --version`\n  - [ ] [auto] nested: `echo nested`\n  1. numbered\n';
     const items = parsePrerequisites(content);
-    expect(items.map((item) => item.description)).toEqual(['Bun (`bun --version`)']);
+    expect(items.map((item) => item.description)).toEqual(['Bun: `bun --version`']);
   });
 
   it('reads nothing inside a fenced block', () => {
@@ -284,15 +292,15 @@ describe('parsePrerequisites: what the copy changes', () => {
       '',
       '```bash',
       '# install manually',
-      '- [ ] [auto] fenced (`echo fenced`)',
+      '- [ ] [auto] fenced: `echo fenced`',
       '```',
       '',
-      '- [ ] Bun (`bun --version`)',
+      '- [ ] Bun: `bun --version`',
     ].join('\n');
 
     const items = parsePrerequisites(content);
     expect(items.map((item) => [item.description, item.tag, item.probe])).toEqual([
-      ['Bun (`bun --version`)', 'auto', 'bun --version'],
+      ['Bun: `bun --version`', 'auto', 'bun --version'],
     ]);
   });
 
@@ -301,15 +309,15 @@ describe('parsePrerequisites: what the copy changes', () => {
       '## Checks [auto]',
       '',
       '# install manually',
-      '- [ ] [auto] fenced (`echo fenced`)',
+      '- [ ] [auto] fenced: `echo fenced`',
       '',
-      '- [ ] Bun (`bun --version`)',
+      '- [ ] Bun: `bun --version`',
     ].join('\n');
 
     const items = parsePrerequisites(content);
     expect(items.map((item) => [item.description, item.tag, item.probe])).toEqual([
-      ['fenced (`echo fenced`)', 'auto', 'echo fenced'],
-      ['Bun (`bun --version`)', 'human', null],
+      ['fenced: `echo fenced`', 'auto', 'echo fenced'],
+      ['Bun: `bun --version`', 'human', null],
     ]);
   });
 
@@ -317,11 +325,11 @@ describe('parsePrerequisites: what the copy changes', () => {
     const content = [
       '~~~~',
       '``````',
-      '- [ ] [auto] after a longer run of the other mark (`echo other`)',
+      '- [ ] [auto] after a longer run of the other mark: `echo other`',
       '~~~',
-      '- [ ] [auto] after a shorter run of the same mark (`echo shorter`)',
+      '- [ ] [auto] after a shorter run of the same mark: `echo shorter`',
       '~~~~~',
-      '- [ ] [auto] outside (`echo outside`)',
+      '- [ ] [auto] outside: `echo outside`',
     ].join('\n');
 
     const items = parsePrerequisites(content);
@@ -329,7 +337,7 @@ describe('parsePrerequisites: what the copy changes', () => {
   });
 
   it('reads a span holding only whitespace as no probe', () => {
-    const items = parsePrerequisites('- [ ] [auto] Blank probe (`  `)\n');
+    const items = parsePrerequisites('- [ ] [auto] Blank probe: `  `\n');
     expect(items[0]?.probe).toBeNull();
   });
 
@@ -348,19 +356,19 @@ describe('parsePrerequisites: what the copy changes', () => {
   });
 
   it('inherits start from a heading carrying [start]', () => {
-    const content = '## Before the first dispatch [start]\n\n- [ ] Sibling clean (`git status`)\n';
+    const content = '## Before the first dispatch [start]\n\n- [ ] Sibling clean: `git status`\n';
     const items = parsePrerequisites(content);
     expect(items.map((item) => [item.tag, item.probe])).toEqual([['start', 'git status']]);
   });
 
   it('keeps a start section over a deeper heading with no tag of its own', () => {
-    const content = '## Start state [start]\n\n### Siblings\n\n- [ ] Sibling clean (`git status`)\n';
+    const content = '## Start state [start]\n\n### Siblings\n\n- [ ] Sibling clean: `git status`\n';
     const items = parsePrerequisites(content);
     expect(items.map((item) => [item.tag, item.probe])).toEqual([['start', 'git status']]);
   });
 
   it('does not read a heading that names a start without brackets as start', () => {
-    const content = '## Starting position, restated at the start\n\n- [ ] Sibling clean (`git status`)\n';
+    const content = '## Starting position, restated at the start\n\n- [ ] Sibling clean: `git status`\n';
     const items = parsePrerequisites(content);
     expect(items.map((item) => [item.tag, item.probe])).toEqual([['human', null]]);
   });
@@ -369,16 +377,16 @@ describe('parsePrerequisites: what the copy changes', () => {
     const content = [
       '## Before the first dispatch [start]',
       '',
-      '- [ ] [auto] Bun (`bun --version`)',
-      '- [ ] [human] Lead approves (`echo approved`)',
+      '- [ ] [auto] Bun: `bun --version`',
+      '- [ ] [human] Lead approves: `echo approved`',
       '',
       '## Checks [auto]',
       '',
-      '- [ ] [start] Sibling clean (`git status`)',
+      '- [ ] [start] Sibling clean: `git status`',
       '',
       '## Manual steps',
       '',
-      '- [ ] [start] Sibling clean again (`git status`)',
+      '- [ ] [start] Sibling clean again: `git status`',
     ].join('\n');
 
     const items = parsePrerequisites(content);
@@ -391,12 +399,12 @@ describe('parsePrerequisites: what the copy changes', () => {
   });
 
   it('reads a heading carrying both [auto] and [start] as auto', () => {
-    const content = '## Checks [auto] [start]\n\n- [ ] Bun (`bun --version`)\n';
+    const content = '## Checks [auto] [start]\n\n- [ ] Bun: `bun --version`\n';
     expect(parsePrerequisites(content).map((item) => item.tag)).toEqual(['auto']);
   });
 
   it('answers a frozen list of frozen items', () => {
-    const items = parsePrerequisites('- [ ] [auto] Bun (`bun --version`)\n');
+    const items = parsePrerequisites('- [ ] [auto] Bun: `bun --version`\n');
     expect(Object.isFrozen(items)).toBe(true);
     expect(Object.isFrozen(items[0])).toBe(true);
   });
@@ -419,10 +427,11 @@ describe('planPrerequisites', () => {
     ]);
   });
 
-  it('maps an auto item with no probe to a reminder tagged auto', () => {
+  it('maps an auto item with no probe to a malformed item, never to a reminder', () => {
     const plan = planPrerequisites('- [ ] [auto] The service is reachable\n');
     expect(plan.required).toEqual([]);
-    expect(plan.reminders).toEqual([
+    expect(plan.reminders).toEqual([]);
+    expect(plan.malformed).toEqual([
       { description: 'The service is reachable', tag: 'auto', line: 1 },
     ]);
   });
@@ -440,14 +449,15 @@ describe('planPrerequisites', () => {
     ]);
   });
 
-  it('reads the same steps as required items once their heading carries [auto]', () => {
+  it('reads the same steps as malformed once their heading carries [auto], running neither quoted name', () => {
     const tagged = OPERATOR_STEPS_FILE.replace(
       '## Operator steps after the plan merges',
       '## Operator steps after the plan merges [auto]',
     );
     const plan = planPrerequisites(tagged);
-    expect(plan.required.map((item) => item.probe)).toEqual(['main', 'npm publish']);
+    expect(plan.required).toEqual([]);
     expect(plan.reminders).toEqual([]);
+    expect(plan.malformed.map((item) => [item.tag, item.line])).toEqual([['auto', 18], ['auto', 20]]);
   });
 
   it('maps a start item with a probe to a start-only required item and never to a required one', () => {
@@ -467,11 +477,12 @@ describe('planPrerequisites', () => {
     expect(plan.startRequired).toEqual([]);
   });
 
-  it('maps a start item with no probe to a reminder tagged start', () => {
+  it('maps a start item with no probe to a malformed item tagged start', () => {
     const plan = planPrerequisites('- [ ] [start] The sibling checkout has nothing uncommitted\n');
     expect(plan.required).toEqual([]);
     expect(plan.startRequired).toEqual([]);
-    expect(plan.reminders).toEqual([
+    expect(plan.reminders).toEqual([]);
+    expect(plan.malformed).toEqual([
       { description: 'The sibling checkout has nothing uncommitted', tag: 'start', line: 1 },
     ]);
   });
@@ -480,10 +491,10 @@ describe('planPrerequisites', () => {
     const content = [
       '## Checks [auto]',
       '',
-      '- [ ] Bun (`bun --version`)',
-      '- [ ] [start] Sibling clean (`git status`)',
-      '- [ ] gh logged in (`gh auth status`)',
-      '- [ ] [start] Tracker absent (`test ! -e tracker`)',
+      '- [ ] Bun: `bun --version`',
+      '- [ ] [start] Sibling clean: `git status`',
+      '- [ ] gh logged in: `gh auth status`',
+      '- [ ] [start] Tracker absent: `test ! -e tracker`',
       '- [ ] [human] Lead approves',
     ].join('\n');
 
@@ -494,7 +505,7 @@ describe('planPrerequisites', () => {
   });
 
   it('answers frozen lists of frozen entries', () => {
-    const plan = planPrerequisites('- [ ] [auto] Bun (`bun --version`)\n- [ ] Backup confirmed\n');
+    const plan = planPrerequisites('- [ ] [auto] Bun: `bun --version`\n- [ ] Backup confirmed\n');
     expect(Object.isFrozen(plan)).toBe(true);
     expect(Object.isFrozen(plan.required)).toBe(true);
     expect(Object.isFrozen(plan.required[0])).toBe(true);
@@ -503,9 +514,64 @@ describe('planPrerequisites', () => {
   });
 
   it('answers a frozen start tier of frozen entries', () => {
-    const plan = planPrerequisites('- [ ] [start] Sibling clean (`git status`)\n');
+    const plan = planPrerequisites('- [ ] [start] Sibling clean: `git status`\n');
     expect(Object.isFrozen(plan.startRequired)).toBe(true);
     expect(Object.isFrozen(plan.startRequired[0])).toBe(true);
+  });
+
+  it('answers a frozen malformed list of frozen entries', () => {
+    const plan = planPrerequisites('- [ ] [auto] `bun --version` answers\n');
+    expect(Object.isFrozen(plan.malformed)).toBe(true);
+    expect(Object.isFrozen(plan.malformed[0])).toBe(true);
+  });
+});
+
+describe('the probe: the one backticked span after the final ": "', () => {
+  /** #140: a package name quoted ahead of the command, which exited 127 when run. */
+  const NPM_LINE = '- [ ] `@open-tomato/define-config` 0.4.0 reachable on npmjs:'
+    + ' `curl -sf https://registry.npmjs.org/@open-tomato%2fdefine-config/0.4.0 -o /dev/null`';
+  const NPM_PROBE = 'curl -sf https://registry.npmjs.org/@open-tomato%2fdefine-config/0.4.0 -o /dev/null';
+
+  /** #140's second repro: the first span IS a command on PATH, and exits 2 for want of arguments. */
+  const UVX_LINE = '- [ ] uv installed, for `uvx check-jsonschema` and `uvx --from actionlint-py actionlint`:'
+    + ' `uvx --version`';
+
+  /** The probes `line` gives under an `[auto]` heading, and the lines of what it holds malformed. */
+  function probesUnderAuto(line: string): { probes: readonly string[]; malformed: readonly number[] } {
+    const plan = planPrerequisites(`## Toolchain [auto]\n\n${line}\n`);
+    return { probes: plan.required.map((item) => item.probe ?? ''), malformed: plan.malformed.map((item) => item.line) };
+  }
+
+  it('runs the command after a quoted package name, where the unquoted name gives the same probe', () => {
+    expect(probesUnderAuto(NPM_LINE)).toEqual({ probes: [NPM_PROBE], malformed: [] });
+    expect(probesUnderAuto(NPM_LINE.replace('`@open-tomato/define-config`', '@open-tomato/define-config')))
+      .toEqual({ probes: [NPM_PROBE], malformed: [] });
+  });
+
+  it('runs the command after quoted commands of its own, where the same item quoting none gives the same probe', () => {
+    expect(probesUnderAuto(UVX_LINE)).toEqual({ probes: ['uvx --version'], malformed: [] });
+    expect(probesUnderAuto('- [ ] uv installed: `uvx --version`')).toEqual({ probes: ['uvx --version'], malformed: [] });
+  });
+
+  it('holds an item with its command first malformed, where the command after a final ": " is run', () => {
+    expect(probesUnderAuto('- [ ] `gh --version` — the GitHub CLI on PATH')).toEqual({ probes: [], malformed: [3] });
+    expect(probesUnderAuto('- [ ] The GitHub CLI on PATH: `gh --version`')).toEqual({ probes: ['gh --version'], malformed: [] });
+  });
+
+  it('holds an item with text after its span malformed, where the span ending the item is run', () => {
+    expect(probesUnderAuto('- [ ] Claude on PATH: `claude --version` measured at 2.1')).toEqual({ probes: [], malformed: [3] });
+    expect(probesUnderAuto('- [ ] Claude on PATH, measured at 2.1: `claude --version`'))
+      .toEqual({ probes: ['claude --version'], malformed: [] });
+  });
+
+  it('keeps a ": " inside the command as part of it', () => {
+    expect(probesUnderAuto('- [ ] JSON served: `curl -sf -H "Accept: application/json" http://localhost:3000`'))
+      .toEqual({ probes: ['curl -sf -H "Accept: application/json" http://localhost:3000'], malformed: [] });
+  });
+
+  it('names a malformed item by its first line when it runs on over several', () => {
+    const plan = planPrerequisites('# Prerequisites\n\n- [ ] [start] `git status` is clean,\n      in the sibling\n');
+    expect(plan.malformed).toEqual([{ description: '`git status` is clean, in the sibling', tag: 'start', line: 3 }]);
   });
 });
 
@@ -563,6 +629,14 @@ describe('mergePlanPrerequisites', () => {
     const settings = configuredSettings();
     expect(mergePlanPrerequisites(settings, PLAN_A).startRequired).toEqual([]);
     expect(mergePlanPrerequisites(settings, null).startRequired).toEqual([]);
+  });
+
+  it('carries the plan malformed items alone, and none for no plan at all', () => {
+    const settings = configuredSettings();
+    const merged = mergePlanPrerequisites(settings, `${PLAN_B}- [ ] [auto] \`npm ping\` answers\n`);
+    expect(merged.required.map((item) => item.probe)).toEqual(['bun --version', 'npm ping']);
+    expect(merged.malformed).toEqual([{ description: '`npm ping` answers', tag: 'auto', line: 2 }]);
+    expect(mergePlanPrerequisites(settings, null).malformed).toEqual([]);
   });
 
   it('answers a new frozen set', () => {

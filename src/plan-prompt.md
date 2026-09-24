@@ -66,7 +66,9 @@ criteria — **do not execute the plan**.
   as a checklist in the PREREQUISITES.md format of the dev-planner
   specification below. Only genuinely non-automatable steps; do not duplicate
   what `README.md`/`AGENTS.md` already require of every contributor. Link to
-  it from the plan.
+  it from the plan. An `[auto]` item holds exactly one backticked span, and
+  that span is its command, ending the item after `: ` and run as written:
+  prove a tool with `<tool> --version`, `<tool> --help` or `which <tool>`.
 * Do not create or touch any tracker file — the loop derives it from the plan.
 
 {PLAN_FORMAT}

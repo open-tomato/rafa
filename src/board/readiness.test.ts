@@ -18,8 +18,9 @@
  *    emptied, one word changed.
  *  - A gate that refuses NOTHING satisfies every negative case. So each
  *    exemption — a fenced placeholder, a backticked one, a lower-case
- *    one, a `rafa:` marker comment, a heading quoted in a fence — sits
- *    beside the body that differs only in the part the rule reads.
+ *    one, a `rafa:` marker comment, a fenced or backticked comment, a
+ *    heading quoted in a fence — sits beside the body that differs
+ *    only in the part the rule reads.
  *
  * The self-reference is a case of its own. This module and its spec
  * quote `TBD`, `TODO` and `???` while describing the check, so a body
@@ -308,17 +309,36 @@ describe('a surviving template comment', () => {
   it('leaves a section holding nothing else reported empty and not twice', () => {
     expect(gapsIn(bodyWith({ Design: '<!-- say what changes -->' }))).toEqual(['empty-heading Design']);
   });
+
+  it('is not reported inside an inline code span, where the bare comment is', () => {
+    expect(findReadinessGaps(bodyWith({ Design: 'three agents each carry `<!-- Source: … -->`' }))).toEqual([]);
+    expect(gapsIn(bodyWith({ Design: 'three agents each carry <!-- Source: … -->' })))
+      .toEqual(['placeholder Design']);
+    expect(findReadinessGaps(bodyWith({ Design: 'Two pure functions. <!-- rafa:spec-review v1 -->' }))).toEqual([]);
+  });
+
+  it('is not reported inside a fenced block, where the same comment outside one is', () => {
+    expect(findReadinessGaps(bodyWith({ Design: 'Prose.\n\n```markdown\n<!-- say what changes -->\n```' })))
+      .toEqual([]);
+    expect(gapsIn(bodyWith({ Design: 'Prose.\n\n<!-- say what changes -->' }))).toEqual(['placeholder Design']);
+  });
+
+  it('left open inside a fenced block does not hide the sections after the fence', () => {
+    const fenced = 'Prose.\n\n```markdown\n<!-- a comment quoted half-way\n```';
+    expect(findReadinessGaps(bodyWith({ Design: fenced }))).toEqual([]);
+  });
 });
 
 describe('a spec written about this check', () => {
   it('passes, quoting every placeholder word and the template itself', () => {
     const body = bodyWith({
       Design: [
-        'No placeholder survives (`TBD`, `TODO`, `???`, an unfilled comment).',
+        'No placeholder survives (`TBD`, `TODO`, `???`, an unfilled `<!-- comment -->`).',
         '',
         '```markdown',
         '## Design',
         '',
+        '<!-- say what changes -->',
         'TODO: say what changes',
         '```',
       ].join('\n'),
