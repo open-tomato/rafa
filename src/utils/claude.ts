@@ -112,6 +112,10 @@
  * the session's stdout. The argument list, the prompt, the environment
  * and the inherited stderr are the same in both modes.
  *
+ * The environment is `sessionSpawnEnv(process.env)` at both doors
+ * (`session-env.ts`), the one function a reading of the session's
+ * environment calls too, so neither door spells an entry of its own.
+ *
  * ## Interrupting a running session
  *
  * Both doors hold the process they spawn among the live sessions until it
@@ -169,6 +173,8 @@ import type { ClaudeSettingSource } from '../config.js';
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { commandSpelling } from '../cli/command.js';
 import { runningCommand } from '../cli/running.js';
+
+import { sessionSpawnEnv } from './session-env.js';
 
 export async function getClaudeUsagePercent(): Promise<number | null> {
   const envPct = process.env['CLAUDE_USAGE_PERCENT'];
@@ -296,24 +302,6 @@ export function interruptClaudeSessions(): number {
 }
 
 /**
- * The environment every session is spawned with: the loop's own, plus
- * the one entry a session must see whichever spawner started it.
- *
- * Shared by {@link spawnClaude} and {@link spawnClaudeCaptured} so the
- * two cannot drift apart. A hook that observed uncaptured sessions and
- * missed captured ones would miss exactly the task sessions.
- */
-function claudeSessionEnv(): Record<string, string | undefined> {
-  return {
-    ...process.env,
-    // Allow ECC continuous-learning hooks to observe ralph sessions.
-    // observe.sh Layer 1 filters on CLAUDE_CODE_ENTRYPOINT — 'cli' is
-    // in the allow-list; the default for -p mode is not.
-    CLAUDE_CODE_ENTRYPOINT: 'cli',
-  };
-}
-
-/**
  * Refused to start a session: the running command's `spends` declaration
  * does not cover this run. See "The spend guard" in the module note.
  */
@@ -390,7 +378,7 @@ export async function spawnClaude(
     stdin: new TextEncoder().encode(prompt),
     stdout: 'inherit',
     stderr: 'inherit',
-    env: claudeSessionEnv(),
+    env: sessionSpawnEnv(process.env),
   });
   liveSessions.add(proc);
   try {
@@ -564,7 +552,7 @@ async function spawnCaptured(
     stdin: new TextEncoder().encode(prompt),
     stdout: 'pipe',
     stderr: 'inherit',
-    env: claudeSessionEnv(),
+    env: sessionSpawnEnv(process.env),
     ...(options.cwd === undefined
       ? {}
       : { cwd: options.cwd }),
