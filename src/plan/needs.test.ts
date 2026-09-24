@@ -1,5 +1,6 @@
 /**
- * Tests for `readPlanNeeds`, `readSpecNeeds` and the readings under them.
+ * Tests for `readPlanNeeds`, `readSpecNeeds`, `readStackNeeds` and the
+ * readings under them.
  *
  * One world is planted under this file's temporary directory: a
  * project, a home, a rafa entry and one `PATH` directory. The plan in
@@ -24,7 +25,9 @@
  * The stack-tools cases plant one small TypeScript project each (a
  * `tsconfig.json`, a one-task plan, its own home and `PATH` directory),
  * so `ts-symbols` present, missing, and its skill only at user level
- * are each read beside the reading that flips them.
+ * are each read beside the reading that flips them. `readStackNeeds`
+ * reads the same worlds with no plan, and is held equal to the stack
+ * part of `readPlanNeeds` over each, so the two cannot drift apart.
  */
 import type { Need, NeedsReading, NeedsSeams } from './needs.js';
 import type { ClaudeSettingSource } from '../config-sections.js';
@@ -43,6 +46,7 @@ import {
   programDirectory,
   readPlanNeeds,
   readSpecNeeds,
+  readStackNeeds,
   STACK_TOOLS,
 } from './needs.js';
 
@@ -486,5 +490,69 @@ describe('the stack-tools table', () => {
 
     expect(reading.stacks).toEqual([]);
     expect(reading.items.map((item) => item.name)).toEqual(['project-reviewer']);
+  });
+});
+
+describe('readStackNeeds', () => {
+  it('reads the stack tools with no plan, as readPlanNeeds reads their stack part', async () => {
+    const world = typescriptWorld('stack-only', { onPath: true, skillAt: 'project' });
+
+    const reading = await readStackNeeds(world.seams(WITHOUT_USER));
+    const planned = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+
+    const origin = { by: 'stack', stack: 'typescript' };
+    expect(reading.items.map((item) => [item.kind, item.name, item.status, item.origins])).toEqual([
+      ['skill', 'ts-symbols-for-agents', 'present', [origin]],
+      ['program', 'ts-symbols', 'present', [origin]],
+    ]);
+    expect(reading.stacks).toEqual(planned.stacks);
+    expect(reading.stacks[0]).toMatchObject({ met: true, hint: null });
+    expect(reading.items).toEqual(planned.items.filter((item) => item.origins.some((o) => o.by === 'stack')));
+  });
+
+  it('leaves out what a plan names: its task agent is no item', async () => {
+    const world = typescriptWorld('stack-no-plan', { onPath: true, skillAt: 'project' });
+
+    const planned = await readPlanNeeds(world.plan, world.seams(WITHOUT_USER));
+    const reading = await readStackNeeds(world.seams(WITHOUT_USER));
+
+    expect(planned.items.some((item) => item.name === 'project-reviewer')).toBe(true);
+    expect(reading.items.some((item) => item.name === 'project-reviewer')).toBe(false);
+  });
+
+  it('reads ts-symbols off PATH as missing and unmet, with the install hint', async () => {
+    const world = typescriptWorld('stack-missing', { onPath: false, skillAt: 'project' });
+
+    const reading = await readStackNeeds(world.seams(WITHOUT_USER));
+
+    expect(reading.items.filter(isUnmet).map((item) => [item.kind, item.name])).toEqual([['program', 'ts-symbols']]);
+    expect(reading.stacks[0]).toMatchObject({ met: false, hint: `typescript: ${STACK_TOOLS[0]?.install}` });
+  });
+
+  it('reads a user-only skill as hidden under settingSources without user, and met with it', async () => {
+    const world = typescriptWorld('stack-user', { onPath: true, skillAt: 'user' });
+
+    const hidden = await readStackNeeds(world.seams(WITHOUT_USER));
+    const shown = await readStackNeeds(world.seams(WITH_USER));
+
+    expect(needOf(hidden, 'skill', 'ts-symbols-for-agents')).toMatchObject({ source: 'user', visibleToLoop: false });
+    expect(hidden.stacks[0]?.met).toBe(false);
+    expect(needOf(shown, 'skill', 'ts-symbols-for-agents')).toMatchObject({ source: 'user', visibleToLoop: true });
+    expect(shown.stacks[0]).toMatchObject({ met: true, hint: null });
+  });
+
+  it('reads no stack and no item for a project root with no marker, or none at all', async () => {
+    const world = typescriptWorld('stack-unmarked', { onPath: true, skillAt: 'project' });
+    const marked = world.seams(WITHOUT_USER);
+    const unmarked = join(base, 'ts-stack-unmarked', 'plain');
+    mkdirSync(unmarked, { recursive: true });
+
+    const control = await readStackNeeds(marked);
+    const plain = await readStackNeeds({ ...marked, projectRoot: unmarked });
+    const rootless = await readStackNeeds({ ...marked, projectRoot: null });
+
+    expect(control.stacks).toHaveLength(1);
+    expect(plain).toMatchObject({ items: [], stacks: [] });
+    expect(rootless).toMatchObject({ items: [], stacks: [] });
   });
 });
