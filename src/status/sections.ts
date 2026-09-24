@@ -90,7 +90,7 @@
  * worktree blocked for being dirty or locked is still idle by that rule.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
+import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
 import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
 import type { BlockedTask } from '../commands/loop/status.js';
 import type { PlanListing } from '../commands/plan/list.js';
@@ -250,6 +250,11 @@ interface NetworkDeadline {
   readonly start: () => void;
   /** Milliseconds left; zero or less once it has passed. */
   readonly left: () => number;
+}
+
+/** True when nothing touched `row` within `cleanup.worktreeIdleDays`: it holds no `recent` blocker. */
+export function isIdleWorktree(row: Pick<WorktreeRow, 'blockers'>): boolean {
+  return !row.blockers.some((blocker) => blocker.kind === 'recent');
 }
 
 /** A section not read, for `problem`. */
@@ -430,7 +435,7 @@ async function readHousekeeping(
     const settings = doctorCleanupSettings({ root: input.root, home: input.home, config: input.config, gh: null }, now);
     const reading = await readCleanup(cleanup, settings);
     if (!reading.ok) return unread(reading.detail);
-    const idle = reading.worktrees.filter((row) => !row.blockers.some((blocker) => blocker.kind === 'recent'));
+    const idle = reading.worktrees.filter((row) => isIdleWorktree(row));
     return read({ counts: cleanupCounts(reading), idleWorktrees: idle.length, notes: reading.notes });
   } catch (error) {
     return unread(messageOf(error));
