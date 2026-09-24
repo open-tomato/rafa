@@ -25,13 +25,13 @@
  * {@link BlockedReading.kind} is one of five words, four of them faults:
  *
  *  - `no-line` — the body carries no `Blocked by:` line.
- *  - `no-ids` — a line is there and names no `#<n>`.
+ *  - `no-ids` — a line is there and names no local `#<n>`.
  *  - `self-reference` — the line names the issue it sits in.
  *  - `unknown-issue` — the line names an id the board has no issue for.
  *  - `blocked` — the only reading a caller may ACT on.
  *
- * A fault still carries what parsed, in {@link BlockedReading.blockers}
- * and {@link BlockedReading.unknown}, because the report names what was
+ * A fault still carries what parsed, in {@link BlockedReading.blockers},
+ * {@link BlockedReading.unknown} and {@link BlockedReading.foreign}, because the report names what was
  * read. It is there to be PRINTED, not to be acted on: an `unblock` run
  * that took a self-referencing line's ids and removed the label would be
  * guessing at exactly the thing the spec says not to guess at. Check
@@ -67,6 +67,29 @@
  * reading. An id repeated is read once, in the order the line first
  * names it.
  *
+ * ## A blocker on another repository
+ *
+ * `Blocked by: #24 open-tomato/agentic-research#12` names two blockers,
+ * and only the first is on this board. An `owner/repo#<n>` token is
+ * kept, exactly as written, in {@link BlockedReading.foreign} and is
+ * NOT read as the local id `#<n>`: reading it that way would wait on
+ * whatever this board numbers 12, or call the line a self-reference
+ * when that number is the issue's own. A foreign token is never checked
+ * against `known` either, since `known` is this board's numbers. The
+ * token is `owner/repo` spelled as GitHub spells them — letters,
+ * digits and `-` for the owner, those plus `.` and `_` for the
+ * repository — with `#<digits>` straight after, and is read once when
+ * repeated, in line order.
+ *
+ * What the kind says is about LOCAL ids alone, so a line naming no
+ * foreign token reads exactly as it did before foreign tokens were
+ * read. A line naming only foreign tokens is `no-ids`, a fault: nothing
+ * on this board can clear it, and a `blocked` reading with no local
+ * blocker would read to `rafa issue unblock` as every blocker closed.
+ * Its fault sentence names the foreign tokens instead of calling the
+ * line empty. A foreign blocker's state is not this module's to ask,
+ * as a local one's is not.
+ *
  * A line inside a fenced block is not the field. That matters more here
  * than it looks: this repository's own specs QUOTE the line while
  * describing it, and a reader that took those would find a spec about
@@ -88,7 +111,7 @@ export type BlockedReadingKind =
   | 'blocked'
   /** The body carries no `Blocked by:` line. */
   | 'no-line'
-  /** A line is there and names no `#<n>`. */
+  /** A line is there and names no local `#<n>`; it may name foreign ones. */
   | 'no-ids'
   /** The line names the issue it sits in. */
   | 'self-reference'
@@ -105,8 +128,10 @@ export interface BlockedReading {
   readonly line: number | null;
   /** What the line said after the colon, trimmed, or null when there is none. */
   readonly text: string | null;
-  /** Every id the line named, deduped and in line order. */
+  /** Every local id the line named, deduped and in line order. */
   readonly blockers: readonly number[];
+  /** Every `owner/repo#<n>` the line named, as written, deduped and in line order. */
+  readonly foreign: readonly string[];
   /** The named ids `known` has no issue for, in line order. */
   readonly unknown: readonly number[];
 }
@@ -119,6 +144,9 @@ const FIELD_LINE = /^ {0,3}(?:[-*+]\s+)?[*_]{0,2}blocked\s+by[*_]{0,2}\s*:(.*)$/
 
 /** An issue id as the line names it; nothing but this counts. */
 const ISSUE_ID = /#(\d+)/gu;
+
+/** An issue on another repository, `owner/repo#<n>`, as GitHub spells the names. */
+const FOREIGN_ID = /[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+#\d+/gu;
 
 /** What an author must do about a fault; one clause, spelled once. */
 const REMEDY = `name them as "${BLOCKED_BY_FIELD}: #24 #26", or take the ${SPEC_BLOCKED_LABEL} label off`;
@@ -167,12 +195,32 @@ function idsIn(text: string): readonly number[] {
   return found;
 }
 
+/** Every `owner/repo#<n>` in `text`, as written, deduped, in line order. */
+function foreignIn(text: string): readonly string[] {
+  const found: string[] = [];
+  for (const [token] of text.matchAll(FOREIGN_ID)) {
+    if (!found.includes(token)) found.push(token);
+  }
+  return found;
+}
+
+/** What a field line named: its local ids and its foreign tokens. */
+interface Named {
+  /** The local ids, deduped, in line order. */
+  readonly ids: readonly number[];
+  /** The foreign tokens, as written, deduped, in line order. */
+  readonly foreign: readonly string[];
+}
+
+/** No ids and no foreign tokens: what a body with no line names. */
+const NAMED_NOTHING: Named = { ids: [], foreign: [] };
+
 /** One reading, spelled. */
 function reading(
   kind: BlockedReadingKind,
   issue: number,
   found: FieldLine | null,
-  blockers: readonly number[],
+  named: Named,
   unknown: readonly number[],
 ): BlockedReading {
   return {
@@ -180,14 +228,16 @@ function reading(
     issue,
     line: found?.number ?? null,
     text: found?.text ?? null,
-    blockers,
+    blockers: named.ids,
+    foreign: named.foreign,
     unknown,
   };
 }
 
 /**
  * The `Blocked by:` line in `body`, read for the issue numbered
- * `issue`: the ids it names, or which of the four faults it is.
+ * `issue`: the local ids and foreign `owner/repo#<n>` tokens it names,
+ * or which of the four faults it is.
  *
  * `known` is the board's issue numbers, open and closed alike, and is
  * optional; the module note holds why an absent one makes no id
@@ -206,19 +256,21 @@ export function readBlockedBy(
   known?: ReadonlySet<number>,
 ): BlockedReading {
   const found = findFieldLine(body);
-  if (found === null) return reading('no-line', issue, null, [], []);
+  if (found === null) return reading('no-line', issue, null, NAMED_NOTHING, []);
 
-  const ids = idsIn(found.text);
-  if (ids.length === 0) return reading('no-ids', issue, found, [], []);
+  const foreign = foreignIn(found.text);
+  const ids = idsIn(found.text.replace(FOREIGN_ID, ' '));
+  const named = { ids, foreign };
+  if (ids.length === 0) return reading('no-ids', issue, found, named, []);
 
   const unknown = known === undefined
     ? []
     : ids.filter((id) => id !== issue && !known.has(id));
 
-  if (ids.includes(issue)) return reading('self-reference', issue, found, ids, unknown);
-  if (unknown.length > 0) return reading('unknown-issue', issue, found, ids, unknown);
+  if (ids.includes(issue)) return reading('self-reference', issue, found, named, unknown);
+  if (unknown.length > 0) return reading('unknown-issue', issue, found, named, unknown);
 
-  return reading('blocked', issue, found, ids, unknown);
+  return reading('blocked', issue, found, named, unknown);
 }
 
 /** `#24 #26`, the way a report names a list of ids. */
@@ -232,6 +284,9 @@ function faultClause(read: BlockedReading): string {
 
   if (read.kind === 'no-line') {
     return `is labelled ${SPEC_BLOCKED_LABEL} and its body carries no "${BLOCKED_BY_FIELD}:" line`;
+  }
+  if (read.kind === 'no-ids' && read.foreign.length > 0) {
+    return `has a "${BLOCKED_BY_FIELD}:" line ${at} naming only issues on other repositories: ${read.foreign.join(' ')}`;
   }
   if (read.kind === 'no-ids') {
     return `has a "${BLOCKED_BY_FIELD}:" line ${at} naming no issue: "${read.text ?? ''}"`;
