@@ -169,6 +169,9 @@ implies for the served directory:
   `--tools` is, so the flag must not come before a token it would
   swallow. `--agents <json>` takes one value. `--plugin-dir` is
   repeatable. This was read from the help, not measured.
+- A skill served under `plugin-dir` would be named `rafa:<name>` in a
+  session. `src/tiers/skill-names.ts` maps between that name and the
+  bare name, and under `add-dir` it returns names unchanged.
 
 Not measured: delivery under setting sources other than
 `project,local`, a served name that collides with a project or user

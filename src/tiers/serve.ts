@@ -53,7 +53,8 @@
  *   - `plugin-dir`: to `<served>/skills/<name>/`, beside a
  *     `<served>/.claude-plugin/plugin.json` naming the plugin
  *     {@link SERVED_PLUGIN_NAME}, handed over as `--plugin-dir <served>`.
- *     Mapping between the bare name and `rafa:<name>` is not done here.
+ *     Mapping between the bare name and `rafa:<name>` is not done here;
+ *     it lives in `src/tiers/skill-names.ts`.
  *
  * Agents go through `--agents <json>` under either delivery, which keeps
  * their bare names. The probe measured that `--plugin-dir` would prefix
