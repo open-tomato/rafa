@@ -125,6 +125,7 @@ import type {
   IssueQuery,
   IssueRef,
   IssueState,
+  IssueType,
   PreflightResult,
   Tracker,
   TrackerCapabilities,
@@ -434,6 +435,28 @@ function labelValue(labels: readonly string[], prefix: string): string | undefin
   return labels.find((label) => label.startsWith(prefix))?.slice(prefix.length);
 }
 
+/**
+ * The type an issue's labels carry: the value of its first `type:`
+ * label when that is one of the port's types, else `code`. `get` answers
+ * it, and the board listing (`src/board/roadmap-board.ts`) reads each
+ * row's type with it, so the two cannot disagree about one issue.
+ */
+export function typeOfLabels(labels: readonly string[]): IssueType {
+  const type = labelValue(labels, GITHUB_LABELS.typePrefix);
+  return isOneOf(ISSUE_TYPES, type)
+    ? type
+    : 'code';
+}
+
+/**
+ * The module an issue's labels carry: the value of its first `module:`
+ * label, else `unassigned`. Read by `get` and by the board listing, as
+ * {@link typeOfLabels} is.
+ */
+export function moduleOfLabels(labels: readonly string[]): string {
+  return labelValue(labels, GITHUB_LABELS.modulePrefix) ?? 'unassigned';
+}
+
 /** The state `get` answers for a viewed issue; see the module note. */
 function stateOf(viewed: ViewedIssue): IssueState {
   if (viewed.state === 'OPEN') return 'todo';
@@ -444,16 +467,13 @@ function stateOf(viewed: ViewedIssue): IssueState {
 
 /** The issue `get` answers for `ref`, from what `gh issue view` wrote. */
 function issueOf(ref: IssueRef, viewed: ViewedIssue): Issue {
-  const type = labelValue(viewed.labels, GITHUB_LABELS.typePrefix);
   const priority = labelValue(viewed.labels, GITHUB_LABELS.priorityPrefix);
   return {
     opt: ref.opt,
     title: viewed.title,
     body: viewed.body,
-    type: isOneOf(ISSUE_TYPES, type)
-      ? type
-      : 'code',
-    module: labelValue(viewed.labels, GITHUB_LABELS.modulePrefix) ?? 'unassigned',
+    type: typeOfLabels(viewed.labels),
+    module: moduleOfLabels(viewed.labels),
     priority: isOneOf(ISSUE_PRIORITIES, priority)
       ? priority
       : null,
