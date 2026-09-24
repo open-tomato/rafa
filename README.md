@@ -108,6 +108,7 @@ the next one, so you rarely have to remember it.
    ```bash
    rafa init
    rafa doctor
+   rafa doctor --deep
    ```
 
    `init` writes `.rafa/config.yaml`, keeps `.rafa/` out of git, and on a
@@ -345,7 +346,7 @@ and a line here is ticked by the change that finishes the feature.
   about them in plain language
 - ✅ The roadmap in one table: what is ready, what blocks it, and what
   already has a plan, a branch or a pull request
-- ⬜ `rafa doctor --deep`: what a loop session and its subagents can
+- ✅ `rafa doctor --deep`: what a loop session and its subagents can
   actually reach — settings, `PATH`, providers and the tools its stack needs
 - ⬜ Clean up merged, stale and unpushed branches and idle worktrees
 - ⬜ `rafa status`: everything in one snapshot, and one line about what
