@@ -119,8 +119,19 @@
  * nothing and refuses nothing: `loop start`'s preflight and `rafa plan
  * validate` are where such a name stops a run, and a missing name no
  * user definition carries is left to them, having no vendor fix to
- * name. On a fresh project `plan.dir` holds no plan and nothing is
- * warned.
+ * name. A name the rafa tier holds is never warned about either,
+ * even under `tiers.rafa: off`: its fix is that setting, and the
+ * preflight names it. On a fresh project `plan.dir` holds no plan and
+ * nothing is warned.
+ *
+ * ## Nothing under `.claude/`
+ *
+ * `init` writes nothing under `.claude/`, the project's or the home's.
+ * rafa's own agents and skills are its rafa tier, `bundled/` beside the
+ * entry, served per session (`src/tiers/serve.ts`), so a new project
+ * routes to the core roster with no copy made. The one command that
+ * does copy an agent into `.claude/agents` is `rafa agent vendor`,
+ * which only the warning above names and which `init` never runs.
  *
  * ## What it prints
  *
@@ -136,9 +147,10 @@
  *
  * ## Seams
  *
- * The working directory, the home, whether standard input is a terminal,
- * the prompter, the roots filesystem, the git probe, the `origin` probe
- * and the `gh` runner are {@link InitSeams}. The terminal and the
+ * The working directory, the home, the entry the rafa tier sits beside,
+ * whether standard input is a terminal, the prompter, the roots
+ * filesystem, the git probe, the `origin` probe and the `gh` runner are
+ * {@link InitSeams}. The terminal and the
  * prompter are what the release step and the board step ask through. The registered command
  * reads `process.cwd()`, `homedir()` and `process.stdin`, prompts on
  * stderr, and spawns git and `gh` in the root. The writes go to the
@@ -191,6 +203,8 @@ export interface InitSeams {
   readonly cwd: () => string;
   /** The home directory, absolute: the user scope's base, and the base of both bin directories. */
   readonly home: () => string;
+  /** The entry whose `bundled/agents` is the rafa tier the agent warning reads. */
+  readonly entry: () => string;
   /** True when an answer can be read from a terminal. */
   readonly isTerminal: () => boolean;
   /** Opens the prompter the candidates are listed and answers read through. Called only to prompt. */
@@ -209,6 +223,7 @@ export interface InitSeams {
 export const DEFAULT_INIT_SEAMS: InitSeams = Object.freeze({
   cwd: () => process.cwd(),
   home: () => homedir(),
+  entry: () => Bun.main,
   isTerminal: () => process.stdin.isTTY === true,
   openPrompter: () => createLinePrompter(process.stdin, process.stderr),
   fs: DISK_ROOTS_FILE_SYSTEM,
@@ -235,7 +250,7 @@ export interface InitResult {
   readonly trackingNotice: boolean;
   /** Where `~/.rafa/bin` sits on the `PATH` handed in. */
   readonly binPath: BinPathReading;
-  /** Each agent a plan under `plan.dir` routes to that resolves only in `~/.claude/agents`. */
+  /** Each agent a plan under `plan.dir` routes to that resolves only in `~/.claude/agents` and rafa does not ship. */
   readonly vendorableAgents: readonly VendorableAgent[];
   /** What the release step came to: the setting it wrote, or why it wrote none (`./init-release.ts`). */
   readonly release: ReleaseStepResult;
@@ -411,7 +426,7 @@ interface ScopesWritten {
 }
 
 /** Checks, then writes, the scopes for `root`; see the module note for the order. */
-function initialise(root: ChosenRoot, start: string, home: string, context: RafaContext): ScopesWritten {
+function initialise(root: ChosenRoot, start: string, home: string, context: RafaContext, entry: string): ScopesWritten {
   const warn = (message: string): void => {
     context.output.warn(message);
   };
@@ -440,6 +455,7 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
         home,
         planDir: config.planDir,
         settings: config,
+        entry,
       }),
     },
     config,
@@ -533,7 +549,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   const start = seams.cwd();
   const home = seams.home();
   const root = await chooseRoot(context, seams, start, home, yes);
-  const scopes = initialise(root, start, home, context);
+  const scopes = initialise(root, start, home, context, seams.entry());
   const release = await releaseStep(scopes, wantsRelease, yes, seams);
   const board = await boardStep(scopes, wantsBoard, seams);
   const result: InitResult = {
@@ -568,8 +584,8 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' `tracking` settings; under the home it writes `~/.rafa/config.yaml` and `~/.rafa/instincts/` when'
       + ' they are missing. Only what is missing or stale is written, so a rerun changes no byte and says'
       + ' so. It warns when `~/.rafa/bin` is not on PATH ahead of `~/.bun/bin`, and when a plan under'
-      + ' `plan.dir` routes to an agent that resolves only in `~/.claude/agents`, naming'
-      + ' `rafa agent vendor <name>`. A repository whose pull request provider is `gh` ends with one'
+      + ' `plan.dir` routes to an agent that resolves only in `~/.claude/agents` and rafa does not ship,'
+      + ' naming `rafa agent vendor <name>`; it writes nothing under `.claude/` itself. A repository whose pull request provider is `gh` ends with one'
       + ' question about setting up the GitHub board, which `--board` and `--no-board` answer for a'
       + ' script. On a terminal it also asks once whether every pull request bumps the version and gains'
       + ' a changelog entry, and writes the answer as `release.enabled`; `--release` and `--no-release`'

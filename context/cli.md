@@ -486,7 +486,10 @@ New; it replaces no earlier text. What a row or an action added to
   only in `~/.claude/agents` under the resolved `loop.settingSources`,
   naming each plan, its lines and `rafa agent vendor <name>`
   (`src/agents/vendorable.ts`); a missing agent no user definition
-  carries is left to the preflight, which refuses on it. In json mode the
+  carries is left to the preflight, which refuses on it, and so is a
+  name the rafa tier holds, even under `tiers.rafa: off`, whose fix is
+  the setting and not a copy. `init` writes nothing under `.claude/`,
+  in the project or the home. In json mode the
   result's `data` holds the root, its source, the working directory,
   whether the config existed, every path checked with its change, that
   reading, those vendorable uses, and what the release step and the

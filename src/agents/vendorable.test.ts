@@ -11,8 +11,10 @@
  * The claim under test is a narrowing — only a missing name the home
  * defines is answered — so each narrowing case carries the control that
  * makes it fail: the same plan under the same roots with the one fact
- * changed (the definition present, the sources naming `user`, the rafa
- * tier switched off, the task ticked) answers the other way. Each world
+ * changed (the definition present, the sources naming `user`, the task
+ * ticked) answers the other way. A name the rafa tier holds is answered
+ * neither served nor under `tiers.rafa: off`, and its control is a name
+ * rafa does not ship, planted in the same home and answered. Each world
  * carries a rafa entry of its own, so the checkout's `src/bundled/agents`
  * is never the rafa tier a case reads.
  */
@@ -132,9 +134,10 @@ describe('vendorableAgents', () => {
     expect(scan({ ...world, repoRoot: join(world.repoRoot, 'elsewhere') })).toEqual([]);
   });
 
-  it('says nothing when the rafa tier serves the name, and answers it once tiers.rafa is off', () => {
+  it('says nothing about a name the rafa tier holds, served or unloaded by tiers.rafa: off', () => {
     const world = freshWorld();
     plantAgent(world.home, 'tdd-guide');
+    plantAgent(world.home, 'rust-reviewer');
     const bundled = join(world.entry, '..', 'bundled', 'agents');
     mkdirSync(bundled, { recursive: true });
     writeFileSync(
@@ -142,10 +145,13 @@ describe('vendorableAgents', () => {
       ['---', 'name: tdd-guide', 'description: Writes the tests first.', '---', 'Body.', ''].join('\n'),
       'utf8',
     );
-    plantPlan(world, 'PLAN.md', ['- [ ] Write the module {agent=tdd-guide}']);
+    plantPlan(world, 'PLAN.md', [
+      '- [ ] Write the module {agent=tdd-guide}',
+      '- [ ] Review the crate {agent=rust-reviewer}',
+    ]);
 
-    expect(scan(world)).toEqual([]);
-    expect(scan(world, WITHOUT_USER, { tiersRafa: 'off' }).map((agent) => agent.fix)).toEqual([`${VENDOR_COMMAND} tdd-guide`]);
+    expect(scan(world).map((agent) => agent.name)).toEqual(['rust-reviewer']);
+    expect(scan(world, WITHOUT_USER, { tiersRafa: 'off' }).map((agent) => agent.fix)).toEqual([`${VENDOR_COMMAND} rust-reviewer`]);
   });
 
   it('says nothing when the sources load the user scope, where the name resolves', () => {
