@@ -20,9 +20,12 @@
  * machine's `~/.claude/agents`; the first of them asserts both resolve
  * under this file's scratch directory. Each reading that halts on a
  * missing agent sits beside a control differing in one thing only — the
- * sources loaded, the project's definitions, the checkbox of the line,
- * or which of the plan and the tracker exists — so a check applied to
- * everything reddens the control.
+ * sources loaded, `tiers.rafa`, a `tiers.agents` entry, the project's
+ * definitions, the checkbox of the line, or which of the plan and the
+ * tracker exists — so a check applied to everything reddens the control.
+ * Every case but one leaves the rafa entry out, so the tier sits beside
+ * this file under `bun test` (`Bun.main`), where no `bundled/agents`
+ * exists; the one that hands an entry plants the tier it reads.
  *
  * Twenty-nine mutations were driven against this file on 2026-09-15, 25
  * of `start/preflight.ts` and 4 of the notice in `start/dispatch.ts`, each
@@ -881,18 +884,20 @@ describe('the agent roster check', () => {
 
     expect(run.refusal?.exitCode).toBe(1);
     expect(run.refusal?.message.split('\n')).toEqual([
-      `❌ Refusing to start: PLAN-${STUB}.md names 2 agent(s) no loaded scope defines`
-        + ' (loop.settingSources: project, local).',
-      '   agent "tdd-guide" (line 3) resolves under no loaded scope: run `rafa agent vendor tdd-guide`',
-      '   agent "no-such-agent" (lines 4, 6) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
+      `❌ Refusing to start: PLAN-${STUB}.md names 2 agent(s) no loaded tier serves`
+        + ' (loop.settingSources: project, local; tiers.rafa: on).',
+      '   agent "tdd-guide" (line 3) cannot be dispatched: agent tdd-guide is held only by the user tier'
+        + ` (${join(home, '.claude', 'agents', 'tdd-guide.md')}), which loop.settingSources (project, local) leaves out:`
+        + ' add user to loop.settingSources, or run `rafa agent vendor tdd-guide`',
+      '   agent "no-such-agent" (lines 4, 6) cannot be dispatched: agent no-such-agent is held by no tier:'
+        + ' no project, rafa or user definition carries it, and it is no built-in agent',
       '   Nothing was checked and nothing was dispatched.',
     ]);
     expect([run.probes, run.info, run.warn]).toEqual([[], [], []]);
     expect(existsSync(sqliteStorePath(root))).toBe(false);
 
     // Under `user` only `no-such-agent` is left, so the halt is the roster's and not the sources'.
-    expect(control.refusal?.message).toContain('names 1 agent(s) no loaded scope defines');
+    expect(control.refusal?.message).toContain('names 1 agent(s) no loaded tier serves');
     expect(control.refusal?.message).not.toContain('"tdd-guide"');
     expect([root, home].every((planted) => planted.startsWith(tempRoot))).toBe(true);
   });
@@ -969,9 +974,36 @@ describe('the agent roster check', () => {
     });
 
     expect(CONFIG_DEFAULTS.settingSources).toEqual(['project', 'local']);
-    expect(defaulted.refusal?.message).toContain('(loop.settingSources: project, local).');
+    expect(defaulted.refusal?.message).toContain('(loop.settingSources: project, local; tiers.rafa: on).');
     expect(defaulted.refusal?.message).toContain('run `rafa agent vendor tdd-guide`');
     expect(loadingUser.refusal).toBeNull();
+  });
+
+  it('resolves the tier switch, the pins and the rafa entry the run was configured with', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    const entry = join(freshHome(), 'dist', 'cli.js');
+    const bundled = join(entry, '..', 'bundled', 'agents');
+    mkdirSync(bundled, { recursive: true });
+    writeFileSync(join(bundled, 'from-rafa.md'), '---\nname: from-rafa\ndescription: Planted.\n---\nBody.\n', 'utf8');
+    plantAgent(root, 'in-the-project');
+    writeFileSync(planPathIn(root), '- [ ] Write it  {agent=in-the-project}\n- [ ] Test it  {agent=from-rafa}\n', 'utf8');
+    const sources = ['project', 'local'] as const;
+
+    const served = await drive(root, settingsOf([], []), {}, { agents: { settingSources: sources, home, entry } });
+    const rafaOff = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: sources, tiersRafa: 'off', home, entry },
+    });
+    const switchedOff = await drive(root, settingsOf([], []), {}, {
+      agents: { settingSources: sources, tiersAgents: new Map([['in-the-project', false]]), home, entry },
+    });
+
+    expect(served.refusal).toBeNull();
+    expect(rafaOff.refusal?.message).toContain('names 1 agent(s) no loaded tier serves (loop.settingSources: project, local; tiers.rafa: off).');
+    expect(rafaOff.refusal?.message).toContain('"from-rafa" (line 2)');
+    expect(switchedOff.refusal?.message).toContain('"in-the-project" (line 1) cannot be dispatched:'
+      + ' agent in-the-project is switched off by tiers.agents: { in-the-project: false }');
+    expect(switchedOff.refusal?.message).not.toContain('"from-rafa"');
   });
 
   it('halts on the roster before any probe runs, where the probe would halt the run too', async () => {
@@ -988,7 +1020,7 @@ describe('the agent roster check', () => {
       agents: { settingSources: ['project', 'local'], home },
     });
 
-    expect(run.refusal?.message).toContain('names 1 agent(s) no loaded scope defines');
+    expect(run.refusal?.message).toContain('names 1 agent(s) no loaded tier serves');
     expect(run.probes).toEqual([]);
     expect(control.refusal?.message).toContain('preflight halted');
     expect(control.probes).toEqual([`bun --version in ${root}`]);

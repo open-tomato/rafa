@@ -19,10 +19,13 @@
  *   2. **Checks the agent roster**, before any item is read and any
  *      probe is run, through `agents/roster.ts`: every `agent=` the
  *      still-to-run tasks of this run's checklist ask for, against the
- *      names a session under `agents.settingSources` would resolve. A
- *      name none of them answers refuses the run, because the dispatch
- *      it is routed to exits 1 before any model call
- *      (`context/workflow.md`). The tasks read are the ones the
+ *      names the three tiers serve a session under the run's
+ *      `loop.settingSources`, `tiers.rafa` and pins (`resolveTiers`), and
+ *      the built-ins. A name that does not resolve, is switched off with
+ *      `false`, or is held by two loaded tiers with different contents
+ *      refuses the run, because the dispatch it is routed to exits 1
+ *      before any model call (`context/workflow.md`), or would run on
+ *      a holder the plan did not choose. The tasks read are the ones the
  *      dispatcher will reach, a line a `rafa:*` block the document never
  *      closed hides included: `findNextTask` runs such a line, so the
  *      roster check reads it too (`PlanModel.hiddenTasks`), and the
@@ -91,15 +94,22 @@
  * sentence about where the rows went.
  *
  * An unresolvable agent refuses before any of that, naming the document
- * it read, the sources it resolved under, and every missing name with
- * the line that asked for it and the command that would fix it
- * (`missingAgentLine`):
+ * it read, the settings it resolved under, and every missing name with
+ * the line that asked for it, why, and the pin line or setting that
+ * settles it (`missingAgentLine`):
  *
- *     ❌ Refusing to start: PLAN_TRACKER-demo.md names 1 agent(s) no
- *        loaded scope defines (loop.settingSources: project, local).
- *        agent "tdd-guide" (line 7) resolves under no loaded scope:
- *        run `rafa agent vendor tdd-guide`
+ *     ❌ Refusing to start: PLAN-demo.md names 1 agent(s) no loaded
+ *        tier serves (loop.settingSources: project, local; tiers.rafa: on).
+ *        agent "tdd-guide" (line 5) cannot be dispatched: agent
+ *        tdd-guide is held by 2 loaded tiers with different contents:
+ *        project <root>/.claude/agents/tdd-guide.md and rafa
+ *        <dist>/bundled/agents/tdd-guide.md; pin the tier that serves
+ *        it: tiers.agents: { tdd-guide: project }
  *        Nothing was checked and nothing was dispatched.
+ *
+ * That is a reading, wrapped here, of a project and a rafa tier holding
+ * `tdd-guide` with different bodies, taken on 2026-09-24. The other
+ * reasons, and their sentences, are `agents/roster.ts`'s.
  *
  * A malformed item in the plan's PREREQUISITES file refuses before any
  * probe too, naming each by its line and the one shape a probed item
@@ -175,6 +185,7 @@ import type {
   PrerequisiteSettings,
 } from '../preflight/prerequisites-md.js';
 import type { PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
+import type { TierSettings } from '../tiers/resolve.js';
 
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -212,8 +223,16 @@ export interface StartPreflightAgents {
    * as the run resolved it. The config default when left out.
    */
   readonly settingSources?: readonly ClaudeSettingSource[];
-  /** The home whose `.claude/agents` loads under `user`. `homedir()` when left out. */
+  /** `tiers.rafa` as the run resolved it. The config default when left out. */
+  readonly tiersRafa?: TierSettings['tiersRafa'];
+  /** `tiers.skills` as the run resolved it. The config default when left out. */
+  readonly tiersSkills?: TierSettings['tiersSkills'];
+  /** `tiers.agents` as the run resolved it. The config default when left out. */
+  readonly tiersAgents?: TierSettings['tiersAgents'];
+  /** The home whose `.claude/agents` is the user tier. `homedir()` when left out. */
   readonly home?: string;
+  /** The entry the rafa tier sits beside. `Bun.main` when left out. */
+  readonly entry?: string;
 }
 
 /**
@@ -288,22 +307,34 @@ function readIfReadable(path: string): string | null {
 }
 
 /**
- * Refuses the run when a still-to-run task routes to an agent no scope
- * the run loads defines, naming each with its fix; see the module note.
+ * Refuses the run when a still-to-run task routes to an agent no loaded
+ * tier serves, naming each with what settles it; see the module note.
  */
 function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   const path = agentSourcePath(options.planPath);
   const markdown = readIfReadable(path);
   if (markdown === null) return;
 
-  const settingSources = options.agents?.settingSources ?? CONFIG_DEFAULTS.settingSources;
-  const roots = { repoRoot: options.repoRoot, home: options.agents?.home ?? homedir() };
-  const missing = missingPlanAgents(markdown, resolveAgentRoster(roots, settingSources));
+  const agents = options.agents ?? {};
+  const settings: TierSettings = {
+    settingSources: agents.settingSources ?? CONFIG_DEFAULTS.settingSources,
+    tiersRafa: agents.tiersRafa ?? CONFIG_DEFAULTS.tiersRafa,
+    tiersSkills: agents.tiersSkills ?? CONFIG_DEFAULTS.tiersSkills,
+    tiersAgents: agents.tiersAgents ?? CONFIG_DEFAULTS.tiersAgents,
+  };
+  const roots = {
+    repoRoot: options.repoRoot,
+    home: agents.home ?? homedir(),
+    ...(agents.entry === undefined
+      ? {}
+      : { entry: agents.entry }),
+  };
+  const missing = missingPlanAgents(markdown, resolveAgentRoster(roots, settings));
   if (missing.length === 0) return;
 
   throw new CommandExit(1, [
-    `❌ Refusing to start: ${basename(path)} names ${missing.length} agent(s) no loaded scope`
-      + ` defines (loop.settingSources: ${settingSources.join(', ')}).`,
+    `❌ Refusing to start: ${basename(path)} names ${missing.length} agent(s) no loaded tier`
+      + ` serves (loop.settingSources: ${settings.settingSources.join(', ')}; tiers.rafa: ${settings.tiersRafa}).`,
     ...missing.map((agent) => `   ${missingAgentLine(agent)}`),
     '   Nothing was checked and nothing was dispatched.',
   ].join('\n'));

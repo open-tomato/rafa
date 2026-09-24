@@ -24,9 +24,12 @@
  * Beside the parser's issues, the command checks the `agent=` of every
  * still-to-run task against the agents a session would resolve
  * (`agents/roster.ts`), which is the check `loop start`'s preflight
- * halts on (`start/preflight.ts`): a name no loaded scope defines stops
- * that task's dispatch with exit code 1 before any model call, so a plan
- * carrying one does not run however well it parses.
+ * halts on (`start/preflight.ts`): a name no loaded tier serves — held
+ * by no tier, switched off with `false`, held only by a tier the session
+ * does not load, or held by two loaded tiers with different contents —
+ * stops that task's dispatch with exit code 1 before any model call, or
+ * would run it on a holder nobody chose, so a plan carrying one does not
+ * run however well it parses.
  *
  * The tasks checked are the ones the DISPATCHER will reach rather than
  * the ones the model holds, so a task line a `rafa:*` block the plan
@@ -36,8 +39,11 @@
  * `tasks` counts — while `findNextTask` dispatches it all the same.
  *
  * The roster is resolved against the project the dispatcher found from
- * the working directory and the config that resolves there, whose
- * `loop.settingSources` decides whether `~/.claude/agents` is in reach.
+ * the working directory and the config that resolves there: its
+ * `loop.settingSources` decides whether `~/.claude/agents` is in reach,
+ * `tiers.rafa` whether rafa's own tier is, and `tiers.agents` which
+ * names are off or pinned. The rafa tier is the one beside the running
+ * entry.
  * A config `loadConfig` refuses is refused with exit code 1. Handed no
  * project, the command says so and checks no agent, since it needs no
  * repository to read a plan; that is why the check is the command's and
@@ -55,8 +61,8 @@
  * counting from one: a `log` event in json mode, an `error: ` line on
  * stdout in text mode. Each missing agent follows them, at `error` too,
  * as `<file>: <the line `missingAgentLine` words>`, which names the
- * agent, the task lines that asked for it and the command that would fix
- * it or that no user definition carries the name. The command then
+ * agent, the task lines that asked for it, why it cannot be dispatched,
+ * and the pin line or setting that settles it. The command then
  * throws `CommandExit` with exit code 1 and a message counting what it
  * found, which text mode writes to stderr and json mode carries in the
  * terminal result.
@@ -102,7 +108,7 @@ export interface PlanValidation {
 
 /** A plan file read, with the agents of its still-to-run tasks checked. */
 export interface PlanValidationResult extends PlanValidation {
-  /** Every `agent=` no loaded scope defines, each with its fix; empty when no project was found. */
+  /** Every `agent=` no loaded tier serves, each with why; empty when no project was found. */
   readonly missingAgents: readonly MissingAgent[];
 }
 
@@ -127,8 +133,8 @@ function resolvedConfig(project: ProjectFound, warn: (message: string) => void):
 }
 
 /**
- * The `agent=` of the plan's still-to-run tasks that no scope the project
- * loads defines. None, with one line saying so, when the command was
+ * The `agent=` of the plan's still-to-run tasks that no tier the project
+ * loads serves. None, with one line saying so, when the command was
  * handed no project; see the module note.
  */
 function checkAgents(context: RafaContext, markdown: string): readonly MissingAgent[] {
@@ -138,11 +144,11 @@ function checkAgents(context: RafaContext, markdown: string): readonly MissingAg
     return [];
   }
 
-  const { settingSources } = resolvedConfig(project, (message) => {
+  const config = resolvedConfig(project, (message) => {
     context.output.warn(message);
   });
   const roots = { repoRoot: project.root, home: project.home };
-  return missingPlanAgents(markdown, resolveAgentRoster(roots, settingSources));
+  return missingPlanAgents(markdown, resolveAgentRoster(roots, config));
 }
 
 /** The refusal a plan with issues, missing agents or both ends with. */
@@ -170,10 +176,12 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
     summary: 'check that a plan file reads as written and routes to agents that resolve, starting no session',
     description: 'Reads one plan file with the plan parser, the rafa:* blocks and the checklist, and starts'
       + ' no session. When the parser reads the whole file as written, and every `agent=` of its'
-      + ' still-to-run tasks resolves for a session spawned under `loop.settingSources`, it prints the'
-      + ' stages and the tasks counted by checkbox. Otherwise it writes every issue the parser reported as'
-      + ' an error line naming the file, the line and the reason, then one line per agent no loaded scope'
-      + ' defines with the `rafa agent vendor` command that would fix it, then exits 1 — the same check'
+      + ' still-to-run tasks resolves for a session spawned under `loop.settingSources`, `tiers.rafa` and'
+      + ' `tiers.agents`, it prints the stages and the tasks counted by checkbox. Otherwise it writes every'
+      + ' issue the parser reported as an error line naming the file, the line and the reason, then one'
+      + ' line per agent no loaded tier serves, saying why (held by no tier, switched off, held only by a'
+      + ' tier the session does not load, or held by two tiers with different contents) and naming the'
+      + ' paths and the pin line or setting that settles it, then exits 1 — the same check'
       + ' `rafa loop start` halts on before it dispatches anything. The path is read relative to the'
       + ' working directory; the agents are read from the project found from it and the config that'
       + ' resolves there, and are left unchecked when there is no project. With `--output=json` each issue'

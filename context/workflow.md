@@ -47,11 +47,16 @@ answer both questions from one column.
 makes a wrong row something a test can find rather than a silent
 downgrade: an unresolvable agent exits 1 with NO JSON at all and the
 whole roster on stderr, before any model call. `loop start` no longer
-waits for that: its preflight resolves the roster from the same two
-`.claude/agents` directories and refuses the run, ahead of every
-prerequisite probe, when a still-to-run task of the plan or the tracker
-names an agent no loaded scope defines (`src/start/preflight.ts`).
-`rafa plan validate` runs the same check and exits 1 on the same plan.
+waits for that: its preflight resolves the roster from the three agent
+tiers, the project's and the home's `.claude/agents` and rafa's own
+`bundled/agents`, through `resolveTiers` (`src/agents/roster.ts`), and
+refuses the run, ahead of every prerequisite probe, when a still-to-run
+task of the plan or the tracker names an agent no loaded tier serves:
+one no tier holds, one `tiers.agents` switches off, one only an unloaded
+tier holds, or one two loaded tiers hold with different contents, whose
+refusal names both paths and the pin line that settles it
+(`src/start/preflight.ts`). `rafa plan validate` runs the same check and
+exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies
 both.** A declaration carrying an agent never passes `--model` or

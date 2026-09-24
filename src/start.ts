@@ -89,9 +89,10 @@
  * prompt carries after its plan text, with one sentence saying such an
  * item is neither a bug to fix nor a credential to patch around. Ahead
  * of every probe, the same preflight refuses a run whose checklist
- * routes a still-to-run task to an `agent=` no scope
- * `loop.settingSources` loads defines, since that dispatch would exit 1
- * before any model call.
+ * routes a still-to-run task to an `agent=` no loaded tier serves under
+ * `loop.settingSources`, `tiers.rafa` and the pins: one no tier holds,
+ * one switched off, or one two tiers hold with different contents. That
+ * dispatch would exit 1 before any model call.
  *
  * Each task session is spawned under an id the loop picks, with its stdout
  * captured (`start/dispatch.ts`). The exit code alone decides `failed`; a
@@ -494,7 +495,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       planPath,
       settings: runConfig.config,
       newRunId: () => session.id,
-      agents: { settingSources, home: homedir() },
+      agents: {
+        settingSources,
+        tiersRafa: runConfig.config.tiersRafa,
+        tiersSkills: runConfig.config.tiersSkills,
+        tiersAgents: runConfig.config.tiersAgents,
+        home: homedir(),
+      },
     });
 
     // What each session, task and wrap-up alike, is served against: the

@@ -3,20 +3,20 @@
  * `~/.claude/agents`, and the warning `rafa init` writes about them.
  *
  * `start/preflight.ts` and `rafa plan validate` REFUSE on an `agent=`
- * no loaded scope defines, because a run that starts on one exits 1 at
+ * no loaded tier serves, because a run that starts on one exits 1 at
  * the first dispatch with no JSON at all. `init` is earlier than both
  * and writes rather than dispatches, so it only warns: the project is
  * set up whatever its plans route to, exactly as the `PATH` check warns
  * and never refuses.
  *
  * The warning is narrower than the refusals on purpose. It names only a
- * missing agent {@link vendorFixCommand} answers for — one
- * `~/.claude/agents` defines under the same name, which under the
+ * missing agent the roster gives a vendor command (`MissingAgent.fix`):
+ * one only the user tier, `~/.claude/agents`, holds, which under the
  * resolved `loop.settingSources` the run does not load, so
- * `rafa agent vendor <name>` would make it resolve. A name no user file
- * carries has no such fix, and `init` says nothing about it: it is a
- * typo or an agent yet to be written, and the preflight is where it is
- * refused with its lines.
+ * `rafa agent vendor <name>` would make it resolve. A name the rafa tier
+ * serves is not missing at all. A name no tier holds, one switched off
+ * and one two tiers collide on have no such fix, and `init` says nothing
+ * about them: the preflight is where each is refused with its lines.
  *
  * ## What is scanned
  *
@@ -32,7 +32,7 @@
  * where `plan.dir` is a directory `init` itself is about to create —
  * warns about nothing.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { TierSettings } from '../tiers/resolve.js';
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
@@ -59,8 +59,10 @@ export interface VendorableScan {
   readonly home: string;
   /** The config's `plan.dir`, absolute or relative to the root. */
   readonly planDir: string;
-  /** `loop.settingSources` as the config resolved it. */
-  readonly settingSources: readonly ClaudeSettingSource[];
+  /** `loop.settingSources`, `tiers.rafa` and the pins as the config resolved them; a `RafaConfig` is one. */
+  readonly settings: TierSettings;
+  /** The entry the rafa tier sits beside. `Bun.main` when left out. */
+  readonly entry?: string;
 }
 
 /** The `.md` files directly under `dir`, sorted, or none when it is unreadable. */
@@ -96,7 +98,14 @@ export function vendorableAgents(scan: VendorableScan): readonly VendorableAgent
   const dir = isAbsolute(scan.planDir)
     ? scan.planDir
     : join(scan.repoRoot, scan.planDir);
-  const roster = resolveAgentRoster({ repoRoot: scan.repoRoot, home: scan.home }, scan.settingSources);
+  const roots = {
+    repoRoot: scan.repoRoot,
+    home: scan.home,
+    ...(scan.entry === undefined
+      ? {}
+      : { entry: scan.entry }),
+  };
+  const roster = resolveAgentRoster(roots, scan.settings);
   const found: VendorableAgent[] = [];
 
   for (const file of planFiles(dir)) {

@@ -11,16 +11,21 @@
  * The claim under test is a narrowing — only a missing name the home
  * defines is answered — so each narrowing case carries the control that
  * makes it fail: the same plan under the same roots with the one fact
- * changed (the definition present, the sources naming `user`, the task
- * ticked) answers the other way.
+ * changed (the definition present, the sources naming `user`, the rafa
+ * tier switched off, the task ticked) answers the other way. Each world
+ * carries a rafa entry of its own, so the checkout's `src/bundled/agents`
+ * is never the rafa tier a case reads.
  */
 import type { ClaudeSettingSource } from '../config.js';
+import type { TierSettings } from '../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { CONFIG_DEFAULTS } from '../config.js';
 
 import { VENDOR_COMMAND } from './roster.js';
 import { vendorableAgentLine, vendorableAgents, vendorableAgentWarnings } from './vendorable.js';
@@ -42,17 +47,19 @@ afterAll(() => {
 
 let planted = 0;
 
-/** One case's world: a repo root, a home, and nothing written yet. */
+/** One case's world: a repo root, a home, a rafa entry, and nothing written yet. */
 interface World {
   readonly repoRoot: string;
   readonly home: string;
+  /** The entry whose `bundled/agents` is the rafa tier, so the checkout's own is never read. */
+  readonly entry: string;
 }
 
 /** A fresh world under this file's temporary directory. */
 function freshWorld(): World {
   planted += 1;
   const base = join(tempBase, `case-${String(planted)}`);
-  return { repoRoot: join(base, 'repo'), home: join(base, 'home') };
+  return { repoRoot: join(base, 'repo'), home: join(base, 'home'), entry: join(base, 'dist', 'cli.js') };
 }
 
 /** Writes `<root>/.claude/agents/<name>.md` carrying that frontmatter `name`. */
@@ -71,13 +78,25 @@ function plantPlan(world: World, file: string, lines: readonly string[]): string
   return path;
 }
 
+/** The config defaults' tier settings under `sources`, with `changes` over them. */
+function settingsFor(sources: readonly ClaudeSettingSource[], changes: Partial<TierSettings> = {}): TierSettings {
+  return {
+    settingSources: sources,
+    tiersRafa: CONFIG_DEFAULTS.tiersRafa,
+    tiersSkills: CONFIG_DEFAULTS.tiersSkills,
+    tiersAgents: CONFIG_DEFAULTS.tiersAgents,
+    ...changes,
+  };
+}
+
 /** The scan's answer for `world` under `sources`. */
-function scan(world: World, sources: readonly ClaudeSettingSource[] = WITHOUT_USER) {
+function scan(world: World, sources: readonly ClaudeSettingSource[] = WITHOUT_USER, changes: Partial<TierSettings> = {}) {
   return vendorableAgents({
     repoRoot: world.repoRoot,
     home: world.home,
+    entry: world.entry,
     planDir: PLAN_DIR,
-    settingSources: sources,
+    settings: settingsFor(sources, changes),
   });
 }
 
@@ -111,6 +130,22 @@ describe('vendorableAgents', () => {
 
     expect(scan(world)).toEqual([]);
     expect(scan({ ...world, repoRoot: join(world.repoRoot, 'elsewhere') })).toEqual([]);
+  });
+
+  it('says nothing when the rafa tier serves the name, and answers it once tiers.rafa is off', () => {
+    const world = freshWorld();
+    plantAgent(world.home, 'tdd-guide');
+    const bundled = join(world.entry, '..', 'bundled', 'agents');
+    mkdirSync(bundled, { recursive: true });
+    writeFileSync(
+      join(bundled, 'tdd-guide.md'),
+      ['---', 'name: tdd-guide', 'description: Writes the tests first.', '---', 'Body.', ''].join('\n'),
+      'utf8',
+    );
+    plantPlan(world, 'PLAN.md', ['- [ ] Write the module {agent=tdd-guide}']);
+
+    expect(scan(world)).toEqual([]);
+    expect(scan(world, WITHOUT_USER, { tiersRafa: 'off' }).map((agent) => agent.fix)).toEqual([`${VENDOR_COMMAND} tdd-guide`]);
   });
 
   it('says nothing when the sources load the user scope, where the name resolves', () => {
@@ -166,8 +201,9 @@ describe('vendorableAgents', () => {
     const found = vendorableAgents({
       repoRoot: world.repoRoot,
       home: world.home,
+      entry: world.entry,
       planDir: absolute,
-      settingSources: WITHOUT_USER,
+      settings: settingsFor(WITHOUT_USER),
     });
 
     expect(found.map((agent) => agent.plan)).toEqual([join(absolute, 'PLAN.md')]);

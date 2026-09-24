@@ -303,10 +303,15 @@ New; it replaces no earlier text. What a row or an action added to
   and like every command but `module exec`, the two checkers, `init` and
   `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
   `<file>:<line>: <reason>: <text>`, then the `agent=` of each
-  still-to-run task that no scope the project's `loop.settingSources`
-  loads defines, as `<file>: <the line `missingAgentLine` words>` naming
-  the agent, the lines that asked for it and its `rafa agent vendor`
-  fix or that no user definition carries it
+  still-to-run task that no tier serves under the project's
+  `loop.settingSources`, `tiers.rafa` and `tiers.agents` (`resolveTiers`,
+  with the built-ins beside it), as `<file>: <the line `missingAgentLine`
+  words>` naming the agent, the lines that asked for it and why: held by
+  no tier; switched off, with the `false` line; held only by a tier the
+  session does not load, with that tier's path and the setting that
+  loads it, and `rafa agent vendor` for the user tier; held by two loaded
+  tiers with different contents, with both paths and the pin line; or a
+  rafa-tier holder the served directory refuses
   (`src/agents/roster.ts`). It throws exit code 1 when there is either,
   with a message counting both. That is the check `loop start`'s
   preflight halts on, so a plan the loop would refuse is refused here
@@ -1175,8 +1180,8 @@ New; it replaces no earlier text. What a row or an action added to
   arguments, `plan show` also for a stub no plan stamp can carry, a stub
   naming no plan or no tracker and a `--tracker` value other than `true`
   or `false`, and `plan validate` also for a path that is no file, for
-  a plan with an issue, for a plan naming an agent no loaded scope
-  defines, and for a config `loadConfig` refuses. `plan needs` also
+  a plan with an issue, for a plan naming an agent no loaded tier
+  serves, and for a config `loadConfig` refuses. `plan needs` also
   throws 1 under `--missing` when a need is unmet, and whatever
   `resolveCreateSpec` throws for `--spec` and `--issue`, 2 for the
   board's own state included. `init` throws 1 for a positional word, a `--yes`

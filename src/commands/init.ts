@@ -439,7 +439,7 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
         repoRoot: root.path,
         home,
         planDir: config.planDir,
-        settingSources: config.settingSources,
+        settings: config,
       }),
     },
     config,

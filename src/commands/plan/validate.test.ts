@@ -106,6 +106,10 @@ const PLAN_NAMING_AGENTS = [
   '',
 ].join('\n');
 
+/** What `missingAgentLine` words after the lines for `tdd-guide` when no tier holds it. */
+const UNHELD_TDD_GUIDE = 'cannot be dispatched: agent tdd-guide is held by no tier:'
+  + ' no project, rafa or user definition carries it, and it is no built-in agent';
+
 /** Writes `<root>/.claude/agents/<name>.md` carrying that name as its frontmatter, and answers its path. */
 function plantAgent(root: string, name: string): string {
   const dir = join(root, '.claude', 'agents');
@@ -290,7 +294,7 @@ describe('rafa plan validate, dispatched', () => {
 });
 
 describe('the agents rafa plan validate checks', () => {
-  it('writes one error line per agent no loaded scope defines, with its fix, and exits 1', async () => {
+  it('writes one error line per agent no loaded tier serves, with why, and exits 1', async () => {
     const project = plantRoutedProject();
     const vendorable = plantAgent(project.home, 'tdd-guide');
 
@@ -301,10 +305,11 @@ describe('the agents rafa plan validate checks', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stdout.split('\n')).toEqual([
-      'error: plan.md: agent "tdd-guide" (line 5) resolves under no loaded scope:'
-        + ' run `rafa agent vendor tdd-guide`',
-      'error: plan.md: agent "no-such-agent" (line 7) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
+      'error: plan.md: agent "tdd-guide" (line 5) cannot be dispatched: agent tdd-guide is held only by the user tier'
+        + ` (${vendorable}), which loop.settingSources (project, local) leaves out:`
+        + ' add user to loop.settingSources, or run `rafa agent vendor tdd-guide`',
+      'error: plan.md: agent "no-such-agent" (line 7) cannot be dispatched: agent no-such-agent is held by no tier:'
+        + ' no project, rafa or user definition carries it, and it is no built-in agent',
       '',
     ]);
     expect(run.stderr).toBe('❌ plan.md: 2 unresolvable agents; no session would be dispatched\n');
@@ -336,17 +341,11 @@ describe('the agents rafa plan validate checks', () => {
     const control = await validateIn(plantRoutedProject(closedFence));
 
     expect(run.exitCode).toBe(1);
-    expect(run.stdout).toContain(
-      'error: plan.md: agent "tdd-guide" (line 6) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
-    );
+    expect(run.stdout).toContain(`error: plan.md: agent "tdd-guide" (line 6) ${UNHELD_TDD_GUIDE}`);
     expect(run.stderr).toBe('❌ plan.md: 2 issues, 1 unresolvable agent; the plan does not read as written\n');
 
     expect(control.exitCode).toBe(1);
-    expect(control.stdout).toContain(
-      'error: plan.md: agent "tdd-guide" (line 7) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
-    );
+    expect(control.stdout).toContain(`error: plan.md: agent "tdd-guide" (line 7) ${UNHELD_TDD_GUIDE}`);
     expect(control.stderr).toBe('❌ plan.md: 1 unresolvable agent; no session would be dispatched\n');
   });
 
@@ -389,8 +388,7 @@ describe('the agents rafa plan validate checks', () => {
     expect([refused.exitCode, refused.stderr]).toEqual([1, '']);
     expect(eventsOf(refused.stdout).map(labelOf)).toEqual([
       'start',
-      'error:plan.md: agent "tdd-guide" (line 1) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
+      `error:plan.md: agent "tdd-guide" (line 1) ${UNHELD_TDD_GUIDE}`,
       'result',
     ]);
     expect(eventsOf(passed.stdout).at(-1)).toMatchObject({

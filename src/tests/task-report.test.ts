@@ -138,6 +138,7 @@ import {
 import { setActiveOutput } from '../adapters/output/active.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
+import { projectConfigText } from '../project/scaffold.js';
 import {
   dispatchTask,
   renderProgressForDispatch,
@@ -998,16 +999,23 @@ function plantDefinition(root: string, name: string, effort: string): void {
  *
  * Two of the three names are Claude Code built-ins, which is what keeps
  * the run past the preflight's roster check (`start/preflight.ts`): that
- * check refuses a run naming an agent no loaded scope resolves, and a
- * home definition is in no loaded scope under the default sources. A
- * built-in name resolves for the roster whatever the sources, while
+ * check refuses a run naming an agent no loaded tier serves, and a home
+ * definition is in no loaded tier under the default sources. A built-in
+ * name only an unloaded tier holds resolves for the roster, while
  * `utils/agent-definition.ts` still reads a definition of that name only
  * where the sources let it, which is what these cases measure.
+ *
+ * The spawned CLI's rafa tier is this checkout's `src/bundled/agents`,
+ * which holds a `tdd-guide` of its own, so the repository's differs from
+ * it and the roster check refuses the pair as a collision. The project
+ * config pins `tdd-guide` to the project tier, the line that refusal
+ * names, so the repository's definition is the one served and read.
  */
 function plantRoutedScratch(): Scratch {
   const scratch = plantScratch([ROUTED_HOME_TASK, ROUTED_REPO_TASK, ROUTED_NOWHERE_TASK]);
   plantDefinition(scratch.home, 'Explore', 'high');
   plantDefinition(scratch.repo, 'tdd-guide', 'high');
+  plantProjectConfig(scratch.repo, `${projectConfigText()}tiers:\n  agents: { tdd-guide: project }\n`);
   git(scratch.repo, 'add', '-A');
   git(scratch.repo, 'commit', '-q', '--no-verify', '-m', 'agents');
   return scratch;

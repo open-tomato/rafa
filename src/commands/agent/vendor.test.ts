@@ -13,10 +13,11 @@
  * ## What each reading is measured against
  *
  * The point of the command is the roster, so the copy is read back
- * through `resolveAgentRoster` under the loop's default
- * `project,local`, where the home is out of reach: the same roster over
- * the same roots before the copy resolves the name under no scope, and
- * after it resolves it under `project`. That control is what says the
+ * through `resolveAgentRoster` under the config defaults, whose
+ * `project,local` leaves the user tier out of reach, with a rafa tier of
+ * the case's own that holds nothing: the same roster over the same roots
+ * before the copy resolves the name under no tier, and after it resolves
+ * it under `project`. That control is what says the
  * copy landed somewhere a session reaches, rather than merely somewhere.
  *
  * Every refusal sits beside a line differing in one thing only — the
@@ -36,6 +37,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { resolveAgentRoster } from '../../agents/roster.js';
+import { CONFIG_DEFAULTS } from '../../config.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { createAgentVendorCommand, sourceHeader, withSourceHeader } from './vendor.js';
@@ -52,9 +54,6 @@ const SUBJECTS = [{ name: 'agent', summary: 'agents' }];
 
 /** The day every dispatched case stamps its headers with. */
 const DAY = new Date('2026-09-18T09:30:00.000Z');
-
-/** The sources a run with no config resolves to, leaving the user scope out. */
-const DEFAULT_SOURCES = ['project', 'local'] as const;
 
 /** A definition's text: its frontmatter, carrying `name`, and a body. */
 function definitionText(name: string): string {
@@ -101,9 +100,10 @@ async function vendorIn(
   return dispatchInProject(['agent', 'vendor', ...words], SUBJECTS, [createAgentVendorCommand(() => DAY)], project);
 }
 
-/** Where the roster resolves `name` under the loop's default sources, or null. */
+/** Where the roster resolves `name` under the config defaults and an empty rafa tier, or null. */
 function scopeOf(project: PlantedProject, name: string): string | null {
-  const roster = resolveAgentRoster({ repoRoot: project.root, home: project.home }, DEFAULT_SOURCES);
+  const roots = { repoRoot: project.root, home: project.home, entry: join(project.root, 'no-rafa-tier', 'cli.js') };
+  const roster = resolveAgentRoster(roots, CONFIG_DEFAULTS);
   return roster.agents.find((agent) => agent.name === name)?.scope ?? null;
 }
 
