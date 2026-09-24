@@ -44,6 +44,12 @@
  * the key exists and what it takes, which is the whole point of a
  * template of commented settings.
  *
+ * The `tiers` and `routing` sections close the template. `tiers.skills`
+ * and `tiers.agents` are written as `{}`, their empty default, and
+ * `routing` as one line per row of `tiers/routing.ts`'s
+ * `DEFAULT_ROUTES`, so the template cannot drift from the defaults the
+ * schema answers.
+ *
  * A file is written only when nothing is at its path, with the `wx` flag,
  * so a file that appears between the check and the write is refused by
  * the system rather than overwritten. An existing file is never read,
@@ -62,6 +68,7 @@ import { join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
+import { DEFAULT_ROUTES } from '../tiers/routing.js';
 
 import { scopeAt } from './scope.js';
 
@@ -122,6 +129,12 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   acceptStaleRefs: ${String(CONFIG_DEFAULTS.dangerousAcceptStaleRefs)}       # true plans past dangling and suspect spec references on every run`,
   '# status:',
   `#   notice: ${String(CONFIG_DEFAULTS.statusNotice)}                 # false drops the one-line notice of what is new since the last command`,
+  '# tiers:',
+  `#   rafa: ${CONFIG_DEFAULTS.tiersRafa}                     # on | off, whether the skills and agents rafa ships are served`,
+  '#   skills: {}                   # name: false turns a skill off; name: project | rafa | user pins its tier',
+  '#   agents: {}                   # name: false turns an agent off; name: project | rafa | user pins its tier',
+  '# routing:',
+  ...DEFAULT_ROUTES.map(([shape, agent]) => `#   ${shape}: ${agent}`),
 ]);
 
 /** The line every file opens its settings with. */
