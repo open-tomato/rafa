@@ -312,6 +312,60 @@ describe('claudeArgs', () => {
   });
 });
 
+/** Served flags as `servedFlags` spells them: the variadic skill flag, then `--agents` with its one value. */
+const SERVED_FLAGS = ['--add-dir', '/p/.rafa/runs/r/served', '--agents', '{"zz-agent":{}}'];
+
+describe('claudeArgs with served flags', () => {
+  it('puts the served flags after the setting sources and before the resolved flags', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS, SERVED_FLAGS)).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+      '--add-dir',
+      '/p/.rafa/runs/r/served',
+      '--agents',
+      '{"zz-agent":{}}',
+      '--effort',
+      'low',
+      '--agent',
+      'doc-updater',
+    ]);
+  });
+
+  it('keeps --tools the last flag when served flags are handed over', () => {
+    const args = claudeArgs(DEFAULT_SOURCES, ['--model', 'opus', '--tools', 'Read', 'Grep'], ['--plugin-dir', '/served']);
+
+    expect(args.slice(-3)).toEqual(['--tools', 'Read', 'Grep']);
+    expect(args.slice(4, 6)).toEqual(['--plugin-dir', '/served']);
+  });
+
+  it('answers the served flags last when no resolved flag is handed over', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, [], ['--add-dir', '/served'])).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+      '--add-dir',
+      '/served',
+    ]);
+  });
+
+  it('answers what it answered before for an empty served list', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS, [])).toEqual(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS));
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS, [])).toHaveLength(8);
+  });
+
+  it('passes the served flags through in the order given, leaving the caller\'s list unchanged', () => {
+    const served = ['--agents', '{}', '--add-dir', '/served'];
+
+    const args = claudeArgs(DEFAULT_SOURCES, [], served);
+
+    expect(args.slice(4)).toEqual(['--agents', '{}', '--add-dir', '/served']);
+    expect(served).toEqual(['--agents', '{}', '--add-dir', '/served']);
+  });
+});
+
 describe('runClaude', () => {
   it('spawns the base arguments and setting sources alone for a plan or wrap-up call', async () => {
     const { calls, spawn } = recordingSpawner();

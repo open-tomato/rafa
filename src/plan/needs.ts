@@ -66,11 +66,10 @@
  *     holds an executable file of its name (any exec bit, the checker's
  *     rule), or, for a program rafa ships, when the rafa tier's
  *     `bundled/bin` holds one first (see Stack tools). The loop's
- *     sessions inherit that `PATH`, so a program has no separate
- *     visibility. `sessionSpawnEnv` does not yet put `bundled/bin` on
- *     a session's `PATH` (measured 2026-09-24: `src/utils/session-env.ts`
- *     names neither), so a program found only there is present to this
- *     reading before a session can run it by name.
+ *     sessions inherit that `PATH`, with `sessionSpawnEnv`
+ *     (`src/utils/session-env.ts`) putting the running entry's
+ *     `bundled/bin` in front, the order this reading looks in, so a
+ *     program has no separate visibility.
  *
  * {@link isUnmet} is the one test `--missing` applies: missing, or
  * present and not visible to a run.

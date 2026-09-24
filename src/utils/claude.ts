@@ -115,6 +115,8 @@
  * The environment is `sessionSpawnEnv(process.env)` at both doors
  * (`session-env.ts`), the one function a reading of the session's
  * environment calls too, so neither door spells an entry of its own.
+ * That puts the running entry's `bundled/bin` at the front of every
+ * session's `PATH`.
  *
  * ## Interrupting a running session
  *
@@ -249,7 +251,7 @@ export const SETTING_SOURCES_FLAG = '--setting-sources';
 
 /**
  * Builds the argument list for one session: the base arguments, the
- * setting sources, then the flags.
+ * setting sources, the served flags, then the flags.
  *
  * `settingSources` is the run's resolved `loop.settingSources`, joined
  * with commas in the order given. `config.ts` has already refused a
@@ -261,12 +263,23 @@ export const SETTING_SOURCES_FLAG = '--setting-sources';
  * reordered, deduped or filtered here: this module has no opinion on
  * which flags are legal, and one that did would be a second authority
  * for a decision `utils/declaration.ts` already makes.
+ *
+ * `served` is `ServedSet.flags` from `serveResolution`
+ * (`src/tiers/serve.ts`), the session-only flags handing the run's
+ * served directory over, and is taken as it is for the same reason.
+ * It defaults to empty, so a caller that serves nothing spawns what it
+ * spawned before. It goes BEFORE `flags`, never after: `--tools` has to
+ * stay the last element (see the module note), and the served flags
+ * are safe ahead of the resolved ones, since `serve.ts` ends them with
+ * `--agents <json>` when an agent is served and every resolved flag
+ * starts with a dash, which is where the variadic `--add-dir` stops.
  */
 export function claudeArgs(
   settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
+  served: readonly string[] = [],
 ): string[] {
-  return [...CLAUDE_BASE_ARGS, SETTING_SOURCES_FLAG, settingSources.join(','), ...flags];
+  return [...CLAUDE_BASE_ARGS, SETTING_SOURCES_FLAG, settingSources.join(','), ...served, ...flags];
 }
 
 /**
