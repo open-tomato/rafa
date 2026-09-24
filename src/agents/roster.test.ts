@@ -45,13 +45,16 @@ import { findNextTask } from '../utils/tracker.js';
 import {
   BUILT_IN_AGENTS,
   BUILT_IN_AGENTS_CLI_VERSION,
+  collidingPlanSkills,
   missingAgent,
   missingAgentLine,
   missingPlanAgents,
   planAgentUses,
+  planSkillUses,
   readAgentDefinitions,
   resolveAgentRoster,
   rosterResolves,
+  skillCollisionLine,
   vendorFixCommand,
   VENDOR_COMMAND,
 } from './roster.js';
@@ -135,6 +138,26 @@ function plantAgent(root: string, name: string, text = servableText(name)): stri
 /** Plants `<name>.md` in the rafa tier of `roots`, and answers its path. */
 function plantRafa(roots: Required<AgentRosterRoots>, name: string, text = servableText(name)): string {
   return plantIn(rafaTier(roots), `${name}.md`, text);
+}
+
+/** A `SKILL.md` for `name`: a description, then `body`. */
+function skillText(name: string, body = 'The skill body.'): string {
+  return ['---', `name: ${name}`, `description: ${name}, planted.`, '---', body, ''].join('\n');
+}
+
+/** Plants `<dir>/<name>/SKILL.md`, and answers its path. */
+function plantSkillIn(dir: string, name: string, text = skillText(name)): string {
+  return plantIn(join(dir, name), 'SKILL.md', text);
+}
+
+/** The project tier's skills directory of `roots`. */
+function projectSkills(roots: Required<AgentRosterRoots>): string {
+  return join(roots.repoRoot, '.claude', 'skills');
+}
+
+/** The rafa tier's skills directory of `roots`: `bundled/skills` beside its entry. */
+function rafaSkills(roots: Required<AgentRosterRoots>): string {
+  return join(roots.entry, '..', 'bundled', 'skills');
 }
 
 /** The names of a roster, in the order it holds them. */
@@ -667,6 +690,84 @@ describe('missingAgentLine', () => {
     const line = missingAgentLine({ name: 'no-such-agent', lines: [3, 9], reason: 'unheld', message: 'why', fix: null });
 
     expect(line).toBe('agent "no-such-agent" (lines 3, 9) cannot be dispatched: why');
+  });
+});
+
+describe('planSkillUses', () => {
+  it('reads every skills= name of the open and blocked lines, with each line that named it, and skips a ticked one', () => {
+    const plan = [
+      '- [ ] Write it  {skills=documentation,bun-testing}',
+      '- [x] Already ran  {skills=ticked-only}',
+      '- [BLOCKED] Retry it  {agent=tdd-guide skills=documentation}',
+      '- [ ] No declaration at all',
+      '',
+    ].join('\n');
+
+    expect(planSkillUses(plan)).toEqual([
+      { name: 'documentation', lines: [1, 3] },
+      { name: 'bun-testing', lines: [1] },
+    ]);
+    // The agent= of the same lines is read apart, so neither list borrows the other's names.
+    expect(planAgentUses(plan)).toEqual([{ name: 'tdd-guide', lines: [3] }]);
+  });
+
+  it('reads a line a never-closed fence hides, as the dispatcher reaches it', () => {
+    const hidden = ['```rafa:context', 'Never closed.', '', '- [ ] Write it  {skills=documentation}', ''].join('\n');
+
+    expect(planSkillUses(hidden)).toEqual([{ name: 'documentation', lines: [4] }]);
+  });
+});
+
+describe('collidingPlanSkills', () => {
+  it('names a skill the project and rafa tiers hold with different contents, with both paths and the pin line', () => {
+    const roots = freshRoots();
+    const project = plantSkillIn(projectSkills(roots), 'documentation', skillText('documentation', 'The project body.'));
+    const rafa = plantSkillIn(rafaSkills(roots), 'documentation');
+    const plan = '- [ ] Write it  {skills=documentation}\n- [ ] Again  {skills=documentation}\n';
+
+    const [colliding, ...rest] = collidingPlanSkills(plan, resolveAgentRoster(roots, settings()));
+
+    expect(rest).toEqual([]);
+    expect(colliding?.lines).toEqual([1, 2]);
+    expect(colliding?.collision.holders.map((holder) => holder.path)).toEqual([project, rafa]);
+    expect(colliding === undefined
+      ? null
+      : skillCollisionLine(colliding)).toBe('skill "documentation" (lines 1, 2) cannot be served: skill documentation is held by'
+      + ` 2 loaded tiers with different contents: project ${project} and rafa ${rafa};`
+      + ' pin the tier that serves it: tiers.skills: { documentation: project }');
+    expect([project, rafa].every((path) => path.startsWith(tempBase))).toBe(true);
+  });
+
+  it('names nothing once a pin chooses, the copies are byte-identical, the rafa tier is off, or no tier holds the name', () => {
+    const roots = freshRoots();
+    plantSkillIn(projectSkills(roots), 'documentation', skillText('documentation', 'The project body.'));
+    plantSkillIn(rafaSkills(roots), 'documentation');
+    const identical = freshRoots();
+    plantSkillIn(projectSkills(identical), 'documentation');
+    plantSkillIn(rafaSkills(identical), 'documentation');
+    const plan = '- [ ] Write it  {skills=documentation,held-by-nobody}\n';
+
+    const pinned = settings({ tiersSkills: new Map([['documentation', 'rafa']]) });
+
+    expect(collidingPlanSkills(plan, resolveAgentRoster(roots, pinned))).toEqual([]);
+    expect(collidingPlanSkills(plan, resolveAgentRoster(identical, settings()))).toEqual([]);
+    expect(collidingPlanSkills(plan, resolveAgentRoster(roots, settings({ tiersRafa: 'off' })))).toEqual([]);
+    // The control: the same roots and plan under no pin do collide, so the readings above are not vacuous.
+    expect(collidingPlanSkills(plan, resolveAgentRoster(roots, settings())).map((skill) => skill.name))
+      .toEqual(['documentation']);
+  });
+
+  it('keeps a skill out of the agents, so a skill named like an agent resolves no agent= of that name', () => {
+    const roots = freshRoots();
+    plantSkillIn(rafaSkills(roots), 'tdd-guide');
+
+    const roster = resolveAgentRoster(roots, settings());
+
+    expect(namesOf(roster)).not.toContain('tdd-guide');
+    expect(missingAgent(roster, { name: 'tdd-guide', lines: [1] })?.reason).toBe('unheld');
+    // The control: the skill was read, since the resolution holds it as a served skill.
+    expect(roster.resolution.items.map((item) => [item.kind, item.name, item.state]))
+      .toEqual([['skill', 'tdd-guide', 'served']]);
   });
 });
 

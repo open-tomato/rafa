@@ -17,7 +17,8 @@
  * directory. Every reading that reports a missing agent sits beside a
  * control differing in one thing only: the project's definitions, the
  * `loop.settingSources` of the project's config, or the checkbox of the
- * line that named it. The one case with no project at all is run by
+ * line that named it. The one reporting a colliding skill sits beside a
+ * control differing in the `tiers.skills` pin of the config alone. The one case with no project at all is run by
  * calling the command directly, since the dispatcher refuses a command
  * needing a project outside one and would never hand it null.
  *
@@ -116,6 +117,15 @@ function plantAgent(root: string, name: string): string {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${name}.md`);
   writeFileSync(file, `---\nname: ${name}\n---\nThe agent body.\n`, 'utf8');
+  return file;
+}
+
+/** Writes `<root>/.claude/skills/documentation/SKILL.md` ending in `body`, and answers its path. */
+function plantSkill(root: string, body: string): string {
+  const dir = join(root, '.claude', 'skills', 'documentation');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'SKILL.md');
+  writeFileSync(file, `---\nname: documentation\ndescription: Planted.\n---\n${body}\n`, 'utf8');
   return file;
 }
 
@@ -398,6 +408,39 @@ describe('the agents rafa plan validate checks', () => {
     });
   });
 
+  it('writes one error line per skills= name two loaded tiers hold with different contents, until a pin chooses', async () => {
+    const plan = '- [ ] Write it  {skills=documentation}\n';
+    const sources = 'version: 1\nloop:\n  settingSources: user,project,local\n';
+    const collided = plantRoutedProject(plan, sources);
+    const pinned = plantRoutedProject(plan, `${sources}tiers:\n  skills: { documentation: user }\n`);
+    const paths = [collided, pinned].map((project) => ({
+      project: plantSkill(project.root, 'The project body.'),
+      user: plantSkill(project.home, 'The user body.'),
+    }));
+
+    const refused = await validateIn(collided);
+    const json = await validateIn(collided, ['--output=json']);
+    const passed = await validateIn(pinned, ['--output=json']);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toBe('error: plan.md: skill "documentation" (line 1) cannot be served: skill documentation is held'
+      + ` by 2 loaded tiers with different contents: project ${paths[0]?.project} and user ${paths[0]?.user};`
+      + ' pin the tier that serves it: tiers.skills: { documentation: project }\n');
+    expect(refused.stderr).toBe('❌ plan.md: 1 skill collision; no session would be dispatched\n');
+    expect(eventsOf(json.stdout).map(labelOf)).toEqual([
+      'start',
+      expect.stringContaining('error:plan.md: skill "documentation" (line 1) cannot be served:'),
+      'result',
+    ]);
+    // The control differs in the pin alone.
+    expect(passed.exitCode).toBe(0);
+    expect(eventsOf(passed.stdout).at(-1)).toMatchObject({
+      type: 'result',
+      ok: true,
+      data: { missingAgents: [], skillCollisions: [] },
+    });
+  });
+
   it('refuses a config the loader refuses with exit code 1, where the same plan passes under a usable one', async () => {
     const refusedConfig = plantRoutedProject(CLEAN_PLAN, 'version: 1\nloop:\n  settingSources: nowhere\n');
     const usable = plantRoutedProject(CLEAN_PLAN);
@@ -422,7 +465,7 @@ describe('the agents rafa plan validate checks', () => {
 
     expect(ran).toBeUndefined();
     expect(info).toEqual([
-      'ℹ️  No project was found from the working directory, so no `agent=` was checked.',
+      'ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.',
       '✅ plan.md: no issues; 0 stages, tasks 0/1 done, 0 blocked, 1 open',
     ]);
     expect([inProject.exitCode, inProject.stdout.includes('"tdd-guide"')]).toEqual([1, true]);

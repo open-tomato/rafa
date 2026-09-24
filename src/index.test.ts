@@ -394,7 +394,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
   ]],
   ['./commands/plan/validate.js', [
-    ['../../agents/roster.js', ['missingAgentLine', 'missingPlanAgents', 'resolveAgentRoster']],
+    ['../../agents/roster.js', [
+      'collidingPlanSkills',
+      'missingAgentLine',
+      'missingPlanAgents',
+      'resolveAgentRoster',
+      'skillCollisionLine',
+    ]],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
     ['../../config.js', ['ConfigError']],

@@ -55,8 +55,11 @@ task of the plan or the tracker names an agent no loaded tier serves:
 one no tier holds, one `tiers.agents` switches off, one only an unloaded
 tier holds, or one two loaded tiers hold with different contents, whose
 refusal names both paths and the pin line that settles it
-(`src/start/preflight.ts`). `rafa plan validate` runs the same check and
-exits 1 on the same plan.
+(`src/start/preflight.ts`). The same resolution covers the three skill
+trees, so a `skills=` name of those tasks that two loaded tiers hold
+with different contents refuses the run too, naming both paths and its
+`tiers.skills` pin line; a skill name no tier holds does not.
+`rafa plan validate` runs the same check and exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies
 both.** A declaration carrying an agent never passes `--model` or

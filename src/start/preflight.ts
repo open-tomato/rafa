@@ -25,12 +25,16 @@
  *      `false`, or is held by two loaded tiers with different contents
  *      refuses the run, because the dispatch it is routed to exits 1
  *      before any model call (`context/workflow.md`), or would run on
- *      a holder the plan did not choose. The tasks read are the ones the
- *      dispatcher will reach, a line a `rafa:*` block the document never
- *      closed hides included: `findNextTask` runs such a line, so the
- *      roster check reads it too (`PlanModel.hiddenTasks`), and the
- *      refusal names it by the document and the line as it names any
- *      other. The checklist read is the tracker when
+ *      a holder the plan did not choose. Every `skills=` name of the
+ *      same tasks is checked against the same resolution, and one two
+ *      loaded tiers hold with different contents refuses the run too,
+ *      since nobody serves it (`start/serving.ts`); a skill name no tier
+ *      holds does not, as `agents/roster.ts` explains. The tasks read are
+ *      the ones the dispatcher will reach, a line a `rafa:*` block the
+ *      document never closed hides included: `findNextTask` runs such a
+ *      line, so the roster check reads it too (`PlanModel.hiddenTasks`),
+ *      and the refusal names it by the document and the line as it names
+ *      any other. The checklist read is the tracker when
  *      one is already beside the plan, and the plan otherwise, since the
  *      tracker is created after this preflight; a document that cannot
  *      be read is passed over, as the plan's own absence is refused by
@@ -110,6 +114,23 @@
  * That is a reading, wrapped here, of a project and a rafa tier holding
  * `tdd-guide` with different bodies, taken on 2026-09-24. The other
  * reasons, and their sentences, are `agents/roster.ts`'s.
+ *
+ * A `skills=` name two loaded tiers hold with different contents
+ * refuses in the same message, after the agents, through
+ * `skillCollisionLine`; the opening names each kind it found:
+ *
+ *     ❌ Refusing to start: PLAN-demo.md names 1 skill(s) two loaded
+ *        tiers hold with different contents (loop.settingSources:
+ *        project, local; tiers.rafa: on).
+ *        skill "documentation" (line 1) cannot be served: skill
+ *        documentation is held by 2 loaded tiers with different
+ *        contents: project <root>/.claude/skills/documentation/SKILL.md
+ *        and rafa <dist>/bundled/skills/documentation/SKILL.md; pin the
+ *        tier that serves it: tiers.skills: { documentation: project }
+ *        Nothing was checked and nothing was dispatched.
+ *
+ * That is `preflight.test.ts`'s reading, wrapped here, and the same run
+ * under `tiers.skills: { documentation: rafa }` goes on to its probes.
  *
  * A malformed item in the plan's PREREQUISITES file refuses before any
  * probe too, naming each by its line and the one shape a probed item
@@ -193,7 +214,13 @@ import { homedir } from 'node:os';
 import { basename } from 'path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { missingAgentLine, missingPlanAgents, resolveAgentRoster } from '../agents/roster.js';
+import {
+  collidingPlanSkills,
+  missingAgentLine,
+  missingPlanAgents,
+  resolveAgentRoster,
+  skillCollisionLine,
+} from '../agents/roster.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS } from '../config.js';
@@ -306,9 +333,23 @@ function readIfReadable(path: string): string | null {
   }
 }
 
+/** `names 1 agent(s) no loaded tier serves and 1 skill(s) ...`, leaving out a kind with none. */
+function refusedNames(agents: number, skills: number): string {
+  const clauses = [
+    agents > 0
+      ? `${agents} agent(s) no loaded tier serves`
+      : null,
+    skills > 0
+      ? `${skills} skill(s) two loaded tiers hold with different contents`
+      : null,
+  ].filter((clause): clause is string => clause !== null);
+  return `names ${clauses.join(' and ')}`;
+}
+
 /**
  * Refuses the run when a still-to-run task routes to an agent no loaded
- * tier serves, naming each with what settles it; see the module note.
+ * tier serves, or asks for a skill two loaded tiers hold with different
+ * contents, naming each with what settles it; see the module note.
  */
 function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   const path = agentSourcePath(options.planPath);
@@ -329,13 +370,16 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
       ? {}
       : { entry: agents.entry }),
   };
-  const missing = missingPlanAgents(markdown, resolveAgentRoster(roots, settings));
-  if (missing.length === 0) return;
+  const roster = resolveAgentRoster(roots, settings);
+  const missing = missingPlanAgents(markdown, roster);
+  const colliding = collidingPlanSkills(markdown, roster);
+  if (missing.length === 0 && colliding.length === 0) return;
 
   throw new CommandExit(1, [
-    `❌ Refusing to start: ${basename(path)} names ${missing.length} agent(s) no loaded tier`
-      + ` serves (loop.settingSources: ${settings.settingSources.join(', ')}; tiers.rafa: ${settings.tiersRafa}).`,
+    `❌ Refusing to start: ${basename(path)} ${refusedNames(missing.length, colliding.length)}`
+      + ` (loop.settingSources: ${settings.settingSources.join(', ')}; tiers.rafa: ${settings.tiersRafa}).`,
     ...missing.map((agent) => `   ${missingAgentLine(agent)}`),
+    ...colliding.map((skill) => `   ${skillCollisionLine(skill)}`),
     '   Nothing was checked and nothing was dispatched.',
   ].join('\n'));
 }

@@ -66,14 +66,17 @@
  *
  * ## Resolved through the three tiers
  *
- * {@link resolveAgentRoster} reads the agents tree of each tier
- * (`readAgentTree` in `inventory/trees.ts`: the project's
- * `.claude/agents`, rafa's `bundled/agents` beside the entry, the home's
- * `.claude/agents`) and hands the rows to `resolveTiers`
- * (`tiers/resolve.ts`) under the run's four settings: `loop.settingSources`,
- * `tiers.rafa` and the two pin maps. `start/serving.ts` resolves the same
- * rows under the same settings before every session, so the roster
- * answers what the session will be served. Skills are not read here.
+ * {@link resolveAgentRoster} reads the skills and the agents tree of
+ * each tier (`readTrees` in `inventory/trees.ts`: the project's
+ * `.claude/{skills,agents}`, rafa's `bundled/{skills,agents}` beside the
+ * entry, the home's `.claude/{skills,agents}`) and hands the rows to
+ * `resolveTiers` (`tiers/resolve.ts`) under the run's four settings:
+ * `loop.settingSources`, `tiers.rafa` and the two pin maps.
+ * `start/serving.ts` reads the same trees the same way, with no `PATH`
+ * directories, and resolves them under the same settings before every
+ * session, so the roster answers what the session will be served. The
+ * roster's agents are the agent rows' outcomes; the skill rows are read
+ * for the collision check below and decide no agent.
  *
  * A name resolves when it is one of these, and every other name a plan
  * asks for is refused ({@link MissingAgent.reason}):
@@ -138,6 +141,26 @@
  * document: `start/preflight.ts` the checklist it read, `rafa plan
  * validate` the file as typed.
  *
+ * ## Which skills a plan asks for, and the one refusal they meet
+ *
+ * {@link planSkillUses} reads the `skills=` names of the same task
+ * lines, each with the lines that asked for it, and
+ * {@link collidingPlanSkills} answers those a session under the roster's
+ * settings could not be served because two loaded tiers hold them with
+ * different contents (`resolveTiers`' `collision`). Nobody serves such a
+ * name (`start/serving.ts`), so the task would run on whichever copy
+ * Claude Code finds by itself, or on none. The sentence is
+ * `collisionMessage`'s, naming every path and the one pin line that
+ * settles it, and {@link skillCollisionLine} words it for the preflight
+ * and `rafa plan validate`. A pin in `tiers.skills` settles it, as a
+ * pin in `tiers.agents` settles an agent's.
+ *
+ * A collision is the only refusal a `skills=` name meets here. A name no
+ * tier holds is not one, because `parseSkillList` in
+ * `utils/declaration.ts` leaves membership unchecked on purpose: a
+ * skill can come from a plugin or an add-on, outside the three tiers,
+ * and a plan may name one this checkout has yet to install.
+ *
  * Nothing here throws, and nothing here spawns the CLI. An unreadable
  * directory, an unreadable file, a file with no frontmatter and one
  * whose frontmatter carries no usable `name` are each passed over, so a
@@ -145,13 +168,14 @@
  * it.
  */
 import type { SkillTier } from '../schema/tiers.js';
-import type { Resolution, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
+import type { Resolution, TierCollision, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
+import type { TaskDeclaration } from '../utils/declaration.js';
 import type { Dirent } from 'node:fs';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readAgentTree } from '../inventory/trees.js';
+import { readTrees } from '../inventory/trees.js';
 import { parsePlan } from '../plan/parse.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
 import { isSkillTier, SKILL_TIERS } from '../schema/tiers.js';
@@ -214,7 +238,7 @@ export interface RosterAgent {
 export interface AgentRoster {
   /** The settings the roster was resolved under. */
   readonly settings: TierSettings;
-  /** `resolveTiers` over the three agent trees: every name any tier holds, whatever its outcome. */
+  /** `resolveTiers` over the three skill and agent trees: every name any tier holds, whatever its outcome. */
   readonly resolution: Resolution;
   /** Each name a session resolves, once: the tier winners in tier order, then the built-ins. */
   readonly agents: readonly RosterAgent[];
@@ -233,6 +257,22 @@ export interface AgentUse {
   readonly name: string;
   /** The task lines that named it, counting from one, in order. */
   readonly lines: readonly number[];
+}
+
+/** One skill name a document asks for, and where it asked. */
+export interface SkillUse {
+  /** One name of a `skills=` value, exactly as the declaration carried it. */
+  readonly name: string;
+  /** The task lines that named it, counting from one, in order. */
+  readonly lines: readonly number[];
+}
+
+/** An asked-for skill two loaded tiers hold with different contents. */
+export interface SkillCollision extends SkillUse {
+  /** The collision `resolveTiers` answered, with every distinct holder and the pin line. */
+  readonly collision: TierCollision;
+  /** `collisionMessage`'s sentence: every path, then the pin line that settles it. */
+  readonly message: string;
 }
 
 /** Why an asked-for name does not resolve; see the module note. */
@@ -332,23 +372,26 @@ function isBuiltIn(name: string): boolean {
   return (BUILT_IN_AGENTS as readonly string[]).includes(name);
 }
 
-/** The agent rows of the three tiers, each tier's sorted by name. */
-function agentRows(roots: AgentRosterRoots): readonly TierRow[] {
-  const seams = {
+/**
+ * The skill rows of the three tiers, then their agent rows, each tier's
+ * sorted by name: `start/serving.ts`'s reading, with no `PATH` directories.
+ */
+function tierRows(roots: AgentRosterRoots): readonly TierRow[] {
+  return readTrees({
     home: roots.home,
     projectRoot: roots.repoRoot,
+    pathDirs: [],
     ...(roots.entry === undefined
       ? {}
       : { entry: roots.entry }),
-  };
-  return SKILL_TIERS.flatMap((tier) => readAgentTree(tier, seams).items);
+  }).flatMap((listing) => listing.items);
 }
 
 /** Why each rafa winner of `resolution` is not served, by name. */
 function unservedWinners(resolution: Resolution): ReadonlyMap<string, string> {
   const unserved = new Map<string, string>();
   for (const item of resolution.items) {
-    if (item.state !== 'served' || item.winner.source !== 'rafa') continue;
+    if (item.kind !== 'agent' || item.state !== 'served' || item.winner.source !== 'rafa') continue;
     const verdict = serveVerdict(item.winner);
     if (!verdict.ok) unserved.set(item.name, verdict.why);
   }
@@ -366,11 +409,13 @@ function builtInAnswers(item: TierItem | undefined, name: string): boolean {
  * note.
  */
 export function resolveAgentRoster(roots: AgentRosterRoots, settings: TierSettings): AgentRoster {
-  const rows = agentRows(roots);
+  const rows = tierRows(roots);
   const resolution = resolveTiers(rows, settings, readItemBytes);
   const unserved = unservedWinners(resolution);
 
-  const winners = resolution.items.flatMap((item) => item.state === 'served' && !unserved.has(item.name)
+  const winners = resolution.items.flatMap((item) => item.kind === 'agent'
+    && item.state === 'served'
+    && !unserved.has(item.name)
     ? [item.winner]
     : []);
   const served: RosterAgent[] = SKILL_TIERS.flatMap((tier) => winners
@@ -382,7 +427,9 @@ export function resolveAgentRoster(roots: AgentRosterRoots, settings: TierSettin
 
   const userDefinitions = new Map<string, string>();
   for (const row of rows) {
-    if (row.source === 'user' && !userDefinitions.has(row.name)) userDefinitions.set(row.name, row.path);
+    if (row.kind === 'agent' && row.source === 'user' && !userDefinitions.has(row.name)) {
+      userDefinitions.set(row.name, row.path);
+    }
   }
 
   return { settings, resolution, agents: [...served, ...builtIns], unserved, userDefinitions };
@@ -470,6 +517,32 @@ export function missingAgent(roster: AgentRoster, use: AgentUse): MissingAgent |
 }
 
 /**
+ * The names `namesOf` reads off each still-to-run task line of
+ * `markdown`, each with the lines that asked, counting from one, in the
+ * order they were first named. See {@link planAgentUses}.
+ */
+function planUses(
+  markdown: string,
+  namesOf: (declaration: TaskDeclaration) => readonly string[],
+): readonly AgentUse[] {
+  const lines = new Map<string, number[]>();
+  const model = parsePlan(markdown);
+  const dispatchable = [...model.tasks, ...model.hiddenTasks].sort((a, b) => a.lineNum - b.lineNum);
+
+  for (const task of dispatchable) {
+    if (task.status === 'done' || task.declaration === null) continue;
+
+    for (const name of namesOf(task.declaration)) {
+      const seen = lines.get(name);
+      if (seen === undefined) lines.set(name, [task.lineNum + 1]);
+      else seen.push(task.lineNum + 1);
+    }
+  }
+
+  return [...lines].map(([name, used]) => ({ name, lines: used }));
+}
+
+/**
  * The `agent=` names the still-to-run task lines of `markdown` ask for,
  * each with the lines that asked, counting from one, in the order they
  * were first named. Reads a plan and a tracker alike: both are the
@@ -479,22 +552,36 @@ export function missingAgent(roster: AgentRoster, use: AgentUse): MissingAgent |
  * see the module note.
  */
 export function planAgentUses(markdown: string): readonly AgentUse[] {
-  const lines = new Map<string, number[]>();
-  const model = parsePlan(markdown);
-  const dispatchable = [...model.tasks, ...model.hiddenTasks].sort((a, b) => a.lineNum - b.lineNum);
+  return planUses(markdown, (declaration) => declaration.agent === null
+    ? []
+    : [declaration.agent]);
+}
 
-  for (const task of dispatchable) {
-    if (task.status === 'done') continue;
+/**
+ * The `skills=` names the still-to-run task lines of `markdown` ask
+ * for, read as {@link planAgentUses} reads `agent=`: each name once,
+ * with every line that named it.
+ */
+export function planSkillUses(markdown: string): readonly SkillUse[] {
+  return planUses(markdown, (declaration) => declaration.skills ?? []);
+}
 
-    const name = task.declaration?.agent ?? null;
-    if (name === null) continue;
-
-    const seen = lines.get(name);
-    if (seen === undefined) lines.set(name, [task.lineNum + 1]);
-    else seen.push(task.lineNum + 1);
-  }
-
-  return [...lines].map(([name, used]) => ({ name, lines: used }));
+/**
+ * The `skills=` names `markdown` asks for that two loaded tiers hold
+ * with different contents under the roster's settings, each with the
+ * collision and its sentence. Empty when every name is served, pinned,
+ * or held outside the three tiers; see the module note.
+ */
+export function collidingPlanSkills(
+  markdown: string,
+  roster: AgentRoster,
+): readonly SkillCollision[] {
+  return planSkillUses(markdown).flatMap((use) => {
+    const item = findTierItem(roster.resolution, 'skill', use.name);
+    return item?.state === 'collision'
+      ? [{ ...use, collision: item.collision, message: collisionMessage(item.collision) }]
+      : [];
+  });
 }
 
 /**
@@ -515,15 +602,27 @@ export function missingPlanAgents(
   });
 }
 
+/** `line 3`, or `lines 3, 5` for more than one. */
+function linesClause(lines: readonly number[]): string {
+  return lines.length === 1
+    ? `line ${lines[0]}`
+    : `lines ${lines.join(', ')}`;
+}
+
 /**
  * One line naming a missing agent, where it was asked for and why it
  * cannot be dispatched, for the preflight halt and for `rafa plan
  * validate` to print as they print their other refusals.
  */
 export function missingAgentLine(missing: MissingAgent): string {
-  const where = missing.lines.length === 1
-    ? `line ${missing.lines[0]}`
-    : `lines ${missing.lines.join(', ')}`;
+  return `agent "${missing.name}" (${linesClause(missing.lines)}) cannot be dispatched: ${missing.message}`;
+}
 
-  return `agent "${missing.name}" (${where}) cannot be dispatched: ${missing.message}`;
+/**
+ * One line naming a colliding skill, where it was asked for, and the
+ * paths and pin line of the collision, for the same two callers as
+ * {@link missingAgentLine}.
+ */
+export function skillCollisionLine(colliding: SkillCollision): string {
+  return `skill "${colliding.name}" (${linesClause(colliding.lines)}) cannot be served: ${colliding.message}`;
 }

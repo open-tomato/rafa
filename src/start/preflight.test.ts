@@ -19,13 +19,14 @@
  * hand both to the run, so a case that lost one would read this
  * machine's `~/.claude/agents`; the first of them asserts both resolve
  * under this file's scratch directory. Each reading that halts on a
- * missing agent sits beside a control differing in one thing only — the
- * sources loaded, `tiers.rafa`, a `tiers.agents` entry, the project's
- * definitions, the checkbox of the line, or which of the plan and the
- * tracker exists — so a check applied to everything reddens the control.
- * Every case but one leaves the rafa entry out, so the tier sits beside
- * this file under `bun test` (`Bun.main`), where no `bundled/agents`
- * exists; the one that hands an entry plants the tier it reads.
+ * missing agent or a colliding skill sits beside a control differing in
+ * one thing only — the sources loaded, `tiers.rafa`, a `tiers.agents` or
+ * `tiers.skills` entry, the project's definitions, the checkbox of the
+ * line, or which of the plan and the tracker exists — so a check applied
+ * to everything reddens the control. Every case but two leaves the rafa
+ * entry out, so the tier sits beside this file under `bun test`
+ * (`Bun.main`), where no `bundled/agents` or `bundled/skills` exists; the
+ * two that hand an entry plant the tier they read.
  *
  * Twenty-nine mutations were driven against this file on 2026-09-15, 25
  * of `start/preflight.ts` and 4 of the notice in `start/dispatch.ts`, each
@@ -1004,6 +1005,48 @@ describe('the agent roster check', () => {
     expect(switchedOff.refusal?.message).toContain('"in-the-project" (line 1) cannot be dispatched:'
       + ' agent in-the-project is switched off by tiers.agents: { in-the-project: false }');
     expect(switchedOff.refusal?.message).not.toContain('"from-rafa"');
+  });
+
+  it('halts on a skills= name two loaded tiers hold with different contents, until a tiers.skills pin chooses', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    const entry = join(freshHome(), 'dist', 'cli.js');
+    const rafa = join(entry, '..', 'bundled', 'skills', 'documentation', 'SKILL.md');
+    const project = join(root, '.claude', 'skills', 'documentation', 'SKILL.md');
+    for (const [path, body] of [[rafa, 'The rafa body.'], [project, 'The project body.']] as const) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, `---\nname: documentation\ndescription: Planted.\n---\n${body}\n`, 'utf8');
+    }
+    writeFileSync(planPathIn(root), '- [ ] Write it  {skills=documentation}\n', 'utf8');
+    const agents = { settingSources: ['project', 'local'] as const, home, entry };
+
+    const collided = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, { agents });
+    const pinned = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents: { ...agents, tiersSkills: new Map([['documentation', 'rafa']]) },
+    });
+    // Beside a missing agent the one refusal names both kinds.
+    writeFileSync(planPathIn(root), '- [ ] Write it  {agent=no-such-agent skills=documentation}\n', 'utf8');
+    const both = await drive(root, settingsOf([], []), {}, { agents });
+
+    const skillLine = '   skill "documentation" (line 1) cannot be served: skill documentation is held by 2 loaded tiers'
+      + ` with different contents: project ${project} and rafa ${rafa};`
+      + ' pin the tier that serves it: tiers.skills: { documentation: project }';
+    expect(collided.refusal?.exitCode).toBe(1);
+    expect(collided.refusal?.message.split('\n')).toEqual([
+      `❌ Refusing to start: PLAN-${STUB}.md names 1 skill(s) two loaded tiers hold with different contents`
+        + ' (loop.settingSources: project, local; tiers.rafa: on).',
+      skillLine,
+      '   Nothing was checked and nothing was dispatched.',
+    ]);
+    expect(collided.probes).toEqual([]);
+    expect(pinned.refusal).toBeNull();
+    expect(pinned.probes).toEqual([`bun --version in ${root}`]);
+    expect(both.refusal?.message.split('\n').slice(0, 3)).toEqual([
+      `❌ Refusing to start: PLAN-${STUB}.md names 1 agent(s) no loaded tier serves and 1 skill(s) two loaded`
+        + ' tiers hold with different contents (loop.settingSources: project, local; tiers.rafa: on).',
+      expect.stringContaining('   agent "no-such-agent" (line 1) cannot be dispatched:'),
+      skillLine,
+    ]);
   });
 
   it('halts on the roster before any probe runs, where the probe would halt the run too', async () => {

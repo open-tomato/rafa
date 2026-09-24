@@ -312,15 +312,19 @@ New; it replaces no earlier text. What a row or an action added to
   loads it, and `rafa agent vendor` for the user tier; held by two loaded
   tiers with different contents, with both paths and the pin line; or a
   rafa-tier holder the served directory refuses
-  (`src/agents/roster.ts`). It throws exit code 1 when there is either,
-  with a message counting both. That is the check `loop start`'s
+  (`src/agents/roster.ts`). Then each `skills=` name of those tasks that
+  two loaded tiers hold with different contents, under `tiers.skills`, as
+  `<file>: <the line `skillCollisionLine` words>` with both paths and the
+  pin line; a skill name no tier holds is not reported. It throws exit
+  code 1 when there is any of the three, with a message counting each. That is the check `loop start`'s
   preflight halts on, so a plan the loop would refuse is refused here
   too. The roster is the project the dispatcher found and the config that
   resolves there, which is the only thing this command reads beyond the
-  file; handed no project it says so and checks no agent. In json mode a
-  list, a plan and a clean validation are the terminal result's `data`,
-  the validation carrying an empty `issues` and an empty `missingAgents`,
-  and each issue and each missing agent is an `error` `log` event; text
+  file; handed no project it says so and checks no agent and no skill.
+  In json mode a list, a plan and a clean validation are the terminal
+  result's `data`, the validation carrying an empty `issues`, an empty
+  `missingAgents` and an empty `skillCollisions`, and each issue, missing
+  agent and skill collision is an `error` `log` event; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where

@@ -31,6 +31,13 @@
  * would run it on a holder nobody chose, so a plan carrying one does not
  * run however well it parses.
  *
+ * The `skills=` names of the same tasks are checked against the same
+ * resolution: one two loaded tiers hold with different contents, with no
+ * `tiers.skills` pin to choose, is served by nobody, and is reported with
+ * both paths and the pin line that settles it. A skill name no tier holds
+ * is not reported, since a skill may come from a plugin or an add-on
+ * (`agents/roster.ts`).
+ *
  * The tasks checked are the ones the DISPATCHER will reach rather than
  * the ones the model holds, so a task line a `rafa:*` block the plan
  * never closed hides is checked as well, against the line it sits on.
@@ -42,18 +49,20 @@
  * the working directory and the config that resolves there: its
  * `loop.settingSources` decides whether `~/.claude/agents` is in reach,
  * `tiers.rafa` whether rafa's own tier is, and `tiers.agents` which
- * names are off or pinned. The rafa tier is the one beside the running
- * entry.
+ * names are off or pinned, as `tiers.skills` decides for skills. The
+ * rafa tier is the one beside the running entry.
  * A config `loadConfig` refuses is refused with exit code 1. Handed no
- * project, the command says so and checks no agent, since it needs no
- * repository to read a plan; that is why the check is the command's and
- * not `validatePlan`'s, which reads one file and nothing else.
+ * project, the command says so and checks no agent and no skill, since
+ * it needs no repository to read a plan; that is why the check is the
+ * command's and not `validatePlan`'s, which reads one file and nothing
+ * else.
  *
  * ## What it writes
  *
  * With nothing to report, json mode gives the terminal result `data`:
  * `file` (absolute), the number of `stages`, the task counts under
- * `tasks`, an empty `issues` and an empty `missingAgents`. Text mode
+ * `tasks`, an empty `issues`, an empty `missingAgents` and an empty
+ * `skillCollisions`. Text mode
  * writes one line naming the file as typed, its stages and its counts.
  *
  * With issues, each is written at `error`, in line order, as
@@ -62,7 +71,9 @@
  * stdout in text mode. Each missing agent follows them, at `error` too,
  * as `<file>: <the line `missingAgentLine` words>`, which names the
  * agent, the task lines that asked for it, why it cannot be dispatched,
- * and the pin line or setting that settles it. The command then
+ * and the pin line or setting that settles it. Each colliding skill
+ * follows those, at `error`, as `<file>: <the line `skillCollisionLine`
+ * words>`. The command then
  * throws `CommandExit` with exit code 1 and a message counting what it
  * found, which text mode writes to stderr and json mode carries in the
  * terminal result.
@@ -71,7 +82,7 @@
  * are refused with exit code 1 before anything is parsed.
  */
 import type { TaskCounts } from './plan-files.js';
-import type { MissingAgent } from '../../agents/roster.js';
+import type { MissingAgent, SkillCollision } from '../../agents/roster.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { PlanIssue } from '../../plan/index.js';
@@ -80,7 +91,13 @@ import type { ProjectFound } from '../../project/scope.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { missingAgentLine, missingPlanAgents, resolveAgentRoster } from '../../agents/roster.js';
+import {
+  collidingPlanSkills,
+  missingAgentLine,
+  missingPlanAgents,
+  resolveAgentRoster,
+  skillCollisionLine,
+} from '../../agents/roster.js';
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
@@ -106,11 +123,16 @@ export interface PlanValidation {
   readonly issues: readonly PlanIssue[];
 }
 
-/** A plan file read, with the agents of its still-to-run tasks checked. */
-export interface PlanValidationResult extends PlanValidation {
+/** What the roster check of one plan found; see the module note. */
+export interface RosterFindings {
   /** Every `agent=` no loaded tier serves, each with why; empty when no project was found. */
   readonly missingAgents: readonly MissingAgent[];
+  /** Every `skills=` name two loaded tiers hold with different contents; empty when no project was found. */
+  readonly skillCollisions: readonly SkillCollision[];
 }
+
+/** A plan file read, with the agents and skills of its still-to-run tasks checked. */
+export interface PlanValidationResult extends PlanValidation, RosterFindings {}
 
 /** The plan at the absolute path `file`, read, or a refusal with exit code 1 when it is no file. */
 export function validatePlan(file: string): PlanValidation {
@@ -134,31 +156,39 @@ function resolvedConfig(project: ProjectFound, warn: (message: string) => void):
 
 /**
  * The `agent=` of the plan's still-to-run tasks that no tier the project
- * loads serves. None, with one line saying so, when the command was
- * handed no project; see the module note.
+ * loads serves, and the `skills=` names two loaded tiers hold with
+ * different contents. None, with one line saying so, when the command
+ * was handed no project; see the module note.
  */
-function checkAgents(context: RafaContext, markdown: string): readonly MissingAgent[] {
+function checkRoster(context: RafaContext, markdown: string): RosterFindings {
   const project = context.project;
   if (project === null) {
-    context.output.info('ℹ️  No project was found from the working directory, so no `agent=` was checked.');
-    return [];
+    context.output.info('ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.');
+    return { missingAgents: [], skillCollisions: [] };
   }
 
   const config = resolvedConfig(project, (message) => {
     context.output.warn(message);
   });
   const roots = { repoRoot: project.root, home: project.home };
-  return missingPlanAgents(markdown, resolveAgentRoster(roots, config));
+  const roster = resolveAgentRoster(roots, config);
+  return {
+    missingAgents: missingPlanAgents(markdown, roster),
+    skillCollisions: collidingPlanSkills(markdown, roster),
+  };
 }
 
-/** The refusal a plan with issues, missing agents or both ends with. */
-function refusalFor(typed: string, issues: number, agents: number): string {
+/** The refusal a plan with issues, missing agents, colliding skills or any mix ends with. */
+function refusalFor(typed: string, issues: number, agents: number, skills: number): string {
   const counts = [
     issues > 0
       ? plural(issues, 'issue')
       : null,
     agents > 0
       ? plural(agents, 'unresolvable agent')
+      : null,
+    skills > 0
+      ? plural(skills, 'skill collision')
       : null,
   ].filter((count): count is string => count !== null);
   const tail = issues > 0
@@ -173,7 +203,7 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
     name: 'plan validate',
     subject: 'plan',
     action: 'validate',
-    summary: 'check that a plan file reads as written and routes to agents that resolve, starting no session',
+    summary: 'check that a plan file reads as written and routes to agents and skills that resolve, starting no session',
     description: 'Reads one plan file with the plan parser, the rafa:* blocks and the checklist, and starts'
       + ' no session. When the parser reads the whole file as written, and every `agent=` of its'
       + ' still-to-run tasks resolves for a session spawned under `loop.settingSources`, `tiers.rafa` and'
@@ -181,7 +211,9 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       + ' issue the parser reported as an error line naming the file, the line and the reason, then one'
       + ' line per agent no loaded tier serves, saying why (held by no tier, switched off, held only by a'
       + ' tier the session does not load, or held by two tiers with different contents) and naming the'
-      + ' paths and the pin line or setting that settles it, then exits 1 — the same check'
+      + ' paths and the pin line or setting that settles it, then one line per `skills=` name two loaded'
+      + ' tiers hold with different contents, naming both paths and the `tiers.skills` pin line that'
+      + ' settles it, then exits 1 — the same check'
       + ' `rafa loop start` halts on before it dispatches anything. The path is read relative to the'
       + ' working directory; the agents are read from the project found from it and the config that'
       + ' resolves there, and are left unchecked when there is no project. With `--output=json` each issue'
@@ -212,12 +244,13 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       const file = resolve(workingDirectory(), typed);
       const validation = validatePlan(file);
       const { issues, stages, tasks } = validation;
-      const missingAgents = checkAgents(context, readFileSync(file, 'utf8'));
-      const result: PlanValidationResult = { ...validation, missingAgents };
-      if (issues.length > 0 || missingAgents.length > 0) {
+      const { missingAgents, skillCollisions } = checkRoster(context, readFileSync(file, 'utf8'));
+      const result: PlanValidationResult = { ...validation, missingAgents, skillCollisions };
+      if (issues.length > 0 || missingAgents.length > 0 || skillCollisions.length > 0) {
         for (const issue of issues) context.output.error(issueLine(typed, issue));
         for (const agent of missingAgents) context.output.error(`${typed}: ${missingAgentLine(agent)}`);
-        throw new CommandExit(1, refusalFor(typed, issues.length, missingAgents.length));
+        for (const skill of skillCollisions) context.output.error(`${typed}: ${skillCollisionLine(skill)}`);
+        throw new CommandExit(1, refusalFor(typed, issues.length, missingAgents.length, skillCollisions.length));
       }
       if (context.outputMode === 'json') {
         context.output.result(result);
