@@ -80,12 +80,15 @@ export type InventoryCheck = 'pass' | 'warn' | 'fail';
 
 /**
  * Whether an item answers under its name. `shadowed-by:<source>` names
- * the nearer source holding the same name and kind; `disabled:<how>`
- * names the switch that turned it off (`skillOverrides`, or the
- * frontmatter key).
+ * the source holding the same name and kind; `disabled:<how>` names
+ * the switch that turned it off (`skillOverrides`, the frontmatter key,
+ * `tiers.rafa`, `tiers.skills` or `tiers.agents`); `collision` marks a
+ * holder in one of two or more loaded tiers holding different items
+ * under the name, which nothing serves (`tiers/resolve.ts`).
  */
 export type InventoryState =
   | 'enabled'
+  | 'collision'
   | `shadowed-by:${InventorySource}`
   | `disabled:${string}`;
 

@@ -33,6 +33,7 @@
 import type { AgentListSeams } from './list.js';
 import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { InventoryRecord } from '../../inventory/record.js';
+import type { Resolution } from '../../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -173,6 +174,9 @@ function record(fields: Partial<InventoryRecord>): InventoryRecord {
   };
 }
 
+/** A resolution of no tier rows, for an inventory built by hand. */
+const NO_RESOLUTION: Resolution = { loadedTiers: [], items: [], collisions: [] };
+
 describe('the words an agent list line is read as', () => {
   it('reads the three filters, and nothing when each is left out', () => {
     expect(readAgentFilters({})).toEqual({ source: null, state: null, hiddenFromLoop: false });
@@ -193,7 +197,7 @@ describe('the words an agent list line is read as', () => {
   });
 
   it('refuses a plugin source the inventory does not know, and takes one it does', () => {
-    const inventory = { records: [record({ source: 'plugin:beta' })], trees: [], warnings: [], overrideWarnings: [] };
+    const inventory = { records: [record({ source: 'plugin:beta' })], trees: [], resolution: NO_RESOLUTION, warnings: [], overrideWarnings: [] };
 
     expect(() => expectKnownAgentSource('plugin:beta', inventory)).not.toThrow();
     expect(() => expectKnownAgentSource(null, inventory)).not.toThrow();
@@ -223,6 +227,18 @@ describe('the home definitions a run cannot reach', () => {
     ];
 
     expect(unreachableUserAgents(agents)).toEqual([]);
+  });
+
+  it('leaves out a colliding home name, which a pin settles and vendoring does not', () => {
+    const colliding = [
+      record({ name: 'tdd-guide', state: 'collision', visibleToLoop: false }),
+      record({ name: 'tdd-guide', source: 'user', state: 'collision', visibleToLoop: false }),
+    ];
+    // Control: the same hidden home row, not colliding, is named.
+    const hidden = [record({ name: 'tdd-guide', source: 'user', visibleToLoop: false })];
+
+    expect(unreachableUserAgents(colliding)).toEqual([]);
+    expect(unreachableUserAgents(hidden)).toEqual(['tdd-guide']);
   });
 
   it('writes the count and the vendor command, and nothing for no name', () => {
@@ -325,8 +341,10 @@ describe('rafa agent list over planted sources', () => {
     expect(rowsOf(json.stdout)).toEqual([
       ['alpha:reviewer', 'plugin:alpha', 'enabled', true],
       ['home-only', 'user', 'enabled', true],
-      ['tdd-guide', 'project', 'enabled', true],
-      ['tdd-guide', 'user', 'shadowed-by:project', false],
+      // The two copies differ, so with the user tier loaded they collide
+      // (`resolveTiers`), and a loop session is served neither.
+      ['tdd-guide', 'project', 'collision', false],
+      ['tdd-guide', 'user', 'collision', false],
     ]);
     expect(resultData(json.stdout).unreachable).toEqual([]);
     expect(text.exitCode).toBe(0);

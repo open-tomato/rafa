@@ -19,9 +19,11 @@
  *
  * The same as `rafa skill list` builds it: the project the dispatcher
  * found gives the root and the home, the project's config gives
- * `loop.settingSources`, which decides `visibleToLoop`, and the
- * config's `modules:` are loaded, only a `loaded` one being an add-on
- * source. A config `loadConfig` refuses is a refusal here too. The
+ * `loop.settingSources`, which decides `visibleToLoop`, and
+ * `tiers.rafa`, `tiers.skills` and `tiers.agents`, which `resolveTiers`
+ * reads for a tier row's state, and the config's `modules:` are
+ * loaded, only a `loaded` one being an add-on source. A config
+ * `loadConfig` refuses is a refusal here too. The
  * rafa tier is measured from {@link AgentListSeams.entry}, `Bun.main`
  * by default and a planted file in a test, and the module loader's
  * seams are {@link AgentListSeams.modules}.
@@ -45,9 +47,10 @@
  * rows whose name NO visible row answers, then one pointing at the
  * vendor command. A home definition the project shadows is not one of
  * them: its name resolves, at the project's file, and there is nothing
- * to vendor. The hint reads the whole inventory whatever the filters
- * keep, so narrowing the rows never hides it, and json mode gives the
- * same names as `unreachable`.
+ * to vendor. Nor is one in a `collision`: vendoring it would not settle
+ * which copy serves the name, a pin does. The hint reads the whole
+ * inventory whatever the filters keep, so narrowing the rows never
+ * hides it, and json mode gives the same names as `unreachable`.
  *
  * ## `-i | --interactive`
  *
@@ -173,12 +176,13 @@ export function expectKnownAgentSource(source: string | null, inventory: Invento
 /**
  * The `user` agent names no visible agent row answers, sorted, each
  * once: the definitions `rafa agent vendor` would copy. A name the
- * project also holds is answered there and left out.
+ * project also holds is answered there and left out, and a `collision`
+ * row is left out, as a pin settles it and vendoring does not.
  */
 export function unreachableUserAgents(agents: readonly InventoryRecord[]): readonly string[] {
   const answered = new Set(agents.filter((agent) => agent.visibleToLoop).map((agent) => agent.name));
   const names = agents
-    .filter((agent) => agent.source === 'user' && !answered.has(agent.name))
+    .filter((agent) => agent.source === 'user' && agent.state !== 'collision' && !answered.has(agent.name))
     .map((agent) => agent.name);
   return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
@@ -270,13 +274,16 @@ async function projectInventory(
   try {
     const resolved = loadConfig({ root: project.root, home: project.home });
     const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
-    const { settingSources } = resolved.config;
+    const { settingSources, tiersRafa, tiersSkills, tiersAgents } = resolved.config;
     const inventory = buildInventory({
       home: project.home,
       projectRoot: project.root,
       entry: seams.entry(),
       pathDirs: pathDirectories(context.env['PATH']),
       settingSources,
+      tiersRafa,
+      tiersSkills,
+      tiersAgents,
       modules: loaded.modules,
     });
     return { inventory, settingSources };

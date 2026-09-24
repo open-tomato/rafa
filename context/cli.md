@@ -818,12 +818,13 @@ New; it replaces no earlier text. What a row or an action added to
   lists every skill the inventory holds** (`src/commands/skill/list.ts`,
   over `buildInventory` in `src/inventory/index.ts`). The inventory is
   built against the project the dispatcher resolved, its home, the
-  config's `loop.settingSources` and the modules `loadModules` answers
-  `loaded`; the rafa tier is measured from `Bun.main`, and the entry and
+  config's `loop.settingSources`, `tiers.rafa`, `tiers.skills` and
+  `tiers.agents`, and the modules `loadModules` answers `loaded`; the
+  rafa tier is measured from `Bun.main`, and the entry and
   the module loader's seams are the command factory's two seams. One row
   per skill, of every source (`project`, `rafa`, `user`, `addon:<name>`,
   `plugin:<name>`), prints `●` when a loop session resolves it and `○`
-  when not, then its name, source, state (`enabled`,
+  when not, then its name, source, state (`enabled`, `collision`,
   `shadowed-by:<source>` or `disabled:<how>`) and summary, the columns
   padded to the widest cell. `--source` keeps the rows of one whole
   source string and refuses a `plugin:` or `addon:` source no row or

@@ -21,6 +21,7 @@
  * holds, whose refusal carries no hint.
  */
 import type { ShowView } from '../../inventory/show.js';
+import type { Resolution } from '../../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -172,9 +173,12 @@ function record(kind: 'skill' | 'agent', name: string, source: 'project' | 'user
   } as const;
 }
 
+/** A resolution of no tier rows, for an inventory built by hand. */
+const NO_RESOLUTION: Resolution = { loadedTiers: [], items: [], collisions: [] };
+
 /** An inventory holding the rows given, and nothing else. */
 function inventoryOf(records: ReturnType<typeof record>[]) {
-  return { records, trees: [], warnings: [], overrideWarnings: [] };
+  return { records, trees: [], resolution: NO_RESOLUTION, warnings: [], overrideWarnings: [] };
 }
 
 describe('which skill a name shows', () => {

@@ -348,8 +348,13 @@ export function servedFlags(
   return [...skillFlag, ...agentFlag];
 }
 
-/** A winner's final verdict: a skill admitted, an agent with its entry, or why it is left out. */
-function judge(row: TierRow): ServeVerdict<AgentDefinition | null> {
+/**
+ * A rafa-tier winner's final verdict: a skill admitted, an agent with
+ * its entry, or why it is left out. It reads the row's file and copies
+ * nothing, so `buildInventory` (`inventory/index.ts`) asks it whether a
+ * rafa row is being served, and the two can never disagree.
+ */
+export function serveVerdict(row: TierRow): ServeVerdict<AgentDefinition | null> {
   const read = admit(row);
   if (!read.ok) return read;
   return row.kind === 'skill'
@@ -369,7 +374,7 @@ export function serveResolution(resolution: Resolution, options: ServeOptions): 
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
 
-  const judged = rafaWinners(resolution).map((item) => ({ row: item.winner, verdict: judge(item.winner) }));
+  const judged = rafaWinners(resolution).map((item) => ({ row: item.winner, verdict: serveVerdict(item.winner) }));
   const skillsDir = join(dir, SERVED_SKILLS_PATH[delivery]);
   const skills = judged.flatMap(({ row, verdict }) => verdict.ok && row.kind === 'skill'
     ? [copySkill(row, skillsDir)]

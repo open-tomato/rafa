@@ -40,8 +40,10 @@
  * the Settings section rather than given a fix of its own: why it is
  * hidden (a source left out, a shadow, a switch) is that section's
  * reading. The exception is an item of the `rafa` or an `addon:`
- * source, which the Settings section leaves out as no session is ever
- * handed one: it reads as the missing item it is to a session. A plan
+ * source, which the Settings section leaves out: a hidden one is a
+ * rafa item rafa does not serve (`inventory/index.ts`), or an add-on's,
+ * which no session is ever handed. It reads as the missing item it is
+ * to a session. A plan
  * with nothing unmet is one `ok` row. The stacks' own lines are not
  * repeated: they are the Stack tools section.
  *
@@ -196,7 +198,7 @@ function unmetPhrase(need: Need): string {
   return `${from.trim()}, not visible to a run`;
 }
 
-/** Whether a source is one no session is ever handed: rafa's own tier, or an add-on's. */
+/** Whether a source is rafa's own tier or an add-on's, which the Settings section leaves out. */
 function isRafaSource(source: string | null): boolean {
   return source === 'rafa' || (source?.startsWith('addon:') ?? false);
 }
@@ -214,6 +216,7 @@ function unmetFix(need: Need): string {
   }
   const add = `add the ${need.kind} ${need.name} under .claude/${need.kind}s/ in this project`;
   if (need.status === 'missing') return add;
+  if (need.source === 'rafa') return `${add}: rafa does not serve its ${need.kind} ${need.name}`;
   return isRafaSource(need.source)
     ? `${add}: a session is never handed a ${need.source ?? ''} ${need.kind}`
     : `see the ${need.source ?? ''} ${need.kind} ${need.name} in the Settings section`;

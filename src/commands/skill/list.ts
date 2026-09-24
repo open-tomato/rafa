@@ -17,9 +17,11 @@
  *
  * The project the dispatcher found gives the root and the home, the
  * project's config gives `loop.settingSources`, which decides
- * `visibleToLoop`, and the config's `modules:` are loaded as
- * `rafa module list` loads them, since only a `loaded` module is an
- * add-on source. A config `loadConfig` refuses is a refusal here too.
+ * `visibleToLoop`, and `tiers.rafa`, `tiers.skills` and `tiers.agents`,
+ * which `resolveTiers` reads for a tier row's state, and the config's
+ * `modules:` are loaded as `rafa module list` loads them, since only a
+ * `loaded` module is an add-on source. A config `loadConfig` refuses is
+ * a refusal here too.
  * The rafa tier is measured from this process's entry, which under
  * `bun test` is the test runner rather than a `cli.js`, so the entry is
  * {@link SkillListSeams.entry}, `Bun.main` by default and a planted
@@ -449,13 +451,16 @@ export async function projectInventory(
   try {
     const resolved = loadConfig({ root: project.root, home: project.home });
     const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
-    const { settingSources } = resolved.config;
+    const { settingSources, tiersRafa, tiersSkills, tiersAgents } = resolved.config;
     const inventory = buildInventory({
       home: project.home,
       projectRoot: project.root,
       entry: seams.entry(),
       pathDirs: pathDirectories(context.env['PATH']),
       settingSources,
+      tiersRafa,
+      tiersSkills,
+      tiersAgents,
       modules: loaded.modules,
     });
     return { inventory, settingSources };

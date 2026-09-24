@@ -4,7 +4,9 @@
  * One world is planted under this file's temporary directory: a
  * TypeScript project (a `tsconfig.json` at its root), a home holding a
  * user-only skill `symbols` whose description names `ts-symbols`, a rafa
- * entry with one skill of its own beside it, and one `PATH` directory
+ * entry with two skills of its own beside it (`rafa-served`, which rafa
+ * serves, and `rafa-only`, an unreviewed third-party one it does not),
+ * and one `PATH` directory
  * holding `ts-symbols`. A second rafa entry holds `ts-symbols` in its
  * `bundled/bin`, as a build does. A second project root holds no marker.
  *
@@ -82,7 +84,11 @@ write(join(projectRoot, '.claude/agents/project-reviewer.md'), agent('project-re
 write(join(home, '.claude/agents/user-reviewer.md'), agent('user-reviewer'));
 write(join(home, '.claude/skills/symbols/SKILL.md'), skill('symbols', 'Trace TypeScript symbols with ts-symbols'));
 write(join(runtime, 'cli.js'), '');
-write(join(runtime, 'bundled/skills/rafa-only/SKILL.md'), skill('rafa-only', 'A skill rafa ships'));
+write(
+  join(runtime, 'bundled/skills/rafa-only/SKILL.md'),
+  skill('rafa-only', 'A skill rafa ships').replace('\n---\n\n', '\nprovenance:\n  origin: https://example.com/x\n  license: MIT\n---\n\n'),
+);
+write(join(runtime, 'bundled/skills/rafa-served/SKILL.md'), skill('rafa-served', 'A skill rafa serves'));
 mkdirSync(bareRoot, { recursive: true });
 
 write(join(binDir, 'ts-symbols'), '#!/bin/sh\n');
@@ -96,7 +102,7 @@ write(planPath, [
   '',
   '- [ ] Review with the project agent {agent=project-reviewer}',
   '- [ ] Review with the user agent {agent=user-reviewer}',
-  '- [ ] Use two skills {skills=absent-skill,rafa-only}',
+  '- [ ] Use three skills {skills=absent-skill,rafa-only,rafa-served}',
   '- [ ] Ask a server {tools=mcp__ghost__lookup}',
   '',
 ].join('\n'));
@@ -310,8 +316,10 @@ describe('planNeedsSection', () => {
     });
     expect(byName.get('skill rafa-only')).toMatchObject({
       detail: 'rafa enabled, not visible to a run (task line 5)',
-      fix: 'add the skill rafa-only under .claude/skills/ in this project: a session is never handed a rafa skill',
+      fix: 'add the skill rafa-only under .claude/skills/ in this project: rafa does not serve its skill rafa-only',
     });
+    // Control: the rafa skill rafa serves is visible, so it is no row.
+    expect(byName.has('skill rafa-served')).toBe(false);
     expect(byName.get('mcp ghost')).toMatchObject({
       detail: 'missing (task line 6)',
       fix: 'declare the mcp server ghost in a scope loop.settingSources loads',

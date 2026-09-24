@@ -14,7 +14,11 @@
  *   - `switched`, a project skill `skillOverrides` sets `off`, and
  *     `quiet`, one whose frontmatter sets `disable-model-invocation`;
  *   - `rafa-only` beside the entry and `addon-only` in a loaded add-on,
- *     which the inventory reads as hidden and this section leaves out;
+ *     which this section leaves out; the rafa one reads as hidden once
+ *     `tiers.rafa` is `off`, since otherwise rafa serves it;
+ *   - under `tiers.skills` pinning `project-only` to `false`, that skill,
+ *     and in a second project whose `gate-order` differs from the
+ *     home's, both copies as a `collision`;
  *   - MCP servers: `proj-srv` (loads), `off-srv` (`disabledMcpServers`),
  *     `rejected-srv` (`disabledMcpjsonServers` in the project settings),
  *     `shared` in both `local` and `project` (the project one shadowed),
@@ -172,13 +176,14 @@ describe('readDeepSettings: which items are hidden', () => {
   });
 
   it('leaves out rafa and add-on rows the inventory itself reads as hidden', () => {
-    const inventoryHidden = buildInventory(seams(WITH_USER)).records
+    const rafaOff: DeepSettingsSeams = { ...seams(WITH_USER), tiersRafa: 'off' };
+    const inventoryHidden = buildInventory(rafaOff).records
       .filter((record) => !record.visibleToLoop)
       .map((record) => record.source);
     expect(inventoryHidden).toContain('rafa');
     expect(inventoryHidden).toContain('addon:linear');
 
-    const sources = readDeepSettings(seams(WITH_USER)).hidden.map((item) => item.source);
+    const sources = readDeepSettings(rafaOff).hidden.map((item) => item.source);
     expect(sources).not.toContain('rafa');
     expect(sources).not.toContain('addon:linear');
   });
@@ -239,6 +244,33 @@ describe('readDeepSettings: why and the fix', () => {
     const item = hiddenItem(WITH_USER, 'project mcp server shared');
     expect(item.why).toBe('shadowed by the local mcp server of the same name');
     expect(item.fix).toBe('rename it, or remove the local mcp server shared');
+  });
+
+  it('names the config key whose false switched a skill off', () => {
+    const pinned: DeepSettingsSeams = { ...seams(WITH_USER), tiersSkills: new Map([['project-only', false]]) };
+    const item = readDeepSettings(pinned).hidden.find((hidden) => label(hidden) === 'project skill project-only');
+
+    expect(item).toMatchObject({
+      why: `tiers.skills sets it to false in ${CONFIG_FILE}`,
+      fix: `remove project-only from tiers.skills in ${CONFIG_FILE}`,
+    });
+    // Control: without the pin the same skill is visible, so no row.
+    expect(readDeepSettings(seams(WITH_USER)).hidden.map(label)).not.toContain('project skill project-only');
+  });
+
+  it('gives the pin line for both copies of a colliding skill', () => {
+    const clashRoot = join(base, 'clash-project');
+    write(join(clashRoot, '.claude/skills/gate-order/SKILL.md'), skill('gate-order', 'version: 2\n'));
+    const hidden = readDeepSettings({ ...seams(WITH_USER), projectRoot: clashRoot }).hidden;
+    const clashing = hidden.filter((item) => item.name === 'gate-order');
+
+    expect(clashing.map(label)).toEqual(['project skill gate-order', 'user skill gate-order']);
+    for (const item of clashing) {
+      expect(item.why).toBe('another loaded tier holds a different skill of the same name, so neither is served');
+      expect(item.fix).toBe(`pin the tier that serves it in ${CONFIG_FILE}: tiers.skills: { gate-order: project }`);
+    }
+    // Control: in the main project the two copies are byte-identical, so only the home one is a row, as shadowed.
+    expect(hiddenItem(WITH_USER, 'user skill gate-order').why).toBe('shadowed by the project skill of the same name');
   });
 
   it('gives the source first when the server\'s own source is off', () => {

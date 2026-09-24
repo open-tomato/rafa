@@ -37,6 +37,7 @@
 import type { SkillListSeams } from './list.js';
 import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { InventoryRecord } from '../../inventory/record.js';
+import type { Resolution } from '../../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -219,11 +220,15 @@ function record(fields: Partial<InventoryRecord>): InventoryRecord {
   };
 }
 
+/** A resolution of no tier rows, for an inventory built by hand. */
+const NO_RESOLUTION: Resolution = { loadedTiers: [], items: [], collisions: [] };
+
 /** An inventory holding the rows and warnings given, and nothing else. */
 function inventoryOf(records: readonly InventoryRecord[], warningSources: readonly string[] = []) {
   return {
     records,
     trees: [],
+    resolution: NO_RESOLUTION,
     warnings: warningSources.map((source) => ({ source: source as `plugin:${string}`, path: '/x', reason: 'unreadable' })),
     overrideWarnings: [],
   };
@@ -412,8 +417,10 @@ describe('rafa skill list over planted sources', () => {
       ['alpha:brainstorm', 'plugin:alpha', 'enabled', true],
       ['switched-off', 'project', 'disabled:skillOverrides', false],
       ['user-only', 'user', 'enabled', true],
-      ['verification-loop', 'project', 'enabled', true],
-      ['verification-loop', 'user', 'shadowed-by:project', false],
+      // The two copies differ, so with the user tier loaded they collide
+      // (`resolveTiers`), and a loop session is served neither.
+      ['verification-loop', 'project', 'collision', false],
+      ['verification-loop', 'user', 'collision', false],
     ]);
   });
 

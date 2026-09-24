@@ -19,20 +19,41 @@ Each item in the inventory holds these fields:
 | `stack` | frontmatter list of technology tags; empty when absent |
 | `tags` | frontmatter list of domain tags; empty when absent |
 | `check` | `pass`, `warn`, or `fail`, from `checkDirectory` for skills only |
-| `state` | `enabled`, `shadowed-by:<source>`, or `disabled:<how>` |
-| `visibleToLoop` | boolean: true when a session spawned under this project's `loop.settingSources` resolves it |
+| `state` | `enabled`, `collision`, `shadowed-by:<source>`, or `disabled:<how>` |
+| `visibleToLoop` | boolean: true when a session spawned under this project's `loop.settingSources` resolves it, or is served it |
 
 ### Sources and precedence
 
 Precedence is nearest-first: **project**, **rafa**, **user**,
-**addon:\<name\>**, **plugin:\<name\>**. The first holder of a given name and
-kind is `enabled` (unless explicitly disabled); each later holder of that
-name and kind is `shadowed-by:<source>` where `<source>` is the first holder's
-source. A shadowed or disabled item is never visible.
+**addon:\<name\>**, **plugin:\<name\>**. The three tiers' rows take their
+state from `resolveTiers` (`src/tiers/resolve.ts`) under
+`loop.settingSources`, `tiers.rafa`, `tiers.skills` and `tiers.agents`, so
+the inventory restates none of its rules:
+
+- a name one holder serves: the winner is `enabled` (unless explicitly
+  disabled), and every other holder, a byte-identical copy included, is
+  `shadowed-by:<winner's source>`. Under a pin the winner can be the
+  farther tier;
+- a name two or more loaded tiers hold with different contents and no pin:
+  each loaded tier's holder is `collision`, and nothing serves it;
+- a name `tiers.skills` or `tiers.agents` sets to `false`: its nearest
+  holder is `disabled:tiers.skills` or `disabled:tiers.agents`;
+- a name only the rafa tier holds while `tiers.rafa` is `off`:
+  `disabled:tiers.rafa`.
+
+Add-on and plugin rows, which `resolveTiers` leaves out, come after: a name
+a tier holds shadows them, and otherwise the first holder of a name and kind
+is `enabled` (unless explicitly disabled) and each later one
+`shadowed-by:<first source>`. A tier row's state can therefore move with
+`loop.settingSources`: a project item and a different user item of one name
+are `enabled` and `shadowed-by:project` without `user`, and both `collision`
+with it. A shadowed, colliding or disabled item is never visible
+(`src/inventory/index.ts`).
 
 ### Disabled readings
 
-`disabled:<how>` reads from two places:
+`disabled:<how>` reads from the tier settings above, and from two places
+outside the config:
 
 - **`skillOverrides` setting**: when set to `off`, reads as
   `disabled:skillOverrides`; other values (`name-only`, `user-invocable-only`,
@@ -45,20 +66,24 @@ source. A shadowed or disabled item is never visible.
   `disabled:disable-model-invocation` (`src/inventory/disabled.ts`).
 
 An item cannot be shadowed AND disabled; once shadowed, shadowing takes
-precedence in `state`.
+precedence in `state`. A colliding item reads `collision` even when a
+switch would disable it, since the loop refuses the name either way.
 
 ### visibleToLoop
 
 An item is visible to a loop session if and only if:
 
-- It is not disabled or shadowed, AND
+- It is `enabled`, AND
 - Its source passes the visibility rule:
   - **project** items are always visible
   - **user** and **plugin:\<name\>** items are visible only when
     `loop.settingSources` includes `user`
-  - **rafa** and **addon:\<name\>** items are never visible, because
-    `claudeArgs` in `src/utils/claude.ts` passes no directory of theirs to
-    a session
+  - **rafa** items are visible when they are served: the winner of their
+    name, admitted by `serveVerdict` (`src/tiers/serve.ts`), the check
+    `serveResolution` makes before it copies one. An unreviewed third-party
+    rafa item is therefore not visible
+  - **addon:\<name\>** items are never visible, because `claudeArgs` in
+    `src/utils/claude.ts` passes no directory of theirs to a session
 
 Plugins are recorded in the user scope at
 `~/.claude/plugins/installed_plugins.json`; the plugin reader scans that file

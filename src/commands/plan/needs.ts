@@ -33,8 +33,9 @@
  * The inventory is built as `rafa skill list` builds it: the project
  * root and the home the dispatcher found, `loop.settingSources` from the
  * config, which decides `visibleToLoop` and which MCP server a run
- * starts, the config's loaded modules as add-on sources, the rafa tier
- * beside {@link PlanNeedsSeams.entry}, and `PATH` from
+ * starts, its `tiers.rafa`, `tiers.skills` and `tiers.agents`, which
+ * decide a tier row's state, the config's loaded modules as add-on
+ * sources, the rafa tier beside {@link PlanNeedsSeams.entry}, and `PATH` from
  * `RafaContext.env`, which is also where a program is looked up, after
  * the rafa tier's `bundled/bin` for a program rafa ships (`ts-symbols`).
  *
@@ -354,6 +355,9 @@ async function readMachine(
         entry: seams.entry(),
         pathDirs: pathDirectories(context.env['PATH']),
         settingSources: config.settingSources,
+        tiersRafa: config.tiersRafa,
+        tiersSkills: config.tiersSkills,
+        tiersAgents: config.tiersAgents,
         modules: loaded.modules,
       },
     };
