@@ -131,6 +131,7 @@ the next one, so you rarely have to remember it.
    rafa plan create --spec=.rafa/specs/my-feature.md   # 🪙
    rafa plan create --issue=42        # 🪙 the spec is issue #42's body
    rafa plan create --next            # 🪙 the first undone line of the Roadmap issue
+   rafa roadmap                        # see the roadmap as a table
    rafa plan show my-feature          # read it before you run it
    ```
 
@@ -342,7 +343,7 @@ and a line here is ticked by the change that finishes the feature.
 - ✅ Before a run, see what it can do on this machine and under your accounts
 - ✅ See every skill and agent a run would use, browse them, and ask
   about them in plain language
-- ⬜ The roadmap in one table: what is ready, what blocks it, and what
+- ✅ The roadmap in one table: what is ready, what blocks it, and what
   already has a plan, a branch or a pull request
 - ⬜ `rafa doctor --deep`: what a loop session and its subagents can
   actually reach — settings, `PATH`, providers and the tools its stack needs

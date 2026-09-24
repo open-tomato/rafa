@@ -22,6 +22,11 @@
  *    once without, and holds `unknown-issue` against `blocked`. Without
  *    the pair, a reader that called every id unknown would look correct
  *    on the first half alone.
+ *  - The foreign cases plant `owner/repo#<n>` tokens whose number is
+ *    also a local id or the issue's own. The bare-`#n` control reads the
+ *    same ids with no foreign token and holds the whole reading equal to
+ *    what it was before foreign tokens were read, so a reader that
+ *    dropped every id on a line holding a `/` fails there.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -206,5 +211,55 @@ describe('the fault sentence', () => {
     const read = readBlockedBy(57, BLOCKED_BODY);
 
     expect(() => blockedFaultMessage(read)).toThrow(/#57 names #24 #26 and has no fault to report/u);
+  });
+});
+
+describe('a blocker on another repository', () => {
+  it('is kept as written and not read as a local id when it stands alone', () => {
+    const read = readBlockedBy(57, body('Blocked by: open-tomato/agentic-research#57'));
+
+    expect(read.kind).toBe('no-ids');
+    expect(read.blockers).toEqual([]);
+    expect(read.foreign).toEqual(['open-tomato/agentic-research#57']);
+    expect(read.unknown).toEqual([]);
+    expect(blockedFaultMessage(read)).toBe(
+      '#57 has a "Blocked by:" line on line 1 naming only issues on other repositories: '
+      + 'open-tomato/agentic-research#57; '
+      + 'name them as "Blocked by: #24 #26", or take the spec:blocked label off',
+    );
+  });
+
+  it('sits beside local ids without adding its number to them or to the unknown', () => {
+    const line = 'Blocked by: #24, Some-Org/my_repo.js#26 and #3 some-org/my_repo.js#26';
+    const read = readBlockedBy(57, body(line), new Set([3, 24, 57]));
+
+    expect(read.kind).toBe('blocked');
+    expect(read.blockers).toEqual([24, 3]);
+    expect(read.foreign).toEqual(['Some-Org/my_repo.js#26', 'some-org/my_repo.js#26']);
+    expect(read.unknown).toEqual([]);
+  });
+
+  it('is read once when the line repeats it', () => {
+    const read = readBlockedBy(57, body('Blocked by: #24 acme/api#9 acme/api#9'));
+
+    expect(read.foreign).toEqual(['acme/api#9']);
+  });
+
+  it('is absent from a bare #n line, which reads exactly as before', () => {
+    const read = readBlockedBy(57, body('Blocked by: #24, #26 and #24'), new Set([24, 26, 57]));
+
+    expect(read).toEqual({
+      kind: 'blocked',
+      issue: 57,
+      line: 1,
+      text: '#24, #26 and #24',
+      blockers: [24, 26],
+      foreign: [],
+      unknown: [],
+    });
+    expect(readBlockedBy(57, body('Blocked by: #57')).kind).toBe('self-reference');
+    expect(blockedFaultMessage(readBlockedBy(57, body('Blocked by: the API work')))).toContain(
+      'naming no issue: "the API work"',
+    );
   });
 });

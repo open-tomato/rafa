@@ -134,6 +134,22 @@ its pull request closes.
 To change the order, edit the issue. There is nothing else to keep in
 sync.
 
+### See the roadmap as a table
+
+```bash
+rafa roadmap      # all undone items
+rafa issue list --roadmap --all    # including done items
+```
+
+`rafa roadmap` reads the roadmap issue once and prints each line as a table
+row. The table has three columns beyond the item itself: **spec** (readiness,
+whether the issue carries `spec:ready`), **blocked by** (the first blocker if
+any, else empty), and **has** (what already exists: a plan, a branch, or an
+open pull request). This view helps you see at a glance what is ready for
+planning, what is waiting, and what is already in motion. `--all` includes
+done items, and `rafa issue list --roadmap` offers more output formats and
+filters than `rafa roadmap` does.
+
 ## Labels
 
 | Label | Meaning | Who sets it |

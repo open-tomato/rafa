@@ -121,9 +121,14 @@ New; it replaces no earlier text. What a row or an action added to
   roster expectations in `src/commands/index.test.ts`, `COMMAND_MODULES`
   in `src/index.test.ts`, and the frozen help snapshots — the last only
   for a new subject or top-level command, or a subject summary that
-  changes with it. A changed subject summary reddens a fourth file as
-  well, `src/tests/spends-cli-surface.test.ts`, whose spawned `--help`
-  case pins each roster line whole, spend mark included. An action
+  changes with it. A changed subject summary or a new top-level command
+  reddens `src/tests/spends-cli-surface.test.ts` as well, whose spawned
+  `--help` cases pin each roster line and the root `Commands` line
+  whole, spend mark included. A new top-level command also reddens the
+  control case in `src/cli/help.test.ts` that pins the root `Commands`
+  line as a literal: `RAFA_UPDATE_HELP_SNAPSHOTS=1` rewrites `rafa.txt`
+  but not that string, which is edited by hand (measured on 2026-09-24,
+  registering `roadmap`). An action
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
@@ -144,7 +149,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `release status`, `release tag`, `next`, `init`,
+  `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
   `doctor`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
@@ -241,7 +246,10 @@ New; it replaces no earlier text. What a row or an action added to
   config names another. That is where `plan create` writes and where
   `loop start` looks for its default plan, and the directory whose plan
   stubs `effort collect` attributes sessions by, so the readers and the
-  writers are on one directory whatever `plan.dir` is set to. A config
+  writers are on one directory whatever `plan.dir` is set to.
+  `resolvePlansDir` loads the config itself, so a command that also
+  reads another key loads it once and passes `config.planDir` to
+  `plansDirAt`, or the config's warnings are written twice. A config
   `loadConfig` refuses is refused with exit code 1, and a line handing
   the wrong number of arguments is refused before the config is read.
   The sweep guard in `src/tests/default-plan-dirs.test.ts` still spells
@@ -927,6 +935,40 @@ New; it replaces no earlier text. What a row or an action added to
   are seams of each command's factory. `src/commands/issue/create.test.ts`
   spawns `issue create` and `issues list` under a stand-in `gh` failing
   the `github` preflight.
+- **`issue list --roadmap` prints the Roadmap in a table**
+  (`src/board/roadmap-rows.ts`, `src/commands/issue/roadmap-table.ts`)
+  with three new columns over the plain list. `--all` includes ticked
+  lines; without it, only unticked lines are shown. The three columns:
+  `spec` is the readiness gate's reading of the body — `ready`, `gaps:
+  <heading>, …`, `outline` (fewer than three template headings, no
+  label), or a disagreement with the label, `label: ready, gate: gaps`
+  or `label: none, gate: ready` — and is read for every row whatever its
+  type, not only `type:spec`. `blocked by` is each blocker as `#<n>
+  open`, `#<n> closed`, `#<n> unknown` (not on the board listing), or
+  `owner/repo#<n> unknown` for one on another repository, else blank.
+  `has` is every one of `plan`, `branch` and `pr #<n>` that exists,
+  joined with `, `. One `gh` read of the board and one of the Roadmap
+  body itself: when the board is unreachable, a `warn:` line is printed
+  on stdout ahead of the rows in text mode, the rows read from the
+  Roadmap body alone with `spec` and `blocked by` empty and `has` still
+  filled, and the command exits 0. The branch reading is
+  `scanClaimBranches`, which also runs `git ls-remote --heads`: a
+  repository with no `origin` adds a warning, so a spawned case plants a
+  bare `origin` (`src/tests/roadmap-cli.test.ts`). The other flags
+  narrow after the Roadmap's selection keeps its order: `--type` and
+  `--module` by the labels read with `typeOfLabels` and
+  `moduleOfLabels`, exported from `src/adapters/tracker/github.ts` so
+  the mapping is spelled once (`type:feature` reads `code`), `--search`
+  by text case-folded in the title or body, and `--limit` keeps the
+  first that many. `--state` beside `--roadmap` is refused on its
+  presence, whatever its value. `rafa roadmap` (`src/commands/roadmap.ts`)
+  is a top-level command that runs `issue list --roadmap` and is not an
+  alias, so help, `describe` and the spends reading name one place
+  rather than two. It leaves `--state` undeclared and still refuses it:
+  `parseArgs` reads an undeclared `--flag` into the context rather than
+  refusing it, so the shared run sees it. Its text output is the same
+  bytes as `issue list --roadmap`; in json mode only the result events
+  match, since the start event names the command as typed.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -970,10 +1012,12 @@ New; it replaces no earlier text. What a row or an action added to
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `comment`, `stub`,
   `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
-  flags `state`, `type`, `module`, `search` and `limit`, `show` the
-  argument `id`, `create` the flags `title`, `body`, `type`, `module` and
-  `priority`, `comment` the argument `id` and the flag `body`, and `move`
-  the arguments `id` and `state`; each declares `text` and `json`. Of the `pr` actions, `pr current` and `pr list`
+  flags `roadmap`, `all`, `state`, `type`, `module`, `search` and `limit`,
+  `show` the argument `id`, `create` the flags `title`, `body`, `type`,
+  `module` and `priority`, `comment` the argument `id` and the flag `body`,
+  and `move` the arguments `id` and `state`; each declares `text` and
+  `json`. `roadmap` is also a top-level command that runs `list` with
+  `--roadmap` set. Of the `pr` actions, `pr current` and `pr list`
   declare no argument and no flag, each with `text` and `json`. `pr show` and `pr view`
   declare the argument `n` and no flag. `pr merge`
   declares the argument `n` and the flags `yes`, `skip-checks`, `method` and `hint`, and

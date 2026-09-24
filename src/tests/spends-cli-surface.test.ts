@@ -60,6 +60,15 @@ describe('rafa --help, spawned', () => {
     expect(run.stdout).toContain('  loop       start a plan; stop, pause, resume, show and list its sessions 🪙\n');
     expect(run.stdout).toContain('🪙  starts Claude Code sessions, which spend your Claude usage\n');
   }, RUN_TIMEOUT);
+
+  it('lists the top-level commands with next alone marked, roadmap among the unmarked', () => {
+    const scratch = plantScratchRepo(tempBase);
+
+    const run = runRafa(scratch, scratch.repo, ['--help']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('Commands:\n  next 🪙, roadmap, init, doctor, self-update, usage, describe\n');
+  }, RUN_TIMEOUT);
 });
 
 describe('rafa pr --help, spawned', () => {
@@ -100,5 +109,6 @@ describe('rafa describe --output=json, spawned', () => {
 
     const document = result?.data as DescribeDocument;
     expect(spendersOf(document).sort()).toEqual(['agent search', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
+    expect(document.commands.find((command) => command.name === 'roadmap')?.spends).toBeNull();
   }, RUN_TIMEOUT);
 });
