@@ -65,6 +65,7 @@ module's note is the long form.
 | `src/commands/doctor-deep-needs.ts` | the Stack tools and Plan needs readings of `--deep`: every unmet stack tool and, for a plan `--plan` names alone, its unmet needs over `src/plan/needs.ts` |
 | `src/commands/doctor-deep-row.ts` | the row every deep section is read into, the section holding them, and the text lines both render to; each status is `ok`, `warn` or `note`, never a failure or a `PreflightCheck` |
 | `src/utils/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, and every other entry handed on as it is |
+| `src/commands/cleanup.ts` | `rafa cleanup [--dry-run]`: the reading of `src/cleanup/` (`git fetch --prune` first, `pr.base`, the three `cleanup.*` settings, git run in the directory the command runs from, the provider `resolvePrProvider` resolves at the project root, or none) shown in four groups, in code and starting no session, so it declares no `spends`. With a terminal the groups are one grouped `multiSelect`, each row the line `./cleanup-render.ts` prints and ticked as the reading ticks it; each ticked Not-pushed row then asks a second `[y/N]` naming its commit count, and `Delete <n> branches and remove <m> worktrees? [y/N]` asks before `src/cleanup/steps.ts` runs the steps. The questions go through a line `Prompter` opened only after the checklist answers, so the two readers never share standard input. `--dry-run` asks the same checklist and second questions, then prints each step's command line in place of the final question. Without a terminal, or with `--output=json`, it prints the four groups (the json data being `cleanupData`), asks nothing and removes nothing, `--dry-run` included. Exit code 0 for every run that removed what was answered or nothing; 1 for an argument, a value typed after `--dry-run`, a config `loadConfig` refuses, a repository git cannot read, and a step that did not run clean |
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
@@ -157,7 +158,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
-  `doctor`, `self-update`, `usage` and
+  `doctor`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
   declared with its first action, never ahead of it.
@@ -197,12 +198,12 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
-  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `self-update`, the plan readers, the
+  `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `cleanup`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
   `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
   `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
-  `doctor`, `self-update`, each plan reader, each `loop` session action,
+  `doctor`, `cleanup`, `self-update`, each plan reader, each `loop` session action,
   each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
   `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every

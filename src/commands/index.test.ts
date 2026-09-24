@@ -1,10 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the fifty-two commands it registers: what the registry
+ * declarations of the fifty-three commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `describe`, `doctor`, `init`, `next`, `roadmap`, `self-update`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
+ * `cleanup`, `describe`, `doctor`, `init`, `next`, `roadmap`, `self-update`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the seven `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
@@ -148,6 +148,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'roadmap': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
+  'cleanup': ['text', 'json'],
   'self-update': ['text', 'json'],
   'usage': ['text', 'json'],
   'describe': ['text', 'json'],
@@ -202,6 +203,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'roadmap': [[], ['all', 'type', 'module', 'search', 'limit']],
   'init': [[], ['root', 'yes', 'board', 'release']],
   'doctor': [[], ['plan', 'deep']],
+  'cleanup': [[], ['dry-run']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
@@ -281,6 +283,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['next --dry-run', 'next', ['--dry-run'], ''],
+  ['cleanup --dry-run', 'cleanup', ['--dry-run'], ''],
   ['roadmap', 'roadmap', [], ''],
   ['roadmap --all --type=bug', 'roadmap', ['--all', '--type=bug'], ''],
   ['self-update', 'self-update', [], ''],
@@ -382,7 +385,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the three instinct actions, the two release actions, next, roadmap, init, doctor, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the seven issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the three instinct actions, the two release actions, next, roadmap, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -433,6 +436,7 @@ describe('the core roster', () => {
       'roadmap',
       'init',
       'doctor',
+      'cleanup',
       'self-update',
       'usage',
       'describe',

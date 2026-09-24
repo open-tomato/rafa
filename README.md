@@ -212,9 +212,7 @@ with its section line, to change it.
 
 ### `cleanup`
 
-Three settings shape what `rafa cleanup` lists. The command is being
-built under rafa-94 and has not shipped yet, so until it does these
-keys are read and checked but change nothing.
+Three settings shape what `rafa cleanup` lists.
 
 | Key | Default | What it sets |
 |---|---|---|

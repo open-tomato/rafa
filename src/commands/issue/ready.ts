@@ -344,9 +344,10 @@ export const DEFAULT_READY_SEAMS: ReadySeams = Object.freeze({});
  * closed by `close`. Nothing is opened by a run that never asks.
  *
  * Exported for `../plan/ready-offer.ts`, which puts this command's
- * question inside a `plan create` run, and for `../next.ts`, which puts
- * one question per step of its chain: each must open and close the
- * terminal the same way rather than spelling the pair again.
+ * question inside a `plan create` run, for `../next.ts`, which puts
+ * one question per step of its chain, and for `../cleanup.ts`, which
+ * asks after its checklist: each must open and close the terminal the
+ * same way rather than spelling the pair again.
  */
 export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () => void } {
   let prompter: Prompter | null = null;
