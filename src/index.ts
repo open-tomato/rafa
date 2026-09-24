@@ -173,6 +173,7 @@ export type {
   InjectionRequest,
   InjectionTask,
   LineSpan,
+  MalformedPrerequisite,
   MarkdownPrerequisite,
   PlanBlockKind,
   PlanHeader,
