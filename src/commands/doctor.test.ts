@@ -72,6 +72,21 @@
  * from a scratch copy verified by sha256: the blocked lines dropped
  * from what text mode prints reddened 2 cases.
  *
+ * ## The deep sections
+ *
+ * `--deep`'s cases add {@link deepSeams} to the seams they already run
+ * with: the session in the project root, the rafa tier under the home,
+ * and a provider runner that answers nothing, so no case spawns `gh`
+ * for it. What each section holds is `./doctor-deep.test.ts`'s; these
+ * cases hold where the sections print, that they move no exit code, and
+ * the json `deep`, each beside the same world run without the flag.
+ *
+ * Two mutations of `src/commands/doctor.ts` were driven against them on
+ * 2026-09-24, the file run alone on a baseline of 49 pass and restored
+ * from a scratch copy verified with `shasum -c`: the sections' lines dropped
+ * from what text mode prints reddened 3 cases, and the reading moved
+ * after the halt's refusal reddened 1.
+ *
  * ## The plan's start-only items
  *
  * Their cases plant a plan, the PREREQUISITES file beside it holding one
@@ -151,8 +166,12 @@ import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
+import { PLAN_NEEDS_SECTION_TITLE, STACK_TOOLS_SECTION_TITLE } from './doctor-deep-needs.js';
+import { PROVIDERS_SECTION_TITLE } from './doctor-deep-providers.js';
+import { SETTINGS_SECTION_TITLE } from './doctor-deep-settings.js';
+import { ENVIRONMENT_SECTION_TITLE } from './doctor-deep.js';
 import { readPreviousCopies } from './doctor-previous.js';
-import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readPlanFlag } from './doctor.js';
+import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readDeepFlag, readPlanFlag } from './doctor.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
 /** A temporary directory of this file's own, its real path. */
@@ -1346,12 +1365,131 @@ describe('the blocked issues', () => {
   });
 });
 
+/** The section heads `--deep` prints, in order, without a plan `--plan` names, whose Plan needs head carries it. */
+const DEEP_HEADS = [
+  `${ENVIRONMENT_SECTION_TITLE}:`,
+  `${SETTINGS_SECTION_TITLE}:`,
+  `${PROVIDERS_SECTION_TITLE}:`,
+  `${STACK_TOOLS_SECTION_TITLE}:`,
+];
+
+/** `seams` with the `--deep` reading's own; see the module note. */
+function deepSeams(world: World, seams: DoctorSeams): DoctorSeams {
+  return {
+    ...seams,
+    sessionCwd: () => world.root,
+    openProviderGh: () => () => Promise.resolve({ ok: false, stdout: '', stderr: 'gh: not planted' }),
+    inventory: { entry: () => join(world.home, 'runtime', 'cli.js') },
+  };
+}
+
+/** The section heads of `stdout`, in the order they print. */
+function deepHeads(stdout: string): string[] {
+  const heads = new Set(DEEP_HEADS);
+  return lines(stdout).filter((line) => heads.has(line) || line.startsWith(`${PLAN_NEEDS_SECTION_TITLE} (`));
+}
+
+/** The result data of a json-mode run. */
+function resultData(stdout: string): DoctorResult | undefined {
+  const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+  return result?.data;
+}
+
+describe('the deep sections', () => {
+  it('prints every section after the blocked issues and before the install line, where no --deep prints none', async () => {
+    const world = plantWorld();
+    const carrying: DoctorSeams['openGh'] = () => fakeGh({ blocked: [{ number: 12, body: 'no line\n' }] }).run;
+    const seams = deepSeams(world, ghSeams(() => GITHUB_ORIGIN, {}, carrying));
+
+    const run = await doctor(world, ['--deep'], { seams });
+    const control = await doctor(world, [], { seams });
+
+    const printed = lines(run.stdout);
+    expect(run.exitCode).toBe(0);
+    expect(deepHeads(run.stdout)).toEqual(DEEP_HEADS);
+    expect(printed.indexOf(BLOCKED_HEADING)).toBeGreaterThan(-1);
+    expect(printed.indexOf(`${ENVIRONMENT_SECTION_TITLE}:`)).toBeGreaterThan(printed.indexOf(BLOCKED_HEADING));
+    expect(printed.at(-1)).toBe(aheadLine(world));
+    expect(control.exitCode).toBe(0);
+    expect(deepHeads(control.stdout)).toEqual([]);
+    expect(lines(control.stdout).at(-1)).toBe(aheadLine(world));
+  });
+
+  it('prints the sections before a halt\'s refusal and leaves the exit code to the preflight', async () => {
+    const world = plantWorld(requiredTool(MISSING_TOOL_PROBE));
+    const seams = deepSeams(world, STILL_CLOCK);
+
+    const run = await doctor(world, ['--deep'], { seams });
+    const control = await doctor(world, [], { seams });
+
+    expect(run.exitCode).toBe(1);
+    expect(control.exitCode).toBe(1);
+    expect(deepHeads(run.stdout)).toEqual(DEEP_HEADS);
+    expect(run.stderr).toContain('rafa loop start would halt here');
+    expect(deepHeads(control.stdout)).toEqual([]);
+  });
+
+  it('adds Plan needs for a plan --plan names, where the default plan adds none', async () => {
+    const world = plantWorld();
+    const plan = '.rafa/plans/PLAN-deep.md';
+    plant(world.root, plan, '# Plan\n\n- [ ] Review it {agent=absent-reviewer}\n');
+    const seams = deepSeams(world, STILL_CLOCK);
+
+    const named = await doctor(world, ['--deep', `--plan=${plan}`], { seams });
+    const fallback = await doctor(world, ['--deep'], { seams });
+
+    expect(named.exitCode).toBe(0);
+    expect(deepHeads(named.stdout)).toEqual([...DEEP_HEADS, `${PLAN_NEEDS_SECTION_TITLE} (${plan}):`]);
+    expect(fallback.exitCode).toBe(0);
+    expect(deepHeads(fallback.stdout)).toEqual(DEEP_HEADS);
+  });
+
+  it('gives the reading as the deep of the json result, where no --deep gives null', async () => {
+    const world = plantWorld();
+    const seams = deepSeams(world, STILL_CLOCK);
+
+    const run = await doctor(world, ['--deep', '--output=json'], { seams });
+    const control = await doctor(world, ['--output=json'], { seams });
+
+    const deep = resultData(run.stdout)?.deep;
+    expect(run.exitCode).toBe(0);
+    expect(deep?.projectRoot).toBe(world.root);
+    expect(deep?.cwd).toBe(world.root);
+    expect(deep?.plan).toBe(null);
+    expect([deep?.environment.title, deep?.settings.title, deep?.providers.title, deep?.stackTools.title])
+      .toEqual([ENVIRONMENT_SECTION_TITLE, SETTINGS_SECTION_TITLE, PROVIDERS_SECTION_TITLE, STACK_TOOLS_SECTION_TITLE]);
+    expect(deep?.planNeeds).toBe(null);
+    expect(deepHeads(run.stdout)).toEqual([]);
+    expect(control.exitCode).toBe(0);
+    expect(resultData(control.stdout)?.deep).toBe(null);
+  });
+
+  it('reads --deep as a switch, and refuses it holding a value, checking nothing, beside the bare flag', async () => {
+    const world = plantWorld();
+    const seams = deepSeams(world, STILL_CLOCK);
+
+    const refused = await doctor(world, ['--deep=yes'], { seams });
+    const bare = await doctor(world, ['--deep'], { seams });
+
+    expect(readDeepFlag(undefined)).toBe(false);
+    expect(readDeepFlag(false)).toBe(false);
+    expect(readDeepFlag(true)).toBe(true);
+    expect(readDeepFlag('true')).toBe(true);
+    expect(() => readDeepFlag('.rafa/plans/PLAN-a.md')).toThrow('--deep takes no value');
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain('rafa doctor: --deep takes no value, and read "yes" as one');
+    expect(refused.stderr).toContain('Nothing was checked.');
+    expect(deepHeads(refused.stdout)).toEqual([]);
+    expect(bare.exitCode).toBe(0);
+  });
+});
+
 describe('the registered command', () => {
   it('runs over the runner seams of its own, which are the runner defaults', () => {
     expect(DEFAULT_DOCTOR_SEAMS.checks).toEqual({});
     expect(doctorCommand).toMatchObject({ subject: 'doctor', action: 'doctor', outputs: ['text', 'json'] });
     expect(doctorCommand.needsProject).toBeUndefined();
-    expect(doctorCommand.flags.map((flag) => flag.name)).toEqual(['plan']);
+    expect(doctorCommand.flags.map((flag) => flag.name)).toEqual(['plan', 'deep']);
   });
 
   it('spawned, checks through the real runner under the process environment, exiting 1 for a failed required probe', () => {

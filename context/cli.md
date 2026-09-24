@@ -528,7 +528,12 @@ New; it replaces no earlier text. What a row or an action added to
   all. An id is called unknown only when the whole board was read: a
   numbers listing that failed or came back full leaves every id
   unchecked and says so in a line of its own. That reading writes
-  nothing and never changes the exit code either. After
+  nothing and never changes the exit code either. Under the boolean
+  `--deep` it then reads and prints the Environment, Settings,
+  Providers and Stack tools sections, and Plan needs for a plan
+  `--plan` names (`src/commands/doctor-deep.ts`), a halt's included,
+  so they come before its refusal; they start no session and never
+  change the exit code. After
   the report, whatever the preflight did,
   it warns when `.ralph/effort/` holds a store file and `.rafa/effort/`
   none (`src/effort/store/legacy.ts`), and when `~/.rafa/bin` is not
@@ -537,7 +542,8 @@ New; it replaces no earlier text. What a row or an action added to
   preflight that did not halt gives the checks, the `known-missing:`
   lines, the reminders, both readings, those rows and those blocked
   issues as the result's `data`, the rows and the issues null for a
-  project with no GitHub board, and a
+  project with no GitHub board, the `--deep` sections as its `deep`,
+  null without the flag, and a
   halt gives the `command_exit` error and no `data`.
 - **`self-update` installs the checkout it runs in**
   (`src/commands/self-update.ts`), as `bun run snapshot` does: both call
@@ -1003,7 +1009,7 @@ New; it replaces no earlier text. What a row or an action added to
   it off the parsed context once the phase 0 function has returned. A
   wrapped command's `outputs` is `['text']` until it writes through the
   active output, and each now declares `text` and `json`, as
-  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` and `skill list` no argument and the flags `source` (aliased `tier`), `state`, `hidden-from-loop` and `interactive` (aliased `i`), `agent show` and `skill show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flag `plan` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
+  `describe` does. `module list` declares neither a flag nor an argument, and `module exec` the arguments `module` and `action`, neither required, and no flag, each with `text` and `json`. `agent vendor` declares the argument `name`, required and read as one or more words, and the flag `force`, `agent list` and `skill list` no argument and the flags `source` (aliased `tier`), `state`, `hidden-from-loop` and `interactive` (aliased `i`), `agent show` and `skill show` the argument `name`, required, and the flag `full`, and `agent search` and `skill search` each the argument `question`, required, and the flags `all` and `model`, the latter defaulting to true and so spelled `--no-model`, each with `text` and `json`. `describe` declares no flag, `init` the flags `root`, `yes` and `board` and no argument, `doctor` the flags `plan` and `deep` and no argument, and `self-update` the flag `force` and no argument, each with `text` and `json`. `loop stop`, `loop pause`, `loop resume` and `loop status` each declare the flag `session-id`, aliased `s`, and `loop list` no flag, none of the five an argument, each with `text` and `json`. Of the plan readers,
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, `plan risk` the argument `plan`
   and the flag `strict`, `plan needs` the argument `plan` and the flags
@@ -1076,7 +1082,7 @@ New; it replaces no earlier text. What a row or an action added to
   `loadConfig` refuses and a `.gitignore` it cannot place its block in,
   each message ending with the line `Nothing was written.`
   `doctor` throws 1 for a positional word, a `--plan` holding no file, a
-  plan named that is no file, a plan path that cannot be checked, a
+  `--deep` holding a value, a plan named that is no file, a plan path that cannot be checked, a
   config `loadConfig` refuses and a
   PREREQUISITES file that cannot be read, each message ending with the
   line `Nothing was checked.`, and for a failed required item, its message the runner's halt.

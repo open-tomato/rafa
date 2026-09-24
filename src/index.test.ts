@@ -812,6 +812,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../start/risk-total.js', ['announceRiskTotal']],
     ['../utils/tracker.js', ['trackerPathFor']],
     ['./doctor-blocked.js', ['readBlockedIssues', 'renderBlockedIssues']],
+    ['./doctor-deep.js', ['readDeep', 'renderDeep']],
     ['./doctor-previous.js', ['readPreviousCopies']],
     ['./doctor-render.js', ['renderBoard', 'renderDoctor']],
     ['./plan/plan-files.js', ['isFile']],
