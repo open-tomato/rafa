@@ -96,6 +96,7 @@ The change I want: <describe it in a few sentences>
 rafa plan create --issue=42     # plan from issue #42
 rafa plan create --next         # plan from the first undone line of the Roadmap issue
 rafa plan create --next --dry-run
+rafa plan create --issue=42 --accept-refs   # plan even though a reference changed
 ```
 
 `--issue` copies the issue's body to `.rafa/specs/rafa-42-<slug>.md` and
@@ -112,6 +113,52 @@ than fifty previous copies accumulate under `previous/`, `rafa doctor`
 warns that they are safe to delete. The plan, its branch and its pull
 request carry the same name: `rafa-42-<slug>`, `feat/rafa-42-<slug>`,
 `rafa-42: <title>`, with `Closes #42` in the pull request.
+
+Before any planning session starts, rafa also checks the references the
+spec makes: the other issues it names, and the files, exported symbols,
+`rafa` commands, flags and config keys it writes in backticks. The first
+time it reads one it records what the target held then, in a comment at
+the top of the saved copy. On every later run it compares again, and it
+refuses to plan (exit code 2) when a reference is **dangling** — the
+file, symbol or issue does not exist — or **suspect** — it changed
+since the spec was read. Each one is listed with where it sits in the
+issue:
+
+```text
+❌ issue #42 names references that are missing or changed since the spec was read:
+   • dangling src/a.ts (line 12)
+   • suspect #7: heading "Design" changed (line 3)
+   Pass --accept-refs to re-stamp them as reviewed and plan on this run, or edit the issue so the spec names what is there now.
+```
+
+For an issue it names which `##` sections changed, so you know what to
+reread. A reference to a file that does not exist yet is dangling too,
+even the first time: a spec that plans to create `src/a.ts` says so, and
+you accept it once.
+
+There are two ways past the refusal. Edit the issue so the spec names
+what is there now, or, once you have looked and the spec still holds,
+run again with `--accept-refs`: rafa records every reference as reviewed
+and plans. A file you accepted as missing then reads as fine until it
+appears, and reads as changed from then on. A blocker named under
+`Blocked by:` that has closed does not refuse; rafa prints
+`resolved #7 — rafa issue unblock 42` so you can take the spec off its
+blocked line. An issue in another repository that rafa cannot read is
+listed and never refuses. `--dry-run` writes no saved copy, so it skips
+this check.
+
+To skip the refusal on every run, set this in `.rafa/config.yaml`:
+
+```yaml
+dangerous:
+  acceptStaleRefs: true
+```
+
+It does what `--accept-refs` does, on every run from the board, and a
+run with it on starts with a warning saying so. It is meant for a
+project whose specs are too out of date to be blocked on, and it sits
+under `dangerous` because with it on, no spec is ever refused for
+naming something that has gone or changed.
 
 ## The roadmap
 

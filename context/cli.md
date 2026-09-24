@@ -38,6 +38,7 @@ module's note is the long form.
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
+| `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: the `dangerous.acceptStaleRefs` warn line printed first thing in the run, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and the core roster, the last imported dynamically since a static import is a load-order cycle through `src/plan.ts`; never under `--dry-run` or `--spec` |
 | `src/commands/issue/ready.ts` | `rafa issue ready <n>`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes. Exit code 0 for the normal completion; 1 for an unusable config or a swap `gh` refused; 2 for an untrusted author and for a body with gaps. The four status values are `marked`, `declined` (question answered no), `unasked` (no terminal), and `already` (label already on). There is no `--yes` flag; the question is always asked where there is a terminal. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state, and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal. |
 | `src/commands/issue/issue-tracker.ts` | what the seven `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
@@ -353,8 +354,9 @@ New; it replaces no earlier text. What a row or an action added to
   `<specs.dir>/previous/`. `--next` reads the roadmap issue
   `roadmap.issue` names, else the pinned issue titled `Roadmap`, prints
   each line it skipped with why, and exits 0 with a message when nothing
-  is left. `--dry-run` does every read and every refusal and stops before
-  the first write, on all three routes. The generated plan records
+  is left. `--dry-run` does every read and every refusal of checks 0–2
+  and stops before the first write, on all three routes, so it never
+  reaches check 4, which reads the saved copy it did not write. The generated plan records
   `issue: "<n>"` in its `rafa:plan` block, quoted so the digits written
   survive the plan reader, which reads an unquoted number as the number
   YAML parsed (`src/board/plan-field.ts`), and the gate's
@@ -391,8 +393,8 @@ New; it replaces no earlier text. What a row or an action added to
   them changes the exit code, since the merge has already happened.
   `--output=json` carries the report as `unblocked`, null when the pull
   request closes nothing.
-- **Three of the readiness gate's four checks run on a board route**
-  (`src/board/plan-spec.ts`): the author's trust (`src/board/trust.ts`),
+- **Checks 0–2 of the readiness gate's five run in the board route's
+  resolution** (`src/board/plan-spec.ts`): the author's trust (`src/board/trust.ts`),
   the `spec:ready` label, then the leak refusal and the completeness
   gaps (`requireCompleteSpec` in `src/board/readiness.ts`), in that
   order, each exit 2 and each before the body is snapshotted, so
@@ -414,6 +416,15 @@ New; it replaces no earlier text. What a row or an action added to
   0 runs on the ROADMAP issue too, through `inspectRoadmapIssue` and
   before a line is parsed out of its body, so a `--next` run checks two
   authors and spends one lookup per login.
+- **Check 4, the references, runs in `src/plan.ts` once the resolution
+  has answered a spec** (`src/commands/plan/refs-check.ts` over
+  `src/board/refs-gate.ts`): after the snapshot settles and the
+  plan-already-there refusal passes, and before `checkUsage`, the
+  notices and the session, on `--issue` and `--next` alone. A dangling
+  or suspect reference refuses with exit 2; `--accept-refs`, or
+  `dangerous.acceptStaleRefs: true`, re-stamps them all and plans. The
+  setting's warn line is printed first thing in the run, before the
+  resolution's first read. `context/pull-requests.md` holds the rules.
 - **The spec issue template is `src/board/templates/spec.md`**, a
   package asset the build copies to `dist/templates/` and `rafa init
   --board` writes to `.github/ISSUE_TEMPLATE/spec.md`. Its front matter

@@ -55,8 +55,9 @@
  *
  * Check 4 belongs on the `--issue` and `--next` routes of `plan create`,
  * after the snapshot has settled and before the planner session starts,
- * so a refusal writes no plan file and spends no session; the caller
- * places {@link enforceRefsGate} there. `--spec` has no issue to read
+ * so a refusal writes no plan file and spends no session;
+ * `src/commands/plan/refs-check.ts` places {@link enforceRefsGate}
+ * there, and builds the verifier it reads with. `--spec` has no issue to read
  * a copy of, and `issue ready` does not run it: `rafa issue check` is
  * the reading on demand.
  */

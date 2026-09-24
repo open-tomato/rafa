@@ -353,7 +353,9 @@ follow-up prompt.
 
 ### The readiness gate
 
-Four checks, cheapest first; any one failing writes no plan file:
+Five checks, cheapest first; any one failing writes no plan file. They
+are numbered in the order the spec lists them, and check 4 runs BEFORE
+the session check 3 is part of, so a refusal from it spends no session:
 
 0. Trust (section above): the issue's author must hold write access or be
    listed, checked before the body is read any further or snapshotted. It
@@ -441,8 +443,52 @@ Four checks, cheapest first; any one failing writes no plan file:
    of this repository's own over a prompt the session had no place to
    answer (`src/board/gate.ts` holds the reading).
 
+4. References (`src/board/refs-gate.ts`, placed on the command by
+   `src/commands/plan/refs-check.ts`): every reference the saved copy's
+   body names — an issue `#<n>`, `rafa-<n>` or `owner/repo#<n>`, and in
+   backticks a path, a code-shaped symbol, a `rafa <subject> <action>`
+   command and a config key, and a flag either way (the seven kinds of
+   `src/refs/extract.ts`) — read against the stamp the copy keeps for it in its
+   `<!-- rafa:refs` block. It runs on `--issue` and `--next` only, once
+   checks 0–2 have passed and the snapshot has settled and once the
+   plan-already-there refusal has passed, and before `checkUsage`, the
+   notices and the session. `--spec` has no saved copy, `--dry-run` stops
+   before any snapshot is written and so before it, and neither
+   `plan needs --issue` nor `issue ready` runs it.
+
+   A reference the copy keeps no stamp for is stamped on that reading
+   and reads `ok`, except a target that does not exist, which is
+   `dangling` on its first read. What each state does:
+
+   | State | What check 4 does |
+   |---|---|
+   | `ok` | nothing |
+   | `dangling`, `suspect` | refuses, exit 2, every such row on its own line |
+   | `resolved` | prints `resolved #<n> — rafa issue unblock <spec>` and goes on |
+   | `unknown` | lists the row (a repository `gh` could not read) and goes on |
+
+   The refusal opens `❌ issue #<n> names references that are missing
+   or changed since the spec was read:`, lists each row as
+   `• dangling src/a.ts (line 12)` or `• suspect #7: heading "Design"
+   changed (line 3)` — the line is the body's, as the issue was
+   written — and ends naming the two ways past it: pass `--accept-refs`
+   on this run, or edit the issue. A board issue `gh` could not read and
+   a refs block the codec will not read refuse with the same exit code
+   and the error's own words.
+
+   `--accept-refs` re-stamps every reference of the spec as reviewed,
+   a missing target as `absent`, which then reads `ok` until the target
+   appears, prints `🔖 --accept-refs: re-stamped <count> references of
+   issue #<n> as reviewed.` with each row it let through, and plans.
+   `dangerous.acceptStaleRefs: true` in the config does the same on
+   every run and names itself in that line; it also prints one warn
+   line at the very start of a board-route run that is not `--dry-run`,
+   before any board read, so a forgotten setting is seen before
+   anything is spent. When both are on, the flag is the one named.
+
 `--skip-review` bypasses check 3 only, and the plan's `rafa:plan` block
-records `review: skipped`.
+records `review: skipped`. No flag but `--accept-refs`, and no setting
+but `dangerous.acceptStaleRefs`, passes check 4.
 
 ### The board and plan routes
 

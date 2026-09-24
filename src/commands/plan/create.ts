@@ -43,7 +43,9 @@ const wrapped = wrapPhaseZeroCommand({
     + ' first undone line of the roadmap issue (`--next`); the two board routes write the issue body to a'
     + ' snapshot under `specs.dir`, plan from that file, and record `issue: <n>` in the plan. The stub is'
     + ' the basename of the spec unless `--stub` names one, and the command refuses when that plan already'
-    + ' exists. The findings in `progress.txt` are handed to the session as advisory context unless'
+    + ' exists. On the two board routes the references the snapshot names are read against the stamps its'
+    + ' saved copy keeps, and one missing or changed since the spec was read refuses the run before any'
+    + ' session starts unless `--accept-refs` re-stamps them. The findings in `progress.txt` are handed to the session as advisory context unless'
     + ' `--no-progress` is given. The session loads the setting sources `loop.settingSources` names, and a'
     + ' config the loop cannot run on refuses the command before any session starts.',
   args: [],

@@ -68,7 +68,9 @@
  * throw exit code 1 with the whole refusal as the message; a board
  * refusal — an issue or a roadmap whose author is trusted with nothing,
  * a closed or unlabelled issue, a leaking body, a snapshot that differs
- * with no `--refresh` — throws exit code 2, and a spec the planner
+ * with no `--refresh`, a reference of the saved copy check 4 reads as
+ * dangling or suspect with no `--accept-refs`
+ * (`commands/plan/refs-check.ts`) — throws exit code 2, and a spec the planner
  * judged not ready over a gap that blocks planning throws exit code 3
  * with every gap in it. Text mode writes
  * that message to stderr, the bytes the command printed there before;
@@ -144,6 +146,7 @@ import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { readGateFlags } from './board/gate.js';
 import { CommandExit } from './cli/command.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
+import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { loadConfig } from './config-load.js';
@@ -334,8 +337,18 @@ export default async function plan(
   repoRoot: string,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
-  const { settingSources, planDir, specsDir, roadmapIssue, boardTrustedAuthors } = resolvePlanConfig(repoRoot, homedir());
+  const {
+    settingSources,
+    planDir,
+    specsDir,
+    roadmapIssue,
+    boardTrustedAuthors,
+    dangerousAcceptStaleRefs,
+  } = resolvePlanConfig(repoRoot, homedir());
   const flags = readGateFlags(args);
+  // Before any board read, so an operator who forgot the setting is told
+  // before anything is spent (`commands/plan/refs-check.ts`).
+  announceCreateRefs(args, dangerousAcceptStaleRefs);
 
   const resolved = await resolveCreateSpec({
     args,
@@ -357,6 +370,10 @@ export default async function plan(
   if (fs.existsSync(path.resolve(repoRoot, planFile))) {
     throw new CommandExit(1, `❌ ${planFile} already exists — remove it or pass a different --stub.`);
   }
+
+  // Check 4: the references the saved copy names, read against its
+  // stamps, before any session is paid for. `--spec` has no copy to read.
+  await checkCreateRefs({ spec: resolved.spec, repoRoot, args, acceptStaleRefs: dangerousAcceptStaleRefs });
 
   await checkUsage('issue');
 

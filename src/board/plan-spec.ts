@@ -36,10 +36,11 @@
  *
  * ## Which checks run, in the order they run
  *
- * The readiness gate is four checks, cheapest first
- * (`.rafa/specs/rafa-20-pr-commands.md`). {@link inspectSpecIssue} is
- * the three of them that run before a planner session is paid for, in
- * the spec's order, and each is a refusal that exits
+ * The readiness gate is five checks, cheapest first
+ * (`.rafa/specs/rafa-20-pr-commands.md`, and check 4 from
+ * `.rafa/specs/rafa-151-references-specs-bugs-are.md`).
+ * {@link inspectSpecIssue} is the three of them that run on the issue
+ * as read, in the spec's order, and each is a refusal that exits
  * {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
  *
  *  0. the author's TRUST (`./trust.ts`): whether the login that opened
@@ -58,7 +59,11 @@
  *     and no placeholder left in the text.
  *
  * Check 3, the planner's own pass over the spec, is a session and is
- * `./gate.ts`'s.
+ * `./gate.ts`'s. Check 4, the references the spec names, reads the
+ * saved copy this module settles, so it runs after the resolution has
+ * answered and before that session, in `src/plan.ts` through
+ * `src/commands/plan/refs-check.ts`; this module neither runs nor
+ * knows it.
  *
  * ## Why trust runs first, and what it costs
  *
