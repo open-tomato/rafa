@@ -39,8 +39,15 @@ For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
 4. **Order wins.** All loaded holders are byte-identical copies (see below), so
    the nearest tier serves it, and the rest are its copies.
 5. **Collision.** Two or more loaded tiers hold different items under the name,
-   with no pin. Nothing serves it; `loop start` preflight and `plan validate`
-   refuse before any session starts.
+   with no pin. Nothing serves it. `loop start` preflight and `plan validate`
+   refuse before any session starts only for a name the plan uses: an agent
+   routed by `agent=`, or a skill named by `skills=`, on a task still to run
+   (`collidingPlanSkills` in `src/agents/roster.ts`). A colliding skill the
+   plan never names starts the run; `doctor` still lists it. To see the
+   refusal by hand, name the skill on an open task, and delete
+   `PLAN_TRACKER-<stub>.md` between runs, since a task the refusal blocked is
+   no longer open. The refused start still writes a run record under
+   `.rafa/runs/` with state `stopped` and task `null`; that is not a crash.
 
 ### Collisions and the byte-identical rule
 
