@@ -641,7 +641,7 @@ describe('bug identity keyed by artifact and tracker file', () => {
       outcome: 'blocked',
       findings: [{
         trigger: 'when parsing', kind: 'gotcha', what: 'lines lost', cause: null, resolution: null,
-        artifact: ARTIFACT, signal: 'loud', extras: [],
+        artifact: ARTIFACT, signal: 'loud', domain: null, extras: [],
       }],
     });
 
@@ -678,7 +678,7 @@ describe('a security bug', () => {
       outcome: 'blocked',
       findings: [{
         trigger: 'when parsing', kind: 'gotcha', what: 'lines lost', cause: null, resolution: null,
-        artifact: ARTIFACT, signal: 'loud', extras: [],
+        artifact: ARTIFACT, signal: 'loud', domain: null, extras: [],
       }],
     });
   }

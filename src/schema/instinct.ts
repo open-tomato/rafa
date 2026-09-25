@@ -61,7 +61,7 @@ import type { InstinctRecord } from '../ports/index.js';
 import type { FindingKind, FindingSignal } from '../report/parse.js';
 
 import { actionHash } from '../learning/identity.js';
-import { FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
+import { FINDING_DOMAINS, FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
 
 import { readFrontmatterDocument, renderFrontmatter } from './frontmatter.js';
 import { PROJECT_ID_LENGTH, PROJECT_ID_PATTERN } from './project-id.js';
@@ -97,21 +97,11 @@ export const INSTINCT_SIGNALS = FINDING_SIGNALS;
 export type InstinctSignal = FindingSignal;
 
 /**
- * continuous-learning-v2's domains: the five its `SKILL.md` names, and
- * the three its `agents/observer.md` calls global-friendly, measured
- * on 2026-09-18. Its `instinct-cli.py` defaults an absent domain to
- * `general`, which is not one of these and is not accepted here; an
- * importer meeting one has to map it.
+ * continuous-learning-v2's domains, declared in `report/parse.ts` as
+ * `FINDING_DOMAINS` so a finding's `domain` is read against the same
+ * set. See that list for where they were measured.
  */
-export const INSTINCT_DOMAINS = [
-  'code-style',
-  'testing',
-  'git',
-  'debugging',
-  'workflow',
-  'security',
-  'general-best-practices',
-] as const;
+export const INSTINCT_DOMAINS = FINDING_DOMAINS;
 
 /** One of {@link INSTINCT_DOMAINS}. */
 export type InstinctDomain = typeof INSTINCT_DOMAINS[number];

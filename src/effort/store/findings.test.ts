@@ -182,6 +182,7 @@ function finding(overrides: Partial<ReportFinding> = {}): ReportFinding {
     resolution: 'run bun install before the first test',
     artifact: 'Cannot find package',
     signal: 'loud',
+    domain: null,
     extras: [],
     ...overrides,
   };
