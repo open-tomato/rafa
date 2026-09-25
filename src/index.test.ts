@@ -746,8 +746,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'INSTINCT_CHECK_USAGE']],
   ]],
   ['./commands/instinct/list.js', [
-    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['../../adapters/learning/held.js', ['toHeldRecords']],
+    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../learning/index.js', ['triggerKey']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'resolveProjectConfig']],
     ['./instinct-records.js', ['allRecords', 'instinctProject', 'readScopes']],
+    ['./promote.js', ['makeLearningAdapter', 'refusedPullMessage']],
   ]],
   ['./commands/instinct/show.js', [
     ['../../cli/command.js', ['CommandExit']],

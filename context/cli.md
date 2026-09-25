@@ -1014,7 +1014,9 @@ New; it replaces no earlier text. What a row or an action added to
   `src/schema/tiers.ts`'s — `<root>/.rafa/instincts` and
   `~/.rafa/instincts`, nearest the work first — and both commands run
   INSIDE a project, reading the home and the root off the project the
-  dispatcher resolved; neither declares a flag or a seam of its own. A
+  dispatcher resolved; `show` declares no flag or seam of its own, and
+  `list` declares the two views below and the adapter registry seam
+  `--blessed` resolves through. A
   record is a top-level `<scope>/<id>.md`, so the local Learning
   adapter's `instincts.ndjson` and `flags.ndjson`, a dotfile and a
   subdirectory are all passed over without a word, and the id a lookup
@@ -1025,14 +1027,24 @@ New; it replaces no earlier text. What a row or an action added to
   broke a rule the number of rules instead; a scope whose directory is
   absent prints its path and `(no such directory)`. Its exit code is 0
   whatever the rows say, with exit code 1 kept for a positional word.
+  `list --blessed` prints instead what the `learning.adapter` adapter's
+  `pullBlessed` answers at `learning.bless.minConfidence`, made as
+  `instinct promote` makes it (`makeLearningAdapter` in
+  `instinct/promote.ts`), and `list --conflicts` each trigger a scope
+  holds with more than one action — read through `toHeldRecords` and
+  grouped by `triggerKey` — its actions side by side with their
+  confidence and usage. The two views are one at a time: both together,
+  a view flag typed with a value, an adapter that cannot be made and a
+  pull it refuses are each exit code 1.
   `show` prints the fields, the two sections, the evidence and the
   `action_hash` computed from the action, which no file stores, and a
   line naming the other scope when it holds that id too; the project
   scope answers first. It refuses with exit code 1 an id no scope holds,
   naming both scopes, and a record that broke a rule, naming its issues,
   each as the `CommandExit` message. In json mode `list` gives the
-  scopes, their records and the two counts as the result's `data`, and
-  `show` the record.
+  scopes, their records and the two counts as the result's `data` (or
+  the view asked for: the adapter kind, floor and lessons, or the
+  conflicts), and `show` the record.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and

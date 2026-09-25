@@ -80,16 +80,21 @@ export interface InstinctPromoteSeams {
   readonly registry?: AdapterRegistry;
 }
 
-/** The message a pull the adapter refused is refused with. */
-export function refusedPullMessage(kind: string, reason: string): string {
-  return `❌ ${NAME}: the \`${kind}\` learning adapter answered no blessed set: ${reason}`;
+/** The message a pull the adapter refused is refused with, opening with `name`, the command asking. */
+export function refusedPullMessage(kind: string, reason: string, name: string = NAME): string {
+  return `❌ ${name}: the \`${kind}\` learning adapter answered no blessed set: ${reason}`;
 }
 
-/** The adapter `kind` names, made as the loop makes it, or a refusal naming the kind. */
-function makeAdapter(
+/**
+ * The adapter `kind` names, made as the loop makes it, or a refusal
+ * opening with `name` (the command asking) and naming the kind.
+ * `rafa instinct list --blessed` makes its adapter through it too.
+ */
+export function makeLearningAdapter(
   registry: AdapterRegistry,
   kind: string,
   context: { readonly repoRoot: string; readonly home: string; readonly minConfidence: number },
+  name: string = NAME,
 ): Learning {
   try {
     return registry.resolve('learning', kind).create({
@@ -98,7 +103,7 @@ function makeAdapter(
       learningBlessMinConfidence: context.minConfidence,
     });
   } catch (error) {
-    throw new CommandExit(1, `❌ ${NAME}: the \`${kind}\` learning adapter cannot be made: ${messageOf(error)}`);
+    throw new CommandExit(1, `❌ ${name}: the \`${kind}\` learning adapter cannot be made: ${messageOf(error)}`);
   }
 }
 
@@ -113,7 +118,7 @@ export async function promotableLessons(
     context.output.warn(message);
   });
   const kind = config.learningAdapter;
-  const adapter = makeAdapter(seams.registry ?? CORE_ADAPTER_REGISTRY, kind, {
+  const adapter = makeLearningAdapter(seams.registry ?? CORE_ADAPTER_REGISTRY, kind, {
     repoRoot: project.root,
     home: project.home,
     minConfidence: config.learningBlessMinConfidence,

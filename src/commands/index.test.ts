@@ -198,7 +198,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'skill demote': [['dir'], ['apply']],
   'skill backfill': [['dir'], ['propose', 'apply', 'project']],
   'instinct check': [['dir'], []],
-  'instinct list': [[], []],
+  'instinct list': [[], ['blessed', 'conflicts']],
   'instinct show': [['id'], []],
   'release status': [[], ['plan']],
   'release tag': [[], []],
