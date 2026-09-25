@@ -352,9 +352,9 @@ and never none.
 The build targets bun, and `engines` names `bun` alone: there is no
 `engines.node`, because no node version runs the binary. The package
 root, `./cli` and `./store` import `bun:sqlite`, which node's ESM loader
-refuses before any module code runs, so only `./plan` and `./ports` load
-under node at all. `module` points at `./dist/index.js`, the same build
-the root of `exports` names. The package ships no type declarations:
+refuses before any module code runs, so only `./plan`, `./ports` and
+`./learning` load under node at all. `module` points at
+`./dist/index.js`, the same build the root of `exports` names. The package ships no type declarations:
 `exports` names no `types`, and a TypeScript consumer gets TS7016 under
 `strict`.
 
