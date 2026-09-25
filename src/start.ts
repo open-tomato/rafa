@@ -197,6 +197,7 @@
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { BranchSeams } from './start/branch.js';
+import type { TaskLearning } from './start/dispatch.js';
 import type { SessionServing } from './start/serving.js';
 
 import fs from 'fs';
@@ -509,6 +510,14 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     // (`start/serving.ts`).
     const serving: SessionServing = { root: repoRoot, run: session.id, home: homedir(), settings: runConfig.config };
 
+    // Where each stored report's lessons are pushed: the adapter the run's
+    // `learning.adapter` names, resolved per push (`start/dispatch.ts`).
+    const learning: TaskLearning = {
+      kind: runConfig.config.learningAdapter,
+      home: homedir(),
+      blessMinConfidence: runConfig.config.learningBlessMinConfidence,
+    };
+
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
@@ -615,7 +624,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // outcome goes on every row the report is stored as. Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
-        const stored = storeTaskReport({ repoRoot, planStub, dispatch, outcome });
+        const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
         return stored;
       };

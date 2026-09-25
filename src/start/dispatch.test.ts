@@ -4,6 +4,12 @@
  * declared and the flags its session was spawned with, whatever became of
  * the task, and no report at all when that row is refused.
  *
+ * Also for `storeTaskReport` pushing a stored report's lessons to a
+ * stubbed Learning adapter, registered in a registry of its own under the
+ * kind `stub`: what the push is handed, the adapter's context, a report
+ * with no lesson and a null `learning` making no adapter, and a refused
+ * push or an unknown kind warned about without failing the store.
+ *
  * Also for `dispatchTask` serving its session: the flags `serveSession`
  * answered reach the runner and the record, a winner left out is warned
  * about, and a null `serving` serves nothing. Those cases plant a rafa
@@ -16,9 +22,11 @@
  * directly. The lines the loop prints go to a sink output set for each
  * case and unset after it.
  */
-import type { TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
+import type { TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
 import type { SessionServing } from './serving.js';
+import type { AdapterContext } from '../adapters/registry.js';
 import type { TierPin } from '../config-sections.js';
+import type { Learning, SyncPayload } from '../ports/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +36,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
@@ -97,6 +106,7 @@ function storeOptions(
       flags: resolveDeclarationFlags(declaration, () => false).args,
     },
     outcome,
+    learning: null,
   };
 }
 
@@ -112,10 +122,10 @@ describe('storeTaskReport, storing the dispatch', () => {
     setActiveOutput(null);
   });
 
-  it('stores the dispatch beside the report, under the same session id', () => {
+  it('stores the dispatch beside the report, under the same session id', async () => {
     const root = freshRoot();
 
-    expect(storeTaskReport(storeOptions(root, 's-1', REPORTED, 'done'))).toBe(true);
+    expect(await storeTaskReport(storeOptions(root, 's-1', REPORTED, 'done'))).toBe(true);
 
     expect(rawQuery(root, 'SELECT session_id, plan_stub, task_line, agent, budget_usd, flags FROM dispatches')).toEqual([{
       session_id: 's-1',
@@ -131,24 +141,24 @@ describe('storeTaskReport, storing the dispatch', () => {
     expect(seen).toEqual([]);
   });
 
-  it('stores the dispatch of a session that ended on its budget and left no report', () => {
+  it('stores the dispatch of a session that ended on its budget and left no report', async () => {
     const root = freshRoot();
 
-    expect(storeTaskReport(storeOptions(root, 's-2', 'Error: Exceeded USD budget (0.5)', 'blocked'))).toBe(true);
+    expect(await storeTaskReport(storeOptions(root, 's-2', 'Error: Exceeded USD budget (0.5)', 'blocked'))).toBe(true);
 
     expect(rawQuery(root, 'SELECT session_id, budget_usd FROM dispatches')).toEqual([{ session_id: 's-2', budget_usd: 0.5 }]);
     expect(rawQuery(root, 'SELECT session_id, outcome FROM report_absences')).toEqual([{ session_id: 's-2', outcome: 'blocked' }]);
     expect(rawQuery(root, 'SELECT session_id FROM task_reports')).toEqual([]);
   });
 
-  it('stores no report when the dispatch row is refused, and answers false', () => {
+  it('stores no report when the dispatch row is refused, and answers false', async () => {
     const root = freshRoot();
     const options = storeOptions(root, 's-3', REPORTED, 'done');
     const { declaration } = options.dispatch;
     if (declaration === null) throw new Error('the fixture line parsed to no declaration');
     const refused = { ...options, dispatch: { ...options.dispatch, declaration: { ...declaration, budget: 0 } } };
 
-    expect(storeTaskReport(refused)).toBe(false);
+    expect(await storeTaskReport(refused)).toBe(false);
 
     expect(existsSync(root)).toBe(false);
     expect(seen).toEqual([
@@ -264,5 +274,172 @@ describe('dispatchTask, serving its session', () => {
     expect(dispatch.served).toEqual([]);
     expect(warned).toEqual([]);
     expect(existsSync(join(root, '.rafa'))).toBe(false);
+  });
+});
+
+/** A session output whose report holds one finding carrying a `resolution`. */
+const LESSONED = [
+  'Done.',
+  '',
+  `${FENCE}rafa:report`,
+  'status: done',
+  'feedback: "it went fine"',
+  'findings:',
+  '  - trigger: "when running bun test under a fresh worktree"',
+  '    kind: gotcha',
+  '    what: "node_modules is absent after fork"',
+  '    cause: "worktree creation does not run bun install"',
+  '    resolution: "run bun install before the first test"',
+  '    artifact: "Cannot find package"',
+  '    signal: loud',
+  'skills_used: []',
+  'blockers: []',
+  'out_of_scope_bugs: []',
+  FENCE,
+  '',
+].join('\n');
+
+/** The clock every lesson case stamps its lessons from. */
+const NOW = new Date('2026-09-25T12:00:00.000Z');
+
+describe('storeTaskReport, pushing the report\'s lessons', () => {
+  let infos: string[] = [];
+  let warned: string[] = [];
+  let pushed: SyncPayload[] = [];
+  let made: AdapterContext[] = [];
+  let refusal: Error | null = null;
+
+  /** A Learning adapter recording each push, or refusing it when {@link refusal} is set. */
+  const stub: Learning = {
+    push: (payload) => {
+      if (refusal !== null) return Promise.reject(refusal);
+      pushed.push(payload);
+      return Promise.resolve({
+        decisions: payload.instincts.map((incoming) => ({ incoming, rule: 'new-trigger' as const, produced: [incoming] })),
+        discarded: [],
+      });
+    },
+    pullBlessed: () => Promise.resolve({ version: 'stub', instincts: [] }),
+    flag: () => Promise.resolve(),
+  };
+
+  /** A registry holding the stub under the kind `stub`, recording each context it is made with. */
+  const registry = createAdapterRegistry([{
+    port: 'learning',
+    kind: 'stub',
+    portVersion: PORT_VERSIONS.learning,
+    create: (context) => {
+      made.push(context);
+      return stub;
+    },
+  }]);
+
+  /** The run's learning settings, naming `kind` in the stub registry. */
+  function learningOf(kind = 'stub'): TaskLearning {
+    return { kind, home: '/home/stand-in', blessMinConfidence: 0.6, registry };
+  }
+
+  /** {@link storeOptions} with `learning` and the fixed clock. */
+  function lessonOptions(
+    root: string,
+    sessionId: string,
+    output: string,
+    outcome: TaskReportStoreOptions['outcome'],
+    learning: TaskLearning | null = learningOf(),
+  ): TaskReportStoreOptions {
+    return { ...storeOptions(root, sessionId, output, outcome), learning, now: () => NOW };
+  }
+
+  beforeEach(() => {
+    infos = [];
+    warned = [];
+    pushed = [];
+    made = [];
+    refusal = null;
+    setActiveOutput(sinkOutput({
+      info: (message) => infos.push(message),
+      warn: (message) => warned.push(message),
+    }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('pushes a finding carrying a resolution to the adapter the kind resolves to, once the report is stored', async () => {
+    const root = freshRoot();
+
+    expect(await storeTaskReport(lessonOptions(root, 'l-1', LESSONED, 'done'))).toBe(true);
+
+    expect(made).toEqual([{ repoRoot: root, home: '/home/stand-in', learningBlessMinConfidence: 0.6 }]);
+    expect(pushed).toHaveLength(1);
+    const [payload] = pushed;
+    expect(payload?.source_id).toBe('l-1');
+    expect(payload?.instincts.map((lesson) => [lesson.action, lesson.confidence, lesson.sources, lesson.created_at]))
+      .toEqual([['run bun install before the first test', 0.5, ['l-1'], NOW.toISOString()]]);
+    // Pushed after the store took the report, which is already readable.
+    expect(rawQuery(root, 'SELECT session_id FROM task_reports')).toEqual([{ session_id: 'l-1' }]);
+    expect(infos.at(-1)).toBe('   Pushed 1 lesson(s) to the `stub` learning adapter: new-trigger.');
+    expect(warned).toEqual([]);
+  });
+
+  it('pushes a blocked task\'s lesson at the blocked confidence', async () => {
+    await storeTaskReport(lessonOptions(freshRoot(), 'l-2', LESSONED, 'blocked'));
+
+    expect(pushed.flatMap((payload) => payload.instincts.map((lesson) => lesson.confidence))).toEqual([0.4]);
+  });
+
+  it('makes no adapter and pushes nothing for a report whose findings carry no resolution', async () => {
+    // The control is the first case: the same store with a resolution
+    // makes the adapter once and pushes once.
+    const unresolved = LESSONED.replace('    resolution: "run bun install before the first test"\n', '');
+    expect(unresolved).not.toContain('resolution:');
+
+    expect(await storeTaskReport(lessonOptions(freshRoot(), 'l-3', unresolved, 'done'))).toBe(true);
+
+    expect(made).toEqual([]);
+    expect(pushed).toEqual([]);
+    expect(warned).toEqual([]);
+  });
+
+  it('makes no adapter and pushes nothing under a null learning', async () => {
+    expect(await storeTaskReport(lessonOptions(freshRoot(), 'l-4', LESSONED, 'done', null))).toBe(true);
+
+    expect(made).toEqual([]);
+    expect(pushed).toEqual([]);
+  });
+
+  it('warns about a refused push and still answers true, the report stored', async () => {
+    const root = freshRoot();
+    refusal = new Error('local learning: refused to store a push');
+
+    expect(await storeTaskReport(lessonOptions(root, 'l-5', LESSONED, 'done'))).toBe(true);
+
+    expect(warned).toEqual([
+      '   1 lesson(s) of session l-5 were not pushed to the `stub` learning adapter: local learning: refused to store a push',
+      '   The task is not failed for it: its report is stored, findings and all.',
+    ]);
+    expect(rawQuery(root, 'SELECT session_id, outcome FROM task_reports')).toEqual([{ session_id: 'l-5', outcome: 'done' }]);
+    expect(infos.some((line) => line.startsWith('   Pushed'))).toBe(false);
+  });
+
+  it('warns about a kind the registry does not hold and still answers true', async () => {
+    expect(await storeTaskReport(lessonOptions(freshRoot(), 'l-6', LESSONED, 'done', learningOf('absent')))).toBe(true);
+
+    expect(made).toEqual([]);
+    expect(warned[0]).toStartWith('   1 lesson(s) of session l-6 were not pushed to the `absent` learning adapter: ');
+    expect(warned[0]).toContain('registered: stub');
+  });
+
+  it('pushes nothing when the store refuses the report', async () => {
+    const options = lessonOptions(freshRoot(), 'l-7', LESSONED, 'done');
+    const { declaration } = options.dispatch;
+    if (declaration === null) throw new Error('the fixture line parsed to no declaration');
+    const refused = { ...options, dispatch: { ...options.dispatch, declaration: { ...declaration, budget: 0 } } };
+
+    expect(await storeTaskReport(refused)).toBe(false);
+
+    expect(made).toEqual([]);
+    expect(pushed).toEqual([]);
   });
 });
