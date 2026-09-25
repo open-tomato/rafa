@@ -85,7 +85,7 @@
  * `off`, and `tiers.skills` and `tiers.agents` as maps of a name to
  * `false` or a tier. {@link tierSwitch} reads the first and
  * {@link tierPin} one value of the other two; the map around it is
- * `config-schema.ts`'s `mapOf`, because what that reader rules on is a
+ * `config-readers.ts`'s `mapOf`, because what that reader rules on is a
  * key. Three readings are this module's:
  *
  *   - `tiers.rafa` takes the WORDS `on` and `off`, as the spec writes

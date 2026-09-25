@@ -23,8 +23,7 @@ import type { InventorySource } from '../inventory/record.js';
 import { describe, expect, it } from 'bun:test';
 
 import { BUILT_IN_AGENTS } from '../agents/roster.js';
-import { mapOf } from '../config-schema.js';
-import { routeTarget } from '../config-sections.js';
+import { routeTable } from '../config-readers.js';
 import { CONFIG_DEFAULTS, parseConfigText } from '../config.js';
 
 import { resolveTiers } from './resolve.js';
@@ -43,9 +42,6 @@ const SPEC_TABLE: [string, string][] = [
   ['review', 'code-reviewer'],
   ['implementation', 'loop-implementer'],
 ];
-
-/** The reader `routing` is read through, as `config-schema.ts` builds it. */
-const readRouting = mapOf(routeTarget, 'false or an agent name');
 
 /** Where every reading here is labelled. */
 const AT: ValueAt = { label: 'F: routing', key: 'routing' };
@@ -80,14 +76,14 @@ describe('DEFAULT_ROUTING', () => {
   });
 
   it('reads back through the routing reader unchanged', () => {
-    const reading = readRouting(Object.fromEntries(DEFAULT_ROUTING), AT);
+    const reading = routeTable(Object.fromEntries(DEFAULT_ROUTING), AT);
 
     expect(reading.problems).toEqual([]);
     expect(reading.value).toEqual(DEFAULT_ROUTING);
   });
 
   it('would fail that reading with a row the reader refuses, the control', () => {
-    const reading = readRouting({ ...Object.fromEntries(DEFAULT_ROUTING), prose: true }, AT);
+    const reading = routeTable({ ...Object.fromEntries(DEFAULT_ROUTING), prose: true }, AT);
 
     expect(reading.value).toBeUndefined();
     expect(reading.problems).toEqual([

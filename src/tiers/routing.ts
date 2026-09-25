@@ -9,8 +9,8 @@
  * rafa's defaults for that map, {@link DEFAULT_ROUTES}, and the map
  * `CONFIG_DEFAULTS` answers when no layer names `routing`,
  * {@link DEFAULT_ROUTING}. How a file's value is READ is
- * `config-sections.ts`'s `routeTarget` inside `config-schema.ts`'s
- * `mapOf`, as for every other setting.
+ * `config-sections.ts`'s `routeTarget` inside `config-readers.ts`'s
+ * `mapOf`, as for every other map setting.
  *
  * Four readings are this module's:
  *

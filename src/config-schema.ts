@@ -8,14 +8,17 @@
  * {@link RafaConfig}, {@link CONFIG_DEFAULTS} and {@link CONFIG_FILE},
  * so nothing outside the pair imports this file. `config-sections.ts`
  * holds every rule about a VALUE: the readers, the closed lists, the
- * item shapes, and why nothing is coerced. The one reader here is
- * {@link mapOf}, because what it rules on is a KEY: the names a map
- * setting's file spells below its own key.
+ * item shapes, and why nothing is coerced. `config-readers.ts` holds
+ * `mapOf`, whose ruling is on a KEY — the names a map setting's file
+ * spells below its own key — and the named readers the settings below
+ * are read through, `directory`, `trackerKind`, `releaseFile`,
+ * `tierPins` and `routeTable`.
  *
- * The trio sits under the 800-line cap of `context/source.md`, which no
- * gate reads. Measured with `wc -l` at the commit that added the `pr`
+ * The modules sit under the 800-line cap of `context/source.md`, which
+ * no gate reads. Measured with `wc -l` at the commit that added the `pr`
  * section: `config-schema.ts` is 396 lines, `config.ts` 506 and
- * `config-sections.ts` 478.
+ * `config-sections.ts` 478. This module had reached 800 exactly when
+ * those readers moved out to `config-readers.ts`, leaving it at 727.
  *
  * ## The schema
  *
@@ -221,7 +224,7 @@
  *     nothing pinned and nothing turned off, the fixed order project →
  *     rafa → user decides alone, and a pin as a default would override
  *     a holder nobody named.
- *   - Each map is read by {@link mapOf} whole, as one setting's value.
+ *   - Each map is read by `mapOf` whole, as one setting's value.
  *     `tiers` is a section and `tiers.skills` is not, so the names under
  *     `skills:` reach the reader rather than the unknown-key warning. A
  *     name spelled flat at the top level, `tiers.skills.tdd-guide:`, is
@@ -236,7 +239,7 @@
  * ## The `routing` setting
  *
  * The same spec makes the routing table a setting: `routing`, a map of
- * a task shape to the agent that takes it, read by {@link mapOf} as the
+ * a task shape to the agent that takes it, read by `mapOf` as the
  * `tiers` maps are. Three readings are this module's:
  *
  *   - It sits at the top level, like `modules`, so it opens no section
@@ -273,38 +276,15 @@
  * `toString` or `__proto__` as an ordinary own key, and an object
  * lookup would match it against `Object.prototype` instead.
  *
- * ## Map settings
- *
- * A map setting holds names the schema cannot list — a skill, an agent,
- * a task shape — each with a value an inner reader checks, and
- * {@link mapOf} reads one. Three readings are this module's:
- *
- *   - A name is a key the FILE spells, not one the schema knows, so it
- *     is kept in a `Map` and never in a plain object: a skill named
- *     `constructor` or `__proto__` is an ordinary name, and an object
- *     would match it against `Object.prototype` or reset the
- *     prototype. A name, like any string that names something, holds a
- *     character other than whitespace, and is kept as written.
- *   - Every entry is read, so a map with two unusable values names both,
- *     as `listOf` does for a list. An entry's label and key gain its
- *     name, `tiers.skills.tdd-guide`. A null value is handed to the
- *     inner reader like any other, which is what a map whose values
- *     include `false` needs: whether `false`, or null, means anything is
- *     the inner reader's answer.
- *   - The answer is a fresh `Map` per read, typed as a `ReadonlyMap`. A
- *     `Map` cannot be frozen the way a list is — `Object.freeze` leaves
- *     `set` working — so the promise that no caller edits a value for
- *     the next is kept by building a new one each time.
- *
  * ## Defaults
  *
  * {@link CONFIG_DEFAULTS} spells every default once, frozen, with each
- * list in it frozen too. A map cannot be frozen, as "Map settings" says,
- * so each map default is one shared `Map` — the empty `tiers` maps and
- * the `routing` table alike — and the promise that no caller edits it
- * rests on its `ReadonlyMap` type. The cutover runs one plan under `full` and
- * again under `stage`; should that comparison argue for `full`, the
- * change is that one line.
+ * list in it frozen too. A map cannot be frozen, as "Map settings" in
+ * `config-readers.ts` says, so each map default is one shared `Map` —
+ * the empty `tiers` maps and the `routing` table alike — and the
+ * promise that no caller edits it rests on its `ReadonlyMap` type. The
+ * cutover runs one plan under `full` and again under `stage`; should
+ * that comparison argue for `full`, the change is that one line.
  */
 import type {
   ClaudeSettingSource,
@@ -317,7 +297,6 @@ import type {
   PrerequisiteItem,
   PrProvider,
   Reader,
-  Reading,
   ReleaseEnabled,
   RouteTarget,
   StoreBackend,
@@ -328,15 +307,20 @@ import type {
 import { join } from 'node:path';
 
 import {
+  directory,
+  releaseFile,
+  routeTable,
+  tierPins,
+  trackerKind,
+} from './config-readers.js';
+import {
   CLAUDE_SETTING_SOURCES,
   confidence,
   CONFIG_VERSIONS,
   dayCount,
-  describeValue,
   flag,
   githubLogin,
   INJECT_MODES,
-  isMapping,
   issueNumber,
   listOf,
   mergeMethod,
@@ -352,11 +336,9 @@ import {
   recurrenceCount,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
-  routeTarget,
   STORE_BACKENDS,
   subsetOf,
   text,
-  tierPin,
   tierSwitch,
   usdAmount,
 } from './config-sections.js';
@@ -371,45 +353,6 @@ import { DEFAULT_ROUTING } from './tiers/routing.js';
  * with `join` of its own.
  */
 export const CONFIG_FILE = join('.rafa', 'config.yaml');
-
-/**
- * Accepts a mapping of names to values `value` accepts, answered as a
- * fresh `Map` in the order written; see "Map settings" in the module
- * note. Every entry is read, so a map with two unusable entries names
- * both. `expected` names the values, in the refusal of a value that is
- * not a mapping.
- */
-export function mapOf<T>(
-  value: Reader<T>,
-  expected: string,
-): Reader<ReadonlyMap<string, T>> {
-  return (raw, at) => {
-    if (!isMapping(raw)) {
-      const problem = `${at.label} is ${describeValue(raw)}, expected a mapping of names to ${expected}`;
-      return { value: undefined, problems: [problem], extras: [] };
-    }
-
-    const readings = Object.entries(raw).map(([name, entry]): [string, Reading<T>] => [
-      name,
-      name.trim() === ''
-        ? {
-          value: undefined,
-          problems: [`${at.label} names ${JSON.stringify(name)}, expected a non-empty name`],
-          extras: [],
-        }
-        : value(entry, { label: `${at.label}.${name}`, key: `${at.key}.${name}` }),
-    ]);
-    const problems = readings.flatMap(([, reading]) => reading.problems);
-    const extras = readings.flatMap(([, reading]) => reading.extras);
-    if (problems.length > 0) return { value: undefined, problems, extras };
-
-    const read = new Map<string, T>();
-    for (const [name, reading] of readings) {
-      if (reading.value !== undefined) read.set(name, reading.value);
-    }
-    return { value: read, problems, extras };
-  };
-}
 
 /** Every setting, resolved. The module note maps each to its file key. */
 export interface RafaConfig {
@@ -608,18 +551,6 @@ export interface SettingSpec<K extends ConfigSetting> {
   itemKeys?: readonly string[];
 }
 
-/** The reader both directory settings share. */
-const directory = text('a directory path');
-
-/** The reader every tracker kind goes through. */
-const trackerKind = text('a tracker kind name');
-
-/** The reader both `release` file settings share. */
-const releaseFile = text('a file path');
-
-/** The reader both `tiers` maps share. */
-const tierPins = mapOf(tierPin, 'false or a tier');
-
 /**
  * Every setting, by name, in the order problems are reported.
  *
@@ -720,11 +651,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   tiersRafa: { key: 'tiers.rafa', read: tierSwitch, cli: false },
   tiersSkills: { key: 'tiers.skills', read: tierPins, cli: false },
   tiersAgents: { key: 'tiers.agents', read: tierPins, cli: false },
-  routing: {
-    key: 'routing',
-    read: mapOf(routeTarget, 'false or an agent name'),
-    cli: false,
-  },
+  routing: { key: 'routing', read: routeTable, cli: false },
 };
 
 /** Every setting name, read off the closed record above. */

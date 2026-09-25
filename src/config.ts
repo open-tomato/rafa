@@ -19,10 +19,11 @@
  *
  * ## Where the rules live
  *
- * The reader is three modules, and a name moving between them is a
- * refactor, never a change of behaviour. This file is intended as the
- * public surface, re-exporting everything the other two export for a
- * caller to import rather than reaching into a sibling; however, 75
+ * The reader is three modules and a helper of the schema's, and a name
+ * moving between them is a refactor, never a change of behaviour. This
+ * file is intended as the public surface, re-exporting everything the
+ * other two modules export for a caller to import rather than reaching
+ * into a sibling; however, 75
  * modules currently import `config-sections.js` directly. The one
  * exception is `MergeMethod`, which `config-sections.ts` re-exports
  * from `pr/types.ts` so `config-schema.ts` can type a field with it. The
@@ -40,6 +41,10 @@
  *     them. The four readings the spec leaves to the reader — open
  *     tracker kinds, empty prerequisite tiers, `version: 1` alone, and
  *     `loop.settingSources` as an ordered list — are argued there.
+ *   - `config-readers.ts` holds `mapOf` and the named readers
+ *     `config-schema.ts` reads its settings through. No caller reads a
+ *     setting through them but the schema, so nothing here re-exports
+ *     them.
  *   - This module holds the rules about LAYERS: which layer answers a
  *     setting, what a file may carry, and what is refused.
  *
