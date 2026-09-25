@@ -286,8 +286,11 @@ describe('the config files', () => {
     expect([flipped.config.tiersRafa, flipped.sources.tiersRafa]).toEqual(['off', 'file']);
   });
 
-  it('closes on the routing section, one line per default row, which resolves from the file once uncommented', () => {
-    const routing = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# routing:'));
+  it('carries the routing section, one line per default row, which resolves from the file once uncommented', () => {
+    const routing = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# routing:'),
+      CONFIG_SETTINGS_LINES.indexOf('# task:'),
+    );
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...routing].join('\n')), 'c.yaml') });
 
     expect(routing.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
@@ -310,6 +313,28 @@ describe('the config files', () => {
 
     expect(resolved.config.routing.get('prose')).toBe('tdd-guide');
     expect(resolved.config.routing.get('tests')).toBe('tdd-guide');
+  });
+
+  it('closes on the task section at its defaults, which resolve from the file once uncommented', () => {
+    const task = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# task:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...task].join('\n')), 'c.yaml') });
+
+    expect(task.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# task:',
+      '#   skills: planner',
+      '#   lessons: on',
+    ]);
+    expect([resolved.config.taskSkills, resolved.config.taskLessons]).toEqual(['planner', 'on']);
+    expect([resolved.sources.taskSkills, resolved.sources.taskLessons]).toEqual(['file', 'file']);
+  });
+
+  it('answers the task settings from the file once their lines are changed, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line
+      .replace(/^(# {3}skills:) planner/, '$1 none')
+      .replace(/^(# {3}lessons:) on/, '$1 off'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect([resolved.config.taskSkills, resolved.config.taskLessons]).toEqual(['none', 'off']);
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

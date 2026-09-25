@@ -44,11 +44,12 @@
  * the key exists and what it takes, which is the whole point of a
  * template of commented settings.
  *
- * The `tiers` and `routing` sections close the template. `tiers.skills`
- * and `tiers.agents` are written as `{}`, their empty default, and
- * `routing` as one line per row of `tiers/routing.ts`'s
+ * The `tiers`, `routing` and `task` sections close the template.
+ * `tiers.skills` and `tiers.agents` are written as `{}`, their empty
+ * default, and `routing` as one line per row of `tiers/routing.ts`'s
  * `DEFAULT_ROUTES`, so the template cannot drift from the defaults the
- * schema answers.
+ * schema answers. `task.skills` and `task.lessons` are written from
+ * `CONFIG_DEFAULTS`, at `planner` and `on`.
  *
  * A file is written only when nothing is at its path, with the `wx` flag,
  * so a file that appears between the check and the write is refused by
@@ -140,6 +141,9 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '#   agents: {}                   # name: false turns an agent off; name: project | rafa | user pins its tier',
   '# routing:',
   ...DEFAULT_ROUTES.map(([shape, agent]) => `#   ${shape}: ${agent}`),
+  '# task:',
+  `#   skills: ${CONFIG_DEFAULTS.taskSkills}                # planner | tag | none, the resolver that picks a task's skills`,
+  `#   lessons: ${CONFIG_DEFAULTS.taskLessons}                    # on | off, whether blessed lessons join a task's prompt`,
 ]);
 
 /** The line every file opens its settings with. */
