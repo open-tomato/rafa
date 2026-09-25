@@ -249,6 +249,13 @@
  *     changes that shape and leaves the other four; a `false` row
  *     routes its shape nowhere.
  *
+ * ## The `learning` section
+ *
+ * `.rafa/specs/rafa-25-rafa-learns-own-runs.md` sets three floors beside
+ * `learning.adapter`: numbers, never null, none a {@link CommandLineSetting}.
+ * Why a confidence outside 0.3..0.9 and an `after` below 1 are refused
+ * is `config-sections.ts`'s to say.
+ *
  * ## The closed set
  *
  * {@link SETTINGS} is a mapped record over {@link ConfigSetting} rather
@@ -322,6 +329,7 @@ import { join } from 'node:path';
 
 import {
   CLAUDE_SETTING_SOURCES,
+  confidence,
   CONFIG_VERSIONS,
   dayCount,
   describeValue,
@@ -341,6 +349,7 @@ import {
   PR_PROVIDERS,
   RELEASE_AUTO,
   releaseEnabled,
+  recurrenceCount,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
   routeTarget,
@@ -420,6 +429,12 @@ export interface RafaConfig {
   trackerFallback: readonly string[];
   /** The learning adapter kind. `learning.adapter`. */
   learningAdapter: string;
+  /** The least confidence a lesson tasks may use. `learning.bless.minConfidence`. */
+  learningBlessMinConfidence: number;
+  /** The distinct sources a lesson needs to be promotable. `learning.promote.after`. */
+  learningPromoteAfter: number;
+  /** The least confidence of a promotable lesson. `learning.promote.minConfidence`. */
+  learningPromoteMinConfidence: number;
   /** How commands write their output. `output.mode`. */
   outputMode: OutputMode;
   /** Items whose failure halts a run. `prerequisites.required`. */
@@ -546,6 +561,9 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   trackerDefault: 'github',
   trackerFallback: Object.freeze(['local']),
   learningAdapter: 'local',
+  learningBlessMinConfidence: 0.5,
+  learningPromoteAfter: 3,
+  learningPromoteMinConfidence: 0.7,
   outputMode: 'text',
   prerequisitesRequired: Object.freeze([]),
   prerequisitesOptional: Object.freeze([]),
@@ -625,6 +643,9 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: text('a learning adapter name'),
     cli: true,
   },
+  learningBlessMinConfidence: { key: 'learning.bless.minConfidence', read: confidence, cli: false },
+  learningPromoteAfter: { key: 'learning.promote.after', read: recurrenceCount, cli: false },
+  learningPromoteMinConfidence: { key: 'learning.promote.minConfidence', read: confidence, cli: false },
   outputMode: { key: 'output.mode', read: oneOf(OUTPUT_MODES), cli: true },
   prerequisitesRequired: {
     key: 'prerequisites.required',

@@ -148,6 +148,36 @@ describe('the config files', () => {
     ]);
   });
 
+  it('carries the learning section at its defaults, which resolve from the file once uncommented', () => {
+    const learning = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# learning:'),
+      CONFIG_SETTINGS_LINES.indexOf('# output:'),
+    );
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...learning].join('\n')), 'c.yaml') });
+    const settings = ['learningBlessMinConfidence', 'learningPromoteAfter', 'learningPromoteMinConfidence'] as const;
+
+    expect(learning.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# learning:',
+      '#   adapter: local',
+      '#   bless:',
+      '#     minConfidence: 0.5',
+      '#   promote:',
+      '#     after: 3',
+      '#     minConfidence: 0.7',
+    ]);
+    expect(settings.map((setting) => resolved.config[setting])).toEqual([0.5, 3, 0.7]);
+    expect(settings.map((setting) => resolved.sources[setting])).toEqual(['file', 'file', 'file']);
+  });
+
+  it('answers each learning floor from the default once its line is dropped, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {5}(?:minConfidence|after):/.test(line));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+    const settings = ['learningBlessMinConfidence', 'learningPromoteAfter', 'learningPromoteMinConfidence'] as const;
+
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 3);
+    expect(settings.map((setting) => resolved.sources[setting])).toEqual(['default', 'default', 'default']);
+  });
+
   it('carries the cleanup section at its defaults, which resolve from the file once uncommented', () => {
     const cleanup = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# cleanup:'),
