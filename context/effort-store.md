@@ -99,9 +99,11 @@ redden.
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
 the session id, holding the block as written, each declared value the
-parser could use and the flags the session was spawned with, whatever
-became of the task, and then the report; a refused dispatch row stores no
-report. No column holds the outcome: `task_reports` and `report_absences`
+parser could use, the flags the session was spawned with, and the
+resolver with the bare names of the skills and the ids of the lessons its
+prompt offered, whatever became of the task, and then the report; a
+refused dispatch row stores no report. A dispatch handed no handout
+stores a NULL resolver beside two `[]` offers. No column holds the outcome: `task_reports` and `report_absences`
 hold it under the same session id.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived

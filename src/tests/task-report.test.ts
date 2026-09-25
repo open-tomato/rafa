@@ -308,6 +308,9 @@ describe('a report\'s change notes, stored under a plan stub', () => {
       output: OUTPUT_WITH_CHANGES,
       declaration: null,
       flags: [],
+      resolver: null,
+      skillsOffered: [],
+      lessonsOffered: [],
     };
     expect(await storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done', learning: null })).toBe(true);
 
@@ -338,6 +341,9 @@ describe('a report\'s change notes, stored under a plan stub', () => {
       output: OUTPUT_WITHOUT_CHANGES,
       declaration: null,
       flags: [],
+      resolver: null,
+      skillsOffered: [],
+      lessonsOffered: [],
     };
     expect(await storeTaskReport({
       repoRoot: root,
@@ -749,7 +755,16 @@ describe('what a store the loop cannot use tells the operator', () => {
     const stored = await storeTaskReport({
       repoRoot: root,
       planStub: 'probe',
-      dispatch: { sessionId: 'aaaa-1111', taskText: 'Record the report', output: '', declaration: null, flags: [] },
+      dispatch: {
+        sessionId: 'aaaa-1111',
+        taskText: 'Record the report',
+        output: '',
+        declaration: null,
+        flags: [],
+        resolver: null,
+        skillsOffered: [],
+        lessonsOffered: [],
+      },
       outcome: 'done',
       learning: null,
     });

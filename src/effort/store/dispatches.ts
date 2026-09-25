@@ -50,9 +50,13 @@
  * `resolver`, `skills_offered` and `lessons_offered` say which arm chose
  * the task's skills and what reached its prompt, so a session's use of a
  * skill can be read against what it was handed. The resolver's name is
- * recorded here and never printed into the prompt. Each is optional on a
- * write, and a write that leaves one out, or passes null, stores NULL:
- * not recorded, which is what every row a version-9 store held reads. An
+ * recorded here and never printed into the prompt. `storeTaskReport`
+ * (`start/dispatch.ts`) writes all three off the dispatch, the offered
+ * skills by bare name and the lessons by id; a dispatch that ran no
+ * resolver, handed no handout, writes a NULL resolver beside two `[]`.
+ * Each is optional on a write, and a write that leaves one out, or passes
+ * null, stores NULL: not recorded, which is what every row a version-9
+ * store held reads. An
  * offered list stores `[]` when the prompt offered nothing, so an empty
  * offer and an unrecorded one stay apart. Each list is stored in the
  * order it was handed, as the prompt's section listed it.

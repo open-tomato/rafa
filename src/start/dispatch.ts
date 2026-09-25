@@ -555,8 +555,14 @@ export interface TaskReportStoreOptions {
   readonly repoRoot: string;
   /** The plan the run is executing, or null when its file name gives none. */
   readonly planStub: string | null;
-  /** The dispatch whose session wrote the report, with what it declared and was spawned with. */
-  readonly dispatch: Pick<TaskDispatch, 'sessionId' | 'taskText' | 'output' | 'declaration' | 'flags'>;
+  /**
+   * The dispatch whose session wrote the report, with what it declared,
+   * what it was spawned with, and the resolver and what its prompt offered.
+   */
+  readonly dispatch: Pick<
+    TaskDispatch,
+    'sessionId' | 'taskText' | 'output' | 'declaration' | 'flags' | 'resolver' | 'skillsOffered' | 'lessonsOffered'
+  >;
   /** What the loop made of the task. */
   readonly outcome: FindingOutcome;
   /**
@@ -612,9 +618,14 @@ async function pushTaskLessons(
  * whether the store took it.
  *
  * The dispatch goes first: one `dispatches` row holding what the task's
- * declaration asked for, its budget among it, and the flags the session
- * was spawned with (`effort/store/dispatches.ts`), whatever became of the
- * task, so every session the loop stores has one. The report follows.
+ * declaration asked for, its budget among it, the flags the session was
+ * spawned with, the resolver that chose its skills, and the bare names of
+ * the skills and the ids of the lessons its prompt offered, in the order
+ * the sections listed them (`effort/store/dispatches.ts`), whatever became
+ * of the task, so every session the loop stores has one. A dispatch handed
+ * no handout records a null resolver and offered lists of `[]`: nothing
+ * was offered, which the row keeps apart from a row written before these
+ * columns existed. The report follows.
  *
  * Every row carries the sentence the dispatch quoted, declaration off, and
  * the id the session ran under, so it joins that session's log. An output
@@ -642,6 +653,9 @@ export async function storeTaskReport(options: TaskReportStoreOptions): Promise<
       taskLine: dispatch.taskText,
       declaration: dispatch.declaration,
       flags: dispatch.flags,
+      resolver: dispatch.resolver,
+      skillsOffered: dispatch.skillsOffered.map((skill) => skill.name),
+      lessonsOffered: dispatch.lessonsOffered.map((lesson) => lesson.id),
     });
     record = recordTaskReport(options.repoRoot, {
       dispatch: {

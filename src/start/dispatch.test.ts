@@ -42,6 +42,7 @@ import type { AdapterContext } from '../adapters/registry.js';
 import type { TierPin } from '../config-sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning, SyncPayload } from '../ports/index.js';
+import type { ResolvedSkill } from '../task/resolve-skills.js';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -120,11 +121,46 @@ function storeOptions(
       output,
       declaration,
       flags: resolveDeclarationFlags(declaration, () => false).args,
+      resolver: null,
+      skillsOffered: [],
+      lessonsOffered: [],
     },
     outcome,
     learning: null,
   };
 }
+
+/** A skill a dispatch offered, as a resolver answers it. */
+function offeredSkill(name: string): ResolvedSkill {
+  return { name, source: 'rafa', path: `/tiers/rafa/skills/${name}/SKILL.md`, description: `the ${name} skill` };
+}
+
+/** A blessed lesson a dispatch offered. */
+function offeredLesson(id: string): InstinctRecord {
+  return {
+    id,
+    trigger: `when ${id} applies`,
+    action: `act on ${id}`,
+    action_hash: `hash-${id}`,
+    confidence: 0.8,
+    usage_count: 1,
+    signal: 'loud',
+    status: 'active',
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  };
+}
+
+/** The resolver and offered columns of every `dispatches` row under `root`. */
+interface OfferedRow {
+  readonly session_id: string;
+  readonly resolver: string | null;
+  readonly skills_offered: string | null;
+  readonly lessons_offered: string | null;
+}
+
+/** Selects {@link OfferedRow}s in append order. */
+const SELECT_OFFERED = 'SELECT session_id, resolver, skills_offered, lessons_offered FROM dispatches ORDER BY seq';
 
 describe('storeTaskReport, storing the dispatch', () => {
   let seen: string[] = [];
@@ -165,6 +201,59 @@ describe('storeTaskReport, storing the dispatch', () => {
     expect(rawQuery(root, 'SELECT session_id, budget_usd FROM dispatches')).toEqual([{ session_id: 's-2', budget_usd: 0.5 }]);
     expect(rawQuery(root, 'SELECT session_id, outcome FROM report_absences')).toEqual([{ session_id: 's-2', outcome: 'blocked' }]);
     expect(rawQuery(root, 'SELECT session_id FROM task_reports')).toEqual([]);
+  });
+
+  it('stores the resolver, the offered skills by bare name and the offered lessons by id, in the order offered', async () => {
+    const root = freshRoot();
+    const options = storeOptions(root, 's-4', REPORTED, 'done');
+    const offered = {
+      ...options,
+      dispatch: {
+        ...options.dispatch,
+        resolver: 'tag' as const,
+        skillsOffered: [offeredSkill('zeta'), offeredSkill('alpha')],
+        lessonsOffered: [offeredLesson('lesson-b'), offeredLesson('lesson-a')],
+      },
+    };
+
+    expect(await storeTaskReport(offered)).toBe(true);
+
+    expect(rawQuery<OfferedRow>(root, SELECT_OFFERED)).toEqual([{
+      session_id: 's-4',
+      resolver: 'tag',
+      skills_offered: '["zeta","alpha"]',
+      lessons_offered: '["lesson-b","lesson-a"]',
+    }]);
+    expect(seen).toEqual([]);
+  });
+
+  it('stores a null resolver beside two empty offers for a dispatch handed nothing, never NULL offers', async () => {
+    // The control is the case above: the same write with a resolver and
+    // offers stores them, so these values are read off the dispatch.
+    const root = freshRoot();
+
+    expect(await storeTaskReport(storeOptions(root, 's-5', REPORTED, 'done'))).toBe(true);
+
+    expect(rawQuery<OfferedRow>(root, SELECT_OFFERED)).toEqual([{
+      session_id: 's-5',
+      resolver: null,
+      skills_offered: '[]',
+      lessons_offered: '[]',
+    }]);
+  });
+
+  it('stores no report when an offered skill is named twice, and answers false', async () => {
+    const root = freshRoot();
+    const options = storeOptions(root, 's-6', REPORTED, 'done');
+    const twice = {
+      ...options,
+      dispatch: { ...options.dispatch, resolver: 'planner' as const, skillsOffered: [offeredSkill('a'), offeredSkill('a')] },
+    };
+
+    expect(await storeTaskReport(twice)).toBe(false);
+
+    expect(existsSync(root)).toBe(false);
+    expect(seen[0]).toStartWith('error:\n❌ The report of session s-6 was not stored: effort store: dispatch write has offered skills ');
   });
 
   it('stores no report when the dispatch row is refused, and answers false', async () => {

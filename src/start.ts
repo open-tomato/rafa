@@ -646,7 +646,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const { exitCode } = dispatch;
 
       // Stored once the task's fate is known, and never before: the
-      // outcome goes on every row the report is stored as. Triage follows
+      // outcome goes on every row the report is stored as, and the
+      // dispatch row takes the resolver and what the prompt offered off
+      // `dispatch` (`start/dispatch.ts`). Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
