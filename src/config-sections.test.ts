@@ -32,6 +32,8 @@ import {
   githubLogin,
   isGitHubLogin,
   isMapping,
+  LESSON_SWITCHES,
+  lessonSwitch,
   listOf,
   mergeMethod,
   MODULE_SOURCE_KINDS,
@@ -45,6 +47,8 @@ import {
   releaseEnabled,
   requiredPrerequisite,
   routeTarget,
+  SKILL_RESOLVERS,
+  skillResolverName,
   STORE_BACKENDS,
   subsetOf,
   text,
@@ -542,6 +546,43 @@ describe('routeTarget', () => {
     expect(problemsOf(routeTarget, raw)).toEqual([
       `F: s is ${found}, expected false or an agent name`,
     ]);
+  });
+});
+
+describe('skillResolverName', () => {
+  it('accepts planner, tag and none, each as itself', () => {
+    expect(SKILL_RESOLVERS.map((name) => valueOf(skillResolverName, name)))
+      .toEqual(['planner', 'tag', 'none']);
+  });
+
+  it.each([
+    ['a resolver nobody defined', 'model', '"model"'],
+    ['a different case', 'Planner', '"Planner"'],
+    ['an empty name', '', '""'],
+    ['the boolean false', false, 'false'],
+    ['a list of resolvers', ['tag'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(skillResolverName, raw)).toEqual([
+      `F: s is ${found}, expected one of: planner, tag, none`,
+    ]);
+  });
+});
+
+describe('lessonSwitch', () => {
+  it('accepts on and off, each as itself, including as the parser answers them unquoted', () => {
+    const parsed = Bun.YAML.parse('a: on\nb: off\n') as Record<string, unknown>;
+
+    expect(LESSON_SWITCHES.map((word) => valueOf(lessonSwitch, word))).toEqual(['on', 'off']);
+    expect([valueOf(lessonSwitch, parsed.a), valueOf(lessonSwitch, parsed.b)]).toEqual(['on', 'off']);
+  });
+
+  it.each([
+    ['the boolean false, which nothing here coerces', false, 'false'],
+    ['the boolean true', true, 'true'],
+    ['a different case', 'On', '"On"'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(lessonSwitch, raw)).toEqual([`F: s is ${found}, expected one of: on, off`]);
   });
 });
 

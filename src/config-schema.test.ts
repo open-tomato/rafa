@@ -71,6 +71,8 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['tiersSkills', 'tiers.skills'],
   ['tiersAgents', 'tiers.agents'],
   ['routing', 'routing'],
+  ['taskSkills', 'task.skills'],
+  ['taskLessons', 'task.lessons'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -83,6 +85,7 @@ const COMMAND_LINE: readonly ConfigSetting[] = [
   'learningAdapter',
   'outputMode',
   'settingSources',
+  'taskSkills',
 ];
 
 /** The keys known at the top level, in schema order. */
@@ -108,6 +111,7 @@ const TOP = [
   'status',
   'tiers',
   'routing',
+  'task',
 ];
 
 describe('SETTINGS', () => {
@@ -176,6 +180,7 @@ describe('SECTIONS', () => {
       'roadmap',
       'specs',
       'status',
+      'task',
       'tiers',
       'tracker',
       'tracking',
@@ -214,6 +219,7 @@ describe('knownKeysAbove', () => {
     ]);
     expect(knownKeysAbove('learning.blessed')).toEqual(['learning', ['adapter', 'bless', 'promote']]);
     expect(knownKeysAbove('tiers.lessons')).toEqual(['tiers', ['rafa', 'skills', 'agents']]);
+    expect(knownKeysAbove('task.resolver')).toEqual(['task', ['skills', 'lessons']]);
   });
 
   it('answers the tiers section for a map name spelled flat, which no setting reads', () => {

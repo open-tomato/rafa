@@ -86,7 +86,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup, dangerous, status, tiers, routing)';
+  + 'roadmap, release, cleanup, dangerous, status, tiers, routing, task)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -129,6 +129,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'tiersSkills',
   'tiersAgents',
   'routing',
+  'taskSkills',
+  'taskLessons',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -178,6 +180,8 @@ const DEFAULTS: RafaConfig = {
     ['review', 'code-reviewer'],
     ['implementation', 'loop-implementer'],
   ]),
+  taskSkills: 'planner',
+  taskLessons: 'on',
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -249,6 +253,9 @@ const FULL = [
   '  skills: { react-query: false, documentation: project }',
   '  agents: { tdd-guide: user }',
   'routing: { cleanup: refactor-cleaner, review: false }',
+  'task:',
+  '  skills: tag',
+  '  lessons: off',
   '',
 ].join('\n');
 
@@ -307,6 +314,8 @@ const FULL_VALUES: RafaConfig = {
   tiersSkills: new Map<string, TierPin>([['react-query', false], ['documentation', 'project']]),
   tiersAgents: new Map([['tdd-guide', 'user']]),
   routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
+  taskSkills: 'tag',
+  taskLessons: 'off',
 };
 
 /**
@@ -719,6 +728,16 @@ describe('parseConfigText', () => {
         'routing.prose is true, expected false or an agent name',
         'routing: { prose: tdd-guide }', 'routing', new Map([['prose', 'tdd-guide']]),
       ],
+      [
+        'task.skills', 'task:\n  skills: Tag',
+        'task.skills is "Tag", expected one of: planner, tag, none',
+        'task:\n  skills: none', 'taskSkills', 'none',
+      ],
+      [
+        'task.lessons', 'task:\n  lessons: false',
+        'task.lessons is false, expected one of: on, off',
+        'task:\n  lessons: off', 'taskLessons', 'off',
+      ],
     ];
 
     it('covers every setting once', () => {
@@ -871,6 +890,7 @@ describe('resolveConfig', () => {
       learningAdapter: 'mirror',
       outputMode: 'text',
       settingSources: 'local',
+      taskSkills: 'none',
     };
     const resolved = resolveConfig({ file: fileOf(FULL), cli });
 
@@ -884,6 +904,7 @@ describe('resolveConfig', () => {
       learningAdapter: 'mirror',
       outputMode: 'text',
       settingSources: ['local'],
+      taskSkills: 'none',
     });
     expect(resolved.sources).toEqual(sourcesWith({
       store: 'cli',
@@ -894,11 +915,12 @@ describe('resolveConfig', () => {
       learningAdapter: 'cli',
       outputMode: 'cli',
       settingSources: 'cli',
+      taskSkills: 'cli',
     }, 'file'));
   });
 
   it('reads no command-line key naming a setting only the file spells', () => {
-    const cli = { version: '2', modules: 'x', trackingAll: 'true' } as unknown as ConfigOverrides;
+    const cli = { version: '2', modules: 'x', trackingAll: 'true', taskLessons: 'off' } as unknown as ConfigOverrides;
     const resolved = resolveConfig({ cli });
 
     expect(resolved.config).toEqual(DEFAULTS);
@@ -943,6 +965,7 @@ describe('resolveConfig', () => {
     ['a misspelt backend', { store: 'sqllite' }, 'store is "sqllite"', 'one of: sqlite, ndjson'],
     ['an empty directory', { planDir: '' }, 'planDir is ""', 'a directory path'],
     ['an output mode', { outputMode: 'tui' }, 'outputMode is "tui"', 'one of: text, json'],
+    ['an empty resolver', { taskSkills: '' }, 'taskSkills is ""', 'one of: planner, tag, none'],
     [
       'empty setting sources', { settingSources: '' }, 'settingSources is ""',
       'a comma-separated subset of: user, project, local',

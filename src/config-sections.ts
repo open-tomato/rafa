@@ -119,6 +119,25 @@
  *     and a shape with nothing after it routes nothing, where silence
  *     is the shape left out.
  *
+ * ## The `task` section
+ *
+ * `task.skills` names the resolver that picks a task's skills at
+ * dispatch, and `task.lessons` whether blessed lessons join its prompt.
+ * {@link skillResolverName} reads the first and {@link lessonSwitch}
+ * the second, each a closed list declared here. Two readings are this
+ * module's:
+ *
+ *   - `task.skills` takes `planner`, `tag` or `none` and nothing else.
+ *     Which resolver runs under each name is `task/resolve-skills.ts`'s
+ *     to say. A name outside the list, `model` included, is refused
+ *     here, where a person can still fix the file, and not left for
+ *     dispatch to find.
+ *   - `task.lessons` takes the WORDS `on` and `off`, as `tiers.rafa`
+ *     does and for the same reason: `Bun.YAML.parse` answers both as
+ *     strings, so `lessons: false` is refused and told what to write.
+ *     It has a list of its own rather than {@link TIER_SWITCHES},
+ *     since the two settings share a spelling and not a meaning.
+ *
  * ## The lists this module does not own
  *
  * Every other closed list here is declared here. Three are not, and
@@ -314,6 +333,18 @@ export type TierPin = false | SkillTier;
  */
 export type RouteTarget = false | string;
 
+/** The skill resolvers `task.skills` may name; see "The `task` section". */
+export const SKILL_RESOLVERS = ['planner', 'tag', 'none'] as const;
+
+/** One of {@link SKILL_RESOLVERS}. */
+export type SkillResolverName = (typeof SKILL_RESOLVERS)[number];
+
+/** What `task.lessons` takes: the words, not the booleans. */
+export const LESSON_SWITCHES = ['on', 'off'] as const;
+
+/** One of {@link LESSON_SWITCHES}. */
+export type LessonSwitch = (typeof LESSON_SWITCHES)[number];
+
 /** A reading of `value` with nothing wrong. */
 function accepted<T>(value: T): Reading<T> {
   return { value, problems: [], extras: [] };
@@ -495,6 +526,12 @@ export const routeTarget: Reader<RouteTarget> = (raw, at) => raw === false
   || (typeof raw === 'string' && raw.trim() !== '')
   ? accepted(raw)
   : refused(at, raw, 'false or an agent name');
+
+/** Accepts one of {@link SKILL_RESOLVERS}; see "The `task` section". */
+export const skillResolverName: Reader<SkillResolverName> = oneOf(SKILL_RESOLVERS);
+
+/** Accepts `on` or `off`, as words; see "The `task` section". */
+export const lessonSwitch: Reader<LessonSwitch> = oneOf(LESSON_SWITCHES);
 
 /**
  * A GitHub account login as the collaborators endpoint takes one in a

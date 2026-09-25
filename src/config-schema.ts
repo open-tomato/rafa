@@ -252,6 +252,24 @@
  *     changes that shape and leaves the other four; a `false` row
  *     routes its shape nowhere.
  *
+ * ## The `task` section
+ *
+ * Plan rafa-23 hands each task the skills and lessons it needs:
+ * `task.skills` names the resolver that picks the skills, `task.lessons`
+ * whether blessed lessons join the prompt. The two sit under one `task`
+ * section so #118's merge finds them as one map. What each VALUE may be
+ * is `config-sections.ts`'s to say. Three readings are this module's:
+ *
+ *   - `task.skills` defaults to `planner`, the resolver that serves the
+ *     skills the plan named, and `task.lessons` to `on`. Neither is
+ *     null, so a project that has said nothing gets the arm the plan
+ *     was written for.
+ *   - `task.skills` is a {@link CommandLineSetting}, so a command line
+ *     may name it for one run as it names `plan.inject`. It is the one
+ *     `task` setting that is: `task.lessons` has no flag.
+ *   - Both are single strings, never maps, so they merge across layers
+ *     as every scalar does, the project over the user over the default.
+ *
  * ## The `learning` section
  *
  * `.rafa/specs/rafa-25-rafa-learns-own-runs.md` sets three floors beside
@@ -290,6 +308,7 @@ import type {
   ClaudeSettingSource,
   ConfigVersion,
   InjectMode,
+  LessonSwitch,
   MergeMethod,
   ModuleSource,
   OptionalPrerequisiteItem,
@@ -299,6 +318,7 @@ import type {
   Reader,
   ReleaseEnabled,
   RouteTarget,
+  SkillResolverName,
   StoreBackend,
   TierPin,
   TierSwitch,
@@ -322,6 +342,7 @@ import {
   githubLogin,
   INJECT_MODES,
   issueNumber,
+  lessonSwitch,
   listOf,
   mergeMethod,
   MODULE_SOURCE_KEYS,
@@ -336,6 +357,7 @@ import {
   recurrenceCount,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
+  skillResolverName,
   STORE_BACKENDS,
   subsetOf,
   text,
@@ -480,6 +502,10 @@ export interface RafaConfig {
    * routed nowhere. `routing`.
    */
   routing: ReadonlyMap<string, RouteTarget>;
+  /** The resolver that picks each task's skills at dispatch. `task.skills`. */
+  taskSkills: SkillResolverName;
+  /** Whether blessed lessons join each task's prompt. `task.lessons`. */
+  taskLessons: LessonSwitch;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */
@@ -492,7 +518,8 @@ export type ConfigSetting = keyof RafaConfig;
  * would have to invent.
  */
 export type CommandLineSetting = 'store' | 'inject' | 'planDir' | 'specsDir'
-  | 'trackerDefault' | 'learningAdapter' | 'outputMode' | 'settingSources';
+  | 'trackerDefault' | 'learningAdapter' | 'outputMode' | 'settingSources'
+  | 'taskSkills';
 
 /** What every setting resolves to when no layer names it. */
 export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
@@ -535,6 +562,8 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   tiersSkills: new Map<string, TierPin>(),
   tiersAgents: new Map<string, TierPin>(),
   routing: DEFAULT_ROUTING,
+  taskSkills: 'planner',
+  taskLessons: 'on',
 });
 
 /** What the module knows about one setting. */
@@ -652,6 +681,8 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   tiersSkills: { key: 'tiers.skills', read: tierPins, cli: false },
   tiersAgents: { key: 'tiers.agents', read: tierPins, cli: false },
   routing: { key: 'routing', read: routeTable, cli: false },
+  taskSkills: { key: 'task.skills', read: skillResolverName, cli: true },
+  taskLessons: { key: 'task.lessons', read: lessonSwitch, cli: false },
 };
 
 /** Every setting name, read off the closed record above. */

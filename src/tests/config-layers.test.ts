@@ -195,6 +195,9 @@ const PROJECT_TEXT = [
   'routing:',
   '  cleanup: refactor-cleaner',
   '  review: false',
+  'task:',
+  '  skills: tag',
+  '  lessons: off',
   '',
 ].join('\n');
 
@@ -257,6 +260,8 @@ const PROJECT_VALUES: RafaConfig = {
     ['cleanup', 'refactor-cleaner'],
     ['review', false],
   ]),
+  taskSkills: 'tag',
+  taskLessons: 'off',
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -322,6 +327,9 @@ const USER_TEXT = [
   '  skills: { documentation: user }',
   '  agents: { tdd-guide: user, code-reviewer: false }',
   'routing: { review: typescript-reviewer }',
+  'task:',
+  '  skills: none',
+  '  lessons: on',
   '',
 ].join('\n');
 
@@ -370,6 +378,8 @@ const USER_VALUES: RafaConfig = {
   tiersSkills: new Map([['documentation', 'user']]),
   tiersAgents: new Map<string, TierPin>([['tdd-guide', 'user'], ['code-reviewer', false]]),
   routing: new Map([...CONFIG_DEFAULTS.routing, ['review', 'typescript-reviewer']]),
+  taskSkills: 'none',
+  taskLessons: 'on',
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -382,6 +392,7 @@ const CLI_OVERRIDES: ConfigOverrides = {
   learningAdapter: 'cli-adapter',
   outputMode: 'text',
   settingSources: 'local',
+  taskSkills: 'planner',
 };
 
 describe('loadConfig across the whole schema', () => {
@@ -414,6 +425,7 @@ describe('loadConfig across the whole schema', () => {
       learningAdapter: 'cli-adapter',
       outputMode: 'text',
       settingSources: ['local'],
+      taskSkills: 'planner',
     });
     expect(flagged.sources).toEqual(sourcesWith({
       store: 'cli',
@@ -424,6 +436,7 @@ describe('loadConfig across the whole schema', () => {
       learningAdapter: 'cli',
       outputMode: 'cli',
       settingSources: 'cli',
+      taskSkills: 'cli',
     }, 'file'));
 
     // The control: the same roots with no flag answer the project's
@@ -650,6 +663,16 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'routing', 'routing: { tests: }',
     'routing.tests is null, expected false or an agent name',
     'routing: { tests: false }', 'routing', new Map([...CONFIG_DEFAULTS.routing, ['tests', false]]),
+  ],
+  [
+    'task.skills', 'task:\n  skills: [planner]',
+    'task.skills is a list, expected one of: planner, tag, none',
+    'task:\n  skills: tag', 'taskSkills', 'tag',
+  ],
+  [
+    'task.lessons', 'task:\n  lessons: "Off"',
+    'task.lessons is "Off", expected one of: on, off',
+    'task:\n  lessons: off', 'taskLessons', 'off',
   ],
 ];
 

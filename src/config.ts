@@ -175,6 +175,7 @@ export type {
   ConfigExtra,
   ConfigVersion,
   InjectMode,
+  LessonSwitch,
   ModuleSource,
   ModuleSourceKind,
   OptionalPrerequisiteItem,
@@ -184,6 +185,7 @@ export type {
   PrProvider,
   ReleaseEnabled,
   RouteTarget,
+  SkillResolverName,
   StoreBackend,
   TierPin,
   TierSwitch,
@@ -354,6 +356,8 @@ function readLayer(
     tiersSkills: read('tiersSkills'),
     tiersAgents: read('tiersAgents'),
     routing: read('routing'),
+    taskSkills: read('taskSkills'),
+    taskLessons: read('taskLessons'),
   };
   return { layer, problems, extras };
 }
