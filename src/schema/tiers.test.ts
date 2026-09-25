@@ -13,9 +13,18 @@
  * ## The control
  *
  * The link case could be a false negative: a resolver that ignored
- * links entirely would still answer a path ending in `skills`. So it is
- * held to the runtime's directory AND held apart from the link's own,
- * which is the answer an unresolved entry gives.
+ * links entirely would still answer a path ending in `bundled/skills`.
+ * So it is held to the runtime's directory AND held apart from the
+ * link's own, which is the answer an unresolved entry gives.
+ *
+ * The rafa tier's path is written out as `bundled/skills` rather than
+ * read off `BUNDLED_SKILLS_DIR`, so a constant that moved back would
+ * fail here instead of carrying the test with it; and it is held apart
+ * from `skills/` beside the entry, where the tier sat before.
+ *
+ * The shadowing cases hand the user record first, so a resolver that
+ * kept the order it was handed instead of the scope order would answer
+ * the user's record and fail them.
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,6 +33,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
+  BUNDLED_BIN_DIR,
+  BUNDLED_SKILLS_DIR,
+  bundledBinDirectory,
   bundledSkillsDirectory,
   INSTINCT_SCOPES,
   instinctScopeDirectory,
@@ -32,6 +44,7 @@ import {
   realEntry,
   resolveInstinctScopes,
   resolveSkillTiers,
+  shadowLessonsById,
   SKILL_TIERS,
   skillTierDirectory,
   tierExists,
@@ -63,7 +76,15 @@ describe('the skill tiers', () => {
 
     expect(skillTierDirectory('user', seams)).toBe(join(HOME, '.claude', 'skills'));
     expect(skillTierDirectory('project', seams)).toBe(join(ROOT, '.claude', 'skills'));
-    expect(skillTierDirectory('rafa', seams)).toBe(join('/install/runtime', 'skills'));
+    expect(skillTierDirectory('rafa', seams)).toBe(join('/install/runtime', 'bundled', 'skills'));
+  });
+
+  it('puts the rafa tier under bundled/, not in a bare skills/ beside the entry', () => {
+    const answered = skillTierDirectory('rafa', seamsWith('/install/runtime/cli.js'));
+
+    expect(BUNDLED_SKILLS_DIR).toBe(join('bundled', 'skills'));
+    // Control: the old place is a different answer.
+    expect(answered).not.toBe(join('/install/runtime', 'skills'));
   });
 
   it('answers no directory for the project tier without a project root', () => {
@@ -92,19 +113,28 @@ describe('the skill tiers', () => {
 
     const answered = bundledSkillsDirectory(join(bin, 'rafa'));
 
-    expect(answered).toBe(join(runtime, 'skills'));
-    expect(answered).not.toBe(join(bin, 'skills'));
+    expect(answered).toBe(join(runtime, 'bundled', 'skills'));
+    expect(answered).not.toBe(join(bin, 'bundled', 'skills'));
+    expect(bundledBinDirectory(join(bin, 'rafa'))).toBe(join(runtime, 'bundled', 'bin'));
   });
 
   it('answers a path that is not there as it was given', () => {
     const absent = join(tempBase, 'no-such', 'cli.js');
 
     expect(realEntry(absent)).toBe(absent);
-    expect(bundledSkillsDirectory(absent)).toBe(join(dirname(absent), 'skills'));
+    expect(bundledSkillsDirectory(absent)).toBe(join(dirname(absent), 'bundled', 'skills'));
   });
 
   it('measures the entry off Bun.main when the caller names none', () => {
-    expect(bundledSkillsDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'skills'));
+    expect(bundledSkillsDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'bundled', 'skills'));
+    expect(bundledBinDirectory()).toBe(join(dirname(realEntry(Bun.main)), 'bundled', 'bin'));
+  });
+
+  it('puts the rafa tier programs in bundled/bin, beside its skills', () => {
+    const absent = join(tempBase, 'no-such', 'cli.js');
+
+    expect(BUNDLED_BIN_DIR).toBe(join('bundled', 'bin'));
+    expect(bundledBinDirectory(absent)).toBe(join(dirname(bundledSkillsDirectory(absent)), 'bin'));
   });
 });
 
@@ -123,6 +153,51 @@ describe('the instinct scopes', () => {
     expect(resolveInstinctScopes(seamsWith('/x/cli.js')).map((scope) => scope.scope)).toEqual(['project', 'user']);
     expect(without.map((scope) => scope.scope)).toEqual(['user']);
     expect(instinctScopeDirectory('project', { home: HOME, projectRoot: null })).toBeNull();
+  });
+});
+
+describe('lesson shadowing by id', () => {
+  const lesson = (scope: 'project' | 'user', id: string, path: string) => ({ scope, id, path });
+
+  it('serves the project record and shadows the user one of the same id', () => {
+    const user = lesson('user', 'retry-flaky', '/home/retry-flaky.md');
+    const project = lesson('project', 'retry-flaky', '/root/retry-flaky.md');
+
+    const answered = shadowLessonsById([user, project]);
+
+    expect(answered.winners).toEqual([project]);
+    expect(answered.shadowed).toEqual([{ record: user, by: project }]);
+  });
+
+  it('keeps every record whose id only one scope holds, in scope order', () => {
+    const userOnly = lesson('user', 'only-user', '/home/only-user.md');
+    const projectOnly = lesson('project', 'only-project', '/root/only-project.md');
+
+    const answered = shadowLessonsById([userOnly, projectOnly]);
+
+    expect(answered.winners).toEqual([projectOnly, userOnly]);
+    expect(answered.shadowed).toEqual([]);
+  });
+
+  it('shadows a second record of one id inside one scope by the first it was handed', () => {
+    const first = lesson('user', 'twice', '/home/a/twice.md');
+    const second = lesson('user', 'twice', '/home/b/twice.md');
+
+    const answered = shadowLessonsById([first, second]);
+
+    expect(answered.winners).toEqual([first]);
+    expect(answered.shadowed).toEqual([{ record: second, by: first }]);
+  });
+
+  it('answers nothing for no records', () => {
+    expect(shadowLessonsById([])).toEqual({ winners: [], shadowed: [] });
+  });
+
+  it('refuses a record in the rafa tier, which holds no lessons', () => {
+    const rafa = { scope: 'rafa', id: 'shipped', path: '/install/shipped.md' } as unknown as ReturnType<typeof lesson>;
+
+    expect(() => shadowLessonsById([lesson('project', 'shipped', '/root/shipped.md'), rafa]))
+      .toThrow('lesson shipped names scope rafa, which holds no lessons');
   });
 });
 

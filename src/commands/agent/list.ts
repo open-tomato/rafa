@@ -7,8 +7,14 @@
  *
  * Every row is an {@link InventoryRecord} of kind `agent` as
  * `buildInventory` (`src/inventory/index.ts`) decides it, so
- * precedence, `shadowed-by:` and `visibleToLoop` are decided there and
- * only there, and this command filters and prints them. An agents tree
+ * precedence, `collision`, `shadowed-by:` and `visibleToLoop` are
+ * decided there and only there, and this command filters and prints
+ * them. A `collision` row is one of two loaded tiers' different
+ * definitions under one name, which the loop serves neither of until a
+ * `tiers.agents` pin settles it. A `rafa` row, from the
+ * `bundled/agents` directory beside the running rafa, is visible when
+ * it is served to a loop session (the winner of its name, admitted by
+ * `serveVerdict`), and hidden otherwise. An agents tree
  * is read by its definitions' frontmatter `name`, the way Claude Code
  * resolves `--agent`, so a row names what a task routed
  * `agent=<name>` would reach. The Claude Code built-ins are not
@@ -19,9 +25,11 @@
  *
  * The same as `rafa skill list` builds it: the project the dispatcher
  * found gives the root and the home, the project's config gives
- * `loop.settingSources`, which decides `visibleToLoop`, and the
- * config's `modules:` are loaded, only a `loaded` one being an add-on
- * source. A config `loadConfig` refuses is a refusal here too. The
+ * `loop.settingSources`, which decides `visibleToLoop`, and
+ * `tiers.rafa`, `tiers.skills` and `tiers.agents`, which `resolveTiers`
+ * reads for a tier row's state, and the config's `modules:` are
+ * loaded, only a `loaded` one being an add-on source. A config
+ * `loadConfig` refuses is a refusal here too. The
  * rafa tier is measured from {@link AgentListSeams.entry}, `Bun.main`
  * by default and a planted file in a test, and the module loader's
  * seams are {@link AgentListSeams.modules}.
@@ -32,7 +40,7 @@
  * matched by the same `matchesFilters`: `--source=<source>` on the
  * whole source string (`plugin:<name>` and `addon:<name>` included,
  * `--tier` its alias for one release after this one), `--state` on the
- * state's prefix (`enabled`, `shadowed`, `disabled`), and
+ * state's prefix (`enabled`, `collision`, `shadowed`, `disabled`), and
  * `--hidden-from-loop` on `visibleToLoop: false`. A `plugin:` or
  * `addon:` source the inventory does not know is refused, so a typo
  * never reads as an empty source.
@@ -45,9 +53,10 @@
  * rows whose name NO visible row answers, then one pointing at the
  * vendor command. A home definition the project shadows is not one of
  * them: its name resolves, at the project's file, and there is nothing
- * to vendor. The hint reads the whole inventory whatever the filters
- * keep, so narrowing the rows never hides it, and json mode gives the
- * same names as `unreachable`.
+ * to vendor. Nor is one in a `collision`: vendoring it would not settle
+ * which copy serves the name, a pin does. The hint reads the whole
+ * inventory whatever the filters keep, so narrowing the rows never
+ * hides it, and json mode gives the same names as `unreachable`.
  *
  * ## `-i | --interactive`
  *
@@ -113,7 +122,7 @@ export const DEFAULT_AGENT_LIST_SEAMS: AgentListSeams = Object.freeze({
 const COMMAND_NAME = 'rafa agent list';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa agent list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop] [-i]';
+const USAGE = 'rafa agent list [--source=<source>] [--state=enabled|collision|shadowed|disabled] [--hidden-from-loop] [-i]';
 
 /** What json mode gives as the terminal result's `data`. */
 export interface AgentListResult {
@@ -173,12 +182,13 @@ export function expectKnownAgentSource(source: string | null, inventory: Invento
 /**
  * The `user` agent names no visible agent row answers, sorted, each
  * once: the definitions `rafa agent vendor` would copy. A name the
- * project also holds is answered there and left out.
+ * project also holds is answered there and left out, and a `collision`
+ * row is left out, as a pin settles it and vendoring does not.
  */
 export function unreachableUserAgents(agents: readonly InventoryRecord[]): readonly string[] {
   const answered = new Set(agents.filter((agent) => agent.visibleToLoop).map((agent) => agent.name));
   const names = agents
-    .filter((agent) => agent.source === 'user' && !answered.has(agent.name))
+    .filter((agent) => agent.source === 'user' && agent.state !== 'collision' && !answered.has(agent.name))
     .map((agent) => agent.name);
   return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
@@ -270,13 +280,16 @@ async function projectInventory(
   try {
     const resolved = loadConfig({ root: project.root, home: project.home });
     const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
-    const { settingSources } = resolved.config;
+    const { settingSources, tiersRafa, tiersSkills, tiersAgents } = resolved.config;
     const inventory = buildInventory({
       home: project.home,
       projectRoot: project.root,
       entry: seams.entry(),
       pathDirs: pathDirectories(context.env['PATH']),
       settingSources,
+      tiersRafa,
+      tiersSkills,
+      tiersAgents,
       modules: loaded.modules,
     });
     return { inventory, settingSources };
@@ -321,14 +334,16 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
     action: 'list',
     summary: 'list every agent definition with its source, its state and whether the loop sees it',
     description: 'Lists every agent definition the inventory holds — the project\'s `.claude/agents`, the'
-      + ' `agents/` directory beside the running rafa, `~/.claude/agents`, each loaded add-on\'s and each'
+      + ' `bundled/agents` directory beside the running rafa, `~/.claude/agents`, each loaded add-on\'s and each'
       + ' installed plugin\'s — one row each, under the frontmatter `name` a task routes to: a mark saying'
-      + ' whether a session the loop spawns under `loop.settingSources` resolves it, its name, its source,'
-      + ' its state (`enabled`, or `shadowed-by:<source>` when a nearer source holds the same name) and its'
-      + ' own description as the summary. The Claude Code built-ins are not listed. `--source=<source>`'
-      + ' keeps one source, `plugin:<name>` and `addon:<name>` included; `--state=<state>` keeps `enabled`,'
-      + ' `shadowed` or `disabled` rows; `--hidden-from-loop` keeps the rows no loop session resolves. The'
-      + ' filters combine. When `~/.claude/agents` holds a name no visible row answers, a trailing line'
+      + ' whether a session the loop spawns under `loop.settingSources` resolves it or is served it from the'
+      + ' rafa tier, its name, its source, its state (`enabled`, `collision` when two loaded tiers hold'
+      + ' different definitions under the name and a `tiers.agents` pin must settle it,'
+      + ' `shadowed-by:<source>` when another source serves the name, or `disabled:<how>`) and its own'
+      + ' description as the summary. The Claude Code built-ins are not listed. `--source=<source>` keeps'
+      + ' one source, `plugin:<name>` and `addon:<name>` included; `--state=<state>` keeps `enabled`,'
+      + ' `collision`, `shadowed` or `disabled` rows; `--hidden-from-loop` keeps the rows no loop session'
+      + ' resolves. The filters combine. When `~/.claude/agents` holds a name no visible row answers, a trailing line'
       + ' names it and points at `rafa agent vendor`. It spawns no session and exits 0 whatever the rows'
       + ' say. With `--output=json` the rows, the vendor names and the warnings are the data of the'
       + ' terminal result event. `-i` browses the listed rows in the terminal instead of printing them,'
@@ -362,6 +377,10 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
       {
         cmd: 'rafa agent list --hidden-from-loop --source=user',
         note: 'Lists the `~/.claude/agents` definitions a loop session does not resolve.',
+      },
+      {
+        cmd: 'rafa agent list --state=collision',
+        note: 'Lists the holders of every name two loaded tiers hold different definitions under, which a pin settles.',
       },
       {
         cmd: 'rafa agent list -i',

@@ -137,6 +137,7 @@ describe('a block the schema accepts', () => {
       supersedes: [],
       disableModelInvocation: false,
       userInvocable: false,
+      provenance: null,
     });
   });
 
@@ -624,6 +625,63 @@ describe('fields that belong to an instinct', () => {
   });
 });
 
+describe('provenance', () => {
+  test('first-party passes and parses', () => {
+    const data = withFields(MINIMAL, { provenance: 'first-party' });
+
+    expect(checkSkillFrontmatter(data)).toEqual([]);
+    expect(parseSkillFrontmatter(data).skill?.provenance).toEqual({ kind: 'first-party' });
+  });
+
+  test('a reviewed third-party mapping passes and parses', () => {
+    const data = withFields(MINIMAL, {
+      provenance: { origin: 'https://example.com/repo', license: 'MIT', reviewed: 'marcos 2026-09-24' },
+    });
+
+    expect(checkSkillFrontmatter(data)).toEqual([]);
+    expect(parseSkillFrontmatter(data).skill?.provenance).toEqual({
+      kind: 'third-party',
+      origin: 'https://example.com/repo',
+      license: 'MIT',
+      reviewed: { who: 'marcos', date: '2026-09-24' },
+    });
+  });
+
+  test('a mapping without license is refused on the entry', () => {
+    const data = withFields(MINIMAL, { provenance: { origin: 'https://example.com/repo' } });
+
+    expect(marks(data)).toEqual(['missing-field@provenance.license']);
+    expect(parseSkillFrontmatter(data).skill).toBeNull();
+  });
+
+  test('a string other than first-party is refused', () => {
+    expect(marks(withFields(MINIMAL, { provenance: 'third-party' })))
+      .toEqual(['unknown-provenance@provenance']);
+  });
+
+  test('a malformed reviewed is refused', () => {
+    const data = withFields(MINIMAL, {
+      provenance: { origin: 'x', license: 'MIT', reviewed: '2026-09-24' },
+    });
+
+    expect(marks(data)).toEqual(['invalid-reviewed@provenance.reviewed']);
+  });
+
+  test('it is reported after the booleans and before the forbidden fields', () => {
+    const data = withFields(MINIMAL, {
+      'user-invocable': 'yes',
+      provenance: 'mine',
+      confidence: 0.6,
+    });
+
+    expect(marks(data)).toEqual([
+      'wrong-type@user-invocable',
+      'unknown-provenance@provenance',
+      'forbidden-field@confidence',
+    ]);
+  });
+});
+
 /** One block per code, so the set of codes is closed at both ends. */
 const CODE_EXAMPLES: Readonly<Record<string, Record<string, unknown>>> = {
   'description-too-long': withFields(MINIMAL, { description: filler(DESCRIPTION_LIMIT) }),
@@ -636,6 +694,10 @@ const CODE_EXAMPLES: Readonly<Record<string, Record<string, unknown>>> = {
   'unpaired-prevents': withFields(MINIMAL, { prevents: 'a trap' }),
   'unusable-glob': withFields(MINIMAL, { paths: ['[abc'] }),
   'wrong-type': withFields(MINIMAL, { tags: 'one' }),
+  'unknown-provenance': withFields(MINIMAL, { provenance: 'ours' }),
+  'invalid-reviewed': withFields(MINIMAL, {
+    provenance: { origin: 'x', license: 'MIT', reviewed: 'nobody' },
+  }),
 };
 
 describe('everyCodeIsReachable', () => {

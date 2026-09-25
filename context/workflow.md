@@ -11,24 +11,43 @@ is whatever the edit happens to be (`Remove ...`, `Rewrite ...`,
 `Split ...`) while the thing it names is reliably a markdown file, so
 the shape discriminates where the verb does not.
 
+<!-- routing-table:start (generated from DEFAULT_ROUTES in src/tiers/routing.ts; do not edit by hand) -->
 | Task shape | Agent | Where it lives |
 |---|---|---|
-| Prose — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `.claude/agents/doc-updater.md` |
-| Tests — a suite over code that already exists, or a red-first case | `tdd-guide` | `.claude/agents/tdd-guide.md` |
-| Repair — a red gate, a type error, a broken build | `build-error-resolver` | `.claude/agents/build-error-resolver.md` |
-| Cleanup — dead code, duplicates, a consolidation | `refactor-cleaner` | user-level |
-| Review of a TypeScript change | `typescript-reviewer` | user-level |
-| Review of a change as a whole | `code-reviewer` | `.claude/agents/code-reviewer.md` |
-| Implementation — a module plus its TSDoc plus its colocated tests | `loop-implementer` | `.claude/agents/loop-implementer.md` |
+| `prose` — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `src/bundled/agents/doc-updater.md` |
+| `tests` — a suite over code that already exists, or a red-first case | `tdd-guide` | `src/bundled/agents/tdd-guide.md` |
+| `repair` — a red gate, a type error, a broken build | `build-error-resolver` | `src/bundled/agents/build-error-resolver.md` |
+| `review` — a change as a whole | `code-reviewer` | `src/bundled/agents/code-reviewer.md` |
+| `implementation` — a module plus its TSDoc plus its colocated tests | `loop-implementer` | `src/bundled/agents/loop-implementer.md` |
+<!-- routing-table:end -->
 
-**`user-level` in the third column is a portability warning and not a
-footnote.** Those two definitions live outside the repo, so a fresh
-clone receives none of them and the name resolves against whatever that
-machine happens to hold — or against nothing. Under the default
+**This table is generated from rafa's `routing` defaults**
+(`DEFAULT_ROUTES` in `src/tiers/routing.ts`) by `src/tiers/routing-table.ts`,
+and `routing-table.test.ts` fails when the page and the generator
+disagree, so change a row there and regenerate the table rather than
+editing it here. A project's own `.rafa/config.yaml` can add, re-point
+or remove a row under `routing`, and the planner reads the resolved map
+from its `{ROUTING}` slot rather than from this page.
+
+Every agent the table names lives in `src/bundled/agents/`, the rafa
+tier that ships with the package, so the bundled file is the one to
+edit. This repository's `.claude/agents/<name>.md` for each is a
+symbolic link into it, and `dev-planner`, `git-workflow` and the
+`documentation` skill's `SKILL.md` under `.claude/skills/` are linked
+the same way into `src/bundled/skills/`. The five tracked rows
+travel with the package.
+
+**The defaults carry no user-level agent.** `cleanup` →
+`refactor-cleaner` and a TypeScript review → `typescript-reviewer`
+left the table because rafa does not ship either agent, and a project
+that has them routes them in its own file, for instance
+`routing: { cleanup: refactor-cleaner }`. Such a row is a portability
+warning rather than a footnote: the definition lives outside the repo,
+so a fresh clone receives none of it. Under the default
 `loop.settingSources` of `project,local` it resolves against nothing on
 any machine: every loop session is spawned with `--setting-sources`,
 and the CLI lists no agent from `~/.claude/agents` until the sources
-include `user`. The five tracked rows travel. A project file also SHADOWS a user-level agent of the same name
+include `user`. A project file also SHADOWS a user-level agent of the same name
 rather than merging with it, and the roster is blind to the difference:
 a shadowed name appears exactly ONCE in the CLI's own list of available
 agents, so only a behavioural probe separates a shadow from an
@@ -41,10 +60,18 @@ answer both questions from one column.
 makes a wrong row something a test can find rather than a silent
 downgrade: an unresolvable agent exits 1 with NO JSON at all and the
 whole roster on stderr, before any model call. `loop start` no longer
-waits for that: its preflight resolves the roster from the same two
-`.claude/agents` directories and refuses the run, ahead of every
-prerequisite probe, when a still-to-run task of the plan or the tracker
-names an agent no loaded scope defines (`src/start/preflight.ts`).
+waits for that: its preflight resolves the roster from the three agent
+tiers, the project's and the home's `.claude/agents` and rafa's own
+`bundled/agents`, through `resolveTiers` (`src/agents/roster.ts`), and
+refuses the run, ahead of every prerequisite probe, when a still-to-run
+task of the plan or the tracker names an agent no loaded tier serves:
+one no tier holds, one `tiers.agents` switches off, one only an unloaded
+tier holds, or one two loaded tiers hold with different contents, whose
+refusal names both paths and the pin line that settles it
+(`src/start/preflight.ts`). The same resolution covers the three skill
+trees, so a `skills=` name of those tasks that two loaded tiers hold
+with different contents refuses the run too, naming both paths and its
+`tiers.skills` pin line; a skill name no tier holds does not.
 `rafa plan validate` runs the same check and exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies

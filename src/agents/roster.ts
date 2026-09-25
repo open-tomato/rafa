@@ -7,9 +7,9 @@
  * it exits 1 with no JSON at all, before any model call, and prints the
  * roster it could have run on stderr (`context/workflow.md`). That is
  * what this module is for. It answers, without spawning anything, which
- * names a run under a given `loop.settingSources` resolves, so a plan
- * naming an agent the project does not carry is refused by the
- * preflight rather than one task into the run.
+ * names a run under its tier settings resolves, so a plan naming an
+ * agent no loaded tier serves is refused by the preflight rather than
+ * one task into the run.
  *
  * `utils/agent-definition.ts` reads ONE definition, by the name a
  * declaration asked for, for the one question the dispatcher has of it
@@ -58,23 +58,63 @@
  *     refused by a CLI whose own list, printed in the same line, held
  *     `Explore`.
  *
- * So the roster is the project's definitions under `project`, then the
- * home's under `user`, then the built-ins, each name taken once and the
- * first scope to hold it the one that answers. A project file SHADOWS a
- * user-level definition of the same name rather than merging with it,
- * and {@link RosterAgent.shadows} is where that is visible: the roster
- * itself shows one entry, as the CLI shows one name.
+ * So the CLI's own order is the project's definitions under `project`,
+ * then the home's under `user`, then the built-ins, each name taken once.
+ * The roster no longer takes that order from the CLI: rafa decides which
+ * holder of a name a session is served (below), and the CLI's order only
+ * ever sees the winner.
  *
- * ## The home is read whatever the sources say
+ * ## Resolved through the three tiers
  *
- * {@link AgentRoster.userDefinitions} holds `~/.claude/agents` even
- * under the loop's default `project,local`, where none of it resolves.
- * That is the fix command's evidence and not the roster's: a name the
- * run cannot resolve but the home defines is one `rafa agent vendor
- * <name>` can copy into the project, and a name no user file carries
- * has no such fix ({@link vendorFixCommand}). Under sources naming
- * `user` the question never arises, since a home name resolves and is
- * therefore never missing.
+ * {@link resolveAgentRoster} reads the skills and the agents tree of
+ * each tier (`readTrees` in `inventory/trees.ts`: the project's
+ * `.claude/{skills,agents}`, rafa's `bundled/{skills,agents}` beside the
+ * entry, the home's `.claude/{skills,agents}`) and hands the rows to
+ * `resolveTiers` (`tiers/resolve.ts`) under the run's four settings:
+ * `loop.settingSources`, `tiers.rafa` and the two pin maps.
+ * `start/serving.ts` reads the same trees the same way, with no `PATH`
+ * directories, and resolves them under the same settings before every
+ * session, so the roster answers what the session will be served. The
+ * roster's agents are the agent rows' outcomes; the skill rows are read
+ * for the collision check below and decide no agent.
+ *
+ * A name resolves when it is one of these, and every other name a plan
+ * asks for is refused ({@link MissingAgent.reason}):
+ *
+ *   - **served** by a project or user winner, which Claude Code loads by
+ *     itself, or by a rafa winner `serveVerdict` (`tiers/serve.ts`)
+ *     admits, which reaches the session through `--agents`. A rafa winner
+ *     the verdict refuses is never handed over, so its name is refused
+ *     as `not-served`, with the verdict's reason.
+ *   - **a built-in** no loaded tier makes a claim on: no row holds the
+ *     name, or only tiers the session does not load hold it. A built-in
+ *     name a loaded tier holds is that tier's to serve or refuse.
+ *
+ * The refusals, each a sentence that names the fix:
+ *
+ *   - `collision`: two loaded tiers hold the name with different bytes.
+ *     The sentence is `collisionMessage`'s, naming every path and the
+ *     one pin line that settles it.
+ *   - `off`: `false` in `tiers.agents` turned the name off. The sentence
+ *     names that line, and the pin to serve it instead when a loaded
+ *     tier holds it.
+ *   - `unloaded`: only tiers the session does not load hold it. The
+ *     sentence names each tier with its path and the setting that loads
+ *     it; for the user tier it also names `rafa agent vendor <name>`,
+ *     which copies the home's definition into the project tier.
+ *   - `not-served`: above.
+ *   - `unheld`: no tier holds it and no built-in answers it.
+ *
+ * The vendor command used to be every refusal's fix. Since the rafa tier
+ * serves the roster, a name rafa ships resolves without any copy, so the
+ * command is named only where it is the fix: a name the user tier alone
+ * holds. {@link MissingAgent.fix} carries it there and nowhere else,
+ * which is what `rafa init`'s warning (`agents/vendorable.ts`) reads.
+ *
+ * Under `bun test`, `Bun.main` is the test file, so a caller that leaves
+ * {@link AgentRosterRoots.entry} out reads the rafa tier beside that file.
+ * A test file directly under `src/` would read the checkout's own
+ * `src/bundled/agents`; one deeper reads an absent tier.
  *
  * ## Which names a plan asks for
  *
@@ -101,19 +141,48 @@
  * document: `start/preflight.ts` the checklist it read, `rafa plan
  * validate` the file as typed.
  *
+ * ## Which skills a plan asks for, and the one refusal they meet
+ *
+ * {@link planSkillUses} reads the `skills=` names of the same task
+ * lines, each with the lines that asked for it, and
+ * {@link collidingPlanSkills} answers those a session under the roster's
+ * settings could not be served because two loaded tiers hold them with
+ * different contents (`resolveTiers`' `collision`). Nobody serves such a
+ * name (`start/serving.ts`), so the task would run on whichever copy
+ * Claude Code finds by itself, or on none. The sentence is
+ * `collisionMessage`'s, naming every path and the one pin line that
+ * settles it, and {@link skillCollisionLine} words it for the preflight
+ * and `rafa plan validate`. A pin in `tiers.skills` settles it, as a
+ * pin in `tiers.agents` settles an agent's, when it names the copy
+ * Claude Code loads; a skill pin that does not is set aside and the
+ * sentence says so (`tiers/resolve.ts`).
+ *
+ * A collision is the only refusal a `skills=` name meets here. A name no
+ * tier holds is not one, because `parseSkillList` in
+ * `utils/declaration.ts` leaves membership unchecked on purpose: a
+ * skill can come from a plugin or an add-on, outside the three tiers,
+ * and a plan may name one this checkout has yet to install.
+ *
  * Nothing here throws, and nothing here spawns the CLI. An unreadable
  * directory, an unreadable file, a file with no frontmatter and one
  * whose frontmatter carries no usable `name` are each passed over, so a
  * `.claude/agents` holding a README contributes no agent named after
  * it.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { SkillTier } from '../schema/tiers.js';
+import type { Resolution, TierCollision, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
+import type { TaskDeclaration } from '../utils/declaration.js';
+import type { Dirent } from 'node:fs';
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { readTrees } from '../inventory/trees.js';
 import { parsePlan } from '../plan/parse.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
+import { isSkillTier, SKILL_TIERS } from '../schema/tiers.js';
+import { collisionMessage, findTierItem, pinKey, pinLine, readItemBytes, resolveTiers } from '../tiers/resolve.js';
+import { serveVerdict } from '../tiers/serve.js';
 import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 
 /**
@@ -136,15 +205,17 @@ export const BUILT_IN_AGENTS_CLI_VERSION = '2.1.268';
 /** The command that copies a user definition into the project. */
 export const VENDOR_COMMAND = 'rafa agent vendor';
 
-/** Where a roster name resolves. */
-export type AgentScope = 'project' | 'user' | 'built-in';
+/** Where a roster name resolves: the tier whose holder is served, or the CLI's own built-ins. */
+export type AgentScope = SkillTier | 'built-in';
 
-/** The two roots definitions are read from. */
+/** The roots the three agent tiers are read from. */
 export interface AgentRosterRoots {
-  /** The project root, whose `.claude/agents` loads under `project`. */
+  /** The project root, whose `.claude/agents` is the project tier. */
   readonly repoRoot: string;
-  /** The home, whose `.claude/agents` loads under `user`. */
+  /** The home, whose `.claude/agents` is the user tier. */
   readonly home: string;
+  /** The entry the rafa tier's `bundled/agents` sits beside. `Bun.main` when left out. */
+  readonly entry?: string;
 }
 
 /** One definition file, under the name its frontmatter carries. */
@@ -159,29 +230,25 @@ export interface AgentDefinitionFile {
 export interface RosterAgent {
   /** The name `--agent` takes, matched case-sensitively. */
   readonly name: string;
-  /** The scope that answers for it. */
+  /** The tier that serves it, or `built-in`. */
   readonly scope: AgentScope;
-  /** The file it was read from, or null for a built-in. */
+  /** The file it is served from, or null for a built-in. */
   readonly path: string | null;
-  /**
-   * The user-level file this project definition shadows, or null: for a
-   * project entry with no home file of the same name, for every entry
-   * when the sources leave `user` out, and for every entry that is not
-   * a project one.
-   */
-  readonly shadows: string | null;
 }
 
-/** Every name a session under one config resolves. */
+/** Every name a session under one set of tier settings resolves. */
 export interface AgentRoster {
-  /** The sources the roster was resolved under. */
-  readonly settingSources: readonly ClaudeSettingSource[];
-  /** Each name once, project first, then user, then the built-ins. */
+  /** The settings the roster was resolved under. */
+  readonly settings: TierSettings;
+  /** `resolveTiers` over the three skill and agent trees: every name any tier holds, whatever its outcome. */
+  readonly resolution: Resolution;
+  /** Each name a session resolves, once: the tier winners in tier order, then the built-ins. */
   readonly agents: readonly RosterAgent[];
+  /** Why each rafa winner `serveVerdict` refuses is left out, by name. */
+  readonly unserved: ReadonlyMap<string, string>;
   /**
-   * The home's definitions by name, read whatever the sources say, so a
-   * name the run cannot resolve can still be answered with a vendor
-   * command.
+   * The user tier's definitions by name, whether or not the sources load
+   * it, so a name only the home holds can be answered with a vendor command.
    */
   readonly userDefinitions: ReadonlyMap<string, string>;
 }
@@ -194,11 +261,34 @@ export interface AgentUse {
   readonly lines: readonly number[];
 }
 
+/** One skill name a document asks for, and where it asked. */
+export interface SkillUse {
+  /** One name of a `skills=` value, exactly as the declaration carried it. */
+  readonly name: string;
+  /** The task lines that named it, counting from one, in order. */
+  readonly lines: readonly number[];
+}
+
+/** An asked-for skill two loaded tiers hold with different contents. */
+export interface SkillCollision extends SkillUse {
+  /** The collision `resolveTiers` answered, with every distinct holder and the pin line. */
+  readonly collision: TierCollision;
+  /** `collisionMessage`'s sentence: every path, then the pin line that settles it. */
+  readonly message: string;
+}
+
+/** Why an asked-for name does not resolve; see the module note. */
+export type MissingAgentReason = 'collision' | 'off' | 'unloaded' | 'not-served' | 'unheld';
+
 /** An asked-for name the roster does not resolve. */
 export interface MissingAgent extends AgentUse {
+  /** Why it does not resolve. */
+  readonly reason: MissingAgentReason;
+  /** The sentence saying why, naming the paths and the setting or pin line that settles it. */
+  readonly message: string;
   /**
-   * The command that would make the name resolve, or null when no user
-   * definition carries it and there is therefore nothing to copy.
+   * The vendor command that would copy the home's definition into the
+   * project, for a name only the user tier holds; null for every other.
    */
   readonly fix: string | null;
 }
@@ -212,6 +302,17 @@ function readText(path: string): string | null {
   }
 }
 
+/**
+ * Whether `entry` under `dir` is a file, following a symbolic link the way
+ * Claude Code does: this repository's `.claude/agents/` links into
+ * `src/bundled/agents/`, and a dangling link counts as no file.
+ */
+function isFileEntry(dir: string, entry: Dirent): boolean {
+  if (entry.isFile()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  return statSync(join(dir, entry.name), { throwIfNoEntry: false })?.isFile() === true;
+}
+
 /** The `.md` file names under `dir`, sorted, or none when it is unreadable. */
 function markdownFiles(dir: string): readonly string[] {
   let entries;
@@ -222,7 +323,7 @@ function markdownFiles(dir: string): readonly string[] {
   }
 
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .filter((entry) => entry.name.endsWith('.md') && isFileEntry(dir, entry))
     .map((entry) => entry.name)
     .sort((a, b) => a.localeCompare(b));
 }
@@ -242,9 +343,9 @@ function definitionName(text: string): string | null {
  * Every definition directly under `dir`, by the name its frontmatter
  * carries, sorted by that name. A file with no readable text, no
  * frontmatter, or no usable `name` is passed over, and two files
- * carrying one name are both answered — {@link resolveAgentRoster} is
- * where a name is taken once. `src/inventory/trees.ts` reads rafa's own
- * `agents/` through this, which is no `.claude/agents` under any root.
+ * carrying one name are both answered — `resolveTiers` is where a name
+ * is taken once. `src/inventory/trees.ts` reads each tier's agents
+ * through this, rafa's own `bundled/agents` included.
  */
 export function readAgentDirectory(dir: string): readonly AgentDefinitionFile[] {
   const found: AgentDefinitionFile[] = [];
@@ -268,60 +369,72 @@ export function readAgentDefinitions(root: string): readonly AgentDefinitionFile
   return readAgentDirectory(join(root, AGENT_DEFINITION_DIR));
 }
 
-/** The first file answering for each name, in the order they were read. */
-function firstByName(files: readonly AgentDefinitionFile[]): Map<string, string> {
-  const byName = new Map<string, string>();
-  for (const file of files) {
-    if (!byName.has(file.name)) byName.set(file.name, file.path);
-  }
-  return byName;
+/** Whether `name` is one of {@link BUILT_IN_AGENTS}, matched case-sensitively. */
+function isBuiltIn(name: string): boolean {
+  return (BUILT_IN_AGENTS as readonly string[]).includes(name);
 }
 
 /**
- * The names a session spawned under `settingSources` resolves, read
- * from `roots` and never from the CLI.
+ * The skill rows of the three tiers, then their agent rows, each tier's
+ * sorted by name: `start/serving.ts`'s reading, with no `PATH` directories.
  */
-export function resolveAgentRoster(
-  roots: AgentRosterRoots,
-  settingSources: readonly ClaudeSettingSource[],
-): AgentRoster {
-  const loadsProject = settingSources.includes('project');
-  const loadsUser = settingSources.includes('user');
-  const userDefinitions = firstByName(readAgentDefinitions(roots.home));
-  const projectDefinitions = loadsProject
-    ? firstByName(readAgentDefinitions(roots.repoRoot))
-    : new Map<string, string>();
+function tierRows(roots: AgentRosterRoots): readonly TierRow[] {
+  return readTrees({
+    home: roots.home,
+    projectRoot: roots.repoRoot,
+    pathDirs: [],
+    ...(roots.entry === undefined
+      ? {}
+      : { entry: roots.entry }),
+  }).flatMap((listing) => listing.items);
+}
 
-  const agents: RosterAgent[] = [];
-  const taken = new Set<string>();
-
-  for (const [name, path] of projectDefinitions) {
-    taken.add(name);
-    agents.push({
-      name,
-      scope: 'project',
-      path,
-      shadows: loadsUser
-        ? userDefinitions.get(name) ?? null
-        : null,
-    });
+/** Why each rafa winner of `resolution` is not served, by name. */
+function unservedWinners(resolution: Resolution): ReadonlyMap<string, string> {
+  const unserved = new Map<string, string>();
+  for (const item of resolution.items) {
+    if (item.kind !== 'agent' || item.state !== 'served' || item.winner.source !== 'rafa') continue;
+    const verdict = serveVerdict(item.winner);
+    if (!verdict.ok) unserved.set(item.name, verdict.why);
   }
+  return unserved;
+}
 
-  if (loadsUser) {
-    for (const [name, path] of userDefinitions) {
-      if (taken.has(name)) continue;
-      taken.add(name);
-      agents.push({ name, scope: 'user', path, shadows: null });
+/** Whether a built-in answers `name`: no loaded tier makes a claim on it. See the module note. */
+function builtInAnswers(item: TierItem | undefined, name: string): boolean {
+  return isBuiltIn(name) && (item === undefined || item.state === 'unloaded');
+}
+
+/**
+ * The names a session spawned under `settings` resolves, read from the
+ * three agent tiers under `roots` and never from the CLI. See the module
+ * note.
+ */
+export function resolveAgentRoster(roots: AgentRosterRoots, settings: TierSettings): AgentRoster {
+  const rows = tierRows(roots);
+  const resolution = resolveTiers(rows, settings, readItemBytes);
+  const unserved = unservedWinners(resolution);
+
+  const winners = resolution.items.flatMap((item) => item.kind === 'agent'
+    && item.state === 'served'
+    && !unserved.has(item.name)
+    ? [item.winner]
+    : []);
+  const served: RosterAgent[] = SKILL_TIERS.flatMap((tier) => winners
+    .filter((row) => row.source === tier)
+    .map((row) => ({ name: row.name, scope: tier, path: row.path })));
+  const builtIns: RosterAgent[] = BUILT_IN_AGENTS
+    .filter((name) => builtInAnswers(findTierItem(resolution, 'agent', name), name))
+    .map((name) => ({ name, scope: 'built-in', path: null }));
+
+  const userDefinitions = new Map<string, string>();
+  for (const row of rows) {
+    if (row.kind === 'agent' && row.source === 'user' && !userDefinitions.has(row.name)) {
+      userDefinitions.set(row.name, row.path);
     }
   }
 
-  for (const name of BUILT_IN_AGENTS) {
-    if (taken.has(name)) continue;
-    taken.add(name);
-    agents.push({ name, scope: 'built-in', path: null, shadows: null });
-  }
-
-  return { settingSources, agents, userDefinitions };
+  return { settings, resolution, agents: [...served, ...builtIns], unserved, userDefinitions };
 }
 
 /** True when a session under this roster would resolve `name`. */
@@ -330,14 +443,105 @@ export function rosterResolves(roster: AgentRoster, name: string): boolean {
 }
 
 /**
- * The command that would make `name` resolve in the project, or null
- * when `~/.claude/agents` carries no definition of that name and there
- * is therefore nothing to copy.
+ * The command that would copy the home's definition of `name` into the
+ * project, or null when the user tier holds no definition of that name.
  */
 export function vendorFixCommand(roster: AgentRoster, name: string): string | null {
   return roster.userDefinitions.has(name)
     ? `${VENDOR_COMMAND} ${name}`
     : null;
+}
+
+/** The clause naming why the session does not load `holder`'s tier. */
+function unloadedClause(holder: TierRow, settings: TierSettings): string {
+  return holder.source === 'rafa'
+    ? `the rafa tier (${holder.path}), which tiers.rafa: off unloads`
+    : `the user tier (${holder.path}), which loop.settingSources (${settings.settingSources.join(', ')}) leaves out`;
+}
+
+/** What would load `holder`'s tier. */
+function loadingFix(holder: TierRow): string {
+  return holder.source === 'rafa'
+    ? 'set tiers.rafa: on'
+    : `add user to loop.settingSources, or run \`${VENDOR_COMMAND} ${holder.name}\``;
+}
+
+/** The sentence for a name only unloaded tiers hold. */
+function unloadedMessage(item: TierItem, settings: TierSettings): string {
+  const clauses = item.holders.map((holder) => unloadedClause(holder, settings)).join(' and ');
+  const fixes = item.holders.map(loadingFix).join(', or ');
+  return `agent ${item.name} is held only by ${clauses}: ${fixes}`;
+}
+
+/** The sentence for a name `false` switched off. */
+function offMessage(item: TierItem): string {
+  const off = `agent ${item.name} is switched off by ${pinKey('agent')}: { ${item.name}: false }`;
+  const [nearest] = item.loaded;
+  return nearest !== undefined && isSkillTier(nearest.source)
+    ? `${off}; pin the tier that serves it instead: ${pinLine('agent', item.name, nearest.source)}`
+    : `${off}; drop that entry to serve it`;
+}
+
+/** Why `name` does not resolve and the sentence saying so, or null when it resolves. */
+function missingReason(
+  roster: AgentRoster,
+  name: string,
+): Pick<MissingAgent, 'reason' | 'message'> | null {
+  const item = findTierItem(roster.resolution, 'agent', name);
+  if (builtInAnswers(item, name)) return null;
+  if (item === undefined) {
+    return {
+      reason: 'unheld',
+      message: `agent ${name} is held by no tier: no project, rafa or user definition carries it, and it is no built-in agent`,
+    };
+  }
+  if (item.state === 'collision') return { reason: 'collision', message: collisionMessage(item.collision) };
+  if (item.state === 'off') return { reason: 'off', message: offMessage(item) };
+  if (item.state === 'unloaded') return { reason: 'unloaded', message: unloadedMessage(item, roster.settings) };
+
+  const why = roster.unserved.get(name);
+  return why === undefined
+    ? null
+    : { reason: 'not-served', message: `agent ${name} is held by the rafa tier but not served: ${why} (${item.winner.path})` };
+}
+
+/**
+ * `use` as a missing agent when a session under `roster` would not
+ * resolve its name, or null when it would.
+ */
+export function missingAgent(roster: AgentRoster, use: AgentUse): MissingAgent | null {
+  const missing = missingReason(roster, use.name);
+  if (missing === null) return null;
+  const fix = missing.reason === 'unloaded'
+    ? vendorFixCommand(roster, use.name)
+    : null;
+  return { ...use, ...missing, fix };
+}
+
+/**
+ * The names `namesOf` reads off each still-to-run task line of
+ * `markdown`, each with the lines that asked, counting from one, in the
+ * order they were first named. See {@link planAgentUses}.
+ */
+function planUses(
+  markdown: string,
+  namesOf: (declaration: TaskDeclaration) => readonly string[],
+): readonly AgentUse[] {
+  const lines = new Map<string, number[]>();
+  const model = parsePlan(markdown);
+  const dispatchable = [...model.tasks, ...model.hiddenTasks].sort((a, b) => a.lineNum - b.lineNum);
+
+  for (const task of dispatchable) {
+    if (task.status === 'done' || task.declaration === null) continue;
+
+    for (const name of namesOf(task.declaration)) {
+      const seen = lines.get(name);
+      if (seen === undefined) lines.set(name, [task.lineNum + 1]);
+      else seen.push(task.lineNum + 1);
+    }
+  }
+
+  return [...lines].map(([name, used]) => ({ name, lines: used }));
 }
 
 /**
@@ -350,52 +554,77 @@ export function vendorFixCommand(roster: AgentRoster, name: string): string | nu
  * see the module note.
  */
 export function planAgentUses(markdown: string): readonly AgentUse[] {
-  const lines = new Map<string, number[]>();
-  const model = parsePlan(markdown);
-  const dispatchable = [...model.tasks, ...model.hiddenTasks].sort((a, b) => a.lineNum - b.lineNum);
+  return planUses(markdown, (declaration) => declaration.agent === null
+    ? []
+    : [declaration.agent]);
+}
 
-  for (const task of dispatchable) {
-    if (task.status === 'done') continue;
+/**
+ * The `skills=` names the still-to-run task lines of `markdown` ask
+ * for, read as {@link planAgentUses} reads `agent=`: each name once,
+ * with every line that named it.
+ */
+export function planSkillUses(markdown: string): readonly SkillUse[] {
+  return planUses(markdown, (declaration) => declaration.skills ?? []);
+}
 
-    const name = task.declaration?.agent ?? null;
-    if (name === null) continue;
-
-    const seen = lines.get(name);
-    if (seen === undefined) lines.set(name, [task.lineNum + 1]);
-    else seen.push(task.lineNum + 1);
-  }
-
-  return [...lines].map(([name, used]) => ({ name, lines: used }));
+/**
+ * The `skills=` names `markdown` asks for that two loaded tiers hold
+ * with different contents under the roster's settings, each with the
+ * collision and its sentence. Empty when every name is served, pinned,
+ * or held outside the three tiers; see the module note.
+ */
+export function collidingPlanSkills(
+  markdown: string,
+  roster: AgentRoster,
+): readonly SkillCollision[] {
+  return planSkillUses(markdown).flatMap((use) => {
+    const item = findTierItem(roster.resolution, 'skill', use.name);
+    return item?.state === 'collision'
+      ? [{ ...use, collision: item.collision, message: collisionMessage(item.collision) }]
+      : [];
+  });
 }
 
 /**
  * The names `markdown` asks for that a session under `roster` would not
- * resolve, each with the command that would fix it or null when there
- * is none. Empty for a document whose every open task routes somewhere
- * the run can reach, which is what lets a caller halt on a non-empty
- * answer alone.
+ * resolve, each with why and what settles it. Empty for a document whose
+ * every open task routes somewhere the run can reach, which is what lets
+ * a caller halt on a non-empty answer alone.
  */
 export function missingPlanAgents(
   markdown: string,
   roster: AgentRoster,
 ): readonly MissingAgent[] {
-  return planAgentUses(markdown)
-    .filter((use) => !rosterResolves(roster, use.name))
-    .map((use) => ({ ...use, fix: vendorFixCommand(roster, use.name) }));
+  return planAgentUses(markdown).flatMap((use) => {
+    const missing = missingAgent(roster, use);
+    return missing === null
+      ? []
+      : [missing];
+  });
+}
+
+/** `line 3`, or `lines 3, 5` for more than one. */
+function linesClause(lines: readonly number[]): string {
+  return lines.length === 1
+    ? `line ${lines[0]}`
+    : `lines ${lines.join(', ')}`;
 }
 
 /**
- * One line naming a missing agent, where it was asked for and what to
- * run about it, for the preflight halt and for `rafa plan validate` to
- * print as they print their other refusals.
+ * One line naming a missing agent, where it was asked for and why it
+ * cannot be dispatched, for the preflight halt and for `rafa plan
+ * validate` to print as they print their other refusals.
  */
 export function missingAgentLine(missing: MissingAgent): string {
-  const where = missing.lines.length === 1
-    ? `line ${missing.lines[0]}`
-    : `lines ${missing.lines.join(', ')}`;
-  const fix = missing.fix === null
-    ? 'no definition under ~/.claude/agents to vendor'
-    : `run \`${missing.fix}\``;
+  return `agent "${missing.name}" (${linesClause(missing.lines)}) cannot be dispatched: ${missing.message}`;
+}
 
-  return `agent "${missing.name}" (${where}) resolves under no loaded scope: ${fix}`;
+/**
+ * One line naming a colliding skill, where it was asked for, and the
+ * paths and pin line of the collision, for the same two callers as
+ * {@link missingAgentLine}.
+ */
+export function skillCollisionLine(colliding: SkillCollision): string {
+  return `skill "${colliding.name}" (${linesClause(colliding.lines)}) cannot be served: ${colliding.message}`;
 }

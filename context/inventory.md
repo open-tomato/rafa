@@ -5,71 +5,244 @@ command that reads skills or agents reads this inventory; it is the single
 source of truth for which items exist, where they live, what they cost to
 run, and whether they are visible to a particular session.
 
-### The record
+### The three tiers
 
-Each item in the inventory holds these fields:
+Skills and agents live in three tiers, nearest-first:
 
-| Field | Meaning |
-|-------|---------|
-| `kind` | `skill` or `agent` |
-| `name` | item name, as implied by its place in the filesystem |
-| `source` | where it comes from: `project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>` |
-| `path` | absolute path to the item's file |
-| `summary` | item's frontmatter `description`, cut at 130 characters, never generated |
-| `stack` | frontmatter list of technology tags; empty when absent |
-| `tags` | frontmatter list of domain tags; empty when absent |
-| `check` | `pass`, `warn`, or `fail`, from `checkDirectory` for skills only |
-| `state` | `enabled`, `shadowed-by:<source>`, or `disabled:<how>` |
-| `visibleToLoop` | boolean: true when a session spawned under this project's `loop.settingSources` resolves it |
+| Tier | Location | Loaded when |
+|------|----------|-------------|
+| **project** | `<root>/.claude/skills` and `.claude/agents` | always |
+| **rafa** | `bundled/skills` and `bundled/agents` beside entry | `tiers.rafa` is not `off` |
+| **user** | `~/.claude/skills` and `~/.claude/agents` | `loop.settingSources` includes `user` |
 
-### Sources and precedence
+The rafa tier is measured from the running entry (resolved through symlinks),
+so `~/.rafa/bin/rafa` carries skills in `~/.rafa/runtime/<version>/bundled/`.
+Running as `bun src/rafa.ts` carries `src/bundled/`. Plugins and add-ons are
+outside these three tiers and keep the inventory's own separate precedence.
 
-Precedence is nearest-first: **project**, **rafa**, **user**,
-**addon:\<name\>**, **plugin:\<name\>**. The first holder of a given name and
-kind is `enabled` (unless explicitly disabled); each later holder of that
-name and kind is `shadowed-by:<source>` where `<source>` is the first holder's
-source. A shadowed or disabled item is never visible.
+### The resolver: `resolveTiers`
+
+`resolveTiers(rows, settings)` in `src/tiers/resolve.ts` is a pure resolver
+that decides which holder of a skill or agent name a loop session is served.
+It works in tier order (project, rafa, user) and only counts tiers the session
+loads.
+
+For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
+
+1. **`false` turns it off.** A name in `tiers.skills: { name: false }` or
+   `tiers.agents: { name: false }` is off in every tier and never served.
+2. **Unloaded.** No loaded tier holds the name.
+3. **Pinned.** A `tiers.skills` or `tiers.agents` map names a tier to serve,
+   and that tier holds it. The pin is the declared winner, except a skill pin
+   naming a copy Claude Code would not load: it has no effect (see "A skill
+   pin must name the copy Claude Code loads" below).
+4. **Order wins.** All loaded holders are byte-identical copies (see below), so
+   the nearest tier serves it, and the rest are its copies.
+5. **Collision.** Two or more loaded tiers hold different items under the name,
+   with no pin. Nothing serves it. `loop start` preflight and `plan validate`
+   refuse before any session starts only for a name the plan uses: an agent
+   routed by `agent=`, or a skill named by `skills=`, on a task still to run
+   (`collidingPlanSkills` in `src/agents/roster.ts`). A colliding skill the
+   plan never names starts the run; `doctor` still lists it. To see the
+   refusal by hand, name the skill on an open task, and delete
+   `PLAN_TRACKER-<stub>.md` between runs, since a task the refusal blocked is
+   no longer open. The refused start still writes a run record under
+   `.rafa/runs/` with state `stopped` and task `null`; that is not a crash.
+
+### Collisions and the byte-identical rule
+
+Two or more loaded tiers holding the same kind and name with different contents
+is a collision. The loop refuses it with a message naming both paths and
+the one config line that settles it:
+
+```yaml
+tiers.skills: { documentation: project }
+```
+
+For an agent the pin names the nearest holder's tier, since that holder
+would have won by order. For a skill it names the tier of the copy Claude
+Code loads first (below), so the suggested pin is never one the resolver
+sets aside: a project and a loaded user skill of one name suggest
+`tiers.skills: { documentation: user }`. A project and a user item of one
+name are both `collision` without a pin, but `enabled` and `shadowed` with
+`loop.settingSources` narrowed to exclude `user`.
+
+**A skill pin must name the copy Claude Code loads.** rafa serves only
+winners, but Claude Code loads the project's and a loaded user tier's
+`.claude/skills/<name>` by itself, and a served skill reaches a session
+through `--add-dir`. Claude Code loads a user skill over a project skill,
+and both over the rafa copy it is served. That is `CLAUDE_SKILL_ORDER` in
+`src/tiers/resolve.ts`. It is not the tier order: project → rafa → user
+still decides which of byte-identical copies serves, and which tiers load.
+
+So a skill pin has no effect while a loaded holder Claude Code ranks above
+the pinned one differs from the pinned copy, and the name stays a
+`collision`:
+
+- a `rafa` pin, while the project or a loaded user tier holds a different
+  copy;
+- a `project` pin, while a loaded user tier holds a different copy;
+- a `user` pin never, since nothing outranks a loaded user skill.
+
+The refusal (`collisionMessage`, from `TierCollision.setAsidePin` and
+`outrankedBy`) names the copies Claude Code loads over the pinned one and
+the two ways out: pin the copy it loads, or delete or rename those copies
+to let the pinned copy serve. A byte-identical copy is the same item, so it
+never sets a pin aside.
+
+Agents keep their pins. A served agent goes through `--agents`, which
+outranks both a project and a user agent of the same name.
+
+The readings behind this were taken on 2026-09-25 against Claude Code 2.1.280,
+in a scratch git repository with `claude -p --output-format stream-json
+--verbose`. Each copy of one name told the session to reply with its own word.
+The `init` event listed the name once whichever copy loaded, so the reply is
+what shows which copy won. Every mix ran beside a single-copy control:
+
+| Copies present | Sources | Replied with |
+|---|---|---|
+| project skill, `--add-dir` skill | `project,local` | project |
+| `--add-dir` skill alone (control) | `project,local` | `--add-dir` |
+| project skill, user skill (3 runs) | `user,project,local` | user |
+| project skill, user skill | `project,local` | project |
+| project skill alone (control) | `user,project,local` | project |
+| user skill, `--add-dir` skill (2 runs) | `user,project,local` | user |
+| `--add-dir` skill alone (control) | `user,project,local` | `--add-dir` |
+| project agent, `--agents` agent, run as `--agent` | `project,local` | `--agents` |
+| the same, run as a subagent through the Agent tool | `project,local` | `--agents` |
+| project agent alone, run as `--agent` (control) | `project,local` | project |
+| project agent, `--agents` agent, run as `--agent` | `user,project,local` | `--agents` |
+| user agent, `--agents` agent, run as `--agent` (2 runs) | `user,project,local` | `--agents` |
+| project, user and `--agents` agents, run as `--agent` | `user,project,local` | `--agents` |
+| project, user and `--agents` agents, as a subagent | `user,project,local` | `--agents` |
+| user agent, `--agents` agent, as a subagent | `user,project,local` | `--agents` |
+| project agent, user agent, run as `--agent` (2 runs) | `user,project,local` | project |
+| project agent, user agent, as a subagent | `user,project,local` | project |
+| project agent alone, run as `--agent` (control) | `user,project,local` | project |
+| user agent alone, run as `--agent` (control) | `user,project,local` | user |
+| user agent alone, as a subagent (control) | `user,project,local` | user |
+| `--agents` agent alone, run as `--agent` (control) | `user,project,local` | `--agents` |
+
+A user agent was planted under `~/.claude/agents` for the run and removed
+after it, since a session under a scratch `HOME` is not logged in. The last
+agent rows show a project agent outranks a user agent. So a `user` agent pin
+against a differing project agent does not reach the session either; the
+resolver does not act on that.
+
+**The byte-identical rule.** Two holders are the same when their definition
+files are byte-identical after removing every line of rafa's vendoring header
+(`<!-- vendored by rafa from … on YYYY-MM-DD -->`). `rafa agent vendor` writes
+that header when copying, so a copy it made compares equal to its source. The
+comparison reads the bytes as `latin1`, which maps each byte to one character,
+so it is exact where a UTF-8 decode would fold invalid sequences into U+FFFD.
+
+Only the row's own file is compared (an agent's file, or a skill's `SKILL.md`).
+Supporting files beside `SKILL.md` are not read, so two skill directories with
+one `SKILL.md` and different scripts count as one item, served by the nearer.
+A file the reader cannot read equals nothing. When all loaded holders of a name
+are byte-identical, the nearest serves it and `doctor` suggests deleting the
+copies.
+
+This covers projects that took #127's workaround (copying bundled items
+into `.claude/`), and this repository's own links from `.claude/` into
+`src/bundled/`.
+
+### Serving and provenance
+
+Before each task or wrap-up session, rafa copies the tier winners Claude Code
+would not load by itself into `.rafa/runs/<run>/served/` and hands them to the
+session with session-only flags. Today that means rafa-tier winners only: a
+user-tier winner is never served while `user` is not a loaded source. Project
+items are left for Claude Code to load by itself.
+
+**What is served.** Only winners are copied, so a collision, an item switched
+off and a name set aside by a pin never reach a session. Because only winners
+are passed, Claude Code's own precedence between flags never decides anything.
+Copies are made with links followed, so the served tree holds no symlink.
+A `self-update` during a run therefore cannot change what a running session was
+given.
+
+**The delivery mechanism.** Agents go through `--agents <file>` with JSON
+mapping names to `{ description, prompt, ... }`. Skills go through `--add-dir
+<served>` if the probed Claude Code version lists a skill from
+`<served>/.claude/skills/` by its bare name under `--setting-sources
+project,local`. The probe ran on 2026-09-24 against Claude Code 2.1.280
+(`SERVE_CLI_VERSION`):
+
+| Flag and argument | Planted where | Listed as |
+|---|---|---|
+| none (negative control) | nothing | no probe name |
+| none, skill in cwd's `.claude/skills/` (positive control) | skill | bare |
+| `--agents '<inline JSON>'` | agent | bare |
+| `--add-dir <dir>` | `<dir>/.claude/skills/<n>/` | bare |
+| `--add-dir <dir>` | `<dir>/.claude/agents/<n>.md` | bare |
+| `--add-dir <dir>` | `<dir>/skills/<n>/` | not listed |
+| `--plugin-dir <dir>` with `.claude-plugin/plugin.json` | skill, agent | `<plugin>:<n>` |
+
+So `SKILL_DELIVERY` is `add-dir` in `src/tiers/delivery.ts`, pinned with
+`SERVE_CLI_VERSION`. The served directory keeps the `.claude/` layout. A skill
+served under `plugin-dir` would be named `rafa:<name>` in a session, but
+`--add-dir` keeps the bare name. Agents are prefixed in either delivery, and
+under `add-dir` are stored in `agents.json`. A CLI version other than
+`SERVE_CLI_VERSION` means running the probe again before trusting the pin.
+
+**Provenance and what blocks serving.** Each bundled skill and agent carries
+`provenance:` in its frontmatter: either `first-party` or
+`{ origin, license, reviewed? }` where `reviewed` is `<who> YYYY-MM-DD`. An
+unreviewed third-party item is not served from the rafa tier. A rafa-tier
+winner's verdict, from `serveVerdict` in `src/tiers/serve.ts`, is one of:
+
+- **served**: a skill admitted, or an agent with its JSON entry
+- **unreviewed**: third-party `provenance` with no `reviewed`
+- **invalid-provenance**: a `provenance` value the checker refuses
+- **unreadable**: the definition file cannot be read or lacks frontmatter
+- **not-loadable**: a skill loose file rather than `<name>/SKILL.md`
+- **invalid-definition**: an agent the CLI would refuse (empty description,
+  empty body, or tools neither a list nor a comma string)
+
+Only `served` items reach the session. The skipped item and reason appear in
+`doctor` output and in test captures of what was served.
+
+### Visibility to loop
+
+An item is visible to a loop session if and only if:
+
+- It is not shadowed by a nearer holder, AND
+- It is not a collision, AND
+- It is not switched off (`false`), AND
+- Its source passes the visibility rule:
+  - **project** items: always visible
+  - **rafa** items: visible only when they are served (`serveVerdict` answered
+    `served`)
+  - **user** and **plugin:\<name\>** items: visible only when
+    `loop.settingSources` includes `user`
+  - **addon:\<name\>** items: never visible, because `claudeArgs` in
+    `src/utils/claude.ts` passes no directory of theirs to a session
+
+The inventory answers `visibleToLoop` as a boolean; `sourceVisibleToLoop` in
+`src/inventory/index.ts` computes it. The loop reads the inventory to decide
+which items a session can invoke.
 
 ### Disabled readings
 
-`disabled:<how>` reads from two places:
+`disabled:<how>` reads from the tier settings above, and from two places
+outside the config:
 
 - **`skillOverrides` setting**: when set to `off`, reads as
   `disabled:skillOverrides`; other values (`name-only`, `user-invocable-only`,
   `on`) do not disable. Reads from `.claude/settings.json`,
   `.claude/settings.local.json`, and `~/.claude/settings.json` (in that order
-  of precedence). This plan only READS; it never writes.
+  of precedence). This code only READS; it never writes.
 - **Frontmatter switches**: a frontmatter key that switches the item off
   reads as `disabled:<key>`. The one read today is
   `disable-model-invocation: true`, as
   `disabled:disable-model-invocation` (`src/inventory/disabled.ts`).
 
 An item cannot be shadowed AND disabled; once shadowed, shadowing takes
-precedence in `state`.
+precedence in `state`. A colliding item reads `collision` even when a
+switch would disable it, since the loop refuses the name either way.
 
-### visibleToLoop
-
-An item is visible to a loop session if and only if:
-
-- It is not disabled or shadowed, AND
-- Its source passes the visibility rule:
-  - **project** items are always visible
-  - **user** and **plugin:\<name\>** items are visible only when
-    `loop.settingSources` includes `user`
-  - **rafa** and **addon:\<name\>** items are never visible, because
-    `claudeArgs` in `src/utils/claude.ts` passes no directory of theirs to
-    a session
-
-Plugins are recorded in the user scope at
-`~/.claude/plugins/installed_plugins.json`; the plugin reader scans that file
-to discover installed plugins and records each with `source: plugin:<name>`.
-The reader pins the Claude Code version it was written against
-(`PLUGINS_CLI_VERSION`) and the file's own `version` key
-(`PLUGINS_RECORD_VERSION`) in `src/inventory/plugins.ts`; a record under any
-other `version` is one warning row, not a guess. The MCP reader pins its own
-(`MCP_CLI_VERSION`, `src/inventory/mcp.ts`).
-
-### Search
+### Search and plan needs
 
 `skill search` and `agent search` rank inventory rows in code, then start
 one session over a scratch copy of the top twelve (`src/inventory/search/`).
@@ -88,8 +261,6 @@ The session's reach is narrower in intent than in fact:
   (`/private/var/folders/…`) before `sessionLogDir` finds the log.
 - The runner sets `kind: 'search'` on the collected effort row itself,
   since the prompt-prefix classifier reads such a log as `other`.
-
-### Plan needs
 
 `rafa plan needs` reports every agent and skill a plan names whether or not
 a run can see it; `visibleToLoop` is a column, not a filter, and `--missing`
@@ -115,15 +286,41 @@ This section replaces the former "Search and plan needs" paragraphs, which
 said both commands offered only visible items; neither filters on
 `visibleToLoop`.
 
-**Settings files are read against the project root, sessions read them
-against their cwd.** `overrideSettingsPath` joins `.claude/settings.json`
-and `.claude/settings.local.json` onto `projectRoot`, while Claude Code
-resolves them from the session's working directory, so for a session
-started from a subdirectory every reader here — `visibleToLoop`, the MCP
-switches and `rafa doctor --deep`'s Environment overlay — can name a file
-that session never loads. The deep reading carries both directories and
-notes the mismatch rather than resolving it. It also leaves out the `env`
-of `~/.claude.json`, which Claude Code applies before any settings file,
-and the keys Claude Code drops from a project-scoped `env`; its module
-note in `src/commands/doctor-deep-env.ts` lists both. This paragraph
-replaces nothing.
+### Settings files and the project root
+
+**Settings files are read against the project root, sessions read them against
+their cwd.** `overrideSettingsPath` joins `.claude/settings.json` and
+`.claude/settings.local.json` onto `projectRoot`, while Claude Code resolves
+them from the session's working directory, so for a session started from a
+subdirectory every reader here — `visibleToLoop`, the MCP switches and
+`rafa doctor --deep`'s Environment overlay — can name a file that session
+never loads. The deep reading carries both directories and notes the mismatch
+rather than resolving it. It also leaves out the `env` of `~/.claude.json`,
+which Claude Code applies before any settings file, and the keys Claude Code
+drops from a project-scoped `env`; its module note in
+`src/commands/doctor-deep-env.ts` lists both.
+
+### Plugins and add-ons
+
+Plugins are recorded at `~/.claude/plugins/installed_plugins.json`; the
+plugin reader scans that file to discover plugins and records each with
+`source: plugin:<name>`. The reader pins the Claude Code version it was
+written against (`PLUGINS_CLI_VERSION`) and the file's own `version` key
+(`PLUGINS_RECORD_VERSION`) in `src/inventory/plugins.ts`; a record under
+any other `version` is one warning row, not a guess. The MCP reader pins
+its own (`MCP_CLI_VERSION`, `src/inventory/mcp.ts`).
+
+Each inventory row carries these fields:
+
+| Field | Meaning |
+|-------|---------|
+| `kind` | `skill` or `agent` |
+| `name` | item name, as implied by its place in the filesystem |
+| `source` | where it comes from: `project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>` |
+| `path` | absolute path to the item's file |
+| `summary` | item's frontmatter `description`, cut at 130 characters, never generated |
+| `stack` | frontmatter list of technology tags; empty when absent |
+| `tags` | frontmatter list of domain tags; empty when absent |
+| `check` | `pass`, `warn`, or `fail`, from `checkDirectory` for skills only |
+| `state` | `enabled`, `collision`, `shadowed-by:<source>`, `disabled:<how>`, or `off` |
+| `visibleToLoop` | boolean: true when a session spawned under this project's `loop.settingSources` resolves it and loads it |

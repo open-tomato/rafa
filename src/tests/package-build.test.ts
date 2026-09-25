@@ -8,8 +8,8 @@
  * first three and phase 1's publishing stage the rest, so a target
  * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest, both tsconfig files, the README, the dev-planner skill
- * and `src/`) into a scratch directory and runs `bun run build` there,
+ * (its manifest, both tsconfig files, the README and `src/`) into a
+ * scratch directory and runs `bun run build` there,
  * the script as the manifest holds it, so nothing is written into the
  * repository's own `dist/`.
  *
@@ -36,14 +36,30 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
- *   - `src/PROMPT.md`, `src/plan-prompt.md` and
- *     `.claude/skills/dev-planner/SKILL.md` are copied into `dist/`.
+ *   - `src/PROMPT.md` and `src/plan-prompt.md` are copied into `dist/`.
  *     `start.ts` and `plan.ts` find them beside themselves through
  *     `import.meta.url`, and a bundle inlining either module answers its
  *     OWN directory. The two built files reading `import.meta.url` are
- *     `cli.js` and `index.js`, both directly in `dist/`. The skill is the
- *     plan format `buildPlanPrompt` inlines into the plan prompt, and a
- *     project running an installed rafa carries no copy of its own.
+ *     `cli.js` and `index.js`, both directly in `dist/`.
+ *   - `src/bundled/` is copied whole to `dist/bundled/`: the rafa tier,
+ *     its skills and agents, which sits beside the entry in both a
+ *     checkout and a build (`src/schema/tiers.ts`). The dev-planner skill
+ *     in it is the plan format `buildPlanPrompt` inlines into the plan
+ *     prompt, read at `bundled/skills/dev-planner/SKILL.md` under the
+ *     module's directory, and a project running an installed rafa
+ *     carries no copy of its own. The copy is whole, not `*.md`, because
+ *     a skill is a directory that may hold more than its `SKILL.md`, and
+ *     a case holds `dist/bundled/` to exactly the files `src/bundled/`
+ *     holds, byte for byte, plus the one program built into it below, so
+ *     a stray file in either is seen.
+ *   - `src/tools/ts-symbols/cli.ts` is built to `dist/bundled/bin/ts-symbols`,
+ *     the rafa tier's `bin`. Like `cli.js`, the build keeps the
+ *     `#!/usr/bin/env bun` line and writes the file executable, so it
+ *     runs by path. The clause comes AFTER the tier copy: with
+ *     `dist/bundled/` already there, `cp -R src/bundled dist/bundled`
+ *     copies into it, as `dist/bundled/bundled/`. Its `typescript` is
+ *     the project's, found from the working directory (see the module),
+ *     so the bundle carries no copy of its own.
  *
  * ## The template cases
  *
@@ -53,13 +69,11 @@
  * handed, and that prompt is held equal to what `buildPlanPrompt` makes of the source
  * template and the source skill. It runs three times: through
  * `dist/cli.js` and through the root bundle's `planCommand`, both inside
- * the scratch package, where the package's own skill also sits one
- * directory above `dist/`, and through a copy of the build outside the
- * package, where only the copy beside `cli.js` exists. Two controls run
- * the same command from a copy of the build outside the package, one
- * without `plan-prompt.md` and one without `SKILL.md`, and each refuses
- * before any session starts, so the check can see a template that is not
- * there.
+ * the scratch package, and through a copy of the build outside the
+ * package. Two controls run the same command from a copy of the build
+ * outside the package, one without `plan-prompt.md` and one without
+ * `bundled/skills/dev-planner/SKILL.md`, and each refuses before any
+ * session starts, so the check can see a template that is not there.
  *
  * The `dist/cli.js` run also holds the session's argument list to the
  * base arguments and `--setting-sources project,local`, the sources a run
@@ -69,7 +83,7 @@
  *
  * ## The asset-tree clause
  *
- * The three templates above are named files; the pinned resolve plans
+ * The two templates above are named files; the pinned resolve plans
  * and the board templates are DIRECTORIES, so the build script ends with
  * a loop over a table of `<source under src>:<name under dist>` pairs.
  * Three readings shape it:
@@ -215,15 +229,27 @@
  * dropped, is equivalent: bun's default root for these four entries is
  * their common directory, `src`, and every case stayed green.
  *
- * Once the skill joined the copy, two mutations of the copy clause were
- * run the same way. Dropping the whole clause reddened all eight template
- * cases that need a copied file: the three byte cases, the three `rafa
- * plan` runs, and both controls, since the file each removes was never
- * written. Dropping only the skill reddened three: its byte case, the
- * run outside the package and the skill control. The two runs inside the
- * scratch package stayed green, because `readPlanFormat` falls back to
- * the package's own skill one directory above `dist/`; that blind spot is
- * why the run outside the package exists.
+ * When the skill moved into the rafa tier, two mutations were driven
+ * on 2026-09-24, one run each, with the files restored byte-identical
+ * (sha256). Dropping `cp -R src/bundled dist/bundled` from the manifest
+ * reddened 6 of 45 here: the tier case, the four `rafa plan` runs and
+ * the skill control, whose file to remove was never written. No run
+ * inside the scratch package stays green on it any more, since
+ * `readPlanFormat` has no fallback to a copy above `dist/`. Pointing
+ * `planFormatPath` back at the checkout's
+ * `.claude/skills/dev-planner/SKILL.md` reddened the same four runs and
+ * the control here, the source case in `plan-format-source.test.ts` and
+ * the four `readPlanFormat` cases in `plan-and-schedule.test.ts`, 10 of
+ * 101 across those files and `src/plan.test.ts`: the tier copy carries
+ * a `provenance` line the `.claude` one does not.
+ *
+ * When ts-symbols joined the build, two mutations of its clause were
+ * driven on 2026-09-24, one run of this file each, 48 pass before and
+ * after and the manifest restored byte-identical (sha256). Dropping it
+ * reddened 4 of 48: the tier case and the three ts-symbols cases.
+ * Moving it before the tier copy reddened 6 of 48, the tier case and the
+ * five cases reading the dev-planner skill from the build, which the copy
+ * had written under `dist/bundled/bundled/`.
  *
  * `check-types` skips this file. Checked through a tsconfig outside the
  * repo, it compiled clean, and a planted TS2322 in a second file of the
@@ -238,7 +264,9 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  realpathSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -250,7 +278,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import * as storeSource from '../effort/store/index.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
-import { buildPlanPrompt, planFormatCandidates } from '../plan.js';
+import { buildPlanPrompt, planFormatPath } from '../plan.js';
 import * as portsSource from '../ports/index.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 
@@ -315,11 +343,23 @@ const DEPENDENCY_KEYS = [
   'bundledDependencies',
 ];
 
-/** The dev-planner skill, from the repository root: the plan format. */
-const SKILL = '.claude/skills/dev-planner/SKILL.md';
+/** The rafa tier in a checkout, from the repository root, and where the build copies it under `dist/`. */
+const BUNDLED = ['src/bundled', 'bundled'] as const;
+
+/** The ts-symbols program: its source, from the repository root, and where the build writes it under `dist/`. */
+const TS_SYMBOLS = ['src/tools/ts-symbols/cli.ts', 'bundled/bin/ts-symbols'] as const;
+
+/** The ts-symbols runs held to the source's answer: neither needs a `typescript` package. */
+const TS_SYMBOLS_RUNS: [string, string[]][] = [['`help`', ['help']], ['no arguments', []]];
+
+/** The dev-planner skill under the tier: the plan format. */
+const PLAN_FORMAT_IN_TIER = 'bundled/skills/dev-planner/SKILL.md';
+
+/** The dev-planner skill, from the repository root. */
+const SKILL = `src/${PLAN_FORMAT_IN_TIER}`;
 
 /** The files the scratch copy of the package takes besides `src/`. */
-const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md', SKILL];
+const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md'];
 
 /** Each library entry: its path under `dist/`, and its source module. */
 const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
@@ -380,7 +420,6 @@ const ROOT_SEAM_NAMES = [
 const TEMPLATES: [string, string][] = [
   ['src/PROMPT.md', 'PROMPT.md'],
   ['src/plan-prompt.md', 'plan-prompt.md'],
-  [SKILL, 'SKILL.md'],
 ];
 
 /**
@@ -579,9 +618,11 @@ function copyBuildOutsidePackage(scratch: PlanScratch, removed: string | null): 
   return copy;
 }
 
-/** The candidates `readPlanFormat` would find from `moduleDir`. */
-function presentPlanFormats(moduleDir: string): string[] {
-  return planFormatCandidates(moduleDir).filter((candidate) => existsSync(candidate));
+/** Every file under `directory`, relative to it, sorted. */
+function filesUnder(directory: string): string[] {
+  return readdirSync(directory, { recursive: true, encoding: 'utf8' })
+    .filter((file) => statSync(join(directory, file)).isFile())
+    .sort();
 }
 
 /** The prompt `rafa plan` builds from the source template and skill for {@link SPEC}. */
@@ -847,7 +888,8 @@ describe('the prompt templates in the build', () => {
     const copy = copyBuildOutsidePackage(scratch, null);
     const plan = run([process.execPath, join(copy, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(presentPlanFormats(copy)).toEqual([join(copy, 'SKILL.md')]);
+    expect(planFormatPath(copy)).toBe(join(copy, PLAN_FORMAT_IN_TIER));
+    expect(existsSync(join(copy, '..', 'src'))).toBe(false);
     expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
     expect(plan.exitCode).toBe(1);
   }, 30_000);
@@ -863,16 +905,91 @@ describe('the prompt templates in the build', () => {
     expect(existsSync(scratch.prompt)).toBe(false);
   }, 30_000);
 
-  it('refuses before any session when the skill is missing beside a bundle outside the package', () => {
+  it('refuses before any session when the skill is missing from the tier of a bundle outside the package', () => {
     const scratch = plantPlanScratch('control-skill');
-    const bare = copyBuildOutsidePackage(scratch, 'SKILL.md');
+    const bare = copyBuildOutsidePackage(scratch, PLAN_FORMAT_IN_TIER);
     const plan = run([process.execPath, join(bare, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(presentPlanFormats(bare)).toEqual([]);
+    expect(existsSync(planFormatPath(bare))).toBe(false);
     expect(plan.exitCode).not.toBe(0);
     expect(plan.stderr).toContain('The plan format is missing');
-    expect(plan.stderr).toContain(join(bare, 'SKILL.md'));
+    expect(plan.stderr).toContain(join(bare, PLAN_FORMAT_IN_TIER));
     expect(existsSync(scratch.prompt)).toBe(false);
+  }, 30_000);
+});
+
+describe('the rafa tier in the build', () => {
+  it('copies every file of src/bundled into dist/bundled, unchanged, and nothing else', () => {
+    const [source, name] = BUNDLED;
+    const sourceDir = join(PACKAGE_DIR, source);
+    const builtDir = join(DIST, name);
+    const names = filesUnder(sourceDir);
+    const differing = names.filter(
+      (file) => !existsSync(join(builtDir, file))
+        || readFileSync(join(builtDir, file), 'utf8') !== readFileSync(join(sourceDir, file), 'utf8'),
+    );
+
+    const built = TS_SYMBOLS[1].slice(`${name}/`.length);
+
+    expect(names).toContain(PLAN_FORMAT_IN_TIER.slice(`${name}/`.length));
+    expect(names).not.toContain(built);
+    expect(differing).toEqual([]);
+    expect(filesUnder(builtDir)).toEqual([...names, built].sort());
+  });
+
+  it('writes no dev-planner copy beside the bundles, so the tier is the only one read', () => {
+    expect(existsSync(join(DIST, 'SKILL.md'))).toBe(false);
+  });
+});
+
+describe('the ts-symbols program in the build', () => {
+  it('keeps the bun shebang and is written executable', () => {
+    const program = join(DIST, TS_SYMBOLS[1]);
+
+    expect(existsSync(program)).toBe(true);
+    expect(readFileSync(program, 'utf8').split('\n')[0]).toBe('#!/usr/bin/env bun');
+    expect(statSync(program).mode & 0o111).toBe(0o111);
+  });
+
+  it.each(TS_SYMBOLS_RUNS)('runs by path and answers %s as its source does', (_label, args) => {
+    const fromSource = run([process.execPath, join(REPO_ROOT, TS_SYMBOLS[0]), ...args], tempRoot, withBunOnPath());
+    const fromBuild = run([join(DIST, TS_SYMBOLS[1]), ...args], tempRoot, withBunOnPath());
+
+    expect(fromSource.stdout).toContain('usage: ts-symbols <command> <target>');
+    expect(fromBuild).toEqual(fromSource);
+  }, 30_000);
+});
+
+describe('the built ts-symbols over a project', () => {
+  /** A copy of the ts-symbols fixture under the temp root, so resolution never walks into rafa's own node_modules. */
+  function plantProject(name: string): string {
+    const root = realpathSync(mkdtempSync(join(tempRoot, `${name}-`)));
+    cpSync(join(REPO_ROOT, 'src/tools/ts-symbols/fixtures/proj'), root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), '{ "name": "fixture", "private": true }\n');
+    return root;
+  }
+
+  it('outlines a TypeScript fixture that has typescript, exiting 0', () => {
+    const root = plantProject('with-ts');
+    const typescript = dirname(Bun.resolveSync('typescript/package.json', REPO_ROOT));
+    mkdirSync(join(root, 'node_modules'), { recursive: true });
+    symlinkSync(typescript, join(root, 'node_modules', 'typescript'), 'dir');
+
+    const result = run([join(DIST, TS_SYMBOLS[1]), 'outline', 'src/util.ts'], root, withBunOnPath());
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('7: export function makeChunk');
+    expect(result.stdout).toContain('11: export class ChunkStore');
+  }, 30_000);
+
+  it('exits 3 naming the root in a temp project without typescript', () => {
+    const root = plantProject('no-ts');
+
+    const result = run([join(DIST, TS_SYMBOLS[1]), 'outline', 'src/util.ts'], root, withBunOnPath());
+
+    expect(result.exitCode).toBe(3);
+    expect(result.stderr).toContain(`no typescript under ${root}: add it to the project`);
+    expect(result.stdout).toBe('');
   }, 30_000);
 });
 

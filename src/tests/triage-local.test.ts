@@ -370,6 +370,7 @@ describe('a blocker over the local adapter', () => {
       repoRoot: f.root,
       home: join(f.root, 'home'),
       settingSources: ['project', 'local'],
+      serving: null,
       run,
       newSessionId: () => 'session-under-test',
     });

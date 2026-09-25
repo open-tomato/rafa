@@ -125,7 +125,18 @@ describe('where each tree sits', () => {
 
     expect(agentTreeDirectory('project', seams)).toBe(join(base, 'project/.claude/agents'));
     expect(agentTreeDirectory('user', seams)).toBe(join(base, 'home/.claude/agents'));
-    expect(agentTreeDirectory('rafa', seams)).toBe(join(base, 'runtime', BUNDLED_AGENTS_DIR));
+    expect(agentTreeDirectory('rafa', seams)).toBe(join(base, 'runtime', 'bundled', 'agents'));
+  });
+
+  it('puts rafa\'s agents beside its skills under bundled/, apart from a bare agents/', () => {
+    const seams = freshSeams();
+    const base = dirname(seams.home);
+
+    expect(BUNDLED_AGENTS_DIR).toBe(join('bundled', 'agents'));
+    expect(dirname(agentTreeDirectory('rafa', seams) ?? ''))
+      .toBe(dirname(skillTierDirectory('rafa', seams) ?? ''));
+    // Control: the old place, which src/agents/ (TypeScript) clashed with, is a different answer.
+    expect(agentTreeDirectory('rafa', seams)).not.toBe(join(base, 'runtime', 'agents'));
   });
 
   it('measures the rafa agents tree from the entry with its links resolved', () => {
@@ -150,7 +161,7 @@ describe('an absent tier', () => {
     const before = readSkillTree('rafa', seams);
     expect(before.exists).toBe(false);
     expect(before.items).toEqual([]);
-    expect(before.dir).toBe(join(dirname(seams.entry ?? ''), 'skills'));
+    expect(before.dir).toBe(join(dirname(seams.entry ?? ''), 'bundled', 'skills'));
 
     mkdirSync(before.dir ?? '', { recursive: true });
     const empty = readSkillTree('rafa', seams);

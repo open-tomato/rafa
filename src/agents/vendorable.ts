@@ -3,20 +3,30 @@
  * `~/.claude/agents`, and the warning `rafa init` writes about them.
  *
  * `start/preflight.ts` and `rafa plan validate` REFUSE on an `agent=`
- * no loaded scope defines, because a run that starts on one exits 1 at
+ * no loaded tier serves, because a run that starts on one exits 1 at
  * the first dispatch with no JSON at all. `init` is earlier than both
  * and writes rather than dispatches, so it only warns: the project is
  * set up whatever its plans route to, exactly as the `PATH` check warns
  * and never refuses.
  *
  * The warning is narrower than the refusals on purpose. It names only a
- * missing agent {@link vendorFixCommand} answers for — one
- * `~/.claude/agents` defines under the same name, which under the
+ * missing agent the roster gives a vendor command (`MissingAgent.fix`):
+ * one only the user tier, `~/.claude/agents`, holds, which under the
  * resolved `loop.settingSources` the run does not load, so
- * `rafa agent vendor <name>` would make it resolve. A name no user file
- * carries has no such fix, and `init` says nothing about it: it is a
- * typo or an agent yet to be written, and the preflight is where it is
- * refused with its lines.
+ * `rafa agent vendor <name>` would make it resolve. A name no tier holds,
+ * one switched off and one two tiers collide on have no such fix, and
+ * `init` says nothing about them: the preflight is where each is refused
+ * with its lines.
+ *
+ * ## No notice for a bundled agent
+ *
+ * A name the rafa tier holds is never answered, whatever else holds it.
+ * Loaded, the rafa tier serves it and it is not missing at all. Unloaded
+ * by `tiers.rafa: off`, a home copy of it is still no reason to copy a
+ * file into the project's `.claude/agents`: the fix is the setting, and
+ * the preflight's refusal names it (`tiers.rafa: on`). So `init` never
+ * points at a write under `.claude/` for an agent rafa ships, the way it
+ * writes nothing there itself.
  *
  * ## What is scanned
  *
@@ -32,10 +42,13 @@
  * where `plan.dir` is a directory `init` itself is about to create —
  * warns about nothing.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { AgentRoster } from './roster.js';
+import type { TierSettings } from '../tiers/resolve.js';
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
+
+import { findTierItem } from '../tiers/resolve.js';
 
 import { missingPlanAgents, resolveAgentRoster, VENDOR_COMMAND } from './roster.js';
 
@@ -59,8 +72,10 @@ export interface VendorableScan {
   readonly home: string;
   /** The config's `plan.dir`, absolute or relative to the root. */
   readonly planDir: string;
-  /** `loop.settingSources` as the config resolved it. */
-  readonly settingSources: readonly ClaudeSettingSource[];
+  /** `loop.settingSources`, `tiers.rafa` and the pins as the config resolved them; a `RafaConfig` is one. */
+  readonly settings: TierSettings;
+  /** The entry the rafa tier sits beside. `Bun.main` when left out. */
+  readonly entry?: string;
 }
 
 /** The `.md` files directly under `dir`, sorted, or none when it is unreadable. */
@@ -87,6 +102,12 @@ function readText(path: string): string | null {
   }
 }
 
+/** True when the rafa tier holds `name`, loaded or not; see "No notice for a bundled agent". */
+function rafaHolds(roster: AgentRoster, name: string): boolean {
+  const item = findTierItem(roster.resolution, 'agent', name);
+  return item?.holders.some((holder) => holder.source === 'rafa') === true;
+}
+
 /**
  * Every agent a plan under `plan.dir` asks for that the run would not
  * resolve and `rafa agent vendor` could fix, plan by plan and in the
@@ -96,7 +117,14 @@ export function vendorableAgents(scan: VendorableScan): readonly VendorableAgent
   const dir = isAbsolute(scan.planDir)
     ? scan.planDir
     : join(scan.repoRoot, scan.planDir);
-  const roster = resolveAgentRoster({ repoRoot: scan.repoRoot, home: scan.home }, scan.settingSources);
+  const roots = {
+    repoRoot: scan.repoRoot,
+    home: scan.home,
+    ...(scan.entry === undefined
+      ? {}
+      : { entry: scan.entry }),
+  };
+  const roster = resolveAgentRoster(roots, scan.settings);
   const found: VendorableAgent[] = [];
 
   for (const file of planFiles(dir)) {
@@ -105,7 +133,7 @@ export function vendorableAgents(scan: VendorableScan): readonly VendorableAgent
     if (markdown === null) continue;
 
     for (const missing of missingPlanAgents(markdown, roster)) {
-      if (missing.fix === null) continue;
+      if (missing.fix === null || rafaHolds(roster, missing.name)) continue;
       found.push({ plan: path, name: missing.name, lines: missing.lines, fix: missing.fix });
     }
   }

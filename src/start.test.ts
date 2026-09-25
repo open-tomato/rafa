@@ -160,7 +160,7 @@ function plantedStart(body: readonly string[]): string {
 const PREPARE = 'const release = prepareReleaseStage({ repoRoot, settings: runConfig.config, planStub, planContent });';
 
 /** The wrap-up session, handed the record step 1 answered. */
-const SESSION = 'await preserveProgress(planContent, settingSources, release);';
+const SESSION = 'await preserveProgress(planContent, settingSources, release, serving);';
 
 /** Step 3, over that same record. */
 const FINISH = 'await finishRelease({ repoRoot, preparation: release });';
@@ -209,7 +209,7 @@ describe('the wrap-up branch of start.ts', () => {
 
   it('hands the session and the finish the very record the preparation answered', () => {
     expect(callTo(CALLS, 'prepareReleaseStage').bound).toBe('release');
-    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release']);
+    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release', 'serving']);
     expect(callTo(CALLS, 'finishRelease').args[0]).toContain('preparation: release');
   });
 

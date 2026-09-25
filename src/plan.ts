@@ -114,14 +114,29 @@
  *
  * ## One source for the plan format
  *
- * `.claude/skills/dev-planner/SKILL.md` is the only file the plan format
- * is written in. The template carries a `{PLAN_FORMAT}` slot where the
- * format goes, and {@link buildPlanPrompt} fills it with the skill's body.
- * A project running an installed rafa has no copy of the skill, so the
- * build copies it into `dist/` beside `plan-prompt.md`, and
- * {@link readPlanFormat} looks there first: beside this module, which is
- * `dist/` in a build, then at the checkout's own skill, which is what this
- * module finds when it runs from `src/`.
+ * `src/bundled/skills/dev-planner/SKILL.md`, the rafa tier's copy, is the
+ * only file the plan format is written in. The template carries a
+ * `{PLAN_FORMAT}` slot where the format goes, and {@link buildPlanPrompt}
+ * fills it with the skill's body. {@link readPlanFormat} reads it at
+ * {@link PLAN_FORMAT_SKILL} under this module's directory, which is
+ * `src/` in a checkout and `dist/` in a build, where the build copies
+ * `src/bundled/` whole; a project running an installed rafa has no copy
+ * of its own. The directory is this module's `import.meta.url`, not the
+ * entry `bundledSkillsDirectory` measures from (`src/schema/tiers.ts`):
+ * `planCommand` also runs from the library bundle, `dist/index.js`,
+ * where `Bun.main` is the importing program and not rafa's `cli.js`.
+ *
+ * ## The routing table
+ *
+ * The template carries a `{ROUTING}` slot beside `{PLAN_FORMAT}`, and
+ * {@link buildPlanPrompt} fills it with {@link formatRoutingSection}:
+ * the resolved `routing` setting (`tiers/routing.ts` holds its
+ * defaults) as a shape → agent table, so the planner routes tasks by the
+ * map this project's config resolved rather than by a table written into
+ * a page. A `false` row is the setting's removal and is left out; a map
+ * with no row left renders a sentence saying so, so the slot never
+ * vanishes silently. The command hands over `config.routing` as it
+ * resolved it for the rest of the run.
  *
  * ## The settings the session loads
  *
@@ -133,6 +148,7 @@
  */
 import type { AdapterRegistry } from './adapters/registry.js';
 import type { GateBase } from './commands/plan/review-gate.js';
+import type { RouteTarget } from './config-sections.js';
 import type { RafaConfig } from './config.js';
 
 import fs from 'fs';
@@ -152,7 +168,9 @@ import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { loadConfig } from './config-load.js';
 import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
+import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';
+import { DEFAULT_ROUTING } from './tiers/routing.js';
 import { checkUsage } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 
@@ -193,35 +211,30 @@ export function formatProgressSection(progressContent: string | undefined): stri
   ].join('\n');
 }
 
-/** The dev-planner skill, relative to the root of a rafa checkout. */
-export const PLAN_FORMAT_SKILL = path.join('.claude', 'skills', 'dev-planner', 'SKILL.md');
+/** The dev-planner skill in the rafa tier, relative to the directory holding the entry. */
+export const PLAN_FORMAT_SKILL = path.join(BUNDLED_SKILLS_DIR, 'dev-planner', 'SKILL.md');
 
 /**
- * Where {@link readPlanFormat} looks for the skill, in order: beside the
- * module, where the build copies it, then the checkout's own skill one
- * directory up, where a module running from `src/` finds it.
+ * Where {@link readPlanFormat} reads the skill: {@link PLAN_FORMAT_SKILL}
+ * under `moduleDir`, `src/` from the checkout and `dist/` in a build.
  */
-export function planFormatCandidates(moduleDir: string): string[] {
-  return [
-    path.join(moduleDir, path.basename(PLAN_FORMAT_SKILL)),
-    path.join(moduleDir, '..', PLAN_FORMAT_SKILL),
-  ];
+export function planFormatPath(moduleDir: string): string {
+  return path.join(moduleDir, PLAN_FORMAT_SKILL);
 }
 
 /**
- * Reads the dev-planner skill the plan prompt inlines, from the first of
- * {@link planFormatCandidates} that exists.
+ * Reads the dev-planner skill the plan prompt inlines, from
+ * {@link planFormatPath}.
  *
- * @throws Error when none exists, naming every path it looked at, so a
- * build that lost its copy refuses before any session starts.
+ * @throws Error when it is not there, naming the path, so a build that
+ * lost its copy refuses before any session starts.
  */
 export function readPlanFormat(moduleDir: string): string {
-  const candidates = planFormatCandidates(moduleDir);
-  const found = candidates.find((candidate) => fs.existsSync(candidate));
-  if (found === undefined) {
-    throw new Error(`The plan format is missing: no dev-planner SKILL.md at ${candidates.join(' or ')}`);
+  const skill = planFormatPath(moduleDir);
+  if (!fs.existsSync(skill)) {
+    throw new Error(`The plan format is missing: no dev-planner SKILL.md at ${skill}`);
   }
-  return fs.readFileSync(found, 'utf8');
+  return fs.readFileSync(skill, 'utf8');
 }
 
 /** A YAML frontmatter block opening a file, and the blank lines after it. */
@@ -236,12 +249,66 @@ export function planFormatBody(skill: string): string {
   return skill.replace(FRONTMATTER, '').trimEnd();
 }
 
+/** The heading {@link formatRoutingSection} opens the `{ROUTING}` slot with. */
+export const ROUTING_HEADING = '## Task shape to agent (the `routing` setting)';
+
+/**
+ * One table cell as a code span: whitespace runs collapsed to one space,
+ * `|` escaped so it cannot end the cell, and a backtick fence one longer
+ * than the longest backtick run inside, padded when the value touches a
+ * backtick, so any name the setting accepts renders as written.
+ */
+function codeCell(value: string): string {
+  const flat = value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replaceAll('|', '\\|');
+  const longestRun = Math.max(0, ...(flat.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = '`'.repeat(longestRun + 1);
+  const pad = flat.startsWith('`') || flat.endsWith('`')
+    ? ' '
+    : '';
+  return `${fence}${pad}${flat}${pad}${fence}`;
+}
+
+/**
+ * Renders the resolved `routing` setting for the `{ROUTING}` slot: a
+ * heading, one sentence on how to use it, and a `Shape | Agent` table in
+ * the map's order. A `false` row is removed and not listed; a map with
+ * no row left says that no shape is routed. Exported for tests.
+ */
+export function formatRoutingSection(routing: ReadonlyMap<string, RouteTarget>): string {
+  const rows = [...routing].flatMap(([shape, agent]) => agent === false
+    ? []
+    : [`| ${codeCell(shape)} | ${codeCell(agent)} |`]);
+  if (rows.length === 0) {
+    return [
+      ROUTING_HEADING,
+      '',
+      'This project\'s `routing` setting routes no task shape to an agent. Declare the granular keys',
+      'on each task instead of `agent=`.',
+    ].join('\n');
+  }
+  return [
+    ROUTING_HEADING,
+    '',
+    'Route each task by its SHAPE to the agent this project\'s `routing` setting names for it,',
+    'written as `{agent=<name>}` on the task line. Where no row fits, declare the granular keys',
+    'instead of an agent.',
+    '',
+    '| Shape | Agent |',
+    '| --- | --- |',
+    ...rows,
+  ].join('\n');
+}
+
 /** The slots a plan-prompt template carries. */
 export const PLAN_PROMPT_SLOTS = [
   'PLAN_FILE',
   'PREREQUISITES_FILE',
   'PROGRESS_SECTION',
   'PLAN_FORMAT',
+  'ROUTING',
   'SPEC_CONTENT',
 ] as const;
 
@@ -258,7 +325,9 @@ const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
  * its frontmatter is dropped here ({@link planFormatBody}). `planDir` is
  * the directory the plan is written into, the run's resolved `plan.dir`,
  * and both files are named in it through `planFilePath`, as the adapter
- * names the files it looks for.
+ * names the files it looks for. `routing` is the resolved `routing`
+ * setting the `{ROUTING}` slot renders ({@link formatRoutingSection}),
+ * rafa's defaults unless one is handed over.
  *
  * Every slot is filled in ONE pass over the template, through a replacer
  * function. Filled text is never scanned again, so a spec, a progress
@@ -275,12 +344,14 @@ export function buildPlanPrompt(
   stub: string,
   planDir: string,
   progressContent?: string,
+  routing: ReadonlyMap<string, RouteTarget> = DEFAULT_ROUTING,
 ): string {
   const values: Record<PlanPromptSlot, string> = {
     PLAN_FILE: planFilePath(planDir, `PLAN-${stub}.md`),
     PREREQUISITES_FILE: planFilePath(planDir, `PREREQUISITES-${stub}.md`),
     PROGRESS_SECTION: formatProgressSection(progressContent),
     PLAN_FORMAT: planFormatBody(planFormat),
+    ROUTING: formatRoutingSection(routing),
     SPEC_CONTENT: specContent,
   };
   return template.replace(SLOT_PATTERN, (_slot: string, name: PlanPromptSlot) => values[name]);
@@ -339,6 +410,7 @@ export default async function plan(
 ): Promise<void> {
   const {
     settingSources,
+    routing,
     planDir,
     specsDir,
     roadmapIssue,
@@ -401,6 +473,7 @@ export default async function plan(
       planStub,
       planDir,
       progressContent,
+      routing,
     ),
   });
 

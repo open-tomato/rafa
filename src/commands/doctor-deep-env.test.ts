@@ -18,6 +18,7 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { bundledBinDirectory } from '../schema/tiers.js';
 import { sessionSpawnEnv } from '../utils/session-env.js';
 
 import {
@@ -85,14 +86,14 @@ function plantEnv(path: string, env: unknown): void {
 }
 
 describe('readSessionEnv with no settings file', () => {
-  it('answers what sessionSpawnEnv answers for the shell, and the entrypoint as the one difference', () => {
+  it('answers what sessionSpawnEnv answers for the shell: the entrypoint added, and bundled/bin in front of PATH', () => {
     const seams = freshSeams();
 
     const reading = readSessionEnv(seams);
 
     expect(reading.env).toEqual(sessionSpawnEnv(SHELL));
     expect(reading.differences).toEqual([{ key: 'CLAUDE_CODE_ENTRYPOINT', kind: 'added', layer: 'spawn' }]);
-    expect(reading.path).toBeNull();
+    expect(reading.path).toEqual({ layer: 'spawn', added: [bundledBinDirectory()], removed: [], reordered: false });
     expect(reading.warnings).toEqual([]);
   });
 

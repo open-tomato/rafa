@@ -312,8 +312,62 @@ describe('claudeArgs', () => {
   });
 });
 
+/** Served flags as `servedFlags` spells them: the variadic skill flag, then `--agents` with its one value. */
+const SERVED_FLAGS = ['--add-dir', '/p/.rafa/runs/r/served', '--agents', '{"zz-agent":{}}'];
+
+describe('claudeArgs with served flags', () => {
+  it('puts the served flags after the setting sources and before the resolved flags', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS, SERVED_FLAGS)).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+      '--add-dir',
+      '/p/.rafa/runs/r/served',
+      '--agents',
+      '{"zz-agent":{}}',
+      '--effort',
+      'low',
+      '--agent',
+      'doc-updater',
+    ]);
+  });
+
+  it('keeps --tools the last flag when served flags are handed over', () => {
+    const args = claudeArgs(DEFAULT_SOURCES, ['--model', 'opus', '--tools', 'Read', 'Grep'], ['--plugin-dir', '/served']);
+
+    expect(args.slice(-3)).toEqual(['--tools', 'Read', 'Grep']);
+    expect(args.slice(4, 6)).toEqual(['--plugin-dir', '/served']);
+  });
+
+  it('answers the served flags last when no resolved flag is handed over', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, [], ['--add-dir', '/served'])).toEqual([
+      '-p',
+      '--dangerously-skip-permissions',
+      '--setting-sources',
+      'project,local',
+      '--add-dir',
+      '/served',
+    ]);
+  });
+
+  it('answers what it answered before for an empty served list', () => {
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS, [])).toEqual(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS));
+    expect(claudeArgs(DEFAULT_SOURCES, UNSORTED_FLAGS, [])).toHaveLength(8);
+  });
+
+  it('passes the served flags through in the order given, leaving the caller\'s list unchanged', () => {
+    const served = ['--agents', '{}', '--add-dir', '/served'];
+
+    const args = claudeArgs(DEFAULT_SOURCES, [], served);
+
+    expect(args.slice(4)).toEqual(['--agents', '{}', '--add-dir', '/served']);
+    expect(served).toEqual(['--agents', '{}', '--add-dir', '/served']);
+  });
+});
+
 describe('runClaude', () => {
-  it('spawns the base arguments and setting sources alone for a plan or wrap-up call', async () => {
+  it('spawns the base arguments and setting sources alone for a plan or CI-repair call', async () => {
     const { calls, spawn } = recordingSpawner();
 
     await runClaude('generate the plan', DEFAULT_SOURCES, [], spawn);
@@ -460,6 +514,40 @@ function recordingCapturingSpawner(answer: CapturedSession): {
 
 /** The answer for a case that reads nothing of what came back. */
 const QUIET_SESSION: CapturedSession = { exitCode: 0, stdout: '' };
+
+describe('both doors with served flags', () => {
+  it('runClaude spawns the served flags between the setting sources and the flags', async () => {
+    const { calls, spawn } = recordingSpawner();
+
+    await runClaude('preserve progress', DEFAULT_SOURCES, ['--model', 'haiku'], spawn, SERVED_FLAGS);
+
+    expect(onlyCall(calls).args).toEqual(claudeArgs(DEFAULT_SOURCES, ['--model', 'haiku'], SERVED_FLAGS));
+    expect(onlyCall(calls).args.slice(4, 8)).toEqual(SERVED_FLAGS);
+  });
+
+  it('runClaudeCaptured spawns the served flags between the setting sources and the flags', async () => {
+    const { calls, spawn } = recordingCapturingSpawner(QUIET_SESSION);
+
+    await runClaudeCaptured('do the scoped task', DEFAULT_SOURCES, ['--session-id', 'aaaa'], spawn, SERVED_FLAGS);
+
+    expect(onlyCall(calls).args).toEqual(claudeArgs(DEFAULT_SOURCES, ['--session-id', 'aaaa'], SERVED_FLAGS));
+    expect(onlyCall(calls).args.slice(4, 8)).toEqual(SERVED_FLAGS);
+  });
+
+  it('spawns no served flag when none is handed over', async () => {
+    // The control for the two cases above: the same calls without the
+    // served list spawn none of its tokens, so their reading is of the
+    // parameter and not of something every spawn carries.
+    const plain = recordingSpawner();
+    const captured = recordingCapturingSpawner(QUIET_SESSION);
+
+    await runClaude('preserve progress', DEFAULT_SOURCES, [], plain.spawn);
+    await runClaudeCaptured('do the scoped task', DEFAULT_SOURCES, [], captured.spawn);
+
+    expect(onlyCall(plain.calls).args).not.toContain('--add-dir');
+    expect(onlyCall(captured.calls).args).not.toContain('--agents');
+  });
+});
 
 describe('runClaudeCaptured', () => {
   it('spawns the base arguments and setting sources alone when no flag argument is passed', async () => {

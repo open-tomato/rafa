@@ -27,7 +27,15 @@ rafa would not exist in this shape without it.
    Copyright (c) 2026 Affaan Mustafa. Licensed under the MIT License.
    rafa's instinct record (trigger, action, confidence, evidence,
    project and user scope) is adapted from that skill's instinct model.
-   No source file of that project is redistributed in this package.
+   Adapted copies of three agent files from that project are redistributed
+   in this package (see item 4).
+
+4. everything-claude-code, three agent files
+   https://github.com/affaan-m/everything-claude-code (agents/tdd-guide.md,
+   agents/build-error-resolver.md, agents/code-reviewer.md)
+   Copyright (c) 2026 Affaan Mustafa. Licensed under the MIT License.
+   Adapted copies of these three agent files from the everything-claude-code
+   project are bundled in src/bundled/agents/ to serve rafa's core agent roster.
 
 The MIT License, under which works 2 and 3 are made available:
 

@@ -1,11 +1,14 @@
 /**
  * Tests for `rafa agent vendor` (`vendor.ts`): the header written into a
- * copy, the copy itself, the refusals, and that a vendored definition is
- * one the roster then resolves.
+ * copy, the copy itself, which tier it is taken from, the refusals, and
+ * that a vendored definition is one the roster then resolves.
  *
  * Every case plants its `~/.claude/agents` under the home of a temporary
- * project of its own, never under this machine's, and the first case
- * asserts both roots resolve under this file's own directory: in the
+ * project of its own, never under this machine's, and its rafa tier as
+ * `bundled/agents` beside an entry of its own under the same directory,
+ * never beside this file, whose `Bun.main` the registered command would
+ * read. The first case asserts every root resolves under this file's own
+ * directory: in the
  * loop the home is the real one, and a case that lost it would copy out
  * of a directory holding 60 definitions and write into a project that is
  * not a test's.
@@ -13,11 +16,18 @@
  * ## What each reading is measured against
  *
  * The point of the command is the roster, so the copy is read back
- * through `resolveAgentRoster` under the loop's default
- * `project,local`, where the home is out of reach: the same roster over
- * the same roots before the copy resolves the name under no scope, and
- * after it resolves it under `project`. That control is what says the
+ * through `resolveAgentRoster` under the config defaults, whose
+ * `project,local` leaves the user tier out of reach, with a rafa tier of
+ * the case's own that holds nothing: the same roster over the same roots
+ * before the copy resolves the name under no tier, and after it resolves
+ * it under `project`. That control is what says the
  * copy landed somewhere a session reaches, rather than merely somewhere.
+ *
+ * Which tier a copy came from is measured against its control: a name
+ * only the home holds is copied from the user tier and one only the rafa
+ * tier holds from the rafa tier, each with its text line and json row
+ * naming that tier, and a name both hold is read back by body, so a copy
+ * that took the wrong holder is red.
  *
  * Every refusal sits beside a line differing in one thing only — the
  * name asked for, `--force`, or where `--force` was typed — and each
@@ -36,9 +46,17 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { resolveAgentRoster } from '../../agents/roster.js';
+import { CONFIG_DEFAULTS } from '../../config.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
-import { createAgentVendorCommand, sourceHeader, withSourceHeader } from './vendor.js';
+import {
+  createAgentVendorCommand,
+  sourceHeader,
+  VENDOR_TIERS,
+  vendoredLine,
+  vendorTierDirectory,
+  withSourceHeader,
+} from './vendor.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-agent-vendor-')));
@@ -52,9 +70,6 @@ const SUBJECTS = [{ name: 'agent', summary: 'agents' }];
 
 /** The day every dispatched case stamps its headers with. */
 const DAY = new Date('2026-09-18T09:30:00.000Z');
-
-/** The sources a run with no config resolves to, leaving the user scope out. */
-const DEFAULT_SOURCES = ['project', 'local'] as const;
 
 /** A definition's text: its frontmatter, carrying `name`, and a body. */
 function definitionText(name: string): string {
@@ -80,6 +95,20 @@ function plantScope(names: readonly string[] = ['tdd-guide'], config?: string): 
   return project;
 }
 
+/** The entry a case's rafa tier sits beside: never this file, whose `Bun.main` holds none of the case's. */
+function rafaEntry(project: PlantedProject): string {
+  return join(project.home, '..', 'rafa-runtime', 'cli.js');
+}
+
+/** Writes `<file>` into the case's rafa tier, `bundled/agents` beside its entry, and answers its path. */
+function plantRafaDefinition(project: PlantedProject, file: string, text: string): string {
+  const dir = vendorTierDirectory('rafa', project.home, rafaEntry(project));
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, file);
+  writeFileSync(path, text, 'utf8');
+  return path;
+}
+
 /** `<root>/.claude/agents`. */
 function agentDir(root: string): string {
   return join(root, '.claude', 'agents');
@@ -98,12 +127,14 @@ async function vendorIn(
   project: PlantedProject,
   words: readonly string[],
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
-  return dispatchInProject(['agent', 'vendor', ...words], SUBJECTS, [createAgentVendorCommand(() => DAY)], project);
+  const command = createAgentVendorCommand(() => DAY, () => rafaEntry(project));
+  return dispatchInProject(['agent', 'vendor', ...words], SUBJECTS, [command], project);
 }
 
-/** Where the roster resolves `name` under the loop's default sources, or null. */
+/** Where the roster resolves `name` under the config defaults and an empty rafa tier, or null. */
 function scopeOf(project: PlantedProject, name: string): string | null {
-  const roster = resolveAgentRoster({ repoRoot: project.root, home: project.home }, DEFAULT_SOURCES);
+  const roots = { repoRoot: project.root, home: project.home, entry: join(project.root, 'no-rafa-tier', 'cli.js') };
+  const roster = resolveAgentRoster(roots, CONFIG_DEFAULTS);
   return roster.agents.find((agent) => agent.name === name)?.scope ?? null;
 }
 
@@ -136,6 +167,7 @@ describe('what rafa agent vendor copies', () => {
 
     expect(project.root.startsWith(tempBase)).toBe(true);
     expect(project.home.startsWith(tempBase)).toBe(true);
+    expect(vendorTierDirectory('rafa', project.home, rafaEntry(project)).startsWith(tempBase)).toBe(true);
     expect(agentFiles(project.home)).toEqual(['tdd-guide.md']);
   });
 
@@ -147,7 +179,7 @@ describe('what rafa agent vendor copies', () => {
 
     expect(before).toBeNull();
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
-    expect(run.stdout).toBe(`✅ tdd-guide: ${join(agentDir(project.root), 'tdd-guide.md')}\n`);
+    expect(run.stdout).toBe(`✅ tdd-guide: ${join(agentDir(project.root), 'tdd-guide.md')} (from the user tier)\n`);
     expect(scopeOf(project, 'tdd-guide')).toBe('project');
   });
 
@@ -207,6 +239,7 @@ describe('what rafa agent vendor copies', () => {
         vendored: [
           {
             name: 'tdd-guide',
+            tier: 'user',
             from: join(agentDir(project.home), 'tdd-guide.md'),
             to: join(agentDir(project.root), 'tdd-guide.md'),
             replaced: false,
@@ -217,8 +250,72 @@ describe('what rafa agent vendor copies', () => {
   });
 });
 
+describe('which tier rafa agent vendor copies from', () => {
+  it('reads the rafa tier ahead of the user tier, the project being the destination', () => {
+    expect(VENDOR_TIERS).toEqual(['rafa', 'user']);
+  });
+
+  it('names the tier in the text line, and the replacement after it', () => {
+    const copy = { name: 'a', tier: 'rafa', from: '/f.md', to: '/t.md', replaced: false } as const;
+
+    expect(vendoredLine(copy)).toBe('✅ a: /t.md (from the rafa tier)');
+    expect(vendoredLine({ ...copy, tier: 'user', replaced: true })).toBe('✅ a: /t.md (from the user tier, replaced)');
+  });
+
+  it('copies a name only the rafa tier holds, naming that tier, where the default sources then resolve it', async () => {
+    const project = plantScope([]);
+    const from = plantRafaDefinition(project, 'loop-implementer.md', definitionText('loop-implementer'));
+    const to = join(agentDir(project.root), 'loop-implementer.md');
+    const before = scopeOf(project, 'loop-implementer');
+
+    const run = await vendorIn(project, ['loop-implementer']);
+
+    expect(before).toBeNull();
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(run.stdout).toBe(`✅ loop-implementer: ${to} (from the rafa tier)\n`);
+    expect(readFileSync(to, 'utf8')).toBe(withSourceHeader(definitionText('loop-implementer'), from, DAY));
+    expect(readFileSync(from, 'utf8')).toBe(definitionText('loop-implementer'));
+    expect(scopeOf(project, 'loop-implementer')).toBe('project');
+  });
+
+  it('gives the rafa tier as the json row\'s tier, where a home-only name in the same line gives user', async () => {
+    const project = plantScope(['tdd-guide']);
+    const from = plantRafaDefinition(project, 'loop-implementer.md', definitionText('loop-implementer'));
+
+    const run = await vendorIn(project, ['loop-implementer', 'tdd-guide', '--output=json']);
+    const events = eventsOf(run.stdout);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(events[1]).toMatchObject({
+      type: 'result',
+      data: {
+        vendored: [
+          { name: 'loop-implementer', tier: 'rafa', from },
+          { name: 'tdd-guide', tier: 'user', from: join(agentDir(project.home), 'tdd-guide.md') },
+        ],
+      },
+    });
+  });
+
+  it('copies the rafa tier\'s definition of a name both tiers hold, where a home-only name is the home\'s', async () => {
+    const both = plantScope([]);
+    const homeOnly = plantScope([]);
+    plantDefinition(both.home, 'tdd-guide.md', '---\nname: tdd-guide\n---\nThe home body.\n');
+    plantRafaDefinition(both, 'tdd-guide.md', '---\nname: tdd-guide\n---\nThe rafa body.\n');
+    plantDefinition(homeOnly.home, 'tdd-guide.md', '---\nname: tdd-guide\n---\nThe home body.\n');
+
+    const fromBoth = await vendorIn(both, ['tdd-guide']);
+    const fromHome = await vendorIn(homeOnly, ['tdd-guide']);
+
+    expect(fromBoth.stdout).toContain('(from the rafa tier)');
+    expect(readFileSync(join(agentDir(both.root), 'tdd-guide.md'), 'utf8')).toContain('The rafa body.');
+    expect(fromHome.stdout).toContain('(from the user tier)');
+    expect(readFileSync(join(agentDir(homeOnly.root), 'tdd-guide.md'), 'utf8')).toContain('The home body.');
+  });
+});
+
 describe('how rafa agent vendor refuses', () => {
-  it('refuses a name no home definition carries, and writes nothing, where the name it carries is copied', async () => {
+  it('refuses a name neither tier carries, naming both, and writes nothing, where the name it carries is copied', async () => {
     const missing = plantScope();
     const carried = plantScope();
 
@@ -226,7 +323,9 @@ describe('how rafa agent vendor refuses', () => {
     const copied = await vendorIn(carried, ['tdd-guide']);
 
     expect(refused.exitCode).toBe(1);
-    expect(refused.stderr).toContain('agent "no-such-agent": no definition under');
+    expect(refused.stderr).toContain(`agent "no-such-agent": no definition under the rafa tier (${
+      vendorTierDirectory('rafa', missing.home, rafaEntry(missing))
+    }) or the user tier (${agentDir(missing.home)}) carries that name`);
     expect(refused.stderr).toContain('Nothing was written.');
     expect(agentFiles(missing.root)).toEqual([]);
     expect([copied.exitCode, agentFiles(carried.root)]).toEqual([0, ['tdd-guide.md']]);
@@ -257,7 +356,7 @@ describe('how rafa agent vendor refuses', () => {
     expect(refused.stderr).toContain(`agent "tdd-guide": ${to} is already there; pass --force to replace it`);
     expect(held).toBe('---\nname: tdd-guide\n---\nThe project body.\n');
     expect(forced.exitCode).toBe(0);
-    expect(forced.stdout).toBe(`✅ tdd-guide: ${to} (replaced)\n`);
+    expect(forced.stdout).toBe(`✅ tdd-guide: ${to} (from the user tier, replaced)\n`);
     expect(readFileSync(to, 'utf8')).toContain('The tdd-guide body.');
   });
 

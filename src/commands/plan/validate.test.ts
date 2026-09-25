@@ -17,7 +17,8 @@
  * directory. Every reading that reports a missing agent sits beside a
  * control differing in one thing only: the project's definitions, the
  * `loop.settingSources` of the project's config, or the checkbox of the
- * line that named it. The one case with no project at all is run by
+ * line that named it. The one reporting a colliding skill sits beside a
+ * control differing in the `tiers.skills` pin of the config alone. The one case with no project at all is run by
  * calling the command directly, since the dispatcher refuses a command
  * needing a project outside one and would never hand it null.
  *
@@ -106,12 +107,25 @@ const PLAN_NAMING_AGENTS = [
   '',
 ].join('\n');
 
+/** What `missingAgentLine` words after the lines for `tdd-guide` when no tier holds it. */
+const UNHELD_TDD_GUIDE = 'cannot be dispatched: agent tdd-guide is held by no tier:'
+  + ' no project, rafa or user definition carries it, and it is no built-in agent';
+
 /** Writes `<root>/.claude/agents/<name>.md` carrying that name as its frontmatter, and answers its path. */
 function plantAgent(root: string, name: string): string {
   const dir = join(root, '.claude', 'agents');
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${name}.md`);
   writeFileSync(file, `---\nname: ${name}\n---\nThe agent body.\n`, 'utf8');
+  return file;
+}
+
+/** Writes `<root>/.claude/skills/documentation/SKILL.md` ending in `body`, and answers its path. */
+function plantSkill(root: string, body: string): string {
+  const dir = join(root, '.claude', 'skills', 'documentation');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'SKILL.md');
+  writeFileSync(file, `---\nname: documentation\ndescription: Planted.\n---\n${body}\n`, 'utf8');
   return file;
 }
 
@@ -290,7 +304,7 @@ describe('rafa plan validate, dispatched', () => {
 });
 
 describe('the agents rafa plan validate checks', () => {
-  it('writes one error line per agent no loaded scope defines, with its fix, and exits 1', async () => {
+  it('writes one error line per agent no loaded tier serves, with why, and exits 1', async () => {
     const project = plantRoutedProject();
     const vendorable = plantAgent(project.home, 'tdd-guide');
 
@@ -301,10 +315,11 @@ describe('the agents rafa plan validate checks', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stdout.split('\n')).toEqual([
-      'error: plan.md: agent "tdd-guide" (line 5) resolves under no loaded scope:'
-        + ' run `rafa agent vendor tdd-guide`',
-      'error: plan.md: agent "no-such-agent" (line 7) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
+      'error: plan.md: agent "tdd-guide" (line 5) cannot be dispatched: agent tdd-guide is held only by the user tier'
+        + ` (${vendorable}), which loop.settingSources (project, local) leaves out:`
+        + ' add user to loop.settingSources, or run `rafa agent vendor tdd-guide`',
+      'error: plan.md: agent "no-such-agent" (line 7) cannot be dispatched: agent no-such-agent is held by no tier:'
+        + ' no project, rafa or user definition carries it, and it is no built-in agent',
       '',
     ]);
     expect(run.stderr).toBe('❌ plan.md: 2 unresolvable agents; no session would be dispatched\n');
@@ -336,17 +351,11 @@ describe('the agents rafa plan validate checks', () => {
     const control = await validateIn(plantRoutedProject(closedFence));
 
     expect(run.exitCode).toBe(1);
-    expect(run.stdout).toContain(
-      'error: plan.md: agent "tdd-guide" (line 6) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
-    );
+    expect(run.stdout).toContain(`error: plan.md: agent "tdd-guide" (line 6) ${UNHELD_TDD_GUIDE}`);
     expect(run.stderr).toBe('❌ plan.md: 2 issues, 1 unresolvable agent; the plan does not read as written\n');
 
     expect(control.exitCode).toBe(1);
-    expect(control.stdout).toContain(
-      'error: plan.md: agent "tdd-guide" (line 7) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
-    );
+    expect(control.stdout).toContain(`error: plan.md: agent "tdd-guide" (line 7) ${UNHELD_TDD_GUIDE}`);
     expect(control.stderr).toBe('❌ plan.md: 1 unresolvable agent; no session would be dispatched\n');
   });
 
@@ -362,6 +371,24 @@ describe('the agents rafa plan validate checks', () => {
     const passed = await validateIn(withUser);
 
     expect([refused.exitCode, refused.stdout.includes('"tdd-guide"')]).toEqual([1, true]);
+    expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
+  });
+
+  it('refuses a plan routing to an agent tiers.agents switches off with false, until the entry is dropped', async () => {
+    const plan = '- [ ] Write the tests  {agent=tdd-guide}\n';
+    const off = plantRoutedProject(plan, 'version: 1\ntiers:\n  agents: { tdd-guide: false }\n');
+    const control = plantRoutedProject(plan);
+    plantAgent(off.root, 'tdd-guide');
+    plantAgent(control.root, 'tdd-guide');
+
+    const refused = await validateIn(off);
+    const passed = await validateIn(control);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toContain('error: plan.md: agent "tdd-guide" (line 1) cannot be dispatched:'
+      + ' agent tdd-guide is switched off by tiers.agents: { tdd-guide: false }');
+    expect(refused.stderr).toBe('❌ plan.md: 1 unresolvable agent; no session would be dispatched\n');
+    // The control differs in the config's pin alone.
     expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
   });
 
@@ -389,14 +416,46 @@ describe('the agents rafa plan validate checks', () => {
     expect([refused.exitCode, refused.stderr]).toEqual([1, '']);
     expect(eventsOf(refused.stdout).map(labelOf)).toEqual([
       'start',
-      'error:plan.md: agent "tdd-guide" (line 1) resolves under no loaded scope:'
-        + ' no definition under ~/.claude/agents to vendor',
+      `error:plan.md: agent "tdd-guide" (line 1) ${UNHELD_TDD_GUIDE}`,
       'result',
     ]);
     expect(eventsOf(passed.stdout).at(-1)).toMatchObject({
       type: 'result',
       ok: true,
       data: { missingAgents: [] },
+    });
+  });
+
+  it('writes one error line per skills= name two loaded tiers hold with different contents, until a pin chooses', async () => {
+    const plan = '- [ ] Write it  {skills=documentation}\n';
+    const sources = 'version: 1\nloop:\n  settingSources: user,project,local\n';
+    const collided = plantRoutedProject(plan, sources);
+    const pinned = plantRoutedProject(plan, `${sources}tiers:\n  skills: { documentation: user }\n`);
+    const paths = [collided, pinned].map((project) => ({
+      project: plantSkill(project.root, 'The project body.'),
+      user: plantSkill(project.home, 'The user body.'),
+    }));
+
+    const refused = await validateIn(collided);
+    const json = await validateIn(collided, ['--output=json']);
+    const passed = await validateIn(pinned, ['--output=json']);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toBe('error: plan.md: skill "documentation" (line 1) cannot be served: skill documentation is held'
+      + ` by 2 loaded tiers with different contents: project ${paths[0]?.project} and user ${paths[0]?.user};`
+      + ' pin the tier that serves it: tiers.skills: { documentation: user }\n');
+    expect(refused.stderr).toBe('❌ plan.md: 1 skill collision; no session would be dispatched\n');
+    expect(eventsOf(json.stdout).map(labelOf)).toEqual([
+      'start',
+      expect.stringContaining('error:plan.md: skill "documentation" (line 1) cannot be served:'),
+      'result',
+    ]);
+    // The control differs in the pin alone.
+    expect(passed.exitCode).toBe(0);
+    expect(eventsOf(passed.stdout).at(-1)).toMatchObject({
+      type: 'result',
+      ok: true,
+      data: { missingAgents: [], skillCollisions: [] },
     });
   });
 
@@ -424,7 +483,7 @@ describe('the agents rafa plan validate checks', () => {
 
     expect(ran).toBeUndefined();
     expect(info).toEqual([
-      'ℹ️  No project was found from the working directory, so no `agent=` was checked.',
+      'ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.',
       '✅ plan.md: no issues; 0 stages, tasks 0/1 done, 0 blocked, 1 open',
     ]);
     expect([inProject.exitCode, inProject.stdout.includes('"tdd-guide"')]).toEqual([1, true]);

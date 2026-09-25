@@ -230,7 +230,7 @@ describe('readDeep over a planted TypeScript project', () => {
     const [row] = stackTools.rows;
 
     expect(row?.status).toBe('warn');
-    expect(row?.detail).toContain('ts-symbols not on PATH');
+    expect(row?.detail).toContain('ts-symbols neither in bundled/bin nor on PATH');
     // Control: the shell's PATH does hold it, so a reader handed the shell's would read it as found.
     expect(Bun.which('ts-symbols', { PATH: shellEnv.PATH })).toBe(join(toolsBin, 'ts-symbols'));
   });

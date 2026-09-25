@@ -11,12 +11,15 @@
  * module closes with, naming whether the session succeeded, goes
  * through the active output (`adapters/output/active.ts`): `info` on
  * success, and `error` on a failure, which does not stop `start()`.
+ * So does a warning for each rafa-tier winner the session is not
+ * served, at `warn`.
  *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
  */
 import type { ClaudeSettingSource } from '../config.js';
+import type { SessionServing } from './serving.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -25,6 +28,7 @@ import { ghPullRequestsIn } from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 
+import { serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 
 /**
@@ -233,15 +237,27 @@ async function openPullRequestNumber(branch: string): Promise<number | null> {
  * over rather than prepared here because the loop verifies and commits
  * the same record after this session returns: a preparation made
  * inside this function would leave `start.ts` nothing to finish.
+ *
+ * `serving` is what the session is served against (`start/serving.ts`),
+ * as a task session is: the run's served directory is filled just
+ * before the spawn, each winner left out is warned about, and the
+ * served flags reach the spawn through `runClaude`. Null serves
+ * nothing. It is required, as `release` is, so a caller has to name
+ * both.
  */
 export async function preserveProgress(
   planContent: string,
   settingSources: readonly ClaudeSettingSource[],
-  release: ReleasePreparation | null = null,
+  release: ReleasePreparation | null,
+  serving: SessionServing | null,
 ): Promise<void> {
   const branch = getCurrentBranch();
   const prompt = buildWrapUpPrompt(branch, planContent, await openPullRequestNumber(branch), release);
-  const exitCode = await runClaude(withStamp(prompt), settingSources);
+  const served = serving === null
+    ? null
+    : serveSession(serving);
+  for (const skipped of served?.skipped ?? []) activeOutput().warn(`   ${skipped.message}`);
+  const exitCode = await runClaude(withStamp(prompt), settingSources, [], undefined, served?.flags ?? []);
   if (exitCode !== 0) {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);
   } else {

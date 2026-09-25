@@ -10,23 +10,29 @@
  * warning is built from. `CONFIG_FILE` and `CONFIG_DEFAULTS` are driven
  * through `config.js` in `config.test.ts` and are not repeated; the
  * layers, the refusals and the warning sentence are driven there too.
+ * The one reader here, `mapOf`, is driven directly as
+ * `config-sections.test.ts` drives the rest, each refusal beside an
+ * accepting control of the same reader.
  *
  * Every key and every section is SPELLED here, never read off
  * {@link SETTINGS}, so a module that renames a key or drops a section
  * fails rather than agreeing with itself.
  */
 import type { ConfigSetting } from './config-schema.js';
+import type { Reader, ValueAt } from './config-sections.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
   isCommandLineSetting,
   knownKeysAbove,
+  mapOf,
   SECTIONS,
   SETTING_BY_KEY,
   SETTING_NAMES,
   SETTINGS,
 } from './config-schema.js';
+import { flag, text } from './config-sections.js';
 
 /** Every setting and the file key it is spelled with, in schema order. */
 const KEYS: readonly (readonly [ConfigSetting, string])[] = [
@@ -62,6 +68,10 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['cleanupKeep', 'cleanup.keep'],
   ['dangerousAcceptStaleRefs', 'dangerous.acceptStaleRefs'],
   ['statusNotice', 'status.notice'],
+  ['tiersRafa', 'tiers.rafa'],
+  ['tiersSkills', 'tiers.skills'],
+  ['tiersAgents', 'tiers.agents'],
+  ['routing', 'routing'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -97,6 +107,8 @@ const TOP = [
   'cleanup',
   'dangerous',
   'status',
+  'tiers',
+  'routing',
 ];
 
 describe('SETTINGS', () => {
@@ -163,6 +175,7 @@ describe('SECTIONS', () => {
       'roadmap',
       'specs',
       'status',
+      'tiers',
       'tracker',
       'tracking',
     ]);
@@ -194,6 +207,21 @@ describe('knownKeysAbove', () => {
       ['acceptStaleRefs'],
     ]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
+    expect(knownKeysAbove('tiers.lessons')).toEqual(['tiers', ['rafa', 'skills', 'agents']]);
+  });
+
+  it('answers the tiers section for a map name spelled flat, which no setting reads', () => {
+    expect(SETTING_BY_KEY.get('tiers.skills.tdd-guide')).toBeUndefined();
+    expect(knownKeysAbove('tiers.skills.tdd-guide')).toEqual([
+      'tiers',
+      ['rafa', 'skills', 'agents'],
+    ]);
+  });
+
+  it('answers the top level for a routing shape spelled flat, which no setting reads', () => {
+    expect(SETTING_BY_KEY.get('routing.prose')).toBeUndefined();
+    expect(SECTIONS.has('routing')).toBe(false);
+    expect(knownKeysAbove('routing.prose')).toEqual(['', TOP]);
   });
 
   it('collapses a list index, so an item key answers the item shape', () => {
@@ -210,5 +238,104 @@ describe('knownKeysAbove', () => {
   it('climbs to the nearest known path, falling back to the top level', () => {
     expect(knownKeysAbove('plan.a.b')).toEqual(['plan', ['inject', 'dir']]);
     expect(knownKeysAbove('nonesuch.deeper.deepest')).toEqual(['', TOP]);
+  });
+});
+
+describe('mapOf', () => {
+  /** Where every map case reads its value. */
+  const at: ValueAt = { label: 'F: m', key: 'm' };
+
+  /** A map of names to YAML booleans. */
+  const flags = mapOf(flag, 'true or false');
+
+  /** An inner reader that accepts null, and retains one extra per value. */
+  const anything: Reader<unknown> = (raw, where) => ({
+    value: raw,
+    problems: [],
+    extras: [{ key: `${where.key}.seen`, value: raw }],
+  });
+
+  it('accepts a mapping, answering a Map in the order written', () => {
+    const reading = flags({ b: true, a: false }, at);
+
+    expect(reading.problems).toEqual([]);
+    expect(reading.value).toBeInstanceOf(Map);
+    expect([...(reading.value ?? [])]).toEqual([['b', true], ['a', false]]);
+  });
+
+  it('accepts an empty mapping as an empty Map', () => {
+    expect(flags({}, at).value?.size).toBe(0);
+  });
+
+  it('refuses a list, a scalar and null, naming what it expected', () => {
+    expect(flags(['a'], at)).toEqual({
+      value: undefined,
+      problems: ['F: m is a list, expected a mapping of names to true or false'],
+      extras: [],
+    });
+    expect(flags('a', at).problems).toEqual([
+      'F: m is "a", expected a mapping of names to true or false',
+    ]);
+    expect(flags(null, at).problems).toEqual([
+      'F: m is null, expected a mapping of names to true or false',
+    ]);
+  });
+
+  it('names every unusable value under its own name, and answers no value', () => {
+    const reading = flags({ a: 'yes', b: true, c: 1 }, at);
+
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual([
+      'F: m.a is "yes", expected true or false',
+      'F: m.c is 1, expected true or false',
+    ]);
+  });
+
+  it('refuses an empty or blank name beside an accepting control', () => {
+    expect(flags({ '': true, ' ': false }, at).problems).toEqual([
+      'F: m names "", expected a non-empty name',
+      'F: m names " ", expected a non-empty name',
+    ]);
+    expect(flags({ ' a ': true }, at).value?.get(' a ')).toBe(true);
+  });
+
+  it('hands a null value to the inner reader rather than deciding for it', () => {
+    expect(flags({ a: null }, at).problems).toEqual(['F: m.a is null, expected true or false']);
+    expect(mapOf(anything, 'anything')({ a: null }, at).value?.get('a')).toBeNull();
+  });
+
+  it('carries the inner reader\'s extras, keyed under each name', () => {
+    const reading = mapOf(anything, 'anything')({ a: 1, b: 2 }, at);
+
+    expect(reading.extras).toEqual([
+      { key: 'm.a.seen', value: 1 },
+      { key: 'm.b.seen', value: 2 },
+    ]);
+  });
+
+  it('keeps names an object would read off its prototype as ordinary names', () => {
+    const raw: unknown = Bun.YAML.parse('__proto__: true\nconstructor: false\ntoString: true\n');
+    const reading = mapOf(text('a name'), 'names')(raw, at);
+    const names = flags(raw, at).value;
+
+    expect(reading.problems).toEqual([
+      'F: m.__proto__ is true, expected a name',
+      'F: m.constructor is false, expected a name',
+      'F: m.toString is true, expected a name',
+    ]);
+    expect([...(names ?? [])]).toEqual([
+      ['__proto__', true],
+      ['constructor', false],
+      ['toString', true],
+    ]);
+    expect(names?.has('hasOwnProperty')).toBe(false);
+  });
+
+  it('answers a fresh Map on every read, so one caller cannot edit the next', () => {
+    const first = flags({ a: true }, at).value;
+    const second = flags({ a: true }, at).value;
+
+    expect(first).not.toBe(second);
+    expect(first).toEqual(second);
   });
 });

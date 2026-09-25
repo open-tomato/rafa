@@ -90,10 +90,22 @@
  * not checked at all: it is an existing free-text field the demotion
  * pass reads, and a schema that constrained it would refuse the corpus
  * it has to run over.
+ *
+ * ## `provenance`, read by the module both checkers share
+ *
+ * The optional `provenance` field — `first-party`, or `{ origin,
+ * license, reviewed? }` — is `./provenance.js`'s, which the agent schema
+ * (`./agent.js`) reads too, so a skill and an agent spell every refusal
+ * of it alike. Its two codes of its own, `unknown-provenance` and
+ * `invalid-reviewed`, are skill codes here; its `missing-field` and
+ * `wrong-type` are the same rules this module names for every other
+ * field. Absent, it is no issue: requiring it is the bundle test's rule.
  */
 
+import type { Provenance } from './provenance.js';
 import type { StackValue } from './stack.js';
 
+import { checkProvenance, readProvenance } from './provenance.js';
 import { AGNOSTIC_STACK, isStackName, unknownStacks } from './stack.js';
 
 /** Longest a `description` may be, exclusive: 129 passes, 130 fails. */
@@ -157,7 +169,11 @@ export type SkillIssueCode =
   /** A `paths` entry that gates on nothing it appears to gate on. */
   | 'unusable-glob'
   /** An instinct's field on a skill; see {@link FORBIDDEN_SKILL_FIELDS}. */
-  | 'forbidden-field';
+  | 'forbidden-field'
+  /** A `provenance` that is neither `first-party` nor a known mapping. */
+  | 'unknown-provenance'
+  /** A `provenance.reviewed` that is not `<who> <YYYY-MM-DD>`. */
+  | 'invalid-reviewed';
 
 /** Every code, in the order this module first documents them. */
 export const SKILL_ISSUE_CODES: readonly SkillIssueCode[] = [
@@ -171,6 +187,8 @@ export const SKILL_ISSUE_CODES: readonly SkillIssueCode[] = [
   'unknown-signal',
   'unusable-glob',
   'forbidden-field',
+  'unknown-provenance',
+  'invalid-reviewed',
 ];
 
 /** One thing the frontmatter said that the schema cannot accept. */
@@ -218,6 +236,8 @@ export interface SkillFrontmatter {
   readonly disableModelInvocation: boolean;
   /** `user-invocable`, false when the key is absent. */
   readonly userInvocable: boolean;
+  /** `provenance`, or null when the key is absent. */
+  readonly provenance: Provenance | null;
 }
 
 /** What {@link parseSkillFrontmatter} answers. */
@@ -603,8 +623,8 @@ function checkForbidden(data: Readonly<Record<string, unknown>>): SkillIssue[] {
 /**
  * Every rule `data` breaks, in field order: `name`, `description`,
  * `tags`, `stack`, `when_to_use`, the `prevents`/`signal` pair,
- * `relates`, `supersedes`, `paths`, the booleans, then the forbidden
- * fields. An empty list means the block is v2.
+ * `relates`, `supersedes`, `paths`, the booleans, `provenance`, then
+ * the forbidden fields. An empty list means the block is v2.
  *
  * Every field is checked, so one pass names every offender rather than
  * the first, and a field that failed its type check contributes no
@@ -623,6 +643,7 @@ export function checkSkillFrontmatter(
     ...SKILL_NAME_LIST_FIELDS.flatMap((field) => checkNameList(data, field)),
     ...checkPaths(data),
     ...SKILL_BOOLEAN_FIELDS.flatMap((field) => checkBoolean(data, field)),
+    ...checkProvenance(data),
     ...checkForbidden(data),
   ];
 }
@@ -667,6 +688,7 @@ export function parseSkillFrontmatter(
       supersedes: stringList(data, 'supersedes'),
       disableModelInvocation: data['disable-model-invocation'] === true,
       userInvocable: data['user-invocable'] === true,
+      provenance: readProvenance(data),
     },
   };
 }

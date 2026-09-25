@@ -41,17 +41,20 @@
  * | Reading | Fix |
  * | --- | --- |
  * | `shadowed-by:<source>` | rename it, or remove the nearer one |
+ * | `collision` | the pin line `resolveTiers` answers for the name (`tiers/resolve.ts`) |
+ * | `disabled:tiers.skills` or `disabled:tiers.agents` | remove the name's `false` from that config key |
  * | `disabled:skillOverrides` | remove the entry from the settings file that holds it |
  * | `disabled:<frontmatter key>` | remove the key from the definition |
  * | enabled, source not loaded | add `user` to `loop.settingSources` |
  *
  * Rows of the `rafa` and `addon:<name>` sources are left out whatever
- * they read: no session is ever handed them, by design (`claudeArgs`
- * passes no directory of theirs), so every one of them would read as
- * hidden with no fix a person could apply, and a report listing rafa's
- * own bundled skills as problems would bury the rows that are. That is
- * a reading of "configured": these are shipped by rafa and its modules,
- * not configured for sessions.
+ * they read. No session is ever handed an add-on's (`claudeArgs` passes
+ * no directory of theirs), and a hidden rafa row is one rafa does not
+ * serve (`inventory/index.ts`): shadowed, colliding, switched off or
+ * unreviewed. A report listing rafa's own bundled items as problems
+ * would bury the rows that are. That is a reading of "configured":
+ * these are shipped by rafa and its modules, not configured for
+ * sessions.
  *
  * An MCP declaration is hidden when it is not the one `mcpServerFor`
  * answers for its name under `loop.settingSources`, read in
@@ -62,9 +65,7 @@
  *
  * Only the first reason is given, the one to fix first: a `user` skill
  * shadowed by a `project` one under the default sources is reported as
- * shadowed. One case is known to be wrong, and is `buildInventory`'s:
- * a `user` item shadowed by a `rafa` item of the same name reads as
- * hidden, while a session, which never sees rafa's tier, loads it.
+ * shadowed.
  *
  * Nothing here throws, writes, or reads the real home: every path comes
  * from {@link DeepSettingsSeams}.
@@ -75,6 +76,7 @@ import type { OverrideReading } from '../inventory/disabled.js';
 import type { Inventory, InventorySeams } from '../inventory/index.js';
 import type { McpDeclaration, McpReading } from '../inventory/mcp.js';
 import type { InventoryRecord } from '../inventory/record.js';
+import type { Resolution } from '../tiers/resolve.js';
 
 import { join } from 'node:path';
 
@@ -82,6 +84,7 @@ import { CONFIG_FILE } from '../config.js';
 import { OVERRIDE_DISABLED, OVERRIDES_KEY, overrideFor, overrideSettingsPath, readSkillOverrides } from '../inventory/disabled.js';
 import { buildInventory } from '../inventory/index.js';
 import { CLAUDE_JSON_FILE, DISABLE_KEY, MCP_SCOPES, mcpServerFor, PROJECTS_KEY, readMcpServers, REJECT_KEY } from '../inventory/mcp.js';
+import { pinKey } from '../tiers/resolve.js';
 
 /** The section's title. */
 export const SETTINGS_SECTION_TITLE = 'Settings';
@@ -142,7 +145,7 @@ function listed(sources: readonly string[]): string {
     : sources.join(', ');
 }
 
-/** Whether a record's source is one a session could ever be handed; see the module note. */
+/** Whether a record's source is one this section lists, rafa's and add-ons' left out; see the module note. */
 function isSessionSource(record: InventoryRecord): boolean {
   return !(record.source === 'rafa' || record.source.startsWith('addon:'));
 }
@@ -152,8 +155,24 @@ function recordReason(
   record: InventoryRecord,
   overrides: OverrideReading,
   settingSources: readonly ClaudeSettingSource[],
+  resolution: Resolution,
 ): Pick<HiddenItem, 'why' | 'fix'> {
   const { state, kind, name, path } = record;
+  if (state === 'collision') {
+    const collision = resolution.collisions.find((held) => held.kind === kind && held.name === name);
+    return {
+      why: `another loaded tier holds a different ${kind} of the same name, so neither is served`,
+      fix: collision === undefined
+        ? `pin the tier that serves it under ${pinKey(kind)} in ${CONFIG_FILE}`
+        : `pin the tier that serves it in ${CONFIG_FILE}: ${collision.pinLine}`,
+    };
+  }
+  if (state === `disabled:${pinKey(kind)}`) {
+    return {
+      why: `${pinKey(kind)} sets it to false in ${CONFIG_FILE}`,
+      fix: `remove ${name} from ${pinKey(kind)} in ${CONFIG_FILE}`,
+    };
+  }
   if (state.startsWith('shadowed-by:')) {
     const holder = state.slice('shadowed-by:'.length);
     return {
@@ -188,7 +207,7 @@ function hiddenRecords(
       name: record.name,
       source: record.source,
       path: record.path,
-      ...recordReason(record, overrides, settingSources),
+      ...recordReason(record, overrides, settingSources, inventory.resolution),
     }));
 }
 

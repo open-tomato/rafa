@@ -186,7 +186,8 @@
  * and none for one that has not; then {@link renderBlockedIssues}'s
  * lines, which a board holding no issue labelled `spec:blocked` has
  * none of either; then the cleanup row, when there is anything to
- * clean; then the references row, when there is a saved copy; then, under `--deep`, `renderDeep`'s sections. A halt
+ * clean; then the references row, when there is a saved copy; then the `Skill tiers` rows
+ * (`./doctor-tiers.ts`), when there is any; then, under `--deep`, `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
@@ -213,6 +214,7 @@ import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
+import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
@@ -256,6 +258,7 @@ import { readDeep, renderDeep } from './doctor-deep.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { renderBoard, renderDoctor } from './doctor-render.js';
+import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
 import { isFile } from './plan/plan-files.js';
 
 /**
@@ -264,7 +267,7 @@ import { isFile } from './plan/plan-files.js';
  * session runs in, the runner its provider probes go through, and how
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
-export interface DoctorSeams extends DeepDoctorSeams, DoctorCleanupSeams, DoctorRefsSeams {
+export interface DoctorSeams extends DeepDoctorSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorTiersRunSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -352,6 +355,8 @@ export interface DoctorResult {
   readonly cleanup: DoctorCleanupReading;
   /** The suspect, dangling and unknown references of every saved copy under `specs.dir`, or why it could not be listed. */
   readonly refs: DoctorRefsReading;
+  /** The skill tier rows and the Claude Code version they were read against (`./doctor-tiers.ts`). */
+  readonly tiers: DoctorTiersReading;
   /** Every `--deep` section as it was read; null without `--deep`. */
   readonly deep: DeepReading | null;
 }
@@ -362,6 +367,7 @@ interface BoardReadings {
   readonly blocked: BlockedIssuesReport | null;
   readonly cleanup: DoctorCleanupReading;
   readonly refs: DoctorRefsReading;
+  readonly tiers: DoctorTiersReading;
 }
 
 /** The line every refusal before a check ends with. */
@@ -613,6 +619,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     blocked: readings.blocked,
     cleanup: readings.cleanup,
     refs: readings.refs,
+    tiers: readings.tiers,
     deep,
   };
 }
@@ -652,11 +659,13 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const gh = boardRunner(preflight, seams);
     const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
     const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
-    const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh), cleanup, refs };
+    const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
+    const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh), cleanup, refs, tiers };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     const repository = [...renderBoard(readings.board), ...renderBlockedIssues(readings.blocked)];
     writeText(context, [...repository, ...renderDoctorCleanup(readings.cleanup), ...renderDoctorRefs(readings.refs)]);
+    writeText(context, renderDoctorTiers(readings.tiers));
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
@@ -701,7 +710,11 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' fetching, the branches and worktrees `rafa cleanup` would list, and prints them in one row naming'
       + ' `rafa cleanup` when any group holds one. It then counts the suspect, dangling and unknown references'
       + ' of every saved copy under `specs.dir`, writing nothing, and names `rafa issue check <n>` for each'
-      + ' copy holding a suspect or dangling one. With `--output=json` the'
+      + ' copy holding a suspect or dangling one. It then prints, under `Skill tiers`, a warning per'
+      + ' skill or agent name two tiers hold with different contents, per unreviewed third-party rafa or'
+      + ' add-on item, and for an installed Claude Code other than the version skill serving was probed'
+      + ' against, and a note per byte-identical copy that can be deleted and per user-tier item with no'
+      + ' `provenance`; none changes the exit code. With `--output=json` the'
       + ' checks, both readings, those rows and those issues are the data of the terminal result event,'
       + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
       + ' `rafa loop start` prints before its notices, which never changes the exit code. With `--deep` it'

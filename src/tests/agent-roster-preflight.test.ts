@@ -19,11 +19,12 @@
  * mutated in place across its steps as an operator's own checkout would
  * be, never removed until every step has run:
  *
- *   1. `loop start` halts on the tracker's `agent=tdd-guide`, before any
- *      session, and the project is left exactly as planted.
+ *   1. `loop start` halts on the tracker's `agent=refactor-cleaner`, which
+ *      only the home holds, naming the user tier and the vendor command,
+ *      before any session, and the project is left exactly as planted.
  *   2. `rafa plan validate` on the plan file names the same agent and the
  *      same fix, and starts no session either.
- *   3. `rafa agent vendor tdd-guide` copies the home's definition in.
+ *   3. `rafa agent vendor refactor-cleaner` copies the home's definition in.
  *   4. The same vendor call, run again with no `--force`, is refused: the
  *      file it would overwrite is already there.
  *   5. `loop start`, run again on the same branch, now resolves the name
@@ -74,9 +75,15 @@ function git(cwd: string, ...args: string[]): void {
   execFileSync('git', args, { cwd, stdio: 'pipe' });
 }
 
-/** The plan's stub, and the agent its one task names. */
+/**
+ * The plan's stub, and the agent its one task names: a user-level agent
+ * rafa's own tier does not ship. The spawned CLI is this checkout's
+ * `src/rafa.ts`, whose rafa tier is `src/bundled/agents`, so a name that
+ * tier carries, `tdd-guide` among them, resolves without any copy and
+ * would halt nothing.
+ */
 const STUB = 'agent-roster-preflight';
-const AGENT = 'tdd-guide';
+const AGENT = 'refactor-cleaner';
 
 /** The task line every planting of the plan and the tracker shares. */
 const TASK_LINE = `- [ ] Write the tests  {agent=${AGENT}}`;
@@ -198,6 +205,18 @@ function callCount(scratch: Scratch): string | null {
     : null;
 }
 
+/**
+ * What `missingAgentLine` words after the lines for {@link AGENT}, which
+ * only the scratch home holds: the user tier's file, the sources that
+ * leave it out, and the vendor command the story then runs.
+ */
+function homeOnly(scratch: Scratch): string {
+  return `cannot be dispatched: agent ${AGENT} is held only by the user tier`
+    + ` (${join(scratch.home, '.claude', 'agents', `${AGENT}.md`)}),`
+    + ' which loop.settingSources (project, local) leaves out:'
+    + ` add user to loop.settingSources, or run \`rafa agent vendor ${AGENT}\``;
+}
+
 /** `<repo>/.claude/agents/<AGENT>.md`, whether or not it exists yet. */
 function vendoredAgentFile(scratch: Scratch): string {
   return join(scratch.repo, '.claude', 'agents', `${AGENT}.md`);
@@ -208,6 +227,10 @@ function vendoredAgentFile(scratch: Scratch): string {
  * defines it under any name, so it never resolves.
  */
 const FENCE_AGENT = 'agent-roster-fence-ghost';
+
+/** What `missingAgentLine` words after the lines for {@link FENCE_AGENT}, which no tier holds. */
+const FENCE_AGENT_UNHELD = `cannot be dispatched: agent ${FENCE_AGENT} is held by no tier:`
+  + ' no project, rafa or user definition carries it, and it is no built-in agent';
 
 /** The stub, and the task line, of the never-closed-fence case. */
 const UNCLOSED_STUB = 'agent-roster-unclosed-context';
@@ -309,12 +332,9 @@ describe('the agent roster preflight, over a plan naming an unresolvable agent b
 
     expect(start.exitCode).toBe(1);
     expect(start.stderr).toContain(
-      `❌ Refusing to start: PLAN-${CLOSED_STUB}.md names 1 agent(s) no loaded scope defines`,
+      `❌ Refusing to start: PLAN-${CLOSED_STUB}.md names 1 agent(s) no loaded tier serves`,
     );
-    expect(start.stderr).toContain(
-      `agent "${FENCE_AGENT}" (line 7) resolves under no loaded scope: no definition under ~/.claude/agents`
-        + ' to vendor',
-    );
+    expect(start.stderr).toContain(`agent "${FENCE_AGENT}" (line 7) ${FENCE_AGENT_UNHELD}`);
     expect(start.stderr).toContain('Nothing was checked and nothing was dispatched.');
     expect(callCount(scratch)).toBeNull();
   });
@@ -326,12 +346,9 @@ describe('the agent roster preflight, over a plan naming an unresolvable agent b
 
     expect(start.exitCode).toBe(1);
     expect(start.stderr).toContain(
-      `❌ Refusing to start: PLAN-${UNCLOSED_STUB}.md names 1 agent(s) no loaded scope defines`,
+      `❌ Refusing to start: PLAN-${UNCLOSED_STUB}.md names 1 agent(s) no loaded tier serves`,
     );
-    expect(start.stderr).toContain(
-      `agent "${FENCE_AGENT}" (line 6) resolves under no loaded scope: no definition under ~/.claude/agents`
-        + ' to vendor',
-    );
+    expect(start.stderr).toContain(`agent "${FENCE_AGENT}" (line 6) ${FENCE_AGENT_UNHELD}`);
     expect(start.stderr).toContain('Nothing was checked and nothing was dispatched.');
     expect(callCount(scratch)).toBeNull();
   });
@@ -344,30 +361,26 @@ describe('the agent roster preflight, end to end over one scratch project and ho
     () => {
       const scratch = plantScratch();
 
-      // 1. A planted tracker naming an agent absent from the project
-      // halts the preflight, naming that agent, before any session.
+      // 1. A planted tracker naming an agent only the home holds halts
+      // the preflight, naming that agent, its tier and the vendor
+      // command, before any session.
       const firstStart = runRafa(scratch, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
       expect(firstStart.exitCode).toBe(1);
       expect(firstStart.stderr).toContain(
-        `❌ Refusing to start: PLAN_TRACKER-${STUB}.md names 1 agent(s) no loaded scope defines`,
+        `❌ Refusing to start: PLAN_TRACKER-${STUB}.md names 1 agent(s) no loaded tier serves`,
       );
-      expect(firstStart.stderr).toContain(
-        `agent "${AGENT}" (line 3) resolves under no loaded scope: run \`rafa agent vendor ${AGENT}\``,
-      );
+      expect(firstStart.stderr).toContain(`agent "${AGENT}" (line 3) ${homeOnly(scratch)}`);
       expect(firstStart.stderr).toContain('Nothing was checked and nothing was dispatched.');
       expect(callCount(scratch)).toBeNull();
       expect(existsSync(vendoredAgentFile(scratch))).toBe(false);
 
       // 2. `rafa plan validate` on the same plan file names the same
-      // agent and the same fix, and starts no session either.
+      // agent and the same reason, and starts no session either.
       const validate = runRafa(scratch, ['plan', 'validate', scratch.planFile]);
 
       expect(validate.exitCode).toBe(1);
-      expect(validate.stdout).toContain(
-        `error: ${scratch.planFile}: agent "${AGENT}" (line 3) resolves under no loaded scope:`
-          + ` run \`rafa agent vendor ${AGENT}\``,
-      );
+      expect(validate.stdout).toContain(`error: ${scratch.planFile}: agent "${AGENT}" (line 3) ${homeOnly(scratch)}`);
       expect(validate.stderr).toBe(
         `❌ ${scratch.planFile}: 1 unresolvable agent; no session would be dispatched\n`,
       );
@@ -377,7 +390,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       const vendored = runRafa(scratch, ['agent', 'vendor', AGENT]);
 
       expect(vendored.exitCode).toBe(0);
-      expect(vendored.stdout).toBe(`✅ ${AGENT}: ${vendoredAgentFile(scratch)}\n`);
+      expect(vendored.stdout).toBe(`✅ ${AGENT}: ${vendoredAgentFile(scratch)} (from the user tier)\n`);
       expect(existsSync(vendoredAgentFile(scratch))).toBe(true);
       const firstCopy = readFileSync(vendoredAgentFile(scratch), 'utf8');
       expect(firstCopy).toContain('<!-- vendored by rafa from');

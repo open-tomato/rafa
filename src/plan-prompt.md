@@ -73,6 +73,8 @@ criteria — **do not execute the plan**.
 
 {PLAN_FORMAT}
 
+{ROUTING}
+
 ## Spec
 
 {SPEC_CONTENT}

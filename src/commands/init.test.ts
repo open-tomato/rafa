@@ -8,6 +8,20 @@
  * the world, never the real home, and each narrowing carries its
  * control: the same plan with the definition vendored into the project,
  * and a plan naming an agent no home file carries, both warn nothing.
+ * Each world has a rafa entry of its own, `dist/cli.js` under its base,
+ * whose `bundled/agents` is absent unless a case plants it, so no case
+ * reads the checkout's `src/bundled/agents` or the one beside `Bun.main`.
+ * A name the world's rafa tier holds is warned about neither served nor
+ * under `tiers.rafa: off`; its control is a name rafa does not ship, in
+ * the same home and plan, which is warned about.
+ *
+ * ## Nothing under `.claude/`
+ *
+ * Every path under the world with a `.claude` segment is listed before
+ * and after `init`, the board step included, and the two lists are held
+ * equal. The control plants a home agent first, so the listing is shown
+ * to find a `.claude` path where there is one: an empty list proves
+ * nothing on its own.
  *
  * ## The world
  *
@@ -129,6 +143,8 @@ interface World {
   readonly rafaBin: string;
   /** `~/.bun/bin` of the home. */
   readonly bunBin: string;
+  /** The entry whose `bundled/agents` is the world's rafa tier, absent until a case plants it. */
+  readonly entry: string;
 }
 
 /** Plants a fresh world under the temporary root. */
@@ -139,7 +155,15 @@ function plantWorld(): World {
   const sub = join(repo, 'sub');
   mkdirSync(home);
   mkdirSync(sub, { recursive: true });
-  return { base, home, repo, sub, rafaBin: join(home, '.rafa', 'bin'), bunBin: join(home, '.bun', 'bin') };
+  return {
+    base,
+    home,
+    repo,
+    sub,
+    rafaBin: join(home, '.rafa', 'bin'),
+    bunBin: join(home, '.bun', 'bin'),
+    entry: join(base, 'dist', 'cli.js'),
+  };
 }
 
 /** The seams of `world`, with `overrides`; see the module note. */
@@ -148,6 +172,7 @@ function seamsFor(world: World, overrides: Partial<InitSeams> = {}): InitSeams {
     ...DEFAULT_INIT_SEAMS,
     cwd: () => world.sub,
     home: () => world.home,
+    entry: () => world.entry,
     isTerminal: () => false,
     openPrompter: () => {
       throw new Error('init opened a prompter where none was expected');
@@ -900,13 +925,30 @@ describe('the agent warning', () => {
     writeFileSync(join(dir, `${name}.md`), ['---', `name: ${name}`, '---', 'Body.', ''].join('\n'), 'utf8');
   };
 
-  /** Writes a one-task plan routed to `agent` under the world's default `plan.dir`. */
-  const plantPlan = (world: World, agent: string): string => {
+  /** Writes a plan of one task per agent in `agents` under the world's default `plan.dir`. */
+  const plantPlan = (world: World, ...agents: readonly string[]): string => {
     const dir = join(world.repo, '.rafa', 'plans');
     mkdirSync(dir, { recursive: true });
     const path = join(dir, 'PLAN.md');
-    writeFileSync(path, `- [ ] Write the module  {agent=${agent}}\n`, 'utf8');
+    writeFileSync(path, agents.map((agent) => `- [ ] Write the module  {agent=${agent}}\n`).join(''), 'utf8');
     return path;
+  };
+
+  /** Writes `<name>.md` into the world's rafa tier, `bundled/agents` beside its entry. */
+  const plantBundled = (world: World, name: string): void => {
+    const dir = join(world.entry, '..', 'bundled', 'agents');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, `${name}.md`),
+      ['---', `name: ${name}`, 'description: Ships with rafa.', '---', 'Body.', ''].join('\n'),
+      'utf8',
+    );
+  };
+
+  /** Writes `tiers.rafa: off` as the project's config, before `init` finds it. */
+  const plantRafaOff = (world: World): void => {
+    mkdirSync(join(world.repo, '.rafa'), { recursive: true });
+    writeFileSync(join(world.repo, '.rafa', 'config.yaml'), 'tiers:\n  rafa: off\n', 'utf8');
   };
 
   it('warns about an agent a plan routes to that only the home defines, naming the vendor command', async () => {
@@ -951,6 +993,64 @@ describe('the agent warning', () => {
       { plan, name: 'tdd-guide', lines: [1], fix: 'rafa agent vendor tdd-guide' },
     ]);
     expect(eventsOf(warned.stdout).map((event) => event.type)).toEqual(['start', 'log', 'log', 'result']);
+  });
+
+  it('says nothing about an agent the rafa tier holds, served or under tiers.rafa: off, and warns about one it does not', async () => {
+    const served = plantWorld();
+    const off = plantWorld();
+    for (const world of [served, off]) {
+      plantBundled(world, 'tdd-guide');
+      plantAgent(world.home, 'tdd-guide');
+      plantAgent(world.home, 'rust-reviewer');
+      plantPlan(world, 'tdd-guide', 'rust-reviewer');
+    }
+    plantRafaOff(off);
+
+    const runs = [await init(served, [`--root=${served.repo}`, '--output=json']), await init(off, [`--root=${off.repo}`, '--output=json'])];
+
+    expect(runs.map((run) => run.exitCode)).toEqual([0, 0]);
+    for (const run of runs) {
+      expect(resultOf(run.stdout).vendorableAgents.map((agent) => agent.name)).toEqual(['rust-reviewer']);
+      expect(run.stdout).not.toContain('rafa agent vendor tdd-guide');
+      expect(run.stdout).toContain('run `rafa agent vendor rust-reviewer`');
+    }
+  });
+});
+
+describe('nothing under .claude/', () => {
+  /** Every path under `base` with a `.claude` segment, relative to it and sorted. */
+  const claudePaths = (base: string): readonly string[] => readdirSync(base, { recursive: true, encoding: 'utf8' })
+    .filter((path) => path.split('/').includes('.claude'))
+    .sort((a, b) => a.localeCompare(b));
+
+  it('writes no .claude path under the project or the home, board step included', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+
+    const run = await init(world, [`--root=${world.repo}`, '--board', '--output=json'], seamsFor(world, {
+      readRemote: () => 'git@github.com:open-tomato/scratch.git',
+      gh: () => gh.run,
+    }));
+
+    const result = resultOf(run.stdout);
+    expect(run.exitCode).toBe(0);
+    expect([result.changed, result.board.status]).toEqual([true, 'ran']);
+    expect(claudePaths(world.base)).toEqual([]);
+    expect(result.writes.filter((write) => write.path.split('/').includes('.claude'))).toEqual([]);
+  });
+
+  it('finds a .claude path where one is planted, and init adds none beside it', async () => {
+    const world = plantWorld();
+    const dir = join(world.home, '.claude', 'agents');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'rust-reviewer.md'), '---\nname: rust-reviewer\n---\nBody.\n', 'utf8');
+    const before = claudePaths(world.base);
+
+    const run = await init(world, [`--root=${world.repo}`]);
+
+    expect(run.exitCode).toBe(0);
+    expect(before).toEqual(['home/.claude', 'home/.claude/agents', 'home/.claude/agents/rust-reviewer.md']);
+    expect(claudePaths(world.base)).toEqual(before);
   });
 });
 

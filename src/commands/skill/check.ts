@@ -14,9 +14,9 @@
  * ## The directory is a tier, and `--project` is the tier's consumer
  *
  * `<dir>` is a skills directory — `~/.claude/skills`, a project's
- * `.claude/skills`, or rafa's own `skills/` — and is scanned one level
- * deep, as Claude Code registers it. `--project=<root>` is the
- * checkout the bodies are consumed in, which is what a body's
+ * `.claude/skills`, or rafa's own `bundled/skills` — and is scanned
+ * one level deep, as Claude Code registers it. `--project=<root>` is
+ * the checkout the bodies are consumed in, which is what a body's
  * `src/check/references.ts` is resolved against. The two are separate
  * on purpose: checking a user tier against the project you happen to
  * stand in would fail every body naming a file of some OTHER project,

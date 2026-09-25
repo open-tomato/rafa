@@ -24,7 +24,7 @@ module's note is the long form.
 | `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts`, `confirm.ts` and `page.ts` the five prompts for text input, single selection, multi-selection, confirmation and paged lists in raw mode on standard error |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
-| `src/commands/agent/` | `agent vendor`, a `~/.claude/agents` definition copied into the project with a source header; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
+| `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
@@ -59,14 +59,14 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
 | `src/commands/doctor-deep-providers.ts` | the Providers reading of `--deep`: the configured tracker and pull request provider, and — when either goes through `gh` — whether `gh` answers under the environment it is handed |
 | `src/commands/doctor-deep-needs.ts` | the Stack tools and Plan needs readings of `--deep`: every unmet stack tool and, for a plan `--plan` names alone, its unmet needs over `src/plan/needs.ts` |
 | `src/commands/doctor-deep-row.ts` | the row every deep section is read into, the section holding them, and the text lines both render to; each status is `ok`, `warn` or `note`, never a failure or a `PreflightCheck` |
-| `src/utils/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, and every other entry handed on as it is |
+| `src/utils/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, `PATH` with the running entry's `bundled/bin` in front, and every other entry handed on as it is |
 | `src/cleanup/index.ts` | the main cleanup reading module: `readCleanup` over the settings and seams reads and groups the merged, stale, not-pushed and worktree rows; `cleanupSteps` renders the ticked rows into deletion steps; `runCleanupSteps` and `dryRunLines` run them or show what they would do; `defaultCleanupSeams` wires the git runner, the branch and worktree readers, and the pull request provider; and `cleanupCounts` counts the rows for `rafa doctor` |
 | `src/cleanup/branches.ts` | reading merged, stale and not-pushed branches: over the config's `pr.base`, `cleanup.keep` and `cleanup.staleDays`; merged rows are reachable from the base; stale rows have an upstream, are not merged and have no commit in the day count; not-pushed rows have no upstream or commits ahead of it; the provider tells merged from stale when the upstream is gone, and squash-merged rows are marked for `-D` instead of `-d` |
 | `src/cleanup/worktrees.ts` | reading idle worktrees: under `.claude/worktrees/` and `~/.rafa/worktrees/`, filtering the current worktree, the ones locked or dirty, the ones running a loop session, and the ones modified within `cleanup.worktreeIdleDays`; each row carries its path, its last access time and what stops it from being ticked |
@@ -86,6 +86,7 @@ module's note is the long form.
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
+| `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -302,19 +303,28 @@ New; it replaces no earlier text. What a row or an action added to
   and like every command but `module exec`, the two checkers, `init` and
   `describe` it runs only inside a project. It writes each `parsePlan` issue at `error` as
   `<file>:<line>: <reason>: <text>`, then the `agent=` of each
-  still-to-run task that no scope the project's `loop.settingSources`
-  loads defines, as `<file>: <the line `missingAgentLine` words>` naming
-  the agent, the lines that asked for it and its `rafa agent vendor`
-  fix or that no user definition carries it
-  (`src/agents/roster.ts`). It throws exit code 1 when there is either,
-  with a message counting both. That is the check `loop start`'s
+  still-to-run task that no tier serves under the project's
+  `loop.settingSources`, `tiers.rafa` and `tiers.agents` (`resolveTiers`,
+  with the built-ins beside it), as `<file>: <the line `missingAgentLine`
+  words>` naming the agent, the lines that asked for it and why: held by
+  no tier; switched off, with the `false` line; held only by a tier the
+  session does not load, with that tier's path and the setting that
+  loads it, and `rafa agent vendor` for the user tier; held by two loaded
+  tiers with different contents, with both paths and the pin line; or a
+  rafa-tier holder the served directory refuses
+  (`src/agents/roster.ts`). Then each `skills=` name of those tasks that
+  two loaded tiers hold with different contents, under `tiers.skills`, as
+  `<file>: <the line `skillCollisionLine` words>` with both paths and the
+  pin line; a skill name no tier holds is not reported. It throws exit
+  code 1 when there is any of the three, with a message counting each. That is the check `loop start`'s
   preflight halts on, so a plan the loop would refuse is refused here
   too. The roster is the project the dispatcher found and the config that
   resolves there, which is the only thing this command reads beyond the
-  file; handed no project it says so and checks no agent. In json mode a
-  list, a plan and a clean validation are the terminal result's `data`,
-  the validation carrying an empty `issues` and an empty `missingAgents`,
-  and each issue and each missing agent is an `error` `log` event; text
+  file; handed no project it says so and checks no agent and no skill.
+  In json mode a list, a plan and a clean validation are the terminal
+  result's `data`, the validation carrying an empty `issues`, an empty
+  `missingAgents` and an empty `skillCollisions`, and each issue, missing
+  agent and skill collision is an `error` `log` event; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
@@ -476,7 +486,10 @@ New; it replaces no earlier text. What a row or an action added to
   only in `~/.claude/agents` under the resolved `loop.settingSources`,
   naming each plan, its lines and `rafa agent vendor <name>`
   (`src/agents/vendorable.ts`); a missing agent no user definition
-  carries is left to the preflight, which refuses on it. In json mode the
+  carries is left to the preflight, which refuses on it, and so is a
+  name the rafa tier holds, even under `tiers.rafa: off`, whose fix is
+  the setting and not a copy. `init` writes nothing under `.claude/`,
+  in the project or the home. In json mode the
   result's `data` holds the root, its source, the working directory,
   whether the config existed, every path checked with its change, that
   reading, those vendorable uses, and what the release step and the
@@ -591,7 +604,9 @@ New; it replaces no earlier text. What a row or an action added to
   suspect or dangling one naming `rafa issue check <n>`
   (`src/commands/doctor-refs.ts`); it writes no stamp, reads each issue
   once per run, reads an issue the board cannot answer as `unknown`,
-  and never changes the exit code. Under the boolean
+  and never changes the exit code. Every run then prints the
+  `Skill tiers` rows (`src/commands/doctor-tiers.ts`), when there is
+  any, as json's `tiers`; they never change the exit code. Under the boolean
   `--deep` it then reads and prints the Environment, Settings,
   Providers and Stack tools sections, and Plan needs for a plan
   `--plan` names (`src/commands/doctor-deep.ts`), a halt's included,
@@ -657,13 +672,17 @@ New; it replaces no earlier text. What a row or an action added to
   `~/.bun/bin` on the context's `PATH` (`readBinPath`). In json mode the
   result's `data` holds the root, the version, the runtime directory, the
   link, where it resolves, the files copied and that reading.
-- **`agent vendor <name>... [--force]` copies a home definition into the
-  project** (`src/commands/agent/vendor.ts`), which is the fix
-  `loop start`'s preflight and `plan validate` name for an `agent=` no
-  loaded scope defines. A name is a definition's frontmatter `name`, what
-  `--agent` resolves by, so the source is the `~/.claude/agents/*.md`
-  carrying it, whatever its stem, and the copy keeps that file's own name
-  under `<root>/.claude/agents/`. The copy carries one line the original
+- **`agent vendor <name>... [--force]` copies a rafa-tier or home
+  definition into the project** (`src/commands/agent/vendor.ts`), which
+  is the fix `loop start`'s preflight and `plan validate` name for an
+  `agent=` only the user tier holds. It reads the rafa tier
+  (`bundled/agents` beside the running entry) first and `~/.claude/agents`
+  second, the resolution order with the project left out, so a name both
+  hold is copied from the rafa tier; each copy's text line ends
+  `(from the rafa tier)` or `(from the user tier)`. A name is a
+  definition's frontmatter `name`, what `--agent` resolves by, so the
+  source is the tier's `*.md` carrying it, whatever its stem, and the copy
+  keeps that file's own name under `<root>/.claude/agents/`. The copy carries one line the original
   does not, an HTML comment naming the source file and the day, written
   directly after the frontmatter's closing `---` — never ahead of the
   opening one, which would leave the file carrying no frontmatter at all
@@ -673,12 +692,12 @@ New; it replaces no earlier text. What a row or an action added to
   It throws exit code 1 for a `--force` value that is neither `true` nor
   `false`, read ahead of the names so `--force` typed first, which
   `parseArgs` hands the next word as its value, meets that refusal; for a
-  line naming no name; for a name no `~/.claude/agents` definition
-  carries; and for a destination already there, which `--force` replaces
+  line naming no name; for a name neither tier carries, the refusal
+  naming both directories; and for a destination already there, which `--force` replaces
   whole. Each refusal ends with the line `Nothing was written.` In json
   mode the result's `data` holds the root, `<root>/.claude/agents` and
-  one row per copy: the name, the file it came from, the file written and
-  whether one was replaced. A declaration has no variadic spelling, so
+  one row per copy: the name, the tier and the file it came from, the
+  file written and whether one was replaced. A declaration has no variadic spelling, so
   `rafa agent vendor --help` renders the argument as `<name>` where the
   refusals' usage line says `<name>...`.
 - **`agent list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
@@ -688,10 +707,11 @@ New; it replaces no earlier text. What a row or an action added to
   the same three filters. `--source` names a whole source string
   (`project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>`), aliased
   `--tier` for one release after this one; `--state` takes `enabled`,
-  `shadowed` or `disabled` and matches the prefix; `--hidden-from-loop`
-  keeps `visibleToLoop: false`. A `plugin:` or `addon:` source the
-  inventory does not know is refused. The filters are read and matched
-  by the helpers `src/commands/skill/list.ts` exports. A definition is
+  `collision`, `shadowed` or `disabled` and matches the prefix;
+  `--hidden-from-loop` keeps `visibleToLoop: false`. A `plugin:` or
+  `addon:` source the inventory does not know is refused. The filters
+  are read and matched by the helpers `src/commands/skill/list.ts`
+  exports. A definition is
   keyed by its frontmatter `name`, as `--agent` resolves it, and each row
   prints the loop mark (`●` when a run sees it, `○` when not), name,
   source, state and summary. The Claude Code built-ins are no inventory
@@ -818,26 +838,31 @@ New; it replaces no earlier text. What a row or an action added to
   lists every skill the inventory holds** (`src/commands/skill/list.ts`,
   over `buildInventory` in `src/inventory/index.ts`). The inventory is
   built against the project the dispatcher resolved, its home, the
-  config's `loop.settingSources` and the modules `loadModules` answers
-  `loaded`; the rafa tier is measured from `Bun.main`, and the entry and
+  config's `loop.settingSources`, `tiers.rafa`, `tiers.skills` and
+  `tiers.agents`, and the modules `loadModules` answers `loaded`; the
+  rafa tier is measured from `Bun.main`, and the entry and
   the module loader's seams are the command factory's two seams. One row
   per skill, of every source (`project`, `rafa`, `user`, `addon:<name>`,
   `plugin:<name>`), prints `●` when a loop session resolves it and `○`
-  when not, then its name, source, state (`enabled`,
+  when not, then its name, source, state (`enabled`, `collision`,
   `shadowed-by:<source>` or `disabled:<how>`) and summary, the columns
   padded to the widest cell. `--source` keeps the rows of one whole
   source string and refuses a `plugin:` or `addon:` source no row or
   warning names; `--tier` is its alias, marked in the help for removal
-  after one release. `--state` takes `enabled`, `shadowed` or `disabled`
-  and matches the state's prefix; `--hidden-from-loop` keeps
-  `visibleToLoop: false`. The filters combine and are read and matched
-  by helpers the module exports. A skills tree whose directory is absent
-  prints its path and `(no such directory)`, and an unreadable plugin
-  record, plugin, add-on manifest, settings file or `skillOverrides`
-  entry is one `warn:` line. The exit code is 0 whatever the rows say —
-  the listing reports and `skill check` gates — and exit code 1 is kept
-  for a positional word, a `--source` or `--state` it cannot take, and a
-  config `loadConfig` refuses. In json mode the kept records, each with
+  after one release. `--state` takes `enabled`, `collision`, `shadowed`
+  or `disabled` and matches the state's prefix, `collision` keeping the
+  holders of every name two loaded tiers hold different items under;
+  `--hidden-from-loop` keeps `visibleToLoop: false`. A `rafa` row is
+  marked `●` when it is served to a loop session and `○` when not
+  (`sourceVisibleToLoop`, `context/inventory.md`). The filters combine
+  and are read and matched by helpers the module exports. A skills tree
+  whose directory is absent prints its path and `(no such directory)`,
+  and an unreadable plugin record, plugin, add-on manifest, settings
+  file or `skillOverrides` entry is one `warn:` line. The exit code is
+  0 whatever the rows say — the listing reports and `skill check`
+  gates — and exit code 1 is kept for a positional word, a `--source`
+  or `--state` it cannot take, and a config `loadConfig` refuses. In
+  json mode the kept records, each with
   its `check`, the filters, the pre-filter total, the skills trees and
   the warnings are the result's `data`. `-i | --interactive` browses the
   kept rows instead of printing them, through `browse` (`src/inventory/browse.ts`)
@@ -1166,8 +1191,8 @@ New; it replaces no earlier text. What a row or an action added to
   arguments, `plan show` also for a stub no plan stamp can carry, a stub
   naming no plan or no tracker and a `--tracker` value other than `true`
   or `false`, and `plan validate` also for a path that is no file, for
-  a plan with an issue, for a plan naming an agent no loaded scope
-  defines, and for a config `loadConfig` refuses. `plan needs` also
+  a plan with an issue, for a plan naming an agent no loaded tier
+  serves, and for a config `loadConfig` refuses. `plan needs` also
   throws 1 under `--missing` when a need is unmet, and whatever
   `resolveCreateSpec` throws for `--spec` and `--issue`, 2 for the
   board's own state included. `init` throws 1 for a positional word, a `--yes`

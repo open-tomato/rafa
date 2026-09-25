@@ -9,17 +9,19 @@
  * INSTALLED, where each one comes from, which holder of a name answers,
  * and which of them a session the loop spawns can reach. Every row is
  * an {@link InventoryRecord} of kind `skill` as `buildInventory`
- * (`src/inventory/index.ts`) decides it, so precedence, `shadowed-by:`,
- * `disabled:` and `visibleToLoop` are decided there and only there,
- * and this command filters and prints them.
+ * (`src/inventory/index.ts`) decides it, so precedence, `collision`,
+ * `shadowed-by:`, `disabled:` and `visibleToLoop` are decided there and
+ * only there, and this command filters and prints them.
  *
  * ## What the inventory is built against
  *
  * The project the dispatcher found gives the root and the home, the
  * project's config gives `loop.settingSources`, which decides
- * `visibleToLoop`, and the config's `modules:` are loaded as
- * `rafa module list` loads them, since only a `loaded` module is an
- * add-on source. A config `loadConfig` refuses is a refusal here too.
+ * `visibleToLoop`, and `tiers.rafa`, `tiers.skills` and `tiers.agents`,
+ * which `resolveTiers` reads for a tier row's state, and the config's
+ * `modules:` are loaded as `rafa module list` loads them, since only a
+ * `loaded` module is an add-on source. A config `loadConfig` refuses is
+ * a refusal here too.
  * The rafa tier is measured from this process's entry, which under
  * `bun test` is the test runner rather than a `cli.js`, so the entry is
  * {@link SkillListSeams.entry}, `Bun.main` by default and a planted
@@ -38,10 +40,12 @@
  *     listed the three tiers alone. A plugin or add-on the inventory
  *     does not know is refused rather than answered with no rows, so a
  *     typo never reads as an empty source.
- *   - `--state=<state>` takes `enabled`, `shadowed` or `disabled` and
- *     keeps the rows whose state begins with it, so `shadowed` keeps
- *     every `shadowed-by:<source>` and `disabled` every
- *     `disabled:<how>`.
+ *   - `--state=<state>` takes `enabled`, `collision`, `shadowed` or
+ *     `disabled` and keeps the rows whose state begins with it, so
+ *     `shadowed` keeps every `shadowed-by:<source>` and `disabled` every
+ *     `disabled:<how>`. `collision` keeps the holders of every name two
+ *     loaded tiers hold different items under: the names the loop
+ *     refuses until a `tiers.skills` pin settles which tier serves.
  *   - `--hidden-from-loop` keeps the rows with `visibleToLoop: false`.
  *
  * ## What each row says
@@ -53,6 +57,14 @@
  * printed. A skills tree whose directory is not there is a line of its
  * own after the rows, as long as `--source` leaves its tier in, so
  * "holds nothing" and "is not there" stay two answers.
+ *
+ * The state is one of `enabled`, `collision`, `shadowed-by:<source>`
+ * or `disabled:<how>`, and a `collision` row is marked `○`: the loop
+ * serves neither holder. A `rafa` row, from the `bundled/skills`
+ * directory beside the running rafa, is marked `●` when it is served to
+ * a loop session (the winner of its name, admitted by `serveVerdict`)
+ * and `○` otherwise, so `--source=rafa` lists what the rafa tier hands
+ * a session and what it holds back.
  *
  * ## Warnings
  *
@@ -133,10 +145,10 @@ export const DEFAULT_SKILL_LIST_SEAMS: SkillListSeams = Object.freeze({
 const COMMAND_NAME = 'rafa skill list';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa skill list [--source=<source>] [--state=enabled|shadowed|disabled] [--hidden-from-loop] [-i]';
+const USAGE = 'rafa skill list [--source=<source>] [--state=enabled|collision|shadowed|disabled] [--hidden-from-loop] [-i]';
 
 /** The words `--state` takes, each matched as a prefix of a row's state. */
-export const STATE_FILTERS = ['enabled', 'shadowed', 'disabled'] as const;
+export const STATE_FILTERS = ['enabled', 'collision', 'shadowed', 'disabled'] as const;
 
 /** One of {@link STATE_FILTERS}. */
 export type StateFilter = (typeof STATE_FILTERS)[number];
@@ -449,13 +461,16 @@ export async function projectInventory(
   try {
     const resolved = loadConfig({ root: project.root, home: project.home });
     const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
-    const { settingSources } = resolved.config;
+    const { settingSources, tiersRafa, tiersSkills, tiersAgents } = resolved.config;
     const inventory = buildInventory({
       home: project.home,
       projectRoot: project.root,
       entry: seams.entry(),
       pathDirs: pathDirectories(context.env['PATH']),
       settingSources,
+      tiersRafa,
+      tiersSkills,
+      tiersAgents,
       modules: loaded.modules,
     });
     return { inventory, settingSources };
@@ -499,13 +514,15 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
     subject: 'skill',
     action: 'list',
     summary: 'list every skill with its source, its state and whether the loop sees it',
-    description: 'Lists every skill the inventory holds — the project\'s `.claude/skills`, the `skills/`'
+    description: 'Lists every skill the inventory holds — the project\'s `.claude/skills`, the `bundled/skills`'
       + ' directory beside the running rafa, `~/.claude/skills`, each loaded add-on\'s and each installed'
       + ' plugin\'s — one row each: a mark saying whether a session the loop spawns under'
-      + ' `loop.settingSources` resolves it, its name, its source, its state (`enabled`,'
-      + ' `shadowed-by:<source>` when a nearer source holds the same name, or `disabled:<how>`) and its own'
-      + ' description as the summary. `--source=<source>` keeps one source, `plugin:<name>` and'
-      + ' `addon:<name>` included; `--state=<state>` keeps `enabled`, `shadowed` or `disabled` rows;'
+      + ' `loop.settingSources` resolves it or is served it from the rafa tier, its name, its source, its'
+      + ' state (`enabled`, `collision` when two loaded tiers hold different skills under the name and a'
+      + ' `tiers.skills` pin must settle it, `shadowed-by:<source>` when another source serves the name, or'
+      + ' `disabled:<how>`) and its own description as the summary. `--source=<source>` keeps one source,'
+      + ' `plugin:<name>` and `addon:<name>` included; `--state=<state>` keeps `enabled`, `collision`,'
+      + ' `shadowed` or `disabled` rows;'
       + ' `--hidden-from-loop` keeps the rows no loop session resolves. The filters combine. A skills'
       + ' directory that is not there says so, and a source that does not read is a warning. The exit code'
       + ' is 0 whatever the rows say: this command reports and `rafa skill check` gates. With'
@@ -540,6 +557,10 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
       {
         cmd: 'rafa skill list --source=user --state=shadowed',
         note: 'Lists the `~/.claude/skills` skills a nearer source holds the name of.',
+      },
+      {
+        cmd: 'rafa skill list --state=collision',
+        note: 'Lists the holders of every name two loaded tiers hold different skills under, which a pin settles.',
       },
       {
         cmd: 'rafa skill list --hidden-from-loop',

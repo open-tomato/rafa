@@ -16,13 +16,26 @@
  *   - an unreadable source: plugin `gone`, whose `installPath` is not
  *     there.
  *
+ * Every copy in that world is byte-identical to the others of its name,
+ * so `resolveTiers` finds no collision there. A second world, planted
+ * beside it, holds the copies that differ:
+ *
+ *   - skill `clash` in the project and the home, with different bodies,
+ *     and in the add-on too;
+ *   - agent `tdd-guide` in rafa and the home, with different bodies;
+ *   - rafa skills `served`, with no `provenance`, and `unreviewed`, a
+ *     third-party one with no `reviewed`, which rafa does not serve.
+ *
+ * It is read under the config defaults and under a pin, a `false`, and
+ * `tiers.rafa: off`, each beside the reading it changes.
+ *
  * Visibility is read under two `settingSources` from the same world,
  * one with `user` and one without, so no `visibleToLoop: false` passes
  * only because everything reads false, and no `true` only because
  * everything reads true.
  */
 import type { OverrideReading } from './disabled.js';
-import type { InventorySeams } from './index.js';
+import type { InventorySeams, PrecedenceReading } from './index.js';
 import type { InventoryRecord } from './record.js';
 import type { ClaudeSettingSource } from '../config-sections.js';
 
@@ -34,7 +47,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { INSTALLED_PLUGINS_PATH, PLUGINS_RECORD_VERSION } from './plugins.js';
 
-import { applyPrecedence, buildInventory, SOURCE_ORDER, sourceRank, sourceVisibleToLoop } from './index.js';
+import { applyPrecedence, buildInventory, SOURCE_ORDER, sourceRank, sourceVisibleToLoop, tierSettings } from './index.js';
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-inventory-index-')));
 
@@ -77,8 +90,8 @@ write(join(projectRoot, '.claude/settings.json'), JSON.stringify({ skillOverride
 
 // rafa, beside its entry.
 write(join(runtime, 'cli.js'), '');
-write(join(runtime, 'skills/rafa-only/SKILL.md'), skill('rafa-only'));
-write(join(runtime, 'agents/reviewer.md'), agent('reviewer'));
+write(join(runtime, 'bundled/skills/rafa-only/SKILL.md'), skill('rafa-only'));
+write(join(runtime, 'bundled/agents/reviewer.md'), agent('reviewer'));
 
 // The home.
 write(join(home, '.claude/skills/gate-order/SKILL.md'), skill('gate-order'));
@@ -145,35 +158,42 @@ describe('buildInventory over the planted world', () => {
       ['skill', 'gate-order', 'project', 'enabled', true],
       ['skill', 'gate-order', 'user', 'shadowed-by:project', false],
       ['skill', 'project-only', 'project', 'enabled', true],
-      ['skill', 'rafa-only', 'rafa', 'enabled', false],
+      // Served: the winner of its name, with nothing keeping it out.
+      ['skill', 'rafa-only', 'rafa', 'enabled', true],
       ['skill', 'switched', 'project', 'disabled:skillOverrides', false],
       ['skill', 'switched', 'user', 'shadowed-by:project', false],
       ['skill', 'user-only', 'user', 'enabled', true],
       ['skill', 'user-only', 'addon:linear', 'shadowed-by:user', false],
-      ['agent', 'reviewer', 'rafa', 'enabled', false],
-      // The plan's rule: shadowed is never visible, although a session,
-      // which never sees the rafa tier, would load this one.
+      ['agent', 'reviewer', 'rafa', 'enabled', true],
+      // The session is served the rafa copy, so the user one is rightly not visible.
       ['agent', 'reviewer', 'user', 'shadowed-by:rafa', false],
     ]);
+    expect(inventory.resolution.collisions).toEqual([]);
   });
 
   it('hides user and plugin rows from the loop without user in settingSources', () => {
     const records = buildInventory(seams(WITHOUT_USER)).records;
     const visible = records.filter((record) => record.visibleToLoop).map((record) => record.name);
 
-    // Control: project rows stay visible, so this is not a world that reads all false.
-    expect(visible).toEqual(['gate-order', 'project-only']);
-    // The states do not move with settingSources; only visibility does.
+    // Control: project and served rafa rows stay visible, so this is not a world that reads all false.
+    expect(visible).toEqual(['gate-order', 'project-only', 'rafa-only', 'reviewer']);
+    // Every copy here is byte-identical, so no state moves with settingSources; only visibility does.
     expect(records.map((record) => record.state))
       .toEqual(buildInventory(seams(WITH_USER)).records.map((record) => record.state));
   });
 
   it('reads the switched skill as the enabled holder once its override is gone', () => {
-    const switched = buildInventory(seams(WITH_USER)).records.filter((record) => record.name === 'switched');
-    const noOverrides: OverrideReading = { scopes: [], warnings: [] };
+    const inventory = buildInventory(seams(WITH_USER));
+    const switched = inventory.records.filter((record) => record.name === 'switched');
+    const reading: PrecedenceReading = {
+      overrides: { scopes: [], warnings: [] } satisfies OverrideReading,
+      settingSources: WITH_USER,
+      resolution: inventory.resolution,
+      isServed: () => true,
+    };
 
     // Control for the `off` row above: the same two rows, no settings, read enabled and shadowed.
-    expect(applyPrecedence(switched, noOverrides, WITH_USER).map(decided)).toEqual([
+    expect(applyPrecedence(switched, reading).map(decided)).toEqual([
       ['skill', 'switched', 'project', 'enabled', true],
       ['skill', 'switched', 'user', 'shadowed-by:project', false],
     ]);
@@ -213,10 +233,164 @@ describe('precedence and visibility, rule by rule', () => {
       .toEqual([4, 3, 2, 1, 0]);
   });
 
-  it('shows the loop project rows always, user and plugin rows only under user, rafa and add-ons never', () => {
+  it('shows the loop project rows always, user and plugin rows only under user, rafa only served, add-ons never', () => {
     const sources = ['project', 'user', 'plugin:alpha', 'rafa', 'addon:linear'] as const;
 
     expect(sources.map((source) => sourceVisibleToLoop(source, WITH_USER))).toEqual([true, true, true, false, false]);
     expect(sources.map((source) => sourceVisibleToLoop(source, WITHOUT_USER))).toEqual([true, false, false, false, false]);
+    // Served decides rafa alone: an add-on is never visible, served or not.
+    expect(sources.map((source) => sourceVisibleToLoop(source, WITHOUT_USER, true))).toEqual([true, false, false, true, false]);
+  });
+
+  it('fills an absent tier setting from the config defaults, and keeps a given one', () => {
+    const defaults = tierSettings(seams(WITHOUT_USER));
+    const pins = new Map([['clash', 'user' as const]]);
+    const given = tierSettings({ ...seams(WITH_USER), tiersRafa: 'off', tiersAgents: pins });
+
+    expect([defaults.tiersRafa, defaults.tiersSkills.size, defaults.tiersAgents.size]).toEqual(['on', 0, 0]);
+    expect([given.settingSources, given.tiersRafa, given.tiersAgents]).toEqual([WITH_USER, 'off', pins]);
+  });
+});
+
+// The second world: copies that differ, read under the tier settings.
+const clashBase = join(base, 'clash');
+const clashHome = join(clashBase, 'home');
+const clashRoot = join(clashBase, 'project');
+const clashRuntime = join(clashBase, 'runtime');
+const clashAddon = join(clashBase, 'modules', 'linear');
+
+/** An unreviewed third-party `provenance` block. */
+const UNREVIEWED = 'provenance:\n  origin: https://example.com/x\n  license: MIT\n';
+
+/** A skill whose body is `body`, with `extra` frontmatter lines. */
+function bodySkill(name: string, body: string, extra = ''): string {
+  return `---\nname: ${name}\ndescription: Run the gates in order\n${extra}---\n\n${body}\n`;
+}
+
+write(join(clashRoot, '.claude/skills/clash/SKILL.md'), bodySkill('clash', 'The project copy.'));
+write(join(clashHome, '.claude/skills/clash/SKILL.md'), bodySkill('clash', 'The home copy.'));
+write(join(clashRuntime, 'cli.js'), '');
+write(join(clashRuntime, 'bundled/skills/served/SKILL.md'), bodySkill('served', 'Served.'));
+write(join(clashRuntime, 'bundled/skills/unreviewed/SKILL.md'), bodySkill('unreviewed', 'Taken.', UNREVIEWED));
+write(join(clashRuntime, 'bundled/agents/tdd-guide.md'), '---\nname: tdd-guide\ndescription: Guides one test\n---\n\nThe rafa copy.\n');
+write(join(clashHome, '.claude/agents/tdd-guide.md'), '---\nname: tdd-guide\ndescription: Guides one test\n---\n\nThe home copy.\n');
+write(join(clashAddon, 'package.json'), JSON.stringify({
+  name: 'linear',
+  version: '1.0.0',
+  rafa: {
+    manifestVersion: 1,
+    types: ['skills'],
+    provides: { skills: './skills' },
+    requires: { rafa: '>=0.0.1', ports: {} },
+  },
+}));
+write(join(clashAddon, 'skills/clash/SKILL.md'), bodySkill('clash', 'The add-on copy.'));
+
+/** The second world's seams under `settingSources` and `tiers`. */
+function clashSeams(
+  settingSources: readonly ClaudeSettingSource[],
+  tiers: Partial<Pick<InventorySeams, 'tiersRafa' | 'tiersSkills' | 'tiersAgents'>> = {},
+): InventorySeams {
+  return {
+    home: clashHome,
+    projectRoot: clashRoot,
+    entry: join(clashRuntime, 'cli.js'),
+    pathDirs: [],
+    settingSources,
+    modules: [{ name: 'linear', directory: clashAddon, state: 'loaded' }],
+    ...tiers,
+  };
+}
+
+describe('state and visibility taken from resolveTiers', () => {
+  it('reads differing copies in two loaded tiers as a collision, neither visible', () => {
+    const inventory = buildInventory(clashSeams(WITH_USER));
+
+    expect(inventory.records.map(decided)).toEqual([
+      ['skill', 'clash', 'project', 'collision', false],
+      ['skill', 'clash', 'user', 'collision', false],
+      // Outside the tiers: shadowed by the nearest loaded holder.
+      ['skill', 'clash', 'addon:linear', 'shadowed-by:project', false],
+      ['skill', 'served', 'rafa', 'enabled', true],
+      // Not served, so not visible, though it holds its name.
+      ['skill', 'unreviewed', 'rafa', 'enabled', false],
+      ['agent', 'tdd-guide', 'rafa', 'collision', false],
+      ['agent', 'tdd-guide', 'user', 'collision', false],
+    ]);
+    // A skill's pin line names the copy Claude Code loads, the user one.
+    expect(inventory.resolution.collisions.map((collision) => collision.pinLine)).toEqual([
+      'tiers.skills: { clash: user }',
+      'tiers.agents: { tdd-guide: rafa }',
+    ]);
+  });
+
+  it('reads the same copies as nearest-wins while the user tier is not loaded', () => {
+    const inventory = buildInventory(clashSeams(WITHOUT_USER));
+
+    // Control for the collision above: only settingSources moved.
+    expect(inventory.records.filter((record) => record.name !== 'served' && record.name !== 'unreviewed').map(decided)).toEqual([
+      ['skill', 'clash', 'project', 'enabled', true],
+      ['skill', 'clash', 'user', 'shadowed-by:project', false],
+      ['skill', 'clash', 'addon:linear', 'shadowed-by:project', false],
+      ['agent', 'tdd-guide', 'rafa', 'enabled', true],
+      ['agent', 'tdd-guide', 'user', 'shadowed-by:rafa', false],
+    ]);
+    expect(inventory.resolution.collisions).toEqual([]);
+  });
+
+  it('serves the pinned tier, reading the nearer copy as shadowed by it', () => {
+    const records = buildInventory(clashSeams(WITH_USER, {
+      tiersSkills: new Map([['clash', 'user']]),
+      tiersAgents: new Map([['tdd-guide', 'user']]),
+    })).records;
+
+    expect(records.filter((record) => record.name === 'clash' || record.name === 'tdd-guide').map(decided)).toEqual([
+      ['skill', 'clash', 'project', 'shadowed-by:user', false],
+      ['skill', 'clash', 'user', 'enabled', true],
+      ['skill', 'clash', 'addon:linear', 'shadowed-by:user', false],
+      ['agent', 'tdd-guide', 'rafa', 'shadowed-by:user', false],
+      ['agent', 'tdd-guide', 'user', 'enabled', true],
+    ]);
+  });
+
+  it('reads a name tiers.skills sets false as disabled by that key, in every tier', () => {
+    const records = buildInventory(clashSeams(WITH_USER, { tiersSkills: new Map([['clash', false]]) })).records;
+
+    expect(records.filter((record) => record.name === 'clash').map(decided)).toEqual([
+      ['skill', 'clash', 'project', 'disabled:tiers.skills', false],
+      ['skill', 'clash', 'user', 'shadowed-by:project', false],
+      ['skill', 'clash', 'addon:linear', 'shadowed-by:project', false],
+    ]);
+  });
+
+  it('reads the rafa tier as disabled by tiers.rafa when it is off, serving the user copy', () => {
+    const records = buildInventory(clashSeams(WITH_USER, { tiersRafa: 'off' })).records;
+
+    expect(records.filter((record) => record.source === 'rafa' || record.name === 'tdd-guide').map(decided)).toEqual([
+      ['skill', 'served', 'rafa', 'disabled:tiers.rafa', false],
+      ['skill', 'unreviewed', 'rafa', 'disabled:tiers.rafa', false],
+      ['agent', 'tdd-guide', 'rafa', 'shadowed-by:user', false],
+      ['agent', 'tdd-guide', 'user', 'enabled', true],
+    ]);
+  });
+
+  it('asks the served check only of a rafa winner', () => {
+    const inventory = buildInventory(clashSeams(WITHOUT_USER));
+    const asked: string[] = [];
+    const reading: PrecedenceReading = {
+      overrides: { scopes: [], warnings: [] },
+      settingSources: WITHOUT_USER,
+      resolution: inventory.resolution,
+      isServed: (row) => {
+        asked.push(`${row.source} ${row.name}`);
+        return false;
+      },
+    };
+
+    const decidedRows = applyPrecedence(inventory.records, reading).map(decided);
+
+    expect(asked).toEqual(['rafa served', 'rafa unreviewed', 'rafa tdd-guide']);
+    // With the check answering false, no rafa row is visible; the project one still is.
+    expect(decidedRows.filter((row) => row[4]).map((row) => `${row[2]} ${row[1]}`)).toEqual(['project clash']);
   });
 });

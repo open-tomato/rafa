@@ -89,9 +89,10 @@
  * prompt carries after its plan text, with one sentence saying such an
  * item is neither a bug to fix nor a credential to patch around. Ahead
  * of every probe, the same preflight refuses a run whose checklist
- * routes a still-to-run task to an `agent=` no scope
- * `loop.settingSources` loads defines, since that dispatch would exit 1
- * before any model call.
+ * routes a still-to-run task to an `agent=` no loaded tier serves under
+ * `loop.settingSources`, `tiers.rafa` and the pins: one no tier holds,
+ * one switched off, or one two tiers hold with different contents. That
+ * dispatch would exit 1 before any model call.
  *
  * Each task session is spawned under an id the loop picks, with its stdout
  * captured (`start/dispatch.ts`). The exit code alone decides `failed`; a
@@ -196,6 +197,7 @@
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { BranchSeams } from './start/branch.js';
+import type { SessionServing } from './start/serving.js';
 
 import fs from 'fs';
 import { homedir } from 'os';
@@ -493,8 +495,19 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       planPath,
       settings: runConfig.config,
       newRunId: () => session.id,
-      agents: { settingSources, home: homedir() },
+      agents: {
+        settingSources,
+        tiersRafa: runConfig.config.tiersRafa,
+        tiersSkills: runConfig.config.tiersSkills,
+        tiersAgents: runConfig.config.tiersAgents,
+        home: homedir(),
+      },
     });
+
+    // What each session, task and wrap-up alike, is served against: the
+    // run's `.rafa/runs/<id>/served/`, refilled before every session
+    // (`start/serving.ts`).
+    const serving: SessionServing = { root: repoRoot, run: session.id, home: homedir(), settings: runConfig.config };
 
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
@@ -542,7 +555,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           planStub,
           planContent,
         });
-        await preserveProgress(planContent, settingSources, release);
+        await preserveProgress(planContent, settingSources, release, serving);
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
         // refusal, the `chore: release` commit and its push. A release
@@ -594,6 +607,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         home: homedir(),
         settingSources,
         knownMissing,
+        serving,
       });
       const { exitCode } = dispatch;
 

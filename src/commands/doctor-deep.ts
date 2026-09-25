@@ -19,7 +19,8 @@
  *   2. **Settings** (`./doctor-deep-settings.ts`) and **Stack tools**
  *      (`./doctor-deep-needs.ts`), both over ONE set of inventory seams
  *      built as `rafa plan needs` builds its own: the project root and
- *      home, `loop.settingSources`, the config's loaded modules, the rafa
+ *      home, `loop.settingSources`, `tiers.rafa`, `tiers.skills` and
+ *      `tiers.agents`, the config's loaded modules, the rafa
  *      tier beside the entry, and the `PATH` of step 1's environment,
  *      not the shell's, so a program is looked up where a session looks.
  *   3. **Providers** (`./doctor-deep-providers.ts`): every `gh` probe
@@ -245,8 +246,12 @@ export function environmentSection(reading: SessionEnvReading, shown: readonly N
   };
 }
 
-/** The inventory seams both inventory sections read, under the session's `PATH`; see the module note. */
-async function inventorySeams(input: DeepInput, sessionPath: string | undefined, seams: DeepInventorySeams): Promise<NeedsSeams> {
+/**
+ * The inventory seams both inventory sections read, under the session's
+ * `PATH`; see the module note. `./doctor-tiers.ts` builds its inventory
+ * over the same seams, so the tier rows and Settings read one world.
+ */
+export async function inventorySeams(input: DeepInput, sessionPath: string | undefined, seams: DeepInventorySeams): Promise<NeedsSeams> {
   const { project, resolved } = input;
   const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
   const entry = seams.entry ?? ((): string => Bun.main);
@@ -256,6 +261,9 @@ async function inventorySeams(input: DeepInput, sessionPath: string | undefined,
     entry: entry(),
     pathDirs: pathDirectories(sessionPath),
     settingSources: resolved.config.settingSources,
+    tiersRafa: resolved.config.tiersRafa,
+    tiersSkills: resolved.config.tiersSkills,
+    tiersAgents: resolved.config.tiersAgents,
     modules: loaded.modules,
   };
 }

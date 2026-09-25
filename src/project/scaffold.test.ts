@@ -206,8 +206,11 @@ describe('the config files', () => {
     expect([absent.config.dangerousAcceptStaleRefs, absent.sources.dangerousAcceptStaleRefs]).toEqual([false, 'default']);
   });
 
-  it('closes on the status section, the notice on by default, which resolves from the file once uncommented', () => {
-    const status = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# status:'));
+  it('carries the status section, the notice on by default, which resolves from the file once uncommented', () => {
+    const status = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# status:'),
+      CONFIG_SETTINGS_LINES.indexOf('# tiers:'),
+    );
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...status].join('\n')), 'c.yaml') });
 
     expect(status.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
@@ -225,6 +228,58 @@ describe('the config files', () => {
 
     expect([flipped.config.statusNotice, flipped.sources.statusNotice]).toEqual([false, 'file']);
     expect([absent.config.statusNotice, absent.sources.statusNotice]).toEqual([true, 'default']);
+  });
+
+  it('carries the tiers section at its defaults, which resolve from the file once uncommented', () => {
+    const tiers = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# tiers:'),
+      CONFIG_SETTINGS_LINES.indexOf('# routing:'),
+    );
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...tiers].join('\n')), 'c.yaml') });
+
+    expect(tiers.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# tiers:',
+      '#   rafa: on',
+      '#   skills: {}',
+      '#   agents: {}',
+    ]);
+    expect([resolved.config.tiersRafa, [...resolved.config.tiersSkills], [...resolved.config.tiersAgents]])
+      .toEqual(['on', [], []]);
+    expect([resolved.sources.tiersRafa, resolved.sources.tiersSkills, resolved.sources.tiersAgents])
+      .toEqual(['file', 'file', 'file']);
+  });
+
+  it('turns the rafa tier off once its line is uncommented with off, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}rafa:) on/, '$1 off'));
+    const flipped = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect([flipped.config.tiersRafa, flipped.sources.tiersRafa]).toEqual(['off', 'file']);
+  });
+
+  it('closes on the routing section, one line per default row, which resolves from the file once uncommented', () => {
+    const routing = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# routing:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...routing].join('\n')), 'c.yaml') });
+
+    expect(routing.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# routing:',
+      '#   prose: doc-updater',
+      '#   tests: tdd-guide',
+      '#   repair: build-error-resolver',
+      '#   review: code-reviewer',
+      '#   implementation: loop-implementer',
+    ]);
+    expect([...resolved.config.routing]).toEqual([...CONFIG_DEFAULTS.routing]);
+    expect(resolved.sources.routing).toBe('file');
+  });
+
+  it('answers routing from the file row by row once a row is changed, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.startsWith('#   prose:')
+      ? '#   prose: tdd-guide'
+      : line);
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect(resolved.config.routing.get('prose')).toBe('tdd-guide');
+    expect(resolved.config.routing.get('tests')).toBe('tdd-guide');
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

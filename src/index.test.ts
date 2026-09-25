@@ -394,7 +394,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
   ]],
   ['./commands/plan/validate.js', [
-    ['../../agents/roster.js', ['missingAgentLine', 'missingPlanAgents', 'resolveAgentRoster']],
+    ['../../agents/roster.js', [
+      'collidingPlanSkills',
+      'missingAgentLine',
+      'missingPlanAgents',
+      'resolveAgentRoster',
+      'skillCollisionLine',
+    ]],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
     ['../../config.js', ['ConfigError']],
@@ -650,8 +656,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/module/exec.js', [['../../cli/command.js', ['CommandExit']], ['../../cli/registry.js', ['mountKey']]]],
   ['./commands/agent/vendor.js', [
-    ['../../agents/roster.js', ['readAgentDefinitions']],
+    ['../../agents/roster.js', ['readAgentDirectory']],
     ['../../cli/command.js', ['CommandExit']],
+    ['../../inventory/trees.js', ['bundledAgentsDirectory']],
     ['../../utils/agent-definition.js', ['AGENT_DEFINITION_DIR', 'readFrontmatter']],
   ]],
   ['./commands/agent/list.js', [
@@ -834,6 +841,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-install.js', ['readInstall', 'writeInstall']],
     ['./doctor-refs.js', ['readDoctorRefs', 'renderDoctorRefs']],
     ['./doctor-render.js', ['renderBoard', 'renderDoctor']],
+    ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
     ['./plan/plan-files.js', ['isFile']],
   ]],
   ['./commands/cleanup.js', [

@@ -4,14 +4,19 @@
  * One world is planted under this file's temporary directory: a
  * TypeScript project (a `tsconfig.json` at its root), a home holding a
  * user-only skill `symbols` whose description names `ts-symbols`, a rafa
- * entry with one skill of its own beside it, and one `PATH` directory
- * holding `ts-symbols`. A second project root holds no marker.
+ * entry with two skills of its own beside it (`rafa-served`, which rafa
+ * serves, and `rafa-only`, an unreviewed third-party one it does not),
+ * and one `PATH` directory
+ * holding `ts-symbols`. A second rafa entry holds `ts-symbols` in its
+ * `bundled/bin`, as a build does. A second project root holds no marker.
  *
  * Every reading is taken beside the one that flips it, so no row passes
  * only because every row reads alike:
  *
  *   - the stack is `ok` with the user source and `ts-symbols` on `PATH`,
- *     and `warn` without the user source, or with an empty `PATH`;
+ *     and `warn` without the user source, or with an empty `PATH`,
+ *     unless the entry carries `bundled/bin/ts-symbols`, when it is `ok`
+ *     with that directory named;
  *   - the plan's user-only agent is a row without the user source and
  *     none with it, while its project agent is never one;
  *   - a plan with nothing unmet is one `ok` row.
@@ -26,7 +31,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readStackNeeds } from '../plan/needs.js';
+import { readStackNeeds, STACK_TOOLS } from '../plan/needs.js';
 
 import {
   PLAN_NEEDS_SECTION_TITLE,
@@ -48,6 +53,8 @@ const home = join(base, 'home');
 const projectRoot = join(base, 'project');
 const bareRoot = join(base, 'bare');
 const runtime = join(base, 'runtime');
+const builtRuntime = join(base, 'built-runtime');
+const builtBin = join(builtRuntime, 'bundled', 'bin');
 const binDir = join(base, 'bin');
 const plansDir = join(projectRoot, '.rafa', 'plans');
 const planPath = join(plansDir, 'PLAN-demo.md');
@@ -77,18 +84,25 @@ write(join(projectRoot, '.claude/agents/project-reviewer.md'), agent('project-re
 write(join(home, '.claude/agents/user-reviewer.md'), agent('user-reviewer'));
 write(join(home, '.claude/skills/symbols/SKILL.md'), skill('symbols', 'Trace TypeScript symbols with ts-symbols'));
 write(join(runtime, 'cli.js'), '');
-write(join(runtime, 'skills/rafa-only/SKILL.md'), skill('rafa-only', 'A skill rafa ships'));
+write(
+  join(runtime, 'bundled/skills/rafa-only/SKILL.md'),
+  skill('rafa-only', 'A skill rafa ships').replace('\n---\n\n', '\nprovenance:\n  origin: https://example.com/x\n  license: MIT\n---\n\n'),
+);
+write(join(runtime, 'bundled/skills/rafa-served/SKILL.md'), skill('rafa-served', 'A skill rafa serves'));
 mkdirSync(bareRoot, { recursive: true });
 
 write(join(binDir, 'ts-symbols'), '#!/bin/sh\n');
 chmodSync(join(binDir, 'ts-symbols'), 0o755);
+write(join(builtRuntime, 'cli.js'), '');
+write(join(builtBin, 'ts-symbols'), '#!/bin/sh\n');
+chmodSync(join(builtBin, 'ts-symbols'), 0o755);
 
 write(planPath, [
   '# Plan',
   '',
   '- [ ] Review with the project agent {agent=project-reviewer}',
   '- [ ] Review with the user agent {agent=user-reviewer}',
-  '- [ ] Use two skills {skills=absent-skill,rafa-only}',
+  '- [ ] Use three skills {skills=absent-skill,rafa-only,rafa-served}',
   '- [ ] Ask a server {tools=mcp__ghost__lookup}',
   '',
 ].join('\n'));
@@ -109,8 +123,9 @@ function seams(
   settingSources: readonly ClaudeSettingSource[],
   pathDirs: readonly string[] = [binDir],
   root: string | null = projectRoot,
+  entryDir: string = runtime,
 ): DeepNeedsSeams {
-  return { home, projectRoot: root, entry: join(runtime, 'cli.js'), pathDirs, settingSources, modules: [] };
+  return { home, projectRoot: root, entry: join(entryDir, 'cli.js'), pathDirs, settingSources, modules: [] };
 }
 
 /** The Stack tools section of this world under `options`. */
@@ -153,14 +168,31 @@ describe('stackToolsSection', () => {
     expect(row?.fix).toContain('add `user` to loop.settingSources');
   });
 
-  it('reads ts-symbols off PATH as a warn naming what to install', async () => {
+  it('reads ts-symbols off PATH and out of bundled/bin as a warn naming what to install', async () => {
     const [row] = (await stackSection(WITH_USER, [])).rows;
 
     expect(row).toMatchObject({
       status: 'warn',
-      detail: 'ts-symbols not on PATH; skill symbols visible to a run',
+      detail: 'ts-symbols neither in bundled/bin nor on PATH; skill symbols visible to a run',
     });
+    expect(row?.fix).toContain('run a built or installed rafa');
     expect(row?.fix).toContain('install `ts-symbols`');
+  });
+
+  it('reads the ts-symbols a built rafa ships in bundled/bin as ok with nothing on PATH', async () => {
+    const [row] = (await stackSection(WITH_USER, [], projectRoot, builtRuntime)).rows;
+
+    expect(row).toEqual({
+      status: 'ok',
+      name: 'typescript',
+      detail: `ts-symbols in ${builtBin}; skill symbols visible to a run`,
+    });
+  });
+
+  it('names bundled/bin before PATH when both hold ts-symbols', async () => {
+    const [row] = (await stackSection(WITH_USER, [binDir], projectRoot, builtRuntime)).rows;
+
+    expect(row?.detail).toBe(`ts-symbols in ${builtBin}; skill symbols visible to a run`);
   });
 
   it('reads a project root with no marker as one note naming the marker', async () => {
@@ -183,8 +215,10 @@ describe('stackToolsSection', () => {
     const lines = renderDeepSection(await stackSection(WITHOUT_USER, []));
 
     expect(lines[0]).toBe('Stack tools:');
-    expect(lines[1]).toBe('  warn  typescript: ts-symbols not on PATH; skill symbols not visible to a run');
-    expect(lines[2]).toStartWith('        fix: typescript: install `ts-symbols`');
+    expect(lines[1]).toBe(
+      '  warn  typescript: ts-symbols neither in bundled/bin nor on PATH; skill symbols not visible to a run',
+    );
+    expect(lines[2]).toStartWith('        fix: typescript: run a built or installed rafa');
   });
 });
 
@@ -282,8 +316,10 @@ describe('planNeedsSection', () => {
     });
     expect(byName.get('skill rafa-only')).toMatchObject({
       detail: 'rafa enabled, not visible to a run (task line 5)',
-      fix: 'add the skill rafa-only under .claude/skills/ in this project: a session is never handed a rafa skill',
+      fix: 'add the skill rafa-only under .claude/skills/ in this project: rafa does not serve its skill rafa-only',
     });
+    // Control: the rafa skill rafa serves is visible, so it is no row.
+    expect(byName.has('skill rafa-served')).toBe(false);
     expect(byName.get('mcp ghost')).toMatchObject({
       detail: 'missing (task line 6)',
       fix: 'declare the mcp server ghost in a scope loop.settingSources loads',
@@ -292,6 +328,23 @@ describe('planNeedsSection', () => {
       detail: 'not on PATH (prerequisite line 5)',
       fix: 'install zz-absent-program on PATH',
     });
+  });
+
+  it('reads the stack program as a row off PATH, and as none when bundled/bin holds it', async () => {
+    const off = planNeedsSection(await readDeepPlanNeeds(metPlanPath, 'PLAN.md', seams(WITH_USER, []))).rows;
+    const built = planNeedsSection(
+      await readDeepPlanNeeds(metPlanPath, 'PLAN.md', seams(WITH_USER, [], projectRoot, builtRuntime)),
+    ).rows;
+
+    expect(off).toEqual([{
+      status: 'warn',
+      name: 'program ts-symbols',
+      detail: 'neither in bundled/bin nor on PATH (stack typescript)',
+      fix: STACK_TOOLS[0]?.install ?? 'no install text',
+    }]);
+    expect(built).toEqual([
+      { status: 'ok', name: 'plan', detail: 'nothing it needs is missing or hidden from a run' },
+    ]);
   });
 
   it('reads a plan with nothing unmet as one ok row', async () => {

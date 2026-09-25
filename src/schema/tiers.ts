@@ -13,8 +13,8 @@
  *
  *   - `project`: `<root>/.claude/skills`, the checkout's own, which
  *     Claude Code loads for a session started in it.
- *   - `rafa`: `skills/` beside the running `cli.js`, the skills rafa
- *     ships. Phase 6 populates it; until then the directory is
+ *   - `rafa`: `bundled/skills` beside the running `cli.js`, the skills
+ *     rafa ships. Until the bundle is populated the directory is
  *     ordinarily absent, which {@link resolveSkillTiers} reports
  *     rather than hides.
  *   - `user`: `~/.claude/skills`, the machine's own.
@@ -25,8 +25,11 @@
  *
  * ## The rafa tier is measured from the entry, with its links resolved
  *
- * The bundle is `dist/cli.js` and its skills sit beside it, so the tier
- * is `dirname(entry)/skills`. The entry is resolved through
+ * The bundle is `dist/cli.js` and its skills sit in `dist/bundled/`
+ * beside it, so the tier is `dirname(entry)/bundled/skills`. The
+ * `bundled/` parent keeps the tier apart from `src/agents/`, which
+ * holds TypeScript, and gives the rafa tier's agents and programs
+ * (`bundled/agents`, `bundled/bin`) one home beside its skills. The entry is resolved through
  * {@link realEntry} because the installed rafa is reached through a
  * link — `~/.rafa/bin/rafa` points into `~/.rafa/runtime/<version>/` —
  * and the skills of a runtime sit in that runtime's directory, not in
@@ -34,10 +37,10 @@
  * the same reason.
  *
  * Run from the checkout as `bun src/rafa.ts`, the entry is
- * `src/rafa.ts` and the tier resolves to `src/skills`, which the
- * repository does not have. That is the honest answer for a checkout:
- * the tier is what the RUNNING build carries, and a checkout run
- * carries whatever sits beside the file bun was handed.
+ * `src/rafa.ts` and the tier resolves to `src/bundled/skills`, the
+ * checkout's own copy of what a build ships. The tier is what the
+ * RUNNING entry carries, and a checkout run carries whatever sits
+ * beside the file bun was handed.
  *
  * ## The two instinct scopes
  *
@@ -46,6 +49,19 @@
  * The scopes are named `user` and `project` so a caller that carries
  * both kinds carries one vocabulary ({@link InstinctScope} is a subset
  * of {@link SkillTier}).
+ *
+ * ## A nearer scope shadows a record of the same id
+ *
+ * {@link shadowLessonsById} decides which record a reader takes when
+ * both scopes hold one `id`: the project's, and the user's is shadowed
+ * by it. It is pure over records a caller already read, keyed by
+ * whatever `id` the caller hands (`src/commands/instinct/
+ * instinct-records.ts` files a record under its file stem). Two scopes
+ * holding one trigger under different ids is not shadowing: that is a
+ * conflict for the conflict table, and both records stand. A record
+ * naming a scope outside {@link INSTINCT_SCOPES}, `rafa` above all,
+ * is refused with a throw rather than ranked, since rafa holds no
+ * lessons and a record claiming it came from a caller's cast.
  *
  * ## No directory is read here
  *
@@ -76,8 +92,11 @@ export const CLAUDE_SKILLS_PATH = join('.claude', 'skills');
 /** The instincts directory a scope holds, under a project root or the home. */
 export const RAFA_INSTINCTS_PATH = join('.rafa', 'instincts');
 
-/** The directory rafa's own skills sit in, beside the running `cli.js`. */
-export const BUNDLED_SKILLS_DIR = 'skills';
+/** The directory rafa's own skills sit in, relative to the running `cli.js`. */
+export const BUNDLED_SKILLS_DIR = join('bundled', 'skills');
+
+/** The directory rafa's own programs sit in, relative to the running `cli.js`. */
+export const BUNDLED_BIN_DIR = join('bundled', 'bin');
 
 /** What a tier is resolved against. Each seam is given; none is read from the environment. */
 export interface TierSeams {
@@ -125,11 +144,22 @@ export function realEntry(entry: string): string {
 }
 
 /**
- * The directory rafa's own skills sit in: `skills/` beside the running
- * `cli.js`, links resolved. See the module note.
+ * The directory rafa's own skills sit in: `bundled/skills` beside the
+ * running `cli.js`, links resolved. See the module note.
  */
 export function bundledSkillsDirectory(entry?: string): string {
   return join(dirname(realEntry(entry ?? Bun.main)), BUNDLED_SKILLS_DIR);
+}
+
+/**
+ * The directory rafa's own programs sit in: `bundled/bin` beside the
+ * running `cli.js`, links resolved, as {@link bundledSkillsDirectory}
+ * resolves its skills. A build writes `ts-symbols` there; a checkout's
+ * `src/bundled/` holds no `bin/`, so run as `bun src/rafa.ts` it names
+ * a directory that is not there.
+ */
+export function bundledBinDirectory(entry?: string): string {
+  return join(dirname(realEntry(entry ?? Bun.main)), BUNDLED_BIN_DIR);
 }
 
 /**
@@ -176,6 +206,59 @@ export function resolveInstinctScopes(seams: TierSeams): readonly InstinctScopeL
     if (dir !== null) located.push({ scope, dir });
   }
   return located;
+}
+
+/** What {@link shadowLessonsById} ranks: a record, the scope holding it, and its id. */
+export interface ScopedLesson {
+  /** The scope that holds it. */
+  readonly scope: InstinctScope;
+  /** The id a nearer scope shadows it by. */
+  readonly id: string;
+}
+
+/** A record that lost to a nearer one of the same id. */
+export interface ShadowedLesson<T extends ScopedLesson> {
+  /** The record that lost. */
+  readonly record: T;
+  /** The record that shadows it, in a nearer scope or first in the same one. */
+  readonly by: T;
+}
+
+/** What {@link shadowLessonsById} answers. */
+export interface LessonShadowing<T extends ScopedLesson> {
+  /** One record per id, in {@link INSTINCT_SCOPES} order, then the order handed. */
+  readonly winners: readonly T[];
+  /** Every other record, each beside the winner that shadows it. */
+  readonly shadowed: readonly ShadowedLesson<T>[];
+}
+
+/**
+ * The record a reader takes for each `id` across the instinct scopes:
+ * the project scope's before the user scope's. Records may come in any
+ * order and are taken in scope order, stably, so a second record of
+ * one id inside one scope is shadowed by the first that scope was
+ * handed. Throws on a record whose scope is not an instinct scope:
+ * the rafa tier holds no lessons (see the module note).
+ */
+export function shadowLessonsById<T extends ScopedLesson>(records: readonly T[]): LessonShadowing<T> {
+  const foreign = records.find((record) => !isInstinctScope(record.scope));
+  if (foreign !== undefined) {
+    throw new TypeError(`lesson ${foreign.id} names scope ${foreign.scope}, which holds no lessons; the scopes are ${INSTINCT_SCOPES.join(', ')}`);
+  }
+  const ordered = INSTINCT_SCOPES.flatMap((scope) => records.filter((record) => record.scope === scope));
+  const byId = new Map<string, T>();
+  const winners: T[] = [];
+  const shadowed: ShadowedLesson<T>[] = [];
+  for (const record of ordered) {
+    const nearer = byId.get(record.id);
+    if (nearer === undefined) {
+      byId.set(record.id, record);
+      winners.push(record);
+    } else {
+      shadowed.push({ record, by: nearer });
+    }
+  }
+  return { winners, shadowed };
 }
 
 /** Whether a resolved tier or scope directory is there at all. */

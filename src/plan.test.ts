@@ -510,6 +510,23 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
+  it('renders the routing the config resolves into the prompt, not rafa\'s defaults alone', () => {
+    const scratch = plantScratch({ config: 'routing:\n  cleanup: refactor-cleaner\n  tests: false\n' });
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
+
+    // The control: the defaults' prompt routes `tests` and not `cleanup`,
+    // so the two readings below are the config's doing.
+    expect(expectedPrompt(undefined)).toContain('| `tests` | `tdd-guide` |');
+    expect(expectedPrompt(undefined)).not.toContain('`cleanup`');
+    expect(run.exitCode).toBe(0);
+    const prompt = String(readRecord(scratch)['prompt']);
+    expect(prompt).toContain('| `cleanup` | `refactor-cleaner` |');
+    expect(prompt).toContain('| `prose` | `doc-updater` |');
+    expect(prompt).not.toContain('`tests`');
+    expect(prompt).not.toContain('{ROUTING}');
+  }, 30_000);
+
   it('reads a spec the project root does not hold from specs.dir, and hands the planner that path', () => {
     const scratch = plantScratch();
     mkdirSync(join(scratch.repo, '.rafa', 'specs'), { recursive: true });

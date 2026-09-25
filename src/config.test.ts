@@ -60,6 +60,8 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
+  RouteTarget,
+  TierPin,
 } from './config.js';
 
 import { join } from 'node:path';
@@ -84,7 +86,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup, dangerous, status)';
+  + 'roadmap, release, cleanup, dangerous, status, tiers, routing)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -120,6 +122,10 @@ const SETTINGS: readonly ConfigSetting[] = [
   'cleanupKeep',
   'dangerousAcceptStaleRefs',
   'statusNotice',
+  'tiersRafa',
+  'tiersSkills',
+  'tiersAgents',
+  'routing',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -156,6 +162,16 @@ const DEFAULTS: RafaConfig = {
   cleanupKeep: [],
   dangerousAcceptStaleRefs: false,
   statusNotice: true,
+  tiersRafa: 'on',
+  tiersSkills: new Map(),
+  tiersAgents: new Map(),
+  routing: new Map([
+    ['prose', 'doc-updater'],
+    ['tests', 'tdd-guide'],
+    ['repair', 'build-error-resolver'],
+    ['review', 'code-reviewer'],
+    ['implementation', 'loop-implementer'],
+  ]),
 };
 
 /** A file naming every setting, each at a value other than its default. */
@@ -217,6 +233,11 @@ const FULL = [
   '  acceptStaleRefs: true',
   'status:',
   '  notice: false',
+  'tiers:',
+  '  rafa: off',
+  '  skills: { react-query: false, documentation: project }',
+  '  agents: { tdd-guide: user }',
+  'routing: { cleanup: refactor-cleaner, review: false }',
   '',
 ].join('\n');
 
@@ -268,6 +289,23 @@ const FULL_VALUES: RafaConfig = {
   cleanupKeep: ['release/*', 'keep-me'],
   dangerousAcceptStaleRefs: true,
   statusNotice: false,
+  tiersRafa: 'off',
+  tiersSkills: new Map<string, TierPin>([['react-query', false], ['documentation', 'project']]),
+  tiersAgents: new Map([['tdd-guide', 'user']]),
+  routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
+};
+
+/**
+ * What {@link FULL} resolves to: maps merge by key over the defaults, so
+ * the file's `false` shadows the default review row rather than dropping it.
+ */
+const FULL_RESOLVED: RafaConfig = {
+  ...FULL_VALUES,
+  routing: new Map<string, RouteTarget>([
+    ...DEFAULTS.routing,
+    ['cleanup', 'refactor-cleaner'],
+    ['review', false],
+  ]),
 };
 
 /** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
@@ -632,6 +670,26 @@ describe('parseConfigText', () => {
         'status.notice is "no", expected true or false',
         'status:\n  notice: false', 'statusNotice', false,
       ],
+      [
+        'tiers.rafa', 'tiers:\n  rafa: false',
+        'tiers.rafa is false, expected one of: on, off',
+        'tiers:\n  rafa: off', 'tiersRafa', 'off',
+      ],
+      [
+        'tiers.skills', 'tiers:\n  skills: { react-query: true }',
+        'tiers.skills.react-query is true, expected false or one of: project, rafa, user',
+        'tiers:\n  skills: { react-query: false }', 'tiersSkills', new Map([['react-query', false]]),
+      ],
+      [
+        'tiers.agents', 'tiers:\n  agents: [tdd-guide]',
+        'tiers.agents is a list, expected a mapping of names to false or a tier',
+        'tiers:\n  agents: { tdd-guide: rafa }', 'tiersAgents', new Map([['tdd-guide', 'rafa']]),
+      ],
+      [
+        'routing', 'routing: { prose: true }',
+        'routing.prose is true, expected false or an agent name',
+        'routing: { prose: tdd-guide }', 'routing', new Map([['prose', 'tdd-guide']]),
+      ],
     ];
 
     it('covers every setting once', () => {
@@ -677,6 +735,22 @@ describe('parseConfigText', () => {
     ]);
   });
 
+  it('retains a tiers map name spelled flat as an unknown key, not as a pin', () => {
+    const file = fileOf('tiers.skills.tdd-guide: false\n');
+
+    expect(file.extras).toEqual([{ key: 'tiers.skills.tdd-guide', value: false }]);
+    expect(file.values.tiersSkills).toBeUndefined();
+    expect(fileOf('tiers:\n  skills:\n    tdd-guide: false\n').values.tiersSkills)
+      .toEqual(new Map([['tdd-guide', false]]));
+  });
+
+  it('retains a routing shape spelled flat as an unknown key, not as a row', () => {
+    const file = fileOf('routing.cleanup: refactor-cleaner\n');
+
+    expect(file.extras).toEqual([{ key: 'routing.cleanup', value: 'refactor-cleaner' }]);
+    expect(file.values.routing).toBeUndefined();
+  });
+
   it.each([
     ['plan.inject', 'plan.inject: full\nplan:\n  inject: task\n'],
     ['loop.settingSources', 'loop.settingSources: user\nloop:\n  settingSources: local\n'],
@@ -688,6 +762,15 @@ describe('parseConfigText', () => {
 });
 
 describe('resolveConfig', () => {
+  it('merges a file\'s routing rows by key over the five defaults', () => {
+    const file = fileOf('routing: { cleanup: refactor-cleaner }\n');
+
+    expect(resolveConfig({ file }).config.routing)
+      .toEqual(new Map([...DEFAULTS.routing, ['cleanup', 'refactor-cleaner']]));
+    expect(resolveConfig({ file: fileOf('store: sqlite\n') }).config.routing)
+      .toEqual(DEFAULTS.routing);
+  });
+
   it('answers the defaults when no layer names a setting', () => {
     expect(resolveConfig()).toEqual({
       config: DEFAULTS,
@@ -703,7 +786,7 @@ describe('resolveConfig', () => {
   it('lets the file outrank the default, for every setting', () => {
     const resolved = resolveConfig({ file: fileOf(FULL) });
 
-    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.config).toEqual(FULL_RESOLVED);
     expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
     expect(resolved.path).toBe(PATH);
   });
@@ -711,7 +794,7 @@ describe('resolveConfig', () => {
   it('lets the user file outrank the default, for every setting', () => {
     const resolved = resolveConfig({ user: fileOf(FULL, USER_PATH) });
 
-    expect(resolved.config).toEqual(FULL_VALUES);
+    expect(resolved.config).toEqual(FULL_RESOLVED);
     expect(resolved.sources).toEqual(sourcesWith({}, 'user'));
     expect([resolved.path, resolved.userPath]).toEqual([null, USER_PATH]);
   });
@@ -721,7 +804,7 @@ describe('resolveConfig', () => {
     const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
     const resolved = resolveConfig({ file, user });
 
-    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'project-plans' });
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'project-plans' });
     expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'file' }, 'user'));
     expect([resolved.path, resolved.userPath]).toEqual([PATH, USER_PATH]);
   });
@@ -731,7 +814,7 @@ describe('resolveConfig', () => {
     const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
     const resolved = resolveConfig({ file, user, cli: { planDir: 'cli-plans' } });
 
-    expect(resolved.config).toEqual({ ...FULL_VALUES, inject: 'task', planDir: 'cli-plans' });
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'cli-plans' });
     expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'cli' }, 'user'));
   });
 
@@ -763,7 +846,7 @@ describe('resolveConfig', () => {
     const resolved = resolveConfig({ file: fileOf(FULL), cli });
 
     expect(resolved.config).toEqual({
-      ...FULL_VALUES,
+      ...FULL_RESOLVED,
       store: 'sqlite',
       inject: 'task',
       planDir: 'cli-plans',

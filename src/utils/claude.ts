@@ -9,7 +9,8 @@
  * effort, every tool. So the flags are a parameter with an EMPTY
  * default: `runClaude(prompt, settingSources)` spawns the base
  * arguments and the setting sources, and nothing a declaration could
- * add.
+ * add. The wrap-up also hands over the flags serving its session the
+ * rafa-tier winners (`start/serving.ts`); the CI repair hands none.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
  * LOOP reads as well. It has three callers: the per-task dispatch,
@@ -23,8 +24,9 @@
  * {@link spawnClaude} answers the exit code alone, so a loop holding
  * that session's exit code holds nothing else. A task session's flags are
  * the ones its routing declaration resolved to, with the
- * `--session-id` the loop picked for that session ahead of them, and
- * the planner hands over none. The captured entry builds its argument
+ * `--session-id` the loop picked for that session ahead of them and
+ * its served flags (`start/serving.ts`) ahead of both, and the planner
+ * hands over none. The captured entry builds its argument
  * list through the same {@link claudeArgs} and hands the prompt over the
  * same way; only the spawner differs, {@link spawnClaudeCaptured} piping
  * stdout, echoing it on to the operator as it arrives and keeping the
@@ -115,6 +117,8 @@
  * The environment is `sessionSpawnEnv(process.env)` at both doors
  * (`session-env.ts`), the one function a reading of the session's
  * environment calls too, so neither door spells an entry of its own.
+ * That puts the running entry's `bundled/bin` at the front of every
+ * session's `PATH`.
  *
  * ## Interrupting a running session
  *
@@ -249,7 +253,7 @@ export const SETTING_SOURCES_FLAG = '--setting-sources';
 
 /**
  * Builds the argument list for one session: the base arguments, the
- * setting sources, then the flags.
+ * setting sources, the served flags, then the flags.
  *
  * `settingSources` is the run's resolved `loop.settingSources`, joined
  * with commas in the order given. `config.ts` has already refused a
@@ -261,12 +265,23 @@ export const SETTING_SOURCES_FLAG = '--setting-sources';
  * reordered, deduped or filtered here: this module has no opinion on
  * which flags are legal, and one that did would be a second authority
  * for a decision `utils/declaration.ts` already makes.
+ *
+ * `served` is `ServedSet.flags` from `serveResolution`
+ * (`src/tiers/serve.ts`), the session-only flags handing the run's
+ * served directory over, and is taken as it is for the same reason.
+ * It defaults to empty, so a caller that serves nothing spawns what it
+ * spawned before. It goes BEFORE `flags`, never after: `--tools` has to
+ * stay the last element (see the module note), and the served flags
+ * are safe ahead of the resolved ones, since `serve.ts` ends them with
+ * `--agents <json>` when an agent is served and every resolved flag
+ * starts with a dash, which is where the variadic `--add-dir` stops.
  */
 export function claudeArgs(
   settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
+  served: readonly string[] = [],
 ): string[] {
-  return [...CLAUDE_BASE_ARGS, SETTING_SOURCES_FLAG, settingSources.join(','), ...flags];
+  return [...CLAUDE_BASE_ARGS, SETTING_SOURCES_FLAG, settingSources.join(','), ...served, ...flags];
 }
 
 /**
@@ -395,15 +410,23 @@ export async function spawnClaude(
  * `flags` defaults to empty, so plan generation, the wrap-up and the
  * CI-repair session, which hand over none, cannot be routed by
  * accident: each spawns the base arguments and its setting sources
- * alone. `settingSources` has no default; see the module note.
+ * with no routing flag. `settingSources` has no default; see the module
+ * note.
+ *
+ * `served` is the flags handing a served directory over, which
+ * {@link claudeArgs} places between the setting sources and `flags`. It
+ * defaults to empty. The wrap-up is the one caller that hands any
+ * (`start/wrap-up.ts`). It comes last so that no call written before it
+ * existed has to change.
  */
 export function runClaude(
   prompt: string,
   settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
   spawn: ClaudeSpawner = spawnClaude,
+  served: readonly string[] = [],
 ): Promise<number> {
-  return spawn(claudeArgs(settingSources, flags), prompt);
+  return spawn(claudeArgs(settingSources, flags, served), prompt);
 }
 
 /**
@@ -577,12 +600,17 @@ async function spawnCaptured(
  * capturing a session changes where its stdout goes and nothing about
  * what is run. The operator still sees that output as it is written,
  * through the tee in {@link spawnClaudeCaptured}.
+ *
+ * `served` is taken as {@link runClaude} takes it. The task session is
+ * the one caller that hands any (`runTaskSession` in
+ * `start/dispatch.ts`).
  */
 export function runClaudeCaptured(
   prompt: string,
   settingSources: readonly ClaudeSettingSource[],
   flags: readonly string[] = [],
   spawn: CapturingSpawner = spawnClaudeCaptured,
+  served: readonly string[] = [],
 ): Promise<CapturedSession> {
-  return spawn(claudeArgs(settingSources, flags), prompt);
+  return spawn(claudeArgs(settingSources, flags, served), prompt);
 }

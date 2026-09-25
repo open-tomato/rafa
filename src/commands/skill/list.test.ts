@@ -24,6 +24,16 @@
  * a failing skill leaves the exit code 0 is held beside its json row,
  * whose `check` says `fail`.
  *
+ * ## The rafa tier
+ *
+ * Skills planted under `bundled/skills` beside the entry list as
+ * `source: rafa`, a first-party one marked visible and an unreviewed
+ * third-party one hidden, and `tiers.rafa: off` hides the served one
+ * again. A project copy that differs from a rafa skill is a
+ * `collision`, kept alone by `--state=collision`; a byte-identical
+ * copy is the control, one item with no collision, and a
+ * `tiers.skills` pin settles the differing pair.
+ *
  * ## `-i`
  *
  * The browse runs over a recording terminal and scripted keys handed in
@@ -37,6 +47,7 @@
 import type { SkillListSeams } from './list.js';
 import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { InventoryRecord } from '../../inventory/record.js';
+import type { Resolution } from '../../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -219,11 +230,15 @@ function record(fields: Partial<InventoryRecord>): InventoryRecord {
   };
 }
 
+/** A resolution of no tier rows, for an inventory built by hand. */
+const NO_RESOLUTION: Resolution = { loadedTiers: [], items: [], collisions: [] };
+
 /** An inventory holding the rows and warnings given, and nothing else. */
 function inventoryOf(records: readonly InventoryRecord[], warningSources: readonly string[] = []) {
   return {
     records,
     trees: [],
+    resolution: NO_RESOLUTION,
     warnings: warningSources.map((source) => ({ source: source as `plugin:${string}`, path: '/x', reason: 'unreadable' })),
     overrideWarnings: [],
   };
@@ -250,15 +265,16 @@ describe('the words a skill list line is read as', () => {
     expect(refusal(() => readSourceFlag(true))[1]).toContain('--source needs a value');
   });
 
-  it('reads the three state words and refuses any other', () => {
+  it('reads the four state words and refuses any other', () => {
     expect(readStateFlag(undefined)).toBeNull();
     expect(readStateFlag('enabled')).toBe('enabled');
+    expect(readStateFlag('collision')).toBe('collision');
     expect(readStateFlag('shadowed')).toBe('shadowed');
     expect(readStateFlag('disabled')).toBe('disabled');
 
     const [code, message] = refusal(() => readStateFlag('shadowed-by:project'));
     expect(code).toBe(1);
-    expect(message).toContain('--state is "shadowed-by:project", expected one of: enabled, shadowed, disabled');
+    expect(message).toContain('--state is "shadowed-by:project", expected one of: enabled, collision, shadowed, disabled');
   });
 
   it('reads the three filters together, --hidden-from-loop as a switch', () => {
@@ -289,6 +305,17 @@ describe('which rows a filter keeps', () => {
     expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'disabled' }))).toEqual([disabled]);
     expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'enabled' }))).toEqual([enabled]);
     expect(rows.filter((row) => matchesFilters(row, { ...none, hiddenFromLoop: true }))).toEqual([shadowed, disabled]);
+  });
+
+  it('keeps the collision rows alone under --state=collision, which --hidden-from-loop also keeps', () => {
+    const colliding = record({ name: 'd', source: 'rafa', state: 'collision', visibleToLoop: false });
+    const rows = [enabled, colliding, shadowed, disabled];
+
+    expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'collision' }))).toEqual([colliding]);
+    // Control: the same row is not kept by any other state word.
+    expect(rows.filter((row) => matchesFilters(row, { ...none, state: 'enabled' }))).toEqual([enabled]);
+    expect(rows.filter((row) => matchesFilters(row, { ...none, hiddenFromLoop: true })))
+      .toEqual([colliding, shadowed, disabled]);
   });
 
   it('knows the tiers, then each named source a row or a warning names, and refuses any other', () => {
@@ -374,7 +401,7 @@ describe('rafa skill list over planted sources', () => {
       '  ○ user-only          user          enabled                  Held by the home alone',
       '  ● verification-loop  project       enabled                  Run the gates in order',
       '  ○ verification-loop  user          shadowed-by:project      The home copy of the gates',
-      `  rafa  ${join(dirname(tree.entry), 'skills')}  (no such directory)`,
+      `  rafa  ${join(dirname(tree.entry), 'bundled', 'skills')}  (no such directory)`,
       '5 of 5 skill(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
       '● a loop session resolves it, ○ it does not',
     ]);
@@ -412,8 +439,10 @@ describe('rafa skill list over planted sources', () => {
       ['alpha:brainstorm', 'plugin:alpha', 'enabled', true],
       ['switched-off', 'project', 'disabled:skillOverrides', false],
       ['user-only', 'user', 'enabled', true],
-      ['verification-loop', 'project', 'enabled', true],
-      ['verification-loop', 'user', 'shadowed-by:project', false],
+      // The two copies differ, so with the user tier loaded they collide
+      // (`resolveTiers`), and a loop session is served neither.
+      ['verification-loop', 'project', 'collision', false],
+      ['verification-loop', 'user', 'collision', false],
     ]);
   });
 
@@ -517,7 +546,7 @@ describe('rafa skill list over planted sources', () => {
     expect(unknown.exitCode).toBe(1);
     expect(unknown.stderr).toContain('known sources: project, rafa, user, plugin:alpha');
     expect(state.exitCode).toBe(1);
-    expect(state.stderr).toContain('--state is "hidden", expected one of: enabled, shadowed, disabled');
+    expect(state.stderr).toContain('--state is "hidden", expected one of: enabled, collision, shadowed, disabled');
   });
 
   it('refuses a config that cannot be used', async () => {
@@ -528,6 +557,144 @@ describe('rafa skill list over planted sources', () => {
 
     expect(answered.exitCode).toBe(1);
     expect(answered.stderr).toContain('rafa skill list: the config cannot be used:');
+  });
+});
+
+/** A rafa-tier skill file: {@link skillText} with the `provenance` lines given in its frontmatter. */
+function rafaSkillText(name: string, description: string, provenance: readonly string[]): string {
+  return skillText(name, description).replace('\ntags:', `\n${provenance.join('\n')}\ntags:`);
+}
+
+/** A first-party rafa skill, which the serving check admits. */
+function servedSkill(name: string, description: string): string {
+  return rafaSkillText(name, description, ['provenance: first-party']);
+}
+
+/** A third-party rafa skill carrying no `reviewed`, which the serving check holds back. */
+function unreviewedSkill(name: string, description: string): string {
+  return rafaSkillText(name, description, [
+    'provenance:',
+    '  origin: "https://example.com/skills"',
+    '  license: "MIT"',
+  ]);
+}
+
+/** Where the rafa tier's skill `name` is planted, beside the planted entry. */
+function bundled(name: string): string {
+  return `runtime/bundled/skills/${name}/SKILL.md`;
+}
+
+describe('rafa skill list over a planted rafa tier', () => {
+  it('lists bundled skills as source rafa, marking the served one and not the unreviewed one', async () => {
+    const tree = plant({
+      [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses'),
+      [bundled('borrowed')]: unreviewedSkill('borrowed', 'Someone else\'s skill'),
+    });
+
+    const json = await run(['skill', 'list', '--source=rafa', '--output=json'], tree);
+    const text = await run(['skill', 'list', '--source=rafa'], tree);
+
+    expect(json.exitCode).toBe(0);
+    expect(rowsOf(json.stdout)).toEqual([
+      ['borrowed', 'rafa', 'enabled', false],
+      ['dev-planner', 'rafa', 'enabled', true],
+    ]);
+    expect(resultData(json.stdout).trees).toEqual([
+      { source: 'rafa', dir: join(dirname(tree.entry), 'bundled', 'skills'), exists: true },
+    ]);
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout.split('\n').filter((line) => line !== '')).toEqual([
+      `Skills (project: ${tree.root}; source rafa):`,
+      '  ○ borrowed     rafa  enabled  Someone else\'s skill',
+      '  ● dev-planner  rafa  enabled  Write a plan the loop parses',
+      '2 of 2 skill(s) listed, 1 visible to the loop (loop.settingSources: project, local)',
+      '● a loop session resolves it, ○ it does not',
+    ]);
+  });
+
+  it('marks a served rafa skill hidden, disabled:tiers.rafa, when tiers.rafa is off', async () => {
+    const tree = plant({ [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses') });
+    plantProjectConfig(tree.root, `${configText('project,local')}tiers:\n  rafa: off\n`);
+
+    const answered = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(rowsOf(answered.stdout)).toEqual([['dev-planner', 'rafa', 'disabled:tiers.rafa', false]]);
+  });
+
+  it('shows a project copy that differs from the rafa one as a collision, and --state=collision keeps both', async () => {
+    const tree = plant({
+      [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses'),
+      'project/.claude/skills/dev-planner/SKILL.md': servedSkill('dev-planner', 'An edited copy'),
+      'project/.claude/skills/verification-loop/SKILL.md': skillText('verification-loop', 'Run the gates in order'),
+    });
+
+    const all = await run(['skill', 'list', '--output=json'], tree);
+    const colliding = await run(['skill', 'list', '--state=collision'], tree);
+
+    expect(all.exitCode).toBe(0);
+    expect(rowsOf(all.stdout)).toEqual([
+      ['dev-planner', 'project', 'collision', false],
+      ['dev-planner', 'rafa', 'collision', false],
+      ['verification-loop', 'project', 'enabled', true],
+    ]);
+    expect(colliding.exitCode).toBe(0);
+    expect(colliding.stdout.split('\n').filter((line) => line !== '')).toEqual([
+      `Skills (project: ${tree.root}; state collision):`,
+      '  ○ dev-planner  project  collision  An edited copy',
+      '  ○ dev-planner  rafa     collision  Write a plan the loop parses',
+      `  user  ${join(tree.home, '.claude', 'skills')}  (no such directory)`,
+      '2 of 3 skill(s) listed, 0 visible to the loop (loop.settingSources: project, local)',
+      '● a loop session resolves it, ○ it does not',
+    ]);
+  });
+
+  it('reads a byte-identical project copy as one item, the control on the collision', async () => {
+    const text = servedSkill('dev-planner', 'Write a plan the loop parses');
+    const tree = plant({ [bundled('dev-planner')]: text, 'project/.claude/skills/dev-planner/SKILL.md': text });
+
+    const all = await run(['skill', 'list', '--output=json'], tree);
+    const colliding = await run(['skill', 'list', '--state=collision', '--output=json'], tree);
+
+    expect(rowsOf(all.stdout)).toEqual([
+      ['dev-planner', 'project', 'enabled', true],
+      ['dev-planner', 'rafa', 'shadowed-by:project', false],
+    ]);
+    expect(rowsOf(colliding.stdout)).toEqual([]);
+  });
+
+  it('keeps a differing project copy a collision under tiers.skills pinning the name to rafa', async () => {
+    // Claude Code loads the project's skill over the served copy, so the
+    // pin has no effect (`tiers/resolve.ts`).
+    const tree = plant({
+      [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses'),
+      'project/.claude/skills/dev-planner/SKILL.md': servedSkill('dev-planner', 'An edited copy'),
+    });
+    plantProjectConfig(tree.root, `${configText('project,local')}tiers:\n  skills:\n    dev-planner: rafa\n`);
+
+    const answered = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(rowsOf(answered.stdout)).toEqual([
+      ['dev-planner', 'project', 'collision', false],
+      ['dev-planner', 'rafa', 'collision', false],
+    ]);
+  });
+
+  it('serves the project copy and shadows the rafa one once tiers.skills pins the name to project', async () => {
+    const tree = plant({
+      [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses'),
+      'project/.claude/skills/dev-planner/SKILL.md': servedSkill('dev-planner', 'An edited copy'),
+    });
+    plantProjectConfig(tree.root, `${configText('project,local')}tiers:\n  skills:\n    dev-planner: project\n`);
+
+    const answered = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(rowsOf(answered.stdout)).toEqual([
+      ['dev-planner', 'project', 'enabled', true],
+      ['dev-planner', 'rafa', 'shadowed-by:project', false],
+    ]);
   });
 });
 

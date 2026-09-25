@@ -170,6 +170,7 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
       repoRoot: tempRoot,
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
+      serving: null,
       run,
     });
 

@@ -275,14 +275,14 @@ describe('assessPlanRisk: commands', () => {
     const force = `${FENCE}bash\ngit push --force\n${FENCE}`;
     const reset = `${FENCE}bash\ngit reset --hard\n${FENCE}`;
     const clean = `${FENCE}bash\ngit clean -fd\n${FENCE}`;
-    plantSkill(join(world.root, 'rafa', 'skills'), 'both', force);
+    plantSkill(join(world.root, 'rafa', 'bundled', 'skills'), 'both', force);
     plantSkill(join(world.home, '.claude', 'skills'), 'both', reset);
     plantSkill(join(world.home, '.claude', 'skills'), 'mine', clean);
 
     const report = await assessPlanRisk(planOf(['- [ ] Go  {tools=Read skills=both,mine,absent}']), seams());
 
     expect(ofKind(report, 'destructive').map((finding) => [finding.text, finding.file])).toEqual([
-      ['git push --force — git push --force', join(world.root, 'rafa', 'skills', 'both', 'SKILL.md')],
+      ['git push --force — git push --force', join(world.root, 'rafa', 'bundled', 'skills', 'both', 'SKILL.md')],
       ['git clean -f — git clean -fd', '~/.claude/skills/mine/SKILL.md'],
     ]);
   });

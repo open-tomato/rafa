@@ -98,6 +98,14 @@ counts at both ends prove the base is red for the same reason. Measured
 at `0aec45d` and at rafa-63's head: `4 pass`, `2 fail` either side. Do not
 re-file it as a finding; over twenty tasks of one plan already did.
 
+A worktree changes what the skills-tier checker suites find: three of their
+cases fail inside a `git worktree` of this repository and pass in the main
+checkout (one is `this repository skills tier, checked with the PATH a CI
+runner provides > exits 0 with no --fix`). The cause is not investigated.
+Run only the file you are proving in the worktree, or subtract those three
+before comparing a full run there against one here. This paragraph replaces
+nothing.
+
 **One case reads a gitignored plan, and it is red in any checkout
 without it.** `src/plan/parse.test.ts`'s `a real plan file on disk` reads
 `.rafa/plans/PLAN-phase-0-package-parity-cutover.md` rather than a

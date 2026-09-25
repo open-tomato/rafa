@@ -106,7 +106,7 @@ describe('rafa doctor --deep, spawned', () => {
     const hidden = settings.findIndex((line) => line.includes(`user skill ${SKILL}: hidden from sessions`));
     expect(hidden).toBeGreaterThanOrEqual(0);
     expect(settings[hidden + 1]).toContain('fix: add user to loop.settingSources in .rafa/config.yaml');
-    expect(sectionLines(deep, 'Stack tools').join('\n')).toContain(`skill ${SKILL} not visible to a run`);
+    expect(sectionLines(deep, 'Stack tools').join('\n')).toContain('skill ts-symbols visible to a run');
     expect(plain.stdout).not.toContain('Settings:');
     expect(deep.exitCode).toBe(plain.exitCode);
     expect(deep.exitCode).toBe(0);

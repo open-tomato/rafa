@@ -21,7 +21,10 @@
  *   - **One per detected stack**: `ok` when met, naming the program's
  *     directory and the skill naming it; `warn` when not, saying which
  *     of the two is unmet, with the stack's `hint` — the line
- *     `plan needs` prints for it — verbatim as the fix.
+ *     `plan needs` prints for it — verbatim as the fix. The directory
+ *     of a program rafa ships (`ts-symbols`) is the rafa tier's
+ *     `bundled/bin` when that holds it, and a missing one is read as
+ *     neither there nor on `PATH`.
  *   - **One `note` when no stack is detected**, naming the marker files
  *     looked for, or that there is no project root to look in.
  *
@@ -30,14 +33,17 @@
  * The rows `rafa plan needs --missing` would print as needs, and no
  * others: every item of the reading `isUnmet` keeps, each a `warn`
  * saying where it was named, with a fix. A missing program is
- * installed on `PATH`, a missing agent or skill added under the
- * project's `.claude/`, a missing MCP server declared in a loaded
- * scope. A hidden agent, skill or MCP server is pointed at its row in
+ * installed on `PATH` (for one rafa ships, the fix is its stack row's
+ * `install` text, which names a built rafa first), a missing agent or
+ * skill added under the project's `.claude/`, a missing MCP server
+ * declared in a loaded scope. A hidden agent, skill or MCP server is pointed at its row in
  * the Settings section rather than given a fix of its own: why it is
  * hidden (a source left out, a shadow, a switch) is that section's
  * reading. The exception is an item of the `rafa` or an `addon:`
- * source, which the Settings section leaves out as no session is ever
- * handed one: it reads as the missing item it is to a session. A plan
+ * source, which the Settings section leaves out: a hidden one is a
+ * rafa item rafa does not serve (`inventory/index.ts`), or an add-on's,
+ * which no session is ever handed. It reads as the missing item it is
+ * to a session. A plan
  * with nothing unmet is one `ok` row. The stacks' own lines are not
  * repeated: they are the Stack tools section.
  *
@@ -60,7 +66,7 @@ import type { DeepRow, DeepSection } from './doctor-deep-row.js';
 import type { Need, NeedsReading, NeedsSeams, NeedsWarning, StackReading } from '../plan/needs.js';
 
 import { messageOf } from '../config-sections.js';
-import { isUnmet, readPlanNeeds, readStackNeeds, STACK_TOOLS } from '../plan/needs.js';
+import { isBundledProgram, isUnmet, readPlanNeeds, readStackNeeds, STACK_TOOLS } from '../plan/needs.js';
 
 import { originsPhrase } from './plan/needs.js';
 
@@ -122,12 +128,19 @@ function itemOf(items: readonly Need[], kind: Need['kind'], name: string | null)
   return items.find((item) => item.kind === kind && item.name === name);
 }
 
+/** Where a missing program was looked for: `bundled/bin` as well as `PATH` for one rafa ships. */
+function notFoundPhrase(program: string): string {
+  return isBundledProgram(program)
+    ? 'neither in bundled/bin nor on PATH'
+    : 'not on PATH';
+}
+
 /** Where a stack's program was found, or that it was not. */
 function programPhrase(stack: StackReading, items: readonly Need[]): string {
   const program = itemOf(items, 'program', stack.program);
   return program?.kind === 'program' && program.directory !== null
     ? `${stack.program} in ${program.directory}`
-    : `${stack.program} not on PATH`;
+    : `${stack.program} ${notFoundPhrase(stack.program)}`;
 }
 
 /** The stack's skill, and whether a run sees it. */
@@ -175,7 +188,7 @@ export function stackToolsSection(
 function unmetPhrase(need: Need): string {
   if (need.status === 'missing') {
     return need.kind === 'program'
-      ? 'not on PATH'
+      ? notFoundPhrase(need.name)
       : 'missing';
   }
   if (need.kind === 'program') return 'present';
@@ -185,14 +198,17 @@ function unmetPhrase(need: Need): string {
   return `${from.trim()}, not visible to a run`;
 }
 
-/** Whether a source is one no session is ever handed: rafa's own tier, or an add-on's. */
+/** Whether a source is rafa's own tier or an add-on's, which the Settings section leaves out. */
 function isRafaSource(source: string | null): boolean {
   return source === 'rafa' || (source?.startsWith('addon:') ?? false);
 }
 
 /** The fix for an unmet need; see the module note. */
 function unmetFix(need: Need): string {
-  if (need.kind === 'program') return `install ${need.name} on PATH`;
+  if (need.kind === 'program') {
+    return STACK_TOOLS.find((tool) => tool.bundled && tool.program === need.name)?.install
+      ?? `install ${need.name} on PATH`;
+  }
   if (need.kind === 'mcp') {
     return need.status === 'present'
       ? `see the mcp server ${need.name} in the Settings section`
@@ -200,6 +216,7 @@ function unmetFix(need: Need): string {
   }
   const add = `add the ${need.kind} ${need.name} under .claude/${need.kind}s/ in this project`;
   if (need.status === 'missing') return add;
+  if (need.source === 'rafa') return `${add}: rafa does not serve its ${need.kind} ${need.name}`;
   return isRafaSource(need.source)
     ? `${add}: a session is never handed a ${need.source ?? ''} ${need.kind}`
     : `see the ${need.source ?? ''} ${need.kind} ${need.name} in the Settings section`;
