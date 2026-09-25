@@ -26,7 +26,7 @@ module's note is the long form.
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
-| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
+| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; and `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
@@ -189,14 +189,13 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
   declared with its first action, never ahead of it.
-  `skill index`, `instinct flag` and `instinct promote` are in the
-  command tree and are registered by none of it yet, so no roster names
-  them.
+  `skill index` is in the command tree and is registered by none of it
+  yet, so no roster names it.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
@@ -233,10 +232,11 @@ New; it replaces no earlier text. What a row or an action added to
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `status`, `cleanup`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
+  `instinct flag`, `instinct promote`, `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
   `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `status`, `cleanup`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
+  each `issue` action, each checker, each listing, `instinct flag`,
+  `instinct promote`, `agent show`, `agent search`, `skill show`,
   `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
