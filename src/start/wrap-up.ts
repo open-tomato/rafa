@@ -8,12 +8,17 @@
  * promotes the lessons the learning library names promotable, syncs
  * the branch with main, commits,
  * pushes and opens or updates the PR. `start()` finishes that release
- * and then waits on the PR's checks after it returns. The line this
- * module closes with, naming whether the session succeeded, goes
+ * and then waits on the PR's checks after it returns. The line naming
+ * whether the session succeeded goes
  * through the active output (`adapters/output/active.ts`): `info` on
  * success, and `error` on a failure, which does not stop `start()`.
  * So does a warning for each rafa-tier winner the session is not
  * served, at `warn`.
+ *
+ * The session's `rafa:promoted` answer is checked once it has
+ * succeeded (`start/promoted-check.ts`): the loop, not the session, sets
+ * `promoted_to` on each lesson whose named path changed, and puts one
+ * line naming every lesson left unanswered or unchanged in the PR body.
  *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
@@ -30,10 +35,11 @@ import { activeOutput } from '../adapters/output/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
-import { ghPullRequestsIn } from '../pr/index.js';
-import { runClaude } from '../utils/claude.js';
+import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';
+import { runClaudeCaptured } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 
+import { checkWrapUpAnswer, readHead } from './promoted-check.js';
 import { serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 
@@ -317,6 +323,20 @@ function messageOf(error: unknown): string {
 }
 
 /**
+ * The run's learning adapter, made as a task's is (`start/dispatch.ts`):
+ * the kind resolved in its registry, at the run's root, home and bless
+ * floor. Throws when no adapter has the kind or it cannot be made.
+ */
+function wrapUpAdapter(learning: WrapUpLearning): Learning {
+  const registry = learning.registry ?? CORE_ADAPTER_REGISTRY;
+  return registry.resolve('learning', learning.kind).create({
+    repoRoot: learning.repoRoot,
+    home: learning.home,
+    learningBlessMinConfidence: learning.blessMinConfidence,
+  });
+}
+
+/**
  * The lessons the wrap-up session is asked to promote: `promotable`
  * over the adapter's blessed set, at the run's `learning.promote.*`
  * keys. Never throws.
@@ -336,13 +356,7 @@ function messageOf(error: unknown): string {
 export async function lessonsToPromote(learning: WrapUpLearning | null): Promise<readonly InstinctRecord[]> {
   if (learning === null) return [];
   try {
-    const registry = learning.registry ?? CORE_ADAPTER_REGISTRY;
-    const adapter: Learning = registry.resolve('learning', learning.kind).create({
-      repoRoot: learning.repoRoot,
-      home: learning.home,
-      learningBlessMinConfidence: learning.blessMinConfidence,
-    });
-    const bundle = await adapter.pullBlessed();
+    const bundle = await wrapUpAdapter(learning).pullBlessed();
     return promotable(bundle.instincts, {
       after: learning.promoteAfter,
       minConfidence: learning.promoteMinConfidence,
@@ -368,7 +382,7 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * `serving` is what the session is served against (`start/serving.ts`),
  * as a task session is: the run's served directory is filled just
  * before the spawn, each winner left out is warned about, and the
- * served flags reach the spawn through `runClaude`. Null serves
+ * served flags reach the spawn through `runClaudeCaptured`. Null serves
  * nothing. It is required, as `release` is, so a caller has to name
  * both.
  *
@@ -377,6 +391,16 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * lookup. Null lists none. It is required for the same reason: a
  * default of nothing would drop every promotion and nothing would say
  * so.
+ *
+ * When the list holds a lesson, HEAD is read just before the spawn, the
+ * session's output is captured as it is shown, and once the session has
+ * succeeded its `rafa:promoted` answer is checked against the changes
+ * since that HEAD (`start/promoted-check.ts`): each confirmed lesson
+ * gets `promoted_to` through the same adapter, and one line naming each
+ * unanswered or unchanged id goes into the PR body with `gh pr edit`. A
+ * session that FAILED is not checked. Its commit, push and PR may never
+ * have happened, and the rerun this module then asks for lists the same
+ * lessons again, which a `promoted_to` set now would take off that list.
  */
 export async function preserveProgress(
   planContent: string,
@@ -393,10 +417,27 @@ export async function preserveProgress(
     ? null
     : serveSession(serving);
   for (const skipped of served?.skipped ?? []) activeOutput().warn(`   ${skipped.message}`);
-  const exitCode = await runClaude(withStamp(prompt), settingSources, [], undefined, served?.flags ?? []);
-  if (exitCode !== 0) {
-    activeOutput().error(`\n❌ Failed to preserve progress (exit ${exitCode}). Please try again.`);
-  } else {
-    activeOutput().info('\n✅ Progress preserved; PR opened or updated on this branch.');
+  const git = learning === null || lessons.length === 0
+    ? null
+    : createGitRunner(learning.repoRoot);
+  const head = git === null
+    ? null
+    : readHead(git);
+  const session = await runClaudeCaptured(withStamp(prompt), settingSources, [], undefined, served?.flags ?? []);
+  if (session.exitCode !== 0) {
+    activeOutput().error(`\n❌ Failed to preserve progress (exit ${session.exitCode}). Please try again.`);
+    return;
   }
+  activeOutput().info('\n✅ Progress preserved; PR opened or updated on this branch.');
+  if (learning === null || git === null) return;
+  await checkWrapUpAnswer({
+    lessons,
+    output: session.stdout,
+    head,
+    repoRoot: learning.repoRoot,
+    branch,
+    git,
+    pulls: ghPullRequestsIn(process.cwd()),
+    learning: () => wrapUpAdapter(learning),
+  });
 }

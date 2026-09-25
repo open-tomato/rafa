@@ -76,8 +76,8 @@
  *     with exit code 0.
  *   - **A run whose task and wrap-up sessions both write that stdout**: in
  *     json mode the same step, and the session lines twice, once through
- *     the task session's tee and once through the wrap-up, which spawns
- *     through `runClaude`. In text mode there is no step line and no
+ *     the task session's tee and once through the wrap-up's, which spawns
+ *     through `runClaudeCaptured`. In text mode there is no step line and no
  *     event, and the bytes of both sessions come out as they were written,
  *     the last line running into the loop's next one. Its stand-in also
  *     writes a tracked file per call ({@link Planting.claudeWork}), so the
@@ -171,6 +171,7 @@ const ROUTED_MODULES: string[] = [
   'preflight/run.ts',
   'start/commit.ts',
   'start/wrap-up.ts',
+  'start/promoted-check.ts',
   'start/dispatch.ts',
   'start/triage.ts',
   'start/release-stage.ts',

@@ -3,24 +3,26 @@
  * has gone.
  *
  * {@link runClaude} is the loop's door onto the CLI for a session whose
- * output only the operator reads. It has two call sites: the wrap-up
- * session in `start/wrap-up.ts` and the CI-repair session in
- * `start/pr-lifecycle.ts`, neither of which is routed — one model, one
- * effort, every tool. So the flags are a parameter with an EMPTY
+ * output only the operator reads. It has one call site, the CI-repair
+ * session in `start/pr-lifecycle.ts`, which is not routed — one model,
+ * one effort, every tool. So the flags are a parameter with an EMPTY
  * default: `runClaude(prompt, settingSources)` spawns the base
  * arguments and the setting sources, and nothing a declaration could
- * add. The wrap-up also hands over the flags serving its session the
- * rafa-tier winners (`start/serving.ts`); the CI repair hands none.
+ * add.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
- * LOOP reads as well. It has three callers: the per-task dispatch,
- * through `runTaskSession` in `start/dispatch.ts`, the backfill
- * proposal pass in `backfill/propose.ts`, and plan generation in the
- * `claude` planner, `adapters/planner/claude.ts`, which `plan.ts`
- * makes. Each of the three parses what its session wrote: a task
- * session ends its final message with a `rafa:report` block, a plan
- * session ends its final message with a `rafa:spec-review` one, and a
- * proposal session's answer goes through `parseSessionAnswer`.
+ * LOOP reads as well. It has four callers: the per-task dispatch,
+ * through `runTaskSession` in `start/dispatch.ts`, the wrap-up session
+ * in `start/wrap-up.ts`, the backfill proposal pass in
+ * `backfill/propose.ts`, and plan generation in the `claude` planner,
+ * `adapters/planner/claude.ts`, which `plan.ts` makes. Each of the four
+ * parses what its session wrote: a task session ends its final message
+ * with a `rafa:report` block, the wrap-up with a `rafa:promoted` one
+ * when it was listed lessons to promote (`start/promoted-check.ts`), a
+ * plan session ends its final message with a `rafa:spec-review` one,
+ * and a proposal session's answer goes through `parseSessionAnswer`.
+ * The wrap-up, like a task session, also hands over the flags serving
+ * it the rafa-tier winners (`start/serving.ts`), and is not routed.
  * {@link spawnClaude} answers the exit code alone, so a loop holding
  * that session's exit code holds nothing else. A task session's flags are
  * the ones its routing declaration resolved to, with the
@@ -407,17 +409,15 @@ export async function spawnClaude(
  * Spawns one Claude session with `prompt` on stdin, loading settings
  * from `settingSources`.
  *
- * `flags` defaults to empty, so plan generation, the wrap-up and the
- * CI-repair session, which hand over none, cannot be routed by
- * accident: each spawns the base arguments and its setting sources
- * with no routing flag. `settingSources` has no default; see the module
- * note.
+ * `flags` defaults to empty, so the CI-repair session, which hands
+ * over none, cannot be routed by accident: it spawns the base arguments
+ * and its setting sources with no routing flag. `settingSources` has
+ * no default; see the module note.
  *
  * `served` is the flags handing a served directory over, which
  * {@link claudeArgs} places between the setting sources and `flags`. It
- * defaults to empty. The wrap-up is the one caller that hands any
- * (`start/wrap-up.ts`). It comes last so that no call written before it
- * existed has to change.
+ * defaults to empty, and the CI repair hands none. It comes last so
+ * that no call written before it existed has to change.
  */
 export function runClaude(
   prompt: string,
@@ -601,9 +601,9 @@ async function spawnCaptured(
  * what is run. The operator still sees that output as it is written,
  * through the tee in {@link spawnClaudeCaptured}.
  *
- * `served` is taken as {@link runClaude} takes it. The task session is
- * the one caller that hands any (`runTaskSession` in
- * `start/dispatch.ts`).
+ * `served` is taken as {@link runClaude} takes it. The task session
+ * (`runTaskSession` in `start/dispatch.ts`) and the wrap-up
+ * (`start/wrap-up.ts`) are the two callers that hand any.
  */
 export function runClaudeCaptured(
   prompt: string,
