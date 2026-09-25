@@ -67,7 +67,7 @@
  * mutation changed the reading it aimed at.
  */
 import type { TierPin } from '../config-sections.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { ClaudeSettingSource, OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
@@ -1078,6 +1078,37 @@ describe('the agent roster check', () => {
       expect.stringContaining('   agent "no-such-agent" (line 1) cannot be dispatched:'),
       skillLine,
     ]);
+  });
+
+  it('halts on a skills= name only an unloaded tier holds, naming the line, and starts once the sources load it', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    const user = join(home, '.claude', 'skills', 'home-only', 'SKILL.md');
+    mkdirSync(join(user, '..'), { recursive: true });
+    writeFileSync(user, '---\nname: home-only\ndescription: Planted.\n---\nThe user body.\n', 'utf8');
+    writeFileSync(planPathIn(root), '- [ ] Read it\n- [x] Ran it  {skills=home-only}\n- [ ] Write it  {skills=home-only}\n', 'utf8');
+    const drivenUnder = (settingSources: readonly ClaudeSettingSource[]) => drive(
+      root,
+      settingsOf([BUN], []),
+      { 'bun --version': answered(0) },
+      { agents: { settingSources, home } },
+    );
+
+    const unloaded = await drivenUnder(['project', 'local']);
+    const loaded = await drivenUnder(['user', 'project', 'local']);
+
+    expect(unloaded.refusal?.exitCode).toBe(1);
+    expect(unloaded.refusal?.message.split('\n')).toEqual([
+      `❌ Refusing to start: PLAN-${STUB}.md names 1 skill(s) no loaded tier resolves`
+        + ' (loop.settingSources: project, local; tiers.rafa: on).',
+      `   skill "home-only" (line 3) cannot be served: skill home-only is held only by the user tier (${user}),`
+        + ' which loop.settingSources (project, local) leaves out: add user to loop.settingSources',
+      '   Nothing was checked and nothing was dispatched.',
+    ]);
+    expect(unloaded.probes).toEqual([]);
+    // The control differs in the sources alone: loading the user tier resolves the name and the run goes on to its probes.
+    expect(loaded.refusal).toBeNull();
+    expect(loaded.probes).toEqual([`bun --version in ${root}`]);
   });
 
   it('halts on a project skill pin while a loaded user skill differs, and starts under the user pin', async () => {

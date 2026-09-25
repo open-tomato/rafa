@@ -455,7 +455,36 @@ describe('the agents rafa plan validate checks', () => {
     expect(eventsOf(passed.stdout).at(-1)).toMatchObject({
       type: 'result',
       ok: true,
-      data: { missingAgents: [], skillCollisions: [] },
+      data: { missingAgents: [], skillCollisions: [], unresolvedSkills: [] },
+    });
+  });
+
+  it('writes one error line per skills= name no loaded tier resolves, naming the line, until the entry switching it off goes', async () => {
+    const plan = '- [ ] Read it  {agent=general-purpose}\n- [ ] Write it  {skills=documentation}\n';
+    const switchedOff = plantRoutedProject(plan, 'version: 1\ntiers:\n  skills: { documentation: false }\n');
+    const served = plantRoutedProject(plan, 'version: 1\n');
+    for (const project of [switchedOff, served]) plantSkill(project.root, 'The project body.');
+
+    const refused = await validateIn(switchedOff);
+    const json = await validateIn(switchedOff, ['--output=json']);
+    const passed = await validateIn(served, ['--output=json']);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toBe('error: plan.md: skill "documentation" (line 2) cannot be served: skill documentation is'
+      + ' switched off by tiers.skills: { documentation: false }; pin the tier that serves it instead:'
+      + ' tiers.skills: { documentation: project }\n');
+    expect(refused.stderr).toBe('❌ plan.md: 1 unresolvable skill; no session would be dispatched\n');
+    expect(eventsOf(json.stdout).map(labelOf)).toEqual([
+      'start',
+      expect.stringContaining('error:plan.md: skill "documentation" (line 2) cannot be served:'),
+      'result',
+    ]);
+    // The control differs in the tiers.skills entry alone.
+    expect(passed.exitCode).toBe(0);
+    expect(eventsOf(passed.stdout).at(-1)).toMatchObject({
+      type: 'result',
+      ok: true,
+      data: { missingAgents: [], skillCollisions: [], unresolvedSkills: [] },
     });
   });
 

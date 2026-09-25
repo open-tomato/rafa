@@ -328,10 +328,12 @@ export function parseToolList(value: string): readonly string[] | null {
  * Splits a `skills=` value into names, or answers null when it is not
  * usable.
  *
- * Membership is NOT checked against the skills installed here, for the
+ * Membership is NOT checked here against the skills installed, for the
  * reason {@link parseToolList} gives: the set moves with the machine,
- * and a plan naming a skill this checkout has yet to install is a plan
- * that still routes. The SHAPE is checked instead — a bare directory
+ * and this reads one declaration and no tier. `agents/roster.ts` checks
+ * it where the tiers are read, and `rafa plan validate` and `loop
+ * start`'s preflight refuse a name no loaded tier resolves. The SHAPE is
+ * checked here instead — a bare directory
  * stem, so no name reaches a path outside `.claude/skills/` — which
  * catches an empty value, a doubled comma and a stray quote.
  */

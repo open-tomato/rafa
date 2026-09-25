@@ -320,16 +320,20 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/agents/roster.ts`). Then each `skills=` name of those tasks that
   two loaded tiers hold with different contents, under `tiers.skills`, as
   `<file>: <the line `skillCollisionLine` words>` with both paths and the
-  pin line; a skill name no tier holds is not reported. It throws exit
-  code 1 when there is any of the three, with a message counting each. That is the check `loop start`'s
+  pin line. Then each other `skills=` name the resolution resolves to no
+  winner, as `<file>: <the line `unresolvedSkillLine` words>`: held by no
+  tier, switched off, or held only by a tier the session does not load,
+  each with what settles it. It throws exit code 1 when there is any of
+  the four, with a message counting each. That is the check `loop start`'s
   preflight halts on, so a plan the loop would refuse is refused here
   too. The roster is the project the dispatcher found and the config that
   resolves there, which is the only thing this command reads beyond the
   file; handed no project it says so and checks no agent and no skill.
   In json mode a list, a plan and a clean validation are the terminal
   result's `data`, the validation carrying an empty `issues`, an empty
-  `missingAgents` and an empty `skillCollisions`, and each issue, missing
-  agent and skill collision is an `error` `log` event; text
+  `missingAgents`, an empty `skillCollisions` and an empty
+  `unresolvedSkills`, and each issue, missing agent, skill collision and
+  unresolved skill is an `error` `log` event; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where

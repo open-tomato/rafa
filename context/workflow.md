@@ -71,7 +71,9 @@ refusal names both paths and the pin line that settles it
 (`src/start/preflight.ts`). The same resolution covers the three skill
 trees, so a `skills=` name of those tasks that two loaded tiers hold
 with different contents refuses the run too, naming both paths and its
-`tiers.skills` pin line; a skill name no tier holds does not.
+`tiers.skills` pin line, and so does one the resolution resolves to no
+winner, exactly as an agent does: one no tier holds, one `tiers.skills`
+switches off, or one only an unloaded tier holds.
 `rafa plan validate` runs the same check and exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies

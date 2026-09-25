@@ -34,9 +34,12 @@
  * The `skills=` names of the same tasks are checked against the same
  * resolution: one two loaded tiers hold with different contents, with no
  * `tiers.skills` pin to choose, is served by nobody, and is reported with
- * both paths and the pin line that settles it. A skill name no tier holds
- * is not reported, since a skill may come from a plugin or an add-on
- * (`agents/roster.ts`).
+ * both paths and the pin line that settles it. Every other name the
+ * resolution does not resolve to a winner is reported too, exactly as an
+ * agent is: held by no tier — a name the planner invented, or one only a
+ * plugin or an add-on holds, which the skill index never lists —
+ * switched off with `false`, or held only by a tier the session does not
+ * load, each with the sentence naming its fix (`agents/roster.ts`).
  *
  * The tasks checked are the ones the DISPATCHER will reach rather than
  * the ones the model holds, so a task line a `rafa:*` block the plan
@@ -61,8 +64,8 @@
  *
  * With nothing to report, json mode gives the terminal result `data`:
  * `file` (absolute), the number of `stages`, the task counts under
- * `tasks`, an empty `issues`, an empty `missingAgents` and an empty
- * `skillCollisions`. Text mode
+ * `tasks`, an empty `issues`, an empty `missingAgents`, an empty
+ * `skillCollisions` and an empty `unresolvedSkills`. Text mode
  * writes one line naming the file as typed, its stages and its counts.
  *
  * With issues, each is written at `error`, in line order, as
@@ -73,7 +76,10 @@
  * agent, the task lines that asked for it, why it cannot be dispatched,
  * and the pin line or setting that settles it. Each colliding skill
  * follows those, at `error`, as `<file>: <the line `skillCollisionLine`
- * words>`. The command then
+ * words>`, and each unresolved skill follows those, at `error`, as
+ * `<file>: <the line `unresolvedSkillLine` words>`, which names the
+ * skill, the task lines that asked for it, why and what settles it. The
+ * command then
  * throws `CommandExit` with exit code 1 and a message counting what it
  * found, which text mode writes to stderr and json mode carries in the
  * terminal result.
@@ -82,7 +88,7 @@
  * are refused with exit code 1 before anything is parsed.
  */
 import type { TaskCounts } from './plan-files.js';
-import type { MissingAgent, SkillCollision } from '../../agents/roster.js';
+import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { PlanIssue } from '../../plan/index.js';
@@ -97,6 +103,8 @@ import {
   missingPlanAgents,
   resolveAgentRoster,
   skillCollisionLine,
+  unresolvedPlanSkills,
+  unresolvedSkillLine,
 } from '../../agents/roster.js';
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
@@ -129,6 +137,8 @@ export interface RosterFindings {
   readonly missingAgents: readonly MissingAgent[];
   /** Every `skills=` name two loaded tiers hold with different contents; empty when no project was found. */
   readonly skillCollisions: readonly SkillCollision[];
+  /** Every other `skills=` name the resolution resolves to no winner, each with why; empty when no project was found. */
+  readonly unresolvedSkills: readonly UnresolvedSkill[];
 }
 
 /** A plan file read, with the agents and skills of its still-to-run tasks checked. */
@@ -156,15 +166,16 @@ function resolvedConfig(project: ProjectFound, warn: (message: string) => void):
 
 /**
  * The `agent=` of the plan's still-to-run tasks that no tier the project
- * loads serves, and the `skills=` names two loaded tiers hold with
- * different contents. None, with one line saying so, when the command
+ * loads serves, the `skills=` names two loaded tiers hold with
+ * different contents, and the `skills=` names no loaded tier resolves.
+ * None, with one line saying so, when the command
  * was handed no project; see the module note.
  */
 function checkRoster(context: RafaContext, markdown: string): RosterFindings {
   const project = context.project;
   if (project === null) {
     context.output.info('ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.');
-    return { missingAgents: [], skillCollisions: [] };
+    return { missingAgents: [], skillCollisions: [], unresolvedSkills: [] };
   }
 
   const config = resolvedConfig(project, (message) => {
@@ -175,11 +186,20 @@ function checkRoster(context: RafaContext, markdown: string): RosterFindings {
   return {
     missingAgents: missingPlanAgents(markdown, roster),
     skillCollisions: collidingPlanSkills(markdown, roster),
+    unresolvedSkills: unresolvedPlanSkills(markdown, roster),
   };
 }
 
-/** The refusal a plan with issues, missing agents, colliding skills or any mix ends with. */
-function refusalFor(typed: string, issues: number, agents: number, skills: number): string {
+/** How many of each kind of refusal one plan met. */
+interface RefusalCounts {
+  readonly issues: number;
+  readonly agents: number;
+  readonly collisions: number;
+  readonly unresolved: number;
+}
+
+/** The refusal a plan with issues, missing agents, colliding or unresolved skills, or any mix ends with. */
+function refusalFor(typed: string, { issues, agents, collisions, unresolved }: RefusalCounts): string {
   const counts = [
     issues > 0
       ? plural(issues, 'issue')
@@ -187,8 +207,11 @@ function refusalFor(typed: string, issues: number, agents: number, skills: numbe
     agents > 0
       ? plural(agents, 'unresolvable agent')
       : null,
-    skills > 0
-      ? plural(skills, 'skill collision')
+    collisions > 0
+      ? plural(collisions, 'skill collision')
+      : null,
+    unresolved > 0
+      ? plural(unresolved, 'unresolvable skill')
       : null,
   ].filter((count): count is string => count !== null);
   const tail = issues > 0
@@ -213,7 +236,9 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       + ' tier the session does not load, or held by two tiers with different contents) and naming the'
       + ' paths and the pin line or setting that settles it, then one line per `skills=` name two loaded'
       + ' tiers hold with different contents, naming both paths and the `tiers.skills` pin line that'
-      + ' settles it, then exits 1 — the same check'
+      + ' settles it, then one line per `skills=` name no loaded tier resolves (held by no tier, switched'
+      + ' off, or held only by a tier the session does not load), naming what settles it, then exits 1'
+      + ' — the same check'
       + ' `rafa loop start` halts on before it dispatches anything. The path is read relative to the'
       + ' working directory; the agents are read from the project found from it and the config that'
       + ' resolves there, and are left unchecked when there is no project. With `--output=json` each issue'
@@ -244,13 +269,21 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       const file = resolve(workingDirectory(), typed);
       const validation = validatePlan(file);
       const { issues, stages, tasks } = validation;
-      const { missingAgents, skillCollisions } = checkRoster(context, readFileSync(file, 'utf8'));
-      const result: PlanValidationResult = { ...validation, missingAgents, skillCollisions };
-      if (issues.length > 0 || missingAgents.length > 0 || skillCollisions.length > 0) {
+      const findings = checkRoster(context, readFileSync(file, 'utf8'));
+      const { missingAgents, skillCollisions, unresolvedSkills } = findings;
+      const result: PlanValidationResult = { ...validation, ...findings };
+      const counts = {
+        issues: issues.length,
+        agents: missingAgents.length,
+        collisions: skillCollisions.length,
+        unresolved: unresolvedSkills.length,
+      };
+      if (Object.values(counts).some((count) => count > 0)) {
         for (const issue of issues) context.output.error(issueLine(typed, issue));
         for (const agent of missingAgents) context.output.error(`${typed}: ${missingAgentLine(agent)}`);
         for (const skill of skillCollisions) context.output.error(`${typed}: ${skillCollisionLine(skill)}`);
-        throw new CommandExit(1, refusalFor(typed, issues.length, missingAgents.length, skillCollisions.length));
+        for (const skill of unresolvedSkills) context.output.error(`${typed}: ${unresolvedSkillLine(skill)}`);
+        throw new CommandExit(1, refusalFor(typed, counts));
       }
       if (context.outputMode === 'json') {
         context.output.result(result);

@@ -400,6 +400,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'missingPlanAgents',
       'resolveAgentRoster',
       'skillCollisionLine',
+      'unresolvedPlanSkills',
+      'unresolvedSkillLine',
     ]],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
