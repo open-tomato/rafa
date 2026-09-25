@@ -411,7 +411,7 @@ and a line here is ticked by the change that finishes the feature.
 - ✅ The right skills reach the right task, chosen when the plan is
   written
 - ⬜ Know which skills earn their place and which are ignored
-- ⬜ rafa learns from its own runs: what one task works out is handed
+- ✅ rafa learns from its own runs: what one task works out is handed
   to the tasks that need it later
 - ⬜ Skills and lessons shared across projects and machines
 - ⬜ Config as code: a typed `rafa.config.ts` holding your settings, your
@@ -465,12 +465,15 @@ rafa stands on other people's work and on earlier work of ours.
   evidence, scope) is adapted from the `continuous-learning-v2` skill of
   [`affaan-m/everything-claude-code`](https://github.com/affaan-m/everything-claude-code)
   by Affaan Mustafa (MIT).
-- **Shared learning (coming).** The design for merging what separate
-  runs learn (one record per lesson, a rule for conflicting lessons,
-  promotion on recurrence) follows Open Tomato's hive-learning design.
-  In rafa it is partly built: lessons are recorded per project today, and
-  sharing them across runs, projects and machines is on the
-  [Roadmap](#roadmap) and not available yet.
+- **Shared learning.** The design for merging what separate runs learn
+  (one record per lesson, a rule for conflicting lessons, promotion on
+  recurrence) follows Open Tomato's hive-learning design. rafa now records
+  lessons in `.rafa/instincts/` — one lesson per task finding that carries
+  a resolution — and pushes them after each task's report. Lessons that
+  meet a confidence floor are blessed and handed to tasks that need them
+  later; lessons that recur enough are promoted into the pages that own
+  their subjects. Sharing lessons across projects and machines is planned
+  for a future version.
 
 ## License
 
