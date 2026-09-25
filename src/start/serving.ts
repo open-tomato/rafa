@@ -26,20 +26,23 @@
  * A collision is served by nobody, which is `resolveTiers`' outcome.
  * Refusing to start a run over one is the preflight's job, so the
  * collision is not reported here.
+ *
+ * The reading and the resolution are {@link resolveSessionTiers}, which
+ * `rafa plan` also calls (`plan.ts`) to render the planner's skill
+ * index, so the index lists what a loop session under the same settings
+ * is served.
  */
-import type { TierSettings } from '../tiers/resolve.js';
+import type { Resolution, TierSettings } from '../tiers/resolve.js';
 import type { ServedSet } from '../tiers/serve.js';
 
 import { readTrees } from '../inventory/trees.js';
 import { readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { serveResolution } from '../tiers/serve.js';
 
-/** What one session is served against. */
-export interface SessionServing {
-  /** The project root. It holds the project tier and `.rafa/runs/`. */
+/** Where the three tiers are read, and the settings they resolve under. */
+export interface TierReading {
+  /** The project root. It holds the project tier. */
   readonly root: string;
-  /** The run's session id, which names `.rafa/runs/<run>/`. */
-  readonly run: string;
   /** The home directory the user tier resolves under. */
   readonly home: string;
   /** The run's settings; a `RafaConfig` is one. */
@@ -48,19 +51,32 @@ export interface SessionServing {
   readonly entry?: string;
 }
 
+/** What one session is served against: a {@link TierReading} and the run. */
+export interface SessionServing extends TierReading {
+  /** The run's session id, which names `.rafa/runs/<run>/` under the root. */
+  readonly run: string;
+}
+
+/**
+ * The three tiers' skill and agent trees read under `reading`, resolved
+ * under its settings. See the module note.
+ */
+export function resolveSessionTiers(reading: TierReading): Resolution {
+  const rows = readTrees({
+    home: reading.home,
+    projectRoot: reading.root,
+    pathDirs: [],
+    ...(reading.entry === undefined
+      ? {}
+      : { entry: reading.entry }),
+  }).flatMap((listing) => listing.items);
+  return resolveTiers(rows, reading.settings, readItemBytes);
+}
+
 /**
  * Serves the rafa-tier winners of the three tiers into the run's served
  * directory, and answers what was served. See the module note.
  */
 export function serveSession(serving: SessionServing): ServedSet {
-  const rows = readTrees({
-    home: serving.home,
-    projectRoot: serving.root,
-    pathDirs: [],
-    ...(serving.entry === undefined
-      ? {}
-      : { entry: serving.entry }),
-  }).flatMap((listing) => listing.items);
-  const resolution = resolveTiers(rows, serving.settings, readItemBytes);
-  return serveResolution(resolution, { root: serving.root, run: serving.run });
+  return serveResolution(resolveSessionTiers(serving), { root: serving.root, run: serving.run });
 }

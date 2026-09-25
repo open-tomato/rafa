@@ -172,8 +172,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from './board/naming.js';
 import { acceptStaleRefsPassLine } from './board/refs-gate.js';
+import { loadConfig } from './config-load.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
-import { buildPlanPrompt, readPlanFormat, runBranchLine } from './plan.js';
+import {
+  buildPlanPrompt,
+  formatSkillIndexSection,
+  PLAN_PROMPT_SLOTS,
+  readPlanFormat,
+  readPlanSkillIndex,
+  ROUTING_HEADING,
+  runBranchLine,
+  SKILL_INDEX_HEADING,
+} from './plan.js';
 import { projectConfigText } from './project/scaffold.js';
 import { ABSENT, readRefsBlock } from './refs/stamp.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
@@ -346,6 +356,7 @@ interface Scratch {
   /** Where the stand-in `claude` leaves its marker, outside the repository. */
   readonly spawned: string;
   readonly probe: string;
+  readonly home: string;
   readonly env: Record<string, string>;
 }
 
@@ -417,7 +428,7 @@ function plantScratch(options: ScratchOptions = {}): Scratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { repo, record: join(root, 'record.json'), spawned, probe, env: { PATH: path, HOME: home } };
+  return { repo, record: join(root, 'record.json'), spawned, probe, home, env: { PATH: path, HOME: home } };
 }
 
 /** What one command run did. */
@@ -444,10 +455,42 @@ function readRecord(scratch: Scratch): Record<string, unknown> {
 /** The plans directory the config resolves when no file names one. */
 const DEFAULT_PLAN_DIR = '.rafa/plans';
 
-/** The prompt `buildPlanPrompt` makes of the source template and skill for the fixture spec. */
-function expectedPrompt(progress: string | undefined, planDir: string = DEFAULT_PLAN_DIR): string {
+/** `src/plan.ts`, the entry the command hands `readPlanSkillIndex`, so the rafa tier is `src/bundled/skills`. */
+const PLAN_MODULE = join(SRC_DIR, 'plan.ts');
+
+/** The skill index the command reads for `scratch`, under the config it resolves there. */
+function scratchSkillIndex(scratch: Scratch): string {
+  const { config } = loadConfig({ root: scratch.repo, home: scratch.home });
+  return readPlanSkillIndex(scratch.repo, scratch.home, config, PLAN_MODULE);
+}
+
+/**
+ * The prompt `buildPlanPrompt` makes of the source template and skill for
+ * the fixture spec, with the skill index read for `scratch`.
+ */
+function expectedPrompt(
+  scratch: Scratch,
+  progress: string | undefined,
+  planDir: string = DEFAULT_PLAN_DIR,
+): string {
   const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
-  return buildPlanPrompt(template, readPlanFormat(SRC_DIR), FIXTURE_SPEC, 'spec', planDir, progress);
+  return buildPlanPrompt(
+    template,
+    readPlanFormat(SRC_DIR),
+    FIXTURE_SPEC,
+    'spec',
+    planDir,
+    progress,
+    undefined,
+    scratchSkillIndex(scratch),
+  );
+}
+
+/** Writes a project-tier skill under `root`'s `.claude/skills/`, with the frontmatter given. */
+function plantProjectSkill(root: string, name: string, frontmatter: readonly string[]): void {
+  const dir = join(root, '.claude', 'skills', name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'SKILL.md'), ['---', `name: ${name}`, ...frontmatter, '---', '', 'The body.', ''].join('\n'));
 }
 
 /** The branch line the fixture's plan path earns, as both output cases read it. */
@@ -470,6 +513,94 @@ describe('the branch line printed under the Execute with hint', () => {
   });
 });
 
+describe('the {SKILL_INDEX} slot', () => {
+  const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
+  const INDEX = 'git-workflow — git, pr — a push to main\ndocs — Use when writing docs';
+
+  /** The prompt over the source template and skill, with `index` handed over. */
+  function promptWith(index?: string): string {
+    return buildPlanPrompt(template, readPlanFormat(SRC_DIR), FIXTURE_SPEC, 'spec', DEFAULT_PLAN_DIR, undefined, undefined, index);
+  }
+
+  it('is a slot the template carries once, after {ROUTING} and before the spec', () => {
+    expect(PLAN_PROMPT_SLOTS).toContain('SKILL_INDEX');
+    expect(template.split('{SKILL_INDEX}')).toHaveLength(2);
+    expect(template.indexOf('{ROUTING}')).toBeLessThan(template.indexOf('{SKILL_INDEX}'));
+    expect(template.indexOf('{SKILL_INDEX}')).toBeLessThan(template.indexOf('## Spec'));
+  });
+
+  it('renders the index under its heading, between the routing section and the spec', () => {
+    const prompt = promptWith(INDEX);
+
+    expect(prompt).not.toContain('{SKILL_INDEX}');
+    expect(prompt).toContain(`${SKILL_INDEX_HEADING}\n`);
+    expect(prompt).toContain(`\n\n${INDEX}\n\n## Spec\n`);
+    expect(prompt.indexOf(ROUTING_HEADING)).toBeLessThan(prompt.indexOf(SKILL_INDEX_HEADING));
+    expect(prompt.indexOf(SKILL_INDEX_HEADING)).toBeLessThan(prompt.indexOf('## Spec'));
+  });
+
+  it('renders a sentence rather than an empty section when no skill reaches a session', () => {
+    const section = formatSkillIndexSection('');
+
+    expect(section).toBe(`${SKILL_INDEX_HEADING}\n\nNo skill reaches a loop session under this project's settings.`);
+    expect(promptWith()).toContain(`${section}\n\n## Spec\n`);
+    // The control: an index with lines renders them, not the sentence.
+    expect(formatSkillIndexSection(INDEX)).not.toContain('No skill reaches');
+    expect(formatSkillIndexSection(INDEX).endsWith(`\n\n${INDEX}`)).toBe(true);
+  });
+
+  it('keeps an index naming a slot or a replacement pattern as written', () => {
+    const index = 'odd — names {SPEC_CONTENT} and $& and {PLAN_FILE}';
+
+    const prompt = promptWith(index);
+
+    expect(prompt).toContain(`\n${index}\n`);
+    expect(prompt.split(FIXTURE_SPEC)).toHaveLength(2);
+  });
+});
+
+describe('the skill index the command reads', () => {
+  /** A scratch project root and home, both empty, under this file's directory. */
+  function plantRoots(): { root: string; home: string } {
+    planted += 1;
+    const root = join(tempDir, `index-${planted}`, 'repo');
+    const home = join(tempDir, `index-${planted}`, 'home');
+    for (const dir of [root, home]) mkdirSync(dir, { recursive: true });
+    return { root, home };
+  }
+
+  it('lists a project skill ahead of the rafa tier, and not one the config switches off', () => {
+    const { root, home } = plantRoots();
+    plantProjectSkill(root, 'aa-probe', ['description: "Use when probing"', 'prevents: a probe gone astray', 'tags: [probe]']);
+    plantProjectSkill(root, 'zz-off', ['description: "Use when never"', 'prevents: nothing at all']);
+    const settings = loadConfig({ root, home }).config;
+    const off = { ...settings, tiersSkills: new Map([['zz-off', false as const]]) };
+
+    const shown = readPlanSkillIndex(root, home, settings, PLAN_MODULE).split('\n');
+    const index = readPlanSkillIndex(root, home, off, PLAN_MODULE).split('\n');
+
+    // The control: under the config as loaded, both project skills are listed.
+    expect(shown.slice(0, 2)).toEqual(['aa-probe — probe — a probe gone astray', 'zz-off — nothing at all']);
+    expect(index[0]).toBe('aa-probe — probe — a probe gone astray');
+    expect(index.some((line) => line.startsWith('zz-off'))).toBe(false);
+    // The rafa tier beside the module is read: the plan format's own skill is in it.
+    expect(index.some((line) => line.startsWith('dev-planner — '))).toBe(true);
+  });
+
+  it('leaves the user tier out while loop.settingSources does not name user', () => {
+    const { root, home } = plantRoots();
+    plantProjectSkill(home, 'user-probe', ['description: "Use when probing"', 'prevents: a user probe']);
+    const settings = loadConfig({ root, home }).config;
+
+    const index = readPlanSkillIndex(root, home, settings, PLAN_MODULE);
+    const withUser = readPlanSkillIndex(root, home, { ...settings, settingSources: ['user', 'project', 'local'] }, PLAN_MODULE);
+
+    expect(settings.settingSources).not.toContain('user');
+    expect(index).not.toContain('user-probe');
+    expect(withUser).toContain('user-probe — a user probe');
+  });
+});
+
 describe('rafa plan through the adapter registry', () => {
   it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', () => {
     const scratch = plantScratch();
@@ -482,7 +613,7 @@ describe('rafa plan through the adapter registry', () => {
       planDir: DEFAULT_PLAN_DIR,
       settingSources: ['project', 'local'],
       request: { specPath: 'spec.md', stub: 'spec' },
-      prompt: expectedPrompt(undefined),
+      prompt: expectedPrompt(scratch, undefined),
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
@@ -503,9 +634,9 @@ describe('rafa plan through the adapter registry', () => {
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
 
-    expect(expectedPrompt(undefined, '.plans')).not.toBe(expectedPrompt(undefined));
+    expect(expectedPrompt(scratch, undefined, '.plans')).not.toBe(expectedPrompt(scratch, undefined));
     expect(run.exitCode).toBe(0);
-    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: expectedPrompt(undefined, '.plans') });
+    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: expectedPrompt(scratch, undefined, '.plans') });
     expect(run.stdout).toContain('📝 Generating .plans/PLAN-spec.md from spec.md...');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
@@ -517,14 +648,29 @@ describe('rafa plan through the adapter registry', () => {
 
     // The control: the defaults' prompt routes `tests` and not `cleanup`,
     // so the two readings below are the config's doing.
-    expect(expectedPrompt(undefined)).toContain('| `tests` | `tdd-guide` |');
-    expect(expectedPrompt(undefined)).not.toContain('`cleanup`');
+    expect(expectedPrompt(scratch, undefined)).toContain('| `tests` | `tdd-guide` |');
+    expect(expectedPrompt(scratch, undefined)).not.toContain('`cleanup`');
     expect(run.exitCode).toBe(0);
     const prompt = String(readRecord(scratch)['prompt']);
     expect(prompt).toContain('| `cleanup` | `refactor-cleaner` |');
     expect(prompt).toContain('| `prose` | `doc-updater` |');
     expect(prompt).not.toContain('`tests`');
     expect(prompt).not.toContain('{ROUTING}');
+  }, 30_000);
+
+  it('renders the skill index the tiers resolve into the prompt, a project skill included', () => {
+    const scratch = plantScratch();
+    plantProjectSkill(scratch.repo, 'aa-probe', ['description: "Use when probing"', 'prevents: a probe gone astray']);
+
+    const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    const prompt = String(readRecord(scratch)['prompt']);
+    expect(prompt).toBe(expectedPrompt(scratch, undefined));
+    expect(prompt).toContain(`${SKILL_INDEX_HEADING}\n`);
+    expect(prompt).toContain('\naa-probe — a probe gone astray\n');
+    expect(prompt).not.toContain('{SKILL_INDEX}');
+    expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
   it('reads a spec the project root does not hold from specs.dir, and hands the planner that path', () => {
@@ -650,9 +796,9 @@ describe('rafa plan through the adapter registry', () => {
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md']);
 
-    expect(expectedPrompt(PROGRESS)).not.toBe(expectedPrompt(undefined));
+    expect(expectedPrompt(scratch, PROGRESS)).not.toBe(expectedPrompt(scratch, undefined));
     expect(run.exitCode).toBe(0);
-    expect(readRecord(scratch)['prompt']).toBe(expectedPrompt(PROGRESS));
+    expect(readRecord(scratch)['prompt']).toBe(expectedPrompt(scratch, PROGRESS));
     expect(run.stdout).toContain('📎 Including findings from progress.txt (disable with --no-progress).');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
