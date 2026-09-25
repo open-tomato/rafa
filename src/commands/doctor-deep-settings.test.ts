@@ -267,7 +267,7 @@ describe('readDeepSettings: why and the fix', () => {
     expect(clashing.map(label)).toEqual(['project skill gate-order', 'user skill gate-order']);
     for (const item of clashing) {
       expect(item.why).toBe('another loaded tier holds a different skill of the same name, so neither is served');
-      expect(item.fix).toBe(`pin the tier that serves it in ${CONFIG_FILE}: tiers.skills: { gate-order: project }`);
+      expect(item.fix).toBe(`pin the tier that serves it in ${CONFIG_FILE}: tiers.skills: { gate-order: user }`);
     }
     // Control: in the main project the two copies are byte-identical, so only the home one is a row, as shadowed.
     expect(hiddenItem(WITH_USER, 'user skill gate-order').why).toBe('shadowed by the project skill of the same name');

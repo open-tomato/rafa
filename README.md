@@ -191,11 +191,13 @@ it.
   a single item off entirely. When two tiers hold different items under
   the same name, the loop refuses it unless a config pin (for example,
   `tiers.agents: {name: project}`) declares which tier to use. A skill pin
-  can only name `project` while the project holds a different copy:
-  Claude Code always loads the project's `.claude/skills/<name>` over the
-  rafa copy, so delete or rename the project copy to let the rafa copy
-  serve. `loop start` refuses a plan that names an agent it cannot
-  resolve before any session is paid for.
+  must name the copy Claude Code loads: it loads a user skill over a
+  project skill, and both over the rafa copy. So a `rafa` pin is refused
+  while the project or a loaded user tier holds a different copy, and a
+  `project` pin while a loaded user tier does; pin the tier the refusal
+  names, or delete or rename the copy it names. `loop start` refuses a
+  plan that names an agent it cannot resolve before any session is paid
+  for.
 - User-tier items are invisible unless `loop.settingSources` includes
   `user`. `rafa agent list` shows what a run sees, `rafa agent vendor
   <name>` copies one in or updates it, and `rafa skill check .claude/skills

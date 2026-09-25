@@ -133,8 +133,10 @@
  * under `tiers.skills: { documentation: project }` goes on to its probes.
  * Under `tiers.skills: { documentation: rafa }` it still refuses. Claude
  * Code loads the project's skill over the served copy, so that line
- * says a skill pin can only name `project`, and that deleting or renaming
- * the project copy lets the rafa copy serve (`tiers/resolve.ts`).
+ * names the pin that works, `project`, and says that deleting or
+ * renaming the project copy lets the rafa copy serve. A `project` pin
+ * is refused the same way while a loaded user skill differs, since
+ * Claude Code loads a user skill over the project's (`tiers/resolve.ts`).
  *
  * A malformed item in the plan's PREREQUISITES file refuses before any
  * probe too, naming each by its line and the one shape a probed item

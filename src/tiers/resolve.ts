@@ -49,45 +49,59 @@
  *      nothing under the name, has no effect, and the order decides.
  *      `resolveConfig` already warns about a pin to the rafa tier while
  *      it is off. It is not refused here, because the operator may
- *      switch the tier back on. A skill pin to the rafa tier while the
- *      project holds a different skill of the name has no effect either
- *      (below).
+ *      switch the tier back on. A skill pin naming a copy Claude Code
+ *      would not load has no effect either (below).
  *   4. All loaded holders are one item (below), so the nearest serves
  *      it (`served`, by `order`), and the rest are its
  *      {@link ServedItem.copies}.
  *   5. Otherwise the name is a `collision`, and nothing serves it.
  *
- * ## A skill pin cannot outrank the project
+ * ## A skill pin must name the copy Claude Code loads
  *
- * A served skill reaches a session through `--add-dir`
- * (`tiers/delivery.ts`), and Claude Code loads the project's own
- * `.claude/skills/<name>` whatever that flag adds. When both hold one
- * name, the project copy is the one a session runs. That was measured on
- * 2026-09-25 against Claude Code 2.1.280, under `--setting-sources
- * project,local`, in a scratch git repository. Each copy of one skill
- * told the session to reply with its own word. With both copies present,
- * the session replied with the project's word. With the project copy
- * moved away, it replied with the `--add-dir` copy's word, which is the
- * control. The stream-json `init` event listed the name once in both
- * runs, so the reply is the only thing that shows which copy loaded.
+ * rafa serves only winners, but it does not decide which copy of a
+ * skill a session runs: Claude Code loads the project's and a loaded
+ * user tier's `.claude/skills/<name>` by itself, and a served skill
+ * reaches it through `--add-dir` (`tiers/delivery.ts`). Claude Code's
+ * own order for one skill name is {@link CLAUDE_SKILL_ORDER}: user, then
+ * project, then the `--add-dir` copy. That is not the tier order above,
+ * which is kept: it still decides which of byte-identical copies serves,
+ * and which tiers load.
  *
- * So a skill pin to `rafa` has no effect while a loaded project holder
- * differs from the pinned copy, and the name stays a `collision`.
- * {@link TierCollision.setAsidePin} records the pin, and
- * {@link collisionMessage} says the two ways out: a skill pin can only
- * name `project`, and deleting or renaming the project copy lets the
- * rafa copy serve. A byte-identical project copy is the same item, so
- * that pin still serves.
+ * The order was measured on 2026-09-25 against Claude Code 2.1.280, in a
+ * scratch git repository. Each copy of one skill told the session to
+ * reply with its own word, and every mix ran beside a control holding
+ * one copy alone. The stream-json `init` event listed the name once in
+ * every run, so the reply is the only thing that shows which copy
+ * loaded. Under `--setting-sources project,local` a project skill beat
+ * the `--add-dir` copy. Under `user,project,local` a user skill beat the
+ * project's (three runs) and the `--add-dir` copy (two runs).
+ *
+ * So a skill pin has no effect while a loaded holder in a tier Claude
+ * Code ranks above the pinned one differs from the pinned copy
+ * ({@link outrankingHolders}), and the name stays a `collision`:
+ *
+ *   - a `rafa` pin, while the project or a loaded user tier holds a
+ *     different copy;
+ *   - a `project` pin, while a loaded user tier holds a different copy;
+ *   - a `user` pin never, since nothing outranks a loaded user skill.
+ *
+ * {@link TierCollision.setAsidePin} records the pin and
+ * {@link TierCollision.outrankedBy} the copies that outrank it.
+ * {@link collisionMessage} names the two ways out: the pin that works,
+ * which is {@link TierCollision.pinLine}, or deleting or renaming those
+ * copies. A byte-identical copy is the same item, so it never sets a
+ * pin aside.
  *
  * Agents keep their pins. A served agent goes through `--agents`, and
- * the same probe found an `--agents` agent outranks a project agent of
- * the name. That held both as the session's `--agent`, which is how a
- * loop session is dispatched, and as a subagent through the Agent tool.
- *
- * A `user` pin is not refused. Under `--setting-sources
- * user,project,local` the same probe found a user-tier skill outranks
- * both the project's skill and an `--add-dir` skill of the name, so a
- * `user` pin does take effect.
+ * the same kind of probe, run on the same day and version under
+ * `user,project,local`, found an `--agents` agent outranks both a
+ * project and a user agent of the name: with the project copy, with the
+ * user copy, and with both. That held as the session's `--agent`, which
+ * is how a loop session is dispatched, and as a subagent through the
+ * Agent tool, and each single-copy control replied with its own word.
+ * The same runs found a project agent outranks a user agent, so a
+ * `user` agent pin against a differing project agent does not reach the
+ * session. The resolver does not act on that.
  *
  * ## Byte-identical holders are one item
  *
@@ -116,12 +130,15 @@
  * Every distinct holder, each the nearest of its byte-identical group,
  * so a refusal names both paths, or all three. It also carries
  * {@link TierCollision.pinLine}, the one config line that settles it.
- * That line pins the nearest holder's tier, since that holder would
- * have won by order. It is written the way the spec writes a pin,
+ * For an agent that line pins the nearest holder's tier, since that
+ * holder would have won by order. For a skill it pins the tier of the
+ * copy Claude Code loads first, so the line it suggests is never one
+ * the resolver sets aside. It is written the way the spec writes a pin,
  * `tiers.skills: { documentation: project }`, with the key path dotted
  * as every config message spells it. {@link collisionMessage} is the
  * sentence a refusal prints. A collision a skill pin failed to settle
- * also carries that pin (see "A skill pin cannot outrank the project").
+ * also carries that pin and the copies that outrank it (see "A skill
+ * pin must name the copy Claude Code loads").
  */
 import type { ClaudeSettingSource, TierPin, TierSwitch } from '../config-sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
@@ -209,11 +226,16 @@ export interface TierCollision {
   /** The config line pinning the nearest holder's tier. */
   readonly pinLine: string;
   /**
-   * The tier a skill pin named that cannot take effect, because the
-   * project holds a different skill of the name. Null when no pin was set
-   * aside. See "A skill pin cannot outrank the project".
+   * The tier a skill pin named that cannot take effect, because a copy
+   * Claude Code loads over it differs. Null when no pin was set aside.
+   * See "A skill pin must name the copy Claude Code loads".
    */
   readonly setAsidePin: SkillTier | null;
+  /**
+   * The loaded holders Claude Code loads over the set-aside pin's copy,
+   * in {@link CLAUDE_SKILL_ORDER}. Empty when no pin was set aside.
+   */
+  readonly outrankedBy: readonly TierRow[];
 }
 
 /** Every name the three tiers hold, resolved. */
@@ -231,6 +253,14 @@ export interface Resolution {
  * `commands/agent/vendor.ts` writes it.
  */
 export const VENDORED_HEADER = /^<!-- vendored by rafa from .* on \d{4}-\d{2}-\d{2} -->$/;
+
+/**
+ * The order Claude Code itself loads one skill name in, the copy a
+ * session runs first: a loaded user skill, then the project's, then the
+ * `--add-dir` copy rafa serves. Measured on Claude Code 2.1.280; see "A
+ * skill pin must name the copy Claude Code loads".
+ */
+export const CLAUDE_SKILL_ORDER: readonly SkillTier[] = ['user', 'project', 'rafa'];
 
 /** The kinds in the order a resolution lists them. */
 const KIND_ORDER: readonly InventoryKind[] = ['skill', 'agent'];
@@ -262,8 +292,9 @@ export function pinLine(kind: InventoryKind, name: string, tier: SkillTier): str
 
 /**
  * The sentence a refusal prints for `collision`: every path, then the pin
- * line. When a skill pin was set aside, it says why that pin cannot take
- * effect and what can settle the name instead.
+ * line. When a skill pin was set aside, it names the copies Claude Code
+ * loads over the pinned one, and the two ways out: the pin that works,
+ * or deleting or renaming those copies.
  */
 export function collisionMessage(collision: TierCollision): string {
   const places = collision.holders
@@ -273,10 +304,15 @@ export function collisionMessage(collision: TierCollision): string {
     + `with different contents: ${places}; `;
   const tier = collision.setAsidePin;
   if (tier === null) return `${held}pin the tier that serves it: ${collision.pinLine}`;
-  return `${held}${pinLine(collision.kind, collision.name, tier)} has no effect, because Claude Code always `
-    + `loads the project's .claude/skills/${collision.name} and it outranks the ${tier} copy: `
-    + `a skill pin can only name project (${collision.pinLine}), `
-    + `or delete or rename the project copy to let the ${tier} copy serve`;
+  const over = collision.outrankedBy;
+  const tiers = over.map((holder) => holder.source).join(' and ');
+  const copies = over.length === 1
+    ? 'copy'
+    : 'copies';
+  const paths = over.map((holder) => holder.path).join(' and ');
+  return `${held}${pinLine(collision.kind, collision.name, tier)} has no effect, because Claude Code loads `
+    + `the ${tiers} ${copies} over the ${tier} copy: pin the copy it loads (${collision.pinLine}), `
+    + `or delete or rename ${paths} to let the ${tier} copy serve`;
 }
 
 /** A file's bytes, or null when it cannot be read. The seam that reads the disk. */
@@ -366,22 +402,40 @@ function served(
   };
 }
 
+/** A skill holder's place in {@link CLAUDE_SKILL_ORDER}: lower loads first. */
+function claudeRank(row: TierRow): number {
+  return (CLAUDE_SKILL_ORDER as readonly string[]).indexOf(row.source);
+}
+
 /**
- * The pinned holder, unless it is a skill the project outranks: a
- * `rafa` pin while a loaded project holder differs from it. See "A skill
- * pin cannot outrank the project".
+ * The loaded holders Claude Code loads over the `pinned` skill: in a tier
+ * it ranks above the pinned one, and not byte-identical to it. Empty for
+ * an agent. See "A skill pin must name the copy Claude Code loads".
  */
-function effectivePin(
-  pinned: TierRow | undefined,
+export function outrankingHolders(
+  pinned: TierRow,
   loaded: readonly TierRow[],
   groups: readonly (readonly TierRow[])[],
-): TierRow | undefined {
-  if (pinned === undefined || pinned.kind !== 'skill' || pinned.source !== 'rafa') return pinned;
-  const project = loaded.find((row) => row.source === 'project');
+): readonly TierRow[] {
+  if (pinned.kind !== 'skill') return [];
   const same = groups.find((group) => group.includes(pinned)) ?? [pinned];
-  return project === undefined || same.includes(project)
-    ? pinned
-    : undefined;
+  return loaded
+    .filter((row) => claudeRank(row) < claudeRank(pinned) && !same.includes(row))
+    .sort((a, b) => claudeRank(a) - claudeRank(b));
+}
+
+/**
+ * The tier the pin line of a collision names: for a skill, the tier of
+ * the copy Claude Code loads first; for an agent, the nearest loaded
+ * tier. `loaded` is nearest first and never empty here.
+ */
+function workingPinTier(kind: InventoryKind, loaded: readonly TierRow[]): SkillTier {
+  const [first] = kind === 'skill'
+    ? [...loaded].sort((a, b) => claudeRank(a) - claudeRank(b))
+    : loaded;
+  return first !== undefined && isSkillTier(first.source)
+    ? first.source
+    : 'project';
 }
 
 /** The outcome for one name's holders. See "The outcome for one name". */
@@ -411,19 +465,27 @@ function resolveItem(
 
   const groups = sameItemGroups(base.loaded, read);
   const pinned = base.loaded.find((row) => row.source === base.pin);
-  const effective = effectivePin(pinned, base.loaded, groups);
-  if (effective !== undefined) return served(base, effective, 'pin', groups);
+  const outrankedBy = pinned === undefined
+    ? []
+    : outrankingHolders(pinned, base.loaded, groups);
+  if (pinned !== undefined && outrankedBy.length === 0) return served(base, pinned, 'pin', groups);
   if (groups.length === 1) return served(base, nearest, 'order', groups);
 
   const distinct = groups.flatMap((group) => group.slice(0, 1));
-  const tier = SKILL_TIERS[tierIndex(nearest)] ?? 'project';
-  const setAsidePin = pinned === undefined
-    ? null
-    : SKILL_TIERS[tierIndex(pinned)] ?? null;
+  const setAsidePin = pinned !== undefined && isSkillTier(pinned.source)
+    ? pinned.source
+    : null;
   return {
     ...base,
     state: 'collision',
-    collision: { kind, name, holders: distinct, pinLine: pinLine(kind, name, tier), setAsidePin },
+    collision: {
+      kind,
+      name,
+      holders: distinct,
+      pinLine: pinLine(kind, name, workingPinTier(kind, base.loaded)),
+      setAsidePin,
+      outrankedBy,
+    },
   };
 }
 

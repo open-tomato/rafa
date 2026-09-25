@@ -125,7 +125,8 @@ describe('resolveTiers over a scratch repository', () => {
       join(rafaPath, 'differs-everywhere/SKILL.md'),
       join(userPath, 'differs-everywhere/SKILL.md'),
     ]);
-    expect(item.collision.pinLine).toBe('tiers.skills: { differs-everywhere: project }');
+    // Claude Code loads a user skill over the others, so that is the pin that works.
+    expect(item.collision.pinLine).toBe('tiers.skills: { differs-everywhere: user }');
   });
 
   it('does not resolve the user-tier skill under project,local', () => {

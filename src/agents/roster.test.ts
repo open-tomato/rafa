@@ -767,7 +767,8 @@ describe('collidingPlanSkills', () => {
 
     expect(colliding?.collision.setAsidePin).toBe('rafa');
     expect(colliding?.message).toContain('tiers.skills: { documentation: rafa } has no effect');
-    expect(colliding?.message).toContain('a skill pin can only name project (tiers.skills: { documentation: project })');
+    expect(colliding?.collision.outrankedBy.map((holder) => holder.source)).toEqual(['project']);
+    expect(colliding?.message).toContain('pin the copy it loads (tiers.skills: { documentation: project })');
   });
 
   it('keeps a skill out of the agents, so a skill named like an agent resolves no agent= of that name', () => {

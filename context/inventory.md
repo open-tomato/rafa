@@ -34,8 +34,8 @@ For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
 2. **Unloaded.** No loaded tier holds the name.
 3. **Pinned.** A `tiers.skills` or `tiers.agents` map names a tier to serve,
    and that tier holds it. The pin is the declared winner, except a skill pin
-   to `rafa` while a loaded project holder differs from the pinned copy: it
-   has no effect (see "A skill pin can only name `project`" below).
+   naming a copy Claude Code would not load: it has no effect (see "A skill
+   pin must name the copy Claude Code loads" below).
 4. **Order wins.** All loaded holders are byte-identical copies (see below), so
    the nearest tier serves it, and the rest are its copies.
 5. **Collision.** Two or more loaded tiers hold different items under the name,
@@ -52,47 +52,75 @@ the one config line that settles it:
 tiers.skills: { documentation: project }
 ```
 
-The pin names the nearest holder's tier as a default, since that holder would
-have won by order. A project and a user item of one name are both `collision`
-without a pin, but `enabled` and `shadowed` with `loop.settingSources` narrowed
-to exclude `user`.
+For an agent the pin names the nearest holder's tier, since that holder
+would have won by order. For a skill it names the tier of the copy Claude
+Code loads first (below), so the suggested pin is never one the resolver
+sets aside: a project and a loaded user skill of one name suggest
+`tiers.skills: { documentation: user }`. A project and a user item of one
+name are both `collision` without a pin, but `enabled` and `shadowed` with
+`loop.settingSources` narrowed to exclude `user`.
 
-**A skill pin can only name `project`.** A served skill reaches a session
-through `--add-dir`, and Claude Code always loads the project's
-`.claude/skills/<name>` too, which outranks the added copy. So
-`tiers.skills: { <name>: rafa }` has no effect while a loaded project holder
-of the name differs from the rafa copy: the name stays a `collision`, and the
-refusal (`collisionMessage`, carried by `TierCollision.setAsidePin`) says that
-a skill pin can only name `project`, and that deleting or renaming the
-project copy lets the rafa copy serve. A byte-identical project copy is the
-same item, so that pin still serves. Agents keep their pins: a served agent
-goes through `--agents`, which outranks a project agent of the same name.
+**A skill pin must name the copy Claude Code loads.** rafa serves only
+winners, but Claude Code loads the project's and a loaded user tier's
+`.claude/skills/<name>` by itself, and a served skill reaches a session
+through `--add-dir`. Claude Code loads a user skill over a project skill,
+and both over the rafa copy it is served. That is `CLAUDE_SKILL_ORDER` in
+`src/tiers/resolve.ts`. It is not the tier order: project → rafa → user
+still decides which of byte-identical copies serves, and which tiers load.
+
+So a skill pin has no effect while a loaded holder Claude Code ranks above
+the pinned one differs from the pinned copy, and the name stays a
+`collision`:
+
+- a `rafa` pin, while the project or a loaded user tier holds a different
+  copy;
+- a `project` pin, while a loaded user tier holds a different copy;
+- a `user` pin never, since nothing outranks a loaded user skill.
+
+The refusal (`collisionMessage`, from `TierCollision.setAsidePin` and
+`outrankedBy`) names the copies Claude Code loads over the pinned one and
+the two ways out: pin the copy it loads, or delete or rename those copies
+to let the pinned copy serve. A byte-identical copy is the same item, so it
+never sets a pin aside.
+
+Agents keep their pins. A served agent goes through `--agents`, which
+outranks both a project and a user agent of the same name.
 
 The readings behind this were taken on 2026-09-25 against Claude Code 2.1.280,
 in a scratch git repository with `claude -p --output-format stream-json
 --verbose`. Each copy of one name told the session to reply with its own word.
 The `init` event listed the name once whichever copy loaded, so the reply is
-what shows which copy won:
+what shows which copy won. Every mix ran beside a single-copy control:
 
 | Copies present | Sources | Replied with |
 |---|---|---|
 | project skill, `--add-dir` skill | `project,local` | project |
 | `--add-dir` skill alone (control) | `project,local` | `--add-dir` |
-| project agent, `--agents` agent, run as `--agent` | `project,local` | `--agents` |
-| the same, run as a subagent through the Agent tool | `project,local` | `--agents` |
-| project agent alone, run as `--agent` (control) | `project,local` | project |
 | project skill, user skill (3 runs) | `user,project,local` | user |
 | project skill, user skill | `project,local` | project |
 | project skill alone (control) | `user,project,local` | project |
 | user skill, `--add-dir` skill (2 runs) | `user,project,local` | user |
 | `--add-dir` skill alone (control) | `user,project,local` | `--add-dir` |
+| project agent, `--agents` agent, run as `--agent` | `project,local` | `--agents` |
+| the same, run as a subagent through the Agent tool | `project,local` | `--agents` |
+| project agent alone, run as `--agent` (control) | `project,local` | project |
+| project agent, `--agents` agent, run as `--agent` | `user,project,local` | `--agents` |
+| user agent, `--agents` agent, run as `--agent` (2 runs) | `user,project,local` | `--agents` |
+| project, user and `--agents` agents, run as `--agent` | `user,project,local` | `--agents` |
+| project, user and `--agents` agents, as a subagent | `user,project,local` | `--agents` |
+| user agent, `--agents` agent, as a subagent | `user,project,local` | `--agents` |
+| project agent, user agent, run as `--agent` (2 runs) | `user,project,local` | project |
+| project agent, user agent, as a subagent | `user,project,local` | project |
+| project agent alone, run as `--agent` (control) | `user,project,local` | project |
+| user agent alone, run as `--agent` (control) | `user,project,local` | user |
+| user agent alone, as a subagent (control) | `user,project,local` | user |
+| `--agents` agent alone, run as `--agent` (control) | `user,project,local` | `--agents` |
 
-A `user` pin is not refused: under a `user` source a user skill outranks the
-project's, so the pin takes effect. The same rows show Claude Code's own skill
-order under that source is user, project, `--add-dir`. That is not the tier
-order the resolver takes, so a `project` or `rafa` skill pin against a
-differing loaded user skill does not reach the session either. The resolver
-does not act on that yet.
+A user agent was planted under `~/.claude/agents` for the run and removed
+after it, since a session under a scratch `HOME` is not logged in. The last
+agent rows show a project agent outranks a user agent. So a `user` agent pin
+against a differing project agent does not reach the session either; the
+resolver does not act on that.
 
 **The byte-identical rule.** Two holders are the same when their definition
 files are byte-identical after removing every line of rafa's vendoring header

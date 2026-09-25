@@ -300,11 +300,12 @@ describe('resolveTiers: a pin', () => {
   });
 });
 
-describe('resolveTiers: a skill pin the project outranks', () => {
+describe('resolveTiers: a skill pin Claude Code would not load', () => {
   const rows = [row('project', 'doc'), row('rafa', 'doc')];
-  const toRafa = settings({ tiersSkills: new Map<string, TierPin>([['doc', 'rafa']]) });
+  const pins = (tier: TierPin) => new Map<string, TierPin>([['doc', tier]]);
+  const toRafa = settings({ tiersSkills: pins('rafa') });
 
-  it('has no effect while a loaded project skill differs, so the name stays a collision', () => {
+  it('sets a rafa pin aside while a loaded project skill differs, so the name stays a collision', () => {
     const resolution = resolveTiers(rows, toRafa, distinct(rows).read);
     const [item] = resolution.items;
     if (item === undefined) throw new Error('no item');
@@ -313,34 +314,98 @@ describe('resolveTiers: a skill pin the project outranks', () => {
     expect(item.pin).toBe('rafa');
     expect(resolution.collisions).toEqual([collision]);
     expect(collision.setAsidePin).toBe('rafa');
+    expect(collision.outrankedBy.map((each) => each.source)).toEqual(['project']);
     expect(collision.pinLine).toBe('tiers.skills: { doc: project }');
   });
 
-  it('says a skill pin can only name project, and that removing the project copy lets rafa serve', () => {
+  it('names the copy to delete or rename and the pin that works', () => {
     const collision = collisionOf(only(rows, toRafa, distinct(rows).read));
 
     expect(collisionMessage(collision)).toBe('skill doc is held by 2 loaded tiers with different contents: '
       + 'project /repo/.claude/skills/doc/SKILL.md and rafa /rafa/bundled/skills/doc/SKILL.md; '
-      + 'tiers.skills: { doc: rafa } has no effect, because Claude Code always loads the project\'s '
-      + '.claude/skills/doc and it outranks the rafa copy: a skill pin can only name project '
-      + '(tiers.skills: { doc: project }), or delete or rename the project copy to let the rafa copy serve');
+      + 'tiers.skills: { doc: rafa } has no effect, because Claude Code loads the project copy over the rafa copy: '
+      + 'pin the copy it loads (tiers.skills: { doc: project }), '
+      + 'or delete or rename /repo/.claude/skills/doc/SKILL.md to let the rafa copy serve');
+  });
+
+  it('sets a rafa pin aside while only a loaded user skill differs, and names the user pin', () => {
+    const rafaAndUser = [row('rafa', 'doc'), row('user', 'doc')];
+    const collision = collisionOf(only(rafaAndUser, settings({ settingSources: ['user'], tiersSkills: pins('rafa') }), distinct(rafaAndUser).read));
+
+    expect(collision.setAsidePin).toBe('rafa');
+    expect(collision.outrankedBy.map((each) => each.source)).toEqual(['user']);
+    expect(collision.pinLine).toBe('tiers.skills: { doc: user }');
+  });
+
+  it('names both the user and the project copy when both outrank a rafa pin', () => {
+    const three = [...rows, row('user', 'doc')];
+    const collision = collisionOf(only(three, settings({ settingSources: ['user'], tiersSkills: pins('rafa') }), distinct(three).read));
+
+    expect(collision.outrankedBy.map((each) => each.source)).toEqual(['user', 'project']);
+    expect(collisionMessage(collision)).toContain('tiers.skills: { doc: rafa } has no effect, because Claude Code loads '
+      + 'the user and project copies over the rafa copy: pin the copy it loads (tiers.skills: { doc: user }), '
+      + 'or delete or rename /home/.claude/skills/doc/SKILL.md and /repo/.claude/skills/doc/SKILL.md '
+      + 'to let the rafa copy serve');
+  });
+
+  it('sets a project pin aside while a loaded user skill differs, and names the user pin', () => {
+    const projectAndUser = [row('project', 'doc'), row('user', 'doc')];
+    const collision = collisionOf(only(projectAndUser, settings({ settingSources: ['user'], tiersSkills: pins('project') }), distinct(projectAndUser).read));
+
+    expect(collision.setAsidePin).toBe('project');
+    expect(collision.outrankedBy.map((each) => each.source)).toEqual(['user']);
+    expect(collisionMessage(collision)).toContain('tiers.skills: { doc: project } has no effect, because Claude Code '
+      + 'loads the user copy over the project copy: pin the copy it loads (tiers.skills: { doc: user }), '
+      + 'or delete or rename /home/.claude/skills/doc/SKILL.md to let the project copy serve');
+  });
+
+  it('keeps a user pin, since nothing outranks a loaded user skill', () => {
+    const three = [...rows, row('user', 'doc')];
+    const item = servedItem(only(three, settings({ settingSources: ['user'], tiersSkills: pins('user') }), distinct(three).read));
+
+    expect(item.winner.source).toBe('user');
+    expect(item.decidedBy).toBe('pin');
+    expect(item.overridden.map((each) => each.source)).toEqual(['project', 'rafa']);
+  });
+
+  it('suggests the user pin for an unpinned skill collision a loaded user tier is in', () => {
+    const projectAndUser = [row('project', 'doc'), row('user', 'doc')];
+    const collision = collisionOf(only(projectAndUser, ALL_LOADED, distinct(projectAndUser).read));
+
+    expect(collision.pinLine).toBe('tiers.skills: { doc: user }');
+    expect(collision.setAsidePin).toBeNull();
+    expect(collision.outrankedBy).toEqual([]);
+  });
+
+  it('control: the same two agents suggest the nearest tier, since agent pins are kept', () => {
+    const agents = [row('project', 'doc', 'agent'), row('user', 'doc', 'agent')];
+    expect(collisionOf(only(agents, ALL_LOADED, distinct(agents).read)).pinLine).toBe('tiers.agents: { doc: project }');
   });
 
   it('control: an unpinned collision sets no pin aside', () => {
-    expect(collisionOf(only(rows, settings(), distinct(rows).read)).setAsidePin).toBeNull();
+    const collision = collisionOf(only(rows, settings(), distinct(rows).read));
+
+    expect(collision.setAsidePin).toBeNull();
+    expect(collision.outrankedBy).toEqual([]);
   });
 
-  it('control: the same pin serves rafa once the project holds nothing under the name', () => {
+  it('control: a rafa pin serves once the project holds nothing and the user tier is not loaded', () => {
     const rafaAndUser = [row('rafa', 'doc'), row('user', 'doc')];
-    const pinned = settings({ settingSources: ['user'], tiersSkills: toRafa.tiersSkills });
-    const item = servedItem(only(rafaAndUser, pinned, distinct(rafaAndUser).read));
+    const item = servedItem(only(rafaAndUser, toRafa, distinct(rafaAndUser).read));
 
     expect(item.winner.source).toBe('rafa');
     expect(item.decidedBy).toBe('pin');
-    expect(item.overridden.map((each) => each.source)).toEqual(['user']);
+    expect(item.holders.map((each) => each.source)).toEqual(['rafa', 'user']);
   });
 
-  it('control: the same pin serves rafa while the project copy is byte-identical', () => {
+  it('control: a project pin serves while the differing user skill is not loaded', () => {
+    const projectAndUser = [row('project', 'doc'), row('user', 'doc')];
+    const item = servedItem(only(projectAndUser, settings({ tiersSkills: pins('project') }), distinct(projectAndUser).read));
+
+    expect(item.winner.source).toBe('project');
+  });
+
+  it('control: a rafa pin serves while the project copy is byte-identical', () => {
     const item = servedItem(only(rows, toRafa, same(rows).read));
 
     expect(item.winner.source).toBe('rafa');
@@ -348,18 +413,27 @@ describe('resolveTiers: a skill pin the project outranks', () => {
     expect(item.copies.map((each) => each.source)).toEqual(['project']);
   });
 
-  it('keeps a user pin, which a loaded user skill honours over the project', () => {
+  it('control: a project pin serves while the loaded user copy is byte-identical, over a differing rafa copy', () => {
     const three = [...rows, row('user', 'doc')];
-    const pinned = settings({ settingSources: ['user'], tiersSkills: new Map<string, TierPin>([['doc', 'user']]) });
-    const item = servedItem(only(three, pinned, distinct(three).read));
+    const { read } = disk(new Map([
+      [three[0]?.path ?? '', 'shared\n'],
+      [three[1]?.path ?? '', 'rafa\n'],
+      [three[2]?.path ?? '', 'shared\n'],
+    ]));
+    const item = servedItem(only(three, settings({ settingSources: ['user'], tiersSkills: pins('project') }), read));
 
-    expect(item.winner.source).toBe('user');
-    expect(item.decidedBy).toBe('pin');
+    expect(item.winner.source).toBe('project');
+    expect(item.copies.map((each) => each.source)).toEqual(['user']);
+    expect(item.overridden.map((each) => each.source)).toEqual(['rafa']);
   });
 
-  it('keeps a project pin, the one the refusal suggests', () => {
-    const pinned = settings({ tiersSkills: new Map<string, TierPin>([['doc', 'project']]) });
-    expect(servedItem(only(rows, pinned, distinct(rows).read)).winner.source).toBe('project');
+  it('control: an agent pin to rafa serves over differing project and user agents, since --agents outranks both', () => {
+    const agents = [row('project', 'doc', 'agent'), row('rafa', 'doc', 'agent'), row('user', 'doc', 'agent')];
+    const pinned = settings({ settingSources: ['user'], tiersAgents: pins('rafa') });
+    const item = servedItem(only(agents, pinned, distinct(agents).read));
+
+    expect(item.winner.source).toBe('rafa');
+    expect(item.overridden.map((each) => each.source)).toEqual(['project', 'user']);
   });
 });
 
@@ -369,16 +443,16 @@ describe('the skill pin rule on the pages that document it', () => {
   const flat = (...path: string[]) => readFileSync(join(repo, ...path), 'utf8').replace(/\s+/g, ' ');
   const pages = { inventory: flat('context', 'inventory.md'), readme: flat('README.md') };
 
-  it('says on both pages that a skill pin can only name project, and that removing the project copy lets rafa serve', () => {
+  it('says on both pages that a skill pin must name the copy Claude Code loads, and how to get out', () => {
     for (const page of Object.values(pages)) {
-      expect(page).toContain('skill pin can only name `project`');
-      expect(page).toMatch(/delet(?:e|ing) or renam(?:e|ing) the project copy/);
+      expect(page).toContain('A skill pin must name the copy Claude Code loads');
+      expect(page).toContain('a user skill over a project skill, and both over the rafa copy');
+      expect(page).toMatch(/delet(?:e|ing) or renam(?:e|ing)/);
     }
   });
 
-  it('control: the README sentence on pins is the one that says it', () => {
-    const sentence = pages.readme.split('. ').find((part) => part.startsWith('A skill pin'));
-    expect(sentence).toContain('can only name `project`');
+  it('control: neither page still says a skill pin can only name project', () => {
+    for (const page of Object.values(pages)) expect(page).not.toContain('can only name `project`');
   });
 });
 

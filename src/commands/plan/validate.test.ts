@@ -443,7 +443,7 @@ describe('the agents rafa plan validate checks', () => {
     expect(refused.exitCode).toBe(1);
     expect(refused.stdout).toBe('error: plan.md: skill "documentation" (line 1) cannot be served: skill documentation is held'
       + ` by 2 loaded tiers with different contents: project ${paths[0]?.project} and user ${paths[0]?.user};`
-      + ' pin the tier that serves it: tiers.skills: { documentation: project }\n');
+      + ' pin the tier that serves it: tiers.skills: { documentation: user }\n');
     expect(refused.stderr).toBe('❌ plan.md: 1 skill collision; no session would be dispatched\n');
     expect(eventsOf(json.stdout).map(labelOf)).toEqual([
       'start',

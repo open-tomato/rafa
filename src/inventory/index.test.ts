@@ -317,8 +317,9 @@ describe('state and visibility taken from resolveTiers', () => {
       ['agent', 'tdd-guide', 'rafa', 'collision', false],
       ['agent', 'tdd-guide', 'user', 'collision', false],
     ]);
+    // A skill's pin line names the copy Claude Code loads, the user one.
     expect(inventory.resolution.collisions.map((collision) => collision.pinLine)).toEqual([
-      'tiers.skills: { clash: project }',
+      'tiers.skills: { clash: user }',
       'tiers.agents: { tdd-guide: rafa }',
     ]);
   });

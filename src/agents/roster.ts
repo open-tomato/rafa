@@ -153,7 +153,9 @@
  * `collisionMessage`'s, naming every path and the one pin line that
  * settles it, and {@link skillCollisionLine} words it for the preflight
  * and `rafa plan validate`. A pin in `tiers.skills` settles it, as a
- * pin in `tiers.agents` settles an agent's.
+ * pin in `tiers.agents` settles an agent's, when it names the copy
+ * Claude Code loads; a skill pin that does not is set aside and the
+ * sentence says so (`tiers/resolve.ts`).
  *
  * A collision is the only refusal a `skills=` name meets here. A name no
  * tier holds is not one, because `parseSkillList` in

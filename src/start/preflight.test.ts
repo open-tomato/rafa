@@ -1057,9 +1057,9 @@ describe('the agent roster check', () => {
     expect(collided.probes).toEqual([]);
     expect(pinnedToRafa.refusal?.exitCode).toBe(1);
     expect(pinnedToRafa.refusal?.message.split('\n')[1]).toBe(`${heldBy} tiers.skills: { documentation: rafa } has no effect,`
-      + ' because Claude Code always loads the project\'s .claude/skills/documentation and it outranks the rafa copy:'
-      + ' a skill pin can only name project (tiers.skills: { documentation: project }),'
-      + ' or delete or rename the project copy to let the rafa copy serve');
+      + ' because Claude Code loads the project copy over the rafa copy:'
+      + ' pin the copy it loads (tiers.skills: { documentation: project }),'
+      + ` or delete or rename ${project} to let the rafa copy serve`);
     expect(pinnedToRafa.probes).toEqual([]);
     // The control: a pin to project settles the name, and the run goes on to its probes.
     expect(pinnedToProject.refusal).toBeNull();
@@ -1078,6 +1078,38 @@ describe('the agent roster check', () => {
       expect.stringContaining('   agent "no-such-agent" (line 1) cannot be dispatched:'),
       skillLine,
     ]);
+  });
+
+  it('halts on a project skill pin while a loaded user skill differs, and starts under the user pin', async () => {
+    const root = freshRoot();
+    const home = freshHome();
+    const user = join(home, '.claude', 'skills', 'documentation', 'SKILL.md');
+    const project = join(root, '.claude', 'skills', 'documentation', 'SKILL.md');
+    for (const [path, body] of [[user, 'The user body.'], [project, 'The project body.']] as const) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, `---\nname: documentation\ndescription: Planted.\n---\n${body}\n`, 'utf8');
+    }
+    writeFileSync(planPathIn(root), '- [ ] Write it  {skills=documentation}\n', 'utf8');
+    const agents = { settingSources: ['user', 'project', 'local'] as const, home };
+    const pinnedTo = (tier: TierPin) => drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents: { ...agents, tiersSkills: new Map<string, TierPin>([['documentation', tier]]) },
+    });
+
+    // Claude Code loads a user skill over the project's, so a project pin
+    // names a copy the session would not run.
+    const toProject = await pinnedTo('project');
+    const toUser = await pinnedTo('user');
+
+    expect(toProject.refusal?.exitCode).toBe(1);
+    expect(toProject.refusal?.message.split('\n')[1]).toBe('   skill "documentation" (line 1) cannot be served:'
+      + ` skill documentation is held by 2 loaded tiers with different contents: project ${project} and user ${user};`
+      + ' tiers.skills: { documentation: project } has no effect, because Claude Code loads the user copy over the'
+      + ' project copy: pin the copy it loads (tiers.skills: { documentation: user }),'
+      + ` or delete or rename ${user} to let the project copy serve`);
+    expect(toProject.probes).toEqual([]);
+    // The control: the pin the refusal names starts the run.
+    expect(toUser.refusal).toBeNull();
+    expect(toUser.probes).toEqual([`bun --version in ${root}`]);
   });
 
   it('halts on the roster before any probe runs, where the probe would halt the run too', async () => {

@@ -176,7 +176,7 @@ describe('doctorTierRows over the planted world', () => {
     expect(clash?.detail).toBe('held by 2 loaded tiers with different contents: '
       + `project ${join(projectRoot, '.claude/skills/clash/SKILL.md')} and `
       + `user ${join(home, '.claude/skills/clash/SKILL.md')}; nothing serves it`);
-    expect(clash?.fix).toBe('pin the tier that serves it: tiers.skills: { clash: project }');
+    expect(clash?.fix).toBe('pin the tier that serves it: tiers.skills: { clash: user }');
     expect(tdd?.fix).toBe('pin the tier that serves it: tiers.agents: { tdd-guide: rafa }');
   });
 
