@@ -21,6 +21,9 @@
  * | `budget_usd` | the declared budget in US dollars, or NULL |
  * | `tools` | the declared tool names joined with commas, or NULL |
  * | `flags` | the flags the declaration resolved to, a JSON array of strings, `[]` for none |
+ * | `resolver` | the skill resolver the session ran under, `planner`, `tag` or `none`, or NULL when not recorded |
+ * | `skills_offered` | the bare names of the skills its prompt offered, a JSON array, or NULL when not recorded |
+ * | `lessons_offered` | the ids of the lessons its prompt offered, a JSON array, or NULL when not recorded |
  * | `collected_at` | the write's time, ISO 8601 |
  *
  * `seq` comes first, the append order, as in every table of the store. The
@@ -38,9 +41,21 @@
  * the session was spawned with.
  *
  * The table sits in the SQLite store's file, created by the seventh entry
- * of `SQLITE_MIGRATIONS`, whichever backend the `store` setting selects. A
- * write always has its one row, and passes `writeSqliteStore` a count of
- * one, as `reports.ts` does.
+ * of `SQLITE_MIGRATIONS`, whichever backend the `store` setting selects;
+ * the tenth added the last three columns. A write always has its one row,
+ * and passes `writeSqliteStore` a count of one, as `reports.ts` does.
+ *
+ * ## What was offered
+ *
+ * `resolver`, `skills_offered` and `lessons_offered` say which arm chose
+ * the task's skills and what reached its prompt, so a session's use of a
+ * skill can be read against what it was handed. The resolver's name is
+ * recorded here and never printed into the prompt. Each is optional on a
+ * write, and a write that leaves one out, or passes null, stores NULL:
+ * not recorded, which is what every row a version-9 store held reads. An
+ * offered list stores `[]` when the prompt offered nothing, so an empty
+ * offer and an unrecorded one stay apart. Each list is stored in the
+ * order it was handed, as the prompt's section listed it.
  *
  * ## One row per session, and no outcome
  *
@@ -73,12 +88,18 @@
  *     null, whose budget is not null or a finite number above zero, or
  *     whose tools are not null or a list of names holding no comma.
  *   - Flags that are not a list of strings.
+ *   - A resolver that is not null or one of `SKILL_RESOLVERS`.
+ *   - Offered skills or lessons that are not null or a list of non-blank
+ *     strings, or that name one entry twice.
  *   - Any text holding a lone UTF-16 surrogate, which SQLite text cannot
  *     hold.
  */
+import type { SkillResolverName } from '../../config-sections.js';
 import type { TaskDeclaration } from '../../utils/declaration.js';
 
 import { existsSync } from 'node:fs';
+
+import { SKILL_RESOLVERS } from '../../config-sections.js';
 
 import { describeValue, textProblem } from './findings.js';
 import { LONE_SURROGATE, sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
@@ -98,6 +119,12 @@ export interface DispatchWrite {
   readonly declaration: DispatchDeclaration | null;
   /** The flags the declaration resolved to, as the session was spawned with them. */
   readonly flags: readonly string[];
+  /** The skill resolver the session ran under; left out or null when not recorded. */
+  readonly resolver?: SkillResolverName | null;
+  /** The bare names of the skills the prompt offered, `[]` for none; left out or null when not recorded. */
+  readonly skillsOffered?: readonly string[] | null;
+  /** The ids of the lessons the prompt offered, `[]` for none; left out or null when not recorded. */
+  readonly lessonsOffered?: readonly string[] | null;
 }
 
 /** The one value a write generates. */
@@ -133,9 +160,9 @@ const INSERT_DISPATCH = `
   INSERT INTO dispatches (
     session_id, plan_stub, task_line,
     declaration, agent, model, effort, budget_usd, tools,
-    flags, collected_at
+    flags, resolver, skills_offered, lessons_offered, collected_at
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (session_id) DO NOTHING
 `;
 
@@ -179,6 +206,28 @@ function checkFlags(flags: unknown): void {
   throw refusedWrite(`has flags ${describeValue(flags)}, not a list of strings SQLite text can hold`);
 }
 
+/** Throws unless `resolver` is left out, null or one of {@link SKILL_RESOLVERS}. */
+function checkResolver(resolver: unknown): void {
+  if (resolver === undefined || resolver === null) return;
+  if ((SKILL_RESOLVERS as readonly unknown[]).includes(resolver)) return;
+  throw refusedWrite(`has resolver ${describeValue(resolver)}, not null or one of ${SKILL_RESOLVERS.join(', ')}`);
+}
+
+/** Throws unless the offered list `name` is left out, null or a list of distinct non-blank strings. */
+function checkOffered(name: string, offered: unknown): void {
+  if (offered === undefined || offered === null) return;
+  const isEntry = (entry: unknown): boolean => textProblem(entry) === null && entry !== null;
+  if (Array.isArray(offered) && offered.every(isEntry) && new Set(offered).size === offered.length) return;
+  throw refusedWrite(`has ${name} ${describeValue(offered)}, not null or a list of distinct non-blank strings`);
+}
+
+/** The JSON a list column holds, or null when the list was not recorded. */
+function offeredJson(offered: readonly string[] | null | undefined): string | null {
+  return offered === undefined || offered === null
+    ? null
+    : JSON.stringify(offered);
+}
+
 /** Throws unless `declaration` is null or a record whose values can be stored. */
 function checkDeclaration(declaration: unknown): void {
   if (declaration === null) return;
@@ -202,6 +251,9 @@ function checkWrite(write: DispatchWrite): void {
   }
   checkDeclaration(write.declaration);
   checkFlags(write.flags);
+  checkResolver(write.resolver);
+  checkOffered('offered skills', write.skillsOffered);
+  checkOffered('offered lessons', write.lessonsOffered);
 }
 
 /**
@@ -229,7 +281,11 @@ export function writeDispatch(
     declaration?.effort ?? null,
     declaration?.budget ?? null,
     declaration?.tools?.join(',') ?? null,
-    JSON.stringify(write.flags), collectedAt,
+    JSON.stringify(write.flags),
+    write.resolver ?? null,
+    offeredJson(write.skillsOffered),
+    offeredJson(write.lessonsOffered),
+    collectedAt,
   ];
 
   const appended = writeSqliteStore(

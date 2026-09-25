@@ -396,6 +396,18 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
   ALTER TABLE out_of_scope_bugs
     ADD COLUMN scope TEXT CHECK (scope IN ('machine', 'rafa'));
   `,
+  // Version 10: the skill resolver a task session ran under and what it
+  // was offered, added to the table version 7 created. `dispatches.ts`
+  // writes them and says why each is nullable. A row a version-9 store
+  // already holds reads NULL in all three.
+  `
+  ALTER TABLE dispatches
+    ADD COLUMN resolver TEXT CHECK (resolver IN ('planner', 'tag', 'none'));
+  ALTER TABLE dispatches
+    ADD COLUMN skills_offered TEXT CHECK (skills_offered IS NULL OR json_type(skills_offered) = 'array');
+  ALTER TABLE dispatches
+    ADD COLUMN lessons_offered TEXT CHECK (lessons_offered IS NULL OR json_type(lessons_offered) = 'array');
+  `,
 ];
 
 /**

@@ -47,6 +47,9 @@ interface StoredDispatch {
   tools: string | null;
   flags: string;
   collected_at: string;
+  resolver: string | null;
+  skills_offered: string | null;
+  lessons_offered: string | null;
 }
 
 /** The table's columns, in order. */
@@ -63,6 +66,9 @@ const COLUMNS = [
   'tools',
   'flags',
   'collected_at',
+  'resolver',
+  'skills_offered',
+  'lessons_offered',
 ];
 
 /** Every table a store at the last version holds, by name. */
@@ -180,6 +186,61 @@ describe('the dispatches table', () => {
     expect(rawQuery(root, 'SELECT id FROM task_reports')).toEqual([{ id: 't-1' }]);
     expect(rowsOf(root).map(({ session_id }) => session_id)).toEqual(['s-1']);
   });
+
+  it('brings a version-9 store forward, reading its rows as not recorded', () => {
+    const root = freshRoot('v9');
+    mkdirSync(dirname(sqliteStorePath(root)), { recursive: true });
+    const db = new Database(sqliteStorePath(root), { create: true, readwrite: true });
+    migrateSchema(db, sqliteStorePath(root), SQLITE_MIGRATIONS.slice(0, 9));
+    db.run(
+      'INSERT INTO dispatches (session_id, plan_stub, task_line, flags, collected_at) VALUES (?, ?, ?, ?, ?)',
+      ['s-0', STUB, 'An earlier task', '[]', WRITTEN_AT],
+    );
+    db.close();
+
+    // The control: the first nine entries make the table without the
+    // three columns, so they came from a later entry.
+    const before = rawQuery<{ name: string }>(root, 'SELECT name FROM pragma_table_info(?) ORDER BY cid', 'dispatches');
+    expect(before.map(({ name }) => name)).toEqual(COLUMNS.slice(0, -3));
+
+    writeDispatch(root, { ...writeOf('s-1', 'Do it'), resolver: 'tag', skillsOffered: ['bun-testing'], lessonsOffered: [] }, CLOCK);
+
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rowsOf(root).map(({ session_id, resolver, skills_offered, lessons_offered }) => [
+      session_id,
+      resolver,
+      skills_offered,
+      lessons_offered,
+    ])).toEqual([
+      ['s-0', null, null, null],
+      ['s-1', 'tag', '["bun-testing"]', '[]'],
+    ]);
+  });
+
+  it('refuses, at the table, a resolver outside the set and an offer that is no JSON list', () => {
+    const root = freshRoot('checks');
+    writeDispatch(root, writeOf('s-0', 'Do it'), CLOCK);
+    const db = new Database(sqliteStorePath(root), { readwrite: true });
+    const insert = (sessionId: string, column: string, value: string): void => {
+      db.run(
+        `INSERT INTO dispatches (session_id, task_line, flags, collected_at, ${column}) VALUES (?, ?, ?, ?, ?)`,
+        [sessionId, 'A task', '[]', WRITTEN_AT, value],
+      );
+    };
+    try {
+      expect(() => insert('s-1', 'resolver', 'random')).toThrow(/CHECK constraint failed/);
+      expect(() => insert('s-2', 'skills_offered', '{"a":1}')).toThrow(/CHECK constraint failed/);
+      expect(() => insert('s-3', 'lessons_offered', '"one"')).toThrow(/CHECK constraint failed/);
+
+      // The control: the same inserts holding values the columns take.
+      insert('s-4', 'resolver', 'none');
+      insert('s-5', 'skills_offered', '[]');
+      insert('s-6', 'lessons_offered', '["l-1"]');
+    } finally {
+      db.close();
+    }
+    expect(rowsOf(root).map(({ session_id }) => session_id)).toEqual(['s-0', 's-4', 's-5', 's-6']);
+  });
 });
 
 describe('writeDispatch', () => {
@@ -201,7 +262,29 @@ describe('writeDispatch', () => {
       tools: 'Read,Bash',
       flags: '["--agent","loop-implementer","--effort","high","--max-budget-usd","0.5"]',
       collected_at: WRITTEN_AT,
+      resolver: null,
+      skills_offered: null,
+      lessons_offered: null,
     }]);
+  });
+
+  it('stores the resolver and what was offered, in the order it was handed', () => {
+    const root = freshRoot('offered');
+
+    writeDispatch(root, {
+      ...writeOf('s-1', FULL_LINE),
+      resolver: 'planner',
+      skillsOffered: ['bun-testing', 'api-design'],
+      lessonsOffered: ['lesson-b', 'lesson-a'],
+    }, CLOCK);
+    writeDispatch(root, { ...writeOf('s-2', 'Do it'), resolver: 'none', skillsOffered: [], lessonsOffered: [] }, CLOCK);
+    writeDispatch(root, { ...writeOf('s-3', 'Do it'), resolver: null, skillsOffered: null, lessonsOffered: null }, CLOCK);
+
+    expect(rowsOf(root).map(({ resolver, skills_offered, lessons_offered }) => [resolver, skills_offered, lessons_offered])).toEqual([
+      ['planner', '["bun-testing","api-design"]', '["lesson-b","lesson-a"]'],
+      ['none', '[]', '[]'],
+      [null, null, null],
+    ]);
   });
 
   it('stores a task with no declaration as no values and no flags', () => {
@@ -222,6 +305,9 @@ describe('writeDispatch', () => {
       tools: null,
       flags: '[]',
       collected_at: WRITTEN_AT,
+      resolver: null,
+      skills_offered: null,
+      lessons_offered: null,
     }]);
   });
 
@@ -271,6 +357,17 @@ describe('writeDispatch', () => {
       ['an empty tool list', withDeclaration({ tools: [] })],
       ['a tool name holding a comma', withDeclaration({ tools: ['Read,Bash'] })],
       ['flags that are not strings', { ...good, flags: [42] } as unknown as DispatchWrite],
+      ['a resolver outside the set', { ...good, resolver: 'random' } as unknown as DispatchWrite],
+      ['a resolver that is no string', { ...good, resolver: 1 } as unknown as DispatchWrite],
+      ['offered skills that are no list', { ...good, skillsOffered: 'bun-testing' } as unknown as DispatchWrite],
+      ['an offered skill that is blank', { ...good, skillsOffered: [' '] }],
+      ['an offered skill that is no string', { ...good, skillsOffered: [null] } as unknown as DispatchWrite],
+      ['an offered skill named twice', { ...good, skillsOffered: ['bun-testing', 'bun-testing'] }],
+      ['an offered skill holding a lone surrogate', { ...good, skillsOffered: [`a${LONE_HIGH}`] }],
+      ['offered lessons that are no list', { ...good, lessonsOffered: { id: 'l-1' } } as unknown as DispatchWrite],
+      ['an offered lesson that is blank', { ...good, lessonsOffered: [''] }],
+      ['an offered lesson that is no string', { ...good, lessonsOffered: [7] } as unknown as DispatchWrite],
+      ['an offered lesson named twice', { ...good, lessonsOffered: ['l-1', 'l-1'] }],
     ];
 
     for (const [label, write] of refused) {
@@ -279,9 +376,12 @@ describe('writeDispatch', () => {
       expect(existsSync(root), label).toBe(false);
     }
 
-    // The control: the write each refusal was varied from is stored.
+    // The control: the write each refusal was varied from is stored, bare
+    // and with every offer field it was varied by.
     const root = freshRoot('refused-control');
     expect(writeDispatch(root, good, CLOCK).appended).toBe(1);
+    const offered = { ...good, sessionId: 's-2', resolver: 'tag', skillsOffered: ['bun-testing'], lessonsOffered: ['l-1'] } as const;
+    expect(writeDispatch(root, offered, CLOCK).appended).toBe(1);
   });
 });
 

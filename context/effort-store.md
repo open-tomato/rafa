@@ -80,7 +80,7 @@ these tables holds what a report wrote; `scope` holds what
 which `store/triage.ts` calls for each bug it stores: `machine` for a
 fault of the machine the session ran on, `rafa` otherwise, and never
 NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
-the one migration that creates no table, so a row a version-8 store
+the first migration that creates no table, so a row a version-8 store
 already held reads NULL — stored before the reading existed. It is
 outside `out_of_scope_bugs_by_entry` because it is a function of `what`
 and `artifact`, which that index already holds, so a repeat of an entry
@@ -103,6 +103,15 @@ parser could use and the flags the session was spawned with, whatever
 became of the task, and then the report; a refused dispatch row stores no
 report. No column holds the outcome: `task_reports` and `report_absences`
 hold it under the same session id.
+
+**`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
+at schema version 10**, a second `ADD COLUMN` migration, so a row a
+version-9 store held reads NULL in all three: not recorded. The
+`DispatchWrite` fields behind them are optional and store NULL when left
+out; an offered list that was recorded stores `[]` when nothing was
+offered. Adding them moved three expectations, all in
+`store/dispatches.test.ts`: the `COLUMNS` list and the two whole-row
+`toEqual`s.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
