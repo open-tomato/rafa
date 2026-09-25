@@ -22,7 +22,7 @@
  * ignored the flag would answer `planner` and fail. `--inject` is read
  * beside it, holding the two flags apart: each answers its own setting.
  */
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -144,6 +144,58 @@ describe('loadRunConfig and --skills-resolver', () => {
       'command line: taskSkills is "", expected one of: planner, tag, none',
     ]);
     expect(loadRunConfig(roots, ['--skills-resolver=planner'], noWarning).config.taskSkills).toBe('planner');
+  });
+});
+
+/** Writes `.rafa/config.yaml` under `dir`. */
+function plantConfig(dir: string, body: string): void {
+  mkdirSync(join(dir, '.rafa'), { recursive: true });
+  writeFileSync(join(dir, '.rafa', 'config.yaml'), body);
+}
+
+/** The problems a load refuses with, or fails if it loads. */
+function refusal(roots: { root: string; home: string }, args: string[]): readonly string[] {
+  try {
+    loadRunConfig(roots, args, noWarning);
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConfigError);
+    return (error as ConfigError).problems;
+  }
+  throw new Error('expected a refusal');
+}
+
+describe('loadRunConfig refusals and layers for the task keys', () => {
+  it('refuses task.skills: model in the project file, naming the file', () => {
+    const roots = bareRoots();
+    plantConfig(roots.root, 'task:\n  skills: model\n');
+
+    const problems = refusal(roots, []);
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('task.skills is "model", expected one of: planner, tag, none');
+  });
+
+  it('refuses --skills-resolver=bogus, naming the command line', () => {
+    expect(refusal(bareRoots(), ['--skills-resolver=bogus'])).toEqual([
+      'command line: taskSkills is "bogus", expected one of: planner, tag, none',
+    ]);
+  });
+
+  it('holds --skills-resolver=tag over a project task.skills: none, and the user layer lessons: off under a silent project', () => {
+    const roots = bareRoots();
+    plantConfig(roots.root, 'task:\n  skills: none\n');
+    const over = loadRunConfig(roots, ['--skills-resolver=tag'], noWarning);
+    expect(over.config.taskSkills).toBe('tag');
+    expect(over.sources.taskSkills).toBe('cli');
+    expect(loadRunConfig(roots, [], noWarning).config.taskSkills).toBe('none');
+
+    const silent = bareRoots();
+    plantConfig(silent.root, '# nothing set\n');
+    plantConfig(silent.home, 'task:\n  lessons: off\n');
+    const layered = loadRunConfig(silent, ['--skills-resolver=tag'], noWarning);
+    expect(layered.config.taskSkills).toBe('tag');
+    expect(layered.config.taskLessons).toBe('off');
+    expect(layered.sources.taskLessons).toBe('user');
   });
 });
 
