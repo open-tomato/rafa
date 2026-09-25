@@ -62,8 +62,16 @@ All comparisons work in whole hundredths (0.55 − 0.45 = 0.10, not 0.1000000000
    - Kept as it is.
    - The payload's `source_id` is joined to its `sources`.
 
-The merge never depends on push order: all triggers are settled over
-their whole set of actions at once, not pair by pair.
+All triggers are settled over their whole set of actions at once, not
+pair by pair, and that makes the held set independent of push order only
+while every action stays within `GAP` of its trigger's leader. A
+discarded action is left out of the held set, so an action discarded by
+one push and confirmed by a later one comes back with only the later
+sources (`merge.ts` documents this); an order-independence fixture keeps
+every action within `GAP`, as `merge.property.test.ts` does. A collapsed
+record's `evidence` (its description) also comes from the member that
+arrived first, so compare held sets across orders without it. This
+replaces the sentence that read "The merge never depends on push order".
 
 ## Findings become lessons
 
@@ -142,9 +150,14 @@ being asked to read `progress.txt` and decide.
 
 ### How it works
 
-1. Code computes `promotable(held, { after, minConfidence })` — lessons
-   that recurred `learning.promote.after` distinct times and meet
-   `learning.promote.minConfidence`.
+1. Code computes `promotable` over the adapter's `pullBlessed` bundle
+   (`lessonsToPromote` in `src/start/wrap-up.ts`; `rafa instinct
+   promote` does the same) — lessons that recurred
+   `learning.promote.after` distinct times and meet
+   `learning.promote.minConfidence`. The port offers no held set, so a
+   lesson tasks may not use is never promotable, and under `local` the
+   bundle also carries user-scope lessons on triggers the project holds
+   nothing on. This replaces the step that read `promotable(held, …)`.
 
 2. The prompt gets a `## Lessons to promote` list: id, trigger, action,
    artifact.
@@ -153,11 +166,21 @@ being asked to read `progress.txt` and decide.
    subject, or says why not, in a `rafa:promoted` block:
    - `id → path/to/context/page.md` — lesson promoted.
    - `id → skipped: <reason>` — lesson not promoted.
+   - Ids come from `lessonId` in `src/report/lessons.ts`: a slug of the
+     trigger plus the first 8 hex digits of its action hash, never
+     holding whitespace. A second line for an id already answered is
+     unreadable, so an example block needs distinct ids.
 
 4. Code checks the answer:
    - Every listed id must be answered.
    - Every named path must have changed in the working tree.
    - A promoted lesson gets `promoted_to: <path>`, a new optional field.
+     The port has no field-update call: `src/start/promoted-check.ts`
+     pushes the blessed record back with `promoted_to` set, from a
+     source it already holds, so `merge` collapses it as `same-action`
+     with `usage_count` and confidence unchanged. A user-scope lesson
+     has no held member to take a description from, so that push is
+     refused with a warning.
    - A promoted lesson leaves every blessed bundle, because the page now
      carries it.
 
@@ -205,7 +228,7 @@ might disagree.
 | Wrap-up ignores the list. | `rafa:promoted` check reports in PR body. | Sessions must answer every id. |
 | Invalid lesson file. | `rafa instinct check` names it; warning. | Fix the file or remove it. |
 | Library and port drift. | Library owns types; port re-exports them. | Never re-declare them. |
-| Merge depends on order. | Property test runs in every order. | Any failure is a library bug. |
+| Merge depends on order. | Property test runs in every order, over actions within `GAP`. | A failure there is a library bug; a discard followed by a confirmation is order-dependent by design. |
 
 ## Ordered by confidence, then usage, then id
 

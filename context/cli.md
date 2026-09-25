@@ -196,6 +196,11 @@ New; it replaces no earlier text. What a row or an action added to
   declared with its first action, never ahead of it.
   `skill index` is in the command tree and is registered by none of it
   yet, so no roster names it.
+  The module note of `src/commands/index.ts` says so in the words
+  "`<names>` is/are in the command tree and is/are not registered", and
+  `unregisteredNamed` in `src/commands/index.test.ts` reads that
+  sentence and holds every name it lists absent from the registry; keep
+  the wording when registering one of them. This replaces nothing.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
