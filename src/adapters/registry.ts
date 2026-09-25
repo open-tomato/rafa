@@ -62,7 +62,7 @@
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
  * the two outputs under `src/adapters/output/`, `output/text` and
  * `output/json`, the two trackers under `src/adapters/tracker/`,
- * `tracker/local` and `tracker/github`, the learning stub under
+ * `tracker/local` and `tracker/github`, the learning adapter under
  * `src/adapters/learning/`, `learning/local`, and the planner under
  * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
  * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
@@ -374,7 +374,7 @@ const STORE_OPENERS: {
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
  * and `json` outputs, then the `local` and `github` trackers, then the
- * `local` learning stub, then the `claude` planner.
+ * `local` learning adapter, then the `claude` planner.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
