@@ -40,6 +40,11 @@
  *     instincts writing reddened its case. The active output read when
  *     the adapter is made reddened the active-output case alone, and the
  *     adapter unfrozen the frozen case.
+ *
+ * `sources` and `promoted_to` joined the record on 2026-09-25, with 45
+ * pass. `sources` dropped by the copy reddened the optional-fields case
+ * alone, and its check made to accept anything reddened its two
+ * refusals alone.
  */
 import type { LocalLearningOptions } from './local.js';
 import type { InstinctRecord, Learning, Output, SyncPayload } from '../../ports/index.js';
@@ -243,6 +248,29 @@ describe('push', () => {
     expect(second).toEqual(withArtifact);
   });
 
+  it('keeps sources and promoted_to when a record carries them, in the port\'s order', async () => {
+    const dir = freshDir('optional-fields');
+    const learning = localLearning(dir);
+    const carried = instinct({
+      id: 'c',
+      promoted_to: 'context/source.md',
+      sources: ['session-1', 'session-2'],
+      usage_count: 2,
+    });
+
+    const result = await learning.push(payload([carried]));
+    const [held] = (await learning.pullBlessed()).instincts;
+
+    expect(result.decisions[0]?.produced).toEqual([carried]);
+    expect(held).toEqual(carried);
+    expect(Object.keys(held ?? {})).toEqual([
+      'id', 'trigger', 'action', 'action_hash', 'confidence', 'usage_count', 'sources',
+      'signal', 'status', 'promoted_to', 'created_at', 'updated_at',
+    ]);
+    expect(Object.keys(instinct())).not.toContain('sources');
+    expect(Object.keys(instinct())).not.toContain('promoted_to');
+  });
+
   const refusals: [label: string, handed: unknown, problem: string][] = [
     ['a payload that is null', null, 'the payload is null, expected a mapping'],
     ['an empty source', { source_id: '', instincts: [] }, 'source_id is "" in the payload, expected a non-empty string'],
@@ -257,6 +285,9 @@ describe('push', () => {
     ['a confidence written as text', payload([instinct({ confidence: '0.5' as unknown as number })]), 'confidence is "0.5" in instincts[0], expected a number from 0.3 to 0.9'],
     ['a negative usage count', payload([instinct({ usage_count: -1 })]), 'usage_count is -1 in instincts[0], expected a whole number from 0'],
     ['a fractional usage count', payload([instinct({ usage_count: 1.5 })]), 'usage_count is 1.5 in instincts[0], expected a whole number from 0'],
+    ['sources that are one string', payload([instinct({ sources: 's' as unknown as string[] })]), 'sources is "s" in instincts[0], expected a list of non-empty strings when present'],
+    ['sources holding an empty string', payload([instinct({ sources: ['s', ''] })]), 'sources is a list in instincts[0], expected a list of non-empty strings when present'],
+    ['a promoted_to that is a number', payload([instinct({ promoted_to: 3 as unknown as string })]), 'promoted_to is 3 in instincts[0], expected a string when present'],
     ['an artifact that is null', payload([instinct({ artifact: null as unknown as string })]), 'artifact is null in instincts[0], expected a string when present'],
     ['a quiet signal', payload([instinct({ signal: 'quiet' as InstinctRecord['signal'] })]), 'signal is "quiet" in instincts[0], expected one of: loud, silent'],
     ['a retired status', payload([instinct({ status: 'retired' as InstinctRecord['status'] })]), 'status is "retired" in instincts[0], expected one of: active, flagged'],
@@ -278,6 +309,8 @@ describe('push', () => {
       instinct({ id: 'high', confidence: 0.9 }),
       instinct({ id: 'unused', usage_count: 0 }),
       instinct({ id: 'artifact', artifact: '' }),
+      instinct({ id: 'no-sources', sources: [] }),
+      instinct({ id: 'promoted', promoted_to: '' }),
       instinct({ id: 'silent', signal: 'silent', trigger: '' }),
       instinct({ id: 'flagged', status: 'flagged' }),
     ];

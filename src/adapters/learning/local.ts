@@ -27,9 +27,9 @@
  *     `reason` and the `flagged_at` read off `now`.
  *
  * Neither file is rewritten, and no line is removed. A record is written
- * with the port's fields alone, in the port's order, and `artifact` is
- * left out when the record has none; any other key is dropped, on the
- * write and on the read. The directory is made by a push that stores a
+ * with the port's fields alone, in the port's order, and `sources`,
+ * `artifact` and `promoted_to` are each left out when the record has
+ * none; any other key is dropped, on the write and on the read. The directory is made by a push that stores a
  * record, so a pull, a refused push or a push of no records leaves no
  * directory behind.
  *
@@ -56,7 +56,9 @@
  * A record carries a non-empty `id`; a string `trigger`, `action`,
  * `action_hash`, `created_at` and `updated_at`; a `confidence` from 0.3
  * to 0.9, the range the port documents; a `usage_count` that is a whole
- * number from 0; an `artifact` that is a string when present; and a
+ * number from 0; `sources` that is a list of non-empty strings when
+ * present; an `artifact` and a `promoted_to` that are each a string when
+ * present; and a
  * `signal` and a `status` from the port's unions. `action_hash` is not
  * recomputed from `action`. A payload carries a non-empty `source_id`
  * and a list of `instincts`, and a flag a non-empty `id` and a string
@@ -183,9 +185,15 @@ const INSTINCT_CHECKS = {
     (value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
     'a whole number from 0',
   ],
+  sources: [
+    (value) => value === undefined
+      || (Array.isArray(value) && value.every(isNonEmptyString)),
+    'a list of non-empty strings when present',
+  ],
   artifact: [(value) => value === undefined || typeof value === 'string', 'a string when present'],
   signal: [oneOf(SIGNALS), `one of: ${SIGNALS.join(', ')}`],
   status: [oneOf(STATUSES), `one of: ${STATUSES.join(', ')}`],
+  promoted_to: [(value) => value === undefined || typeof value === 'string', 'a string when present'],
   created_at: [isString, 'a string'],
   updated_at: [isString, 'a string'],
 } satisfies Record<keyof InstinctRecord, FieldCheck>;
@@ -247,7 +255,7 @@ function flagProblem(value: unknown): string | null {
 
 /** A record with the port's fields alone, in the port's order. */
 function copyInstinct(record: InstinctRecord): InstinctRecord {
-  const { artifact } = record;
+  const { sources, artifact, promoted_to: promotedTo } = record;
   return {
     id: record.id,
     trigger: record.trigger,
@@ -255,11 +263,17 @@ function copyInstinct(record: InstinctRecord): InstinctRecord {
     action_hash: record.action_hash,
     confidence: record.confidence,
     usage_count: record.usage_count,
+    ...(sources === undefined
+      ? {}
+      : { sources: [...sources] }),
     ...(artifact === undefined
       ? {}
       : { artifact }),
     signal: record.signal,
     status: record.status,
+    ...(promotedTo === undefined
+      ? {}
+      : { promoted_to: promotedTo }),
     created_at: record.created_at,
     updated_at: record.updated_at,
   };

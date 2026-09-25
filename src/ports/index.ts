@@ -15,9 +15,10 @@
  * ## Types, and nothing else
  *
  * The entry exports no runtime value, so importing it runs nothing and
- * adds nothing to a service's bundle. Its one import is an `import
- * type`, which the bundler erases, so naming {@link GeneratedPlan}'s
- * review type pulls `src/board/spec-review.ts` into no bundle. That
+ * adds nothing to a service's bundle. Its imports are `import type`
+ * lines, which the bundler erases, so naming {@link GeneratedPlan}'s
+ * review type pulls `src/board/spec-review.ts` into no bundle, and the
+ * learning records pull in no part of `src/learning/` but its types. That
  * keeps three things a port could otherwise carry out of this module:
  *
  *   - The store's key projection, `EFFORT_KEY_PROJECTIONS`, which is a
@@ -57,8 +58,11 @@
  *     and results it is typed against come with it.
  *   - {@link Learning}: `distributed-learning-library.md`, "rafa's
  *     Learning port", with the records it passes taken from that spec's
- *     package shape. That library, phase 5's, will own the records; the
- *     port imports them from it once it exists.
+ *     package shape. The learning library owns the records:
+ *     {@link InstinctRecord}, {@link SyncPayload}, {@link BlessedBundle},
+ *     {@link MergeRule}, {@link MergeDecision} and {@link MergeResult}
+ *     are declared in `src/learning/types.ts` and re-exported here under
+ *     the same names, so each is declared once.
  *   - {@link Output}: open-tomato's `packages/shared/cli-core`, the
  *     events from `src/events.ts` at
  *     `2b00895eaec9edcdce02839831429da97441c0f5` and the interface from
@@ -77,23 +81,31 @@
  * adapter accepting less than the port hands it, such as a `transition`
  * taking only `done`, compiles against a method and is refused against a
  * property. The Tracker source and the Learning spec both spell methods.
- * This is the one change the Learning copy makes to a member's type; the
+ * This is the one change the Learning port makes to a member's type; the
  * Tracker copy makes one more, opening {@link TrackerKind}.
  *
  * ## Left open for phase 1
  *
  *   - {@link MergeResult}: the spec names `discarded` and describes the
- *     rest, a list saying which rule applied to each incoming record and
- *     what it produced, without naming it. `decisions`,
- *     {@link MergeDecision} and the {@link MergeRule} names are this
- *     module's, one rule per row of the spec's merge table plus the
- *     record no existing trigger shares.
+ *     rest without naming it. `decisions`, {@link MergeDecision} and the
+ *     {@link MergeRule} names are the learning library's, one rule per
+ *     row of the spec's merge table plus the record no existing trigger
+ *     shares.
  *   - {@link PlanRequest} and {@link GeneratedPlan} carry what `rafa
  *     plan` has today. The webhook adapter phase 6 adds lands a plan on a
  *     branch, which may widen the answer.
  */
 import type { SpecReviewReading } from '../board/spec-review.js';
+import type { BlessedBundle, MergeResult, SyncPayload } from '../learning/types.js';
 
+export type {
+  BlessedBundle,
+  InstinctRecord,
+  MergeDecision,
+  MergeResult,
+  MergeRule,
+  SyncPayload,
+} from '../learning/types.js';
 export type {
   AppendResult,
   CommitEffortRow,
@@ -295,75 +307,6 @@ export interface Tracker {
 // ---------------------------------------------------------------------
 // Learning
 // ---------------------------------------------------------------------
-
-/**
- * One instinct: a trigger, the action to take on it, and how far to
- * trust that action. The fields are snake case, as the spec spells the
- * record a sync payload carries.
- */
-export interface InstinctRecord {
-  id: string;
-  trigger: string;
-  action: string;
-  /** `sha256(trim(lower(action)))`: two records share an action by it. */
-  action_hash: string;
-  /** From 0.3 to 0.9. */
-  confidence: number;
-  /** The weight a merge gives the confidence, and sums on a match. */
-  usage_count: number;
-  /** The recurrence key; phase 2's field. */
-  artifact?: string;
-  signal: 'loud' | 'silent';
-  /** A `flagged` record is excluded from every blessed bundle. */
-  status: 'active' | 'flagged';
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * What one source pushes. Under the `local` adapter the source is the
- * task's session id, so two tasks of one plan are two sources.
- */
-export interface SyncPayload {
-  source_id: string;
-  instincts: InstinctRecord[];
-}
-
-/** What a pull answers: the instincts blessed for injection. */
-export interface BlessedBundle {
-  version: string;
-  instincts: InstinctRecord[];
-}
-
-/**
- * The rule a merge applied to one incoming record, one per row of the
- * spec's merge table plus the record whose trigger nothing shares:
- *
- *   - `new-trigger`: no held record shares the trigger, so it is kept.
- *   - `same-action`: the same `action_hash`, so the confidences are
- *     weighted by usage and the usage counts summed.
- *   - `higher-confidence`: a different action, confidences more than
- *     0.10 apart, so the higher one wins.
- *   - `flagged`: a different action, confidences within 0.10, so both
- *     are kept and flagged.
- */
-export type MergeRule = 'new-trigger' | 'same-action' | 'higher-confidence' | 'flagged';
-
-/** Which rule applied to one incoming record, and what it produced. */
-export interface MergeDecision {
-  incoming: InstinctRecord;
-  rule: MergeRule;
-  /** The records the trigger is held as once the rule has applied. */
-  produced: InstinctRecord[];
-}
-
-/** What a push did, so a consumer can log each decision. */
-export interface MergeResult {
-  /** One per incoming record, in the payload's order. */
-  decisions: MergeDecision[];
-  /** The records a higher-confidence action displaced; none is deleted. */
-  discarded: InstinctRecord[];
-}
 
 /**
  * The learning tunnel: findings go in as instincts, blessed instincts
