@@ -25,6 +25,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   CLAUDE_SETTING_SOURCES,
+  confidence,
   dayCount,
   describeValue,
   flag,
@@ -39,6 +40,7 @@ import {
   optionalPrerequisite,
   PR_PROVIDERS,
   PREREQUISITE_KINDS,
+  recurrenceCount,
   RELEASE_AUTO,
   releaseEnabled,
   requiredPrerequisite,
@@ -371,6 +373,62 @@ describe('dayCount', () => {
     expect(valueOf(dayCount, parsed.a)).toBe(30);
     expect(problemsOf(dayCount, parsed.b)).toEqual([
       'F: s is "30", expected a number of days, a whole number above zero',
+    ]);
+  });
+});
+
+/** What {@link confidence} names as expected when it refuses a value. */
+const CONFIDENCE_EXPECTED = 'a confidence from 0.3 to 0.9';
+
+describe('confidence', () => {
+  it('accepts both bounds and a value between them as itself', () => {
+    expect([valueOf(confidence, 0.3), valueOf(confidence, 0.5), valueOf(confidence, 0.9)])
+      .toEqual([0.3, 0.5, 0.9]);
+  });
+
+  it('compares a bound in hundredths, so float noise at it is accepted and kept as written', () => {
+    expect(valueOf(confidence, 0.9000000000000001)).toBe(0.9000000000000001);
+    expect(valueOf(confidence, 0.29999999999999993)).toBe(0.29999999999999993);
+  });
+
+  it.each([
+    ['a value below the range', 0.29, '0.29'],
+    ['a value above the range', 0.91, '0.91'],
+    ['zero', 0, '0'],
+    ['one', 1, '1'],
+    ['a negative value', -0.5, '-0.5'],
+    ['a percentage', 50, '50'],
+    ['not a number', Number.NaN, 'NaN'],
+    ['a confidence quoted as a string', '0.5', '"0.5"'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [0.5], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(confidence, raw)).toEqual([`F: s is ${found}, expected ${CONFIDENCE_EXPECTED}`]);
+  });
+
+  it('accepts the confidence a file spells unquoted, and refuses the same one quoted', () => {
+    const parsed = Bun.YAML.parse('a: 0.70\nb: "0.70"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(confidence, parsed.a)).toBe(0.7);
+    expect(problemsOf(confidence, parsed.b)).toEqual([`F: s is "0.70", expected ${CONFIDENCE_EXPECTED}`]);
+  });
+});
+
+describe('recurrenceCount', () => {
+  it('accepts a whole number of 1 or more as itself', () => {
+    expect([valueOf(recurrenceCount, 1), valueOf(recurrenceCount, 3)]).toEqual([1, 3]);
+  });
+
+  it.each([
+    ['zero, which is not read as off', 0, '0'],
+    ['a negative count', -1, '-1'],
+    ['a fraction', 2.5, '2.5'],
+    ['a count quoted as a string', '3', '"3"'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [3], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(recurrenceCount, raw)).toEqual([
+      `F: s is ${found}, expected a count, a whole number of 1 or more`,
     ]);
   });
 });

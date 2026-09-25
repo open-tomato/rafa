@@ -121,9 +121,9 @@
  *
  * ## The lists this module does not own
  *
- * Every other closed list here is declared here. Three are not,
- * because another module is already their authority and a second
- * spelling could disagree with it:
+ * Every other closed list here is declared here. Three are not, and
+ * neither is one range, because another module is already their
+ * authority and a second spelling could disagree with it:
  *
  *   - The three tiers a pin names are `schema/tiers.ts`'s
  *     {@link SKILL_TIERS}, the order a listing reads them in. That
@@ -143,8 +143,15 @@
  *     survives that round trip: `.inf`, `.nan`, `1e21` and `1e-7` are
  *     each a number the parser returns and `String` writes as something
  *     the flag never takes.
+ *   - The range {@link confidence} accepts, 0.3 to 0.9, is the learning
+ *     library's {@link CONFIDENCE_MIN} and {@link CONFIDENCE_MAX}
+ *     (`learning/identity.ts`), the range every lesson's confidence is
+ *     clamped to. A threshold outside it is one no lesson can meet, or
+ *     one every lesson meets, so the reader asks the library's bounds
+ *     rather than spell its own.
  *
- * Neither of the other two imports is a cycle. `pr/types.ts` imports
+ * `learning/identity.ts` imports `node:crypto` alone, and neither of the
+ * other two imports is a cycle. `pr/types.ts` imports
  * types alone and `utils/declaration.ts` imports nothing, so this
  * module reaches both without either reaching back. The port is reached at `./pr/types.js`
  * and not through the `./pr/index.js` barrel a caller outside `src/pr/`
@@ -161,6 +168,7 @@
 import type { MergeMethod } from './pr/types.js';
 import type { SkillTier } from './schema/tiers.js';
 
+import { CONFIDENCE_MAX, CONFIDENCE_MIN } from './learning/identity.js';
 import { MERGE_METHODS } from './pr/types.js';
 import { SKILL_TIERS } from './schema/tiers.js';
 import { parseBudgetUsd } from './utils/declaration.js';
@@ -416,6 +424,44 @@ export const dayCount: Reader<number> = (raw, at) => typeof raw === 'number'
   && raw > 0
   ? accepted(raw)
   : refused(at, raw, 'a number of days, a whole number above zero');
+
+/**
+ * Accepts a lesson confidence as the `learning` thresholds take one: a
+ * number from {@link CONFIDENCE_MIN} to {@link CONFIDENCE_MAX}, both
+ * included, and no string spelled like one.
+ *
+ * A bound is compared after rounding to two decimals, as the library
+ * compares confidences, so `0.9000000000000001` reads as 0.9. The value
+ * is kept as written. A quoted `"0.5"` is refused, as every reader here
+ * refuses a string spelled like its type.
+ */
+export const confidence: Reader<number> = (raw, at) => typeof raw === 'number'
+  && Number.isFinite(raw)
+  && toHundredths(raw) >= toHundredths(CONFIDENCE_MIN)
+  && toHundredths(raw) <= toHundredths(CONFIDENCE_MAX)
+  ? accepted(raw)
+  : refused(at, raw, `a confidence from ${String(CONFIDENCE_MIN)} to ${String(CONFIDENCE_MAX)}`);
+
+/** `value` in whole hundredths, the precision confidences are compared at. */
+function toHundredths(value: number): number {
+  return Math.round(value * 100);
+}
+
+/**
+ * Accepts how many times a lesson must recur as `learning.promote.after`
+ * counts it: a whole number of 1 or more, and no string spelled like one.
+ *
+ * Zero is refused and not read as "off": every held lesson was
+ * confirmed by at least one source, so 0 would promote exactly what 1
+ * does, and a second spelling of one threshold is a value nobody can
+ * tell was meant. A fraction is refused as {@link dayCount} refuses one:
+ * the setting counts distinct sources, which come whole.
+ */
+export const recurrenceCount: Reader<number> = (raw, at) => typeof raw === 'number'
+  && Number.isSafeInteger(raw)
+  && raw >= 1
+  ? accepted(raw)
+  : refused(at, raw, 'a count, a whole number of 1 or more');
 
 /**
  * Accepts `true`, `false` or `auto`, each as itself. A string spelled

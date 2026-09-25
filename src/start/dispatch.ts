@@ -35,11 +35,20 @@
  * (`start/serving.ts`) when its caller names a
  * {@link TaskDispatchOptions.serving}, and warns once per winner left
  * out, with the sentence `tiers/serve.ts` wrote for it.
+ *
+ * Once a report is stored, its lessons (`report/lessons.ts`) are pushed
+ * to the Learning adapter the run's `learning.adapter` names, and what
+ * the push did is told through `info`. A push that is refused, or an
+ * adapter that cannot be resolved or made, is told through `warn` and
+ * fails nothing: the report is already stored, and a lesson is its copy.
  */
 import type { ClaudeSettingSource, InjectMode } from '../config.js';
 import type { SessionServing } from './serving.js';
+import type { AdapterRegistry } from '../adapters/registry.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { PlanInjection } from '../plan/index.js';
+import type { Learning } from '../ports/index.js';
+import type { TaskReportRecord } from '../report/record.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -47,8 +56,10 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { randomUUID } from 'crypto';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { writeDispatch } from '../effort/store/dispatches.js';
 import { renderInjection } from '../plan/index.js';
+import { reportLessons } from '../report/lessons.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
 import { runClaudeCaptured } from '../utils/claude.js';
@@ -433,6 +444,21 @@ export function renderProgressForDispatch(repoRoot: string, planStub: string | n
   }
 }
 
+/**
+ * Which Learning adapter a task's lessons are pushed to, and what it is
+ * made with: the run's resolved `learning.*` settings.
+ */
+export interface TaskLearning {
+  /** The adapter kind, the run's `learning.adapter`. */
+  readonly kind: string;
+  /** The home whose `.rafa/instincts` is the user scope the adapter reads. */
+  readonly home: string;
+  /** The run's `learning.bless.minConfidence`. */
+  readonly blessMinConfidence: number;
+  /** Where the kind is resolved. `CORE_ADAPTER_REGISTRY` when left out. */
+  readonly registry?: AdapterRegistry;
+}
+
 /** What {@link storeTaskReport} needs to store one session's report. */
 export interface TaskReportStoreOptions {
   /** The repo root the store lives under. */
@@ -443,6 +469,56 @@ export interface TaskReportStoreOptions {
   readonly dispatch: Pick<TaskDispatch, 'sessionId' | 'taskText' | 'output' | 'declaration' | 'flags'>;
   /** What the loop made of the task. */
   readonly outcome: FindingOutcome;
+  /**
+   * The adapter the report's lessons are pushed to. Null pushes nothing,
+   * which a test reading the store alone names. Required for the reason
+   * {@link TaskDispatchOptions.serving} is: a default of nothing would
+   * let a caller that forgot it drop every lesson and nothing would say so.
+   */
+  readonly learning: TaskLearning | null;
+  /** The clock each lesson is stamped from. Defaults to the system clock. */
+  readonly now?: () => Date;
+}
+
+/**
+ * Pushes the lessons in `record` to the adapter `learning` names, and
+ * tells the operator what the push did. Never throws: a kind no registry
+ * holds, an adapter that cannot be made and a push the adapter refuses
+ * are each one warning, and the task goes on as it would have.
+ *
+ * A report holding no lesson, and a null `learning`, resolve and push
+ * nothing, so a run whose findings carry no `resolution` never makes the
+ * adapter at all.
+ */
+async function pushTaskLessons(
+  options: TaskReportStoreOptions,
+  record: TaskReportRecord,
+): Promise<void> {
+  const { learning, dispatch } = options;
+  if (learning === null) return;
+  const now = options.now ?? (() => new Date());
+  const context = {
+    dispatch: { sessionId: dispatch.sessionId, planStub: options.planStub, taskLine: dispatch.taskText },
+    outcome: options.outcome,
+  };
+  const payload = reportLessons(record, context, now());
+  if (payload === null) return;
+
+  const count = payload.instincts.length;
+  try {
+    const registry = learning.registry ?? CORE_ADAPTER_REGISTRY;
+    const adapter: Learning = registry.resolve('learning', learning.kind).create({
+      repoRoot: options.repoRoot,
+      home: learning.home,
+      learningBlessMinConfidence: learning.blessMinConfidence,
+    });
+    const result = await adapter.push(payload);
+    const rules = result.decisions.map((decision) => decision.rule).join(', ');
+    activeOutput().info(`   Pushed ${count} lesson(s) to the \`${learning.kind}\` learning adapter: ${rules}.`);
+  } catch (error) {
+    activeOutput().warn(`   ${count} lesson(s) of session ${dispatch.sessionId} were not pushed to the \`${learning.kind}\` learning adapter: ${messageOf(error)}`);
+    activeOutput().warn('   The task is not failed for it: its report is stored, findings and all.');
+  }
 }
 
 /**
@@ -464,9 +540,16 @@ export interface TaskReportStoreOptions {
  * rather than dispatching tasks whose reports would meet the same store.
  * A refused dispatch row stores no report either. The report is not gone
  * with the row: the session wrote it to the operator's terminal as it ran.
+ *
+ * A stored report's lessons are pushed next, once what was stored has
+ * been told, to the adapter {@link TaskReportStoreOptions.learning}
+ * names. What the push answers never changes what this answers: a
+ * refused push is warned about and the report still counts as stored.
+ * A report the store refused pushes nothing.
  */
-export function storeTaskReport(options: TaskReportStoreOptions): boolean {
+export async function storeTaskReport(options: TaskReportStoreOptions): Promise<boolean> {
   const { dispatch } = options;
+  let record: TaskReportRecord;
   try {
     writeDispatch(options.repoRoot, {
       sessionId: dispatch.sessionId,
@@ -475,7 +558,7 @@ export function storeTaskReport(options: TaskReportStoreOptions): boolean {
       declaration: dispatch.declaration,
       flags: dispatch.flags,
     });
-    const record = recordTaskReport(options.repoRoot, {
+    record = recordTaskReport(options.repoRoot, {
       dispatch: {
         sessionId: dispatch.sessionId,
         planStub: options.planStub,
@@ -487,10 +570,11 @@ export function storeTaskReport(options: TaskReportStoreOptions): boolean {
     const { notes, warnings } = describeTaskReportRecord(record);
     for (const note of notes) activeOutput().info(`   ${note}`);
     for (const warning of warnings) activeOutput().warn(`   ${warning}`);
-    return true;
   } catch (error) {
     activeOutput().error(`\n❌ The report of session ${dispatch.sessionId} was not stored: ${messageOf(error)}`);
     activeOutput().error('   The session printed it above as it ran.');
     return false;
   }
+  await pushTaskLessons(options, record);
+  return true;
 }

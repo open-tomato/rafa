@@ -84,6 +84,14 @@
  * own refusal, which then compiles clean, and the entry's own
  * diagnostics, since the type import it no longer names is an unused
  * local under the root tsconfig.
+ *
+ * The learning records moved to `src/learning/types.ts` on 2026-09-25,
+ * and the entry re-exports them. Each of the six is held to resolve to
+ * its declaration there, through the export's alias, and the entry is
+ * held to declare none of their names itself, so a copy that matches
+ * the library's structurally still reds. Measured that day at 28 pass:
+ * `MergeRule` declared in the entry in place of its re-export reddened
+ * its own name's case and the no-copy case, and nothing else.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -152,6 +160,19 @@ const TYPE_EXPORTS = [
   'TrackerKind',
   'TrackerPortVersion',
   'TransitionResult',
+];
+
+/** The library that owns the learning records the entry re-exports. */
+const LEARNING_TYPES_FILE = join(SRC_DIR, 'learning', 'types.ts');
+
+/** The names the entry takes from the learning library, sorted. */
+const LEARNING_EXPORTS = [
+  'BlessedBundle',
+  'InstinctRecord',
+  'MergeDecision',
+  'MergeResult',
+  'MergeRule',
+  'SyncPayload',
 ];
 
 /** The members of `TrackerKind`, as the checker prints each, sorted. */
@@ -498,6 +519,32 @@ describe('the ports entry as the compiler reads it', () => {
       .sort();
 
     expect(names).toEqual(TYPE_EXPORTS);
+  });
+
+  it.each(LEARNING_EXPORTS)('exports %s as the learning library declares it, not a copy', (name) => {
+    const checker = compiledProbes().program.getTypeChecker();
+    const exported = entryExports().find((symbol) => symbol.name === name);
+    if (exported === undefined) throw new Error(`the entry exports no ${name}`);
+    const target = (exported.flags & ts.SymbolFlags.Alias) === 0
+      ? exported
+      : checker.getAliasedSymbol(exported);
+
+    expect(target.name).toBe(name);
+    expect((target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName))
+      .toEqual([LEARNING_TYPES_FILE]);
+  });
+
+  it('declares nothing in the entry under a learning library name', () => {
+    const { program } = compiledProbes();
+    const entry = program.getSourceFile(ENTRY_FILE);
+    if (entry === undefined) throw new Error('the program holds no entry');
+    const declared = entry.statements.flatMap((statement) => (
+      (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement))
+        ? [statement.name.text]
+        : []));
+
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((name) => LEARNING_EXPORTS.includes(name))).toEqual([]);
   });
 
   it('keeps the three named tracker kinds in a union that admits any other', () => {

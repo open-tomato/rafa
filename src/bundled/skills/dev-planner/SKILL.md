@@ -223,6 +223,7 @@ findings:
     resolution: "wrap append in try/finally"
     artifact: "EMFILE: too many open files"
     signal: loud
+    domain: debugging
   - trigger: "SQLite schema migration timing"
     kind: pattern
     what: "migrations run on every store init, not just schema changes"
@@ -262,6 +263,7 @@ Finding entry fields:
 | `resolution` | string | no | How to fix or work around it |
 | `artifact` | string | no | Error message, file path, or code snippet that signals the finding |
 | `signal` | string | yes | `loud` (it surfaced as a failure) or `silent` (it passed while wrong) |
+| `domain` | string | no | The area of work the finding's lesson belongs to: `code-style`, `testing`, `git`, `debugging`, `workflow`, `security` or `general-best-practices`. A value outside the set is reported as an issue and read as absent |
 
 Change note entry fields:
 

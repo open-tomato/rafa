@@ -60,14 +60,15 @@
 import type { InstinctRecord } from '../ports/index.js';
 import type { FindingKind, FindingSignal } from '../report/parse.js';
 
-import { createHash } from 'node:crypto';
-
-import { FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
+import { actionHash } from '../learning/identity.js';
+import { FINDING_DOMAINS, FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
 
 import { readFrontmatterDocument, renderFrontmatter } from './frontmatter.js';
 import { PROJECT_ID_LENGTH, PROJECT_ID_PATTERN } from './project-id.js';
 
 export type { ProjectIdSeams } from './project-id.js';
+
+export { actionHash } from '../learning/identity.js';
 
 export {
   PROJECT_ID_LENGTH,
@@ -96,21 +97,11 @@ export const INSTINCT_SIGNALS = FINDING_SIGNALS;
 export type InstinctSignal = FindingSignal;
 
 /**
- * continuous-learning-v2's domains: the five its `SKILL.md` names, and
- * the three its `agents/observer.md` calls global-friendly, measured
- * on 2026-09-18. Its `instinct-cli.py` defaults an absent domain to
- * `general`, which is not one of these and is not accepted here; an
- * importer meeting one has to map it.
+ * continuous-learning-v2's domains, declared in `report/parse.ts` as
+ * `FINDING_DOMAINS` so a finding's `domain` is read against the same
+ * set. See that list for where they were measured.
  */
-export const INSTINCT_DOMAINS = [
-  'code-style',
-  'testing',
-  'git',
-  'debugging',
-  'workflow',
-  'security',
-  'general-best-practices',
-] as const;
+export const INSTINCT_DOMAINS = FINDING_DOMAINS;
 
 /** One of {@link INSTINCT_DOMAINS}. */
 export type InstinctDomain = typeof INSTINCT_DOMAINS[number];
@@ -185,12 +176,14 @@ export const INSTINCT_KEY_ORDER = [
   'domain',
   'confidence',
   'usage_count',
+  'sources',
   'artifact',
   'signal',
   'scope',
   'project_id',
   'source',
   'evidence',
+  'promoted_to',
   'created_at',
   'updated_at',
 ] as const;
@@ -221,6 +214,8 @@ export type InstinctIssueCode =
   | 'invalid-usage-count'
   /** `project_id` that is not {@link PROJECT_ID_PATTERN}-shaped. */
   | 'invalid-project-id'
+  /** `promoted_to` that is blank, absolute, or climbs out of the repository. */
+  | 'invalid-promoted-to'
   /** A timestamp that is not an ISO 8601 instant, or names no real time. */
   | 'invalid-timestamp'
   /** No evidence under {@link EVIDENCE_REQUIRED_SOURCE}. */
@@ -244,6 +239,7 @@ export const INSTINCT_ISSUE_CODES: readonly InstinctIssueCode[] = [
   'confidence-out-of-range',
   'invalid-usage-count',
   'invalid-project-id',
+  'invalid-promoted-to',
   'invalid-timestamp',
   'missing-evidence',
   'missing-section',
@@ -285,6 +281,12 @@ export interface Instinct {
   readonly confidence: number;
   /** `usage_count`, {@link DEFAULT_USAGE_COUNT} when the key is absent. */
   readonly usageCount: number;
+  /**
+   * `sources`, the `source_id`s that confirmed the record, in file
+   * order; empty when the key is absent, as on a record written before
+   * sources were kept.
+   */
+  readonly sources: readonly string[];
   /** `artifact`, the byte string a recurrence matches on, or null. */
   readonly artifact: string | null;
   /** `signal`, one of {@link INSTINCT_SIGNALS}. */
@@ -297,6 +299,11 @@ export interface Instinct {
   readonly source: InstinctSource;
   /** `evidence`, possibly empty away from {@link EVIDENCE_REQUIRED_SOURCE}. */
   readonly evidence: readonly InstinctEvidence[];
+  /**
+   * `promoted_to`, the repo-relative path of the page the wrap-up wrote
+   * the record into, or null while it has not been promoted.
+   */
+  readonly promotedTo: string | null;
   /** `created_at`, an ISO 8601 instant. */
   readonly createdAt: string;
   /** `updated_at`, an ISO 8601 instant. */
@@ -315,16 +322,6 @@ export interface InstinctParseResult {
   readonly issues: readonly InstinctIssue[];
   /** The record read, or null when `issues` is non-empty. */
   readonly instinct: Instinct | null;
-}
-
-/**
- * `sha256(trim(lower(action)))` in hex: the Learning port's merge key,
- * spelled here so a record and a pushed payload can never disagree
- * about what two records sharing an action means.
- */
-export function actionHash(action: string): string {
-  return createHash('sha256').update(action.trim().toLowerCase())
-    .digest('hex');
 }
 
 /** One issue, spelled once so every check reads the same. */
@@ -433,6 +430,56 @@ function checkUsageCount(data: Readonly<Record<string, unknown>>): InstinctIssue
       'invalid-usage-count',
       'usage_count',
       `usage_count ${value} is not a whole number of at least ${DEFAULT_USAGE_COUNT}`,
+    )];
+}
+
+/**
+ * `sources`: optional, and a list of non-blank strings. Distinctness is
+ * not checked here: the merge takes the union, so it is the merge that
+ * keeps the list distinct.
+ */
+function checkSources(data: Readonly<Record<string, unknown>>): InstinctIssue[] {
+  const value = data['sources'];
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    return [issue('wrong-type', 'sources', `sources must be a list, not ${typeName(value)}`)];
+  }
+
+  return value.flatMap((entry: unknown, index) => {
+    const field = `sources[${index}]`;
+    if (typeof entry !== 'string') {
+      return [issue('wrong-type', field, `sources entries must be strings, and this one is ${typeName(entry)}`)];
+    }
+    return entry.trim() === ''
+      ? [issue('wrong-type', field, 'sources entries must name a source, and this one is blank')]
+      : [];
+  });
+}
+
+/**
+ * `promoted_to`: optional, and a repo-relative path — not blank, not
+ * absolute (a leading slash, backslash or drive letter), and with no
+ * `..` segment, so the path cannot name a page outside the repository.
+ */
+function checkPromotedTo(data: Readonly<Record<string, unknown>>): InstinctIssue[] {
+  const value = data['promoted_to'];
+  if (value === undefined) return [];
+  if (typeof value !== 'string') {
+    return [issue(
+      'wrong-type',
+      'promoted_to',
+      `promoted_to must be a string, not ${typeName(value)}`,
+    )];
+  }
+
+  const absolute = /^(?:[/\\]|[A-Za-z]:)/.test(value);
+  const climbs = value.split(/[/\\]/).includes('..');
+  return value.trim() !== '' && !absolute && !climbs
+    ? []
+    : [issue(
+      'invalid-promoted-to',
+      'promoted_to',
+      `promoted_to "${value}" is not a path inside the repository such as context/source.md`,
     )];
 }
 
@@ -564,12 +611,14 @@ export function checkInstinctFrontmatter(
     ...requiredChoice(data, 'domain', INSTINCT_DOMAINS, 'unknown-domain'),
     ...checkConfidence(data),
     ...checkUsageCount(data),
+    ...checkSources(data),
     ...checkArtifact(data),
     ...requiredChoice(data, 'signal', INSTINCT_SIGNALS, 'unknown-signal'),
     ...requiredChoice(data, 'scope', INSTINCT_SCOPES, 'unknown-scope'),
     ...checkProjectId(data),
     ...requiredChoice(data, 'source', INSTINCT_SOURCES, 'unknown-source'),
     ...checkEvidence(data),
+    ...checkPromotedTo(data),
     ...checkTimestamp(data, 'created_at'),
     ...checkTimestamp(data, 'updated_at'),
     ...checkStoredHash(data),
@@ -672,6 +721,9 @@ function buildInstinct(
     usageCount: typeof data['usage_count'] === 'number'
       ? data['usage_count']
       : DEFAULT_USAGE_COUNT,
+    sources: Array.isArray(data['sources'])
+      ? (data['sources'] as string[])
+      : [],
     artifact,
     signal: data['signal'] as InstinctSignal,
     scope: data['scope'] as InstinctScope,
@@ -682,6 +734,9 @@ function buildInstinct(
     evidence: Array.isArray(data['evidence'])
       ? (data['evidence'] as InstinctEvidence[])
       : [],
+    promotedTo: typeof data['promoted_to'] === 'string'
+      ? data['promoted_to']
+      : null,
     createdAt: data['created_at'] as string,
     updatedAt: data['updated_at'] as string,
     action,
@@ -693,8 +748,8 @@ function buildInstinct(
 /**
  * `instinct` as the frontmatter mapping a file carries: the keys of
  * {@link INSTINCT_KEY_ORDER} in that order, with `artifact`,
- * `project_id` and an empty `evidence` left out rather than written
- * blank, and no `action_hash`.
+ * `project_id`, `promoted_to` and an empty `sources` or `evidence` left
+ * out rather than written blank, and no `action_hash`.
  */
 export function instinctFrontmatter(instinct: Instinct): Record<string, unknown> {
   const written: Record<string, unknown> = {
@@ -714,6 +769,8 @@ export function instinctFrontmatter(instinct: Instinct): Record<string, unknown>
   if (instinct.artifact !== null) written['artifact'] = instinct.artifact;
   if (instinct.projectId !== null) written['project_id'] = instinct.projectId;
   if (instinct.evidence.length > 0) written['evidence'] = instinct.evidence;
+  if (instinct.sources.length > 0) written['sources'] = instinct.sources;
+  if (instinct.promotedTo !== null) written['promoted_to'] = instinct.promotedTo;
 
   return Object.fromEntries(
     INSTINCT_KEY_ORDER.filter((key) => Object.hasOwn(written, key))
@@ -753,8 +810,9 @@ export function writeInstinct(instinct: Instinct, newline = '\n'): string {
  * nothing else. `status` is `active` because a record is only flagged
  * by a merge that found a rival action, which is the port's decision
  * and never the file's; `kind`, `domain`, `scope`, `project_id`,
- * `source`, `evidence` and the cause stay behind in the file, which
- * remains the record of where the instinct came from.
+ * `source`, `evidence`, `sources`, `promoted_to` and the cause stay
+ * behind in the file, which remains the record of where the instinct
+ * came from.
  *
  * `artifact` is omitted rather than written empty when the record
  * names none, so a payload never claims a recurrence key of `''`.

@@ -26,7 +26,7 @@ module's note is the long form.
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
-| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory, and `instinct list` and `instinct show`, the records the two scopes hold |
+| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; and `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
@@ -189,14 +189,18 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `release status`, `release tag`, `roadmap`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
   declared with its first action, never ahead of it.
-  `skill index`, `instinct flag` and `instinct promote` are in the
-  command tree and are registered by none of it yet, so no roster names
-  them.
+  `skill index` is in the command tree and is registered by none of it
+  yet, so no roster names it.
+  The module note of `src/commands/index.ts` says so in the words
+  "`<names>` is/are in the command tree and is/are not registered", and
+  `unregisteredNamed` in `src/commands/index.test.ts` reads that
+  sentence and holds every name it lists absent from the registry; keep
+  the wording when registering one of them. This replaces nothing.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working
@@ -233,10 +237,11 @@ New; it replaces no earlier text. What a row or an action added to
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `status`, `cleanup`, `self-update`, the plan readers, the
   `loop` session actions, the `issue` actions, the two checkers, the
   three listings (`skill list`, `instinct list` and `instinct show`),
-  `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
+  `instinct flag`, `instinct promote`, `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
   `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
   `doctor`, `status`, `cleanup`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `agent show`, `agent search`, `skill show`,
+  each `issue` action, each checker, each listing, `instinct flag`,
+  `instinct promote`, `agent show`, `agent search`, `skill show`,
   `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
@@ -1014,7 +1019,9 @@ New; it replaces no earlier text. What a row or an action added to
   `src/schema/tiers.ts`'s — `<root>/.rafa/instincts` and
   `~/.rafa/instincts`, nearest the work first — and both commands run
   INSIDE a project, reading the home and the root off the project the
-  dispatcher resolved; neither declares a flag or a seam of its own. A
+  dispatcher resolved; `show` declares no flag or seam of its own, and
+  `list` declares the two views below and the adapter registry seam
+  `--blessed` resolves through. A
   record is a top-level `<scope>/<id>.md`, so the local Learning
   adapter's `instincts.ndjson` and `flags.ndjson`, a dotfile and a
   subdirectory are all passed over without a word, and the id a lookup
@@ -1025,14 +1032,24 @@ New; it replaces no earlier text. What a row or an action added to
   broke a rule the number of rules instead; a scope whose directory is
   absent prints its path and `(no such directory)`. Its exit code is 0
   whatever the rows say, with exit code 1 kept for a positional word.
+  `list --blessed` prints instead what the `learning.adapter` adapter's
+  `pullBlessed` answers at `learning.bless.minConfidence`, made as
+  `instinct promote` makes it (`makeLearningAdapter` in
+  `instinct/promote.ts`), and `list --conflicts` each trigger a scope
+  holds with more than one action — read through `toHeldRecords` and
+  grouped by `triggerKey` — its actions side by side with their
+  confidence and usage. The two views are one at a time: both together,
+  a view flag typed with a value, an adapter that cannot be made and a
+  pull it refuses are each exit code 1.
   `show` prints the fields, the two sections, the evidence and the
   `action_hash` computed from the action, which no file stores, and a
   line naming the other scope when it holds that id too; the project
   scope answers first. It refuses with exit code 1 an id no scope holds,
   naming both scopes, and a record that broke a rule, naming its issues,
   each as the `CommandExit` message. In json mode `list` gives the
-  scopes, their records and the two counts as the result's `data`, and
-  `show` the record.
+  scopes, their records and the two counts as the result's `data` (or
+  the view asked for: the adapter kind, floor and lessons, or the
+  conflicts), and `show` the record.
 - **`issue` acts on the tracker the chain lands on**
   (`src/commands/issue/`). Each action reads its line first, then the
   config as `loop start` resolves it, then hands `tracker.default` and

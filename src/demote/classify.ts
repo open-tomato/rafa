@@ -768,6 +768,7 @@ export function convertToInstinct(
     domain: inferDomain(name, body),
     confidence: DEMOTED_CONFIDENCE,
     usageCount: DEMOTED_USAGE_COUNT,
+    sources: [],
     artifact: null,
     signal: named === null
       ? DEMOTED_SIGNAL
@@ -779,6 +780,7 @@ export function convertToInstinct(
       [EVIDENCE_PATH_KEY]: source.path,
       [EVIDENCE_EXTRACTED_KEY]: extractedDate(body) ?? options.mtime,
     }],
+    promotedTo: null,
     createdAt: options.now,
     updatedAt: options.now,
     action,

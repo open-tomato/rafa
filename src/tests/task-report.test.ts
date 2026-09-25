@@ -297,7 +297,7 @@ describe('a report\'s change notes, stored under a plan stub', () => {
     '',
   ].join('\n');
 
-  it('reads the notes back under their plan stub, none under an absent list, and no row for the same output twice', () => {
+  it('reads the notes back under their plan stub, none under an absent list, and no row for the same output twice', async () => {
     const root = join(tempRoot, 'changes-integration');
     mkdirSync(root, { recursive: true });
 
@@ -308,7 +308,7 @@ describe('a report\'s change notes, stored under a plan stub', () => {
       declaration: null,
       flags: [],
     };
-    expect(storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done' })).toBe(true);
+    expect(await storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done', learning: null })).toBe(true);
 
     expect(readPlanChanges(root, 'a-plan-stub')).toEqual([
       {
@@ -338,13 +338,19 @@ describe('a report\'s change notes, stored under a plan stub', () => {
       declaration: null,
       flags: [],
     };
-    expect(storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch: noChangesDispatch, outcome: 'done' }))
+    expect(await storeTaskReport({
+      repoRoot: root,
+      planStub: 'a-plan-stub',
+      dispatch: noChangesDispatch,
+      outcome: 'done',
+      learning: null,
+    }))
       .toBe(true);
     expect(readPlanChanges(root, 'another-plan-stub')).toEqual([]);
     expect(readPlanChanges(root, 'a-plan-stub')).toHaveLength(2);
 
     // The same output recorded again, under the same session id, adds no row.
-    expect(storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done' })).toBe(true);
+    expect(await storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done', learning: null })).toBe(true);
     expect(readPlanChanges(root, 'a-plan-stub')).toHaveLength(2);
   });
 });
@@ -736,14 +742,15 @@ describe('what a store the loop cannot use tells the operator', () => {
     ]);
   });
 
-  it('writes a report the store refuses through error, and answers false', () => {
+  it('writes a report the store refuses through error, and answers false', async () => {
     const root = brokenStoreRoot('broken-store');
 
-    const stored = storeTaskReport({
+    const stored = await storeTaskReport({
       repoRoot: root,
       planStub: 'probe',
       dispatch: { sessionId: 'aaaa-1111', taskText: 'Record the report', output: '', declaration: null, flags: [] },
       outcome: 'done',
+      learning: null,
     });
 
     expect(stored).toBe(false);

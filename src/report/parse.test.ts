@@ -51,7 +51,16 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CHANGE_LEVELS, FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from './parse.js';
+import { INSTINCT_DOMAINS } from '../schema/instinct.js';
+
+import {
+  CHANGE_LEVELS,
+  FINDING_DOMAINS,
+  FINDING_KINDS,
+  FINDING_SIGNALS,
+  parseReport,
+  REPORT_STATUSES,
+} from './parse.js';
 
 /** A bare backtick fence, spelled once. */
 const FENCE = '```';
@@ -108,6 +117,7 @@ const SPEC_BODY = [
   '    resolution: "run bun install before the first test"',
   '    artifact: "Cannot find package"',
   '    signal: loud',
+  '    domain: testing',
   'skills_used: [progress-hygiene]',
   'blockers:',
   '  - what: "LINEAR_API_KEY unset"',
@@ -153,6 +163,7 @@ function bareFinding(trigger: string, what: string): ReportFinding {
     resolution: null,
     artifact: null,
     signal: 'loud',
+    domain: null,
     extras: [],
   };
 }
@@ -174,6 +185,7 @@ describe('the report a session output ends with', () => {
           resolution: 'run bun install before the first test',
           artifact: 'Cannot find package',
           signal: 'loud',
+          domain: 'testing',
           extras: [],
         },
       ],
@@ -430,13 +442,13 @@ describe('the findings list', () => {
         reason: 'unusable-field',
         field: 'findings[1]',
         text: 'findings[1] is "node_modules is absent", not a mapping of '
-          + 'trigger, kind, what, cause, resolution, artifact, signal; dropped',
+          + 'trigger, kind, what, cause, resolution, artifact, signal, domain; dropped',
       },
       {
         reason: 'unusable-field',
         field: 'findings[2]',
         text: 'findings[2] is nothing, not a mapping of '
-          + 'trigger, kind, what, cause, resolution, artifact, signal; dropped',
+          + 'trigger, kind, what, cause, resolution, artifact, signal, domain; dropped',
       },
     ]);
   });
@@ -452,6 +464,7 @@ describe('the findings list', () => {
       resolution: null,
       artifact: null,
       signal: null,
+      domain: null,
       extras: [],
     }]);
     expect(issuePairs(reading)).toEqual([
@@ -486,6 +499,41 @@ describe('the findings list', () => {
       'findings[0].kind is "antipattern", not one of gotcha, pattern, location, skill-suggestion',
       'findings[0].signal is "quiet", not one of loud, silent',
     ]);
+  });
+
+  it.each([...FINDING_DOMAINS])('reads domain %s', (domain) => {
+    const reading = reportOf('status: done', 'findings:', ...findingLines('t', 'w', [`    domain: ${domain}`]));
+
+    expect(reading.report.findings[0]?.domain).toBe(domain);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('reads an absent domain as null, with no issue', () => {
+    const reading = reportOf('status: done', 'findings:', ...findingLines('t', 'w'));
+
+    expect(reading.report.findings[0]?.domain).toBeNull();
+    expect(reading.report.findings[0]?.extras).toEqual([]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it.each([
+    ['a word outside the set', 'general', '"general"'],
+    ['a domain in another case', 'Testing', '"Testing"'],
+    ['a number', '42', 'the number 42'],
+  ])('refuses %s as a domain, keeping the entry', (_label, value, quoted) => {
+    const reading = reportOf('status: done', 'findings:', ...findingLines('t', 'w', [`    domain: ${value}`]));
+
+    expect(reading.report.findings[0]).toMatchObject({ trigger: 't', what: 'w', signal: 'loud', domain: null });
+    expect(reading.report.findings[0]?.extras).toEqual([]);
+    expect(reading.issues).toEqual([{
+      reason: 'unusable-field',
+      field: 'findings[0].domain',
+      text: `findings[0].domain is ${quoted}, not one of ${INSTINCT_DOMAINS.join(', ')}`,
+    }]);
+  });
+
+  it('reads findings against the same domains an instinct record takes', () => {
+    expect(FINDING_DOMAINS).toBe(INSTINCT_DOMAINS);
   });
 });
 
@@ -814,6 +862,7 @@ describe('the final message a real session ended with', () => {
       resolution: 'Run `bun install` in the worktree before `bun test`',
       artifact: 'Cannot find package',
       signal: 'loud',
+      domain: null,
       extras: [],
     },
     {
@@ -824,6 +873,7 @@ describe('the final message a real session ended with', () => {
       resolution: 'Validate boolean inputs in application code; do not rely on the CHECK constraint',
       artifact: null,
       signal: 'loud',
+      domain: null,
       extras: [],
     },
     {
@@ -834,6 +884,7 @@ describe('the final message a real session ended with', () => {
       resolution: null,
       artifact: null,
       signal: 'silent',
+      domain: null,
       extras: [],
     },
     {
@@ -844,6 +895,7 @@ describe('the final message a real session ended with', () => {
       resolution: null,
       artifact: 'bad parameter or other API misuse',
       signal: 'loud',
+      domain: null,
       extras: [],
     },
     {
@@ -854,6 +906,7 @@ describe('the final message a real session ended with', () => {
       resolution: null,
       artifact: null,
       signal: 'silent',
+      domain: null,
       extras: [],
     },
     {
@@ -864,6 +917,7 @@ describe('the final message a real session ended with', () => {
       resolution: null,
       artifact: null,
       signal: 'silent',
+      domain: null,
       extras: [],
     },
     {
@@ -874,6 +928,7 @@ describe('the final message a real session ended with', () => {
       resolution: 'Wrap any value containing a backtick, colon, or other special character in double quotes',
       artifact: null,
       signal: 'silent',
+      domain: null,
       extras: [],
     },
   ];

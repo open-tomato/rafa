@@ -205,7 +205,7 @@ async function runCase(dir: string, sessionId: string, output: string) {
     output: dispatch.output,
   });
 
-  const stored = storeTaskReport({
+  const stored = await storeTaskReport({
     repoRoot: dir,
     planStub: 'report-status',
     dispatch: {
@@ -216,6 +216,7 @@ async function runCase(dir: string, sessionId: string, output: string) {
       flags: dispatch.flags,
     },
     outcome: finished.outcome,
+    learning: null,
   });
 
   return { dispatch, finished, stored };

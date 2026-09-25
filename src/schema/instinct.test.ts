@@ -67,6 +67,7 @@ const COMPLETE = {
   domain: 'workflow',
   confidence: 0.6,
   usage_count: 3,
+  sources: ['6f1e', '7a2b', '8c3d'],
   artifact: 'Cannot find package',
   signal: 'loud',
   scope: 'project',
@@ -78,6 +79,7 @@ const COMPLETE = {
     session: '6f1e',
     outcome: 'blocked',
   }],
+  promoted_to: 'context/verification.md',
   created_at: '2026-09-11T10:00:00Z',
   updated_at: '2026-09-11T10:00:00Z',
 } as const;
@@ -137,10 +139,12 @@ describe('a complete record', () => {
       scope: 'project',
       projectId: '8f2c1a9d3e4b',
       source: 'task-report',
+      promotedTo: 'context/verification.md',
       createdAt: '2026-09-11T10:00:00Z',
       updatedAt: '2026-09-11T10:00:00Z',
     });
     expect(result.instinct?.evidence).toEqual(COMPLETE.evidence);
+    expect(result.instinct?.sources).toEqual(COMPLETE.sources);
   });
 
   test('reads the two body sections trimmed of their blank lines', () => {
@@ -148,17 +152,21 @@ describe('a complete record', () => {
     expect(result.instinct?.cause).toBe(CAUSE);
   });
 
-  test('defaults usage_count and nulls the two optional fields when absent', () => {
+  test('defaults usage_count and sources, and nulls the three optional fields when absent', () => {
     const sparse = parseInstinct(recordText({
       usage_count: undefined,
+      sources: undefined,
       artifact: undefined,
       project_id: undefined,
+      promoted_to: undefined,
     }));
 
     expect(sparse.issues).toEqual([]);
     expect(sparse.instinct?.usageCount).toBe(DEFAULT_USAGE_COUNT);
+    expect(sparse.instinct?.sources).toEqual([]);
     expect(sparse.instinct?.artifact).toBeNull();
     expect(sparse.instinct?.projectId).toBeNull();
+    expect(sparse.instinct?.promotedTo).toBeNull();
   });
 
   test('reads an empty artifact as no artifact', () => {
@@ -266,6 +274,46 @@ interface Refusal {
 
 /** Every rule, refused once and passed once by its neighbouring case. */
 const REFUSALS: readonly Refusal[] = [
+  {
+    title: 'a sources that is a single string rather than a list',
+    changes: { sources: '6f1e' },
+    expected: ['wrong-type sources'],
+  },
+  {
+    title: 'a sources that is a mapping',
+    changes: { sources: { first: '6f1e' } },
+    expected: ['wrong-type sources'],
+  },
+  {
+    title: 'a sources entry that is a number, and one that is blank',
+    changes: { sources: ['6f1e', 7, '  '] },
+    expected: ['wrong-type sources[1]', 'wrong-type sources[2]'],
+  },
+  {
+    title: 'a promoted_to that is a list',
+    changes: { promoted_to: ['context/source.md'] },
+    expected: ['wrong-type promoted_to'],
+  },
+  {
+    title: 'a promoted_to that is blank',
+    changes: { promoted_to: '  ' },
+    expected: ['invalid-promoted-to promoted_to'],
+  },
+  {
+    title: 'a promoted_to that is an absolute path',
+    changes: { promoted_to: '/etc/context.md' },
+    expected: ['invalid-promoted-to promoted_to'],
+  },
+  {
+    title: 'a promoted_to that is a Windows drive path',
+    changes: { promoted_to: 'C:\\context\\source.md' },
+    expected: ['invalid-promoted-to promoted_to'],
+  },
+  {
+    title: 'a promoted_to that climbs out of the repository',
+    changes: { promoted_to: 'context/../../elsewhere.md' },
+    expected: ['invalid-promoted-to promoted_to'],
+  },
   {
     title: 'an absent id',
     changes: { id: undefined },
@@ -412,6 +460,12 @@ describe('the frontmatter rules', () => {
     expect(refusalsOf(recordText({ confidence: CONFIDENCE_MAX }))).toEqual([]);
   });
 
+  test('accepts an empty sources list and a promoted_to with a dotted file name', () => {
+    expect(refusalsOf(recordText({ sources: [] }))).toEqual([]);
+    expect(refusalsOf(recordText({ promoted_to: 'context/..notes.md' }))).toEqual([]);
+    expect(refusalsOf(recordText({ promoted_to: './AGENTS.md' }))).toEqual([]);
+  });
+
   test('accepts a usage_count of one and a twelve-character project_id', () => {
     expect(refusalsOf(recordText({ usage_count: DEFAULT_USAGE_COUNT }))).toEqual([]);
     expect(refusalsOf(recordText({ project_id: '0'.repeat(PROJECT_ID_LENGTH) }))).toEqual([]);
@@ -517,6 +571,8 @@ describe('the writer', () => {
       artifact: undefined,
       project_id: undefined,
       evidence: undefined,
+      sources: undefined,
+      promoted_to: undefined,
     })).instinct;
 
     expect(Object.keys(instinctFrontmatter(sparse!)))
@@ -536,6 +592,20 @@ describe('the writer', () => {
   test('lays the body out under the two headings, ending in one newline', () => {
     expect(writeInstinct(instinct!)).toContain(`---\n\n${ACTION_HEADING}\n${ACTION}\n`);
     expect(writeInstinct(instinct!).endsWith(`${CAUSE}\n`)).toBe(true);
+  });
+
+  test('round-trips sources in their order and promoted_to unchanged', () => {
+    const reread = parseInstinct(writeInstinct(instinct!)).instinct;
+
+    expect(reread?.sources).toEqual(['6f1e', '7a2b', '8c3d']);
+    expect(reread?.promotedTo).toBe('context/verification.md');
+  });
+
+  test('leaves out an empty sources list rather than writing one', () => {
+    const empty = parseInstinct(recordText({ sources: [] })).instinct;
+
+    expect(Object.hasOwn(instinctFrontmatter(empty!), 'sources')).toBe(false);
+    expect(parseInstinct(writeInstinct(empty!)).instinct?.sources).toEqual([]);
   });
 
   test('writes CRLF throughout when asked for it', () => {
@@ -567,7 +637,7 @@ describe('the conversion to the Learning port', () => {
   });
 
   test('leaves the fields that stay in the file behind', () => {
-    for (const key of ['kind', 'domain', 'scope', 'project_id', 'source', 'evidence', 'cause']) {
+    for (const key of ['kind', 'domain', 'scope', 'project_id', 'source', 'evidence', 'cause', 'promoted_to', 'sources']) {
       expect(Object.hasOwn(record, key)).toBe(false);
     }
   });

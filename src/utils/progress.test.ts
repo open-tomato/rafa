@@ -143,6 +143,7 @@ function reported(what: string): ReportFinding {
     resolution: `resolution of ${what}`,
     artifact: `artifact of ${what}`,
     signal: 'silent',
+    domain: null,
     extras: [],
   };
 }

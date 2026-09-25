@@ -19,6 +19,7 @@
  *     resolution: "run bun install before the first test"
  *     artifact: "Cannot find package"
  *     signal: loud
+ *     domain: testing
  * skills_used: [git-workflow]
  * blockers:
  *   - what: "LINEAR_API_KEY unset"
@@ -82,7 +83,8 @@
  *     `unusable-field`. That covers a string field holding something
  *     other than a string or only whitespace, a closed-set field holding
  *     a value outside {@link REPORT_STATUSES}, {@link FINDING_KINDS},
- *     {@link FINDING_SIGNALS} or {@link CHANGE_LEVELS}, and a `security`
+ *     {@link FINDING_SIGNALS}, {@link FINDING_DOMAINS} or
+ *     {@link CHANGE_LEVELS}, and a `security`
  *     flag that is not a boolean. The sets are closed because stored rows
  *     are keyed on them. A later phase promotes a `silent` finding on its
  *     first sighting, for example, so a signal spelled any other way must
@@ -176,6 +178,34 @@ export const FINDING_SIGNALS = ['loud', 'silent'] as const;
 /** One of the two finding signals. */
 export type FindingSignal = (typeof FINDING_SIGNALS)[number];
 
+/**
+ * What area of work a finding's lesson belongs to. Optional on a
+ * finding; the lesson made from it defaults an absent one.
+ *
+ * continuous-learning-v2's domains: the five its `SKILL.md` names, and
+ * the three its `agents/observer.md` calls global-friendly, measured
+ * on 2026-09-18. Its `instinct-cli.py` defaults an absent domain to
+ * `general`, which is not one of these and is not accepted here; an
+ * importer meeting one has to map it.
+ *
+ * Declared here rather than in `schema/instinct.ts`, which re-exports it
+ * as `INSTINCT_DOMAINS`: that module already imports this one, and this
+ * one importing it back fails at load with `Cannot access
+ * 'FINDING_KINDS' before initialization`.
+ */
+export const FINDING_DOMAINS = [
+  'code-style',
+  'testing',
+  'git',
+  'debugging',
+  'workflow',
+  'security',
+  'general-best-practices',
+] as const;
+
+/** One of the finding domains. */
+export type FindingDomain = (typeof FINDING_DOMAINS)[number];
+
 /** How much of a release one change note is worth. */
 export const CHANGE_LEVELS = ['patch', 'minor', 'major', 'none'] as const;
 
@@ -209,6 +239,8 @@ export interface ReportFinding {
   readonly artifact: string | null;
   /** Whether it failed loudly or passed silently. Required. */
   readonly signal: FindingSignal | null;
+  /** What area of work its lesson belongs to. */
+  readonly domain: FindingDomain | null;
   /** Every key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -355,7 +387,16 @@ const REPORT_KEYS = [
 ];
 
 /** A finding's keys. */
-const FINDING_KEYS = ['trigger', 'kind', 'what', 'cause', 'resolution', 'artifact', 'signal'];
+const FINDING_KEYS = [
+  'trigger',
+  'kind',
+  'what',
+  'cause',
+  'resolution',
+  'artifact',
+  'signal',
+  'domain',
+];
 
 /** A blocker's keys. */
 const BLOCKER_KEYS = ['what', 'artifact'];
@@ -528,6 +569,7 @@ function readFinding(item: unknown, field: string, issues: ReportIssue[]): Repor
     resolution: stringField(scope, 'resolution', OPTIONAL),
     artifact: stringField(scope, 'artifact', OPTIONAL),
     signal: choiceField(scope, 'signal', FINDING_SIGNALS, REQUIRED),
+    domain: choiceField(scope, 'domain', FINDING_DOMAINS, OPTIONAL),
     extras: scope.extras,
   };
 }

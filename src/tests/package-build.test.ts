@@ -27,7 +27,7 @@
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
- *   - The four library entries are built together with `--splitting`.
+ *   - The five library entries are built together with `--splitting`.
  *     Without it each entry is a bundle of its own, and `parsePlan`,
  *     `parseReport`, `openSqliteStore` and `EFFORT_KEY_PROJECTIONS` were
  *     each a different value from `dist/index.js` than from their
@@ -165,7 +165,8 @@
  * from `package.json` as `describe` does, and its built `resolveScope`
  * and `validateManifest` are run once each.
  *
- * `README.md` says only `./plan` and `./ports` load under node. The
+ * `README.md` says only `./plan`, `./ports` and `./learning` load under
+ * node; `./learning` is read below, in its own section. The
  * preflight brought `Bun.spawn`, `Bun.which` and `Bun.file` calls into
  * `./plan`, so one case imports `dist/plan/index.js` under node and holds
  * its names to its source's. It imports `dist/index.js` the same way as
@@ -183,6 +184,30 @@
  * in `dist/plan/index.js`, and node loaded that entry's twenty names.
  * `Database` re-exported from `bun:sqlite` there instead reddened the
  * node case, which is the control that it can fail.
+ *
+ * ## The learning subpath, by the package's name
+ *
+ * `./learning` joined the exports map and the build's entry list
+ * together, for the library under `src/learning/`. The computed cases
+ * above read it by path, as `dist/learning/index.js`; two more import it
+ * as a consumer does, by `@open-tomato/rafa/learning`, from a scratch
+ * directory whose `node_modules/@open-tomato/rafa` links to the scratch
+ * package, so the name resolves through the manifest's own exports map.
+ * One imports it under bun and holds its names to the source entry's and
+ * its `actionHash` to the source's answer; the other does the same under
+ * node, which is what lets `README.md` name `./learning` among the
+ * subpaths that load there: the library needs only `node:crypto`. Both
+ * import `@open-tomato/rafa/unmapped` from the same directory first, as
+ * the control that a name the map does not carry is refused, so the
+ * link is not what makes the import pass.
+ *
+ * Two mutations of `package.json` were driven on 2026-09-25 with bun
+ * 1.3.14 and node 22.14.0, one run of this file each, 54 pass before and
+ * after and the manifest restored byte-identical (sha256). Dropping the
+ * `./learning` exports entry reddened 3 of 54: the exports map case and
+ * both name cases. Dropping `src/learning/index.ts` from the build's
+ * entry list reddened 5 of 54: the exports-target case, the two computed
+ * `dist/learning/index.js` cases and both name cases.
  *
  * ## The publishing fields phase 1 sets
  *
@@ -277,6 +302,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import * as storeSource from '../effort/store/index.js';
 import * as rootSource from '../index.js';
+import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath } from '../plan.js';
 import * as portsSource from '../ports/index.js';
@@ -297,6 +323,7 @@ const EXPORTS = {
   './plan': './dist/plan/index.js',
   './store': './dist/effort/store/index.js',
   './ports': './dist/ports/index.js',
+  './learning': './dist/learning/index.js',
 };
 
 /** What the manifest publishes: the build, and the NOTICE the licence asks to travel with it (npm adds LICENSE and README by itself). */
@@ -367,6 +394,7 @@ const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
   ['plan/index.js', planSource],
   ['effort/store/index.js', storeSource],
   ['ports/index.js', portsSource],
+  ['learning/index.js', learningSource],
 ];
 
 /** The subpath bundles whose every name the root bundle carries too. */
@@ -443,6 +471,9 @@ const PLANTED_BOARD_BODY = '<!-- No local paths. -->\n\n# Spec: a copied board t
 
 /** The modules sitting beside the pinned plans, which the build must not copy. */
 const PLAN_READER_MODULES = ['load.ts', 'load.test.ts'];
+
+/** The action the learning cases hash, with case and surrounding whitespace the hash ignores. */
+const HASHED_ACTION = '  Run Bun Install First ';
 
 /** The spec the template cases plan from, and what `rafa plan` is told. */
 const SPEC = '# Spec: a build probe\n\nNothing to build.\n';
@@ -637,7 +668,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the four subpaths to their builds, and nothing else', () => {
+  it('maps the root and the five subpaths to their builds, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -690,7 +721,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set([...Object.values(BIN), ...Object.values(EXPORTS)])];
     const missing = targets.filter((target) => !existsSync(join(PACKAGE_DIR, target)));
 
-    expect(targets).toHaveLength(5);
+    expect(targets).toHaveLength(6);
     expect(missing).toEqual([]);
   });
 
@@ -818,6 +849,64 @@ describe('the names phase 1 adds, in the built entries', () => {
     expect(root.exitCode).not.toBe(0);
     expect(root.stderr).toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
     expect(root.stderr).toContain('bun:');
+  }, 30_000);
+});
+
+describe('the learning subpath, imported by the package name', () => {
+  /** A scratch directory whose `node_modules` links the package's name to the scratch package. */
+  function plantConsumer(name: string): string {
+    const consumer = mkdtempSync(join(tempRoot, `${name}-`));
+    mkdirSync(join(consumer, 'node_modules', '@open-tomato'), { recursive: true });
+    symlinkSync(PACKAGE_DIR, join(consumer, 'node_modules', '@open-tomato', 'rafa'), 'dir');
+    return consumer;
+  }
+
+  /** A module printing the sorted names `specifier` exports, then `actionHash` of {@link HASHED_ACTION}. */
+  function printNames(specifier: string): string {
+    return [
+      `const entry = await import(${JSON.stringify(specifier)});`,
+      `console.log(JSON.stringify([Object.keys(entry).sort(), entry.actionHash(${JSON.stringify(HASHED_ACTION)})]));`,
+      '',
+    ].join('\n');
+  }
+
+  /** What {@link printNames} prints for the source entry. */
+  function expectedNames(): string {
+    return `${JSON.stringify([Object.keys(learningSource).sort(), learningSource.actionHash(HASHED_ACTION)])}\n`;
+  }
+
+  it('imports under bun, with the names and the action hash its source gives', () => {
+    const consumer = plantConsumer('learning-bun');
+    writeFileSync(join(consumer, 'unmapped.mjs'), printNames('@open-tomato/rafa/unmapped'), 'utf8');
+    writeFileSync(join(consumer, 'probe.mjs'), printNames('@open-tomato/rafa/learning'), 'utf8');
+
+    const unmapped = run([process.execPath, 'unmapped.mjs'], consumer, process.env);
+    expect(unmapped.exitCode).not.toBe(0);
+    expect(unmapped.stderr).toContain('@open-tomato/rafa/unmapped');
+
+    expect(run([process.execPath, 'probe.mjs'], consumer, process.env)).toEqual({
+      exitCode: 0,
+      stdout: expectedNames(),
+      stderr: '',
+    });
+  }, 30_000);
+
+  it('imports under node, with the names and the action hash its source gives', () => {
+    const node = Bun.which('node');
+    if (node === null) throw new Error('node is not on the PATH this suite runs under');
+    const consumer = plantConsumer('learning-node');
+    writeFileSync(join(consumer, 'unmapped.mjs'), printNames('@open-tomato/rafa/unmapped'), 'utf8');
+    writeFileSync(join(consumer, 'probe.mjs'), printNames('@open-tomato/rafa/learning'), 'utf8');
+
+    const unmapped = run([node, 'unmapped.mjs'], consumer, process.env);
+    expect(unmapped.exitCode).not.toBe(0);
+    expect(unmapped.stderr).toContain('ERR_PACKAGE_PATH_NOT_EXPORTED');
+
+    expect(run([node, 'probe.mjs'], consumer, process.env)).toEqual({
+      exitCode: 0,
+      stdout: expectedNames(),
+      stderr: '',
+    });
   }, 30_000);
 });
 

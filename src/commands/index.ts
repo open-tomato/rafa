@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-five registered so far wrap a
+ * of each is its command. Five of the fifty-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -46,6 +46,8 @@
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
+ * `instinct flag` and `instinct promote`, which call the Learning adapter
+ * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
  * the seven `pr` actions, which read, wait on, merge and triage one
  * repository's pull requests through the PullRequests port and share
  * `pr/pr-context.ts`, nor `release status` and `release tag`, which
@@ -124,6 +126,11 @@
  *     terminal under `-i`, and `instinct list` and
  *     `instinct show <id>`, the records the project and user instinct
  *     scopes hold, each listing exiting 0 whatever its rows say.
+ *   - `instinct flag <id> <reason>`, one held lesson flagged through the
+ *     Learning adapter so no later bundle blesses it, refusing an id no
+ *     held record carries, and `instinct promote`, the lessons that
+ *     recurred enough to promote under `learning.promote.*`, writing
+ *     nothing.
  *   - `skill show <name> [--full]`, the skill a name resolves to: its
  *     record, its frontmatter, every other holder of the name and its
  *     headings, or its whole file under `--full`, refusing a name no
@@ -183,9 +190,9 @@
  * command runs (`src/cli/dispatch.ts`).
  *
  * The subjects are the ten with an action registered: a subject with
- * none would show in every roster and dispatch nothing. `skill index`,
- * `instinct flag` and `instinct promote` are in the command tree and
- * are not registered, because nothing dispatches them yet.
+ * none would show in every roster and dispatch nothing. `skill index` is
+ * in the command tree and is not registered, because nothing dispatches
+ * it yet.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
@@ -203,7 +210,9 @@ import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
+import instinctFlag from './instinct/flag.js';
 import instinctList from './instinct/list.js';
+import instinctPromote from './instinct/promote.js';
 import instinctShow from './instinct/show.js';
 import issueCheck from './issue/check.js';
 import issueComment from './issue/comment.js';
@@ -258,7 +267,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
-  { name: 'instinct', summary: 'check an instincts directory; list and show its records' },
+  { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
 ]);
 
@@ -308,6 +317,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctCheck,
   instinctList,
   instinctShow,
+  instinctFlag,
+  instinctPromote,
   releaseStatus,
   releaseTag,
   status,

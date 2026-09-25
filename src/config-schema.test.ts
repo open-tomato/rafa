@@ -44,6 +44,9 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['trackerDefault', 'tracker.default'],
   ['trackerFallback', 'tracker.fallback'],
   ['learningAdapter', 'learning.adapter'],
+  ['learningBlessMinConfidence', 'learning.bless.minConfidence'],
+  ['learningPromoteAfter', 'learning.promote.after'],
+  ['learningPromoteMinConfidence', 'learning.promote.minConfidence'],
   ['outputMode', 'output.mode'],
   ['prerequisitesRequired', 'prerequisites.required'],
   ['prerequisitesOptional', 'prerequisites.optional'],
@@ -166,6 +169,8 @@ describe('SECTIONS', () => {
       'cleanup',
       'dangerous',
       'learning',
+      'learning.bless',
+      'learning.promote',
       'loop',
       'output',
       'plan',
@@ -207,6 +212,11 @@ describe('knownKeysAbove', () => {
       ['acceptStaleRefs'],
     ]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
+    expect(knownKeysAbove('learning.promote.afters')).toEqual([
+      'learning.promote',
+      ['after', 'minConfidence'],
+    ]);
+    expect(knownKeysAbove('learning.blessed')).toEqual(['learning', ['adapter', 'bless', 'promote']]);
     expect(knownKeysAbove('tiers.lessons')).toEqual(['tiers', ['rafa', 'skills', 'agents']]);
   });
 

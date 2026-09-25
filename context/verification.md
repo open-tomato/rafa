@@ -249,3 +249,8 @@ the reference example. This section replaces nothing.
   the board section warns without calling `gh`.
 - A `ROUTES` case in `src/commands/index.test.ts` splits its route line on
   spaces, so a quoted multi-word argument does not group; use one word.
+- `runRafa` spawns `src/rafa.ts` (`RAFA_ENTRY`), not the build. To prove
+  a behaviour against `dist/cli.js`, copy the test and `cli-capture.ts`
+  to temporary files with `RAFA_ENTRY`'s URL swapped to
+  `../../dist/cli.js` and the import pointed at the copy, run them after
+  `bun run build`, and delete them. This replaces nothing.
