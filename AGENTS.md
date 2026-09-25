@@ -28,6 +28,8 @@ back into every turn and the split would save nothing.
 - `context/pull-requests.md` — the `pr` subject, the provider and its
   preflight items, merge, triage assessment and --resolve, trust, and the
   readiness gate for plans from the board.
+- `context/terminology.md` — formal and colloquial names: the ledger,
+  lore and hindsight, and how prose introduces them.
 - `context/release.md` — change-note path from report to table, release level,
   the three wrap-up steps with restore, the two release actions, and config keys.
 - `context/notices.md` — the alpha and skip-permissions notices: where they
