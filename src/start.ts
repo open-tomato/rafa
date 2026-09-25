@@ -127,6 +127,9 @@
  * --inject      how much of the plan each task session is handed: full, stage
  *               or task. Outranks `plan.inject` in `.rafa/config.yaml`. The
  *               wrap-up session is handed the whole plan whatever it says.
+ * --skills-resolver the resolver that picks each task's skills: planner, tag
+ *               or none. Outranks `task.skills` in `.rafa/config.yaml`, for
+ *               this run only (`start/run-config.ts`).
  * --runtime     the installed rafa the run goes on in: a version under
  *               `~/.rafa/runtime/`, or a path to a `cli.js` or its directory
  *               (`start/runtime.ts`).

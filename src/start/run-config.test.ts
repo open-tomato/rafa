@@ -1,7 +1,8 @@
 /**
- * Tests for the refusal of a detached run (`start/run-config.ts`):
+ * Tests for `start/run-config.ts`: the refusal of a detached run —
  * which words ask for one, the refusal they meet, and that `loop start`
- * meets it before it reads anything else.
+ * meets it before it reads anything else — and the `--skills-resolver`
+ * flag `loadRunConfig` reads over `task.skills`.
  *
  * `asksDetached` is read over each spelling that asks and beside each near
  * miss that does not: the flag negated, valued `false`, after a `--`, with
@@ -14,6 +15,12 @@
  * refusal is what the line meets once nothing refuses it earlier. The run
  * with `-d` ends on the detached refusal instead, and neither leaves a
  * session record or calls the stand-in.
+ *
+ * The `--skills-resolver` cases load a project with no config file under
+ * a home with none, so the default answers wherever the flag is silent.
+ * The flag named is `tag`, not the default `planner`, so a reading that
+ * ignored the flag would answer `planner` and fail. `--inject` is read
+ * beside it, holding the two flags apart: each answers its own setting.
  */
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,9 +29,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
+import { ConfigError } from '../config.js';
 import { plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
 
-import { asksDetached, refuseDetachedRun } from './run-config.js';
+import { asksDetached, loadRunConfig, refuseDetachedRun } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';
 
 /** A temporary directory of this file's own. */
@@ -83,6 +91,59 @@ describe('refuseDetachedRun', () => {
 
   it('returns for a line asking for none', () => {
     expect(refuseDetachedRun(['--no-detached', '--plan=.plans/PLAN-a.md'])).toBeUndefined();
+  });
+});
+
+/** A project and a home, neither holding a config file. */
+function bareRoots(): { root: string; home: string } {
+  const root = mkdtempSync(join(tempBase, 'project-'));
+  const home = mkdtempSync(join(tempBase, 'home-'));
+  return { root, home };
+}
+
+/** A warning sink that must never be called: no file, so no unknown key. */
+function noWarning(message: string): void {
+  throw new Error(`unexpected config warning: ${message}`);
+}
+
+describe('loadRunConfig and --skills-resolver', () => {
+  it('resolves task.skills from --skills-resolver=tag, naming the command line as its source', () => {
+    const resolved = loadRunConfig(bareRoots(), ['--skills-resolver=tag'], noWarning);
+
+    expect(resolved.config.taskSkills).toBe('tag');
+    expect(resolved.sources.taskSkills).toBe('cli');
+  });
+
+  it('leaves task.skills at the default planner without the flag', () => {
+    const resolved = loadRunConfig(bareRoots(), ['--plan=.plans/PLAN-a.md'], noWarning);
+
+    expect(resolved.config.taskSkills).toBe('planner');
+    expect(resolved.sources.taskSkills).toBe('default');
+  });
+
+  it('reads --inject and --skills-resolver each into its own setting', () => {
+    const resolved = loadRunConfig(bareRoots(), ['--inject=task', '--skills-resolver=none'], noWarning);
+
+    expect(resolved.config.inject).toBe('task');
+    expect(resolved.config.taskSkills).toBe('none');
+    expect(resolved.sources.inject).toBe('cli');
+    expect(resolved.sources.taskSkills).toBe('cli');
+  });
+
+  it('refuses a bare --skills-resolver as an empty value, where the valued control resolves', () => {
+    const roots = bareRoots();
+    let thrown: unknown;
+    try {
+      loadRunConfig(roots, ['--skills-resolver'], noWarning);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ConfigError);
+    expect((thrown as ConfigError).problems).toEqual([
+      'command line: taskSkills is "", expected one of: planner, tag, none',
+    ]);
+    expect(loadRunConfig(roots, ['--skills-resolver=planner'], noWarning).config.taskSkills).toBe('planner');
   });
 });
 
