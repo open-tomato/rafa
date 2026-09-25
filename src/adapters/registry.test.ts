@@ -23,7 +23,14 @@
  * fresh temporary root, and the reason each records off its file. The
  * `local` learning case reads the file and the push-log line that
  * adapter wrote off the disk under a fresh temporary root, and the
- * bundle a second adapter made over that root answers. The `github`
+ * bundle a second adapter made over that root answers. Every learning
+ * case names a scratch home, apart from one that spawns a child `bun`
+ * with a scratch `HOME`, because bun's `homedir()` keeps the `HOME` a
+ * process started with (measured on bun 1.3.14: setting
+ * `process.env.HOME` in the process left `homedir()` unchanged).
+ * Driven on 2026-09-25, the context's home ignored for `homedir()`
+ * reddened the two cases that name one, and the context's floor ignored
+ * reddened the floor case alone. The `github`
  * tracker cases hand that adapter the recorded fake as its `gh` runner
  * and read what it filed off the fake. No case runs the runner the
  * adapter makes when its context names none, which spawns the real
@@ -137,6 +144,9 @@ import { parseLocalIssue } from './tracker/local.js';
 
 /** The repository root, whose tsconfig the compiler reads under. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/** The registry itself, as a child process imports it. */
+const REGISTRY_ENTRY = fileURLToPath(new URL('./registry.ts', import.meta.url));
 
 /** The ports entry, whose literal version types the value is held to. */
 const PORTS_ENTRY = fileURLToPath(new URL('../ports/index.ts', import.meta.url));
@@ -458,10 +468,11 @@ describe('the core adapter registry', () => {
 
   it('makes the local learning adapter under .rafa/instincts of its root', async () => {
     const root = freshRoot('learning');
+    const home = freshRoot('learning-home');
     const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
 
-    const pushing = adapter.create({ repoRoot: root });
-    const pulling = adapter.create({ repoRoot: root });
+    const pushing = adapter.create({ repoRoot: root, home });
+    const pulling = adapter.create({ repoRoot: root, home });
     expect(existsSync(root)).toBe(false);
     const result = await pushing.push({ source_id: 'session-1', instincts: [DESCRIBED_INSTINCT] });
     const bundle = await pulling.pullBlessed();
@@ -477,6 +488,53 @@ describe('the core adapter registry', () => {
     });
     expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger']);
     expect(bundle.instincts).toEqual([{ ...INSTINCT, sources: ['session-1'] }]);
+  });
+
+  it('makes the local learning adapter over the home and the floor its context names', async () => {
+    const home = freshRoot('learning-user-home');
+    const root = freshRoot('learning-user-root');
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
+    // A push with the home as its root plants the user scope another root reads.
+    await adapter.create({ repoRoot: home, home: freshRoot('learning-no-home') }).push({
+      source_id: 'session-1',
+      instincts: [{ ...DESCRIBED_INSTINCT, id: 'user-1', trigger: 'another trigger', confidence: 0.6 }],
+    });
+
+    const pull = async (context: Partial<AdapterContext>): Promise<string[]> => (
+      await adapter.create({ repoRoot: root, home, ...context }).pullBlessed()
+    ).instincts.map((record) => record.id);
+
+    expect(await pull({})).toEqual(['user-1']);
+    expect(await pull({ learningBlessMinConfidence: 0.7 })).toEqual([]);
+    // Control: the floor the record meets answers it.
+    expect(await pull({ learningBlessMinConfidence: 0.6 })).toEqual(['user-1']);
+    expect(existsSync(root)).toBe(false);
+  });
+
+  it('reads the user scope under the HOME the process started with when its context names no home', async () => {
+    const home = freshRoot('learning-spawned-home');
+    const emptyHome = freshRoot('learning-spawned-empty-home');
+    const root = freshRoot('learning-spawned-root');
+    const planting = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: home, home: emptyHome });
+    await planting.push({
+      source_id: 'session-1',
+      instincts: [{ ...DESCRIBED_INSTINCT, id: 'user-1', trigger: 'another trigger' }],
+    });
+    // bun's homedir() keeps the HOME the process started with, so each reading is a child of its own.
+    const script = [
+      `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(REGISTRY_ENTRY)});`,
+      `const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: ${JSON.stringify(root)} });`,
+      'console.log(JSON.stringify((await learning.pullBlessed()).instincts.map((record) => record.id)));',
+    ].join('\n');
+    const pulled = (scratchHome: string): { exitCode: number; stdout: string } => {
+      const child = Bun.spawnSync([process.execPath, '-e', script], { env: { ...process.env, HOME: scratchHome } });
+      return { exitCode: child.exitCode, stdout: child.stdout.toString() };
+    };
+
+    expect(pulled(home)).toEqual({ exitCode: 0, stdout: '["user-1"]\n' });
+    // Control: a HOME with no user scope answers nothing, so the reading above came from the HOME.
+    expect(pulled(emptyHome)).toEqual({ exitCode: 0, stdout: '[]\n' });
+    expect(existsSync(emptyHome)).toBe(false);
   });
 
   it('registers the claude planner alone', () => {

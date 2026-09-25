@@ -24,6 +24,20 @@
  * three read-back refusals and the batch case; no push-log line written
  * reddened nineteen cases; and each overwrite guard dropped reddened
  * its own refusal alone.
+ *
+ * The user scope is read under a home each case names, one no case
+ * makes unless the case plants a scope of its own, so no case reads the
+ * real `~/.rafa/instincts`. Seven mutations of the pull were driven on
+ * 2026-09-25 over this file and the registry's, one run each, with 153
+ * pass before and the module restored byte-identical (sha256) after,
+ * and every one reddened at least one case: no user record added
+ * reddened four user-scope cases here; the trigger filter dropped
+ * reddened the adding case and the held-trigger case; the id filter
+ * dropped, and the flags not read over the user scope, each reddened
+ * the id case alone; the floor ignored over the project, and `bless`
+ * replaced by a status filter, each reddened the floor case and the
+ * held-trigger case; and the floor ignored over the user scope
+ * reddened the adding case.
  */
 import type { HeldDescription } from './held.js';
 import type { DescribedInstinctRecord, LocalLearningOptions, PushLogLine } from './local.js';
@@ -44,11 +58,12 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS } from '../../config.js';
 import { actionHash } from '../../learning/index.js';
 import { parseInstinct, writeInstinct } from '../../schema/instinct.js';
 import { setActiveOutput } from '../output/active.js';
 
-import { createLocalLearning, localInstinctsDir } from './local.js';
+import { createLocalLearning, localInstinctsDir, userInstinctsDir } from './local.js';
 
 /** The instant every adapter here is stamped from. */
 const NOW = '2026-09-14T10:00:00.000Z';
@@ -135,7 +150,12 @@ function payload(instincts: InstinctRecord[], sourceId = 'session-1'): SyncPaylo
   return { source_id: sourceId, instincts };
 }
 
-/** A local learning adapter over `instinctsDir`, stamped from {@link NOW}, keeping each report in `warned`. */
+/**
+ * A local learning adapter over `instinctsDir`, stamped from {@link NOW},
+ * keeping each report in `warned`. Its home is one no case makes, so the
+ * user scope is empty unless the case names a home of its own, and its
+ * floor is the config default.
+ */
 function localLearning(
   instinctsDir: string,
   warned: string[] = [],
@@ -143,6 +163,8 @@ function localLearning(
 ): Learning {
   return createLocalLearning({
     instinctsDir,
+    home: join(tempDir, 'home-no-case-makes'),
+    minConfidence: CONFIG_DEFAULTS.learningBlessMinConfidence,
     now: () => NOW,
     warn: (message) => {
       warned.push(message);
@@ -416,7 +438,12 @@ describe('push', () => {
     const dir = freshDir('active-output');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'broken.md'), 'not an instinct\n');
-    const learning = createLocalLearning({ instinctsDir: dir, now: () => NOW });
+    const learning = createLocalLearning({
+      instinctsDir: dir,
+      home: freshDir('active-output-home'),
+      minConfidence: CONFIG_DEFAULTS.learningBlessMinConfidence,
+      now: () => NOW,
+    });
     const warned: string[] = [];
 
     setActiveOutput(warnOnlyOutput(warned));
@@ -605,6 +632,159 @@ describe('pullBlessed', () => {
       created_at: '2026-09-01T10:00:00.000Z',
       updated_at: '2026-09-01T10:00:00.000Z',
     });
+  });
+});
+
+describe('pullBlessed at a floor', () => {
+  it('blesses at the floor it is made with, most trusted first, leaving out a promoted record', async () => {
+    const dir = freshDir('floor');
+    plant(dir, heldInstinct({ id: 'a-mid', trigger: 'mid trigger', confidence: 0.5 }));
+    plant(dir, heldInstinct({ id: 'b-high', trigger: 'high trigger', confidence: 0.7 }));
+    plant(dir, heldInstinct({ id: 'c-low', trigger: 'low trigger', confidence: 0.45 }));
+    plant(dir, heldInstinct({ id: 'd-promoted', trigger: 'promoted trigger', confidence: 0.8, promotedTo: 'context/source.md' }));
+
+    expect(await blessedIds(localLearning(dir))).toEqual(['b-high', 'a-mid']);
+    // Control: the same held set at a lower floor answers the record the default left out.
+    expect(await blessedIds(localLearning(dir, [], { minConfidence: 0.4 }))).toEqual(['b-high', 'a-mid', 'c-low']);
+  });
+});
+
+describe('the user scope', () => {
+  /** A home of its own for one case, with `instincts` planted in its user scope. */
+  function homeHolding(name: string, instincts: readonly Instinct[]): string {
+    const home = freshDir(name);
+    for (const instinct of instincts) plant(userInstinctsDir(home), instinct);
+    return home;
+  }
+
+  /** A user-scope instinct, as a scope's own file says it. */
+  function userInstinct(overrides: Partial<Instinct>): Instinct {
+    return heldInstinct({ scope: 'user', source: 'imported', confidence: 0.8, ...overrides });
+  }
+
+  it('answers .rafa/instincts under the home', () => {
+    expect(userInstinctsDir('/home/someone')).toBe('/home/someone/.rafa/instincts');
+  });
+
+  it('adds its blessed records on triggers the project holds nothing on, after the project\'s', async () => {
+    const dir = freshDir('user-adds');
+    plant(dir, heldInstinct({ id: 'project-a', confidence: 0.5 }));
+    const home = homeHolding('user-adds-home', [
+      userInstinct({ id: 'user-new', trigger: 'another trigger', confidence: 0.6 }),
+      userInstinct({ id: 'user-top', trigger: 'a fourth trigger', confidence: 0.8 }),
+      userInstinct({ id: 'user-same', trigger: '  A test fails under THE full suite \t and passes alone ' }),
+      userInstinct({ id: 'user-low', trigger: 'a third trigger', confidence: 0.4 }),
+    ]);
+
+    const bundle = await localLearning(dir, [], { home }).pullBlessed();
+
+    expect(bundle.instincts.map((record) => record.id)).toEqual(['project-a', 'user-top', 'user-new']);
+    expect(bundle.instincts[1]).toEqual({
+      id: 'user-top',
+      trigger: 'a fourth trigger',
+      action: ACTION,
+      action_hash: actionHash(ACTION),
+      confidence: 0.8,
+      usage_count: 1,
+      signal: 'silent',
+      status: 'active',
+      created_at: '2026-09-01T10:00:00.000Z',
+      updated_at: '2026-09-01T10:00:00.000Z',
+    });
+    // Control: the floor reads the user scope too, so a lower one answers its low record.
+    expect(await blessedIds(localLearning(dir, [], { home, minConfidence: 0.4 })))
+      .toEqual(['project-a', 'user-top', 'user-new', 'user-low']);
+  });
+
+  it('adds nothing on a trigger the project holds, whatever keeps the project\'s records out', async () => {
+    const dir = freshDir('user-shadowed');
+    plant(dir, heldInstinct({ id: 'below-floor', trigger: 'trigger one', confidence: 0.4 }));
+    plant(dir, heldInstinct({ id: 'flagged-by-id', trigger: 'trigger two' }));
+    plant(dir, heldInstinct({ id: 'pair-a', trigger: 'trigger three' }));
+    plant(dir, heldInstinct({ id: 'pair-b', trigger: 'trigger three', action: RIVAL }));
+    const home = homeHolding('user-shadowed-home', [
+      userInstinct({ id: 'user-one', trigger: 'trigger one' }),
+      userInstinct({ id: 'user-two', trigger: 'trigger two' }),
+      userInstinct({ id: 'user-three', trigger: 'trigger three' }),
+    ]);
+    const learning = localLearning(dir, [], { home });
+    await learning.flag('flagged-by-id', 'wrong advice');
+
+    expect(await blessedIds(learning)).toEqual([]);
+    // Control: over a project holding nothing, the same user scope is answered whole.
+    expect(await blessedIds(localLearning(freshDir('user-shadowed-empty'), [], { home })))
+      .toEqual(['user-one', 'user-three', 'user-two']);
+  });
+
+  it('adds no record whose id the project holds or a flag names', async () => {
+    const dir = freshDir('user-ids');
+    plant(dir, heldInstinct({ id: 'shared', confidence: 0.5 }));
+    plant(dir, heldInstinct({ id: 'gone', trigger: 'a trigger the project dropped' }));
+    const home = homeHolding('user-ids-home', [
+      userInstinct({ id: 'shared', trigger: 'the user trigger of shared' }),
+      userInstinct({ id: 'gone', trigger: 'the user trigger of gone' }),
+      userInstinct({ id: 'kept', trigger: 'the user trigger of kept', confidence: 0.6 }),
+    ]);
+    const learning = localLearning(dir, [], { home });
+    await learning.flag('gone', 'wrong advice');
+    rmSync(join(dir, 'gone.md'));
+
+    expect(await blessedIds(learning)).toEqual(['shared', 'kept']);
+    // Control: once the flags are gone, the user record under the flagged id is answered.
+    rmSync(join(dir, FLAGS_FILE));
+    expect(await blessedIds(learning)).toEqual(['shared', 'gone', 'kept']);
+  });
+
+  it('never writes under the home: a push, a flag and a pull leave the user scope byte-identical', async () => {
+    const dir = freshDir('user-read-only');
+    const home = homeHolding('user-read-only-home', [
+      userInstinct({ id: 'user-a' }),
+      userInstinct({ id: 'user-b', trigger: 'another trigger' }),
+    ]);
+    const userDir = userInstinctsDir(home);
+    writeFileSync(join(userDir, 'broken.md'), 'not an instinct\n');
+    const before = snapshot(userDir);
+    const warned: string[] = [];
+    const learning = localLearning(dir, warned, { home });
+
+    await learning.push(payload([lesson({ id: 'user-a' }), lesson({ id: 'c', trigger: 'a third trigger' })]));
+    await learning.flag('c', 'wrong advice');
+    const ids = await blessedIds(learning);
+
+    expect(snapshot(userDir)).toEqual(before);
+    expect(readdirSync(home)).toEqual(['.rafa']);
+    expect(readdirSync(join(home, '.rafa'))).toEqual(['instincts']);
+    expect(ids).toEqual(['user-a', 'user-b']);
+    expect(heldFile(dir, 'user-a').scope).toBe('project');
+    expect(warned).toEqual([
+      `local learning: ${join(userDir, 'broken.md')} is not a held instinct, so it was skipped: `
+        + parseInstinct('not an instinct\n').issues.map((issue) => `${issue.field}: ${issue.message}`)
+          .join('; '),
+    ]);
+  });
+
+  it('makes nothing under a home whose user scope is absent', async () => {
+    const dir = freshDir('user-absent');
+    const home = freshDir('user-absent-home');
+    const learning = localLearning(dir, [], { home });
+
+    await learning.push(payload([lesson({ id: 'a' })]));
+    await learning.flag('a', 'wrong advice');
+    expect(await blessedIds(learning)).toEqual([]);
+    expect(existsSync(home)).toBe(false);
+  });
+
+  it('rejects a flag on an id the user scope alone holds, writing no flag', async () => {
+    const dir = freshDir('user-flag');
+    plant(dir, heldInstinct({ id: 'project-a' }));
+    const home = homeHolding('user-flag-home', [userInstinct({ id: 'user-only', trigger: 'another trigger' })]);
+    const learning = localLearning(dir, [], { home });
+
+    await expect(learning.flag('user-only', 'wrong advice')).rejects.toThrow(
+      `local learning: no instinct "user-only" is held under ${dir}`,
+    );
+    expect(existsSync(join(dir, FLAGS_FILE))).toBe(false);
+    expect(existsSync(join(userInstinctsDir(home), FLAGS_FILE))).toBe(false);
   });
 });
 

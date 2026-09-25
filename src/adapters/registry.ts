@@ -83,8 +83,10 @@
  * adapter needs more gains a field when that adapter lands, optional so
  * that no other port's caller has to pass it: the outputs added `stream`
  * and `verbosity`, the `local` tracker added `fallbackReason`, the
- * `github` tracker added `gh`, and the `claude` planner added
- * `settingSources`, `planPrompt`, `planDir` and `claude`. The planner's
+ * `github` tracker added `gh`, the `claude` planner added
+ * `settingSources`, `planPrompt`, `planDir` and `claude`, and the
+ * `local` learning adapter added `home` and
+ * `learningBlessMinConfidence`, each with a default. The planner's
  * first three are optional to the type and not to the adapter: none has a
  * default it could fall back on (`src/adapters/planner/claude.ts` says
  * why), so its `create` throws when any is left out. Each output `create` makes a new output,
@@ -108,8 +110,10 @@ import type {
 } from '../ports/index.js';
 import type { CapturingSpawner } from '../utils/claude.js';
 
+import { homedir } from 'node:os';
+
 import { describeValue } from '../config-sections.js';
-import { STORE_BACKENDS } from '../config.js';
+import { CONFIG_DEFAULTS, STORE_BACKENDS } from '../config.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
 
@@ -197,6 +201,18 @@ export interface AdapterContext {
    * alone; a spawner running `claude` when left out.
    */
   readonly claude?: CapturingSpawner;
+  /**
+   * The home whose `.rafa/instincts` is the user scope the `local`
+   * learning adapter pulls from. Read by it alone; `homedir()` when left
+   * out.
+   */
+  readonly home?: string;
+  /**
+   * The lowest confidence the `local` learning adapter blesses: the run's
+   * resolved `learning.bless.minConfidence`. Read by it alone; the
+   * config default when left out.
+   */
+  readonly learningBlessMinConfidence?: number;
 }
 
 /**
@@ -416,7 +432,15 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     port: 'learning',
     kind: 'local',
     portVersion: PORT_VERSIONS.learning,
-    create: ({ repoRoot }) => createLocalLearning({ instinctsDir: localInstinctsDir(repoRoot) }),
+    create: ({
+      repoRoot,
+      home = homedir(),
+      learningBlessMinConfidence = CONFIG_DEFAULTS.learningBlessMinConfidence,
+    }) => createLocalLearning({
+      instinctsDir: localInstinctsDir(repoRoot),
+      home,
+      minConfidence: learningBlessMinConfidence,
+    }),
   },
   {
     port: 'planner',

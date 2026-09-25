@@ -1,14 +1,16 @@
 /**
  * The `local` Learning adapter: the `.md` instincts under
  * `.rafa/instincts/` are its held set, the learning library's `merge`
- * settles every push against them, and each decision is logged.
+ * settles every push against them, each decision is logged, and its
+ * `bless` answers every pull, with the user scope's lessons added on
+ * the triggers the project holds nothing on.
  *
  * The adapter the distributed-learning spec describes
  * (`distributed-learning-library.md`, "rafa's Learning port and local
  * adapter") runs the library's `merge` on every push and its `bless` on
- * every pull. `push` runs `merge` as this note describes; `pullBlessed`
- * does not run `bless` yet. Outside the tests, only the adapter
- * registry's `learning/local` entry makes one.
+ * every pull, and this one does both as this note describes. Outside
+ * the tests, only the adapter registry's `learning/local` entry makes
+ * one.
  *
  * ## The files
  *
@@ -33,6 +35,11 @@
  * Neither NDJSON file is rewritten, and no line is removed. The
  * directory is made by a push that logs a decision, so a pull, a
  * refused push or a push of no records leaves no directory behind.
+ *
+ * The user scope, `.rafa/instincts/` under the `home` the adapter is
+ * made with ({@link userInstinctsDir}), is read by a pull through the
+ * same `readScope` and `./held.js`, and is never written: no call makes,
+ * changes or removes anything under it.
  *
  * ## What a push does
  *
@@ -83,15 +90,27 @@
  *
  * ## What the other calls answer
  *
- *   - `pullBlessed` answers every held record that `./held.js` reads
- *     as `active` and whose id no flag names, in file-name order. Its
- *     `version` is `now` when the bundle is made, as open-tomato's
+ *   - `pullBlessed` runs `bless` at the adapter's `minConfidence`,
+ *     which is `learning.bless.minConfidence`, over the project's held
+ *     set with every record whose id a flag names taken out, so it
+ *     answers the `active`, unpromoted records at or above the floor,
+ *     most trusted first. It then runs `bless` at the same floor over
+ *     the user scope, and adds each record it answers, in its order,
+ *     unless the project holds a record on its trigger (by
+ *     `triggerKey`) or under its id, or a flag names its id. A trigger
+ *     the project holds is the project's to settle, whether its records
+ *     there are blessed, below the floor, flagged or named by a flag, so
+ *     a user lesson never stands in for one the project refused. A
+ *     project flag is read as naming an id wherever it is held, which
+ *     keeps a lesson out rather than in. Its `version` is `now` when the
+ *     bundle is made, not the library's hash, as open-tomato's
  *     `BlessedBundle` spells it: "ISO 8601 timestamp of the bundle
  *     generation".
- *   - `flag` appends a flag naming an id some held record carries, and
- *     rejects an id none does. The flag names the id, not one file, so
- *     the record stays out of each later bundle whatever a later merge
- *     writes under that id.
+ *   - `flag` appends a flag naming an id some held record of the
+ *     project carries, and rejects an id none does, a user-scope id
+ *     included. The flag names the id, not one file, so the record stays
+ *     out of each later bundle whatever a later merge writes under that
+ *     id.
  *
  * ## Checks
  *
@@ -114,10 +133,10 @@
  * The held set and the flags fail differently, each toward keeping an
  * instinct out:
  *
- *   - A `.md` file the schema refuses is skipped and reported through
- *     `warn`, which defaults to the active output's `warn`
- *     (`src/adapters/output/active.ts`), read when the report is made.
- *     The other files are read, and a push never writes over it.
+ *   - A `.md` file the schema refuses, in either scope, is skipped and
+ *     reported through `warn`, which defaults to the active output's
+ *     `warn` (`src/adapters/output/active.ts`), read when the report is
+ *     made. The other files are read, and a push never writes over it.
  *   - A flag line that cannot be read rejects the pull, naming the file
  *     and the line, because a bundle skipping it could hold an instinct
  *     it flags. The line has to be mended or removed by hand.
@@ -136,13 +155,14 @@ import type {
   SyncPayload,
 } from '../../ports/index.js';
 import type { Instinct } from '../../schema/instinct.js';
+import type { InstinctScope } from '../../schema/tiers.js';
 
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { readScope } from '../../commands/instinct/instinct-records.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
-import { actionHash, merge, triggerKey } from '../../learning/index.js';
+import { actionHash, bless, merge, triggerKey } from '../../learning/index.js';
 import {
   INSTINCT_DOMAINS,
   INSTINCT_KINDS,
@@ -151,6 +171,7 @@ import {
   parseInstinct,
   writeInstinct,
 } from '../../schema/instinct.js';
+import { RAFA_INSTINCTS_PATH } from '../../schema/tiers.js';
 import { activeOutput } from '../output/active.js';
 
 import { toHeldInstinct, toHeldRecords } from './held.js';
@@ -215,6 +236,15 @@ interface HeldFlag {
 export interface LocalLearningOptions {
   /** The directory the files live in, as {@link localInstinctsDir} answers it for a repository. */
   readonly instinctsDir: string;
+  /**
+   * The home whose `.rafa/instincts` is the user scope a pull reads and
+   * never writes. There is no default, so a caller that leaves it out
+   * cannot reach the real home by accident; the registry passes
+   * `homedir()` when its context names none.
+   */
+  readonly home: string;
+  /** The lowest confidence a pulled record may carry, inclusive: `learning.bless.minConfidence`. */
+  readonly minConfidence: number;
   /** Stamps each merge, each bundle's `version` and each flag, as ISO 8601. The system clock when left out. */
   readonly now?: () => string;
   /** Reports a held file skipped. The active output's `warn` when left out. */
@@ -449,6 +479,27 @@ interface HeldFile {
   readonly instinct: Instinct;
 }
 
+/** Every record in `records`, as the library reads them, whose id no flag names. */
+function unflagged(records: readonly InstinctRecord[], flagged: ReadonlySet<string>): InstinctRecord[] {
+  return records.filter((record) => !flagged.has(record.id));
+}
+
+/**
+ * The user scope's blessed records a project bundle takes: those on a
+ * trigger the project holds no record on, whose id the project holds no
+ * record under and no flag names. See the module note.
+ */
+function userAdditions(
+  userBlessed: readonly InstinctRecord[],
+  projectHeld: readonly InstinctRecord[],
+  flagged: ReadonlySet<string>,
+): InstinctRecord[] {
+  const heldTriggers = new Set(projectHeld.map((record) => triggerKey(record.trigger)));
+  const heldIds = new Set(projectHeld.map((record) => record.id));
+  return unflagged(userBlessed, flagged)
+    .filter((record) => !heldTriggers.has(triggerKey(record.trigger)) && !heldIds.has(record.id));
+}
+
 /** The held set as one read found it. */
 interface HeldSet {
   /** Every file that read clean, in file-name order. */
@@ -577,20 +628,26 @@ function pushLogLines(
 
 /** Where `local` instincts live under a repository: `.rafa/instincts/`. */
 export function localInstinctsDir(repoRoot: string): string {
-  return join(repoRoot, '.rafa', 'instincts');
+  return join(repoRoot, RAFA_INSTINCTS_PATH);
+}
+
+/** The user scope a pull reads under a home: `~/.rafa/instincts/`. */
+export function userInstinctsDir(home: string): string {
+  return join(home, RAFA_INSTINCTS_PATH);
 }
 
 /** Makes a `local` learning adapter over `options.instinctsDir`; see the module note. */
 export function createLocalLearning(options: LocalLearningOptions): Learning {
-  const { instinctsDir } = options;
+  const { instinctsDir, minConfidence } = options;
+  const userDir = userInstinctsDir(options.home);
   const now = options.now ?? ((): string => new Date().toISOString());
   const warn = options.warn ?? warnThroughActiveOutput;
   const instinctsPath = join(instinctsDir, INSTINCTS_FILE);
   const flagsPath = join(instinctsDir, FLAGS_FILE);
 
-  /** The held set, each file that cannot be read reported and left out. */
-  function heldSet(): HeldSet {
-    const { records } = readScope('project', instinctsDir);
+  /** One scope's `.md` records, each file that cannot be read reported and left out. */
+  function readHeld(scope: InstinctScope, dir: string): HeldSet {
+    const { records } = readScope(scope, dir);
     const unreadable = new Set<string>();
     const files: HeldFile[] = [];
     for (const entry of records) {
@@ -603,6 +660,16 @@ export function createLocalLearning(options: LocalLearningOptions): Learning {
       }
     }
     return { files, unreadable };
+  }
+
+  /** The project's held set. */
+  function heldSet(): HeldSet {
+    return readHeld('project', instinctsDir);
+  }
+
+  /** One scope's records as the library reads them. */
+  function heldRecords(held: HeldSet): InstinctRecord[] {
+    return toHeldRecords(held.files.map((file) => file.instinct));
   }
 
   /** Every id a flag names. Rejects on a flag line that cannot be read. */
@@ -649,9 +716,10 @@ export function createLocalLearning(options: LocalLearningOptions): Learning {
 
     pullBlessed: async (): Promise<BlessedBundle> => {
       const flagged = await flaggedIds();
-      const instincts = toHeldRecords(heldSet().files.map((file) => file.instinct))
-        .filter((instinct) => instinct.status === 'active' && !flagged.has(instinct.id));
-      return { version: now(), instincts };
+      const projectHeld = heldRecords(heldSet());
+      const project = bless(unflagged(projectHeld, flagged), { minConfidence }).instincts;
+      const user = bless(heldRecords(readHeld('user', userDir)), { minConfidence }).instincts;
+      return { version: now(), instincts: [...project, ...userAdditions(user, projectHeld, flagged)] };
     },
 
     flag: async (id: string, reason: string): Promise<void> => {
