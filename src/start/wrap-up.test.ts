@@ -22,15 +22,31 @@
  * asserts present, the other asserts absent, which is what keeps a
  * `toContain` from passing on a prompt that emits every bullet
  * unconditionally.
+ *
+ * The third group covers the `## Lessons to promote` section that
+ * replaced the three promotion bullets, and the fourth
+ * `lessonsToPromote`, which reads the list off a stub adapter at the
+ * `learning.promote.*` keys. The section's presence and its absence
+ * are each other's control in the same way, and every threshold case
+ * is paired with one where the same lesson moves across the line.
  */
+import type { WrapUpLearning } from './wrap-up.js';
+import type { AdapterContext } from '../adapters/registry.js';
+import type { InstinctRecord } from '../learning/index.js';
+import type { Learning } from '../ports/index.js';
 import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
 import { classifyPromptContent } from '../effort/classify.js';
+import { actionHash } from '../learning/index.js';
 import { renderChangelogEntry } from '../release/changelog.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 
-import { buildWrapUpPrompt } from './wrap-up.js';
+import { parsePromoted } from './promoted.js';
+import { buildWrapUpPrompt, lessonsToPromote } from './wrap-up.js';
 
 /** The branch a case builds its prompt on. */
 const BRANCH = 'feat/rafa-20-pr-commands';
@@ -194,5 +210,212 @@ describe('the wrap-up prompt\'s release bullets', () => {
     expect(prompt).not.toContain('UNSTAGED and UNCOMMITTED');
     expect(prompt).not.toContain('Rewrite the raw');
     expect(buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease())).toContain('UNSTAGED and UNCOMMITTED');
+  });
+});
+
+/** A lesson as the library holds it, confirmed by `sources` at `confidence`. */
+function lesson(id: string, sources: number, confidence: number, extra: Partial<InstinctRecord> = {}): InstinctRecord {
+  const action = extra.action ?? `run the gate named by ${id}`;
+  const confirmed = Array.from({ length: sources }, (_, index) => `session-${String(index + 1)}`);
+  return {
+    id,
+    trigger: `when ${id} comes up`,
+    action,
+    action_hash: actionHash(action),
+    confidence,
+    usage_count: confirmed.length,
+    sources: confirmed,
+    signal: 'loud',
+    status: 'active',
+    created_at: '2026-09-20T00:00:00.000Z',
+    updated_at: '2026-09-20T00:00:00.000Z',
+    ...extra,
+  };
+}
+
+/** The section's heading, as the prompt writes it. */
+const SECTION = '## Lessons to promote';
+
+/** The three bullets the section replaced, each by a phrase only it held. */
+const REMOVED_BULLETS: readonly string[] = [
+  'If there\'s anything worth keeping',
+  'Promote a finding ONLY when all three hold',
+  'learn/learn-eval skill',
+];
+
+describe('the wrap-up prompt\'s lessons to promote', () => {
+  test('writes no section, heading or block when no lesson is promotable', () => {
+    for (const prompt of [buildWrapUpPrompt(BRANCH, PLAN, null), buildWrapUpPrompt(BRANCH, PLAN, null, null, [])]) {
+      expect(prompt).not.toContain(SECTION);
+      expect(prompt).not.toContain('rafa:promoted');
+    }
+
+    // The control: one lesson brings both in, so the absence above is
+    // the empty list's and not a prompt that never writes them.
+    const listed = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    expect(listed).toContain(SECTION);
+    expect(listed).toContain('```rafa:promoted');
+  });
+
+  test('drops the three promotion bullets whatever the list holds', () => {
+    const bare = buildWrapUpPrompt(BRANCH, PLAN, null);
+    const listed = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+
+    for (const phrase of REMOVED_BULLETS) {
+      expect(bare).not.toContain(phrase);
+      expect(listed).not.toContain(phrase);
+    }
+  });
+
+  test('lists each lesson by id, trigger, action and artifact, in the order given', () => {
+    const first = lesson('bun-test-worktree-1a2b3c4d', 3, 0.8, { artifact: 'Cannot find package' });
+    const second = lesson('lint-type-imports-5e6f7a8b', 4, 0.7);
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [first, second]);
+
+    expect(prompt).toContain([
+      '- `bun-test-worktree-1a2b3c4d`',
+      '  - trigger: when bun-test-worktree-1a2b3c4d comes up',
+      '  - action: run the gate named by bun-test-worktree-1a2b3c4d',
+      '  - artifact: Cannot find package',
+      '- `lint-type-imports-5e6f7a8b`',
+      '  - trigger: when lint-type-imports-5e6f7a8b comes up',
+      '  - action: run the gate named by lint-type-imports-5e6f7a8b',
+      '  - artifact: none',
+    ].join('\n'));
+  });
+
+  test('writes a multi-line action as one line of the list', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [
+      lesson('multi-line-9c8d7e6f', 3, 0.7, { action: '  run bun install\n\n  before   the first test  ' }),
+    ]);
+
+    expect(prompt).toContain('  - action: run bun install before the first test\n');
+    expect(prompt).not.toContain('run bun install\n');
+  });
+
+  test('keeps the classifier key first and the section between the bullets and the plan', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    const [firstLine] = prompt.split('\n');
+    const section = prompt.indexOf(SECTION);
+
+    expect(firstLine).toBe('* Read `@progress.txt` in full.');
+    expect(classifyPromptContent(prompt)).toBe('wrap-up');
+    expect(section).toBeGreaterThan(prompt.indexOf('* Do not include Claude attribution'));
+    expect(section).toBeLessThan(prompt.indexOf('The plan this run executed follows'));
+    expect(prompt.endsWith(`\n${PLAN}`)).toBe(true);
+  });
+
+  test('asks for a block whose two line shapes the parser reads', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    const opening = prompt.indexOf('```rafa:promoted\n');
+    const body = prompt.slice(opening, prompt.indexOf('\n```', opening)).split('\n')
+      .slice(1);
+
+    // Each shape is read as its own block: the template spells both
+    // with the one placeholder id, which a single block answers once.
+    const kinds = body.map((line) => {
+      const reading = parsePromoted(`\`\`\`rafa:promoted\n${line}\n\`\`\`\n`);
+      expect(reading.unreadable).toEqual([]);
+      return reading.answers.map((answer) => answer.kind);
+    });
+    expect(kinds).toEqual([['promoted'], ['skipped']]);
+  });
+});
+
+describe('lessonsToPromote', () => {
+  /** The contexts the stub adapter was made with. */
+  let made: AdapterContext[] = [];
+
+  /** What the stub's pull answers, or rejects with. */
+  let pulled: readonly InstinctRecord[] | Error = [];
+
+  /** Lines the reader warned about. */
+  let warnings: string[] = [];
+
+  beforeEach(() => {
+    made = [];
+    pulled = [];
+    warnings = [];
+    setActiveOutput(sinkOutput({
+      warn: (message) => {
+        warnings.push(message);
+      },
+    }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** A learning adapter whose pull answers {@link pulled}. */
+  const stub: Learning = {
+    push: () => Promise.reject(new Error('the wrap-up pushes nothing')),
+    pullBlessed: () => pulled instanceof Error
+      ? Promise.reject(pulled)
+      : Promise.resolve({ version: 'stub', instincts: [...pulled] }),
+    flag: () => Promise.reject(new Error('the wrap-up flags nothing')),
+  };
+
+  const registry = createAdapterRegistry([{
+    port: 'learning',
+    kind: 'stub',
+    portVersion: PORT_VERSIONS.learning,
+    create: (context) => {
+      made.push(context);
+      return stub;
+    },
+  }]);
+
+  /** The run's learning settings at the default promote keys, over the stub. */
+  function learningOf(overrides: Partial<WrapUpLearning> = {}): WrapUpLearning {
+    return {
+      kind: 'stub',
+      home: '/home/stand-in',
+      blessMinConfidence: 0.5,
+      registry,
+      repoRoot: '/repo/stand-in',
+      promoteAfter: 3,
+      promoteMinConfidence: 0.7,
+      ...overrides,
+    };
+  }
+
+  test('lists a lesson held by three sources at 0.7, and not one short of either key', async () => {
+    pulled = [lesson('held-by-three', 3, 0.7), lesson('held-by-two', 2, 0.9), lesson('below-the-floor', 5, 0.6)];
+
+    const lessons = await lessonsToPromote(learningOf());
+
+    expect(lessons.map((each) => each.id)).toEqual(['held-by-three']);
+
+    // The control: at `after: 2` and `minConfidence: 0.6` the same pull
+    // lists all three, so each was left out by its key above.
+    const wider = await lessonsToPromote(learningOf({ promoteAfter: 2, promoteMinConfidence: 0.6 }));
+    expect(wider.map((each) => each.id).sort()).toEqual(['below-the-floor', 'held-by-three', 'held-by-two']);
+  });
+
+  test('makes the adapter at the run\'s root, home and bless floor', async () => {
+    await lessonsToPromote(learningOf());
+
+    expect(made).toHaveLength(1);
+    expect(made[0]).toMatchObject({ repoRoot: '/repo/stand-in', home: '/home/stand-in', learningBlessMinConfidence: 0.5 });
+  });
+
+  test('lists nothing and makes no adapter when the run names no learning', async () => {
+    expect(await lessonsToPromote(null)).toEqual([]);
+    expect(made).toEqual([]);
+  });
+
+  test('lists nothing and warns once when the pull is refused', async () => {
+    pulled = new Error('flags.ndjson line 2 is not a flag');
+
+    expect(await lessonsToPromote(learningOf())).toEqual([]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('flags.ndjson line 2 is not a flag');
+  });
+
+  test('lists nothing and warns once when no adapter has the kind', async () => {
+    expect(await lessonsToPromote(learningOf({ kind: 'absent' }))).toEqual([]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('`absent` learning adapter');
   });
 });

@@ -5,7 +5,8 @@
  * the setting sources its config resolved to, and the release
  * preparation `start/release-stage.ts` made just before the call; and
  * the session built here, loading settings from those sources,
- * promotes the run's findings, syncs the branch with main, commits,
+ * promotes the lessons the learning library names promotable, syncs
+ * the branch with main, commits,
  * pushes and opens or updates the PR. `start()` finishes that release
  * and then waits on the PR's checks after it returns. The line this
  * module closes with, naming whether the session succeeded, goes
@@ -19,10 +20,15 @@
  * its drift guard reads that literal from.
  */
 import type { ClaudeSettingSource } from '../config.js';
+import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
+import type { InstinctRecord } from '../learning/index.js';
+import type { Learning } from '../ports/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { ghPullRequestsIn } from '../pr/index.js';
 import { runClaude } from '../utils/claude.js';
@@ -70,19 +76,26 @@ import { withStamp } from './stamp.js';
  * under that heading into one line per area, touching nothing else in
  * the file". {@link releaseBullets} holds why each of them is worded
  * the way it is.
+ *
+ * `lessons` is what {@link lessonsToPromote} answered before the
+ * session: the records `promotable` (`learning/bless.ts`) names at the
+ * run's `learning.promote.after` and `learning.promote.minConfidence`.
+ * The session is no longer asked to read `progress.txt` and judge what
+ * to keep; code picks the lessons, and {@link lessonsSection} lists
+ * them under `## Lessons to promote` with the `rafa:promoted` block the
+ * session answers them in (`start/promoted.ts` reads it). With no
+ * lesson the section is not written at all, not even its heading.
  */
 export function buildWrapUpPrompt(
   branch: string,
   planContent: string,
   openPullRequest: number | null = null,
   release: ReleasePreparation | null = null,
+  lessons: readonly InstinctRecord[] = [],
 ): string {
   return [
     '* Read `@progress.txt` in full.',
     '* `@progress.txt` above names the file `progress.txt` at the repo root; the `@` is a reference marker, never part of a path. Do not create or write a file whose name starts with `@`.',
-    '* If there\'s anything worth keeping, take what\'s generally relevant from that file into the `context/` page that owns its subject, `README.md` or a pertinent skill under `.claude/skills/`. The root `AGENTS.md` is a capped map read into every turn of every session: point at the page from there if a new one is needed, never inline the finding itself.',
-    '* Promote a finding ONLY when all three hold, and delete or keep it rather than promoting it when any one fails. It is PROJECT-SPECIFIC — a fact about THIS tree (its layout, its gates, its conventions, what a command here actually answers) and not a general technique, which belongs in a skill and not in this repo\'s docs. It is NOT ALREADY COVERED by a skill under `.claude/skills/` — read the skill that matches the finding\'s subject before writing anything, and extend that skill in place rather than restating it in a second document. And it NAMES WHAT IT REPLACES — the sentence, bullet or table row it supersedes, deleted in the SAME edit — or, when it replaces nothing, says so. A promotion landing beside the claim it should have replaced leaves two authorities on one subject, and nothing here compares two documents, so the stale one is never reported again.',
-    '* If a learn/learn-eval skill is available in this session, invoke it now so reusable patterns from this run are persisted as skills.',
     '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
     `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
     '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
@@ -94,11 +107,67 @@ export function buildWrapUpPrompt(
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
     pullRequestStep(branch, openPullRequest),
     '* Do not include Claude attribution in the commit or PR message.',
+    ...lessonsSection(lessons),
     '',
     'The plan this run executed follows, in full.',
     '',
     planContent,
   ].join('\n');
+}
+
+/** A lesson's field as one line: trimmed, every whitespace run one space. */
+function oneLine(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+/** One lesson of the list: its id, then its trigger, action and artifact. */
+function lessonLines(lesson: InstinctRecord): readonly string[] {
+  const artifact = lesson.artifact === undefined || oneLine(lesson.artifact) === ''
+    ? 'none'
+    : oneLine(lesson.artifact);
+  return [
+    `- \`${lesson.id}\``,
+    `  - trigger: ${oneLine(lesson.trigger)}`,
+    `  - action: ${oneLine(lesson.action)}`,
+    `  - artifact: ${artifact}`,
+  ];
+}
+
+/**
+ * The `## Lessons to promote` section, or nothing at all when `lessons`
+ * is empty.
+ *
+ * Each field is written on one line, whitespace runs collapsed, so a
+ * multi-line action cannot break the list into lines that read as other
+ * entries. The page rules are the ones the superseded promotion bullet
+ * carried: the page that owns the subject, and the capped `AGENTS.md`
+ * pointed from rather than written into. The block's line shapes are
+ * the ones `start/promoted.ts` reads, `→` or `->` alike.
+ *
+ * The section sits below every bullet, so the first line stays the
+ * classifier key, and it tells the session to promote BEFORE the
+ * commit the bullets above ask for, since the pages it writes belong in
+ * that commit.
+ */
+function lessonsSection(lessons: readonly InstinctRecord[]): readonly string[] {
+  if (lessons.length === 0) return [];
+  return [
+    '',
+    '## Lessons to promote',
+    '',
+    'These lessons recurred across enough task sessions of this project, at a high enough confidence, to belong in its tracked docs. Handle them BEFORE the commit and push above, so the pages you write are in that commit.',
+    '',
+    ...lessons.flatMap(lessonLines),
+    '',
+    'For each lesson, EITHER write it into the tracked page that owns its subject — a `context/` page, `README.md`, or a skill under `.claude/skills/` — replacing in the same edit any sentence, bullet or table row it supersedes, OR leave it out and say why. The root `AGENTS.md` is a capped map read into every turn of every session: point at a new page from there if one is needed, never inline the lesson itself.',
+    '',
+    'Then answer every lesson listed above, and no other, in ONE `rafa:promoted` block in your final message: one line per lesson, its id, an arrow, and either the path you changed or `skipped:` and the reason. A promoted path must be a file this session changed, and a lesson the block does not answer is reported in the pull request body.',
+    '',
+    '```rafa:promoted',
+    '<id> → <path>',
+    '<id> → skipped: <reason>',
+    '```',
+  ];
 }
 
 /**
@@ -227,6 +296,64 @@ async function openPullRequestNumber(branch: string): Promise<number | null> {
 }
 
 /**
+ * What {@link lessonsToPromote} reads: the run's learning adapter as a
+ * task's lessons are pushed to it (`start/dispatch.ts`), the root it
+ * is made over, and the run's two `learning.promote.*` keys.
+ */
+export interface WrapUpLearning extends TaskLearning {
+  /** The repo root the adapter holds its lessons under. */
+  readonly repoRoot: string;
+  /** The run's `learning.promote.after`. */
+  readonly promoteAfter: number;
+  /** The run's `learning.promote.minConfidence`. */
+  readonly promoteMinConfidence: number;
+}
+
+/** An error's message, or the value itself as text. */
+function messageOf(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : String(error);
+}
+
+/**
+ * The lessons the wrap-up session is asked to promote: `promotable`
+ * over the adapter's blessed set, at the run's `learning.promote.*`
+ * keys. Never throws.
+ *
+ * The port gives no held set, only `pullBlessed`, and the adapter is
+ * made at `learning.bless.minConfidence` as a task's is: the spec's
+ * promotable lessons are the BLESSED ones that also recurred, so a
+ * lesson tasks may not use is never promoted, whatever
+ * `learning.promote.minConfidence` says. Under `local`, the bundle also
+ * carries the user scope's lessons on triggers the project holds
+ * nothing on, and those are listed like any other.
+ *
+ * A null `learning` lists nothing. An adapter that cannot be made or
+ * refuses the pull is one warning and lists nothing: the wrap-up still
+ * has to sync, commit, push and open the PR.
+ */
+export async function lessonsToPromote(learning: WrapUpLearning | null): Promise<readonly InstinctRecord[]> {
+  if (learning === null) return [];
+  try {
+    const registry = learning.registry ?? CORE_ADAPTER_REGISTRY;
+    const adapter: Learning = registry.resolve('learning', learning.kind).create({
+      repoRoot: learning.repoRoot,
+      home: learning.home,
+      learningBlessMinConfidence: learning.blessMinConfidence,
+    });
+    const bundle = await adapter.pullBlessed();
+    return promotable(bundle.instincts, {
+      after: learning.promoteAfter,
+      minConfidence: learning.promoteMinConfidence,
+    });
+  } catch (error) {
+    activeOutput().warn(`   The wrap-up lists no lesson to promote: the \`${learning.kind}\` learning adapter answered no blessed set: ${messageOf(error)}`);
+    return [];
+  }
+}
+
+/**
  * Runs the wrap-up session over the plan the run was started on, loading
  * settings from `settingSources`, the run's `loop.settingSources`.
  *
@@ -244,15 +371,24 @@ async function openPullRequestNumber(branch: string): Promise<number | null> {
  * served flags reach the spawn through `runClaude`. Null serves
  * nothing. It is required, as `release` is, so a caller has to name
  * both.
+ *
+ * `learning` is where the lessons to promote are read from
+ * ({@link lessonsToPromote}), before the session and after the PR
+ * lookup. Null lists none. It is required for the same reason: a
+ * default of nothing would drop every promotion and nothing would say
+ * so.
  */
 export async function preserveProgress(
   planContent: string,
   settingSources: readonly ClaudeSettingSource[],
   release: ReleasePreparation | null,
   serving: SessionServing | null,
+  learning: WrapUpLearning | null,
 ): Promise<void> {
   const branch = getCurrentBranch();
-  const prompt = buildWrapUpPrompt(branch, planContent, await openPullRequestNumber(branch), release);
+  const openPullRequest = await openPullRequestNumber(branch);
+  const lessons = await lessonsToPromote(learning);
+  const prompt = buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons);
   const served = serving === null
     ? null
     : serveSession(serving);

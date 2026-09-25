@@ -199,6 +199,7 @@ import type { FindingOutcome } from './effort/store/findings.js';
 import type { BranchSeams } from './start/branch.js';
 import type { TaskLearning } from './start/dispatch.js';
 import type { SessionServing } from './start/serving.js';
+import type { WrapUpLearning } from './start/wrap-up.js';
 
 import fs from 'fs';
 import { homedir } from 'os';
@@ -518,6 +519,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       blessMinConfidence: runConfig.config.learningBlessMinConfidence,
     };
 
+    // Where the wrap-up reads the lessons it asks the session to promote:
+    // the same adapter, at the run's `learning.promote.*` keys
+    // (`start/wrap-up.ts`).
+    const wrapUpLearning: WrapUpLearning = {
+      ...learning,
+      repoRoot,
+      promoteAfter: runConfig.config.learningPromoteAfter,
+      promoteMinConfidence: runConfig.config.learningPromoteMinConfidence,
+    };
+
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
@@ -564,7 +575,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           planStub,
           planContent,
         });
-        await preserveProgress(planContent, settingSources, release, serving);
+        await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning);
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
         // refusal, the `chore: release` commit and its push. A release
