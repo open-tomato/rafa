@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/rafa",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Alpha. Runs a plan through the ralph loop: one Claude Code session per task, one commit per task, then a pull request and a CI wait.",
   "private": false,
   "publishConfig": {
