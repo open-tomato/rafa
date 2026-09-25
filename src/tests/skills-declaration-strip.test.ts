@@ -198,6 +198,7 @@ async function dispatchPlanted(taskInfo: TaskInfo) {
     home: join(tempRoot, 'home'),
     settingSources: ['project', 'local'],
     serving: null,
+    handout: null,
     run: async (prompt, flags, _sessionId, settingSources) => {
       const exitCode = await runClaude(prompt, settingSources, flags, spawn);
       return { exitCode, stdout: '' };

@@ -191,6 +191,7 @@ async function runCase(dir: string, sessionId: string, output: string) {
     home: join(dir, 'home'),
     settingSources: ['project', 'local'],
     serving: null,
+    handout: null,
     newSessionId: () => sessionId,
     run: (): Promise<CapturedSession> => {
       writeFileSync(join(dir, 'work.txt'), 'work\n', 'utf8');

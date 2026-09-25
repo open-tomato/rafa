@@ -15,6 +15,13 @@
  * about, and a null `serving` serves nothing. Those cases plant a rafa
  * tier beside a stand-in entry under this file's temporary directory.
  *
+ * Also for `dispatchTask` handing its task out (`start/handout.ts`): the
+ * run's resolver choosing from the tiers the session is served, the
+ * lessons pulled from a stubbed adapter, both rendered into the prompt
+ * and carried on the record with the resolver's name, which the prompt
+ * never holds; a null handout, a null serving and a refused pull each
+ * against the case that hands both sections out.
+ *
  * Also for `buildTaskPrompt` placing the rendered skills and lessons
  * sections (`task/sections.ts`): after the blocker line and before
  * `PROMPT.md`, skills first, each alone or both, and the prompt unchanged
@@ -29,6 +36,7 @@
  * case and unset after it.
  */
 import type { TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
+import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { AdapterContext } from '../adapters/registry.js';
 import type { TierPin } from '../config-sections.js';
@@ -232,6 +240,7 @@ describe('dispatchTask, serving its session', () => {
       home: join(repoRoot, 'home'),
       settingSources: ['project', 'local'],
       serving,
+      handout: null,
       run,
       newSessionId: () => 'session-under-test',
     });
@@ -282,6 +291,174 @@ describe('dispatchTask, serving its session', () => {
     expect(dispatch.served).toEqual([]);
     expect(warned).toEqual([]);
     expect(existsSync(join(root, '.rafa'))).toBe(false);
+  });
+});
+
+describe('dispatchTask, handing its task out', () => {
+  /** A task naming the planted rafa-tier skill in its `skills=`. */
+  const SKILLED = 'Add the served skill  {skills=tier-skill}';
+
+  /** A blessed lesson whose trigger names the task's words, and one naming none. */
+  const BLESSED: InstinctRecord[] = [
+    {
+      id: 'lesson-served',
+      trigger: 'when adding a served skill',
+      action: 'serve it before the spawn',
+      action_hash: 'hash-served',
+      confidence: 0.7,
+      usage_count: 2,
+      signal: 'loud',
+      status: 'active',
+      created_at: '2026-09-01T00:00:00Z',
+      updated_at: '2026-09-01T00:00:00Z',
+    },
+    {
+      id: 'lesson-kernel',
+      trigger: 'when compiling kernels',
+      action: 'pin the toolchain',
+      action_hash: 'hash-kernel',
+      confidence: 0.9,
+      usage_count: 4,
+      signal: 'loud',
+      status: 'active',
+      created_at: '2026-09-01T00:00:00Z',
+      updated_at: '2026-09-01T00:00:00Z',
+    },
+  ];
+
+  let warned: string[] = [];
+  let prompts: string[] = [];
+  let refusal: Error | null = null;
+
+  const registry = createAdapterRegistry([{
+    port: 'learning',
+    kind: 'stub',
+    portVersion: PORT_VERSIONS.learning,
+    create: (): Learning => ({
+      push: () => Promise.reject(new Error('no push expected')),
+      pullBlessed: () => refusal === null
+        ? Promise.resolve({ version: 'stub', instincts: BLESSED })
+        : Promise.reject(refusal),
+      flag: () => Promise.resolve(),
+    }),
+  }]);
+
+  /** The run's `task.*` keys at `planner` and `on`, lessons from the stub. */
+  const HANDOUT: TaskHandout = {
+    resolver: 'planner',
+    lessons: 'on',
+    learning: { kind: 'stub', home: '/home/stand-in', blessMinConfidence: 0.6, registry },
+  };
+
+  const run: TaskSessionRunner = (prompt) => {
+    prompts.push(prompt);
+    return Promise.resolve({ exitCode: 0, stdout: '' });
+  };
+
+  /** Dispatches {@link SKILLED} under `serving` and `handout` through {@link run}. */
+  function dispatchHanded(
+    serving: SessionServing | null,
+    handout: TaskHandout | null,
+    repoRoot: string,
+  ): ReturnType<typeof dispatchTask> {
+    return dispatchTask({
+      taskInfo: { task: SKILLED, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${SKILLED}\n`,
+      inject: 'full',
+      repoRoot,
+      home: join(repoRoot, 'home'),
+      settingSources: ['project', 'local'],
+      serving,
+      handout,
+      run,
+      newSessionId: () => 'session-under-test',
+    });
+  }
+
+  /** The warnings other than the planted third-party agent's. */
+  const ownWarnings = (): string[] => warned.filter((line) => !line.includes('agent borrowed'));
+
+  beforeEach(() => {
+    warned = [];
+    prompts = [];
+    refusal = null;
+    setActiveOutput(sinkOutput({ warn: (message) => warned.push(message) }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('renders the served skill and the matching lesson into the prompt and carries them on the record', async () => {
+    const serving = plantedServing();
+
+    const dispatch = await dispatchHanded(serving, HANDOUT, serving.root);
+
+    expect(dispatch.resolver).toBe('planner');
+    expect(dispatch.skillsOffered.map((skill) => [skill.name, skill.source])).toEqual([['tier-skill', 'rafa']]);
+    expect(dispatch.lessonsOffered.map((lesson) => lesson.id)).toEqual(['lesson-served']);
+    expect(prompts).toEqual([dispatch.prompt]);
+    expect(dispatch.prompt).toContain([
+      '## Skills for this task',
+      'Invoke each with the Skill tool before you change anything it covers.',
+      '- `tier-skill`: A served skill',
+      '',
+      '## Lessons from earlier tasks',
+      '- When adding a served skill: serve it before the spawn (confidence 0.70, from 2 tasks, lesson lesson-served)',
+      '',
+      'The loop commits.',
+    ].join('\n'));
+    expect(dispatch.prompt.startsWith('Your scoped task is: Add the served skill\n')).toBe(true);
+    // The resolver's name is on the record and nowhere in the prompt.
+    expect(dispatch.prompt).not.toContain('planner');
+    // The skill offered is one the session was served, from the same reading.
+    expect(existsSync(join(serving.root, '.rafa/runs/run-1/served/.claude/skills/tier-skill/SKILL.md'))).toBe(true);
+    expect(ownWarnings()).toEqual([]);
+  });
+
+  it('hands out nothing and names no resolver for a null handout', async () => {
+    // The control is the case above: the same dispatch with a handout
+    // renders both sections.
+    const serving = plantedServing();
+
+    const dispatch = await dispatchHanded(serving, null, serving.root);
+
+    expect(dispatch.resolver).toBeNull();
+    expect(dispatch.skillsOffered).toEqual([]);
+    expect(dispatch.lessonsOffered).toEqual([]);
+    expect(dispatch.prompt).not.toContain('## Skills for this task');
+    expect(dispatch.prompt).not.toContain('## Lessons from earlier tasks');
+    expect(dispatch.prompt).toContain('Focus only on the scoped task.\n\nThe loop commits.');
+  });
+
+  it('offers no skill under a null serving, which reads no tier, and still hands out the lessons', async () => {
+    const root = freshRoot();
+    mkdirSync(root, { recursive: true });
+
+    const dispatch = await dispatchHanded(null, HANDOUT, root);
+
+    expect(dispatch.resolver).toBe('planner');
+    expect(dispatch.skillsOffered).toEqual([]);
+    expect(dispatch.prompt).not.toContain('## Skills for this task');
+    expect(dispatch.lessonsOffered.map((lesson) => lesson.id)).toEqual(['lesson-served']);
+  });
+
+  it('warns about a refused lessons pull and dispatches the task with its skills and no lessons section', async () => {
+    const serving = plantedServing();
+    refusal = new Error('the store is locked');
+
+    const dispatch = await dispatchHanded(serving, HANDOUT, serving.root);
+
+    expect(dispatch.exitCode).toBe(0);
+    expect(prompts).toHaveLength(1);
+    expect(dispatch.lessonsOffered).toEqual([]);
+    expect(dispatch.prompt).toContain('## Skills for this task');
+    expect(dispatch.prompt).not.toContain('## Lessons from earlier tasks');
+    expect(ownWarnings()).toEqual([
+      '   Lessons: none handed to this task: the `stub` learning adapter answered no blessed set: the store is locked',
+      '   The task is not failed for it: it is dispatched without a lessons section.',
+    ]);
   });
 });
 

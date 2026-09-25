@@ -229,6 +229,7 @@ describe('a dispatched task session', () => {
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
       serving: null,
+      handout: null,
       run,
       newSessionId,
     });

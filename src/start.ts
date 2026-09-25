@@ -201,6 +201,7 @@ import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { BranchSeams } from './start/branch.js';
 import type { TaskLearning } from './start/dispatch.js';
+import type { TaskHandout } from './start/handout.js';
 import type { SessionServing } from './start/serving.js';
 import type { WrapUpLearning } from './start/wrap-up.js';
 
@@ -522,6 +523,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       blessMinConfidence: runConfig.config.learningBlessMinConfidence,
     };
 
+    // What each task is handed beside the plan: the skills the run's
+    // `task.skills` resolver picks and, under `task.lessons: on`, the
+    // blessed lessons pulled from that same adapter (`start/handout.ts`).
+    const handout: TaskHandout = {
+      resolver: runConfig.config.taskSkills,
+      lessons: runConfig.config.taskLessons,
+      learning,
+    };
+
     // Where the wrap-up reads the lessons it asks the session to promote:
     // the same adapter, at the run's `learning.promote.*` keys
     // (`start/wrap-up.ts`).
@@ -631,6 +641,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         settingSources,
         knownMissing,
         serving,
+        handout,
       });
       const { exitCode } = dispatch;
 

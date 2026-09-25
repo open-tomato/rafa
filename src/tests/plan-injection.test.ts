@@ -347,6 +347,7 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
     home: join(tempRoot, 'home'),
     settingSources: ['project', 'local'],
     serving: null,
+    handout: null,
     run,
   });
   return { result, prompts };

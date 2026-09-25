@@ -41,19 +41,33 @@
  * {@link TaskDispatchOptions.serving}, and warns once per winner left
  * out, with the sentence `tiers/serve.ts` wrote for it.
  *
+ * What fills the two sections is chosen per dispatch
+ * (`start/handout.ts`): the resolver the run's `task.skills` names picks
+ * the skills from the tiers the session is served, read once for both,
+ * and `selectLessons` picks the lessons from the blessed bundle the run's
+ * learning adapter answers, under `task.lessons: on`. The resolver's
+ * name and what was offered travel on {@link TaskDispatch}, never in the
+ * prompt. A lessons pull the adapter refuses is warned about there and
+ * leaves the lessons section absent; it never fails the task.
+ *
  * Once a report is stored, its lessons (`report/lessons.ts`) are pushed
  * to the Learning adapter the run's `learning.adapter` names, and what
  * the push did is told through `info`. A push that is refused, or an
  * adapter that cannot be resolved or made, is told through `warn` and
  * fails nothing: the report is already stored, and a lesson is its copy.
  */
+import type { SkillResolverName } from '../config-sections.js';
 import type { ClaudeSettingSource, InjectMode } from '../config.js';
+import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { AdapterRegistry } from '../adapters/registry.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
+import type { InstinctRecord } from '../learning/index.js';
 import type { PlanInjection } from '../plan/index.js';
 import type { Learning } from '../ports/index.js';
 import type { TaskReportRecord } from '../report/record.js';
+import type { ResolvedSkill } from '../task/resolve-skills.js';
+import type { Resolution } from '../tiers/resolve.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -61,19 +75,20 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { randomUUID } from 'crypto';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { writeDispatch } from '../effort/store/dispatches.js';
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
+import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
 import { runClaudeCaptured } from '../utils/claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
 
+import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
 import { knownMissingNotice } from './preflight.js';
-import { serveSession } from './serving.js';
+import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
@@ -176,6 +191,17 @@ export interface TaskDispatchOptions {
    * without the rafa tier and nothing would say so.
    */
   serving: SessionServing | null;
+  /**
+   * What the task is handed beside the plan: the run's `task.skills`
+   * resolver, its `task.lessons` switch and the adapter its lessons are
+   * pulled from (`start/handout.ts`). The resolver chooses from the tiers
+   * {@link TaskDispatchOptions.serving} reads, so a null `serving` leaves
+   * it nothing to offer. Null hands out nothing and runs no resolver,
+   * which a test driving the `run` seam names. Required for the reason
+   * `serving` is: a default of nothing would let a caller that forgot it
+   * dispatch every task without its sections and nothing would say so.
+   */
+  handout: TaskHandout | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -204,6 +230,16 @@ export interface TaskDispatch {
   exitCode: number;
   /** Everything the session wrote to stdout, its report included. */
   output: string;
+  /**
+   * The resolver that chose {@link TaskDispatch.skillsOffered}, the run's
+   * `task.skills`, or null for a dispatch handed no
+   * {@link TaskDispatchOptions.handout}. Never in {@link TaskDispatch.prompt}.
+   */
+  resolver: SkillResolverName | null;
+  /** The skills the prompt's `## Skills for this task` offered, in its order. Empty when it had none. */
+  skillsOffered: readonly ResolvedSkill[];
+  /** The lessons the prompt's `## Lessons from earlier tasks` offered, in its order. Empty when it had none. */
+  lessonsOffered: readonly InstinctRecord[];
 }
 
 /**
@@ -362,9 +398,14 @@ export function buildTaskPrompt(
  * the sentence the prompt quotes and stamped from `now`, before any line
  * about the task; see the module note.
  *
- * The session is served last, after the prompt is built and just
- * before the spawn, so the served directory holds what the tiers hold
- * when that session starts.
+ * The tiers are read once per dispatch, ahead of the prompt, when a
+ * `serving` is named: the task's skills are chosen from that reading
+ * (`start/handout.ts`), and the session is served that same reading
+ * last, after the prompt is built and just before the spawn. So the
+ * skills the prompt offers are the ones the session is served, and the
+ * served directory holds what the tiers held when that task was
+ * dispatched. The lessons are pulled from the run's adapter between the
+ * two, once; see the module note.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -410,15 +451,22 @@ export async function dispatchTask(
     activeOutput().warn(`   Injection: \`${injection.requested}\` not rendered: ${injection.fallback.text}.`);
   }
 
+  const resolution = options.serving === null
+    ? EMPTY_RESOLUTION
+    : resolveSessionTiers(options.serving);
+  const task = taskInputFor(taskInfo, taskText, declaration, options.planContent);
+  const handed = await handOut(options.handout, task, resolution, options.repoRoot);
+
   const prompt = withStamp(buildTaskPrompt(
     taskText,
     options.promptContent,
     injection.text,
     options.knownMissing,
     taskInfo.blocker ?? null,
+    { skills: renderSkillsSection(handed.skills), lessons: renderLessonsSection(handed.lessons) },
   ));
 
-  const served = serveForSession(options.serving);
+  const served = serveForSession(options.serving, resolution);
   const sessionId = (options.newSessionId ?? randomUUID)();
   const session = await run(prompt, flags, sessionId, options.settingSources, served);
 
@@ -432,16 +480,19 @@ export async function dispatchTask(
     sessionId,
     exitCode: session.exitCode,
     output: session.stdout,
+    resolver: handed.resolver,
+    skillsOffered: handed.skills,
+    lessonsOffered: handed.lessons,
   };
 }
 
 /**
- * Serves one task session and answers its flags, warning once per
- * rafa-tier winner left out; none for a null `serving`.
+ * Serves one task session `resolution` and answers its flags, warning
+ * once per rafa-tier winner left out; none for a null `serving`.
  */
-function serveForSession(serving: SessionServing | null): readonly string[] {
+function serveForSession(serving: SessionServing | null, resolution: Resolution): readonly string[] {
   if (serving === null) return [];
-  const served = serveSession(serving);
+  const served = serveSession(serving, resolution);
   for (const skipped of served.skipped) activeOutput().warn(`   ${skipped.message}`);
   return served.flags;
 }
@@ -545,12 +596,7 @@ async function pushTaskLessons(
 
   const count = payload.instincts.length;
   try {
-    const registry = learning.registry ?? CORE_ADAPTER_REGISTRY;
-    const adapter: Learning = registry.resolve('learning', learning.kind).create({
-      repoRoot: options.repoRoot,
-      home: learning.home,
-      learningBlessMinConfidence: learning.blessMinConfidence,
-    });
+    const adapter: Learning = taskLearningAdapter(learning, options.repoRoot);
     const result = await adapter.push(payload);
     const rules = result.decisions.map((decision) => decision.rule).join(', ');
     activeOutput().info(`   Pushed ${count} lesson(s) to the \`${learning.kind}\` learning adapter: ${rules}.`);
