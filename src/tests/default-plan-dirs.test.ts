@@ -47,7 +47,7 @@
  * never depends on the plant having been reverted.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -137,6 +137,8 @@ function trackedFiles(root: string): string[] {
 function scanOffenders(paths: readonly string[], root: string): ScanOffender[] {
   const offenders: ScanOffender[] = [];
   for (const path of paths) {
+    // A tracked symlink to a directory (`.claude/skills/<name>`) is not a file to read.
+    if (statSync(join(root, path)).isDirectory()) continue;
     const text = readFileSync(join(root, path), 'utf8');
     const tokens = forbiddenTokensIn(text);
     if (tokens.length > 0) offenders.push({ path, tokens });

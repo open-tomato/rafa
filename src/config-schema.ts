@@ -245,10 +245,9 @@
  *   - Its default is NOT empty: it is `tiers/routing.ts`'s
  *     `DEFAULT_ROUTING`, the spec's five rows, so a project that has
  *     said nothing still routes every shape the planner uses.
- *   - A layer naming it answers the map whole, as the `tiers` maps do,
- *     so today a file's one row REPLACES the five defaults rather than
- *     joining them. The merge by key the spec names is what changes
- *     that; see that module's note.
+ *   - Layers merge it by key over the defaults, so a file's one row
+ *     changes that shape and leaves the other four; a `false` row
+ *     routes its shape nowhere.
  *
  * ## The closed set
  *

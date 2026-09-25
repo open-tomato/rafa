@@ -272,12 +272,14 @@ describe('the config files', () => {
     expect(resolved.sources.routing).toBe('file');
   });
 
-  it('answers routing from the file row by row once a row is dropped, so the reading above can fail', () => {
-    const lines = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   prose:'));
+  it('answers routing from the file row by row once a row is changed, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.startsWith('#   prose:')
+      ? '#   prose: tdd-guide'
+      : line);
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
-    expect(resolved.config.routing.has('prose')).toBe(false);
-    expect([...resolved.config.routing.keys()]).toEqual(['tests', 'repair', 'review', 'implementation']);
+    expect(resolved.config.routing.get('prose')).toBe('tdd-guide');
+    expect(resolved.config.routing.get('tests')).toBe('tdd-guide');
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

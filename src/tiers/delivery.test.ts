@@ -24,7 +24,7 @@ const INVENTORY_PAGE = join(import.meta.dir, '..', '..', 'context', 'inventory.m
 /** The body of the `### <heading>` section of `page`, or `null` when absent. */
 function sectionOf(page: string, heading: string): string | null {
   const lines = page.split('\n');
-  const start = lines.indexOf(`### ${heading}`);
+  const start = lines.findIndex((line) => line === `### ${heading}` || line.startsWith(`### ${heading} `));
   if (start === -1) return null;
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((line) => /^#{1,3} /.test(line));
