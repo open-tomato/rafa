@@ -462,6 +462,94 @@ describe('dispatchTask, handing its task out', () => {
   });
 });
 
+describe('dispatchTask, one fixture task under each resolver', () => {
+  const FIXTURE = 'Add the served skill  {skills=tier-skill}';
+  const SECTION_FORMAT = [
+    '## Skills for this task',
+    'Invoke each with the Skill tool before you change anything it covers.',
+    '- `tier-skill`: A served skill',
+    '',
+    'The loop commits.',
+  ].join('\n');
+
+  let prompts: string[] = [];
+  const run: TaskSessionRunner = (prompt) => {
+    prompts.push(prompt);
+    return Promise.resolve({ exitCode: 0, stdout: '' });
+  };
+
+  const emptyRegistry = createAdapterRegistry([{
+    port: 'learning',
+    kind: 'stub',
+    portVersion: PORT_VERSIONS.learning,
+    create: (): Learning => ({
+      push: () => Promise.reject(new Error('no push expected')),
+      pullBlessed: () => Promise.resolve({ version: 'stub', instincts: [] }),
+      flag: () => Promise.resolve(),
+    }),
+  }]);
+
+  function handout(resolver: TaskHandout['resolver']): TaskHandout {
+    return {
+      resolver,
+      lessons: 'on',
+      learning: { kind: 'stub', home: '/home/stand-in', blessMinConfidence: 0.6, registry: emptyRegistry },
+    };
+  }
+
+  function dispatchUnder(serving: SessionServing, given: TaskHandout | null): ReturnType<typeof dispatchTask> {
+    return dispatchTask({
+      taskInfo: { task: FIXTURE, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${FIXTURE}\n`,
+      inject: 'full',
+      repoRoot: serving.root,
+      home: join(serving.root, 'home'),
+      settingSources: ['project', 'local'],
+      serving,
+      handout: given,
+      run,
+      newSessionId: () => 'session-under-test',
+    });
+  }
+
+  beforeEach(() => {
+    prompts = [];
+    setActiveOutput(sinkOutput({}));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  for (const resolver of ['planner', 'tag'] as const) {
+    it(`holds the ${resolver} prompt to the documented format, the task line first and no resolver name`, async () => {
+      const serving = plantedServing();
+
+      const dispatch = await dispatchUnder(serving, handout(resolver));
+
+      expect(dispatch.resolver).toBe(resolver);
+      expect(dispatch.prompt.startsWith('Your scoped task is: Add the served skill\n')).toBe(true);
+      expect(dispatch.prompt).toContain(SECTION_FORMAT);
+      expect(dispatch.prompt).not.toContain('## Lessons from earlier tasks');
+      expect(dispatch.prompt).not.toContain(resolver);
+    });
+  }
+
+  it('gives a none task with no lesson the prompt a null handout gives', async () => {
+    const serving = plantedServing();
+
+    const bare = await dispatchUnder(serving, null);
+    const none = await dispatchUnder(serving, handout('none'));
+
+    expect(none.resolver).toBe('none');
+    expect(none.skillsOffered).toEqual([]);
+    expect(none.prompt).toBe(bare.prompt);
+    expect(none.prompt).not.toContain('## Skills for this task');
+    expect(none.prompt).not.toContain('none');
+  });
+});
+
 /** A session output whose report holds one finding carrying a `resolution`. */
 const LESSONED = [
   'Done.',
