@@ -29,7 +29,12 @@
  * session the text the task was blocked on. Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
- * when there are any.
+ * when there are any. Between the blocker line (or the second line, with
+ * no blocker) and `PROMPT.md` go the task's `## Skills for this task` and
+ * `## Lessons from earlier tasks` sections (`task/sections.ts`), each
+ * followed by a blank line, in that order, and each absent when it
+ * rendered empty; with both absent the prompt is the one built before
+ * sections existed.
  *
  * Before each session the dispatch serves it the rafa-tier winners
  * (`start/serving.ts`) when its caller names a
@@ -216,6 +221,28 @@ function blockerLines(blocker: string | null): string[] {
 }
 
 /**
+ * The rendered sections a task is handed ahead of `PROMPT.md`: what
+ * `renderSkillsSection` and `renderLessonsSection` (`task/sections.ts`)
+ * answered for it. A blank section is absent from the prompt.
+ */
+export interface TaskPromptSections {
+  /** The `## Skills for this task` section, or the empty string for none. */
+  readonly skills: string;
+  /** The `## Lessons from earlier tasks` section, or the empty string for none. */
+  readonly lessons: string;
+}
+
+/** No section to hand out: the prompt {@link buildTaskPrompt} built before sections existed. */
+export const NO_TASK_SECTIONS: TaskPromptSections = { skills: '', lessons: '' };
+
+/** Each non-blank section of `sections`, skills first, each followed by a blank line. */
+function sectionLines(sections: TaskPromptSections): string[] {
+  return [sections.skills, sections.lessons]
+    .filter((section) => section.trim().length > 0)
+    .flatMap((section) => [section, '']);
+}
+
+/**
  * Assembles the prompt one task's session is given.
  *
  * `taskText` is the sentence a declaration has already been taken off,
@@ -253,6 +280,16 @@ function blockerLines(blocker: string | null): string[] {
  * planted here, above the one `withStamp` appends, would attribute the
  * session to another plan. With no blocker, or a blank one, the prompt
  * is the one built before blockers were carried.
+ *
+ * `sections` is the task's rendered skills and lessons sections. Each
+ * non-blank one goes after the blank line that closes the head (the
+ * blocker line, or the second line without one) and before
+ * `promptContent`, skills first, each followed by a blank line of its
+ * own, so the head keeps its lines and the scoped-task line stays
+ * first. A section is placed as it was rendered: which resolver chose
+ * the skills is not a field here, so it cannot reach the prompt. With
+ * both blank, the default {@link NO_TASK_SECTIONS}, the prompt is the
+ * one built before sections existed.
  */
 export function buildTaskPrompt(
   taskText: string,
@@ -260,12 +297,14 @@ export function buildTaskPrompt(
   planText: string,
   knownMissing: readonly string[] = [],
   blocker: string | null = null,
+  sections: TaskPromptSections = NO_TASK_SECTIONS,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
     ...blockerLines(blocker),
     '',
+    ...sectionLines(sections),
     promptContent,
     planText,
     ...knownMissingNotice(knownMissing),

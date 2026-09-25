@@ -15,6 +15,12 @@
  * about, and a null `serving` serves nothing. Those cases plant a rafa
  * tier beside a stand-in entry under this file's temporary directory.
  *
+ * Also for `buildTaskPrompt` placing the rendered skills and lessons
+ * sections (`task/sections.ts`): after the blocker line and before
+ * `PROMPT.md`, skills first, each alone or both, and the prompt unchanged
+ * when both are empty or blank, each unchanged case paired with a
+ * rendered section that changes it.
+ *
  * The rest of the module is driven elsewhere: the prompt and the flags in
  * `tests/declaration-dispatch.test.ts`, the session id and the report rows
  * in `tests/task-report.test.ts`. Every store here sits under a fresh root
@@ -26,6 +32,7 @@ import type { TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './
 import type { SessionServing } from './serving.js';
 import type { AdapterContext } from '../adapters/registry.js';
 import type { TierPin } from '../config-sections.js';
+import type { InstinctRecord } from '../learning/index.js';
 import type { Learning, SyncPayload } from '../ports/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,10 +45,11 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { setActiveOutput } from '../adapters/output/active.js';
 import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 
-import { dispatchTask, storeTaskReport } from './dispatch.js';
+import { buildTaskPrompt, dispatchTask, NO_TASK_SECTIONS, storeTaskReport } from './dispatch.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -441,5 +449,78 @@ describe('storeTaskReport, pushing the report\'s lessons', () => {
 
     expect(made).toEqual([]);
     expect(pushed).toEqual([]);
+  });
+});
+
+describe('buildTaskPrompt, placing the task\'s sections', () => {
+  const TASK = 'Make the widget round';
+  const PROMPT_MD = '# PROMPT.md\nDo the task.';
+  const PLAN = '# Plan\n- [ ] Make the widget round';
+  const HEAD = [
+    `Your scoped task is: ${TASK}`,
+    'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
+  ];
+  const SKILLS = renderSkillsSection([{
+    name: 'git-workflow',
+    source: 'project',
+    path: '/project/skills/git-workflow/SKILL.md',
+    description: 'Use when pushing a branch',
+  }], 'add-dir');
+  const LESSON: InstinctRecord = {
+    id: 'lesson-1',
+    trigger: 'when running bun test under a fresh worktree',
+    action: 'run bun install before the first test',
+    action_hash: 'hash-lesson-1',
+    confidence: 0.7,
+    usage_count: 3,
+    signal: 'loud',
+    status: 'active',
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  };
+  const LESSONS = renderLessonsSection([LESSON]);
+  const BEFORE = buildTaskPrompt(TASK, PROMPT_MD, PLAN);
+
+  it('holds the prompt unchanged when both sections are empty or blank', () => {
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS)).toBe(BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: '', lessons: '' })).toBe(BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: ' \n', lessons: '\t' })).toBe(BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: SKILLS, lessons: '' })).not.toBe(BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: '', lessons: LESSONS })).not.toBe(BEFORE);
+  });
+
+  it('holds the prompt built before sections existed', () => {
+    expect(BEFORE).toBe([...HEAD, '', PROMPT_MD, PLAN].join('\n'));
+  });
+
+  it('places both sections after the head and before PROMPT.md, skills first', () => {
+    const prompt = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: SKILLS, lessons: LESSONS });
+
+    expect(prompt).toBe([...HEAD, '', SKILLS, '', LESSONS, '', PROMPT_MD, PLAN].join('\n'));
+    expect(prompt.startsWith(`Your scoped task is: ${TASK}\n`)).toBe(true);
+  });
+
+  it('places a lone section where it would go beside the other', () => {
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: SKILLS, lessons: '' }))
+      .toBe([...HEAD, '', SKILLS, '', PROMPT_MD, PLAN].join('\n'));
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, { skills: '', lessons: LESSONS }))
+      .toBe([...HEAD, '', LESSONS, '', PROMPT_MD, PLAN].join('\n'));
+  });
+
+  it('places the sections after the blocker line', () => {
+    const prompt = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], 'hook refused', { skills: SKILLS, lessons: LESSONS });
+    const lines = prompt.split('\n');
+    const blockerAt = lines.findIndex((line) => line.startsWith('An earlier run of this task left it blocked on: '));
+
+    expect(blockerAt).toBe(2);
+    expect(lines.indexOf('## Skills for this task')).toBe(blockerAt + 2);
+    expect(prompt.indexOf('## Lessons from earlier tasks')).toBeLessThan(prompt.indexOf(PROMPT_MD));
+  });
+
+  it('keeps the known-missing notice after the plan text', () => {
+    const prompt = buildTaskPrompt(TASK, PROMPT_MD, PLAN, ['known-missing: skill foo'], null, { skills: SKILLS, lessons: '' });
+
+    expect(prompt.indexOf(SKILLS)).toBeLessThan(prompt.indexOf(PLAN));
+    expect(prompt.indexOf(PLAN)).toBeLessThan(prompt.indexOf('known-missing: skill foo'));
   });
 });
