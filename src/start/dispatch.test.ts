@@ -550,6 +550,95 @@ describe('dispatchTask, one fixture task under each resolver', () => {
   });
 });
 
+describe('dispatchTask, lessons matched by artifact path', () => {
+  const TASK_TEXT = 'Fix the guard in src/start/dispatch.ts';
+  const STAMP = '2026-09-01T00:00:00Z';
+
+  const lesson = (id: string, trigger: string, artifact: string): InstinctRecord => ({
+    id,
+    trigger,
+    action: `act ${id}`,
+    action_hash: `hash-${id}`,
+    confidence: 0.8,
+    usage_count: 3,
+    signal: 'loud',
+    status: 'active',
+    artifact,
+    created_at: STAMP,
+    updated_at: STAMP,
+  });
+
+  const BLESSED: InstinctRecord[] = [
+    lesson('by-path', 'when zebras migrate', 'src/start/dispatch.ts'),
+    lesson('unrelated', 'when compiling kernels', 'src/other/elsewhere.ts'),
+  ];
+
+  const registry = createAdapterRegistry([{
+    port: 'learning',
+    kind: 'stub',
+    portVersion: PORT_VERSIONS.learning,
+    create: (): Learning => ({
+      push: () => Promise.reject(new Error('no push expected')),
+      pullBlessed: () => Promise.resolve({ version: 'stub', instincts: BLESSED }),
+      flag: () => Promise.resolve(),
+    }),
+  }]);
+
+  function handout(lessons: TaskHandout['lessons']): TaskHandout {
+    return {
+      resolver: 'none',
+      lessons,
+      learning: { kind: 'stub', home: '/home/stand-in', blessMinConfidence: 0.6, registry },
+    };
+  }
+
+  function dispatchWith(given: TaskHandout): ReturnType<typeof dispatchTask> {
+    const root = freshRoot();
+    mkdirSync(root, { recursive: true });
+    return dispatchTask({
+      taskInfo: { task: TASK_TEXT, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${TASK_TEXT}\n`,
+      inject: 'full',
+      repoRoot: root,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: given,
+      run: () => Promise.resolve({ exitCode: 0, stdout: '' }),
+      newSessionId: () => 'session-under-test',
+    });
+  }
+
+  beforeEach(() => {
+    setActiveOutput(sinkOutput({}));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('holds the lesson whose artifact path the task names inside the section, and only it', async () => {
+    const dispatch = await dispatchWith(handout('on'));
+
+    expect(dispatch.lessonsOffered.map((offered) => offered.id)).toEqual(['by-path']);
+    const start = dispatch.prompt.indexOf('## Lessons from earlier tasks');
+    expect(start).toBeGreaterThan(-1);
+    const section = dispatch.prompt.slice(start, dispatch.prompt.indexOf('The loop commits.'));
+    expect(section).toContain('lesson by-path)');
+    expect(dispatch.prompt).not.toContain('lesson unrelated');
+    expect(dispatch.prompt).not.toContain('when compiling kernels');
+  });
+
+  it('leaves the section absent under task.lessons off', async () => {
+    const dispatch = await dispatchWith(handout('off'));
+
+    expect(dispatch.lessonsOffered).toEqual([]);
+    expect(dispatch.prompt).not.toContain('## Lessons from earlier tasks');
+    expect(dispatch.prompt).not.toContain('lesson by-path');
+  });
+});
+
 /** A session output whose report holds one finding carrying a `resolution`. */
 const LESSONED = [
   'Done.',
