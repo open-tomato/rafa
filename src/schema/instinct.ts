@@ -60,14 +60,15 @@
 import type { InstinctRecord } from '../ports/index.js';
 import type { FindingKind, FindingSignal } from '../report/parse.js';
 
-import { createHash } from 'node:crypto';
-
+import { actionHash } from '../learning/identity.js';
 import { FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
 
 import { readFrontmatterDocument, renderFrontmatter } from './frontmatter.js';
 import { PROJECT_ID_LENGTH, PROJECT_ID_PATTERN } from './project-id.js';
 
 export type { ProjectIdSeams } from './project-id.js';
+
+export { actionHash } from '../learning/identity.js';
 
 export {
   PROJECT_ID_LENGTH,
@@ -315,16 +316,6 @@ export interface InstinctParseResult {
   readonly issues: readonly InstinctIssue[];
   /** The record read, or null when `issues` is non-empty. */
   readonly instinct: Instinct | null;
-}
-
-/**
- * `sha256(trim(lower(action)))` in hex: the Learning port's merge key,
- * spelled here so a record and a pushed payload can never disagree
- * about what two records sharing an action means.
- */
-export function actionHash(action: string): string {
-  return createHash('sha256').update(action.trim().toLowerCase())
-    .digest('hex');
 }
 
 /** One issue, spelled once so every check reads the same. */
