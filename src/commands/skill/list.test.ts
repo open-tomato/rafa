@@ -663,7 +663,9 @@ describe('rafa skill list over a planted rafa tier', () => {
     expect(rowsOf(colliding.stdout)).toEqual([]);
   });
 
-  it('serves the rafa copy and shadows the project one once tiers.skills pins the name to rafa', async () => {
+  it('keeps a differing project copy a collision under tiers.skills pinning the name to rafa', async () => {
+    // Claude Code loads the project's skill over the served copy, so the
+    // pin has no effect (`tiers/resolve.ts`).
     const tree = plant({
       [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses'),
       'project/.claude/skills/dev-planner/SKILL.md': servedSkill('dev-planner', 'An edited copy'),
@@ -674,8 +676,24 @@ describe('rafa skill list over a planted rafa tier', () => {
 
     expect(answered.exitCode).toBe(0);
     expect(rowsOf(answered.stdout)).toEqual([
-      ['dev-planner', 'project', 'shadowed-by:rafa', false],
-      ['dev-planner', 'rafa', 'enabled', true],
+      ['dev-planner', 'project', 'collision', false],
+      ['dev-planner', 'rafa', 'collision', false],
+    ]);
+  });
+
+  it('serves the project copy and shadows the rafa one once tiers.skills pins the name to project', async () => {
+    const tree = plant({
+      [bundled('dev-planner')]: servedSkill('dev-planner', 'Write a plan the loop parses'),
+      'project/.claude/skills/dev-planner/SKILL.md': servedSkill('dev-planner', 'An edited copy'),
+    });
+    plantProjectConfig(tree.root, `${configText('project,local')}tiers:\n  skills:\n    dev-planner: project\n`);
+
+    const answered = await run(['skill', 'list', '--output=json'], tree);
+
+    expect(answered.exitCode).toBe(0);
+    expect(rowsOf(answered.stdout)).toEqual([
+      ['dev-planner', 'project', 'enabled', true],
+      ['dev-planner', 'rafa', 'shadowed-by:project', false],
     ]);
   });
 });

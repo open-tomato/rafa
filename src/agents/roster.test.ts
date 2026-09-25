@@ -738,7 +738,7 @@ describe('collidingPlanSkills', () => {
     expect([project, rafa].every((path) => path.startsWith(tempBase))).toBe(true);
   });
 
-  it('names nothing once a pin chooses, the copies are byte-identical, the rafa tier is off, or no tier holds the name', () => {
+  it('names nothing once a project pin chooses, the copies are byte-identical, the rafa tier is off, or no tier holds the name', () => {
     const roots = freshRoots();
     plantSkillIn(projectSkills(roots), 'documentation', skillText('documentation', 'The project body.'));
     plantSkillIn(rafaSkills(roots), 'documentation');
@@ -747,7 +747,7 @@ describe('collidingPlanSkills', () => {
     plantSkillIn(rafaSkills(identical), 'documentation');
     const plan = '- [ ] Write it  {skills=documentation,held-by-nobody}\n';
 
-    const pinned = settings({ tiersSkills: new Map([['documentation', 'rafa']]) });
+    const pinned = settings({ tiersSkills: new Map([['documentation', 'project']]) });
 
     expect(collidingPlanSkills(plan, resolveAgentRoster(roots, pinned))).toEqual([]);
     expect(collidingPlanSkills(plan, resolveAgentRoster(identical, settings()))).toEqual([]);
@@ -755,6 +755,19 @@ describe('collidingPlanSkills', () => {
     // The control: the same roots and plan under no pin do collide, so the readings above are not vacuous.
     expect(collidingPlanSkills(plan, resolveAgentRoster(roots, settings())).map((skill) => skill.name))
       .toEqual(['documentation']);
+  });
+
+  it('still names a skill a rafa pin cannot settle, since the project copy outranks the served one', () => {
+    const roots = freshRoots();
+    plantSkillIn(projectSkills(roots), 'documentation', skillText('documentation', 'The project body.'));
+    plantSkillIn(rafaSkills(roots), 'documentation');
+    const plan = '- [ ] Write it  {skills=documentation}\n';
+
+    const [colliding] = collidingPlanSkills(plan, resolveAgentRoster(roots, settings({ tiersSkills: new Map([['documentation', 'rafa']]) })));
+
+    expect(colliding?.collision.setAsidePin).toBe('rafa');
+    expect(colliding?.message).toContain('tiers.skills: { documentation: rafa } has no effect');
+    expect(colliding?.message).toContain('a skill pin can only name project (tiers.skills: { documentation: project })');
   });
 
   it('keeps a skill out of the agents, so a skill named like an agent resolves no agent= of that name', () => {

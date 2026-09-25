@@ -129,8 +129,12 @@
  *        tier that serves it: tiers.skills: { documentation: project }
  *        Nothing was checked and nothing was dispatched.
  *
- * That is `preflight.test.ts`'s reading, wrapped here, and the same run
- * under `tiers.skills: { documentation: rafa }` goes on to its probes.
+ * That is `preflight.test.ts`'s reading, wrapped here. The same run
+ * under `tiers.skills: { documentation: project }` goes on to its probes.
+ * Under `tiers.skills: { documentation: rafa }` it still refuses. Claude
+ * Code loads the project's skill over the served copy, so that line
+ * says a skill pin can only name `project`, and that deleting or renaming
+ * the project copy lets the rafa copy serve (`tiers/resolve.ts`).
  *
  * A malformed item in the plan's PREREQUISITES file refuses before any
  * probe too, naming each by its line and the one shape a probed item

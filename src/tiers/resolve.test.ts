@@ -17,7 +17,7 @@ import type { TierPin } from '../config-sections.js';
 import type { ReadItemBytes, TierItem, TierRow, TierSettings } from './resolve.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -263,9 +263,10 @@ describe('resolveTiers: a pin', () => {
   const rows = [row('project', 'doc'), row('rafa', 'doc')];
 
   it('settles a collision by serving the pinned tier', () => {
-    const pinned = settings({ tiersSkills: new Map<string, TierPin>([['doc', 'rafa']]) });
-    const resolution = resolveTiers(rows, pinned, distinct(rows).read);
-    const item = servedItem(only(rows, pinned, distinct(rows).read));
+    const agents = [row('project', 'doc', 'agent'), row('rafa', 'doc', 'agent')];
+    const pinned = settings({ tiersAgents: new Map<string, TierPin>([['doc', 'rafa']]) });
+    const resolution = resolveTiers(agents, pinned, distinct(agents).read);
+    const item = servedItem(only(agents, pinned, distinct(agents).read));
 
     expect(resolution.collisions).toEqual([]);
     expect(item.winner.source).toBe('rafa');
@@ -296,6 +297,88 @@ describe('resolveTiers: a pin', () => {
 
     expect(item.state).toBe('collision');
     expect(item.pin).toBe('user');
+  });
+});
+
+describe('resolveTiers: a skill pin the project outranks', () => {
+  const rows = [row('project', 'doc'), row('rafa', 'doc')];
+  const toRafa = settings({ tiersSkills: new Map<string, TierPin>([['doc', 'rafa']]) });
+
+  it('has no effect while a loaded project skill differs, so the name stays a collision', () => {
+    const resolution = resolveTiers(rows, toRafa, distinct(rows).read);
+    const [item] = resolution.items;
+    if (item === undefined) throw new Error('no item');
+    const collision = collisionOf(item);
+
+    expect(item.pin).toBe('rafa');
+    expect(resolution.collisions).toEqual([collision]);
+    expect(collision.setAsidePin).toBe('rafa');
+    expect(collision.pinLine).toBe('tiers.skills: { doc: project }');
+  });
+
+  it('says a skill pin can only name project, and that removing the project copy lets rafa serve', () => {
+    const collision = collisionOf(only(rows, toRafa, distinct(rows).read));
+
+    expect(collisionMessage(collision)).toBe('skill doc is held by 2 loaded tiers with different contents: '
+      + 'project /repo/.claude/skills/doc/SKILL.md and rafa /rafa/bundled/skills/doc/SKILL.md; '
+      + 'tiers.skills: { doc: rafa } has no effect, because Claude Code always loads the project\'s '
+      + '.claude/skills/doc and it outranks the rafa copy: a skill pin can only name project '
+      + '(tiers.skills: { doc: project }), or delete or rename the project copy to let the rafa copy serve');
+  });
+
+  it('control: an unpinned collision sets no pin aside', () => {
+    expect(collisionOf(only(rows, settings(), distinct(rows).read)).setAsidePin).toBeNull();
+  });
+
+  it('control: the same pin serves rafa once the project holds nothing under the name', () => {
+    const rafaAndUser = [row('rafa', 'doc'), row('user', 'doc')];
+    const pinned = settings({ settingSources: ['user'], tiersSkills: toRafa.tiersSkills });
+    const item = servedItem(only(rafaAndUser, pinned, distinct(rafaAndUser).read));
+
+    expect(item.winner.source).toBe('rafa');
+    expect(item.decidedBy).toBe('pin');
+    expect(item.overridden.map((each) => each.source)).toEqual(['user']);
+  });
+
+  it('control: the same pin serves rafa while the project copy is byte-identical', () => {
+    const item = servedItem(only(rows, toRafa, same(rows).read));
+
+    expect(item.winner.source).toBe('rafa');
+    expect(item.decidedBy).toBe('pin');
+    expect(item.copies.map((each) => each.source)).toEqual(['project']);
+  });
+
+  it('keeps a user pin, which a loaded user skill honours over the project', () => {
+    const three = [...rows, row('user', 'doc')];
+    const pinned = settings({ settingSources: ['user'], tiersSkills: new Map<string, TierPin>([['doc', 'user']]) });
+    const item = servedItem(only(three, pinned, distinct(three).read));
+
+    expect(item.winner.source).toBe('user');
+    expect(item.decidedBy).toBe('pin');
+  });
+
+  it('keeps a project pin, the one the refusal suggests', () => {
+    const pinned = settings({ tiersSkills: new Map<string, TierPin>([['doc', 'project']]) });
+    expect(servedItem(only(rows, pinned, distinct(rows).read)).winner.source).toBe('project');
+  });
+});
+
+describe('the skill pin rule on the pages that document it', () => {
+  const repo = join(import.meta.dir, '..', '..');
+  /** The page at `path` under the repo, with every run of whitespace one space. */
+  const flat = (...path: string[]) => readFileSync(join(repo, ...path), 'utf8').replace(/\s+/g, ' ');
+  const pages = { inventory: flat('context', 'inventory.md'), readme: flat('README.md') };
+
+  it('says on both pages that a skill pin can only name project, and that removing the project copy lets rafa serve', () => {
+    for (const page of Object.values(pages)) {
+      expect(page).toContain('skill pin can only name `project`');
+      expect(page).toMatch(/delet(?:e|ing) or renam(?:e|ing) the project copy/);
+    }
+  });
+
+  it('control: the README sentence on pins is the one that says it', () => {
+    const sentence = pages.readme.split('. ').find((part) => part.startsWith('A skill pin'));
+    expect(sentence).toContain('can only name `project`');
   });
 });
 

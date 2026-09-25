@@ -66,6 +66,7 @@
  * with each of three strings of `src/start.ts` mutated in turn, and each
  * mutation changed the reading it aimed at.
  */
+import type { TierPin } from '../config-sections.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
@@ -1009,7 +1010,7 @@ describe('the agent roster check', () => {
     expect(switchedOff.refusal?.message).not.toContain('"from-rafa"');
   });
 
-  it('halts on a skills= name two loaded tiers hold with different contents, until a tiers.skills pin chooses', async () => {
+  it('halts on a skills= name two loaded tiers hold with different contents, until a project pin chooses', async () => {
     const root = freshRoot();
     const home = freshHome();
     const entry = join(freshHome(), 'dist', 'cli.js');
@@ -1021,18 +1022,31 @@ describe('the agent roster check', () => {
     }
     writeFileSync(planPathIn(root), '- [ ] Write it  {skills=documentation}\n', 'utf8');
     const agents = { settingSources: ['project', 'local'] as const, home, entry };
+    const tierSettings = (pin: TierPin | null) => ({
+      settingSources: ['project', 'local'] as const,
+      tiersRafa: 'on' as const,
+      tiersSkills: new Map<string, TierPin>(pin === null
+        ? []
+        : [['documentation', pin]]),
+      tiersAgents: new Map<string, TierPin>(),
+    });
 
     const collided = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, { agents });
-    const pinned = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+    // Claude Code loads the project's skill over the served copy, so a
+    // pin to rafa cannot settle the name, and the run still halts.
+    const pinnedToRafa = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
       agents: { ...agents, tiersSkills: new Map([['documentation', 'rafa']]) },
+    });
+    const pinnedToProject = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents: { ...agents, tiersSkills: new Map([['documentation', 'project']]) },
     });
     // Beside a missing agent the one refusal names both kinds.
     writeFileSync(planPathIn(root), '- [ ] Write it  {agent=no-such-agent skills=documentation}\n', 'utf8');
     const both = await drive(root, settingsOf([], []), {}, { agents });
 
-    const skillLine = '   skill "documentation" (line 1) cannot be served: skill documentation is held by 2 loaded tiers'
-      + ` with different contents: project ${project} and rafa ${rafa};`
-      + ' pin the tier that serves it: tiers.skills: { documentation: project }';
+    const heldBy = '   skill "documentation" (line 1) cannot be served: skill documentation is held by 2 loaded tiers'
+      + ` with different contents: project ${project} and rafa ${rafa};`;
+    const skillLine = `${heldBy} pin the tier that serves it: tiers.skills: { documentation: project }`;
     expect(collided.refusal?.exitCode).toBe(1);
     expect(collided.refusal?.message.split('\n')).toEqual([
       `❌ Refusing to start: PLAN-${STUB}.md names 1 skill(s) two loaded tiers hold with different contents`
@@ -1041,15 +1055,23 @@ describe('the agent roster check', () => {
       '   Nothing was checked and nothing was dispatched.',
     ]);
     expect(collided.probes).toEqual([]);
-    expect(pinned.refusal).toBeNull();
-    expect(pinned.probes).toEqual([`bun --version in ${root}`]);
-    // Started under the pin, the session is served the rafa copy.
-    const served = serveSession({ root, run: RUN_ID, home, entry, settings: { settingSources: ['project', 'local'], tiersRafa: 'on', tiersSkills: new Map([['documentation', 'rafa']]), tiersAgents: new Map() } });
+    expect(pinnedToRafa.refusal?.exitCode).toBe(1);
+    expect(pinnedToRafa.refusal?.message.split('\n')[1]).toBe(`${heldBy} tiers.skills: { documentation: rafa } has no effect,`
+      + ' because Claude Code always loads the project\'s .claude/skills/documentation and it outranks the rafa copy:'
+      + ' a skill pin can only name project (tiers.skills: { documentation: project }),'
+      + ' or delete or rename the project copy to let the rafa copy serve');
+    expect(pinnedToRafa.probes).toEqual([]);
+    // The control: a pin to project settles the name, and the run goes on to its probes.
+    expect(pinnedToProject.refusal).toBeNull();
+    expect(pinnedToProject.probes).toEqual([`bun --version in ${root}`]);
+    // Under the rafa pin, the session is served no copy of the name.
+    const setAside = serveSession({ root, run: RUN_ID, home, entry, settings: tierSettings('rafa') });
+    expect(setAside.skills).toEqual([]);
+    // With the project copy gone, the way out the refusal names, the same pin serves the rafa copy.
+    rmSync(join(project, '..'), { recursive: true });
+    const served = serveSession({ root, run: RUN_ID, home, entry, settings: tierSettings('rafa') });
     expect(served.skills.map((copy) => copy.name)).toEqual(['documentation']);
     expect(readFileSync(join(served.dir, '.claude', 'skills', 'documentation', 'SKILL.md'), 'utf8')).toContain('The rafa body.');
-    // Refused, the collision serves nothing.
-    const unpinned = serveSession({ root, run: RUN_ID, home, entry, settings: { settingSources: ['project', 'local'], tiersRafa: 'on', tiersSkills: new Map(), tiersAgents: new Map() } });
-    expect(unpinned.skills).toEqual([]);
     expect(both.refusal?.message.split('\n').slice(0, 3)).toEqual([
       `❌ Refusing to start: PLAN-${STUB}.md names 1 agent(s) no loaded tier serves and 1 skill(s) two loaded`
         + ' tiers hold with different contents (loop.settingSources: project, local; tiers.rafa: on).',

@@ -180,7 +180,9 @@ describe('what is served', () => {
     expect(served.skipped).toEqual([]);
   });
 
-  it('serves the rafa copy a pin chose over the project\'s', () => {
+  it('serves no rafa copy of a skill the project holds differently, even under a rafa pin', () => {
+    // Claude Code loads the project's skill over an `--add-dir` copy, so
+    // the resolver sets the pin aside (`tiers/resolve.ts`).
     const rows = [
       skillRow('project', 'clash', skillText('clash', 'provenance: first-party\nversion: 2')),
       skillRow('rafa', 'clash'),
@@ -188,8 +190,21 @@ describe('what is served', () => {
 
     const served = serve(rows, 'add-dir', settings({ tiersSkills: new Map<string, TierPin>([['clash', 'rafa']]) }));
 
-    expect(names(served, 'skill')).toEqual(['clash']);
-    expect(readFileSync(join(served.dir, '.claude', 'skills', 'clash', 'SKILL.md'), 'utf8')).toBe(skillText('clash'));
+    expect(names(served, 'skill')).toEqual([]);
+    expect(existsSync(join(served.dir, '.claude', 'skills', 'clash'))).toBe(false);
+  });
+
+  it('serves the rafa copy of an agent a pin chose over the project\'s', () => {
+    // The control: an `--agents` agent outranks a project agent, so the
+    // same pin on an agent still serves the rafa copy.
+    const rows = [
+      agentRow('project', 'clash', agent('clash', 'provenance: first-party\nversion: 2')),
+      agentRow('rafa', 'clash'),
+    ];
+
+    const served = serve(rows, 'add-dir', settings({ tiersAgents: new Map<string, TierPin>([['clash', 'rafa']]) }));
+
+    expect(names(served, 'agent')).toEqual(['clash']);
   });
 
   it('serves nothing, and hands no flag, while tiers.rafa is off', () => {

@@ -116,9 +116,20 @@ describe('serveSession', () => {
     expect(agents['rafa-agent']?.tools).toEqual(['Read', 'Grep']);
   });
 
-  it('serves a collision once a pin settles it on the rafa tier', () => {
-    // The control for the collision left out above: the one thing
-    // changed is the pin, and the rafa holder is then served.
+  it('serves no rafa copy of a collision a rafa pin names, since the project copy outranks it', () => {
+    // Claude Code loads the project's `.claude/skills/differs` over the
+    // `--add-dir` copy, so the resolver sets the pin aside.
+    const served = serveSession(serving({ tiersSkills: new Map<string, TierPin>([['differs', 'rafa']]) }));
+
+    expect(served.skills.map((copy) => copy.name)).toEqual(['rafa-only']);
+    expect(existsSync(join(served.dir, '.claude/skills/differs'))).toBe(false);
+  });
+
+  it('serves the rafa copy once the project copy is gone, the way out the refusal names', () => {
+    // The control on the case above: with the project copy removed, the
+    // same pin, or the order alone, serves the rafa holder.
+    rmSync(join(root, '.claude/skills/differs'), { recursive: true });
+
     const served = serveSession(serving({ tiersSkills: new Map<string, TierPin>([['differs', 'rafa']]) }));
 
     expect(served.skills.map((copy) => copy.name)).toEqual(['differs', 'rafa-only']);
@@ -165,12 +176,11 @@ describe('serveSession', () => {
 
     const served = serveSession(serving({ tiersSkills: new Map<string, TierPin>([['differs', 'rafa']]) }));
 
-    expect(served.skills).toHaveLength(2);
+    expect(served.skills).toHaveLength(1);
     expect(snapshot(join(root, '.claude'))).toEqual(before);
     // The control: the served tree does hold a `.claude/skills/`, so the
     // snapshot above would have shown one written under the wrong root.
     expect(Object.keys(snapshot(join(served.dir, '.claude'))).sort()).toEqual([
-      join('skills', 'differs', 'SKILL.md'),
       join('skills', 'rafa-only', 'SKILL.md'),
     ]);
   });

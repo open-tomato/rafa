@@ -33,7 +33,9 @@ For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
    `tiers.agents: { name: false }` is off in every tier and never served.
 2. **Unloaded.** No loaded tier holds the name.
 3. **Pinned.** A `tiers.skills` or `tiers.agents` map names a tier to serve,
-   and that tier holds it. The pin is the declared winner.
+   and that tier holds it. The pin is the declared winner, except a skill pin
+   to `rafa` while a loaded project holder differs from the pinned copy: it
+   has no effect (see "A skill pin can only name `project`" below).
 4. **Order wins.** All loaded holders are byte-identical copies (see below), so
    the nearest tier serves it, and the rest are its copies.
 5. **Collision.** Two or more loaded tiers hold different items under the name,
@@ -54,6 +56,43 @@ The pin names the nearest holder's tier as a default, since that holder would
 have won by order. A project and a user item of one name are both `collision`
 without a pin, but `enabled` and `shadowed` with `loop.settingSources` narrowed
 to exclude `user`.
+
+**A skill pin can only name `project`.** A served skill reaches a session
+through `--add-dir`, and Claude Code always loads the project's
+`.claude/skills/<name>` too, which outranks the added copy. So
+`tiers.skills: { <name>: rafa }` has no effect while a loaded project holder
+of the name differs from the rafa copy: the name stays a `collision`, and the
+refusal (`collisionMessage`, carried by `TierCollision.setAsidePin`) says that
+a skill pin can only name `project`, and that deleting or renaming the
+project copy lets the rafa copy serve. A byte-identical project copy is the
+same item, so that pin still serves. Agents keep their pins: a served agent
+goes through `--agents`, which outranks a project agent of the same name.
+
+The readings behind this were taken on 2026-09-25 against Claude Code 2.1.280,
+in a scratch git repository with `claude -p --output-format stream-json
+--verbose`. Each copy of one name told the session to reply with its own word.
+The `init` event listed the name once whichever copy loaded, so the reply is
+what shows which copy won:
+
+| Copies present | Sources | Replied with |
+|---|---|---|
+| project skill, `--add-dir` skill | `project,local` | project |
+| `--add-dir` skill alone (control) | `project,local` | `--add-dir` |
+| project agent, `--agents` agent, run as `--agent` | `project,local` | `--agents` |
+| the same, run as a subagent through the Agent tool | `project,local` | `--agents` |
+| project agent alone, run as `--agent` (control) | `project,local` | project |
+| project skill, user skill (3 runs) | `user,project,local` | user |
+| project skill, user skill | `project,local` | project |
+| project skill alone (control) | `user,project,local` | project |
+| user skill, `--add-dir` skill (2 runs) | `user,project,local` | user |
+| `--add-dir` skill alone (control) | `user,project,local` | `--add-dir` |
+
+A `user` pin is not refused: under a `user` source a user skill outranks the
+project's, so the pin takes effect. The same rows show Claude Code's own skill
+order under that source is user, project, `--add-dir`. That is not the tier
+order the resolver takes, so a `project` or `rafa` skill pin against a
+differing loaded user skill does not reach the session either. The resolver
+does not act on that yet.
 
 **The byte-identical rule.** Two holders are the same when their definition
 files are byte-identical after removing every line of rafa's vendoring header
