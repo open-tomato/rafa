@@ -34,10 +34,23 @@ Measured from the last three merged `rafa-<n>` spec plans on `main` before this 
 | rafa-26 | 50 | 2026-09-26 | unknown | Claude Code version mismatch; sessions cannot be parsed |
 | rafa-101 | 14 | 2026-09-26 | unknown | Claude Code version mismatch; sessions cannot be parsed |
 
-**Note**: The "before" data is unavailable because:
+**Post-merge step to populate the before table:**
+
+After this plan merges and the runtime holding `rafa effort collect --skills` is installed on main:
+
+1. Switch to the main checkout (not this branch).
+2. Run: `rafa effort collect --skills`
+3. From the resulting store, extract the M1 value for each of the three plans:
+   - `rafa-25` (32 tasks)
+   - `rafa-26` (50 tasks)
+   - `rafa-101` (14 tasks)
+4. Use the query in the [Data collection](#data-collection) section to calculate M1 for each plan.
+5. Record the M1, task count, and today's date in the table above.
+
+**Note**: The "before" data is initially recorded as `unknown` because:
 1. Skill collection was not implemented when these plans ran.
 2. Claude Code session logs from before the current `SKILL_USE_CLI_VERSION` cannot be parsed, storing `unknown` in the count column.
-3. Baseline M1 for "arm none" cannot be established until the loop runs plans with skill collection enabled, using matching Claude Code versions.
+3. Baseline M1 for "arm none" is established by running the query above on the main checkout after this plan merges and 0.18.0 is installed with skill collection enabled.
 
 ## After: measured runs with resolver arms
 
