@@ -13,6 +13,12 @@
  * output, no message content of any kind reaches it, so the store it
  * feeds can never become a second copy of a transcript.
  *
+ * `effort/skill-use.ts` is the one exception to that rule, kept out of
+ * this row on purpose: it reads the input of `Skill` tool calls, and
+ * keeps only the tool's name and the `skill` it names, for the
+ * `skill_invocations` table. It reads the log through {@link readLines}
+ * here. Its module note says what it reads and what it leaves.
+ *
  * Record shape, measured against the live tree rather than assumed.
  * The counts move with every run; the shape has not:
  *
