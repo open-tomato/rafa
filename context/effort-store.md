@@ -46,13 +46,14 @@ is copied there as well.
 ### Tables outside the port
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
-`report_absences`, `task_reports`, `preflight` and `dispatches` are
-SQLite-only and stay out of the port's row map. Each arrives as a new
-`SQLITE_MIGRATIONS` entry, is written under the `sqliteStorePath` that
-`store/sqlite.ts` exports, and lands in `effort.sqlite` whatever `store`
-selects. A writer that can be left with nothing to insert goes through
-`writeSqliteStore`, as `writeFindings`, `writeTriage`, `writeChanges`
-and `writePreflightChecks` do, so an empty write on a store that exists
+`report_absences`, `task_reports`, `preflight`, `dispatches` and
+`skill_invocations` are SQLite-only and stay out of the port's row map.
+Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
+`sqliteStorePath` that `store/sqlite.ts` exports, and lands in
+`effort.sqlite` whatever `store` selects. A writer that can be left with
+nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
+`writeTriage`, `writeChanges`, `writePreflightChecks` and
+`writeSkillInvocations` do, so an empty write on a store that exists
 still meets the schema check. `writeReportAbsence` always has its one
 row and opens `withSqliteStore` directly, as `writeTrackerRef` does.
 `writeTaskReport` always has its one row too, and passes
@@ -72,7 +73,8 @@ A new table moves every full table-list expectation with it: two in
 `reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts` and
 `changes.test.ts`, and the filter the version-5 case of
 `preflight.test.ts` takes the later tables out with, beside the
-version-7 filter of `changes.test.ts`.
+version-6 filter of `dispatches.test.ts` and the two version-7 filters
+of `changes.test.ts`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what

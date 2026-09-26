@@ -108,6 +108,7 @@ const TABLES = [
   'preflight',
   'report_absences',
   'sessions',
+  'skill_invocations',
   'task_reports',
 ];
 
@@ -322,7 +323,7 @@ describe('the preflight migration', () => {
     // preflight table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
     expect(tablesOf(root)).toEqual(
-      TABLES.filter((table) => table !== 'preflight' && table !== 'dispatches' && table !== 'changes'),
+      TABLES.filter((table) => table !== 'preflight' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations'),
     );
 
     const result = writePreflightChecks(root, { runId: 'run-v5', checks: [PASS_CHECK] }, CLOCK);
