@@ -37,17 +37,17 @@ function caseDir(): string {
   return dir;
 }
 
-/** A column added to a table this rafa knows, as rafa-23's version 10 did. */
-const ADDED_COLUMN = 'ALTER TABLE sessions ADD COLUMN resolver TEXT;';
+/** A column added to a table this rafa knows, as a later rafa's migration might. */
+const ADDED_COLUMN = 'ALTER TABLE sessions ADD COLUMN future_note TEXT;';
 
-/** A table this rafa does not know, as rafa-23's version 11 did. */
+/** A table this rafa does not know, as a later rafa's migration might. */
 const ADDED_TABLE = `
-  CREATE TABLE skill_invocations (
+  CREATE TABLE future_readings (
     seq INTEGER PRIMARY KEY,
     session_id TEXT NOT NULL,
     name TEXT
   );
-  CREATE UNIQUE INDEX skill_invocations_by_use ON skill_invocations (session_id, ifnull(name, ''));
+  CREATE UNIQUE INDEX future_readings_by_use ON future_readings (session_id, ifnull(name, ''));
 `;
 
 /** A newer history that drops a column this rafa writes: not additive. */
@@ -68,12 +68,12 @@ function plantStore(path: string, migrations: readonly string[], fill: (db: Data
 
 /** Rows in the known tables and in the two additions. */
 function fillNewer(db: Database): void {
-  db.run('INSERT INTO sessions (session_id, row_json, resolver) VALUES (\'s-1\', \'{"sessionId":"s-1"}\', \'tag\')');
-  db.run('INSERT INTO sessions (session_id, row_json, resolver) VALUES (\'s-2\', \'{"sessionId":"s-2"}\', NULL)');
+  db.run('INSERT INTO sessions (session_id, row_json, future_note) VALUES (\'s-1\', \'{"sessionId":"s-1"}\', \'tag\')');
+  db.run('INSERT INTO sessions (session_id, row_json, future_note) VALUES (\'s-2\', \'{"sessionId":"s-2"}\', NULL)');
   db.run('INSERT INTO commits (sha, row_json) VALUES (\'abc123\', \'{"sha":"abc123"}\')');
-  db.run('INSERT INTO skill_invocations (session_id, name) VALUES (\'s-1\', \'tdd-workflow\')');
-  db.run('INSERT INTO skill_invocations (session_id, name) VALUES (\'s-2\', \'verification-loop\')');
-  db.run('INSERT INTO skill_invocations (session_id, name) VALUES (\'s-2\', \'git-workflow\')');
+  db.run('INSERT INTO future_readings (session_id, name) VALUES (\'s-1\', \'tdd-workflow\')');
+  db.run('INSERT INTO future_readings (session_id, name) VALUES (\'s-2\', \'verification-loop\')');
+  db.run('INSERT INTO future_readings (session_id, name) VALUES (\'s-2\', \'git-workflow\')');
 }
 
 /** The store's `user_version`, read without migrating it. */
@@ -124,9 +124,9 @@ describe('fixStoreSchema on a store past this rafa', () => {
 
     expect(result.kept).toContainEqual({ table: 'sessions', rows: 2 });
     expect(result.kept).toContainEqual({ table: 'commits', rows: 1 });
-    expect(result.kept.map((row) => row.table)).not.toContain('skill_invocations');
-    expect(result.leftTables).toEqual([{ table: 'skill_invocations', rows: 3 }]);
-    expect(result.leftColumns).toEqual([{ table: 'sessions', column: 'resolver', values: 1 }]);
+    expect(result.kept.map((row) => row.table)).not.toContain('future_readings');
+    expect(result.leftTables).toEqual([{ table: 'future_readings', rows: 3 }]);
+    expect(result.leftColumns).toEqual([{ table: 'sessions', column: 'future_note', values: 1 }]);
   });
 
   it('can run --dry-run twice, each time leaving nothing behind', () => {
@@ -156,7 +156,7 @@ describe('fixStoreSchema on a store past this rafa', () => {
     expect(versionOf(path)).toBe(SQLITE_SCHEMA_VERSION);
     expect(countOf(path, 'SELECT count(*) AS n FROM sessions')).toBe(2);
     expect(countOf(path, 'SELECT count(*) AS n FROM commits')).toBe(1);
-    expect(countOf(path, 'SELECT count(*) AS n FROM sqlite_master WHERE name = \'skill_invocations\'')).toBe(0);
+    expect(countOf(path, 'SELECT count(*) AS n FROM sqlite_master WHERE name = \'future_readings\'')).toBe(0);
     expect(readdirSync(dir).sort()).toEqual(['effort.sqlite', `effort.sqlite.v${String(SQLITE_SCHEMA_VERSION + 2)}-${STAMP}.bak`]);
   });
 

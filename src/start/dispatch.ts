@@ -29,12 +29,26 @@
  * session the text the task was blocked on. Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
- * when there are any.
+ * when there are any. Between the blocker line (or the second line, with
+ * no blocker) and `PROMPT.md` go the task's `## Skills for this task` and
+ * `## Lessons from earlier tasks` sections (`task/sections.ts`), each
+ * followed by a blank line, in that order, and each absent when it
+ * rendered empty; with both absent the prompt is the one built before
+ * sections existed.
  *
  * Before each session the dispatch serves it the rafa-tier winners
  * (`start/serving.ts`) when its caller names a
  * {@link TaskDispatchOptions.serving}, and warns once per winner left
  * out, with the sentence `tiers/serve.ts` wrote for it.
+ *
+ * What fills the two sections is chosen per dispatch
+ * (`start/handout.ts`): the resolver the run's `task.skills` names picks
+ * the skills from the tiers the session is served, read once for both,
+ * and `selectLessons` picks the lessons from the blessed bundle the run's
+ * learning adapter answers, under `task.lessons: on`. The resolver's
+ * name and what was offered travel on {@link TaskDispatch}, never in the
+ * prompt. A lessons pull the adapter refuses is warned about there and
+ * leaves the lessons section absent; it never fails the task.
  *
  * Once a report is stored, its lessons (`report/lessons.ts`) are pushed
  * to the Learning adapter the run's `learning.adapter` names, and what
@@ -42,13 +56,18 @@
  * adapter that cannot be resolved or made, is told through `warn` and
  * fails nothing: the report is already stored, and a lesson is its copy.
  */
+import type { SkillResolverName } from '../config-sections.js';
 import type { ClaudeSettingSource, InjectMode } from '../config.js';
+import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { AdapterRegistry } from '../adapters/registry.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
+import type { InstinctRecord } from '../learning/index.js';
 import type { PlanInjection } from '../plan/index.js';
 import type { Learning } from '../ports/index.js';
 import type { TaskReportRecord } from '../report/record.js';
+import type { ResolvedSkill } from '../task/resolve-skills.js';
+import type { Resolution } from '../tiers/resolve.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -56,19 +75,20 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { randomUUID } from 'crypto';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { writeDispatch } from '../effort/store/dispatches.js';
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
+import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
 import { runClaudeCaptured } from '../utils/claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
 
+import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
 import { knownMissingNotice } from './preflight.js';
-import { serveSession } from './serving.js';
+import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
@@ -171,6 +191,17 @@ export interface TaskDispatchOptions {
    * without the rafa tier and nothing would say so.
    */
   serving: SessionServing | null;
+  /**
+   * What the task is handed beside the plan: the run's `task.skills`
+   * resolver, its `task.lessons` switch and the adapter its lessons are
+   * pulled from (`start/handout.ts`). The resolver chooses from the tiers
+   * {@link TaskDispatchOptions.serving} reads, so a null `serving` leaves
+   * it nothing to offer. Null hands out nothing and runs no resolver,
+   * which a test driving the `run` seam names. Required for the reason
+   * `serving` is: a default of nothing would let a caller that forgot it
+   * dispatch every task without its sections and nothing would say so.
+   */
+  handout: TaskHandout | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -199,6 +230,16 @@ export interface TaskDispatch {
   exitCode: number;
   /** Everything the session wrote to stdout, its report included. */
   output: string;
+  /**
+   * The resolver that chose {@link TaskDispatch.skillsOffered}, the run's
+   * `task.skills`, or null for a dispatch handed no
+   * {@link TaskDispatchOptions.handout}. Never in {@link TaskDispatch.prompt}.
+   */
+  resolver: SkillResolverName | null;
+  /** The skills the prompt's `## Skills for this task` offered, in its order. Empty when it had none. */
+  skillsOffered: readonly ResolvedSkill[];
+  /** The lessons the prompt's `## Lessons from earlier tasks` offered, in its order. Empty when it had none. */
+  lessonsOffered: readonly InstinctRecord[];
 }
 
 /**
@@ -213,6 +254,28 @@ function blockerLines(blocker: string | null): string[] {
   return blocker === null || blocker.trim().length === 0
     ? []
     : [`${BLOCKER_PROMPT_PREFIX}${escapeBlockerText(blocker)}`];
+}
+
+/**
+ * The rendered sections a task is handed ahead of `PROMPT.md`: what
+ * `renderSkillsSection` and `renderLessonsSection` (`task/sections.ts`)
+ * answered for it. A blank section is absent from the prompt.
+ */
+export interface TaskPromptSections {
+  /** The `## Skills for this task` section, or the empty string for none. */
+  readonly skills: string;
+  /** The `## Lessons from earlier tasks` section, or the empty string for none. */
+  readonly lessons: string;
+}
+
+/** No section to hand out: the prompt {@link buildTaskPrompt} built before sections existed. */
+export const NO_TASK_SECTIONS: TaskPromptSections = { skills: '', lessons: '' };
+
+/** Each non-blank section of `sections`, skills first, each followed by a blank line. */
+function sectionLines(sections: TaskPromptSections): string[] {
+  return [sections.skills, sections.lessons]
+    .filter((section) => section.trim().length > 0)
+    .flatMap((section) => [section, '']);
 }
 
 /**
@@ -253,6 +316,16 @@ function blockerLines(blocker: string | null): string[] {
  * planted here, above the one `withStamp` appends, would attribute the
  * session to another plan. With no blocker, or a blank one, the prompt
  * is the one built before blockers were carried.
+ *
+ * `sections` is the task's rendered skills and lessons sections. Each
+ * non-blank one goes after the blank line that closes the head (the
+ * blocker line, or the second line without one) and before
+ * `promptContent`, skills first, each followed by a blank line of its
+ * own, so the head keeps its lines and the scoped-task line stays
+ * first. A section is placed as it was rendered: which resolver chose
+ * the skills is not a field here, so it cannot reach the prompt. With
+ * both blank, the default {@link NO_TASK_SECTIONS}, the prompt is the
+ * one built before sections existed.
  */
 export function buildTaskPrompt(
   taskText: string,
@@ -260,12 +333,14 @@ export function buildTaskPrompt(
   planText: string,
   knownMissing: readonly string[] = [],
   blocker: string | null = null,
+  sections: TaskPromptSections = NO_TASK_SECTIONS,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
     ...blockerLines(blocker),
     '',
+    ...sectionLines(sections),
     promptContent,
     planText,
     ...knownMissingNotice(knownMissing),
@@ -323,9 +398,14 @@ export function buildTaskPrompt(
  * the sentence the prompt quotes and stamped from `now`, before any line
  * about the task; see the module note.
  *
- * The session is served last, after the prompt is built and just
- * before the spawn, so the served directory holds what the tiers hold
- * when that session starts.
+ * The tiers are read once per dispatch, ahead of the prompt, when a
+ * `serving` is named: the task's skills are chosen from that reading
+ * (`start/handout.ts`), and the session is served that same reading
+ * last, after the prompt is built and just before the spawn. So the
+ * skills the prompt offers are the ones the session is served, and the
+ * served directory holds what the tiers held when that task was
+ * dispatched. The lessons are pulled from the run's adapter between the
+ * two, once; see the module note.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -371,15 +451,22 @@ export async function dispatchTask(
     activeOutput().warn(`   Injection: \`${injection.requested}\` not rendered: ${injection.fallback.text}.`);
   }
 
+  const resolution = options.serving === null
+    ? EMPTY_RESOLUTION
+    : resolveSessionTiers(options.serving);
+  const task = taskInputFor(taskInfo, taskText, declaration, options.planContent);
+  const handed = await handOut(options.handout, task, resolution, options.repoRoot);
+
   const prompt = withStamp(buildTaskPrompt(
     taskText,
     options.promptContent,
     injection.text,
     options.knownMissing,
     taskInfo.blocker ?? null,
+    { skills: renderSkillsSection(handed.skills), lessons: renderLessonsSection(handed.lessons) },
   ));
 
-  const served = serveForSession(options.serving);
+  const served = serveForSession(options.serving, resolution);
   const sessionId = (options.newSessionId ?? randomUUID)();
   const session = await run(prompt, flags, sessionId, options.settingSources, served);
 
@@ -393,16 +480,19 @@ export async function dispatchTask(
     sessionId,
     exitCode: session.exitCode,
     output: session.stdout,
+    resolver: handed.resolver,
+    skillsOffered: handed.skills,
+    lessonsOffered: handed.lessons,
   };
 }
 
 /**
- * Serves one task session and answers its flags, warning once per
- * rafa-tier winner left out; none for a null `serving`.
+ * Serves one task session `resolution` and answers its flags, warning
+ * once per rafa-tier winner left out; none for a null `serving`.
  */
-function serveForSession(serving: SessionServing | null): readonly string[] {
+function serveForSession(serving: SessionServing | null, resolution: Resolution): readonly string[] {
   if (serving === null) return [];
-  const served = serveSession(serving);
+  const served = serveSession(serving, resolution);
   for (const skipped of served.skipped) activeOutput().warn(`   ${skipped.message}`);
   return served.flags;
 }
@@ -465,8 +555,14 @@ export interface TaskReportStoreOptions {
   readonly repoRoot: string;
   /** The plan the run is executing, or null when its file name gives none. */
   readonly planStub: string | null;
-  /** The dispatch whose session wrote the report, with what it declared and was spawned with. */
-  readonly dispatch: Pick<TaskDispatch, 'sessionId' | 'taskText' | 'output' | 'declaration' | 'flags'>;
+  /**
+   * The dispatch whose session wrote the report, with what it declared,
+   * what it was spawned with, and the resolver and what its prompt offered.
+   */
+  readonly dispatch: Pick<
+    TaskDispatch,
+    'sessionId' | 'taskText' | 'output' | 'declaration' | 'flags' | 'resolver' | 'skillsOffered' | 'lessonsOffered'
+  >;
   /** What the loop made of the task. */
   readonly outcome: FindingOutcome;
   /**
@@ -506,12 +602,7 @@ async function pushTaskLessons(
 
   const count = payload.instincts.length;
   try {
-    const registry = learning.registry ?? CORE_ADAPTER_REGISTRY;
-    const adapter: Learning = registry.resolve('learning', learning.kind).create({
-      repoRoot: options.repoRoot,
-      home: learning.home,
-      learningBlessMinConfidence: learning.blessMinConfidence,
-    });
+    const adapter: Learning = taskLearningAdapter(learning, options.repoRoot);
     const result = await adapter.push(payload);
     const rules = result.decisions.map((decision) => decision.rule).join(', ');
     activeOutput().info(`   Pushed ${count} lesson(s) to the \`${learning.kind}\` learning adapter: ${rules}.`);
@@ -527,9 +618,14 @@ async function pushTaskLessons(
  * whether the store took it.
  *
  * The dispatch goes first: one `dispatches` row holding what the task's
- * declaration asked for, its budget among it, and the flags the session
- * was spawned with (`effort/store/dispatches.ts`), whatever became of the
- * task, so every session the loop stores has one. The report follows.
+ * declaration asked for, its budget among it, the flags the session was
+ * spawned with, the resolver that chose its skills, and the bare names of
+ * the skills and the ids of the lessons its prompt offered, in the order
+ * the sections listed them (`effort/store/dispatches.ts`), whatever became
+ * of the task, so every session the loop stores has one. A dispatch handed
+ * no handout records a null resolver and offered lists of `[]`: nothing
+ * was offered, which the row keeps apart from a row written before these
+ * columns existed. The report follows.
  *
  * Every row carries the sentence the dispatch quoted, declaration off, and
  * the id the session ran under, so it joins that session's log. An output
@@ -557,6 +653,9 @@ export async function storeTaskReport(options: TaskReportStoreOptions): Promise<
       taskLine: dispatch.taskText,
       declaration: dispatch.declaration,
       flags: dispatch.flags,
+      resolver: dispatch.resolver,
+      skillsOffered: dispatch.skillsOffered.map((skill) => skill.name),
+      lessonsOffered: dispatch.lessonsOffered.map((lesson) => lesson.id),
     });
     record = recordTaskReport(options.repoRoot, {
       dispatch: {

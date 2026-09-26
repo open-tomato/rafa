@@ -81,6 +81,12 @@ const wrapped = wrapPhaseZeroCommand({
       type: 'string',
     },
     {
+      name: 'skills-resolver',
+      description: 'The resolver that picks the skills each task session is handed: `planner`, `tag`'
+        + ' or `none`. Outranks `task.skills` in `.rafa/config.yaml` for this run only.',
+      type: 'string',
+    },
+    {
       name: 'runtime',
       description: 'The installed rafa the run goes on in: a version under `~/.rafa/runtime/`, or a path'
         + ' against the working directory to a `cli.js` or the directory holding it. Refused inside the'

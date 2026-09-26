@@ -431,6 +431,7 @@ async function dispatchSpec(
     home: overrides.roots?.home ?? join(tempRoot, 'no-definitions', 'home'),
     settingSources: overrides.settingSources ?? ['project', 'local'],
     serving: null,
+    handout: null,
     run,
   });
 

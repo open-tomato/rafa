@@ -28,8 +28,11 @@
  *      a holder the plan did not choose. Every `skills=` name of the
  *      same tasks is checked against the same resolution, and one two
  *      loaded tiers hold with different contents refuses the run too,
- *      since nobody serves it (`start/serving.ts`); a skill name no tier
- *      holds does not, as `agents/roster.ts` explains. The tasks read are
+ *      since nobody serves it (`start/serving.ts`). So does every other
+ *      `skills=` name the resolution resolves to no winner, exactly as
+ *      an agent's does: one no tier holds, which is the name a planner
+ *      invented, one `false` switches off, and one only an unloaded tier
+ *      holds (`agents/roster.ts`). The tasks read are
  *      the ones the dispatcher will reach, a line a `rafa:*` block the
  *      document never closed hides included: `findNextTask` runs such a
  *      line, so the roster check reads it too (`PlanModel.hiddenTasks`),
@@ -138,6 +141,23 @@
  * is refused the same way while a loaded user skill differs, since
  * Claude Code loads a user skill over the project's (`tiers/resolve.ts`).
  *
+ * A `skills=` name the resolution resolves to no winner refuses in the
+ * same message, after the collisions, through `unresolvedSkillLine`, and
+ * the opening counts it as `N skill(s) no loaded tier resolves`:
+ *
+ *     ❌ Refusing to start: PLAN-demo.md names 1 skill(s) no loaded tier
+ *        resolves (loop.settingSources: project, local; tiers.rafa: on).
+ *        skill "home-only" (line 3) cannot be served: skill home-only is
+ *        held only by the user tier (<home>/.claude/skills/home-only/
+ *        SKILL.md), which loop.settingSources (project, local) leaves
+ *        out: add user to loop.settingSources
+ *        Nothing was checked and nothing was dispatched.
+ *
+ * That too is `preflight.test.ts`'s reading, wrapped here; under
+ * `loop.settingSources: user, project, local` the same run goes on to
+ * its probes. A name no tier holds is refused the same way, with the
+ * sentence `agents/roster.ts` words for it.
+ *
  * A malformed item in the plan's PREREQUISITES file refuses before any
  * probe too, naming each by its line and the one shape a probed item
  * takes (`malformedPrerequisiteLines`), so a quoted name is never run
@@ -226,6 +246,8 @@ import {
   missingPlanAgents,
   resolveAgentRoster,
   skillCollisionLine,
+  unresolvedPlanSkills,
+  unresolvedSkillLine,
 } from '../agents/roster.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
@@ -340,13 +362,16 @@ function readIfReadable(path: string): string | null {
 }
 
 /** `names 1 agent(s) no loaded tier serves and 1 skill(s) ...`, leaving out a kind with none. */
-function refusedNames(agents: number, skills: number): string {
+function refusedNames(agents: number, collisions: number, unresolved: number): string {
   const clauses = [
     agents > 0
       ? `${agents} agent(s) no loaded tier serves`
       : null,
-    skills > 0
-      ? `${skills} skill(s) two loaded tiers hold with different contents`
+    collisions > 0
+      ? `${collisions} skill(s) two loaded tiers hold with different contents`
+      : null,
+    unresolved > 0
+      ? `${unresolved} skill(s) no loaded tier resolves`
       : null,
   ].filter((clause): clause is string => clause !== null);
   return `names ${clauses.join(' and ')}`;
@@ -355,7 +380,7 @@ function refusedNames(agents: number, skills: number): string {
 /**
  * Refuses the run when a still-to-run task routes to an agent no loaded
  * tier serves, or asks for a skill two loaded tiers hold with different
- * contents, naming each with what settles it; see the module note.
+ * contents or no loaded tier resolves, naming each with what settles it; see the module note.
  */
 function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   const path = agentSourcePath(options.planPath);
@@ -379,13 +404,15 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   const roster = resolveAgentRoster(roots, settings);
   const missing = missingPlanAgents(markdown, roster);
   const colliding = collidingPlanSkills(markdown, roster);
-  if (missing.length === 0 && colliding.length === 0) return;
+  const unresolved = unresolvedPlanSkills(markdown, roster);
+  if (missing.length === 0 && colliding.length === 0 && unresolved.length === 0) return;
 
   throw new CommandExit(1, [
-    `❌ Refusing to start: ${basename(path)} ${refusedNames(missing.length, colliding.length)}`
+    `❌ Refusing to start: ${basename(path)} ${refusedNames(missing.length, colliding.length, unresolved.length)}`
       + ` (loop.settingSources: ${settings.settingSources.join(', ')}; tiers.rafa: ${settings.tiersRafa}).`,
     ...missing.map((agent) => `   ${missingAgentLine(agent)}`),
     ...colliding.map((skill) => `   ${skillCollisionLine(skill)}`),
+    ...unresolved.map((skill) => `   ${unresolvedSkillLine(skill)}`),
     '   Nothing was checked and nothing was dispatched.',
   ].join('\n'));
 }

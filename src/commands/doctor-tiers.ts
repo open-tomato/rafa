@@ -8,7 +8,9 @@
  * its `resolveTiers` outcome (`tiers/resolve.ts`) give the collisions
  * and the byte-identical copies, `provenanceBlock` (`tiers/serve.ts`)
  * gives the unreviewed items, and `SERVE_CLI_VERSION`
- * (`tiers/delivery.ts`) gives the pin. The module lives beside
+ * (`tiers/delivery.ts`) gives the pin. A sixth row,
+ * from `SKILL_USE_CLI_VERSION` (`effort/skill-use.ts`), holds the same
+ * installed version against the log format the skill-use collector reads. The module lives beside
  * `./doctor.ts`, not inside it, because that file is near the 800-line
  * cap (`context/source.md`). `rafa doctor` calls {@link checkDoctorTiers}
  * on every run, `--deep` or not, after the references row and before the
@@ -31,6 +33,7 @@
  * | `unreviewed` | `warn` | rafa-tier or add-on row whose `provenance` `provenanceBlock` refuses |
  * | `cli-version` | `warn` | reading, when the installed Claude Code is not `SERVE_CLI_VERSION` |
  * | `cli-version` | `note` | reading, when no installed version could be read |
+ * | `skill-use-version` | `warn` | reading, when the installed Claude Code is not `SKILL_USE_CLI_VERSION` |
  * | `copy` | `note` | byte-identical copy a person can delete, with the deletion as the fix |
  * | `no-provenance` | `note` | user-tier row with no `provenance`, when the user tier is loaded |
  *
@@ -89,6 +92,18 @@
  * version that cannot be read gets a note, so a missing reading is never
  * mistaken for a match.
  *
+ * ## The skill-use pin
+ *
+ * `SKILL_USE_CLI_VERSION` is a second pin on the same reading: the
+ * Claude Code whose log format the skill-use collector was written
+ * against. A session logged under any other version is stored in
+ * `skill_invocations` as an unknown count, so an installed version that
+ * differs gets one warning of its own, telling a person that the skill
+ * counts of the sessions it writes will read as unknown. The two pins
+ * are separate constants that can move apart, so each has its row. A
+ * version that cannot be read gets no second row: the `cli-version`
+ * note already says so, and one missing reading is one note.
+ *
  * Nothing here writes. The files are read through
  * {@link TierFileReaders}, and Claude Code through
  * {@link DoctorTiersSeams.readClaudeVersion}, so each case drives a
@@ -104,6 +119,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
 import { buildInventory } from '../inventory/index.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
 import { PROVENANCE_FIELD } from '../schema/provenance.js';
@@ -122,7 +138,7 @@ export const TIERS_SECTION_TITLE = 'Skill tiers';
 export const CLAUDE_VERSION_TIMEOUT_MS = 10_000;
 
 /** Which reading a row reports; see the module note's table. */
-export type TierDoctorRowKind = 'collision' | 'unreviewed' | 'cli-version' | 'copy' | 'no-provenance';
+export type TierDoctorRowKind = 'collision' | 'unreviewed' | 'cli-version' | 'skill-use-version' | 'copy' | 'no-provenance';
 
 /** One tier row: a deep row, with the reading it reports. */
 export interface TierDoctorRow extends DeepRow {
@@ -330,6 +346,22 @@ export function cliVersionRows(installed: string | null, pinned = SERVE_CLI_VERS
 }
 
 /**
+ * The skill-use pin's row: a warning when `installed` is read and is not
+ * `pinned`, nothing on a match or when unread. See "The skill-use pin".
+ */
+export function skillUseVersionRows(installed: string | null, pinned = SKILL_USE_CLI_VERSION): readonly TierDoctorRow[] {
+  if (installed === null || installed === pinned) return [];
+  return [row(
+    'skill-use-version',
+    'warn',
+    'Claude Code',
+    `${installed} is installed, and the skill-use collector reads logs of ${pinned}, `
+      + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
+    'record the skill-use fixture again under the installed version (src/effort/skill-use.ts) before moving SKILL_USE_CLI_VERSION',
+  )];
+}
+
+/**
  * Every tier row of `inventory`, with `installed` read against the pin,
  * in the module note's order. Reads definition files through `readers`
  * and writes nothing.
@@ -344,6 +376,7 @@ export function doctorTierRows(
     ...collisionRows(inventory.resolution.collisions),
     ...unreviewedRows(inventory.records, readText),
     ...cliVersionRows(installed),
+    ...skillUseVersionRows(installed),
     ...copyRows(inventory.resolution.items, readers.realPath ?? realPathOf),
     ...noProvenanceRows(inventory, readText),
   ];

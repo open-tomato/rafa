@@ -360,11 +360,18 @@ The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, wh
 
 ### `skills=` declaration
 
+When a task needs help from a skill, name those skills with `skills=`. Skill names must come from the skill index provided in this prompt; naming a skill no tier holds is recorded as an issue. Names are comma-separated with no spaces.
+
 `skills` is a recognised key that maps to no flag: there is no CLI flag for a skill, so the names are parsed, kept on the dispatch record and stripped from the task text with the rest of the block. It stands on its own — `{skills=bun-testing}` is a declaration with no other key beside it — and a value that is not a comma-separated list of skill names is recorded as an issue rather than passed on.
+
+A task with no `skills=` declaration is valid — naming none is the answer when no skill guides the task.
 
 ```markdown
   - [ ] Port vitest tests to bun:test  {agent=build-error-resolver skills=bun-testing,vitest-migration}
+  - [ ] Add the Zod schema for `CreateJobRequest` with its unit tests
 ```
+
+The second example above has no `skills=` and is still a valid task declaration.
 
 ---
 

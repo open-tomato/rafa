@@ -32,6 +32,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
 import { buildInventory } from '../inventory/index.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
@@ -43,6 +44,7 @@ import {
   readClaudeVersion,
   readDoctorTiers,
   renderDoctorTiers,
+  skillUseVersionRows,
   TIERS_SECTION_TITLE,
 } from './doctor-tiers.js';
 
@@ -265,12 +267,13 @@ describe('the SERVE_CLI_VERSION pin', () => {
     ]);
   });
 
-  it('places the warning after the unreviewed rows and before the notes', () => {
+  it('places both pin warnings after the unreviewed rows and before the notes', () => {
     const rows = doctorTierRows(buildInventory(seams(WITHOUT_USER)), '9.9.9');
 
-    expect(heads(rows).slice(2, 5)).toEqual([
+    expect(heads(rows).slice(2, 6)).toEqual([
       'unreviewed warn agent borrowed',
       'cli-version warn Claude Code',
+      'skill-use-version warn Claude Code',
       'copy note skill documentation',
     ]);
   });
@@ -278,6 +281,42 @@ describe('the SERVE_CLI_VERSION pin', () => {
   it('parses the leading X.Y.Z of claude --version', () => {
     expect(parseClaudeVersion('2.1.280 (Claude Code)\n')).toBe('2.1.280');
     expect(parseClaudeVersion('Claude Code, no version')).toBeNull();
+  });
+});
+
+describe('the SKILL_USE_CLI_VERSION pin', () => {
+  it('gives no row when the installed version is the pin', () => {
+    expect(skillUseVersionRows(SKILL_USE_CLI_VERSION)).toEqual([]);
+  });
+
+  it('gives one warning naming both versions when they differ', () => {
+    expect(skillUseVersionRows('2.1.999', '2.1.280')).toEqual([{
+      kind: 'skill-use-version',
+      status: 'warn',
+      name: 'Claude Code',
+      detail: '2.1.999 is installed, and the skill-use collector reads logs of 2.1.280, '
+        + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
+      fix: 'record the skill-use fixture again under the installed version (src/effort/skill-use.ts) '
+        + 'before moving SKILL_USE_CLI_VERSION',
+    }]);
+  });
+
+  it('gives no second row when no version could be read, the cli-version note standing for both', () => {
+    expect(skillUseVersionRows(null, '2.1.280')).toEqual([]);
+    // Control: the unread version is still reported, once, by the delivery pin.
+    expect(cliVersionRows(null, '2.1.280').map((row) => `${row.kind} ${row.status}`)).toEqual(['cli-version note']);
+  });
+
+  it('warns for the skill-use pin alone when only that pin differs from the installed version', () => {
+    const rows = [...cliVersionRows('2.1.300', '2.1.300'), ...skillUseVersionRows('2.1.300', '2.1.280')];
+
+    expect(rows.map((row) => row.kind)).toEqual(['skill-use-version']);
+  });
+
+  it('gives no pin row over the planted world when the installed version matches both pins', () => {
+    // Guards the default arguments: rowsOf passes SERVE_CLI_VERSION, so this holds only while the pins agree.
+    expect(SKILL_USE_CLI_VERSION).toBe(SERVE_CLI_VERSION);
+    expect(rowsOf(WITHOUT_USER).some((row) => row.kind === 'cli-version' || row.kind === 'skill-use-version')).toBe(false);
   });
 });
 

@@ -81,30 +81,36 @@ export function refuseDetachedRun(args: readonly string[]): void {
 /** The flag naming how much of the plan each task session is handed. */
 const INJECT_FLAG = '--inject';
 
+/** The flag naming the resolver that picks each task's skills. */
+const SKILLS_RESOLVER_FLAG = '--skills-resolver';
+
 /**
- * The raw `--inject` value, for `resolveConfig` to validate: undefined
- * without the flag, and the empty string for a bare `--inject`.
+ * The raw value of a valued flag, for `resolveConfig` to validate:
+ * undefined without the flag, and the empty string for the bare flag.
  *
  * A bare flag is an empty value rather than no flag, so it is refused.
- * Read as absent, it would dispatch every task under the config's mode
- * while the operator believed they had named one.
+ * Read as absent, it would dispatch every task under the config's
+ * setting while the operator believed they had named one.
  */
-function injectFlagValue(args: readonly string[]): string | undefined {
-  return args.includes(INJECT_FLAG)
+function valuedFlag(args: readonly string[], flag: string): string | undefined {
+  return args.includes(flag)
     ? ''
-    : argValue(args, INJECT_FLAG);
+    : argValue(args, flag);
 }
 
 /**
- * Resolves the settings a run starts on: `--inject=` over the project's
- * `.rafa/config.yaml` under `roots.root`, that over the user scope's
- * under `roots.home`, and both over the defaults, as `config.ts` ranks
- * them.
+ * Resolves the settings a run starts on: `--inject=` and
+ * `--skills-resolver=` over the project's `.rafa/config.yaml` under
+ * `roots.root`, that over the user scope's under `roots.home`, and both
+ * over the defaults, as `config.ts` ranks them.
  *
- * `--inject` is the one flag. `store` resolves from the files and the
- * default and the loop acts on nothing it says, but each file is judged
- * whole, so an unusable `store:` refuses the run as an unusable
- * `plan.inject:` does.
+ * `--inject` overrides `plan.inject` and `--skills-resolver` overrides
+ * `task.skills`, each for this run only: neither writes a file. They are
+ * the two flags. `store` resolves from the files and the default and the
+ * loop acts on nothing it says, but each file is judged whole, so an
+ * unusable `store:` refuses the run as an unusable `plan.inject:` does.
+ * A flag's value no setting accepts, a bare flag's empty one included,
+ * refuses the run rather than falling back to the file's.
  *
  * Throws the {@link ConfigError} `loadConfig` throws, naming every
  * problem. A warning per unknown key goes to `warn`, or through the
@@ -116,7 +122,10 @@ export function loadRunConfig(
   args: readonly string[],
   warn: (message: string) => void = warnThroughActiveOutput,
 ): ResolvedConfig {
-  return loadConfig(roots, { inject: injectFlagValue(args) }, warn);
+  return loadConfig(roots, {
+    inject: valuedFlag(args, INJECT_FLAG),
+    taskSkills: valuedFlag(args, SKILLS_RESOLVER_FLAG),
+  }, warn);
 }
 
 /** Writes one config warning through the active output. */

@@ -67,7 +67,9 @@
  * plan` runs from the build in a scratch repository, under a PATH holding
  * git and a stand-in `claude` that keeps the prompt and the arguments it is
  * handed, and that prompt is held equal to what `buildPlanPrompt` makes of the source
- * template and the source skill. It runs three times: through
+ * template and the source skill, with the skill index `readPlanSkillIndex`
+ * reads for the scratch repository over the source rafa tier, which the
+ * build's `bundled/` copies byte for byte. It runs three times: through
  * `dist/cli.js` and through the root bundle's `planCommand`, both inside
  * the scratch package, and through a copy of the build outside the
  * package. Two controls run the same command from a copy of the build
@@ -300,11 +302,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { loadConfig } from '../config-load.js';
 import * as storeSource from '../effort/store/index.js';
 import * as rootSource from '../index.js';
 import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
-import { buildPlanPrompt, planFormatPath } from '../plan.js';
+import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
 import * as portsSource from '../ports/index.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 
@@ -656,11 +659,18 @@ function filesUnder(directory: string): string[] {
     .sort();
 }
 
-/** The prompt `rafa plan` builds from the source template and skill for {@link SPEC}. */
-function expectedPlanPrompt(): string {
+/**
+ * The prompt `rafa plan` builds from the source template and skill for
+ * {@link SPEC}, with the skill index read for `scratch` under the config
+ * it resolves there, over the source rafa tier.
+ */
+function expectedPlanPrompt(scratch: PlanScratch): string {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
   const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
-  return buildPlanPrompt(template, skill, SPEC, 'spec', '.rafa/plans');
+  const home = scratch.env['HOME'] ?? '';
+  const { config } = loadConfig({ root: scratch.repo, home });
+  const index = readPlanSkillIndex(scratch.repo, home, config, join(REPO_ROOT, 'src', 'plan.ts'));
+  return buildPlanPrompt(template, skill, SPEC, 'spec', '.rafa/plans', undefined, undefined, index);
 }
 
 describe('the package manifest', () => {
@@ -931,7 +941,7 @@ describe('the prompt templates in the build', () => {
     const scratch = plantPlanScratch('cli');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
@@ -942,7 +952,7 @@ describe('the prompt templates in the build', () => {
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
@@ -968,7 +978,7 @@ describe('the prompt templates in the build', () => {
     ].join('\n'), 'utf8');
     const plan = run([process.execPath, probe], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
@@ -979,7 +989,7 @@ describe('the prompt templates in the build', () => {
 
     expect(planFormatPath(copy)).toBe(join(copy, PLAN_FORMAT_IN_TIER));
     expect(existsSync(join(copy, '..', 'src'))).toBe(false);
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt());
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 

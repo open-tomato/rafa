@@ -371,6 +371,7 @@ describe('a blocker over the local adapter', () => {
       home: join(f.root, 'home'),
       settingSources: ['project', 'local'],
       serving: null,
+      handout: null,
       run,
       newSessionId: () => 'session-under-test',
     });

@@ -138,6 +138,20 @@
  * vanishes silently. The command hands over `config.routing` as it
  * resolved it for the rest of the run.
  *
+ * ## The skill index
+ *
+ * The template carries a `{SKILL_INDEX}` slot after `{ROUTING}`, and
+ * {@link buildPlanPrompt} fills it with {@link formatSkillIndexSection}:
+ * a heading over the index `renderSkillIndex` (`task/skill-index.ts`)
+ * writes, one line per skill a loop session will see, so a plan can name
+ * the skills a task needs. The command reads it with
+ * {@link readPlanSkillIndex}: the three tiers read and resolved under
+ * the run's config by `resolveSessionTiers` (`start/serving.ts`), the
+ * call that serves a loop session, with the rafa tier beside this module
+ * as {@link readPlanFormat} finds the plan format. An index with no line
+ * renders a sentence saying no skill reaches a session, so the slot never
+ * vanishes silently.
+ *
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
@@ -150,6 +164,7 @@ import type { AdapterRegistry } from './adapters/registry.js';
 import type { GateBase } from './commands/plan/review-gate.js';
 import type { RouteTarget } from './config-sections.js';
 import type { RafaConfig } from './config.js';
+import type { TierSettings } from './tiers/resolve.js';
 
 import fs from 'fs';
 import { homedir } from 'os';
@@ -170,6 +185,8 @@ import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';
+import { resolveSessionTiers } from './start/serving.js';
+import { renderSkillIndex } from './task/skill-index.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
 import { checkUsage } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
@@ -302,6 +319,48 @@ export function formatRoutingSection(routing: ReadonlyMap<string, RouteTarget>):
   ].join('\n');
 }
 
+/** The heading {@link formatSkillIndexSection} opens the `{SKILL_INDEX}` slot with. */
+export const SKILL_INDEX_HEADING = '## Skill index (the skills a loop session will see)';
+
+/**
+ * Renders a rendered skill index for the `{SKILL_INDEX}` slot: a
+ * heading, one sentence on how a line reads, and the index as written.
+ * An empty index says that no skill reaches a loop session. Exported for
+ * tests.
+ */
+export function formatSkillIndexSection(index: string): string {
+  if (index.trim() === '') {
+    return [
+      SKILL_INDEX_HEADING,
+      '',
+      'No skill reaches a loop session under this project\'s settings.',
+    ].join('\n');
+  }
+  return [
+    SKILL_INDEX_HEADING,
+    '',
+    'One skill per line, as `name — tags — what it prevents`, or its description where it names',
+    'nothing it prevents.',
+    '',
+    index,
+  ].join('\n');
+}
+
+/**
+ * The skill index for a plan written under `settings`: the three tiers
+ * read under `repoRoot` and `home`, with the rafa tier beside `entry`,
+ * resolved as a loop session is served them, and rendered by
+ * `renderSkillIndex`. See "The skill index".
+ */
+export function readPlanSkillIndex(
+  repoRoot: string,
+  home: string,
+  settings: TierSettings,
+  entry: string,
+): string {
+  return renderSkillIndex(resolveSessionTiers({ root: repoRoot, home, settings, entry }));
+}
+
 /** The slots a plan-prompt template carries. */
 export const PLAN_PROMPT_SLOTS = [
   'PLAN_FILE',
@@ -309,6 +368,7 @@ export const PLAN_PROMPT_SLOTS = [
   'PROGRESS_SECTION',
   'PLAN_FORMAT',
   'ROUTING',
+  'SKILL_INDEX',
   'SPEC_CONTENT',
 ] as const;
 
@@ -327,7 +387,9 @@ const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
  * and both files are named in it through `planFilePath`, as the adapter
  * names the files it looks for. `routing` is the resolved `routing`
  * setting the `{ROUTING}` slot renders ({@link formatRoutingSection}),
- * rafa's defaults unless one is handed over.
+ * rafa's defaults unless one is handed over. `skillIndex` is the index
+ * the `{SKILL_INDEX}` slot renders ({@link formatSkillIndexSection}), as
+ * {@link readPlanSkillIndex} reads it; empty unless one is handed over.
  *
  * Every slot is filled in ONE pass over the template, through a replacer
  * function. Filled text is never scanned again, so a spec, a progress
@@ -345,6 +407,7 @@ export function buildPlanPrompt(
   planDir: string,
   progressContent?: string,
   routing: ReadonlyMap<string, RouteTarget> = DEFAULT_ROUTING,
+  skillIndex = '',
 ): string {
   const values: Record<PlanPromptSlot, string> = {
     PLAN_FILE: planFilePath(planDir, `PLAN-${stub}.md`),
@@ -352,6 +415,7 @@ export function buildPlanPrompt(
     PROGRESS_SECTION: formatProgressSection(progressContent),
     PLAN_FORMAT: planFormatBody(planFormat),
     ROUTING: formatRoutingSection(routing),
+    SKILL_INDEX: formatSkillIndexSection(skillIndex),
     SPEC_CONTENT: specContent,
   };
   return template.replace(SLOT_PATTERN, (_slot: string, name: PlanPromptSlot) => values[name]);
@@ -408,6 +472,8 @@ export default async function plan(
   repoRoot: string,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
+  const home = homedir();
+  const config = resolvePlanConfig(repoRoot, home);
   const {
     settingSources,
     routing,
@@ -416,7 +482,7 @@ export default async function plan(
     roadmapIssue,
     boardTrustedAuthors,
     dangerousAcceptStaleRefs,
-  } = resolvePlanConfig(repoRoot, homedir());
+  } = config;
   const flags = readGateFlags(args);
   // Before any board read, so an operator who forgot the setting is told
   // before anything is spent (`commands/plan/refs-check.ts`).
@@ -462,6 +528,7 @@ export default async function plan(
 
   const template = fs.readFileSync(path.join(__dirname, 'plan-prompt.md'), 'utf8');
   const planFormat = readPlanFormat(__dirname);
+  const skillIndex = readPlanSkillIndex(repoRoot, home, config, fileURLToPath(import.meta.url));
   const planner = registry.resolve('planner', 'claude').create({
     repoRoot,
     planDir,
@@ -474,6 +541,7 @@ export default async function plan(
       planDir,
       progressContent,
       routing,
+      skillIndex,
     ),
   });
 

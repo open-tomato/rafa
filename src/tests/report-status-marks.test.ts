@@ -191,6 +191,7 @@ async function runCase(dir: string, sessionId: string, output: string) {
     home: join(dir, 'home'),
     settingSources: ['project', 'local'],
     serving: null,
+    handout: null,
     newSessionId: () => sessionId,
     run: (): Promise<CapturedSession> => {
       writeFileSync(join(dir, 'work.txt'), 'work\n', 'utf8');
@@ -214,6 +215,9 @@ async function runCase(dir: string, sessionId: string, output: string) {
       output: dispatch.output,
       declaration: dispatch.declaration,
       flags: dispatch.flags,
+      resolver: dispatch.resolver,
+      skillsOffered: dispatch.skillsOffered,
+      lessonsOffered: dispatch.lessonsOffered,
     },
     outcome: finished.outcome,
     learning: null,

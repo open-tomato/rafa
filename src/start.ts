@@ -127,6 +127,9 @@
  * --inject      how much of the plan each task session is handed: full, stage
  *               or task. Outranks `plan.inject` in `.rafa/config.yaml`. The
  *               wrap-up session is handed the whole plan whatever it says.
+ * --skills-resolver the resolver that picks each task's skills: planner, tag
+ *               or none. Outranks `task.skills` in `.rafa/config.yaml`, for
+ *               this run only (`start/run-config.ts`).
  * --runtime     the installed rafa the run goes on in: a version under
  *               `~/.rafa/runtime/`, or a path to a `cli.js` or its directory
  *               (`start/runtime.ts`).
@@ -198,6 +201,7 @@ import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { BranchSeams } from './start/branch.js';
 import type { TaskLearning } from './start/dispatch.js';
+import type { TaskHandout } from './start/handout.js';
 import type { SessionServing } from './start/serving.js';
 import type { WrapUpLearning } from './start/wrap-up.js';
 
@@ -519,6 +523,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       blessMinConfidence: runConfig.config.learningBlessMinConfidence,
     };
 
+    // What each task is handed beside the plan: the skills the run's
+    // `task.skills` resolver picks and, under `task.lessons: on`, the
+    // blessed lessons pulled from that same adapter (`start/handout.ts`).
+    const handout: TaskHandout = {
+      resolver: runConfig.config.taskSkills,
+      lessons: runConfig.config.taskLessons,
+      learning,
+    };
+
     // Where the wrap-up reads the lessons it asks the session to promote:
     // the same adapter, at the run's `learning.promote.*` keys
     // (`start/wrap-up.ts`).
@@ -628,11 +641,14 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         settingSources,
         knownMissing,
         serving,
+        handout,
       });
       const { exitCode } = dispatch;
 
       // Stored once the task's fate is known, and never before: the
-      // outcome goes on every row the report is stored as. Triage follows
+      // outcome goes on every row the report is stored as, and the
+      // dispatch row takes the resolver and what the prompt offered off
+      // `dispatch` (`start/dispatch.ts`). Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });

@@ -1,10 +1,12 @@
 /**
  * `rafa effort collect`: session and commit rows appended to the effort
- * store by the phase 0 command in `src/effort/collect.ts`.
+ * store by the phase 0 command in `src/effort/collect.ts`, and the skills
+ * each session invoked counted into `skill_invocations`.
  *
  * The spelling is phase 0's, so no alias is needed.
- * `src/effort/collect.ts` reads its own flags and refuses any other, and
- * the ones declared here are those it reads.
+ * `src/effort/collect.ts` reads its own flags through its parser in
+ * `src/effort/collect-args.ts` and refuses any other, and the ones
+ * declared here are those it reads.
  */
 import collect from '../../effort/collect.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
@@ -16,7 +18,8 @@ export default wrapPhaseZeroCommand({
   summary: 'collect session and commit rows into the effort store',
   description: 'Reads the Claude Code session logs of this repo and its commit history, and appends every'
     + ' session and commit the effort store does not hold yet to the store `store` in'
-    + ' `.rafa/config.yaml` selects. A run over an unchanged history appends nothing. An unrecognised'
+    + ' `.rafa/config.yaml` selects, then counts the skills each appended session invoked into'
+    + ' `effort.sqlite`. A run over an unchanged history appends nothing. An unrecognised'
     + ' argument, a `--since` that is no date and a config the loop cannot run on are each refused,'
     + ' one line per problem.',
   args: [],
@@ -35,9 +38,15 @@ export default wrapPhaseZeroCommand({
     {
       name: 'sessions',
       description: 'Collects session rows; `--no-sessions` skips them. Refused beside `--no-git`,'
-        + ' which would leave nothing to collect.',
+        + ' which would leave nothing to collect, unless `--skills` is given.',
       type: 'boolean',
       default: true,
+    },
+    {
+      name: 'skills',
+      description: 'Counts the `Skill` calls of every session the store already holds, not only the ones'
+        + ' this run appends. Lifts the refusal of `--no-git` beside `--no-sessions`.',
+      type: 'boolean',
     },
     {
       name: 'verbose',

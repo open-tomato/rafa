@@ -1013,7 +1013,10 @@ describe.each(CONFIGURED)('a run finding %s', (
     const commits = plantedCommits([commitRow('aaa')]);
 
     const result = await collectEffort(optionsFor(tree, commits));
-    const files = [...new Set([sessionsFile, commitsFile])].sort();
+    // The skill half writes `skill_invocations`, a SQLite-only table, so
+    // `effort.sqlite` is there under every backend: the planted log carries
+    // no `version`, so its session is stored as an unknown count.
+    const files = [...new Set([sessionsFile, commitsFile, 'effort.sqlite'])].sort();
 
     expect(result.sessions?.appended).toBe(1);
     expect(result.commits?.appended).toBe(1);
@@ -1086,7 +1089,7 @@ describe('the store a run goes through', () => {
 
     expect(result.sessions?.appended).toBe(1);
     expect(readdirSync(storeDir(tree.root)).sort())
-      .toEqual(['commits.ndjson', 'sessions.ndjson']);
+      .toEqual(['commits.ndjson', 'effort.sqlite', 'sessions.ndjson']);
   });
 
   it('reads the config for plan.dir when a store is passed without a plans directory', async () => {
@@ -1215,10 +1218,12 @@ describe('formatCollectSummary', () => {
       repoRoot: '/repo',
       sessions: null,
       commits: null,
+      skills: null,
     });
 
     expect(lines.join('\n')).toContain('--no-sessions');
     expect(lines.join('\n')).toContain('--no-git');
+    expect(lines.at(-1)).toBe('  skills    skipped (--no-sessions)');
   });
 });
 

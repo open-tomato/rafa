@@ -86,7 +86,7 @@ module's note is the long form.
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
-| `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
+| `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`, and again for one other than `SKILL_USE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -320,16 +320,20 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/agents/roster.ts`). Then each `skills=` name of those tasks that
   two loaded tiers hold with different contents, under `tiers.skills`, as
   `<file>: <the line `skillCollisionLine` words>` with both paths and the
-  pin line; a skill name no tier holds is not reported. It throws exit
-  code 1 when there is any of the three, with a message counting each. That is the check `loop start`'s
+  pin line. Then each other `skills=` name the resolution resolves to no
+  winner, as `<file>: <the line `unresolvedSkillLine` words>`: held by no
+  tier, switched off, or held only by a tier the session does not load,
+  each with what settles it. It throws exit code 1 when there is any of
+  the four, with a message counting each. That is the check `loop start`'s
   preflight halts on, so a plan the loop would refuse is refused here
   too. The roster is the project the dispatcher found and the config that
   resolves there, which is the only thing this command reads beyond the
   file; handed no project it says so and checks no agent and no skill.
   In json mode a list, a plan and a clean validation are the terminal
   result's `data`, the validation carrying an empty `issues`, an empty
-  `missingAgents` and an empty `skillCollisions`, and each issue, missing
-  agent and skill collision is an `error` `log` event; text
+  `missingAgents`, an empty `skillCollisions` and an empty
+  `unresolvedSkills`, and each issue, missing agent, skill collision and
+  unresolved skill is an `error` `log` event; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
@@ -1140,7 +1144,12 @@ New; it replaces no earlier text. What a row or an action added to
 - **A wrapped command declares exactly the flags its phase 0 module
   reads**, plus the wrapper's own, as the line types them.
   `src/commands/index.test.ts` holds each list equal to the quoted `--`
-  literals of the modules reading that line, with one flag held apart and
+  literals of the modules its `READERS` entry names, so a flag added to a
+  wrapped command such as `effort collect` moves that entry (adding the
+  module that compares the new flag when it is a new one) and never
+  `OWN_DECLARATIONS`, which holds only the commands wrapping no phase 0
+  command; a spelling in both lists or in neither is red. This replaces
+  nothing. The list is equal to those literals with one flag held apart and
   named: `hint`, which `plan create` and `loop start` declare and no
   phase 0 parser reads, since `endingWith` (`src/next/ending.ts`) reads
   it off the parsed context once the phase 0 function has returned. A

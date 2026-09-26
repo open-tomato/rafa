@@ -75,6 +75,8 @@ criteria — **do not execute the plan**.
 
 {ROUTING}
 
+{SKILL_INDEX}
+
 ## Spec
 
 {SPEC_CONTENT}

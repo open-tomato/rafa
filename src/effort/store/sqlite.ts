@@ -37,22 +37,23 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds eight tables that are not kinds. Six are filled from
+ * The file holds nine tables that are not kinds. Six are filled from
  * task reports: `findings`, `blockers`, `out_of_scope_bugs` and
  * `changes`, one per list a report carries, `report_absences`, one row
  * per task session whose output held no report to read, and
  * `task_reports`, one row per task session whose output carried one,
- * holding its status. The other two are filled from no report:
- * `preflight`, one row per item a run's preflight checked, and
- * `dispatches`, one row per task session the loop spawned. The
+ * holding its status. The other three are filled from no report:
+ * `preflight`, one row per item a run's preflight checked,
+ * `dispatches`, one row per task session the loop spawned, and
+ * `skill_invocations`, one row per skill a session invoked. The
  * port's row map names none of them, and nothing in this module reads or
  * writes them. `findings.ts` writes the first, `triage.ts` the next two,
  * `changes.ts` the fourth, `absences.ts` the fifth, `reports.ts` the
- * sixth, `preflight.ts` the seventh and `dispatches.ts` the
- * last. `tracker-refs.ts` writes the first as well, setting a filed
+ * sixth, `preflight.ts` the seventh, `dispatches.ts` the eighth and
+ * `skill-invocations.ts` the last. `tracker-refs.ts` writes the first as well, setting a filed
  * issue's reference on a row and inserting the row when there is none.
- * `findings.ts`, `triage.ts`, `changes.ts` and `preflight.ts` write
- * through {@link writeSqliteStore}, as an append does, so a write left
+ * `findings.ts`, `triage.ts`, `changes.ts`, `preflight.ts` and
+ * `skill-invocations.ts` write through {@link writeSqliteStore}, as an append does, so a write left
  * with nothing to insert still meets the schema check.
  * `absences.ts` always has its one row and opens {@link withSqliteStore}
  * directly, as `tracker-refs.ts` does with the one row it places.
@@ -395,6 +396,34 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE out_of_scope_bugs
     ADD COLUMN scope TEXT CHECK (scope IN ('machine', 'rafa'));
+  `,
+  // Version 10: the skill resolver a task session ran under and what it
+  // was offered, added to the table version 7 created. `dispatches.ts`
+  // writes them and says why each is nullable. A row a version-9 store
+  // already holds reads NULL in all three.
+  `
+  ALTER TABLE dispatches
+    ADD COLUMN resolver TEXT CHECK (resolver IN ('planner', 'tag', 'none'));
+  ALTER TABLE dispatches
+    ADD COLUMN skills_offered TEXT CHECK (skills_offered IS NULL OR json_type(skills_offered) = 'array');
+  ALTER TABLE dispatches
+    ADD COLUMN lessons_offered TEXT CHECK (lessons_offered IS NULL OR json_type(lessons_offered) = 'array');
+  `,
+  // Version 11: how often a session invoked each skill, outside the port's
+  // row map and filled from no task report. `skill-invocations.ts` writes
+  // it and says why a row with no name, no side and no count is `unknown`.
+  `
+  CREATE TABLE skill_invocations (
+    seq        INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL CHECK (session_id <> ''),
+    name       TEXT CHECK (name <> ''),
+    sidechain  INTEGER CHECK (sidechain IN (0, 1)),
+    count      INTEGER CHECK (count IS NULL OR (typeof(count) = 'integer' AND count > 0)),
+    CHECK ((name IS NULL) = (count IS NULL) AND (name IS NULL) = (sidechain IS NULL))
+  );
+
+  CREATE UNIQUE INDEX skill_invocations_by_use
+    ON skill_invocations (session_id, ifnull(name, ''), ifnull(sidechain, -1));
   `,
 ];
 

@@ -141,10 +141,13 @@
  * document: `start/preflight.ts` the checklist it read, `rafa plan
  * validate` the file as typed.
  *
- * ## Which skills a plan asks for, and the one refusal they meet
+ * ## Which skills a plan asks for, and the refusals they meet
  *
  * {@link planSkillUses} reads the `skills=` names of the same task
- * lines, each with the lines that asked for it, and
+ * lines, each with the lines that asked for it, and two checks read
+ * them against the roster's resolution, which holds the three skill
+ * trees beside the agent ones.
+ *
  * {@link collidingPlanSkills} answers those a session under the roster's
  * settings could not be served because two loaded tiers hold them with
  * different contents (`resolveTiers`' `collision`). Nobody serves such a
@@ -157,11 +160,29 @@
  * Claude Code loads; a skill pin that does not is set aside and the
  * sentence says so (`tiers/resolve.ts`).
  *
- * A collision is the only refusal a `skills=` name meets here. A name no
- * tier holds is not one, because `parseSkillList` in
- * `utils/declaration.ts` leaves membership unchecked on purpose: a
- * skill can come from a plugin or an add-on, outside the three tiers,
- * and a plan may name one this checkout has yet to install.
+ * {@link unresolvedPlanSkills} answers every other name `resolveTiers`
+ * does not resolve to a winner, each with {@link UnresolvedSkill.reason}
+ * and a sentence naming the fix, as an agent's refusal does:
+ *
+ *   - `unheld`: no tier holds it. This is the name a planner invented,
+ *     or one only a plugin or an add-on holds: `resolveTiers` leaves
+ *     those rows out, and the skill index the planner names skills from
+ *     (`task/skill-index.ts`) lists only tier winners, so a plan naming
+ *     one names what the index never offered.
+ *   - `off`: `false` in `tiers.skills` turned it off. The sentence names
+ *     that line, and the pin to serve it instead when a loaded tier
+ *     holds it.
+ *   - `unloaded`: only tiers the session does not load hold it. The
+ *     sentence names each tier with its path and the setting that loads
+ *     it. No vendor command is named: `rafa agent vendor` copies agents.
+ *
+ * {@link unresolvedSkillLine} words each for the same two callers.
+ * `parseSkillList` in `utils/declaration.ts` still leaves membership
+ * unchecked, since it reads one declaration and no tier; the refusal is
+ * this module's, where the tiers are read. A rafa-tier winner the served
+ * directory would skip (`serveVerdict` in `tiers/serve.ts`) is not
+ * refused here: `resolveTiers` resolves it, and the verdict is
+ * `start/serving.ts`'s to report.
  *
  * Nothing here throws, and nothing here spawns the CLI. An unreadable
  * directory, an unreadable file, a file with no frontmatter and one
@@ -274,6 +295,17 @@ export interface SkillCollision extends SkillUse {
   /** The collision `resolveTiers` answered, with every distinct holder and the pin line. */
   readonly collision: TierCollision;
   /** `collisionMessage`'s sentence: every path, then the pin line that settles it. */
+  readonly message: string;
+}
+
+/** Why an asked-for skill name does not resolve, other than a collision; see the module note. */
+export type UnresolvedSkillReason = 'off' | 'unloaded' | 'unheld';
+
+/** An asked-for skill name `resolveTiers` resolves to no winner, and not for a collision. */
+export interface UnresolvedSkill extends SkillUse {
+  /** Why it does not resolve. */
+  readonly reason: UnresolvedSkillReason;
+  /** The sentence saying why, naming the paths and the setting or pin line that settles it. */
   readonly message: string;
 }
 
@@ -459,26 +491,27 @@ function unloadedClause(holder: TierRow, settings: TierSettings): string {
     : `the user tier (${holder.path}), which loop.settingSources (${settings.settingSources.join(', ')}) leaves out`;
 }
 
-/** What would load `holder`'s tier. */
+/** What would load `holder`'s tier; the vendor command only for an agent, which is all it copies. */
 function loadingFix(holder: TierRow): string {
-  return holder.source === 'rafa'
-    ? 'set tiers.rafa: on'
-    : `add user to loop.settingSources, or run \`${VENDOR_COMMAND} ${holder.name}\``;
+  if (holder.source === 'rafa') return 'set tiers.rafa: on';
+  return holder.kind === 'agent'
+    ? `add user to loop.settingSources, or run \`${VENDOR_COMMAND} ${holder.name}\``
+    : 'add user to loop.settingSources';
 }
 
 /** The sentence for a name only unloaded tiers hold. */
 function unloadedMessage(item: TierItem, settings: TierSettings): string {
   const clauses = item.holders.map((holder) => unloadedClause(holder, settings)).join(' and ');
   const fixes = item.holders.map(loadingFix).join(', or ');
-  return `agent ${item.name} is held only by ${clauses}: ${fixes}`;
+  return `${item.kind} ${item.name} is held only by ${clauses}: ${fixes}`;
 }
 
 /** The sentence for a name `false` switched off. */
 function offMessage(item: TierItem): string {
-  const off = `agent ${item.name} is switched off by ${pinKey('agent')}: { ${item.name}: false }`;
+  const off = `${item.kind} ${item.name} is switched off by ${pinKey(item.kind)}: { ${item.name}: false }`;
   const [nearest] = item.loaded;
   return nearest !== undefined && isSkillTier(nearest.source)
-    ? `${off}; pin the tier that serves it instead: ${pinLine('agent', item.name, nearest.source)}`
+    ? `${off}; pin the tier that serves it instead: ${pinLine(item.kind, item.name, nearest.source)}`
     : `${off}; drop that entry to serve it`;
 }
 
@@ -586,6 +619,42 @@ export function collidingPlanSkills(
   });
 }
 
+/** Why `name` resolves to no skill winner and the sentence saying so, or null for a winner or a collision. */
+function unresolvedSkillReason(
+  roster: AgentRoster,
+  name: string,
+): Pick<UnresolvedSkill, 'reason' | 'message'> | null {
+  const item = findTierItem(roster.resolution, 'skill', name);
+  if (item === undefined) {
+    return {
+      reason: 'unheld',
+      message: `skill ${name} is held by no tier: no project, rafa or user skill carries it; \`rafa skill list\` names the skills a session is served`,
+    };
+  }
+  if (item.state === 'off') return { reason: 'off', message: offMessage(item) };
+  if (item.state === 'unloaded') return { reason: 'unloaded', message: unloadedMessage(item, roster.settings) };
+  return null;
+}
+
+/**
+ * The `skills=` names `markdown` asks for that `resolveTiers` resolves
+ * to no winner under the roster's settings — held by no tier, switched
+ * off, or held only by tiers the session does not load — each with why
+ * and what settles it. A collision is {@link collidingPlanSkills}'
+ * answer and not this one's; see the module note.
+ */
+export function unresolvedPlanSkills(
+  markdown: string,
+  roster: AgentRoster,
+): readonly UnresolvedSkill[] {
+  return planSkillUses(markdown).flatMap((use) => {
+    const unresolved = unresolvedSkillReason(roster, use.name);
+    return unresolved === null
+      ? []
+      : [{ ...use, ...unresolved }];
+  });
+}
+
 /**
  * The names `markdown` asks for that a session under `roster` would not
  * resolve, each with why and what settles it. Empty for a document whose
@@ -627,4 +696,12 @@ export function missingAgentLine(missing: MissingAgent): string {
  */
 export function skillCollisionLine(colliding: SkillCollision): string {
   return `skill "${colliding.name}" (${linesClause(colliding.lines)}) cannot be served: ${colliding.message}`;
+}
+
+/**
+ * One line naming a skill no tier resolves, where it was asked for and
+ * why, for the same two callers as {@link missingAgentLine}.
+ */
+export function unresolvedSkillLine(unresolved: UnresolvedSkill): string {
+  return `skill "${unresolved.name}" (${linesClause(unresolved.lines)}) cannot be served: ${unresolved.message}`;
 }

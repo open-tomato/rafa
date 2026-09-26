@@ -55,6 +55,8 @@ import {
   resolveAgentRoster,
   rosterResolves,
   skillCollisionLine,
+  unresolvedPlanSkills,
+  unresolvedSkillLine,
   vendorFixCommand,
   VENDOR_COMMAND,
 } from './roster.js';
@@ -158,6 +160,11 @@ function projectSkills(roots: Required<AgentRosterRoots>): string {
 /** The rafa tier's skills directory of `roots`: `bundled/skills` beside its entry. */
 function rafaSkills(roots: Required<AgentRosterRoots>): string {
   return join(roots.entry, '..', 'bundled', 'skills');
+}
+
+/** The user tier's skills directory of `roots`. */
+function userSkills(roots: Required<AgentRosterRoots>): string {
+  return join(roots.home, '.claude', 'skills');
 }
 
 /** The names of a roster, in the order it holds them. */
@@ -782,6 +789,84 @@ describe('collidingPlanSkills', () => {
     // The control: the skill was read, since the resolution holds it as a served skill.
     expect(roster.resolution.items.map((item) => [item.kind, item.name, item.state]))
       .toEqual([['skill', 'tdd-guide', 'served']]);
+  });
+});
+
+describe('unresolvedPlanSkills', () => {
+  it('refuses a name no tier holds as unheld, naming every open line that asked, and leaves a served name and a ticked line alone', () => {
+    const roots = freshRoots();
+    const project = plantSkillIn(projectSkills(roots), 'documentation');
+    const plan = [
+      '- [ ] Write it  {skills=documentation,held-by-nobody}',
+      '- [x] Already ran  {skills=ticked-only}',
+      '- [ ] Again  {skills=held-by-nobody}',
+      '',
+    ].join('\n');
+
+    const unresolved = unresolvedPlanSkills(plan, resolveAgentRoster(roots, settings()));
+
+    expect(unresolved.map((skill) => [skill.name, skill.reason, skill.lines])).toEqual([['held-by-nobody', 'unheld', [1, 3]]]);
+    expect(unresolved.map(unresolvedSkillLine)).toEqual([
+      'skill "held-by-nobody" (lines 1, 3) cannot be served: skill held-by-nobody is held by no tier:'
+      + ' no project, rafa or user skill carries it; `rafa skill list` names the skills a session is served',
+    ]);
+    // The control: the planted skill was read and served, so its absence above is the resolution's answer.
+    expect(project.startsWith(tempBase)).toBe(true);
+    expect(resolveAgentRoster(roots, settings()).resolution.items.map((item) => [item.kind, item.name, item.state]))
+      .toEqual([['skill', 'documentation', 'served']]);
+  });
+
+  it('refuses a name tiers.skills switches off, naming the false line and the pin that serves it instead', () => {
+    const roots = freshRoots();
+    plantSkillIn(projectSkills(roots), 'documentation');
+    const plan = '- [ ] Write it  {skills=documentation}\n';
+
+    const off = unresolvedPlanSkills(plan, resolveAgentRoster(roots, settings({ tiersSkills: new Map([['documentation', false]]) })));
+
+    expect(off.map((skill) => skill.reason)).toEqual(['off']);
+    expect(off[0]?.message).toBe('skill documentation is switched off by tiers.skills: { documentation: false };'
+      + ' pin the tier that serves it instead: tiers.skills: { documentation: project }');
+    // The control: the same roots and plan with no entry resolve the name.
+    expect(unresolvedPlanSkills(plan, resolveAgentRoster(roots, settings()))).toEqual([]);
+  });
+
+  it('refuses a name only an unloaded tier holds, naming the tier, its path and the setting that loads it, and no vendor command', () => {
+    const roots = freshRoots();
+    const user = plantSkillIn(userSkills(roots), 'home-only');
+    const rafa = plantSkillIn(rafaSkills(roots), 'rafa-only');
+    const plan = '- [ ] Write it  {skills=home-only,rafa-only}\n';
+
+    const unloaded = unresolvedPlanSkills(plan, resolveAgentRoster(roots, settings({ tiersRafa: 'off' })));
+
+    expect(unloaded.map((skill) => [skill.name, skill.reason])).toEqual([['home-only', 'unloaded'], ['rafa-only', 'unloaded']]);
+    expect(unloaded.map((skill) => skill.message)).toEqual([
+      `skill home-only is held only by the user tier (${user}), which loop.settingSources (project, local) leaves out:`
+      + ' add user to loop.settingSources',
+      `skill rafa-only is held only by the rafa tier (${rafa}), which tiers.rafa: off unloads: set tiers.rafa: on`,
+    ]);
+    expect(unloaded.some((skill) => skill.message.includes(VENDOR_COMMAND))).toBe(false);
+    // The control: loading both tiers resolves both names from the same roots.
+    expect(unresolvedPlanSkills(plan, resolveAgentRoster(roots, settings({ settingSources: WITH_USER })))).toEqual([]);
+  });
+
+  it('leaves a collision to collidingPlanSkills, so one name is refused once', () => {
+    const roots = freshRoots();
+    plantSkillIn(projectSkills(roots), 'documentation', skillText('documentation', 'The project body.'));
+    plantSkillIn(rafaSkills(roots), 'documentation');
+    const plan = '- [ ] Write it  {skills=documentation}\n';
+    const colliding = resolveAgentRoster(roots, settings());
+
+    expect(unresolvedPlanSkills(plan, colliding)).toEqual([]);
+    // The control: the name does collide, so the empty answer above is not a name the resolution served.
+    expect(collidingPlanSkills(plan, colliding).map((skill) => skill.name)).toEqual(['documentation']);
+  });
+
+  it('reads a skills= name on a line a never-closed fence hides, as the dispatcher reaches it', () => {
+    const hidden = ['```rafa:context', 'Never closed.', '', '- [ ] Write it  {skills=held-by-nobody}', ''].join('\n');
+
+    const unresolved = unresolvedPlanSkills(hidden, resolveAgentRoster(freshRoots(), settings()));
+
+    expect(unresolved.map((skill) => [skill.name, skill.lines])).toEqual([['held-by-nobody', [4]]]);
   });
 });
 

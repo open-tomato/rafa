@@ -171,6 +171,7 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
       serving: null,
+      handout: null,
       run,
     });
 

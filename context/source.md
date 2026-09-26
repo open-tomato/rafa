@@ -71,8 +71,9 @@ wiring that reading back in as a whole-fence rule took it to 795, and
 the single-segment route rule took it to exactly 800 — its note paid
 for by rewrapping the prose the rule superseded. NO non-test file under
 `src/` is over the cap; the nearest is `src/check/references.ts` at
-that 800, with `src/effort/collect.ts` at 798 and
-`src/demote/classify.ts` at 795 behind it.
+that 800, with `src/demote/classify.ts` at 797 behind it. `src/effort/collect.ts`
+was at 798 until its argv parser moved to `collect-args.ts` and its
+skill half went to `collect-skills.ts`, which left it at 777.
 
 **The cap is a rule about modules, not about their tests.** At `b2bebfe`
 exactly one non-test file under `src/` is over it, `src/check/references.ts`

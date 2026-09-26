@@ -406,6 +406,7 @@ describe('a blocker comment on its way downstream', () => {
       home: join(tempRoot, 'no-definitions', 'home'),
       settingSources: ['project', 'local'],
       serving: null,
+      handout: null,
       run,
       newSessionId: () => 'session-under-test',
     });

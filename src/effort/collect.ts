@@ -147,13 +147,24 @@
  * refusal above exists to prevent. `--no-git` together with
  * `--no-sessions` is refused for the same reason: it leaves nothing
  * to collect, and a zero-row run that looks successful is worse than
- * a message.
+ * a message. `--skills` lifts that refusal, since it leaves the stored
+ * sessions to count. The parser is `collect-args.ts`.
  *
  * An EMPTY plan roster is not refused — `plan.dir` is untracked by
  * default and absent on a fresh clone — but it makes every session's
  * `planStub` resolve to null, which reads as a collector that failed
  * to attribute anything. The roster size is reported for that reason.
+ *
+ * ## The skill half
+ *
+ * After the session and commit halves, `collect-skills.ts` counts the
+ * `Skill` calls of the sessions this run read into a row, or with
+ * `--skills` of every stored session whose log is in the directory and
+ * the window. It writes the SQLite-only `skill_invocations` table, not
+ * the port, so it lands in `effort.sqlite` under any `store`. Its note
+ * says which sessions it skips and why a count can be `unknown`.
  */
+import type { SkillCollectSummary, SkillLog, SkillScope } from './collect-skills.js';
 import type {
   CommitLogOptions,
   CommitLogParseResult,
@@ -176,6 +187,8 @@ import { ConfigError } from '../config.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
+import { parseCollectArgs } from './collect-args.js';
+import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
 import { readCommitLog } from './commits.js';
 import {
   readLines,
@@ -211,6 +224,10 @@ const SESSION_MODE: SessionMode = 'local';
  */
 export type { SessionEffortRow } from './store/types.js';
 
+/* The argv parser moved to its own module; re-exported so callers keep one import. */
+export type { CollectArgs } from './collect-args.js';
+export { parseCollectArgs, parseSinceInstant } from './collect-args.js';
+
 /** One session log the walk found, before anything has been read. */
 export interface SessionLogCandidate {
   path: string;
@@ -234,19 +251,6 @@ export interface SessionSelection {
 export interface CommitSelection {
   pending: CommitStats[];
   alreadyCollected: CommitStats[];
-}
-
-/** What the parsed argv asked for. */
-export interface CollectArgs {
-  /** The `--since` value as given, for reporting. */
-  since: string | null;
-  /** The same instant, resolved once and shared by both halves. */
-  sinceEpochMs: number | null;
-  collectSessions: boolean;
-  collectCommits: boolean;
-  verbose: boolean;
-  /** Every refusal, so all of them are reported and not just the first. */
-  errors: string[];
 }
 
 /** What the session half did. */
@@ -298,6 +302,8 @@ export interface CollectResult {
   repoRoot: string;
   sessions: SessionCollectSummary | null;
   commits: CommitCollectSummary | null;
+  /** Null when the session half was off and `--skills` was not given. */
+  skills: SkillCollectSummary | null;
 }
 
 /** How a run is bounded and where it reads from. */
@@ -324,6 +330,15 @@ export interface CollectOptions {
   store?: EffortStore;
   collectSessions?: boolean;
   collectCommits?: boolean;
+  /**
+   * Which sessions the skill half reads: `appended`, the default, the
+   * ones the session half read into a row this run; `held`, every one
+   * the store holds; null, none. `appended` with the session half off
+   * runs nothing. The half writes `effort.sqlite` under `repoRoot` even
+   * when a store is passed, so a caller whose root is not its own passes
+   * null.
+   */
+  skills?: SkillScope | null;
   verbose?: boolean;
   /**
    * Sink for progress, errors and config warnings. Defaults to the
@@ -475,73 +490,6 @@ export function selectCommits(
   return { pending, alreadyCollected };
 }
 
-/**
- * Resolves a `--since` value to an instant, or null when it cannot be
- * read. See the module note on why an unreadable value is refused
- * rather than handed to git.
- */
-export function parseSinceInstant(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-
-  const epoch = Date.parse(trimmed);
-  return Number.isNaN(epoch)
-    ? null
-    : epoch;
-}
-
-/**
- * Parses the collect argv.
- *
- * Every refusal is collected rather than thrown at the first one, so
- * an operator fixing a command line sees all of it at once. A
- * repeated flag takes its LAST occurrence, which is what a shell
- * alias appending an override expects.
- */
-export function parseCollectArgs(args: readonly string[]): CollectArgs {
-  const errors: string[] = [];
-  let since: string | null = null;
-  let sinceEpochMs: number | null = null;
-  let collectSessions = true;
-  let collectCommits = true;
-  let verbose = false;
-
-  for (const arg of args) {
-    if (arg === '--no-git') {
-      collectCommits = false;
-    } else if (arg === '--no-sessions') {
-      collectSessions = false;
-    } else if (arg === '--verbose') {
-      verbose = true;
-    } else if (arg === '--since') {
-      errors.push('--since takes a value, as --since=<date>');
-    } else if (arg.startsWith('--since=')) {
-      const raw = arg.slice('--since='.length);
-      const epoch = parseSinceInstant(raw);
-      if (epoch === null) {
-        errors.push(`--since value is not a date this can read: ${raw}`);
-      } else {
-        since = raw;
-        sinceEpochMs = epoch;
-      }
-    } else {
-      errors.push(`unrecognised argument: ${arg}`);
-    }
-  }
-
-  if (!collectSessions && !collectCommits) {
-    errors.push('--no-git with --no-sessions leaves nothing to collect');
-  }
-  return {
-    since,
-    sinceEpochMs,
-    collectSessions,
-    collectCommits,
-    verbose,
-    errors,
-  };
-}
-
 /** Reads the plan roster, tolerating a plans directory that is not there. */
 export function readPlanStubs(plansDir: string): string[] {
   return existsSync(plansDir)
@@ -591,10 +539,14 @@ function messageOf(error: unknown): string {
     : String(error);
 }
 
+/** What the session half did, and the logs it read into a row, which the skill half reads by default. */
+interface SessionHalf {
+  summary: SessionCollectSummary;
+  read: SessionLogCandidate[];
+}
+
 /** Collects the session half. */
-async function collectSessionHalf(
-  context: HalfContext,
-): Promise<SessionCollectSummary> {
+async function collectSessionHalf(context: HalfContext): Promise<SessionHalf> {
   const planStubs = readPlanStubs(context.plansDir);
   const candidates = listSessionLogs(context.logDir);
   const selection = selectSessionLogs(
@@ -608,10 +560,12 @@ async function collectSessionHalf(
   context.note(`sessions: ${stubs} in ${context.plansDir}`);
 
   const rows: SessionEffortRow[] = [];
+  const read: SessionLogCandidate[] = [];
   let failed = 0;
   for (const candidate of selection.pending) {
     try {
       rows.push(await collectSessionRow(candidate, planStubs));
+      read.push(candidate);
       context.note(`sessions: read ${candidate.sessionId}`);
     } catch (error) {
       failed += 1;
@@ -620,7 +574,7 @@ async function collectSessionHalf(
   }
 
   const appended = context.store.append('sessions', rows);
-  return {
+  const summary = {
     logDir: context.logDir,
     storePath: appended.path,
     planStubCount: planStubs.length,
@@ -632,6 +586,19 @@ async function collectSessionHalf(
     appended: appended.appended,
     skippedOnAppend: appended.skipped,
   };
+  return { summary, read };
+}
+
+/**
+ * The logs the skill half reads: under `held`, every loose log in the
+ * directory whose session the store holds, inside the window; under
+ * `appended`, the ones the session half read, or null when it did not run.
+ */
+function skillLogs(context: HalfContext, scope: SkillScope, sessions: SessionHalf | null): SkillLog[] | null {
+  if (scope === 'appended') return sessions?.read ?? null;
+  const held = context.store.keys('sessions');
+  return selectSessionLogs(listSessionLogs(context.logDir), new Set(), context.sinceEpochMs)
+    .pending.filter((candidate) => held.has(candidate.sessionId));
 }
 
 /** Collects the commit half. */
@@ -679,10 +646,11 @@ function resolveSources(
 /**
  * Runs one collect.
  *
- * The halves are independent and neither reads the other's rows, so
- * switching one off changes nothing about the other's result. They do
- * share one store and one roster, resolved before either runs; see the
- * module note.
+ * The session and commit halves are independent and neither reads the
+ * other's rows, so switching one off changes nothing about the other's
+ * result. They do share one store and one roster, resolved before either
+ * runs; see the module note. The skill half runs last, over the logs the
+ * session half read, or under `held` over the sessions the store holds.
  *
  * Rejects with a `ConfigError`, having read no log and run no git, when
  * a store or a plans directory is not passed and a config file under the
@@ -706,15 +674,22 @@ export async function collectEffort(
     readCommits: options.readCommits ?? readCommitLog,
   };
 
-  return {
-    repoRoot,
-    sessions: options.collectSessions === false
-      ? null
-      : await collectSessionHalf(context),
-    commits: options.collectCommits === false
-      ? null
-      : collectCommitHalf(context),
-  };
+  const sessions = options.collectSessions === false
+    ? null
+    : await collectSessionHalf(context);
+  const commits = options.collectCommits === false
+    ? null
+    : collectCommitHalf(context);
+  const scope = options.skills === undefined
+    ? 'appended'
+    : options.skills;
+  const logs = scope === null
+    ? null
+    : skillLogs(context, scope, sessions);
+  const skills = scope === null || logs === null
+    ? null
+    : await collectSkillHalf({ repoRoot, scope, logs, log, note: context.note });
+  return { repoRoot, sessions: sessions?.summary ?? null, commits, skills };
 }
 
 /** Renders a run as the lines the command prints. */
@@ -746,6 +721,7 @@ export function formatCollectSummary(result: CollectResult): string[] {
       + `, +${commits.appended} rows`,
     );
   }
+  lines.push(formatSkillSummary(result.skills));
   return lines;
 }
 
@@ -786,6 +762,9 @@ export default async function collect(args: string[], repoRoot: string): Promise
       sinceEpochMs: parsed.sinceEpochMs,
       collectSessions: parsed.collectSessions,
       collectCommits: parsed.collectCommits,
+      skills: parsed.collectHeldSkills
+        ? 'held'
+        : 'appended',
       verbose: parsed.verbose,
     });
   } catch (error) {

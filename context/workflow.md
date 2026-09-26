@@ -71,7 +71,9 @@ refusal names both paths and the pin line that settles it
 (`src/start/preflight.ts`). The same resolution covers the three skill
 trees, so a `skills=` name of those tasks that two loaded tiers hold
 with different contents refuses the run too, naming both paths and its
-`tiers.skills` pin line; a skill name no tier holds does not.
+`tiers.skills` pin line, and so does one the resolution resolves to no
+winner, exactly as an agent does: one no tier holds, one `tiers.skills`
+switches off, or one only an unloaded tier holds.
 `rafa plan validate` runs the same check and exits 1 on the same plan.
 
 **`agent=` outranks `model` and `tools` because routing supplies
@@ -100,6 +102,66 @@ prompt is untouched, byte-identical to what was piped in, but record 0
 becomes an agent-setting record and the enqueue moves to record 1, so
 every prompt-keyed reader has to key on the type/operation pair and
 never on position.
+
+### Skills and lessons at dispatch
+
+**Every task's prompt holds a skill index, and at dispatch the session is
+handed both the skills it needs and the lessons it learned from earlier
+work.** The planner reads a compact skill index (`renderSkillIndex` in
+`src/task/skill-index.ts`) that lists every enabled skill a loop session
+will see, one line per skill with its bare name, tags and either its
+prevents clause or a one-line summary. A plan can name the skills each
+task needs with `skills=` beside its text; a task declaring none gets
+none. At dispatch, one of three resolvers (`src/task/resolve-skills.ts`)
+picks the skills to offer, and (`src/task/select-lessons.ts`) picks up to 5
+blessed lessons from the learning store when they are enabled. Both go into
+the task's prompt as two sections, after the blocker line and before
+`PROMPT.md`, rendered by (`src/task/sections.ts`).
+
+**The three resolvers are `planner`, `tag` and `none`.** The planner
+resolver uses the task's `skills=` declaration and offers exactly those
+skills by name, in order. The tag resolver is a model-free control arm:
+it ignores `skills=`, ranks every offered skill against the task text
+and its stage context with `rankCandidates`, and keeps the top 3 scoring
+above a floor of zero (at least one question word matched one field).
+The none resolver offers nothing; it is the "before" condition. The
+resolver that runs is set by `task.skills` in the config (defaulting to
+`planner`), which the `--skills-resolver=` flag overrides. The resolver's
+name is recorded on the dispatch row and carried in the store, but never
+printed into the prompt, so a session cannot tell which arm it is in.
+
+**The prompt sections are `## Skills for this task` and `## Lessons from
+earlier tasks`.** Skills are listed with their session name (the name the
+session invokes with the Skill tool), a colon, and a one-line description
+of what the skill covers, or the skill name alone when it has no
+description. Lessons are listed with a trigger clause, an action, a
+confidence score with two decimals, the count of distinct tasks that
+confirmed the lesson, and the lesson's id. When a section has nothing to
+offer, it is rendered as the empty string and left out of the prompt, so
+a task with no skills and lessons disabled gets the prompt it would have
+gotten before.
+
+**`task.skills` names the resolver and `task.lessons` gates whether blessed
+lessons join the prompt.** Both are configuration settings: `task.skills`
+takes `planner`, `tag` or `none` and defaults to `planner`; `task.lessons`
+takes the words `on` and `off` and defaults to `on`. `task.skills` is a
+command-line setting (the `--skills-resolver=` flag), so it overrides
+the project's `.rafa/config.yaml` and any user-level `~/.rafa/config.yaml`.
+`task.lessons` has no flag. Both are optional, so a config file spelling
+neither uses the defaults, and a file spelling one but not the other
+keeps the other at its default.
+
+**The dispatch record holds what skills and lessons reached the prompt.**
+The `dispatches` table in the store (`src/effort/store/dispatches.ts`)
+carries three new columns: `resolver` (the name that ran, one of
+`planner`, `tag` or `none`, or NULL when not recorded), `skills_offered`
+(a JSON array of the bare names, in order, or NULL), and `lessons_offered`
+(a JSON array of lesson ids, or NULL). A dispatch that ran no resolver or
+handed no handout writes NULL for the resolver and `[]` for both lists, so
+an empty offer and an unrecorded one stay apart. A session's use of a skill
+can be read against what it was handed by matching the names in
+`skills_offered` against the skill invocations in the `skill_invocations`
+table (`src/effort/store/skill-invocations.ts`).
 
 ### Naming convention
 
