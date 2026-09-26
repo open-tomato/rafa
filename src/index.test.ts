@@ -649,6 +649,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/effort/fix-schema.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../effort/store/fix-schema.js', ['fixStoreSchema', 'SchemaFixRefusal']],
+    ['../../effort/store/sqlite.js', ['sqliteStorePath']],
+    ['../../loop/sessions.js', ['readSessions']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
+  ]],
   ['./commands/module/list.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
@@ -1065,6 +1072,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/wait.js',
       './commands/pr/merge.js',
       './commands/pr/triage.js',
+      './commands/effort/fix-schema.js',
       './commands/module/list.js',
       './commands/module/exec.js',
       './commands/agent/vendor.js',
