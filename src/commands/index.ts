@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-seven registered so far wrap a
+ * of each is its command. Five of the fifty-eight registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -101,7 +101,9 @@
  *     assessed in code into a class with its evidence and a follow-up
  *     prompt, the reading left as one comment per pull request. Each
  *     refuses with exit code 2 where `pr.provider` is not `gh`.
- *   - `effort collect` and `effort report`, whose spelling is phase 0's.
+ *   - `effort collect` and `effort report`, whose spelling is phase 0's,
+ *     and `effort fix-schema [--dry-run]`, a store a newer rafa migrated
+ *     rebuilt at the version this one knows, the original kept whole.
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
@@ -207,6 +209,7 @@ import cleanup from './cleanup.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
+import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
@@ -263,7 +266,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
-  { name: 'effort', summary: 'collect session and commit rows; report per plan' },
+  { name: 'effort', summary: 'collect session and commit rows; report per plan; repair a store a newer rafa migrated' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
@@ -302,6 +305,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   prTriage,
   effortCollect,
   effortReport,
+  effortFixSchema,
   moduleList,
   moduleExec,
   agentVendor,

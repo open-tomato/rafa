@@ -43,6 +43,29 @@ fix:** TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
 one**, so a field added to the attribution reaches no stored row until it
 is copied there as well.
 
+### A store past this rafa
+
+**A plan that adds a migration can lock its own loop out of the store.**
+`migrateSchema` refuses a store past the version `SQLITE_MIGRATIONS` holds,
+and every read and write goes through it. A task that runs the branch's
+own code from its working tree against `.rafa/effort/effort.sqlite`
+migrates the project's store, while the loop driving the plan is the older
+installed runtime. From then on that runtime refuses the store, and the
+task reports it collects are not stored. Seen on rafa-23 (2026-09-26): its
+versions 10 and 11 reached the store through `rafa effort collect` run from
+the branch, and the 0.18.0 loop stopped.
+
+**`rafa effort fix-schema` repairs such a store**
+(`src/effort/store/fix-schema.ts`). It builds `effort.sqlite.fix-<stamp>`
+at this rafa's version, copies every table and column this rafa knows,
+checks the row counts and `integrity_check`, and lists the tables and
+columns only the newer schema holds. The original is then renamed to
+`effort.sqlite.v<version>-<stamp>.bak`, whole, and the rebuild takes its
+place. `--dry-run` deletes the rebuild instead, so it can be repeated and
+runs beside a live loop; the swap refuses while a loop session is running
+or paused. A newer schema that dropped a table or column this rafa writes
+is not additive, and the repair refuses it rather than copy around it.
+
 ### Tables outside the port
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
