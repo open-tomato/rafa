@@ -117,6 +117,16 @@ offered. Adding them moved three expectations, all in
 `store/dispatches.test.ts`: the `COLUMNS` list and the two whole-row
 `toEqual`s.
 
+**`skill_invocations` is written by `effort collect`, not by a task
+report.** Its skill half (`src/effort/collect-skills.ts`) reads the
+`Skill` calls of each session the run read into a session row, or with
+`--skills` of every session the port holds whose log is in the
+directory, and skips a session already holding a row. It writes under
+the repo root even when `collectEffort` is handed a store, so the
+parity suites, whose `repoRoot` is the live sibling, pass `skills: null`.
+A run over the planted logs of a test writes `effort.sqlite` under a
+`store: ndjson` config too: a log with no `version` is an unknown row.
+
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
 `store/changes.ts` passes `checkDispatch` a null outcome and only the
@@ -190,8 +200,9 @@ caller passes no `plansDir`.
 **`collectEffort` writes the store under its `repoRoot`, and reads the
 config there unless it is handed both `store` and `plansDir`.** A case
 pointing `repoRoot` at the live sibling appends to the sibling's own
-`.rafa/effort/` unless it also passes a `store` opened under a temp root,
-or uses a temp `repoRoot` with `plansDir` and `readCommits` supplied. The
+`.rafa/effort/` unless it also passes a `store` opened under a temp root
+and `skills: null`, or uses a temp `repoRoot` with `plansDir` and
+`readCommits` supplied. The
 parity suites pass the sibling's plans directory as `plansDir` beside the
 store, so they attribute by the sibling's roster and read no config.
 

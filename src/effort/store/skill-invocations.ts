@@ -7,8 +7,9 @@
  * and no tool input, so nothing else the store holds says which skills a
  * session actually used. `dispatches` says which ones its prompt offered;
  * this table is the other half of that comparison. The collector in
- * `effort/skill-use.ts` reads the counts off a session's logs and hands
- * them to {@link writeSkillInvocations}.
+ * `effort/skill-use.ts` reads the counts off a session's logs, and the
+ * skill half of `effort collect` (`effort/collect-skills.ts`) hands them
+ * to {@link writeSkillInvocations}.
  *
  * ## The row
  *

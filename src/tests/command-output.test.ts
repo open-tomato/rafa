@@ -220,6 +220,7 @@ describe('rafa effort collect', () => {
       `effort collect: ${scratch.repo}`,
       '  sessions  skipped (--no-sessions)',
       '  commits   1 parsed, 1 already stored, +0 rows',
+      '  skills    skipped (--no-sessions)',
     ]);
     expect([json.exitCode, json.stderr]).toEqual([0, '']);
     expect(infoMessages(eventsOf(json))).toEqual(linesOf(text.stdout));

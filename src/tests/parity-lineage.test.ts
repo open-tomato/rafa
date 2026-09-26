@@ -337,6 +337,8 @@ describe.skipIf(!fixture.present)(title, () => {
       logDir: fixturePaths.logDir,
       plansDir: join(SIBLING_CHECKOUT_ROOT, '.plans'),
       store,
+      // The skill half writes under repoRoot whatever store is passed.
+      skills: null,
       verbose: false,
       log: () => undefined,
     });
