@@ -70,11 +70,12 @@ of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
 render.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
-`reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts` and
-`changes.test.ts`, and the filter the version-5 case of
-`preflight.test.ts` takes the later tables out with, beside the
-version-6 filter of `dispatches.test.ts` and the two version-7 filters
-of `changes.test.ts`.
+`reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts`,
+`changes.test.ts` and `skill-invocations.test.ts`, and the filter the
+version-5 case of `preflight.test.ts` takes the later tables out with,
+beside the version-6 filter of `dispatches.test.ts`, the two version-7
+filters of `changes.test.ts`, and the version-11 filter of
+`skill-invocations.test.ts`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what
@@ -100,32 +101,54 @@ redden.
 
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
-the session id, holding the block as written, each declared value the
-parser could use, the flags the session was spawned with, and the
-resolver with the bare names of the skills and the ids of the lessons its
-prompt offered, whatever became of the task, and then the report; a
-refused dispatch row stores no report. A dispatch handed no handout
-stores a NULL resolver beside two `[]` offers. No column holds the outcome: `task_reports` and `report_absences`
-hold it under the same session id.
+the session id, holding what the task line's declaration asked for and the
+flags the session was spawned with, one row per session. The table has
+three columns holding resolver and offer information: `resolver` (the skill
+resolver the session ran under), `skills_offered` (the bare names of skills
+its prompt offered), and `lessons_offered` (the ids of lessons its prompt
+offered). Whatever became of the task, the dispatch is written ahead of the
+task report; a refused dispatch row stores no report. A dispatch handed no
+handout stores a NULL resolver beside two `[]` offers. No column holds the
+outcome: `task_reports` and `report_absences` hold it under the same
+session id.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a
 version-9 store held reads NULL in all three: not recorded. The
 `DispatchWrite` fields behind them are optional and store NULL when left
 out; an offered list that was recorded stores `[]` when nothing was
-offered. Adding them moved three expectations, all in
-`store/dispatches.test.ts`: the `COLUMNS` list and the two whole-row
-`toEqual`s.
+offered. Each list is stored in the order it was handed, as the prompt's
+section listed it. Adding the three columns moved three expectations, all
+in `store/dispatches.test.ts`: the `COLUMNS` list and the two
+whole-row `toEqual`s.
 
 **`skill_invocations` is written by `effort collect`, not by a task
-report.** Its skill half (`src/effort/collect-skills.ts`) reads the
-`Skill` calls of each session the run read into a session row, or with
-`--skills` of every session the port holds whose log is in the
+report.** Its collector (`src/effort/skill-use.ts`) reads the input of
+`Skill` tool calls — the one exception to the "no tool input" rule — to
+extract and count each skill a session invoked, in its main thread and in
+its sidechains. The skill half of `effort collect` (`src/effort/collect-skills.ts`)
+reads the `Skill` calls of each session the run read into a session row, or
+with `--skills` of every session the port holds whose log is in the
 directory, and skips a session already holding a row. It writes under
 the repo root even when `collectEffort` is handed a store, so the
 parity suites, whose `repoRoot` is the live sibling, pass `skills: null`.
-A run over the planted logs of a test writes `effort.sqlite` under a
-`store: ndjson` config too: a log with no `version` is an unknown row.
+One session invoked from both sides is two rows, one per side. An
+`unknown` row — one row holding the session and NULL in `name`, `sidechain`
+and `count` — marks a session whose log the collector could not vouch for
+(log version mismatch, unreadable line, or unreadable skill call). A session
+that invoked no skill stores no row at all.
+
+**The collector's exception to "no tool input".** `session-log.ts`
+and the effort port fold a session's logs into counters and identifiers
+without keeping message content. The skill-use collector in
+`src/effort/skill-use.ts` is the single exception: it reads the `skill`
+field from the input of a `Skill` tool call, mapped to a bare name with
+`bareSkillName`, and no message content otherwise — not the call's
+args, every other tool's input, every prompt, or any tool output. The
+counts it answers can therefore be stored beside the session rows without
+the store becoming a copy of a transcript. The collector vouches for the log
+format by comparing each record's `version` against `SKILL_USE_CLI_VERSION`;
+a session read as `unknown` is never averaged as a session that used no skill.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
@@ -202,9 +225,12 @@ config there unless it is handed both `store` and `plansDir`.** A case
 pointing `repoRoot` at the live sibling appends to the sibling's own
 `.rafa/effort/` unless it also passes a `store` opened under a temp root
 and `skills: null`, or uses a temp `repoRoot` with `plansDir` and
-`readCommits` supplied. The
-parity suites pass the sibling's plans directory as `plansDir` beside the
-store, so they attribute by the sibling's roster and read no config.
+`readCommits` supplied. The parity suites pass the sibling's plans
+directory as `plansDir` beside the store, so they attribute by the
+sibling's roster and read no config. **Never run this branch's code
+against `.rafa/effort/` directly.** Tests over the store open a copy under
+a temporary root, or read the store through `readStoreRows` and pass no
+path; both patterns keep the real `.rafa/effort/` untouched.
 
 **Compare the two backends' rows by `JSON.stringify(row)`, paired by key
 rather than by position.** `toEqual` ignores field order, and
