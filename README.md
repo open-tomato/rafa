@@ -174,8 +174,8 @@ the next one, so you rarely have to remember it.
 ### Which agents and skills are involved
 
 A task line may end with a declaration, for example
-`{agent=tdd-guide effort=medium}`. The planner writes it; you can change
-it.
+`{agent=tdd-guide skills=dev-planner effort=medium}`. The planner
+writes it; you can change it.
 
 - `agent=` routes the task to a Claude Code subagent. The planner picks
   by the task's SHAPE: implementation, tests, prose, a red build, a
@@ -196,8 +196,8 @@ it.
   while the project or a loaded user tier holds a different copy, and a
   `project` pin while a loaded user tier does; pin the tier the refusal
   names, or delete or rename the copy it names. `loop start` refuses a
-  plan that names an agent it cannot resolve before any session is paid
-  for.
+  plan that names an agent or a skill it cannot resolve before any
+  session is paid for.
 - User-tier items are invisible unless `loop.settingSources` includes
   `user`. `rafa agent list` shows what a run sees, `rafa agent vendor
   <name>` copies one in or updates it, and `rafa skill check .claude/skills
@@ -205,6 +205,25 @@ it.
   not resolve, a missing field) before it costs a task.
 - The plan format itself is a skill, `dev-planner`, shipped in the rafa
   tier and used when the project has none of its own.
+- **Skills for this task.** A task may declare the skills it needs with
+  `skills=skill1,skill2` on its line. At dispatch, one of three resolvers
+  picks which skills to offer: `planner` uses the task's `skills=`
+  declaration exactly, in order; `tag` ignores `skills=` and ranks every
+  enabled skill against the task text to find the top 3 scoring above a
+  floor of zero; `none` offers no skills. The resolver is set by
+  `task.skills` in `.rafa/config.yaml` (defaulting to `planner`), and the
+  `--skills-resolver=` flag overrides it. A compact skill index is listed
+  in the planner's prompt so the planner sees what skills are available
+  before writing the task. When a task is dispatched, the prompt gains a
+  "Skills for this task" section with the skills the resolver picked, or
+  stays unchanged if none were picked. The dispatch record stores the
+  resolver name and which skills were offered.
+- **Lessons from earlier tasks.** Up to 5 lessons from the learning store
+  are added to a task's prompt as a "Lessons from earlier tasks" section
+  when `task.lessons` is `on` (the default). The lessons are blessed
+  passages from earlier task findings that recurred or reached a
+  confidence floor. When neither skills nor lessons appear, the prompt
+  stays unchanged from before.
 - `model=`, `effort=`, `tools=` and `budget=` on a task line set the
   session's model, reasoning effort, tool list and spending cap when no
   agent decides them.
