@@ -1144,7 +1144,12 @@ New; it replaces no earlier text. What a row or an action added to
 - **A wrapped command declares exactly the flags its phase 0 module
   reads**, plus the wrapper's own, as the line types them.
   `src/commands/index.test.ts` holds each list equal to the quoted `--`
-  literals of the modules reading that line, with one flag held apart and
+  literals of the modules its `READERS` entry names, so a flag added to a
+  wrapped command such as `effort collect` moves that entry (adding the
+  module that compares the new flag when it is a new one) and never
+  `OWN_DECLARATIONS`, which holds only the commands wrapping no phase 0
+  command; a spelling in both lists or in neither is red. This replaces
+  nothing. The list is equal to those literals with one flag held apart and
   named: `hint`, which `plan create` and `loop start` declare and no
   phase 0 parser reads, since `endingWith` (`src/next/ending.ts`) reads
   it off the parsed context once the phase 0 function has returned. A
