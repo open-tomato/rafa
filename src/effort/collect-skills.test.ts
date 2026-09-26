@@ -17,11 +17,12 @@
 import type { CollectOptions } from './collect.js';
 import type { EffortStore } from './store/types.js';
 
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { parseCollectArgs } from './collect-args.js';
@@ -284,5 +285,59 @@ describe('the skill summary line', () => {
 
     expect(formatCollectSummary(result).at(-1))
       .toBe('  skills    1 appended sessions, 0 already counted, 1 read, 0 unknown, 0 failed, +3 rows');
+  });
+});
+
+/** Every row of `skill_invocations`, straight off the file, `seq` left out. */
+function rawInvocations(root: string): Record<string, unknown>[] {
+  const db = new Database(sqlitePath(root), { readonly: true });
+  try {
+    return db
+      .query('SELECT session_id, name, sidechain, count FROM skill_invocations ORDER BY seq')
+      .all() as Record<string, unknown>[];
+  } finally {
+    db.close();
+  }
+}
+
+describe('--skills over a scratch store and the fixture log', () => {
+  it('counts the main-thread and sidechain calls and stores nothing but ids, names, flags and counts', async () => {
+    const tree = fixtureTree();
+    const store = openNdjsonStore(tree.root);
+    await storeSessionRows(tree, store, [FIXTURE_ID]);
+
+    await collectEffort(options(tree, store, { collectSessions: false, skills: 'held' }));
+
+    const rows = rawInvocations(tree.root);
+    expect(rows).toEqual([
+      { session_id: FIXTURE_ID, name: 'fixture-alpha', sidechain: 0, count: 1 },
+      { session_id: FIXTURE_ID, name: 'fixture-alpha', sidechain: 1, count: 1 },
+      { session_id: FIXTURE_ID, name: 'fixture-beta', sidechain: 0, count: 1 },
+    ]);
+    // Nothing of the transcript: every text value is a session id or a skill name.
+    const text = rows.flatMap((row) => [row['session_id'], row['name']]);
+    expect(text.every((value) => value === FIXTURE_ID || /^fixture-(alpha|beta)$/.test(String(value)))).toBe(true);
+    const mainLog = readFileSync(join(tree.logDir, `${FIXTURE_ID}.jsonl`), 'utf8');
+    expect(mainLog).toContain('"Skill"');
+    const stored = readFileSync(sqlitePath(tree.root)).toString('latin1');
+    expect(stored).not.toContain('"tool_use"');
+  });
+
+  it('refuses a log of another Claude Code version to unknown, never to a count of 0', async () => {
+    const tree = fixtureTree();
+    const path = join(tree.logDir, `${FIXTURE_ID}.jsonl`);
+    writeFileSync(path, readFileSync(path, 'utf8').replaceAll('"version":"2.1.280"', '"version":"2.1.1"'));
+    const store = openNdjsonStore(tree.root);
+    await storeSessionRows(tree, store, [FIXTURE_ID]);
+
+    const result = await collectEffort(options(tree, store, { collectSessions: false, skills: 'held' }));
+
+    expect(result.skills).toMatchObject({ read: 1, unknown: 1, appended: 1 });
+    expect(rawInvocations(tree.root)).toEqual([
+      { session_id: FIXTURE_ID, name: null, sidechain: null, count: null },
+    ]);
+    expect(readSkillInvocations(tree.root)).toEqual([
+      { sessionId: FIXTURE_ID, name: null, sidechain: null, count: 'unknown' },
+    ]);
   });
 });
