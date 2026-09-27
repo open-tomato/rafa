@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-nine registered so far wrap a
+ * of each is its command. Five of the sixty registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -28,7 +28,9 @@
  * the references of a spec's saved copy, all eight sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `epics`, which reads one epic's lines
- * into the same rows through `src/board/roadmap-rows.ts`, nor `self-update`, which installs the
+ * into the same rows through `src/board/roadmap-rows.ts`, nor `switch`,
+ * which moves the checkout's place through `src/board/place.ts` and
+ * `src/project/position.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -174,6 +176,11 @@
  *     of its own. Not an alias, since an alias prints a deprecation line.
  *   - `epics [<n>]`, top-level: one epic's lines as the same table, the
  *     epic numbered or the first `now` epic on the Roadmap not done.
+ *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
+ *     moved to a board or an epic by its number, or back to the previous
+ *     place with `-`, re-homing unless `--no-rehome`, and written to
+ *     `.rafa/position.json`; a number that is no open board or epic, and
+ *     `-` with no previous place, refused with exit code 2.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -262,6 +269,7 @@ import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
+import switchCommand from './switch.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -333,6 +341,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   next,
   roadmap,
   epics,
+  switchCommand,
   init,
   doctor,
   cleanup,

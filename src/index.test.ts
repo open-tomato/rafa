@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epics`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epics`, `switch`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -857,6 +857,21 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue/roadmap-table.js', ['renderRoadmapTable']],
     ['./plan/plan-files.js', ['plansDirAt']],
   ]],
+  ['./commands/switch.js', [
+    ['../adapters/tracker/github.js', ['createGhRunner']],
+    ['../board/boards.js', ['resolveDefaultBoard']],
+    ['../board/epics.js', ['readEpics']],
+    ['../board/place.js', ['resolvePlace']],
+    ['../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../board/roadmap-epic-rows.js', ['horizonOf']],
+    ['../board/roadmap.js', ['createGhRoadmapSearch', 'parseRoadmapBody']],
+    ['../board/setup.js', ['ROADMAP_LABEL']],
+    ['../cli/command.js', ['CommandExit']],
+    ['../config-sections.js', ['messageOf']],
+    ['../project/position.js', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
+    ['./epics.js', ['firstNowEpic']],
+    ['./issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
+  ]],
   ['./commands/init.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
@@ -1128,6 +1143,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/next.js',
       './commands/roadmap.js',
       './commands/epics.js',
+      './commands/switch.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/cleanup.js',

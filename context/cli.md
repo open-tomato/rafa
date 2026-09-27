@@ -91,6 +91,7 @@ module's note is the long form.
 | `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`, and again for one other than `SKILL_USE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
 | `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
+| `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
 
@@ -166,9 +167,11 @@ New; it replaces no earlier text. What a row or an action added to
   line as a literal: `RAFA_UPDATE_HELP_SNAPSHOTS=1` rewrites `rafa.txt`
   but not that string, which is edited by hand (measured on 2026-09-24,
   registering `roadmap`). Registering `epics` pushed that line past the
-  help's width, so it wraps onto a second line holding `describe`, and
-  both literals, there and in `src/tests/spends-cli-surface.test.ts`,
-  now hold the wrap (measured on 2026-09-27). An action
+  help's width, so it wraps onto a second line, and both literals, there
+  and in `src/tests/spends-cli-surface.test.ts`, hold the wrap (measured
+  on 2026-09-27); registering `switch` moved `usage` onto that second
+  line beside `describe`, and both literals moved with it (measured on
+  2026-09-28). An action
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
@@ -194,7 +197,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `epics`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `epics`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
@@ -1244,6 +1247,36 @@ New; it replaces no earlier text. What a row or an action added to
   is no epic, or does not hold, is refused with exit 1; a Roadmap that
   cannot be read, with `ROADMAP_REFUSAL_EXIT`. It declares no flag and
   no `spends`.
+- **`rafa switch <n | -> [--no-rehome]` moves this checkout's place**
+  (`src/commands/switch.ts`) and writes it to `.rafa/position.json`
+  through `writePositionFile` (`src/project/position.ts`). It reads the
+  board listing once, `createGhBoardListing` with every issue open and
+  closed, and ranks the default board (`resolveDefaultBoard`) over that
+  listing's open `type:roadmap` rows rather than a second
+  `gh issue list --label`, asking it at most once and only when an
+  answer needs it. The number is told a board or an epic by the
+  listing's labels: `type:roadmap` is a board, else a row typed `epic`
+  is an epic, else the default board (an unlabelled titled "Roadmap", or
+  `roadmap.issue`, even one the listing does not hold) is a board. A
+  board moves to its first `now` epic that is not done (`firstNowEpic`,
+  null when none); an epic moves with the board whose checklist lists
+  it, the current board first, then the default, then the
+  lowest-numbered open board, else the default. `-` moves to the
+  position's `previous`, checked as a number is. The move starts from
+  the place `resolvePlace` (`src/board/place.ts`) answers, so with no
+  file the first switch's `previous` is the fallback place and
+  `rafa switch -` goes back there; every notice but the absent-file one
+  is a `warn` line. A switch re-homes (`rehome`); `--no-rehome` keeps
+  home (`hop`), and `-` re-homes too unless it is typed. Text mode
+  prints `board #<b> · epic #<e> <title> (<horizon>) · <done>/<total>
+  done`, or `board #<b> · no epic`; the `· next #<n>` the spec's status
+  line ends with is not printed, since naming the next issue needs the
+  claims the walk reads. Json mode's result is `SwitchResult`. A number
+  that is no open board or epic, a closed one, `-` with no previous place
+  or one that no longer stands, and a board listing or default board that
+  cannot be read are refused with exit code 2 and write nothing; a line
+  naming no target, an unusable config and a file that cannot be written,
+  with 1. It declares no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
