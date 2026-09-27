@@ -21,7 +21,7 @@
  *
  * ## The controls
  *
- * Five readings here could pass while wrong, and each is paired:
+ * Six readings here could pass while wrong, and each is paired:
  *
  *  - The swap case runs one issue twice, answering the question yes and
  *    then no, and holds the write against no write. Without the pair, a
@@ -39,6 +39,10 @@
  *    run that spent one for a listed login would be refused rather than
  *    passed; it is paired with the same login taken off the list, which
  *    does spend the lookup and is refused by it.
+ *  - The epic label refusal runs one issue under two `epic:` labels and
+ *    under one of them, so the refusal is held against the run that
+ *    asks and writes; a check that refused every `epic:` label, or read
+ *    the prefix alone, would fail the second half.
  *  - The dispatched no-terminal case holds that no prompter was opened
  *    and no `gh issue edit` was sent, against the dispatched case above
  *    it, which opens one and sends one over the same planted board.
@@ -70,6 +74,7 @@ import {
   createIssueReadyCommand,
   READY_USAGE,
   readyQuestion,
+  requireOneEpic,
   runIssueReady,
   trustPassLine,
 } from './ready.js';
@@ -455,6 +460,87 @@ describe('the completeness check', () => {
   });
 });
 
+/** Two `epic:` labels on one spec, the fault the epic label check refuses. */
+const TWO_EPICS = [SPEC_LABEL, 'epic:board', 'epic:views'];
+
+/** The sentence `readEpicProblems` gives {@link TWO_EPICS} on #57. */
+const TWO_EPICS_SENTENCE = 'issue #57 cannot be marked spec:ready: #57 carries 2 epic labels'
+  + ' (epic:board, epic:views); an issue belongs to one epic, so remove all but one';
+
+describe('the epic label check', () => {
+  it('refuses two epic labels with exit 2 naming both, and marks the same issue under one of them', async () => {
+    const ask = scriptedAsk(true);
+    const board = recordingBoard();
+    const options = { gh: unusedGh().run, issue: 57, trust: fakeTrust().trust, ask: ask.ask, board: board.board };
+
+    const exit = await refusal(() => runIssueReady({ ...options, readIssue: fakeReader({ labels: TWO_EPICS }).read }));
+    const asked = [...ask.asked()];
+    const swapped = [...board.swapped()];
+    const passed = await runIssueReady({ ...options, readIssue: fakeReader({ labels: [SPEC_LABEL, 'epic:board'] }).read });
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toBe(TWO_EPICS_SENTENCE);
+    expect([asked, swapped]).toEqual([[], []]);
+    expect(passed.status).toBe('marked');
+    expect(board.swapped()).toEqual(['#57 -spec:needs-work +spec:ready']);
+  });
+
+  it('refuses an issue already marked spec:ready rather than calling it already marked', async () => {
+    const labels = [...TWO_EPICS, SPEC_READY_LABEL];
+    const options = { gh: unusedGh().run, issue: 57, trust: fakeTrust().trust, ask: null, board: recordingBoard().board };
+
+    const exit = await refusal(() => runIssueReady({ ...options, readIssue: fakeReader({ labels }).read }));
+    const already = await runIssueReady({ ...options, readIssue: fakeReader({ labels: [SPEC_LABEL, SPEC_READY_LABEL] }).read });
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toBe(TWO_EPICS_SENTENCE);
+    expect(already.status).toBe('already');
+  });
+
+  it('runs after the author and the body, so an outsider and a thin body keep their own sentences', async () => {
+    const options = { gh: unusedGh().run, issue: 57, ask: null, board: recordingBoard().board };
+
+    const untrusted = await refusal(() => runIssueReady({
+      ...options,
+      trust: fakeTrust({ permission: 'read' }).trust,
+      readIssue: fakeReader({ labels: TWO_EPICS }).read,
+    }));
+    const thin = await refusal(() => runIssueReady({
+      ...options,
+      trust: fakeTrust().trust,
+      readIssue: fakeReader({ body: THIN, labels: TWO_EPICS }).read,
+    }));
+
+    expect(untrusted.message).toContain('has no write access');
+    expect(thin.message).toContain('is not ready to plan from');
+    expect([untrusted.message, thin.message].some((message) => message.includes('epic labels'))).toBe(false);
+  });
+
+  it('lets an issue through with no epic label, or with one no epic carries, which is the board\'s fault', () => {
+    const issue = { number: 57, title: 'Issue 57', body: COMPLETE, state: 'OPEN' as const, author: 'maintainer' };
+
+    expect(() => {
+      requireOneEpic({ ...issue, labels: [SPEC_LABEL] });
+    }).not.toThrow();
+    expect(() => {
+      requireOneEpic({ ...issue, labels: [SPEC_LABEL, 'epic:no-such-epic'] });
+    }).not.toThrow();
+  });
+
+  it('refuses an epic issue carrying two epic labels, and names three when there are three', () => {
+    const issue = { number: 12, title: 'Epic', body: '', state: 'OPEN' as const, author: 'maintainer' };
+    const epic = (): void => {
+      requireOneEpic({ ...issue, labels: ['type:epic', 'epic:board', 'epic:views', 'horizon:now'] });
+    };
+    const three = (): void => {
+      requireOneEpic({ ...issue, labels: ['epic:a', 'epic:b', 'epic:c'] });
+    };
+
+    expect(epic).toThrow('#12 carries 2 epic labels (epic:board, epic:views)');
+    expect(three).toThrow('#12 carries 3 epic labels (epic:a, epic:b, epic:c)');
+  });
+});
+
 /** What a dispatched case's board answers. */
 interface FakeBoard {
   readonly body?: string;
@@ -601,6 +687,23 @@ describe('rafa issue ready, dispatched', () => {
     expect(outcome.exitCode).toBe(2);
     expect(outcome.stderr).toContain('issue #57 is not ready to plan from:');
     expect(gh.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(false);
+  });
+
+  it('refuses two epic labels with exit 2 on stderr, opening no prompter and sending no edit', async () => {
+    const gh = dispatchedGh({ labels: TWO_EPICS });
+    const command = createIssueReadyCommand({
+      openGh: () => gh.run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter for an issue it refuses');
+      },
+    });
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [command], plant());
+
+    expect(outcome).toEqual({ exitCode: 2, stdout: '', stderr: `${TWO_EPICS_SENTENCE}\n` });
+    expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['issue view', 'api repos/{owner}/{repo}/collaborators/maintainer/permission']);
   });
 
   it('gives the report as the data of the one result event in json mode', async () => {

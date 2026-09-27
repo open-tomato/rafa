@@ -58,7 +58,7 @@
  *
  * ## The order, and what each check costs
  *
- * Three readings, in this order, and the first that refuses ends the
+ * Four readings, in this order, and the first that refuses ends the
  * run:
  *
  *  1. the AUTHOR's trust (`src/board/trust.ts`), through
@@ -74,15 +74,24 @@
  *     heading, which is the same sentence `plan create` refuses an
  *     incomplete spec with, so an operator who marks an issue ready
  *     here cannot be refused by the gate for a gap this run could see;
- *  3. the `spec:ready` label already on the issue, which is not a
+ *  3. the issue's `epic:` LABELS, through {@link requireOneEpic}: exit 2
+ *     for an issue carrying two or more, naming every one. The finding is
+ *     `readEpicProblems`'s own (`src/board/epic-problems.ts`), asked of
+ *     the one issue already read and its `several-epic-labels` answer
+ *     alone kept, so no board listing is spent and the sentence is the
+ *     one `doctor` and the views print. An issue belongs to one epic, and
+ *     one marked ready while carrying two would be counted by both;
+ *  4. the `spec:ready` label already on the issue, which is not a
  *     refusal but an `already`: there is nothing to add, so nothing is
  *     asked and nothing is written.
  *
- * The label reading is LAST of the three on purpose. An issue somebody
+ * The `spec:ready` reading is LAST of the four on purpose. An issue somebody
  * labelled ready whose body has gaps is refused with them named rather
  * than reported as already done, since the gaps are what the operator
  * came for and the gate would refuse the same body later at the price
- * of a `plan create` run.
+ * of a `plan create` run. Two `epic:` labels on an issue marked ready
+ * already are refused for the same reason: the label is a fault the
+ * operator has to fix, and `already` would pass it over.
  *
  * ## The one write
  *
@@ -109,19 +118,26 @@
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
-import type { SpecIssueReader } from '../../board/issue.js';
+import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
+import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner } from '../../pr/git.js';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
+import { createGhRunner, moduleOfLabels, typeOfLabels } from '../../adapters/tracker/github.js';
+import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
 import { boardRepoLabel, issueSource } from '../../board/plan-spec.js';
-import { hasSpecReadyLabel, requireCompleteSpec, SPEC_READY_LABEL } from '../../board/readiness.js';
+import {
+  hasSpecReadyLabel,
+  READINESS_REFUSAL_EXIT,
+  requireCompleteSpec,
+  SPEC_READY_LABEL,
+} from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
@@ -230,6 +246,34 @@ function unaskedMessage(issue: number): string {
     + ` Run rafa issue ready ${number} where an answer can be typed`;
 }
 
+/**
+ * Lets an issue carrying at most one `epic:` label through, and throws
+ * `CommandExit(2)` for one carrying two or more, the sentence naming
+ * every label it carries. See the module note's third reading.
+ *
+ * The issue is handed to `readEpicProblems` as a one-issue listing and
+ * only its `several-epic-labels` answer is read: an orphan label is a
+ * fault of the board, which one issue cannot show, and is `doctor`'s.
+ */
+export function requireOneEpic(found: SpecIssue): void {
+  const listed: BoardIssue = {
+    number: found.number,
+    title: found.title,
+    body: found.body,
+    state: found.state,
+    stateReason: null,
+    labels: found.labels,
+    type: typeOfLabels(found.labels),
+    module: moduleOfLabels(found.labels),
+  };
+  const several = readEpicProblems([listed]).find((problem) => problem.kind === 'several-epic-labels');
+  if (several === undefined) return;
+  throw new CommandExit(
+    READINESS_REFUSAL_EXIT,
+    `issue #${String(found.number)} cannot be marked ${SPEC_READY_LABEL}: ${epicProblemMessage(several)}`,
+  );
+}
+
 /** One report, spelled. */
 function readyReport(
   issue: number,
@@ -254,7 +298,7 @@ function readyReport(
  * checks, what each costs and the one write.
  *
  * Throws the `CommandExit` of every refusal: exit 2 for an untrusted
- * author and for a body with gaps, and exit {@link READY_WRITE_EXIT}
+ * author, for a body with gaps and for two `epic:` labels, and exit {@link READY_WRITE_EXIT}
  * for a swap `gh` refused. An issue that could not be read at all
  * rejects with the reader's own `Error` naming the command.
  */
@@ -266,6 +310,7 @@ export async function runIssueReady(options: ReadyOptions): Promise<ReadyReport>
   const found = await readIssue(issue);
   const reading = await requireTrustedBoardAuthor({ kind: 'issue', number: issue }, trust, found.author);
   requireCompleteSpec(issueSource(issue), found.body);
+  requireOneEpic(found);
 
   const lines = { trust: trustPassLine(issue, trust.repo, reading), checked: completeLine(issue) };
   if (hasSpecReadyLabel(found.labels)) {
@@ -415,7 +460,8 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
     action: 'ready',
     summary: `mark an issue ${SPEC_READY_LABEL} once its author and its body check out`,
     description: 'Reads the issue on the GitHub board, refuses one opened by an account without write access to'
-      + ' the repository, refuses a body that does not fill the spec template, and then asks whether to mark it'
+      + ' the repository, refuses a body that does not fill the spec template, refuses an issue carrying two'
+      + ' `epic:` labels, and then asks whether to mark it'
       + ` ${SPEC_READY_LABEL}. On a yes it swaps the labels in one write, adding ${SPEC_READY_LABEL} and`
       + ` removing ${SPEC_NEEDS_WORK_LABEL}. It always asks and declares no flag that skips the question;`
       + ' without a terminal it prints both readings and adds no label. A run that marks the issue, or finds'
