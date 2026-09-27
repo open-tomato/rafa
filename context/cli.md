@@ -59,7 +59,7 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -85,6 +85,8 @@ module's note is the long form.
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
+| `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues and the epic labels read over it in that order (`readDoctorBoard`, all three null with no runner), and their lines joined in that order (`renderDoctorBoard`) |
+| `src/commands/doctor-epics.ts` | the epic labels row of `rafa doctor`: one board listing over `src/board/roadmap-board.ts`, the `several-epic-labels` and `orphan-label` problems of `readEpicProblems` (`src/board/epic-problems.ts`) kept and worded by `epicProblemMessage`, no orphan reported when the listing came back full, and the `Epic labels:` lines, none for a board carrying no `epic:` label |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`, and again for one other than `SKILL_USE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
@@ -603,7 +605,22 @@ New; it replaces no earlier text. What a row or an action added to
   all. An id is called unknown only when the whole board was read: a
   numbers listing that failed or came back full leaves every id
   unchecked and says so in a line of its own. That reading writes
-  nothing and never changes the exit code either. Every repository
+  nothing and never changes the exit code either. Through that same
+  runner it then reads the epic labels (`src/commands/doctor-epics.ts`):
+  one `gh issue list --state all --limit 1000 --json
+  number,title,body,state,stateReason,labels`, the board listing the
+  roadmap views read. Under `Epic labels:` it names every issue
+  carrying two `epic:` labels and every `epic:` label no `type:epic`
+  issue carries, in the words and order of `readEpicProblems`
+  (`src/board/epic-problems.ts`), the only reader of either; the horizon
+  and checklist faults are left to the board views. A board whose labels
+  all read is one line counting them, a board carrying no `epic:` label
+  prints nothing, and a failed listing is the heading and one line
+  naming why. An orphan is reported only when the whole board was read:
+  a listing that came back full reports none and says so in a line of
+  its own. The three board readings live in `src/commands/doctor-board.ts`,
+  which opens the runner and joins their lines; that row writes nothing
+  and never changes the exit code either. Every repository
   then gets one row counting the branches and worktrees `rafa cleanup`
   would list, `Cleanup: <n> merged, <n> stale, <n> not pushed, <n>
   worktrees; run rafa cleanup to review and remove them.`
@@ -631,9 +648,10 @@ New; it replaces no earlier text. What a row or an action added to
   ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text
   mode says so in an `info` line when the order holds. In json mode a
   preflight that did not halt gives the checks, the `known-missing:`
-  lines, the reminders, both readings, those rows and those blocked
-  issues as the result's `data`, the rows and the issues null for a
-  project with no GitHub board, the cleanup counts as its `cleanup`
+  lines, the reminders, both readings, those rows, those blocked
+  issues and those epic labels (`epics`: `labelled`, `faults`,
+  `problem`, `unchecked`) as the result's `data`, the rows, the issues
+  and the labels null for a project with no GitHub board, the cleanup counts as its `cleanup`
   (`{ ok: false, detail }` for a repository git cannot read), the
   references counts as its `refs` (`{ ok: false, detail }` for a
   `specs.dir` that cannot be listed), the `--deep` sections as its `deep`,

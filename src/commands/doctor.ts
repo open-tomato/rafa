@@ -58,44 +58,30 @@
  *      as it is found. The environment is the one this invocation was
  *      handed, `process.env` for the registered command.
  *
- * ## The board rows
+ * ## The board readings
  *
- * A repository that resolves to `pr.provider: gh` also gets one row per
- * part of the GitHub board `rafa init --board` makes — the seven labels,
- * the spec issue template, the Roadmap issue and `roadmap.issue` — each
- * read through {@link readBoardStatus} (`board/status.ts`) as present,
- * missing or, for a reading that failed, unknown. A run with any row
- * that is not present ends those lines with `rafa init --board` as the
- * fix, which is the one command that would change them.
+ * A repository that resolves to `pr.provider: gh` also gets three
+ * readings of its GitHub board, through one runner opened once
+ * (`./doctor-board.ts`, which holds the runner, the order and what the
+ * three share): a row per part `rafa init --board` makes, each open
+ * `spec:blocked` issue whose `Blocked by:` line is missing or unreadable
+ * (`./doctor-blocked.ts`), and each issue carrying two `epic:` labels or
+ * an `epic:` label no epic carries (`./doctor-epics.ts`).
  *
  * The provider is resolved ONCE per run, by the same reading that
  * decides the automatic items, so `pr.provider: none` costs no `gh`
- * command and no board row. It is read AFTER the preflight, because the
- * two `gh` commands it sends are worth nothing on a repository whose
- * `gh` is missing or logged out, and the preflight is what says so.
- *
- * A board row never changes the exit code, and never changes a byte:
- * this command reports the gaps and makes none of them. A run whose
- * preflight halted prints its rows before the refusal, since they were
- * read by then and a person reading a halt still wants the whole
- * picture.
- *
- * ## The blocked issues
- *
- * That same repository gets one more reading, through the same runner:
- * every open issue labelled `spec:blocked` whose `Blocked by:` line is
- * missing or unreadable, named under `Blocked issues:`
- * (`./doctor-blocked.ts`, which holds the `gh` commands, the lines and
- * why they are a module of their own). It is the report half of a
- * dependency the spec keeps as data and refuses to guess at, and like a
- * board row it writes nothing and never changes the exit code.
+ * command and no board line. It is read AFTER the preflight, because the
+ * `gh` commands it sends are worth nothing on a repository whose `gh` is
+ * missing or logged out, and the preflight is what says so. None of the
+ * three writes to the board or changes the exit code, and a halt prints
+ * them before its refusal.
  *
  * ## The cleanup row
  *
  * Every repository then gets the counts `rafa cleanup` would list, read
  * without fetching (`./doctor-cleanup.ts`, which holds what is read and
  * where), as one row pointing at that command, printed after the
- * blocked issues and only when any count is above zero. It never
+ * board readings and only when any count is above zero. It never
  * changes the exit code.
  *
  * ## The references row
@@ -182,10 +168,9 @@
  * line naming the start-only items a resume passed over; the steps that
  * file names and nothing checks; and the verdict with any
  * `known-missing:` lines; then the risk total of a plan `--plan` names;
- * then `renderBoard`'s lines (`./doctor-render.ts`) for a repository that has a GitHub board,
- * and none for one that has not; then {@link renderBlockedIssues}'s
- * lines, which a board holding no issue labelled `spec:blocked` has
- * none of either; then the cleanup row, when there is anything to
+ * then `renderDoctorBoard`'s lines (`./doctor-board.ts`) for a repository that has a GitHub board —
+ * its rows, then any blocked issues, then any epic labels — and none for
+ * one that has not; then the cleanup row, when there is anything to
  * clean; then the references row, when there is a saved copy; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then, under `--deep`, `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
@@ -202,21 +187,19 @@
  * The project, its home and the environment are the dispatcher's
  * (`cli/dispatch.ts`), so a case names them through its options. How a
  * probe and a service request run, the timeout, the clock, the
- * `origin` probe the provider is read through, the runner the board rows
- * and the blocked issues are read with, and the git and `gh` the risk
+ * `origin` probe the provider is read through, the runner the board
+ * readings are read with (`DoctorBoardSeams`), and the git and `gh` the risk
  * total reads the accounts through are {@link DoctorSeams},
  * each left out being the runner's own, and so are the `--deep` reading's
  * (`DeepDoctorSeams`).
  */
-import type { BlockedIssuesReport } from './doctor-blocked.js';
+import type { DoctorBoardReadings, DoctorBoardSeams } from './doctor-board.js';
 import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardStatus } from '../board/status.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { PrProvider } from '../config-sections.js';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '../config.js';
@@ -231,8 +214,6 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { basename, resolve } from 'node:path';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { readBoardStatus } from '../board/status.js';
 import { CommandExit } from '../cli/command.js';
 import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
@@ -252,12 +233,12 @@ import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { announceRiskTotal } from '../start/risk-total.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
-import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
+import { boardRunner, readDoctorBoard, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
-import { renderBoard, renderDoctor } from './doctor-render.js';
+import { renderDoctor } from './doctor-render.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
 import { isFile } from './plan/plan-files.js';
 
@@ -267,12 +248,11 @@ import { isFile } from './plan/plan-files.js';
  * session runs in, the runner its provider probes go through, and how
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
-export interface DoctorSeams extends DeepDoctorSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorTiersRunSeams {
+export interface DoctorSeams
+  extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorTiersRunSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
-  /** Opens the runner both board readings go through. `gh` spawned in the root when left out. */
-  readonly openGh?: (root: string) => GhRunner;
   /** git and `gh` for the plan's risk total, at a root. Both spawned there when left out. */
   readonly riskRunners?: (root: string) => AccountSeams;
 }
@@ -348,9 +328,11 @@ export interface DoctorResult {
   /** How many previous copies `previous/` under `specs.dir` holds; null when they could not be counted. */
   readonly previousCopies: PreviousCopiesReading | null;
   /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
-  readonly board: BoardStatus | null;
+  readonly board: DoctorBoardReadings['board'];
   /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board. */
-  readonly blocked: BlockedIssuesReport | null;
+  readonly blocked: DoctorBoardReadings['blocked'];
+  /** Every issue carrying two `epic:` labels and every orphan `epic:` label; null for a project with no GitHub board. */
+  readonly epics: DoctorBoardReadings['epics'];
   /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
   readonly cleanup: DoctorCleanupReading;
   /** The suspect, dangling and unknown references of every saved copy under `specs.dir`, or why it could not be listed. */
@@ -361,10 +343,8 @@ export interface DoctorResult {
   readonly deep: DeepReading | null;
 }
 
-/** Both readings of the GitHub board, each null for a project that has none, and the cleanup counts. */
-interface BoardReadings {
-  readonly board: BoardStatus | null;
-  readonly blocked: BlockedIssuesReport | null;
+/** The readings of the GitHub board, each null for a project that has none, and the rows every repository gets. */
+interface BoardReadings extends DoctorBoardReadings {
   readonly cleanup: DoctorCleanupReading;
   readonly refs: DoctorRefsReading;
   readonly tiers: DoctorTiersReading;
@@ -550,35 +530,6 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   });
 }
 
-/**
- * The runner both board readings go through, opened once, or null for
- * a project whose provider is not `gh` and so has no board.
- */
-function boardRunner(preflight: DoctorPreflight, seams: DoctorSeams): GhRunner | null {
-  if (preflight.provider !== 'gh') return null;
-  const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
-  return openGh(preflight.root);
-}
-
-/**
- * Every part of the GitHub board as it stands, or null for a project
- * that has none. Reads and writes nothing of its own; see the module
- * note.
- */
-async function checkBoard(preflight: DoctorPreflight, gh: GhRunner | null): Promise<BoardStatus | null> {
-  if (gh === null) return null;
-  return readBoardStatus({ gh, root: preflight.root });
-}
-
-/**
- * Every open issue labelled `spec:blocked`, read, or null for a project
- * that has no board; see the module note and `./doctor-blocked.ts`.
- */
-async function checkBlocked(gh: GhRunner | null): Promise<BlockedIssuesReport | null> {
-  if (gh === null) return null;
-  return readBlockedIssues({ gh });
-}
-
 /** The refusal for a halt: the runner's own text, then what `loop start` would do. */
 function haltRefusal(halt: string): CommandExit {
   return new CommandExit(1, [
@@ -617,6 +568,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     previousCopies: install.previousCopies,
     board: readings.board,
     blocked: readings.blocked,
+    epics: readings.epics,
     cleanup: readings.cleanup,
     refs: readings.refs,
     tiers: readings.tiers,
@@ -656,15 +608,15 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
   const install = readInstall(context, project);
   try {
     const preflight = await checkPreflight(context, project, seams);
-    const gh = boardRunner(preflight, seams);
+    const gh = boardRunner(preflight.provider, preflight.root, seams);
     const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
     const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
-    const readings: BoardReadings = { board: await checkBoard(preflight, gh), blocked: await checkBlocked(gh), cleanup, refs, tiers };
+    const readings: BoardReadings = { ...await readDoctorBoard(gh, project.root), cleanup, refs, tiers };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
-    const repository = [...renderBoard(readings.board), ...renderBlockedIssues(readings.blocked)];
-    writeText(context, [...repository, ...renderDoctorCleanup(readings.cleanup), ...renderDoctorRefs(readings.refs)]);
+    const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
+    writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
     writeText(context, renderDoctorTiers(readings.tiers));
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
@@ -706,7 +658,9 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' nothing to the board and a row never changes the exit code. It then names, under `Blocked'
       + ' issues:`, every open issue labelled `spec:blocked` whose `Blocked by:` line is missing, names no'
       + ' issue, names itself, or names an id the board has no issue for, with what an author does about'
-      + ' it; that reading writes nothing and never changes the exit code either. It then counts, without'
+      + ' it; that reading writes nothing and never changes the exit code either. It then names, under'
+      + ' `Epic labels:`, every issue carrying two `epic:` labels and every `epic:` label no `type:epic` issue'
+      + ' carries, read off one board listing, writing nothing and never changing the exit code. It then counts, without'
       + ' fetching, the branches and worktrees `rafa cleanup` would list, and prints them in one row naming'
       + ' `rafa cleanup` when any group holds one. It then counts the suspect, dangling and unknown references'
       + ' of every saved copy under `specs.dir`, writing nothing, and names `rafa issue check <n>` for each'
@@ -715,7 +669,7 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' add-on item, and for an installed Claude Code other than the version skill serving was probed'
       + ' against, and a note per byte-identical copy that can be deleted and per user-tier item with no'
       + ' `provenance`; none changes the exit code. With `--output=json` the'
-      + ' checks, both readings, those rows and those issues are the data of the terminal result event,'
+      + ' checks, both readings, those rows, those issues and those labels are the data of the terminal result event,'
       + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
       + ' `rafa loop start` prints before its notices, which never changes the exit code. With `--deep` it'
       + ' also prints the machine as a loop session sees it, starting no session: the session\'s'
