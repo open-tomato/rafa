@@ -223,7 +223,7 @@ rafa issue list --roadmap --all    # including done items
 ```
 
 `rafa roadmap` reads the roadmap issue once and prints each line as a table
-row. The table has four columns beyond the item itself: **spec** (readiness,
+row. After `rafa switch`, the roadmap it reads is the board you switched to. The table has four columns beyond the item itself: **spec** (readiness,
 whether the issue carries `spec:ready`), **blocked by** (each blocker and
 whether it is open, `-` when there is none), **has** (what already exists: a plan, a branch, or an
 open pull request), and **refs** (how many references in the issue's saved
@@ -544,7 +544,7 @@ is not walked.
 ### Example: using `rafa epics`
 
 ```bash
-rafa epics         # the first now epic not done on the roadmap
+rafa epics         # the epic you switched to, else the first now epic not done on the roadmap
 rafa epics 254     # the epic #254, whatever its horizon
 ```
 

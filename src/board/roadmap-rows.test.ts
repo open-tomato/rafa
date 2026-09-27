@@ -16,6 +16,12 @@
  * off the board and on another repository; `has` plan, branch and pr;
  * `refs` a clean copy (#11), a copy with faults (#16), an unread copy
  * (#17) and no copy at all (every other line).
+ *
+ * The current place is read from a position file planted under a
+ * temporary root of its own; each case moving the read to a second
+ * board is paired with the same options read without a root, which
+ * reads the default board, so a reading that ignored the file could
+ * not pass both.
  */
 import type { BoardLister } from './boards.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
@@ -23,6 +29,7 @@ import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRefs, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
+import type { Place } from '../project/position.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,6 +38,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
+import { positionAt, positionFilePath, writePositionFile } from '../project/position.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { LIST_HEADINGS, SPEC_READY_LABEL, TEMPLATE_HEADINGS } from './readiness.js';
@@ -45,7 +53,9 @@ import {
   readSpecColumn,
   refsText,
   specText,
+  unweighedPositionNotice,
 } from './roadmap-rows.js';
+import { ROADMAP_LABEL } from './setup.js';
 
 const ROADMAP = 1;
 
@@ -406,6 +416,106 @@ describe('the other readings failing', () => {
   it('rejects with the roadmap refusal when no issue is titled Roadmap', async () => {
     const { options } = planted({ configured: null, search: () => Promise.resolve([]) });
     await expect(readRoadmapRows(options)).rejects.toBeInstanceOf(CommandExit);
+  });
+});
+
+describe('the current place', () => {
+  /** The second board: a labelled board naming #11 and #13 alone. */
+  const SECOND = 2;
+  const roots: string[] = [];
+
+  afterAll(() => {
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  });
+
+  /** A fresh root, holding a position file at `place` unless it is null. */
+  function rootAt(place: Place | null): string {
+    const root = mkdtempSync(join(tmpdir(), 'rafa-roadmap-rows-place-'));
+    roots.push(root);
+    if (place !== null) writePositionFile(root, positionAt(place));
+    return root;
+  }
+
+  /** The planted board with the second board on it, labelled and in `state`. */
+  function withSecond(state: BoardIssue['state'] = 'OPEN'): BoardListing {
+    const second = issue(SECOND, { title: 'Team board', body: '- [ ] #11\n- [ ] #13\n', labels: [ROADMAP_LABEL], state });
+    return () => Promise.resolve([...BOARD, second]);
+  }
+
+  it('reads the default board, asking the listing once, when the root holds no position file', async () => {
+    const bare = planted();
+    const rooted = planted({ root: rootAt(null) });
+    const read = await readRoadmapRows(rooted.options);
+
+    expect(read).toEqual(await readRoadmapRows(bare.options));
+    expect(rooted.counts).toEqual(bare.counts);
+  });
+
+  it('asks no listing before the Roadmap when the root holds no position file', async () => {
+    const { options, counts } = planted({ root: rootAt(null), issues: () => Promise.reject(new Error('gh issue view failed')) });
+
+    await expect(readRoadmapRows(options)).rejects.toThrow('gh issue view failed');
+    expect(counts.board).toBe(0);
+  });
+
+  it('reads the current place\'s board, the listing asked once, the control being the same read with no root', async () => {
+    const root = rootAt({ board: SECOND, epic: null });
+    const moved = planted({ root, board: withSecond() });
+    const control = planted({ board: withSecond() });
+    const read = await readRoadmapRows(moved.options);
+
+    expect(read.roadmap).toBe(SECOND);
+    expect(moved.counts.roadmap).toEqual([SECOND]);
+    expect(read.rows.map((row) => row.line.issue)).toEqual([11, 12, 13, 14, 15, 16, 17, 18]);
+    expect(read.warnings).toEqual([UNREAD_COPY_WARNING]);
+    expect((await readRoadmapRows(control.options)).roadmap).toBe(ROADMAP);
+    expect(control.counts.roadmap).toEqual([ROADMAP]);
+  });
+
+  it('keeps --all as it is on the current place\'s board', async () => {
+    const { options } = planted({ root: rootAt({ board: SECOND, epic: null }), board: withSecond(), all: true });
+    const read = await readRoadmapRows(options);
+
+    expect(read.roadmap).toBe(SECOND);
+    expect(read.rows.map((row) => row.line.issue)).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  });
+
+  it('falls back to the default board with the lost notice first when the place\'s board is closed', async () => {
+    const { options, counts } = planted({ root: rootAt({ board: SECOND, epic: null }), board: withSecond('CLOSED') });
+    const read = await readRoadmapRows(options);
+
+    expect(read.roadmap).toBe(ROADMAP);
+    expect(counts.roadmap).toEqual([ROADMAP]);
+    expect(read.warnings).toHaveLength(2);
+    expect(read.warnings[0]).toStartWith(`The current place and home lost board #${String(SECOND)}, which is closed; falling back to`);
+    expect(read.warnings[1]).toBe(UNREAD_COPY_WARNING);
+  });
+
+  it('warns a position file that holds no JSON and reads the default board', async () => {
+    const root = rootAt(null);
+    mkdirSync(join(root, '.rafa'), { recursive: true });
+    writeFileSync(positionFilePath(root), '{ not json');
+    const read = await readRoadmapRows(planted({ root, board: withSecond() }).options);
+
+    expect(read.roadmap).toBe(ROADMAP);
+    expect(read.warnings[0]).toContain('holds no JSON');
+  });
+
+  it('reads the default board with one more warning when the listing fails, asking it once', async () => {
+    const { options, counts } = planted({
+      root: rootAt({ board: SECOND, epic: null }),
+      board: () => {
+        counts.board += 1;
+        return Promise.reject(new Error('offline'));
+      },
+      refs: () => Promise.resolve(new Map()),
+    });
+    const read = await readRoadmapRows(options);
+
+    expect(read.roadmap).toBe(ROADMAP);
+    expect(read.warnings[0]).toBe(unweighedPositionNotice(ROADMAP));
+    expect(read.warnings[1]).toContain('the board could not be listed, so the spec and blocked by columns are empty: offline');
+    expect(counts.board).toBe(1);
   });
 });
 

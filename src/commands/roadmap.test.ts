@@ -13,10 +13,16 @@
  * pair that could agree by printing nothing is ruled out by the first
  * case, which holds the rows to be there. The control that `roadmap` is set on the line is `--all`: it
  * is refused by `rafa issue list` without `--roadmap` and taken here.
+ *
+ * The current place is a position file planted in the case's project,
+ * on a second board, #2 (`type:roadmap`), naming #11 alone unticked
+ * beside a ticked #12; the same line with no position file, reading
+ * the Roadmap's #13 and #11, is the control.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { RafaCommand } from '../cli/command.js';
 import type { GitRunner } from '../pr/git.js';
+import type { Place } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -26,6 +32,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_READY_LABEL } from '../board/readiness.js';
+import { positionAt, writePositionFile } from '../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
@@ -61,15 +68,35 @@ const BOARD_JSON = JSON.stringify([
   boardIssue(20, 'Open blocker', 'Still open.', 'OPEN', []),
 ]);
 
+/** The second board, labelled `type:roadmap`. */
+const SECOND = 2;
+
+/** The second board's body: #12 ticked, then #11. */
+const SECOND_BODY = '- [x] #12 — shipped chore\n- [ ] #11 — ready spec\n';
+
+/** The board with the second board on it. */
+const BOARD_WITH_SECOND_JSON = JSON.stringify([
+  ...JSON.parse(BOARD_JSON) as object[],
+  boardIssue(SECOND, 'Team board', SECOND_BODY, 'OPEN', ['type:roadmap']),
+]);
+
 /** A `gh` answering the Roadmap read, the board listing and the open pull requests, recording each call. */
-function plantedGh(calls: string[][]): GhRunner {
+function plantedGh(calls: string[][], second = false): GhRunner {
   const ok = (stdout: string): GhResult => ({ ok: true, stdout, stderr: '' });
   const roadmap = JSON.stringify({ number: ROADMAP, title: 'Roadmap', body: ROADMAP_BODY, state: 'OPEN', labels: [], author: { login: 'owner' } });
+  const team = JSON.stringify({ number: SECOND, title: 'Team board', body: SECOND_BODY, state: 'OPEN', labels: [], author: { login: 'owner' } });
+  const board = second
+    ? BOARD_WITH_SECOND_JSON
+    : BOARD_JSON;
   return (args) => {
     calls.push([...args]);
-    const [noun, verb] = args;
-    if (noun === 'issue' && verb === 'view') return Promise.resolve(ok(roadmap));
-    if (noun === 'issue' && verb === 'list') return Promise.resolve(ok(BOARD_JSON));
+    const [noun, verb, number] = args;
+    if (noun === 'issue' && verb === 'view') {
+      return Promise.resolve(ok(number === String(SECOND)
+        ? team
+        : roadmap));
+    }
+    if (noun === 'issue' && verb === 'list') return Promise.resolve(ok(board));
     if (noun === 'pr' && verb === 'list') return Promise.resolve(ok('[]'));
     return Promise.resolve({ ok: false, stdout: '', stderr: `unplanted: gh ${args.join(' ')}` });
   };
@@ -79,9 +106,9 @@ function plantedGh(calls: string[][]): GhRunner {
 const plantedGit: GitRunner = () => ({ ok: true, stdout: '', stderr: '' });
 
 /** Both spellings over one planted `gh` and `git` and no terminal, and the `gh` calls they make. */
-function plantedCommands(): { commands: readonly RafaCommand[]; calls: string[][] } {
+function plantedCommands(second = false): { commands: readonly RafaCommand[]; calls: string[][] } {
   const calls: string[][] = [];
-  const seams = { gh: plantedGh(calls), git: plantedGit, planNames: () => () => [], terminalWidth: () => undefined };
+  const seams = { gh: plantedGh(calls, second), git: plantedGit, planNames: () => () => [], terminalWidth: () => undefined };
   return { commands: [createIssueListCommand(seams), createRoadmapCommand(seams)], calls };
 }
 
@@ -91,10 +118,17 @@ function plantCase(): PlantedProject {
 }
 
 /** Dispatches `words` from a fresh project over both spellings, answering the outcome and the `gh` calls. */
-async function run(words: readonly string[]) {
-  const { commands, calls } = plantedCommands();
-  const outcome = await dispatchInProject(words, [{ name: 'issue', summary: 'issues' }], commands, plantCase());
+async function run(words: readonly string[], position?: Place) {
+  const { commands, calls } = plantedCommands(position !== undefined);
+  const project = plantCase();
+  if (position !== undefined) writePositionFile(project.root, positionAt(position));
+  const outcome = await dispatchInProject(words, [{ name: 'issue', summary: 'issues' }], commands, project);
   return { ...outcome, calls };
+}
+
+/** The first word of each stdout line. */
+function heads(stdout: string): readonly string[] {
+  return stdout.split('\n').map((line) => line.split(' ')[0] ?? '');
 }
 
 /** The command a start event names, or null for any other event. */
@@ -171,5 +205,27 @@ describe('rafa roadmap, beside rafa issue list --roadmap', () => {
     expect(bare.stderr).toStartWith('❌ --all keeps the ticked Roadmap lines, so it needs --roadmap');
     expect(shortcut.exitCode).toBe(0);
     expect(shortcut.stdout.split('\n').map((line) => line.split(' ')[0])).toEqual(['Roadmap:', '', '#13', '#12', '#11', '']);
+  });
+});
+
+describe('rafa roadmap on the current place', () => {
+  it('prints the current place\'s board in both spellings, the control being the Roadmap with no position file', async () => {
+    const shortcut = await run(['roadmap'], { board: SECOND, epic: null });
+    const long = await run(['issue', 'list', '--roadmap'], { board: SECOND, epic: null });
+    const control = await run(['roadmap']);
+
+    expect(shortcut).toEqual(long);
+    expect(shortcut.exitCode).toBe(0);
+    expect(shortcut.stderr).toBe('');
+    expect(shortcut.stdout.split('\n')[0]).toBe(`Roadmap: #${String(SECOND)}`);
+    expect(heads(shortcut.stdout)).toEqual(['Roadmap:', '', '#11', '']);
+    expect(shortcut.calls.filter((call) => call[1] === 'view').map((call) => call[2])).toEqual([String(SECOND)]);
+    expect(heads(control.stdout)).toEqual(['Roadmap:', '', '#13', '#11', '']);
+  });
+
+  it('keeps --all as it is, the ticked line of the current place\'s board included', async () => {
+    const outcome = await run(['roadmap', '--all'], { board: SECOND, epic: null });
+
+    expect(heads(outcome.stdout)).toEqual(['Roadmap:', '', '#12', '#11', '']);
   });
 });

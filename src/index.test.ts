@@ -858,7 +858,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/issue.js', ['createGhSpecIssueReader']],
     ['../board/roadmap-board.js', ['createGhBoardListing']],
     ['../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams']],
-    ['../board/roadmap-rows.js', ['createPlanDirNames', 'readLineRows']],
+    ['../board/roadmap-rows.js', ['createPlanDirNames', 'readCurrentPlace', 'readLineRows']],
     ['../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
     ['../cli/command.js', ['CommandExit']],
     ['../config-sections.js', ['messageOf']],

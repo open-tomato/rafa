@@ -10,10 +10,18 @@
  * the listing holds that is not an epic, and one the listing does not
  * hold, are refused with exit code 1.
  *
- * Without it, the Roadmap is read as `rafa roadmap` reads it
- * (`resolveDefaultBoard`, `src/board/boards.ts`: `roadmap.issue`, else
- * the lowest-numbered open `type:roadmap` board, else the open issue
- * titled Roadmap) and its unticked
+ * Without it, the epic is the CURRENT PLACE's, read as `rafa roadmap`
+ * reads its board (`readCurrentPlace`, `src/board/roadmap-rows.ts`):
+ * with a position file, `resolvePlace` (`src/board/place.ts`) over the
+ * one board listing, a place that no longer stands falling back by its
+ * rule, and each notice it gives but the absent-file one a `warn` line.
+ * A current place naming an epic shows that epic, whatever its horizon
+ * and computed state, and reads no board body. A place naming a board
+ * alone, and a project with no position file, read the board — the
+ * place's, else the default board (`resolveDefaultBoard`,
+ * `src/board/boards.ts`: `roadmap.issue`, else the lowest-numbered open
+ * `type:roadmap` board, else the open issue titled Roadmap) — and its
+ * unticked
  * lines are asked in order for the first naming an epic that is OPEN,
  * carries exactly one `horizon:` label and that label `horizon:now`
  * (`isNowEpic`, the walk's own test, `src/board/epic-walk.ts`), and whose
@@ -80,7 +88,7 @@ import { readEpics } from '../board/epics.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { claimsOf, onceSeams } from '../board/roadmap-epic-rows.js';
-import { createPlanDirNames, readLineRows } from '../board/roadmap-rows.js';
+import { createPlanDirNames, readCurrentPlace, readLineRows } from '../board/roadmap-rows.js';
 import {
   createGhOpenPullRequests,
   createGhRoadmapSearch,
@@ -105,7 +113,7 @@ const ISSUE_NUMBER = /^[1-9]\d*$/u;
 
 /** What json mode gives as the terminal result's `data`. */
 export interface EpicsResult {
-  /** The Roadmap read to choose the epic, or null when the line numbered one. */
+  /** The board the epic was chosen on, the current place's, or null when the line numbered one. */
   readonly roadmap: number | null;
   /** The epic the line numbered, or null when it numbered none. */
   readonly asked: number | null;
@@ -204,19 +212,36 @@ export function renderEpics(result: EpicsResult, width?: number): string[] {
   return [epicHead(result.epic), ...disagreement, ...table];
 }
 
-/** The Roadmap's number and lines; a refusal with `ROADMAP_REFUSAL_EXIT` when it cannot be found or read. */
-async function readRoadmap(config: RafaConfig, gh: GhRunner): Promise<{
+/** The board an epic is chosen on with no number; see the module note. */
+interface ChosenBoard {
+  /** The current place's board. */
   readonly number: number;
+  /** The board's lines; empty, and not read, when the place names an epic. */
   readonly lines: readonly RoadmapLine[];
-}> {
+  /** The current place's epic, or null to take the board's first now epic not done. */
+  readonly epic: number | null;
+  /** The current place's notices, each written as a warning. */
+  readonly notices: readonly string[];
+}
+
+/**
+ * The current place's board and epic; a refusal with
+ * `ROADMAP_REFUSAL_EXIT` when the default board cannot be found or the
+ * board read cannot be.
+ */
+async function readRoadmap(config: RafaConfig, gh: GhRunner, root: string, read: LineRowsOptions): Promise<ChosenBoard> {
   try {
-    const { number } = await resolveDefaultBoard({
+    const { number: fallback } = await resolveDefaultBoard({
       configured: config.roadmapIssue,
       listBoards: createGhBoardLister({ gh }),
       search: createGhRoadmapSearch({ gh }),
     });
+    const { place, notices } = await readCurrentPlace(root, read.board, fallback);
+    const number = place?.board ?? fallback;
+    const epic = place?.epic ?? null;
+    if (epic !== null) return { number, lines: [], epic, notices };
     const issue = await createGhSpecIssueReader({ gh })(number);
-    return { number, lines: parseRoadmapBody(issue.body) };
+    return { number, lines: parseRoadmapBody(issue.body), epic, notices };
   } catch (error) {
     const code = error instanceof CommandExit
       ? error.exitCode
@@ -234,6 +259,14 @@ function askedEpic(number: number, listing: readonly BoardIssue[], epics: Epics)
   throw new CommandExit(1, listed
     ? `❌ ${id} is not an epic: it does not carry type:epic`
     : `❌ ${id} is not on the board listing, so it cannot be read as an epic`);
+}
+
+/** The current place's epic off `epics`, else `board`'s first now epic not done; null when there is none. */
+function placeEpic(board: ChosenBoard | null, listing: readonly BoardIssue[], epics: Epics): Epic | null {
+  if (board === null) return null;
+  const { epic: chosen } = board;
+  if (chosen === null) return firstNowEpic(board.lines, listing, epics);
+  return epics.epics.find((epic) => epic.number === chosen) ?? null;
 }
 
 /** The seams the rows and the claims read through, each asked once; see the module note. */
@@ -268,9 +301,11 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const read = rowSeams(context, seams, config, gh);
   const roadmap = asked === null
-    ? await readRoadmap(config, gh)
+    ? await readRoadmap(config, gh, project.root, read)
     : null;
-  const empty = { roadmap: roadmap?.number ?? null, asked, rows: [], problems: [], warnings: [] };
+  const notices = roadmap?.notices ?? [];
+  for (const notice of notices) warn(notice);
+  const empty = { roadmap: roadmap?.number ?? null, asked, rows: [], problems: [], warnings: Object.freeze([...notices]) };
 
   let listing: readonly BoardIssue[];
   try {
@@ -280,7 +315,7 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   }
   const epics = readEpics({ issues: listing, claims: await claimsOf(listing, read), today: new Date() });
   const epic = asked === null
-    ? firstNowEpic(roadmap?.lines ?? [], listing, epics)
+    ? placeEpic(roadmap, listing, epics)
     : askedEpic(asked, listing, epics);
   const row = listing.find((issue) => issue.number === epic?.number);
   if (epic === null || row === undefined) return Object.freeze({ ...empty, epic: null, unknown: null });
@@ -295,7 +330,7 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
     unknown: null,
     rows: rows.rows,
     problems: Object.freeze([...problems]),
-    warnings: Object.freeze(warnings),
+    warnings: Object.freeze([...notices, ...warnings]),
   });
 }
 
@@ -320,8 +355,9 @@ export function createEpicsCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): Raf
     description: 'Prints one epic\'s issues as `rafa roadmap` prints its spec lines, with the spec, blocked by,'
       + ' has and refs columns: the unticked lines of the epic\'s checklist in its order, then its open members'
       + ' missing from the checklist by number. The epic is the type:epic issue numbered, or, with no number,'
-      + ' the first epic the Roadmap (`roadmap.issue`, else the lowest-numbered open type:roadmap board, else'
-      + ' the open issue titled Roadmap) names that is open,'
+      + ' the current place\'s epic, the one `rafa switch` moved to; a place naming a board alone, or no'
+      + ' position file, takes the first epic that board (with no position file `roadmap.issue`, else the'
+      + ' lowest-numbered open type:roadmap board, else the open issue titled Roadmap) names that is open,'
       + ' horizon:now and not done, the one `rafa next` walks into. The table is headed by the epic\'s title,'
       + ' computed state and done/total, and a stored state disagreeing with the computed one is printed'
       + ' under it. No issue of another epic is named. Each label problem about the epic and each reading that'
@@ -331,7 +367,7 @@ export function createEpicsCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): Raf
     args: [
       {
         name: 'n',
-        description: 'The epic\'s issue number on the GitHub board. Left out, the first now epic on the Roadmap that is not done.',
+        description: 'The epic\'s issue number on the GitHub board. Left out, the current place\'s epic, else the first now epic on its board that is not done.',
         type: 'string',
         required: false,
       },

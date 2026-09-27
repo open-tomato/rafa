@@ -26,7 +26,9 @@
  *
  * The rows are the Roadmap issue's lines, read by `readRoadmapRows`
  * (`board/roadmap-rows.ts`), which owns every reading on them: which
- * issue is the Roadmap (`roadmap.issue`, else the lowest-numbered open
+ * issue is the Roadmap (the current place's board, handed the project
+ * root so `.rafa/position.json` is weighed; with no position file the
+ * default board, `roadmap.issue`, else the lowest-numbered open
  * `type:roadmap` board, else the one open issue titled `Roadmap`), the
  * unticked lines in body order — every line under
  * `--all` — and the `spec`, `blocked by`, `has` and `refs` columns. This
@@ -401,6 +403,7 @@ export async function listRoadmap(
       planNames,
       refs,
       all,
+      root: project.root,
     });
   } catch (error) {
     const code = error instanceof CommandExit

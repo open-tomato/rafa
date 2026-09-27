@@ -1137,7 +1137,15 @@ New; it replaces no earlier text. What a row or an action added to
   the `github` preflight.
 - **`issue list --roadmap` prints the Roadmap in a table**
   (`src/board/roadmap-rows.ts`, `src/commands/issue/roadmap-table.ts`)
-  with four new columns over the plain list. `--all` includes ticked
+  with four new columns over the plain list. The board read is the
+  current place's: `readRoadmapRows` finds the default board as before,
+  then, when the project root holds `.rafa/position.json`, weighs it
+  with `resolvePlace` (`src/board/place.ts`) through `readCurrentPlace`
+  over the one board listing, kept and reused by the rows. Each
+  fallback notice but the absent-file one is a `warn` line ahead of the
+  rows' own, and a listing that failed with a position file there adds
+  one saying the default board is read. With no position file nothing
+  is weighed and the listing is not asked before the Roadmap. `--all` includes ticked
   lines; without it, only unticked lines are shown. The four columns:
   `spec` is the readiness gate's reading of the body — `ready`, `gaps:
   <heading>, …`, `outline` (fewer than three template headings, no
@@ -1221,11 +1229,17 @@ New; it replaces no earlier text. What a row or an action added to
 - **`rafa epics [n]` prints one epic's lines as the Roadmap table**
   (`src/commands/epics.ts`). The epic is the `type:epic` issue numbered
   `n`, whatever its horizon and whether the Roadmap names it, or with no
-  number the first unticked Roadmap line naming an epic that is open,
+  number the current place's epic (`readCurrentPlace`, as `rafa
+  roadmap` reads its board), whatever its horizon and state, reading no
+  board body; a place naming a board alone, or no position file, takes
+  that board's (else the default board's) first unticked line naming an
+  epic that is open,
   carries `horizon:now` alone (`isNowEpic`, the walk's own test) and is
   not computed `done` — the epic `rafa next` walks into. Each line is
   told an epic by the board listing's type, never by reading the issue,
-  so the command spends one listing, plus one Roadmap read without `n`.
+  so the command spends one listing, plus one board read without `n`
+  unless the place names its epic. Place notices are `warn` lines, in
+  the result's `warnings` too.
   Its lines are `epicLines` (`src/board/epic-walk.ts`), the checklist
   then the open members missing from it by number, the walk's own order,
   read into rows by `readLineRows` (`src/board/roadmap-rows.ts`), the
