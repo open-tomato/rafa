@@ -2,7 +2,8 @@
  * Tests for the composition (`./sources.ts`): the four settings it reads
  * off one config, the seams every reading arrives through, the refusal a
  * repository without a `gh` provider gets, and the three board readings
- * over one `gh` runner.
+ * over one `gh` runner, including the walk into an epic a roadmap line
+ * names.
  *
  * `./state.test.ts` drives the table over fakes and `./readings.test.ts`
  * the readings themselves; what only this file can see is the WIRING —
@@ -48,6 +49,18 @@
  *  - `requireGhProvider` dropped, a repository with no GitHub remote
  *    composing sources anyway: 178 pass and 1 fail, the provider case
  *    alone.
+ *
+ * Two more were driven on 2026-09-27 over this file alone, restored the
+ * same way, against 19 pass and 0 fail:
+ *
+ *  - the walk back on `pickNextRoadmapLine` with no descent: 15 pass and
+ *    4 fail, every case of the epic block. The roadmap-only cases pass
+ *    either side, which is the control that a roadmap with no epic line
+ *    sends the commands it always did and no board listing.
+ *  - `passed` counting the walk's skipped lines only: 18 pass and 1 fail,
+ *    the epic passed for its horizon. Inside a walked epic the lines
+ *    passed are the walk's own, so only a line the descent passed can
+ *    see it.
  */
 import type { NextSources } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -172,6 +185,32 @@ interface FakeBoard {
   readonly issues?: Readonly<Record<string, { body?: string; state?: string; labels?: readonly string[] }>>;
   /** The candidates the roadmap search answers. */
   readonly search?: readonly { readonly number: number; readonly title: string }[];
+  /** The rows the board listing (`gh issue list --state all`) answers. */
+  readonly listing?: readonly ListingRow[];
+}
+
+/** How {@link fakeGh} records the one board listing, told apart from the roadmap search. */
+const LISTING_CALL = 'issue list --state all';
+
+/** One row as the board listing answers it. */
+interface ListingRow {
+  readonly number: number;
+  readonly body?: string;
+  readonly state?: 'OPEN' | 'CLOSED';
+  readonly stateReason?: string;
+  readonly labels?: readonly string[];
+}
+
+/** The listing's rows as `gh issue list --json number,title,body,state,stateReason,labels` writes them. */
+function listingPayload(rows: readonly ListingRow[]): string {
+  return JSON.stringify(rows.map((row) => ({
+    number: row.number,
+    title: `Issue ${row.number}`,
+    body: row.body ?? '',
+    state: row.state ?? 'OPEN',
+    stateReason: row.stateReason ?? '',
+    labels: (row.labels ?? []).map((name) => ({ name })),
+  })));
 }
 
 /** A `gh` runner over `board`, and the commands it was handed. */
@@ -179,8 +218,13 @@ function fakeGh(board: FakeBoard): { readonly gh: GhRunner; readonly calls: () =
   const calls: string[] = [];
   return {
     gh: (args) => {
-      calls.push(args.slice(0, 3).join(' '));
       const route = args.slice(0, 2).join(' ');
+      // The listing sends --state all, the roadmap search --state open.
+      const listing = route === 'issue list' && args[3] === 'all';
+      calls.push(listing
+        ? LISTING_CALL
+        : args.slice(0, 3).join(' '));
+      if (listing) return wrote(listingPayload(board.listing ?? []));
       if (route === 'issue list') return wrote(JSON.stringify(board.search ?? []));
       if (route === 'pr list') return wrote('[]');
       if (route === 'issue view') {
@@ -392,6 +436,127 @@ describe('the board the roadmap rows are read through', () => {
     const board = ghNextBoard({ gh: gh.gh, git: recordingGit().git, configured: ROADMAP });
 
     expect(await board.blocking(ISSUE)).toBeNull();
+  });
+});
+
+describe('the board walking into an epic', () => {
+  /** The epic the roadmap's first line names. */
+  const EPIC = 80;
+
+  /** A second epic, after the first on the roadmap. */
+  const SECOND_EPIC = 90;
+
+  /** The labels a `now` epic carries under `slug`. */
+  function epicLabels(slug: string, horizon = 'horizon:now'): readonly string[] {
+    return ['type:epic', `epic:${slug}`, horizon];
+  }
+
+  /** A roadmap naming the epic, then `after`. */
+  function roadmapOf(after: number): string {
+    return [`- [ ] #${EPIC} the epic`, `- [ ] #${after} what comes after it`, ''].join('\n');
+  }
+
+  /** A checklist body over `members`. */
+  function checklistOf(members: readonly number[]): string {
+    return members.map((member) => `- [ ] #${member}`).join('\n');
+  }
+
+  it('proposes the epic first open checklist spec, with one listing and the members passed counted', async () => {
+    const body = checklistOf([81, 82]);
+    const gh = fakeGh({
+      issues: {
+        [ROADMAP]: { body: roadmapOf(99) },
+        [EPIC]: { body, labels: epicLabels('walk') },
+        81: { state: 'CLOSED' },
+        82: {},
+        99: {},
+      },
+      listing: [
+        { number: EPIC, body, labels: epicLabels('walk') },
+        { number: 81, state: 'CLOSED', stateReason: 'COMPLETED', labels: ['epic:walk'] },
+        { number: 82, labels: ['epic:walk'] },
+        { number: 83, labels: ['epic:walk'] },
+      ],
+    });
+    const board = ghNextBoard({ gh: gh.gh, git: recordingGit().git, configured: ROADMAP });
+
+    const reading = await board.next();
+
+    expect([reading.line?.issue, reading.passed]).toEqual([82, 1]);
+    expect(gh.calls().filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
+    expect(gh.calls()).not.toContain('issue view 99');
+  });
+
+  it('walks the labelled members missing from the checklist after it, by ascending number', async () => {
+    const body = checklistOf([81]);
+    const gh = fakeGh({
+      issues: {
+        [ROADMAP]: { body: roadmapOf(99) },
+        [EPIC]: { body, labels: epicLabels('walk') },
+        81: { state: 'CLOSED' },
+        84: {},
+        85: {},
+      },
+      listing: [
+        { number: EPIC, body, labels: epicLabels('walk') },
+        { number: 81, state: 'CLOSED', stateReason: 'COMPLETED', labels: ['epic:walk'] },
+        { number: 85, labels: ['epic:walk'] },
+        { number: 84, labels: ['epic:walk'] },
+      ],
+    });
+    const board = ghNextBoard({ gh: gh.gh, git: recordingGit().git, configured: ROADMAP });
+
+    const reading = await board.next();
+
+    expect([reading.line?.issue, reading.passed]).toEqual([84, 1]);
+  });
+
+  it('stops at a dry epic with no line, never reading the second epic on the roadmap', async () => {
+    const body = checklistOf([81, 82]);
+    const gh = fakeGh({
+      issues: {
+        [ROADMAP]: { body: roadmapOf(SECOND_EPIC) },
+        [EPIC]: { body, labels: epicLabels('walk') },
+        81: { state: 'CLOSED' },
+        82: {},
+        [SECOND_EPIC]: { body: checklistOf([91]), labels: epicLabels('other') },
+        91: {},
+      },
+      listing: [
+        { number: EPIC, body, labels: epicLabels('walk') },
+        { number: 81, state: 'CLOSED', stateReason: 'COMPLETED', labels: ['epic:walk'] },
+        { number: 82, labels: ['epic:walk'] },
+        { number: SECOND_EPIC, body: checklistOf([91]), labels: epicLabels('other') },
+        { number: 91, labels: ['epic:other'] },
+      ],
+    });
+    // #82 is open but taken by a branch, so the epic is not done and has run dry.
+    const git: GitRunner = (args) => said(args[0] === 'for-each-ref'
+      ? 'refs/heads/feat/rafa-82-taken\n'
+      : '');
+    const board = ghNextBoard({ gh: gh.gh, git, configured: ROADMAP });
+
+    const reading = await board.next();
+
+    expect([reading.line, reading.passed]).toEqual([null, 2]);
+    expect(gh.calls()).not.toContain(`issue view ${SECOND_EPIC}`);
+    expect(gh.calls()).not.toContain('issue view 91');
+  });
+
+  it('passes an epic that is not now and proposes the line after it, sending no listing', async () => {
+    const gh = fakeGh({
+      issues: {
+        [ROADMAP]: { body: roadmapOf(99) },
+        [EPIC]: { body: checklistOf([81]), labels: epicLabels('walk', 'horizon:later') },
+        99: {},
+      },
+    });
+    const board = ghNextBoard({ gh: gh.gh, git: recordingGit().git, configured: ROADMAP });
+
+    const reading = await board.next();
+
+    expect([reading.line?.issue, reading.passed]).toEqual([99, 1]);
+    expect(gh.calls()).not.toContain(LISTING_CALL);
   });
 });
 
