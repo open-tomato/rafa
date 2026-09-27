@@ -100,6 +100,14 @@
  * thrown with no message (2), config warnings back on `console.warn` (2),
  * and `--json` never read as `--output=json` or writing no deprecation
  * line (1 each).
+ *
+ * The skills report cases came with `--skills` and `--plan=`. They plant a
+ * dispatch offering a project skill and a held lesson under a scratch root,
+ * and hold {@link readSkillsReport} to reading the tiers, the lessons and
+ * the config under that root, each against a control that reads otherwise
+ * once the plant is taken away. The command cases hold `--skills` to the
+ * same report in both output modes, a text run to exactly the formatter's
+ * lines, and `--plan=` alone to a refusal naming the flag.
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
@@ -121,14 +129,17 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
+import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 
 import { PROMPT_SHAPES } from './classify.js';
+import { formatSkillsReport, SKILLS_REPORT_HEADER } from './report-skills-format.js';
 import {
   buildReport,
   dominantEntrypoint,
   emptyGroup,
   groupKeyOf,
   matchesFilters,
+  readSkillsReport,
   SESSION_KINDS,
   sessionSpanMinutes,
   sortGroups,
@@ -139,6 +150,7 @@ import { writeDispatch } from './store/dispatches.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
 import { writePreflightChecks } from './store/preflight.js';
 import { writeTaskReport } from './store/reports.js';
+import { writeSkillInvocations } from './store/skill-invocations.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
@@ -1172,5 +1184,150 @@ describe('the report command', () => {
         message: refusal.problems.map((problem) => `rafa effort report: ${problem}`).join('\n'),
       },
     });
+  });
+});
+
+/** The plan the skills report cases dispatch under. */
+const SKILLS_PLAN = 'rafa-24-know-which-skills-earn';
+
+/** A project skill declaring `failure_strings` when `strings` holds any. */
+function skillFile(name: string, strings: readonly string[]): string {
+  const declared = strings.length === 0
+    ? []
+    : ['failure_strings:', ...strings.map((string) => `  - ${JSON.stringify(string)}`)];
+  return ['---', `name: ${name}`, 'description: a probe skill', ...declared, '---', '', 'Body.', ''].join('\n');
+}
+
+/** A held lesson record of `id` whose artifact is `artifact`. */
+function lessonFile(id: string, artifact: string): string {
+  return [
+    '---',
+    `id: ${id}`,
+    'trigger: when running tests in a freshly forked worktree',
+    'kind: gotcha',
+    'domain: workflow',
+    'confidence: 0.6',
+    'usage_count: 3',
+    `artifact: ${artifact}`,
+    'signal: loud',
+    'scope: project',
+    'source: task-report',
+    'evidence:',
+    '  - plan: my-feature',
+    '    outcome: blocked',
+    'created_at: 2026-09-11T10:00:00Z',
+    'updated_at: 2026-09-11T10:00:00Z',
+    '---',
+    '',
+    ACTION_HEADING,
+    'Run `bun install` before the first test.',
+    '',
+    CAUSE_HEADING,
+    'Worktree creation copies the tree and not its packages.',
+    '',
+  ].join('\n');
+}
+
+/**
+ * A git repository holding one dispatch and its task report under
+ * {@link SKILLS_PLAN}, the dispatch offering `typescript-patterns` and
+ * `lesson-lint` and the session invoking the skill, so the skill reads
+ * `earning` when its file declares a failure string and `unmeasured`
+ * when none does. The skill's file and the lesson, held with an
+ * artifact, are each planted unless left out.
+ */
+function skillsRepo(plant: { skill?: boolean; lesson?: boolean } = {}): string {
+  const root = realpathSync(freshRoot());
+  Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+  writeConfig(root, '');
+  const dispatch = { sessionId: 'skills-1', planStub: SKILLS_PLAN, taskLine: 'A task' };
+  writeDispatch(root, {
+    ...dispatch,
+    declaration: null,
+    flags: [],
+    resolver: 'planner',
+    skillsOffered: ['typescript-patterns'],
+    lessonsOffered: ['lesson-lint'],
+  });
+  writeTaskReport(root, { dispatch, outcome: 'done', report: { status: 'done', skillsUsed: [] } });
+  writeSkillInvocations(root, [{
+    sessionId: dispatch.sessionId,
+    uses: [{ name: 'typescript-patterns', sidechain: false, count: 1 }],
+  }]);
+  if (plant.skill !== false) {
+    const path = join(root, '.claude', 'skills', 'typescript-patterns', 'SKILL.md');
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, skillFile('typescript-patterns', ['TS2769']), 'utf8');
+  }
+  if (plant.lesson !== false) {
+    const path = join(root, '.rafa', 'instincts', 'lesson-lint.md');
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, lessonFile('lesson-lint', 'lint / eslint'), 'utf8');
+  }
+  return root;
+}
+
+describe('readSkillsReport', () => {
+  it('reads the served skill\'s strings and the held lesson\'s artifact under the root', () => {
+    const root = skillsRepo();
+
+    const [plan] = readSkillsReport({ repoRoot: root, home: HOME }).plans;
+    const [arm] = plan?.resolvers ?? [];
+
+    expect(plan?.planStub).toBe(SKILLS_PLAN);
+    expect(arm?.skills.map(({ name, signal }) => [name, signal])).toEqual([['typescript-patterns', 'earning']]);
+    expect(arm?.lessons.map(({ id, artifact }) => [id, artifact])).toEqual([['lesson-lint', 'lint / eslint']]);
+  });
+
+  it('reads the skill as unmeasured and the lesson as unresolved when neither is planted, the control', () => {
+    const root = skillsRepo({ skill: false, lesson: false });
+
+    const [arm] = readSkillsReport({ repoRoot: root, home: HOME }).plans[0]?.resolvers ?? [];
+
+    expect(arm?.skills.map(({ signal }) => signal)).toEqual(['unmeasured']);
+    expect(arm?.lessons.map(({ artifact }) => artifact)).toEqual([null]);
+  });
+
+  it('narrows to the plans named, a stub the store holds no row for reading as no plan', () => {
+    const root = skillsRepo();
+
+    expect(readSkillsReport({ repoRoot: root, home: HOME, plans: [SKILLS_PLAN] }).plans).toHaveLength(1);
+    expect(readSkillsReport({ repoRoot: root, home: HOME, plans: ['no-such-plan'] })).toEqual({ plans: [] });
+    expect(readSkillsReport({ repoRoot: root, home: HOME, plans: null }).plans).toHaveLength(1);
+  });
+
+  it('throws the ConfigError of a config the loop cannot run on', () => {
+    const root = skillsRepo();
+    writeConfig(root, TWO_PROBLEM_CONFIG);
+
+    expect(thrownBy(() => readSkillsReport({ repoRoot: root, home: HOME }))).toBeInstanceOf(ConfigError);
+  });
+});
+
+describe('the report command with --skills', () => {
+  it('writes the skills report as the result in json mode and as the formatter\'s lines in text mode', () => {
+    const root = skillsRepo();
+    const expected = readSkillsReport({ repoRoot: root, home: HOME, entry: RAFA_ENTRY });
+
+    const json = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`, '--output=json']);
+    const text = runReport(root, ['--skills']);
+
+    expect(json.exitCode).toBe(0);
+    expect(eventsOf(json.stdout).at(-1)).toMatchObject({ ok: true, data: expected });
+    expect(expected.plans).toHaveLength(1);
+    expect(text.exitCode).toBe(0);
+    expect(text.stderr).toBe('');
+    expect(text.stdout).toBe(`${formatSkillsReport(expected).join('\n')}\n`);
+    expect(text.stdout.split('\n')[0]).toBe(SKILLS_REPORT_HEADER);
+  });
+
+  it('refuses --plan= without --skills with exit code 1, printing no report', () => {
+    const root = skillsRepo();
+
+    const run = runReport(root, [`--plan=${SKILLS_PLAN}`]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toBe('rafa effort report: --plan narrows the skills report and needs --skills\n');
+    expect(run.stdout).toBe('');
   });
 });

@@ -279,7 +279,8 @@ New; it replaces no earlier text. What a row or an action added to
 - **What json mode gives for the others**: `effort report` gives the
   report as the terminal result's `data`, the document phase 0's `--json`
   printed with the task report tallies, the preflight halts and the
-  budgeted sessions added, and
+  budgeted sessions added, or under `--skills` the `SkillsReport`
+  (`src/effort/report-skills.ts`), and
   writes no table line. `plan create`, `effort collect` and
   `usage` write each line as a `log` event of its level and give no
   result.
@@ -1210,7 +1211,9 @@ New; it replaces no earlier text. What a row or an action added to
   planner's own review judged not ready, whatever the rejection would have
   carried. `effort collect` and
   `effort report` throw 1 for an unrecognised argument and an unusable
-  config, one line per problem. An interrupted task throws
+  config, one line per problem; `effort report` also throws 1 for
+  `--plan=` without `--skills`, and for `--kind` or `--entrypoint` beside
+  it. An interrupted task throws
   `CommandExit(0)` once it is marked and its report stored; a failed,
   blocked or unstored task still returns, and ends with exit code 0.
   The plan readers throw 1 for a line handing them the wrong number of

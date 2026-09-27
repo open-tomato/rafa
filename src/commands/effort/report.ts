@@ -21,7 +21,10 @@ export default wrapPhaseZeroCommand({
     + ' session no plan claims, then tallies the stored task reports by plan, status and outcome, and'
     + ' lists the runs whose preflight halted, one row per required item that failed. It'
     + ' reads only what is stored, so two runs over an unchanged store print the same bytes. With'
-    + ' `--output=json` the report is the data of the terminal result event. An unrecognised argument'
+    + ' `--output=json` the report is the data of the terminal result event. With `--skills` it prints'
+    + ' the skills report instead: per plan, and per resolver within one, whether each offered skill and'
+    + ' injected lesson co-occurred with a recurrence of the failure it should prevent, read from the stored'
+    + ' rows and the skills\' frontmatter, never from a session log. An unrecognised argument'
     + ' and a config the loop cannot run on are each refused, one line per problem.',
   args: [],
   flags: [
@@ -38,6 +41,19 @@ export default wrapPhaseZeroCommand({
       type: 'string',
     },
     {
+      name: 'skills',
+      description: 'Prints the skills report in place of the session tables: per plan and per resolver,'
+        + ' each skill\'s and lesson\'s signal, the skills invoked and never offered, M1, M2 and plan CI.'
+        + ' Refused beside `--kind` or `--entrypoint`, which narrow session rows it does not read.',
+      type: 'boolean',
+    },
+    {
+      name: 'plan',
+      description: 'Keeps only these plan stubs in the skills report, comma-separated, and may be'
+        + ' repeated. A stub the store holds no row for reads as no plan. Refused without `--skills`.',
+      type: 'string',
+    },
+    {
       name: 'json',
       description: 'Deprecated: the phase 0 spelling of `--output=json`, read as that flag after one'
         + ' deprecation line on stderr.',
@@ -49,6 +65,11 @@ export default wrapPhaseZeroCommand({
     {
       cmd: 'rafa effort report',
       note: 'Prints the per-plan tables, the task report tallies, then the preflight halts.',
+    },
+    {
+      cmd: 'rafa effort report --skills --plan=rafa-24-know-which-skills-earn',
+      note: 'Prints one plan\'s skills and lessons with their signals, per resolver, under the fixed'
+        + ' co-occurrence line.',
     },
     {
       cmd: 'rafa effort report --entrypoint=sdk-cli --kind=task --output=json',

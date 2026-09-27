@@ -130,6 +130,19 @@
  * the loop's own numbers and shows a model spread the loop never
  * chose. `--entrypoint=sdk-cli` is the reading that is about the loop.
  *
+ * ## The skills report instead
+ *
+ * `--skills` prints the skills report (`report-skills.ts`) in place of all
+ * of the above, narrowed by `--plan=` to the plans named, and a stub the
+ * store holds no row for reads as no plan rather than as a refusal.
+ * {@link readSkillsReport} resolves what it reads as the rest resolves the
+ * store: the config under the repo root and the home, so a config the loop
+ * cannot run on is refused the same way, the three tiers read under both
+ * and resolved under that config as a loop session is served them
+ * (`start/serving.ts`), and the lessons held in both instinct scopes. In
+ * text mode the lines are `report-skills-format.ts`'s, and in json mode
+ * the report is the result's data, as the session report is.
+ *
  * ## Rounding
  *
  * Minutes come from {@link minutesBetween}, so this module and the
@@ -143,6 +156,7 @@ import type { SessionEffortRow } from './collect.js';
 import type { BudgetedSession } from './report-budgets.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { ConfigRoots } from '../config-load.js';
+import type { SkillsReport } from './report-skills.js';
 import type { SessionBudget } from './store/dispatches.js';
 import type { PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
@@ -154,6 +168,7 @@ import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
+import { resolveSessionTiers } from '../start/serving.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
@@ -165,6 +180,8 @@ import {
   formatReport,
   formatTaskReports,
 } from './report-format.js';
+import { formatSkillsReport } from './report-skills-format.js';
+import { buildSkillsReport, readHeldLessons } from './report-skills.js';
 import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
 import { readPreflightHalts } from './store/preflight.js';
@@ -621,9 +638,72 @@ export function buildReport(options: ReportOptions): EffortReport {
   );
 }
 
+/** Where the skills report reads from and what it narrows to. */
+export interface SkillsReportOptions {
+  /** The project root, with no default. Governs the config, the tiers, the lessons and the store. */
+  repoRoot: string;
+  /** The home the user scope's config, tier and lessons are read under. No default. */
+  home: string;
+  /** The plan stubs to read; every plan when null or left out. */
+  plans?: readonly string[] | null;
+  /** The entry the rafa tier sits beside. Defaults to `Bun.main`. */
+  entry?: string;
+}
+
+/**
+ * The skills report over the store under the repo root, each skill's
+ * failure strings read from the tiers as they resolve now under the
+ * config and each lesson resolved through the held set. See the module
+ * note.
+ *
+ * Throws a `ConfigError`, having read no row, when a config file under
+ * the repo root or the home is one the loop cannot run on.
+ */
+export function readSkillsReport(options: SkillsReportOptions): SkillsReport {
+  const { repoRoot: root, home, entry } = options;
+  const { config } = loadConfig({ root, home });
+  const pinned = entry === undefined
+    ? {}
+    : { entry };
+  return buildSkillsReport({
+    repoRoot: root,
+    ...(options.plans === null || options.plans === undefined
+      ? {}
+      : { plans: options.plans }),
+    resolution: resolveSessionTiers({ root, home, settings: config, ...pinned }),
+    lessons: readHeldLessons({ home, projectRoot: root, ...pinned }),
+  });
+}
+
 /** Refuses the run with exit code 1, its message one line per refusal. */
 function refuse(problems: readonly string[]): never {
   throw new CommandExit(1, problems.map((problem) => `rafa effort report: ${problem}`).join('\n'));
+}
+
+/**
+ * Writes the skills report through the active output: the result in json
+ * mode, the JSON on one `info` line under `--json` in text mode, and
+ * `report-skills-format.ts`'s lines otherwise. A config the loop cannot
+ * run on is refused as {@link report} refuses it.
+ */
+function writeSkillsReport(plans: readonly string[] | null, json: boolean, repoRoot: string): void {
+  let built: SkillsReport;
+  try {
+    built = readSkillsReport({ repoRoot, home: homedir(), plans });
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    refuse(error.problems);
+  }
+  const output = activeOutput();
+  if (activeOutputMode() === 'json') {
+    output.result(built);
+    return;
+  }
+  if (json) {
+    output.info(JSON.stringify(built, null, 2));
+    return;
+  }
+  for (const line of formatSkillsReport(built)) output.info(line);
 }
 
 /**
@@ -653,6 +733,10 @@ function refuse(problems: readonly string[]): never {
 export default async function report(args: string[], repoRoot: string): Promise<void> {
   const parsed = parseReportArgs(args);
   if (parsed.errors.length > 0) refuse(parsed.errors);
+  if (parsed.skills) {
+    writeSkillsReport(parsed.plans, parsed.json, repoRoot);
+    return;
+  }
 
   let built: EffortReport;
   try {

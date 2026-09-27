@@ -8,6 +8,8 @@ describe('parseReportArgs', () => {
       json: false,
       kinds: null,
       entrypoints: null,
+      skills: false,
+      plans: null,
       errors: [],
     });
   });
@@ -63,5 +65,46 @@ describe('parseReportArgs', () => {
     const parsed = parseReportArgs(['--nope', '--kind=nope']);
 
     expect(parsed.errors).toHaveLength(2);
+  });
+});
+
+describe('parseReportArgs for the skills report', () => {
+  it('reads --skills alone as every plan', () => {
+    expect(parseReportArgs(['--skills'])).toMatchObject({ skills: true, plans: null, errors: [] });
+  });
+
+  it('reads --plan= beside --skills, unioning a repeat and dropping the duplicate, in the order typed', () => {
+    const parsed = parseReportArgs(['--plan=b, a', '--skills', '--plan=a,c']);
+
+    expect(parsed).toMatchObject({ skills: true, plans: ['b', 'a', 'c'], errors: [] });
+  });
+
+  it('refuses --plan= without --skills, naming the flag, and reads the same stubs once --skills is typed', () => {
+    const alone = parseReportArgs(['--plan=x']);
+
+    expect(alone.errors).toEqual(['--plan narrows the skills report and needs --skills']);
+    expect(alone.skills).toBe(false);
+    // The control: the same flag beside --skills is no refusal.
+    expect(parseReportArgs(['--plan=x', '--skills']).errors).toEqual([]);
+  });
+
+  it('refuses a --plan that names no stub, with or without a value sign', () => {
+    expect(parseReportArgs(['--skills', '--plan=']).errors).toEqual(['--plan names no plan stub: --plan=']);
+    expect(parseReportArgs(['--skills', '--plan= , ']).errors).toHaveLength(1);
+    expect(parseReportArgs(['--skills', '--plan']).errors).toEqual(['--plan takes a value, as --plan=<value>']);
+  });
+
+  it('refuses a session-row filter beside --skills, once per flag, and neither without it', () => {
+    const parsed = parseReportArgs(['--skills', '--kind=task', '--kind=other', '--entrypoint=sdk-cli']);
+
+    expect(parsed.errors).toEqual([
+      '--kind narrows the session tables, which --skills does not print',
+      '--entrypoint narrows the session tables, which --skills does not print',
+    ]);
+    expect(parseReportArgs(['--kind=task', '--entrypoint=sdk-cli']).errors).toEqual([]);
+  });
+
+  it('refuses a value on --skills as an unrecognised argument', () => {
+    expect(parseReportArgs(['--skills=yes']).errors).toEqual(['unrecognised argument: --skills=yes']);
   });
 });
