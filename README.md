@@ -171,6 +171,44 @@ the next one, so you rarely have to remember it.
 
    Then step 2 again, or `rafa plan create --next`.
 
+### Tracking effort and learning from skills
+
+Each run records what it cost in time, tokens and work, and which skills
+were offered, invoked and worked. Two commands read that record:
+
+```bash
+rafa effort collect        # gather and store session logs
+rafa effort report         # per-plan summary: sessions, tasks, costs
+```
+
+`rafa effort report` shows the per-plan tables (sessions by status and
+outcome), the task report tallies, and any runs whose preflight halted. To
+see which skills earned their place and which are ignored:
+
+```bash
+rafa effort report --skills
+rafa effort report --skills --plan=rafa-24-know-which-skills-earn
+```
+
+With `--skills`, the report shows per plan and per resolver (the method
+that picked which skills to offer: `planner` by task declaration, `tag`
+by ranking, or `none`):
+
+- Each **skill**: offered count, invoked count, reported in the outcome,
+  recurrence count, and its **signal**: `earning` (worked with no failure
+  recurrence), `recurring` (invoked but a failure recurred), `unmeasured`
+  (invoked with no failure strings declared), or `ignored` (offered but
+  never invoked).
+- Each **lesson**: injected count, recurrence count, and whether it
+  recurred.
+- **M1** and **M2**: how many task lines used skills you offered, and how
+  many of the skills you offered were actually invoked.
+- **Plan CI**: the settled result of the pull request's checks when it landed.
+
+The report opens with a fixed line explaining that it shows co-occurrence,
+not causation: a skill can be invoked and its failure recur for reasons the
+skill does not cover.
+
 ### Which agents and skills are involved
 
 A task line may end with a declaration, for example
@@ -429,7 +467,7 @@ and a line here is ticked by the change that finishes the feature.
   changed since you last looked
 - ✅ The right skills reach the right task, chosen when the plan is
   written
-- ⬜ Know which skills earn their place and which are ignored
+- ✅ Know which skills earn their place and which are ignored
 - ✅ rafa learns from its own runs: what one task works out is handed
   to the tasks that need it later
 - ⬜ Skills and lessons shared across projects and machines

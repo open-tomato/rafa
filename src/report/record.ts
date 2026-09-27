@@ -7,13 +7,14 @@
  *
  *   - A report. Its findings go through `writeFindings`, its blockers and
  *     out-of-scope bugs through `writeTriage`, its change notes through
- *     `writeChanges`, and its `status` through `writeTaskReport`, one
- *     `task_reports` row per session. A report whose four lists are all
- *     empty writes no finding, blocker, bug or change row, as each list
- *     writer does with nothing to insert, and still writes its status
- *     row, creating the store when it is absent. Each list writer still
- *     opens a store that exists, for its schema check, so a store past
- *     this rafa's version is refused before any row is written.
+ *     `writeChanges`, and its `status` and `skills_used` through
+ *     `writeTaskReport`, one `task_reports` row per session. A report
+ *     whose four lists are all empty writes no finding, blocker, bug or
+ *     change row, as each list writer does with nothing to insert, and
+ *     still writes its status row, creating the store when it is absent.
+ *     Each list writer still opens a store that exists, for its schema
+ *     check, so a store past this rafa's version is refused before any
+ *     row is written.
  *   - No report, for whatever reason. One telemetry row goes through
  *     `writeReportAbsence`, so a session that reported nothing is still a
  *     row.

@@ -193,6 +193,12 @@ existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
 
+**A resumed `loop start` takes its tasks from `PLAN_TRACKER-<stub>.md`,
+not the plan.** Once the tracker exists, a task line appended to the plan
+file is never dispatched: the loop prints `All tasks completed!`. Append
+the open line to the tracker as well before running again. This replaces
+nothing.
+
 **The order of all work lives in ONE place: the pinned "Roadmap" issue**
 on the `open-tomato/rafa` board. The word "phase" and its letters are
 retired; merged work keeps its old file names and a table in the Roadmap

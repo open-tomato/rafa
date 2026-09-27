@@ -145,7 +145,7 @@ function padCell(cell: string, width: number, right: boolean): string {
  * apart, each column as wide as its widest cell, header included, and
  * every line trimmed of trailing whitespace.
  */
-function alignRows(
+export function alignRows(
   columns: readonly string[],
   rows: readonly (readonly string[])[],
   rightAligned: ReadonlySet<string>,
@@ -236,7 +236,7 @@ export function formatTaskReports(report: EffortReport): string[] {
 }
 
 /** `text` on one line, each run of whitespace one space. */
-function oneLine(text: string): string {
+export function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 

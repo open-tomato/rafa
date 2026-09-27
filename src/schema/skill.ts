@@ -100,11 +100,22 @@
  * `invalid-reviewed`, are skill codes here; its `missing-field` and
  * `wrong-type` are the same rules this module names for every other
  * field. Absent, it is no issue: requiring it is the bundle test's rule.
+ *
+ * ## `failure_strings`, and the one code that is a warning
+ *
+ * The optional `failure_strings` list is read onto {@link
+ * SkillFrontmatter.failureStrings}, empty when absent. The list and
+ * entry types are this module's `wrong-type`; what an entry may hold
+ * is `./failure-strings.js`'s rule, which makes a blank entry a
+ * failure and a short one `short-failure-string`, the one code in
+ * {@link SKILL_WARNING_CODES}: the checker reports it as a warning,
+ * and {@link parseSkillFrontmatter} still answers the skill beside it.
  */
 
 import type { Provenance } from './provenance.js';
 import type { StackValue } from './stack.js';
 
+import { failureStringProblem } from './failure-strings.js';
 import { checkProvenance, readProvenance } from './provenance.js';
 import { AGNOSTIC_STACK, isStackName, unknownStacks } from './stack.js';
 
@@ -173,7 +184,11 @@ export type SkillIssueCode =
   /** A `provenance` that is neither `first-party` nor a known mapping. */
   | 'unknown-provenance'
   /** A `provenance.reviewed` that is not `<who> <YYYY-MM-DD>`. */
-  | 'invalid-reviewed';
+  | 'invalid-reviewed'
+  /** A blank `failure_strings` entry, which every text contains. */
+  | 'empty-failure-string'
+  /** A `failure_strings` entry too short to name one failure; a warning. */
+  | 'short-failure-string';
 
 /** Every code, in the order this module first documents them. */
 export const SKILL_ISSUE_CODES: readonly SkillIssueCode[] = [
@@ -189,7 +204,21 @@ export const SKILL_ISSUE_CODES: readonly SkillIssueCode[] = [
   'forbidden-field',
   'unknown-provenance',
   'invalid-reviewed',
+  'empty-failure-string',
+  'short-failure-string',
 ];
+
+/**
+ * The codes that describe a block the schema still reads: a checker
+ * reports them as warnings, and {@link parseSkillFrontmatter} answers
+ * the skill beside them. Every other code is a failure.
+ */
+export const SKILL_WARNING_CODES: readonly SkillIssueCode[] = ['short-failure-string'];
+
+/** Whether `code` is one of {@link SKILL_WARNING_CODES}. */
+export function isSkillWarning(code: SkillIssueCode): boolean {
+  return SKILL_WARNING_CODES.includes(code);
+}
 
 /** One thing the frontmatter said that the schema cannot accept. */
 export interface SkillIssue {
@@ -238,13 +267,18 @@ export interface SkillFrontmatter {
   readonly userInvocable: boolean;
   /** `provenance`, or null when the key is absent. */
   readonly provenance: Provenance | null;
+  /** `failure_strings`, the literals a recurrence matches. Empty when absent. */
+  readonly failureStrings: readonly string[];
 }
 
 /** What {@link parseSkillFrontmatter} answers. */
 export interface SkillCheckResult {
   /** Every rule broken, in field order. Empty on a clean block. */
   readonly issues: readonly SkillIssue[];
-  /** The block read, or null when `issues` is non-empty. */
+  /**
+   * The block read, or null when `issues` holds any code outside
+   * {@link SKILL_WARNING_CODES}.
+   */
   readonly skill: SkillFrontmatter | null;
 }
 
@@ -597,6 +631,34 @@ function checkPaths(data: Readonly<Record<string, unknown>>): SkillIssue[] {
   return issues;
 }
 
+/** `failure_strings`: an optional, possibly empty list of literal strings. */
+function checkFailureStrings(data: Readonly<Record<string, unknown>>): SkillIssue[] {
+  const value = data['failure_strings'];
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    return [issue(
+      'wrong-type',
+      'failure_strings',
+      `failure_strings must be a list, not ${typeName(value)}`,
+    )];
+  }
+
+  return value.flatMap((entry: unknown, index) => {
+    const field = `failure_strings[${index}]`;
+    if (typeof entry !== 'string') {
+      return [issue(
+        'wrong-type',
+        field,
+        `failure_strings entries must be strings, and this one is ${typeName(entry)}`,
+      )];
+    }
+    const problem = failureStringProblem(entry);
+    return problem === null
+      ? []
+      : [issue(problem.code, field, problem.message)];
+  });
+}
+
 /** A boolean field Claude Code reads: absent, or a real YAML boolean. */
 function checkBoolean(
   data: Readonly<Record<string, unknown>>,
@@ -623,8 +685,10 @@ function checkForbidden(data: Readonly<Record<string, unknown>>): SkillIssue[] {
 /**
  * Every rule `data` breaks, in field order: `name`, `description`,
  * `tags`, `stack`, `when_to_use`, the `prevents`/`signal` pair,
- * `relates`, `supersedes`, `paths`, the booleans, `provenance`, then
- * the forbidden fields. An empty list means the block is v2.
+ * `failure_strings`, `relates`, `supersedes`, `paths`, the booleans,
+ * `provenance`, then the forbidden fields. An empty list means the
+ * block is v2; a list holding only {@link SKILL_WARNING_CODES} means
+ * it is v2 with something its author should look at.
  *
  * Every field is checked, so one pass names every offender rather than
  * the first, and a field that failed its type check contributes no
@@ -640,6 +704,7 @@ export function checkSkillFrontmatter(
     ...checkStack(data),
     ...checkWhenToUse(data),
     ...checkTrigger(data),
+    ...checkFailureStrings(data),
     ...SKILL_NAME_LIST_FIELDS.flatMap((field) => checkNameList(data, field)),
     ...checkPaths(data),
     ...SKILL_BOOLEAN_FIELDS.flatMap((field) => checkBoolean(data, field)),
@@ -658,14 +723,15 @@ function stringList(data: Readonly<Record<string, unknown>>, field: string): str
 
 /**
  * `data` read as v2, with every issue beside it. `skill` is null
- * whenever `issues` is non-empty, so a caller reading the record never
- * has to ask which fields survived.
+ * whenever `issues` holds a failure, so a caller reading the record
+ * never has to ask which fields survived; a warning alone leaves every
+ * field readable, so the skill is answered beside it.
  */
 export function parseSkillFrontmatter(
   data: Readonly<Record<string, unknown>>,
 ): SkillCheckResult {
   const issues = checkSkillFrontmatter(data);
-  if (issues.length > 0) return { issues, skill: null };
+  if (!issues.every((found) => isSkillWarning(found.code))) return { issues, skill: null };
 
   const signal = stringAt(data, 'signal');
 
@@ -689,6 +755,7 @@ export function parseSkillFrontmatter(
       disableModelInvocation: data['disable-model-invocation'] === true,
       userInvocable: data['user-invocable'] === true,
       provenance: readProvenance(data),
+      failureStrings: stringList(data, 'failure_strings'),
     },
   };
 }

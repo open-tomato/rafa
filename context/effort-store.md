@@ -66,11 +66,25 @@ runs beside a live loop; the swap refuses while a loop session is running
 or paused. A newer schema that dropped a table or column this rafa writes
 is not additive, and the repair refuses it rather than copy around it.
 
+### The schema history
+
+**SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and
+re-exported from `store/sqlite.ts`.** Every entry takes a store from one
+version to the next. The entry at index `i` takes version `i` to version
+`i + 1`; the last version is the array's length, so appending a migration
+is what raises it. Two things differ from earlier Ralph: the version lives
+in `PRAGMA user_version`, a SQLite header field written in the same
+transaction as the migrations it records, so a run killed between the two
+rolls the field back with the tables; and the last version is the array's
+length rather than a constant beside it, so an appended entry cannot be
+forgotten. Measured, a throw inside the transaction rolls `user_version`
+back as well.
+
 ### Tables outside the port
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
-`report_absences`, `task_reports`, `preflight`, `dispatches` and
-`skill_invocations` are SQLite-only and stay out of the port's row map.
+`report_absences`, `task_reports`, `preflight`, `dispatches`,
+`skill_invocations` and `plan_ci` are SQLite-only and stay out of the port's row map.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
@@ -94,11 +108,119 @@ render.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
 `reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts`,
-`changes.test.ts` and `skill-invocations.test.ts`, and the filter the
-version-5 case of `preflight.test.ts` takes the later tables out with,
-beside the version-6 filter of `dispatches.test.ts`, the two version-7
-filters of `changes.test.ts`, and the version-11 filter of
-`skill-invocations.test.ts`.
+`changes.test.ts`, `skill-invocations.test.ts` and `plan-ci.test.ts`,
+and the filter the version-5 case of `preflight.test.ts` takes the later
+tables out with, beside the version-6 filter of `dispatches.test.ts`, the
+two version-7 filters of `changes.test.ts`, the two version-10 filters of
+`skill-invocations.test.ts`, and the two version-12 filters of
+`plan-ci.test.ts`.
+
+### The fact rows
+
+**`readSkillFacts` (`src/effort/skill-facts.ts`) answers one row per task
+report, joining what `rafa effort report --skills` needs.** It reads rows
+rafa already stores and nothing else: no session transcript is opened.
+It is a TypeScript reader rather than a SQL view, so the schema's table
+expectations do not move. Each `SkillFact` holds what `task_reports` says
+(plan, task line, outcome, claimed skills), what `dispatches` holds about
+its resolver and offers, what `skill_invocations` shows it invoked (or
+`'unknown'` when its log could not be read), its `findings`, `blockers`
+and `out_of_scope_bugs` rows in append order, and every `plan_ci` reading
+of its plan (empty for no plan or a plan with no reading). Names are
+mapped through `bareSkillName`, so a served skill reads as its bare name
+and a plugin's `plugin:name` is kept. A session with no report (a
+`report_absences` row) has no fact row.
+
+### The recurrence rule
+
+**`findRecurrences` (`src/effort/recurrence.ts`) answers where a failure
+string appears again in rows rafa stores.** A skill's failure strings come
+from its `failure_strings:` in the frontmatter, a lesson's from its
+`artifact`. A string recurs when it appears as a case-sensitive literal
+(`String.prototype.includes`, no folding) in any field of the task's own
+or each later task's findings, blockers or out-of-scope bugs (searched
+fields: `trigger`, `what`, `cause`, `artifact` for findings; `what`,
+`artifact` for entries), or in the plan's failing check names (the union
+over every reading). The task is the fact at `fromIndex`; "later task" is
+a row after it in the same plan. A task under no plan has no later task.
+NULL fields and empty strings are never searched. Each match names the
+string, the source (finding, blocker, bug or plan-ci), the session and
+task line it was found in (NULL for plan CI), the field, and the field's
+whole value. Matches come in search order: task by task, finding then
+blocker then bug then checks, field by field as listed above, string by
+string. A string given twice is searched once.
+
+### The signals
+
+**`skillSignals` and `lessonSignals` (`src/effort/skill-signals.ts`) say
+what co-occurred with a failure string's recurrence.** Both are pure
+functions of the fact rows and the recurrence matcher; neither reads a
+path or config. A signal is checked in order, defined once, and never
+claims a cause.
+
+**Skill signals.** A skill is read when a row's `skillsOffered` or its
+known `invoked` names it. A skill some row offered gets exactly one signal
+(in order): `recurring` (a row invoked it and one of its failure strings
+then recurred), `unmeasured` (invoked with no failure strings declared),
+`earning` (invoked with no recurrence after any invocation), or `ignored`
+(no row invoked it). A skill no row offered, and some row invoked, is in
+`neverOffered` with no signal. A row whose `invoked` is `'unknown'` never
+reads as invoking nothing, so a skill no known row invoked and some
+`unknown` row offered has no signal (cannot tell `ignored`).
+
+**Lesson signals.** A lesson is read when a row's `lessonsOffered` names
+it. It is `injected-recurring` (its artifact recurred after a row injected
+it) or `injected` (otherwise). An id the held set no longer resolves has a
+null artifact and reads as `injected`.
+
+### The SkillsReport JSON schema
+
+**`buildSkillsReport` (`src/effort/report-skills.ts`) answers the report as
+a pure structure and as JSON.** It reads the store's fact rows (narrowed to
+named plans), each skill's `failure_strings:` from the resolved tiers, and
+each held lesson's `artifact` by id. One `SkillsReportPlan` per plan the
+rows hold, in the order facts list them; a report under no plan is its own
+entry. Within a plan, one `SkillsReportArm` per resolver the rows ran under,
+in order first seen. A plan run under one resolver has one arm.
+
+| Field | Type | Note |
+| --- | --- | --- |
+| `plans` | array of `SkillsReportPlan` | one per plan, or empty |
+| `plans[].planStub` | string or null | null for no plan |
+| `plans[].sessions` | number | count of fact rows of this plan |
+| `plans[].planCi` | `PlanCiRow` or null | latest CI reading by time |
+| `plans[].resolvers` | array of `SkillsReportArm` | one per resolver |
+| `plans[].resolvers[].resolver` | string or null | `planner`, `tag`, `none`, or null |
+| `plans[].resolvers[].sessions` | number | fact rows of this arm |
+| `plans[].resolvers[].unknownSessions` | number | rows with unknown invocations |
+| `plans[].resolvers[].skills` | array of `SkillSignalRow` | offered skills |
+| `plans[].resolvers[].skills[].name` | string | bare skill name |
+| `plans[].resolvers[].skills[].offered` | number | fact rows that offered it |
+| `plans[].resolvers[].skills[].invoked` | number | rows whose log shows invocation |
+| `plans[].resolvers[].skills[].reported` | number | rows claiming it was used |
+| `plans[].resolvers[].skills[].recurred` | number | invoking rows after which it recurred |
+| `plans[].resolvers[].skills[].matches` | array of `Recurrence` | each string found |
+| `plans[].resolvers[].skills[].signal` | string or null | `recurring`, `unmeasured`, `earning`, `ignored`, or null |
+| `plans[].resolvers[].neverOffered` | array of `SkillTally` | invoked, never offered |
+| `plans[].resolvers[].lessons` | array of `LessonSignalRow` | injected lessons |
+| `plans[].resolvers[].lessons[].id` | string | lesson id |
+| `plans[].resolvers[].lessons[].artifact` | string or null | string it's searched for |
+| `plans[].resolvers[].lessons[].injected` | number | fact rows that injected it |
+| `plans[].resolvers[].lessons[].recurred` | number | rows after which it recurred |
+| `plans[].resolvers[].lessons[].matches` | array of `Recurrence` | each artifact found |
+| `plans[].resolvers[].lessons[].signal` | string | `injected-recurring` or `injected` |
+| `plans[].resolvers[].m1` | `SkillsMetric` | skill references per task |
+| `plans[].resolvers[].m2` | `SkillsMetric` | uptake of offered skills |
+| `*.m1.numerator` | number | distinct (task line, skill) invoked |
+| `*.m1.denominator` | number | distinct task lines |
+| `*.m1.percent` | number or null | `numerator / denominator * 100` |
+| `*.m2.numerator` | number | (session, skill) both offered and invoked |
+| `*.m2.denominator` | number | (session, skill) offered |
+| `*.m2.percent` | number or null | `numerator / denominator * 100` |
+
+Rows with unknown invocations are left out of M1 and M2 denominators and
+numerators. A `Recurrence` holds the `string` found, the source, session id
+and task line (null for plan CI), field name, and the field's whole `text`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what
@@ -125,15 +247,16 @@ redden.
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
 the session id, holding what the task line's declaration asked for and the
-flags the session was spawned with, one row per session. The table has
-three columns holding resolver and offer information: `resolver` (the skill
-resolver the session ran under), `skills_offered` (the bare names of skills
-its prompt offered), and `lessons_offered` (the ids of lessons its prompt
-offered). Whatever became of the task, the dispatch is written ahead of the
-task report; a refused dispatch row stores no report. A dispatch handed no
-handout stores a NULL resolver beside two `[]` offers. No column holds the
-outcome: `task_reports` and `report_absences` hold it under the same
-session id.
+flags the session was spawned with, one row per session: a second write
+for the same session id is skipped, never merged into the first. The
+table has three columns holding resolver and offer information:
+`resolver` (the skill resolver the session ran under), `skills_offered`
+(the bare names of skills its prompt offered), and `lessons_offered` (the
+ids of lessons its prompt offered). Whatever became of the task, the
+dispatch is written ahead of the task report; a refused dispatch row
+stores no report. A dispatch handed no handout stores a NULL resolver
+beside two `[]` offers. No column holds the outcome: `task_reports` and
+`report_absences` hold it under the same session id.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a
@@ -161,6 +284,28 @@ and `count` — marks a session whose log the collector could not vouch for
 (log version mismatch, unreadable line, or unreadable skill call). A session
 that invoked no skill stores no row at all.
 
+**Claude Code's own usage record covers only plugin-delivered skills, never a
+project skill, so `skill_invocations` has no CLI-native count to check
+itself against.** The one persisted usage record found under `~/.claude/`
+is `pluginUsage` in `~/.claude/.claude.json`: a map keyed
+`<plugin>@<marketplace>`, each entry holding `usageCount`, `lastUsedAt` and
+`lastUsedNumStartups`, and it backs the "last used" / "never invoked" text
+the `/plugin` skill-detail view and `/skill-doctor` read. Verified on
+2026-09-27 with a real `claude -p` session under the pinned
+`SKILL_USE_CLI_VERSION` (2.1.280): a scratch repo with two project skills
+planted under `.claude/skills/`, outside any plugin, each invoked once by
+name in the one session recorded. `readSkillUse` over that session's log
+answered the expected `probe-alpha` and `probe-beta` counts of 1 each,
+while `pluginUsage` held its pre-session eight plugin entries unchanged —
+no key for either probe skill appeared, before or after, and no state file
+was written into the scratch repo's own `.claude/` either.
+`~/.claude/stats-cache.json` was checked too and holds only an aggregate
+`toolCallCount` per day, no per-skill field. So `skill_invocations` is not
+a second recording of a count the CLI already keeps for a rafa-served
+skill; for a project skill, the kind rafa serves, it is the only per-skill
+count that exists anywhere, and this collector is the sole source
+`rafa effort report --skills` can read.
+
 **The collector's exception to "no tool input".** `session-log.ts`
 and the effort port fold a session's logs into counters and identifiers
 without keeping message content. The skill-use collector in
@@ -172,6 +317,36 @@ counts it answers can therefore be stored beside the session rows without
 the store becoming a copy of a transcript. The collector vouches for the log
 format by comparing each record's `version` against `SKILL_USE_CLI_VERSION`;
 a session read as `unknown` is never averaged as a session that used no skill.
+
+**`plan_ci` is written by `pr triage` and `pr merge`, held by the plan CI
+readers.** It arrived at schema version 13: one row per settled reading of
+a pull request's checks, keyed by `(pr, head_sha, read_at)`. The row holds
+the plan stub the head branch resolves to, the verdict (`green`, `red` or
+`none`), and the failing checks' names as a JSON array. Both commands call
+`recordPlanCi` (`store/plan-ci.ts`), handing it the pull request, the
+`CheckRow`s and `plan.dir`; it never throws. A `pending` reading stores
+no row. `readPlanCi` reads every row, or one plan's, in append order.
+**Verdict, PR, head commit.** A `pending` verdict (a check still running)
+stores no row, and the table's CHECK admits only `green`, `red` and `none`.
+`verdictOf` answers the settled verdict over every check, and the `failing`
+list is the failing checks' names; a CHECK keeps `failing` non-empty
+exactly when the verdict is `red`. The key is `(pr, head_sha, read_at)`:
+the same head read twice at two times is two rows, and the same reading
+written twice is stored once (the second counted as skipped).
+**The plan stub.** The head branch is read as `<type>/<stub>` by
+`attributeBranch`, and the stub resolved against the plan roster by
+`resolvePlanStub`, as `effort collect` resolves a session's branch. A stub
+the roster does not hold is taken verbatim, as `release status` takes it.
+A branch naming no stub (`main`, a branch with no `/`) or a queue id
+reaching two plans records nothing, since `plan_stub` is never NULL.
+**Writers.** `pr triage` calls `recordPlanCi` from `assessOne` after each
+checks read of a pull request it assesses, re-assessments of a `--resolve`
+run and readings that assess nothing included; the checks the bare form
+reads to find red candidates store nothing, since a list answers no head
+sha. `pr merge` calls it from `runMerge` straight after its one checks read
+and before any refusal, so a merge refused on red checks still stores what
+it read. Both tests are in `commands/pr/`: `triage-plan-ci.test.ts` and
+`merge-plan-ci.test.ts`.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
@@ -188,6 +363,23 @@ queryable table at all. To recover what a past task actually said — the
 exit codes it captured, the commands it ran — read `session_id` off its
 `task_reports` row and open the matching
 `~/.claude/projects/<project-slug>/<session-id>.jsonl`.
+
+**`task_reports.skills_used` arrived at schema version 12**, an `ADD
+COLUMN` holding the report's claim of skills used as a JSON array, in the
+order written, duplicates kept and no name rewritten; its CHECK admits
+NULL or an array and nothing else. `writeTaskReport` stores it from the
+`TaskReport.skillsUsed` that `storeTaskReport` hands through
+`recordTaskReport`. NULL is "not recorded" and never an empty list: a
+row a version-11 store held reads NULL, and so does a write that leaves
+the list out, while a report that listed no skill stores `[]`.
+`readReportedSkills` (`store/reports.ts`) answers the list per row in
+append order, NULL as null. A `SkillFact` reads it as `skillsUsed` after
+mapping each name through `bareSkillName`, keeping each once in first-
+seen order. It is the session's claim; comparing it with `skill_invocations`
+(what the log shows) is the reader's job, not the writer's. Never called
+by `rafa effort report --skills`, which reads `invoked` and never
+`skillsUsed`. Adding the column moved two expectations, both in
+`store/reports.test.ts`: the `COLUMNS` list and the whole-row `toEqual`.
 
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row

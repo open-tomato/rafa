@@ -596,6 +596,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../../effort/store/plan-ci.js', ['recordPlanCi']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', [
       'cleanUpSteps',
@@ -627,6 +628,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/pr/triage.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
+    ['../../effort/store/plan-ci.js', ['recordPlanCi']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', ['createGitRunner']],
     ['../../pr/triage/classify.js', ['classifyTriage']],

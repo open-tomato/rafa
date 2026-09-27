@@ -9,6 +9,15 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.21.0 — 2026-09-27, Know which skills earn their place
+
+- Effort store: each stored task report records the skills its session said it used (a report stored before reads as not recorded, never as none), and a new SQLite-only `plan_ci` table keeps each settled reading of a plan's pull request checks: its head commit, verdict (`green`, `red` or `none`), failing check names and time.
+- Pull requests: `rafa pr triage` and `rafa pr merge` record each settled checks reading against the plan the head branch belongs to, a merge they refuse included; a failed store write is a warning and never fails the command.
+- Skills: a skill may declare `failure_strings:` in its frontmatter, the literal text of the failure it exists to prevent; `rafa skill check` refuses an empty string and warns on one shorter than 6 characters.
+- Effort: `rafa effort report --skills` reads, per plan and per resolver, whether each offered skill is `earning`, `ignored`, `recurring` or `unmeasured` and whether each injected lesson's failure recurred, a recurrence being a case-sensitive match in the same or a later task's findings, blockers or out-of-scope bugs or in the plan's failing CI check names; each table carries its M1 and M2 and the plan CI verdict, the text opens by saying it shows co-occurrence and not cause, and a footnote notes that Claude Code's own usage record counts only plugin skills; `--plan=` narrows it to the plans named, and `--plan=`, `--kind` or `--entrypoint` beside the wrong mode are refused rather than ignored.
+- Tests: the skills report is held end to end, from a dispatched plan under the stand-in `claude` and its recorded session logs through `effort collect` to every signal and a two-resolver split, and its JSON output is held to the `SkillsReport` type.
+- Docs: `context/effort-store.md` covers `task_reports.skills_used`, the `plan_ci` table and its writers, the fact rows, the recurrence rule, the signals and the `SkillsReport` JSON schema; the README's effort section covers `--skills` and `--plan=`.
+
 ## 0.20.0 — 2026-09-26, The right skills reach the right task
 
 - Config: `task.skills` (`planner`, `tag` or `none`, default `planner`) chooses how each task is handed its skills and `task.lessons` (`on` or `off`, default `on`) whether it is handed lessons; `rafa init` writes both commented out at their defaults.

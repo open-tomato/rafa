@@ -243,10 +243,18 @@ the reference example. This section replaces nothing.
   and a deadline test passes without waiting. Have it
   `exec "<process.execPath>" -e 'setTimeout(() => {}, 600000)'` instead.
 - A scratch project's `origin` is a bare path, so `resolvePrProvider`
-  answers `none` and no `gh` stand-in is ever called. Plant
+  answers `none` and no pull request read calls `gh`. Plant
   `pr.provider: gh` in `.rafa/config.yaml`, and `roadmap.issue` too when
   the test needs the board read (`rafa status`, `rafa next`); without it
-  the board section warns without calling `gh`.
+  the board section warns without calling `gh`. `loop start` is the
+  exception: its risk total (`src/start/risk-total.ts`) reads the
+  accounts through `gh` on every run, whatever the provider, so plant a
+  refusing `gh` stand-in for every `loop start` test. This replaces the
+  claim that a scratch project calls no `gh` at all.
+- A stand-in `claude` that writes JSON (a session log, a report) builds
+  it in a small `.mjs` script it runs with `"<process.execPath>"`, since
+  hand-quoted JSON in `/bin/sh` breaks and a bare `bun` is not on the
+  child's `PATH`. This replaces nothing.
 - A `ROUTES` case in `src/commands/index.test.ts` splits its route line on
   spaces, so a quoted multi-word argument does not group; use one word.
 - `runRafa` spawns `src/rafa.ts` (`RAFA_ENTRY`), not the build. To prove

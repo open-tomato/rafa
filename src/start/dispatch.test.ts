@@ -193,6 +193,22 @@ describe('storeTaskReport, storing the dispatch', () => {
     expect(seen).toEqual([]);
   });
 
+  it('stores the skills the report says it used on its task report row', async () => {
+    const root = freshRoot();
+    const output = REPORTED.replace('skills_used: []', 'skills_used: ["git-workflow", "rafa:dev-planner"]');
+
+    // The control: the fixture's line really changed, so the list below
+    // came from the output and not from a default.
+    expect(output).not.toBe(REPORTED);
+    expect(await storeTaskReport(storeOptions(root, 's-3', output, 'done'))).toBe(true);
+    expect(await storeTaskReport(storeOptions(root, 's-3b', REPORTED, 'done'))).toBe(true);
+
+    expect(rawQuery(root, 'SELECT session_id, skills_used FROM task_reports ORDER BY seq')).toEqual([
+      { session_id: 's-3', skills_used: '["git-workflow","rafa:dev-planner"]' },
+      { session_id: 's-3b', skills_used: '[]' },
+    ]);
+  });
+
   it('stores the dispatch of a session that ended on its budget and left no report', async () => {
     const root = freshRoot();
 
