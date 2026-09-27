@@ -53,6 +53,7 @@ import {
   inferredStack,
   inferredTags,
   LOCALITY_CODES,
+  skillSeverity,
 } from './run.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-check-run-'));
@@ -833,6 +834,46 @@ describe('the stage list and the severity rule', () => {
     expect(hasCheckFailure([])).toBe(false);
     expect(hasCheckFailure([warning])).toBe(false);
     expect(hasCheckFailure([warning, { ...warning, severity: 'failure' }])).toBe(true);
+  });
+});
+
+describe('a skill declaring failure_strings', () => {
+  /** A clean skill's report once `failure_strings` holds `entries`. */
+  function reportWith(entries: readonly string[]): CheckReport {
+    const lines = [
+      ...CLEAN_SKILL_FIELDS,
+      'failure_strings:',
+      ...entries.map((entry) => `  - ${entry}`),
+    ];
+    const root = plant({ 'skills/verification-loop/SKILL.md': skillText(lines, PLAIN_BODY) });
+    return checkFile(join(root, 'skills/verification-loop/SKILL.md'), 'skill', BARE);
+  }
+
+  it('holds a short string to a schema warning that fails nothing', () => {
+    const report = reportWith(['TS27']);
+
+    expect(marks(report)).toEqual(['schema/short-failure-string']);
+    expect(report.issues[0]?.severity).toBe('warning');
+    expect(report.issues[0]?.field).toBe('failure_strings[0]');
+    expect(report.failed).toBe(false);
+  });
+
+  it('holds an empty string to a schema failure', () => {
+    const report = reportWith(['""']);
+
+    expect(marks(report)).toEqual(['schema/empty-failure-string']);
+    expect(report.issues[0]?.severity).toBe('failure');
+    expect(report.failed).toBe(true);
+  });
+
+  it('passes a string of six characters and a sentence untouched', () => {
+    expect(reportWith(['TS2769', 'no changes added to commit']).issues).toEqual([]);
+  });
+
+  it('maps only the short-string code to a warning', () => {
+    expect(skillSeverity('short-failure-string')).toBe('warning');
+    expect(skillSeverity('empty-failure-string')).toBe('failure');
+    expect(skillSeverity('missing-field')).toBe('failure');
   });
 });
 

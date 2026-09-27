@@ -94,7 +94,7 @@ import { basename, dirname } from 'node:path';
 
 import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '../schema/frontmatter.js';
 import { parseInstinct } from '../schema/instinct.js';
-import { checkSkillFrontmatter } from '../schema/skill.js';
+import { checkSkillFrontmatter, isSkillWarning } from '../schema/skill.js';
 import { AGNOSTIC_STACK, inferStacks } from '../schema/stack.js';
 
 import { MARKDOWN_EXTENSION, SKILL_FILE, declaredNameIssue, scanLayout } from './layout.js';
@@ -252,12 +252,23 @@ function fromLayout(issue: LayoutIssue): CheckIssue {
   };
 }
 
-/** A skill schema issue as a checker issue; every one is a failure. */
+/**
+ * The severity a skill schema code carries: `warning` for the codes the
+ * schema lists in `SKILL_WARNING_CODES` (a `failure_strings` entry too
+ * short to name one failure), `failure` for every other.
+ */
+export function skillSeverity(code: SkillIssueCode): CheckSeverity {
+  return isSkillWarning(code)
+    ? 'warning'
+    : 'failure';
+}
+
+/** A skill schema issue as a checker issue, at {@link skillSeverity}. */
 function fromSkill(issue: SkillIssue): CheckIssue {
   return {
     stage: 'schema',
     code: issue.code,
-    severity: 'failure',
+    severity: skillSeverity(issue.code),
     field: issue.field,
     line: null,
     message: issue.message,

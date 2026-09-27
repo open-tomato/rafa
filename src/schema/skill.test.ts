@@ -49,10 +49,12 @@ import {
   SKILL_ISSUE_CODES,
   SKILL_NAME_PATTERN,
   SKILL_SIGNALS,
+  SKILL_WARNING_CODES,
   checkSkillFrontmatter,
   countCharacters,
   globProblem,
   isSkillName,
+  isSkillWarning,
   listingLength,
   parseSkillFrontmatter,
 } from './skill.js';
@@ -138,6 +140,7 @@ describe('a block the schema accepts', () => {
       disableModelInvocation: false,
       userInvocable: false,
       provenance: null,
+      failureStrings: [],
     });
   });
 
@@ -682,6 +685,101 @@ describe('provenance', () => {
   });
 });
 
+describe('failure_strings', () => {
+  test('literal strings of six characters or more pass and parse in order', () => {
+    const data = withFields(MINIMAL, { failure_strings: ['TS2769', 'no changes added to commit'] });
+
+    expect(checkSkillFrontmatter(data)).toEqual([]);
+    expect(parseSkillFrontmatter(data).skill?.failureStrings)
+      .toEqual(['TS2769', 'no changes added to commit']);
+  });
+
+  test('an empty list is accepted like an absent key', () => {
+    const data = withFields(MINIMAL, { failure_strings: [] });
+
+    expect(checkSkillFrontmatter(data)).toEqual([]);
+    expect(parseSkillFrontmatter(data).skill?.failureStrings).toEqual([]);
+  });
+
+  test('an empty string is refused on its entry and leaves no skill', () => {
+    const data = withFields(MINIMAL, { failure_strings: ['TS2769', ''] });
+
+    expect(marks(data)).toEqual(['empty-failure-string@failure_strings[1]']);
+    expect(parseSkillFrontmatter(data).skill).toBeNull();
+  });
+
+  test('a whitespace-only string is refused as empty', () => {
+    expect(marks(withFields(MINIMAL, { failure_strings: ['   '] })))
+      .toEqual(['empty-failure-string@failure_strings[0]']);
+  });
+
+  test('five characters warn and six do not', () => {
+    expect(marks(withFields(MINIMAL, { failure_strings: [filler(5)] })))
+      .toEqual(['short-failure-string@failure_strings[0]']);
+    expect(marks(withFields(MINIMAL, { failure_strings: [filler(6)] }))).toEqual([]);
+  });
+
+  test('length is counted in codepoints, not UTF-16 units', () => {
+    const astral = '\u{1F600}'.repeat(5);
+
+    expect(astral.length).toBe(10);
+    expect(marks(withFields(MINIMAL, { failure_strings: [astral] })))
+      .toEqual(['short-failure-string@failure_strings[0]']);
+  });
+
+  test('a short string is a warning, so the skill is still answered beside it', () => {
+    const data = withFields(MINIMAL, { failure_strings: ['TS27'] });
+    const { issues, skill } = parseSkillFrontmatter(data);
+
+    expect(issues.map((found) => found.code)).toEqual(['short-failure-string']);
+    expect(issues[0]?.message).toContain('"TS27" is 4 characters');
+    expect(skill?.failureStrings).toEqual(['TS27']);
+  });
+
+  test('a warning beside a failure still leaves no skill', () => {
+    const data = withFields(MINIMAL, { failure_strings: ['TS27'], tags: undefined });
+
+    expect(marks(data)).toEqual([
+      'missing-field@tags',
+      'short-failure-string@failure_strings[0]',
+    ]);
+    expect(parseSkillFrontmatter(data).skill).toBeNull();
+  });
+
+  test('a value that is not a list is wrong-type on the field', () => {
+    expect(marks(withFields(MINIMAL, { failure_strings: 'TS2769' })))
+      .toEqual(['wrong-type@failure_strings']);
+    expect(marks(withFields(MINIMAL, { failure_strings: null })))
+      .toEqual(['wrong-type@failure_strings']);
+  });
+
+  test('an entry that is not a string is wrong-type on the entry', () => {
+    expect(marks(withFields(MINIMAL, { failure_strings: ['TS2769', 2769] })))
+      .toEqual(['wrong-type@failure_strings[1]']);
+  });
+
+  test('it is reported after the prevents/signal pair and before relates', () => {
+    const data = withFields(MINIMAL, {
+      prevents: 'a trap',
+      failure_strings: [''],
+      relates: ['Not A Name'],
+    });
+
+    expect(marks(data)).toEqual([
+      'unpaired-prevents@signal',
+      'empty-failure-string@failure_strings[0]',
+      'invalid-name@relates[0]',
+    ]);
+  });
+
+  test('the short-string code is the only warning, and every other code is not', () => {
+    expect(SKILL_WARNING_CODES).toEqual(['short-failure-string']);
+    for (const code of SKILL_ISSUE_CODES) {
+      expect(isSkillWarning(code)).toBe(code === 'short-failure-string');
+    }
+  });
+});
+
 /** One block per code, so the set of codes is closed at both ends. */
 const CODE_EXAMPLES: Readonly<Record<string, Record<string, unknown>>> = {
   'description-too-long': withFields(MINIMAL, { description: filler(DESCRIPTION_LIMIT) }),
@@ -698,6 +796,8 @@ const CODE_EXAMPLES: Readonly<Record<string, Record<string, unknown>>> = {
   'invalid-reviewed': withFields(MINIMAL, {
     provenance: { origin: 'x', license: 'MIT', reviewed: 'nobody' },
   }),
+  'empty-failure-string': withFields(MINIMAL, { failure_strings: [''] }),
+  'short-failure-string': withFields(MINIMAL, { failure_strings: ['TS27'] }),
 };
 
 describe('everyCodeIsReachable', () => {
