@@ -136,6 +136,73 @@ describe('recurring', () => {
   });
 });
 
+describe('a match that differs only in case', () => {
+  const offered = { skillsOffered: ['typescript-patterns'] };
+  const invoked = fact('s1', { ...offered, invoked: invoking('typescript-patterns') });
+
+  it('is refused as a recurrence, so the skill reads earning instead of recurring', () => {
+    const facts = [invoked, fact('s2', { blockers: [blocker(`tsc refused it: ${TS_ERROR.toLowerCase()}`)] })];
+    const row = skillRow(facts, 'typescript-patterns');
+
+    expect(row.signal).toBe('earning');
+    expect(row.recurred).toBe(0);
+    expect(row.matches).toEqual([]);
+  });
+
+  it('turns recurring once the later blocker matches the string\'s own case', () => {
+    const facts = [invoked, fact('s2', { blockers: [blocker(`tsc refused it: ${TS_ERROR}`)] })];
+
+    expect(skillRow(facts, 'typescript-patterns').signal).toBe('recurring');
+  });
+});
+
+describe('a match found only in an earlier task', () => {
+  it('is refused as a recurrence, so the skill reads earning instead of recurring', () => {
+    const facts = [
+      fact('s1', { blockers: [blocker(`earlier ${TS_ERROR}`)] }),
+      fact('s2', { skillsOffered: ['typescript-patterns'], invoked: invoking('typescript-patterns') }),
+    ];
+    const row = skillRow(facts, 'typescript-patterns');
+
+    expect(row.signal).toBe('earning');
+    expect(row.recurred).toBe(0);
+    expect(row.matches).toEqual([]);
+  });
+
+  it('turns recurring once the same text is in a later task instead', () => {
+    const facts = [
+      fact('s1', { skillsOffered: ['typescript-patterns'], invoked: invoking('typescript-patterns') }),
+      fact('s2', { blockers: [blocker(`later ${TS_ERROR}`)] }),
+    ];
+
+    expect(skillRow(facts, 'typescript-patterns').signal).toBe('recurring');
+  });
+});
+
+describe('a string that recurs only in the plan\'s failing check names', () => {
+  it('still holds the skill to recurring', () => {
+    const facts = [
+      fact('s1', {
+        skillsOffered: ['typescript-patterns'],
+        invoked: invoking('typescript-patterns'),
+        planCi: [redCi(TS_ERROR)],
+      }),
+    ];
+    const row = skillRow(facts, 'typescript-patterns');
+
+    expect(row.signal).toBe('recurring');
+    expect(row.recurred).toBe(1);
+    expect(row.matches).toEqual([{
+      string: TS_ERROR,
+      source: 'plan-ci',
+      sessionId: null,
+      taskLine: null,
+      field: 'failing',
+      text: TS_ERROR,
+    }]);
+  });
+});
+
 describe('unmeasured', () => {
   const facts = [fact('s1', { skillsOffered: ['git-workflow'], invoked: invoking('git-workflow') })];
 
