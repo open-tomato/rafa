@@ -8,7 +8,10 @@
  * readers, and this file drives none of that again. It exists for the
  * WIRING, which nothing else can see: that the issue arrives through
  * `gh issue view` with the field list `./issue.ts` declares, that the
- * roadmap walk reaches `gh pr list` and `git`, that the author's trust
+ * roadmap walk reaches `gh pr list` and `git`, and lists the board once
+ * through `gh issue list --state all` only for an epic line (a mutation
+ * narrowing its limit to 5, driven on 2026-09-27: 41 pass and 1 fail,
+ * that case), that the author's trust
  * is read through `gh api` at the collaborators path — on the roadmap
  * as well as on the line it names — that the checks run BEFORE a
  * snapshot is written and in the order that decides which sentence an
@@ -188,6 +191,7 @@ import { notesPath, specPath } from './naming.js';
 import { boardRepoLabel, BOARD_REFUSAL_EXIT, inspectSpecIssue, resolvePlanSpec, UNNAMED_REPO } from './plan-spec.js';
 import { previousDir } from './previous-copy.js';
 import { SPEC_READY_LABEL, specReadyRefusalMessage, TEMPLATE_HEADINGS } from './readiness.js';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from './roadmap-board.js';
 import { PR_LIST_FIELDS } from './roadmap.js';
 import { notesRebuiltLine, refreshQuestion } from './snapshot-settle.js';
 import { TRUST_REFUSAL_EXIT } from './trust.js';
@@ -257,6 +261,20 @@ function permissionCommand(login: string): string {
   return `api ${permissionPath(login)}`;
 }
 
+/** The planted issues as the board listing's `gh issue list --state all` answers them. */
+function boardRows(issues: readonly SpecIssue[]): string {
+  return JSON.stringify(issues.map((issue) => ({
+    number: issue.number,
+    title: issue.title,
+    body: issue.body,
+    state: issue.state,
+    stateReason: issue.state === 'CLOSED'
+      ? 'COMPLETED'
+      : '',
+    labels: issue.labels.map((name) => ({ name })),
+  })));
+}
+
 /**
  * A `gh` runner over planted issues and planted permissions, keeping
  * every command it was sent.
@@ -274,6 +292,7 @@ function plantedGh(
   const gh: GhRunner = (args) => {
     sent = [...sent, args.join(' ')];
     if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(said('[]'));
+    if (args[0] === 'issue' && args[1] === 'list' && args[3] === 'all') return Promise.resolve(said(boardRows(issues)));
     if (args[0] === 'issue' && args[1] === 'list') {
       return Promise.resolve(said(JSON.stringify([{ number: ROADMAP, title: 'Roadmap' }])));
     }
@@ -535,6 +554,32 @@ describe('the spec the roadmap picks', () => {
     if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
     expect(resolved.spec).toMatchObject({ kind: 'next', issue: 20, path: snapshotAt(20) });
     expect(resolved.gate?.number).toBe(20);
+  });
+
+  it('lists the board once through gh for a roadmap whose first line is an epic, and plans its first open spec', async () => {
+    const epicBody = ['## Acceptance criteria', '', '- it works', '', 'Estimate: a week', '', '- [ ] #51 first', '- [ ] #52 second'].join('\n');
+    const member = [SPEC_LABEL, SPEC_READY_LABEL, 'epic:board'];
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: '- [ ] #50 the board epic\n- [ ] #20 the pull request commands', labels: [] }),
+      issueOf(50, { body: epicBody, labels: ['type:epic', 'epic:board', 'horizon:now'] }),
+      issueOf(51, { state: 'CLOSED', labels: member }),
+      issueOf(52, { labels: member }),
+      issueOf(20),
+    ]);
+
+    const resolved = await ask({ kind: 'next', roadmap: null }, board.gh, plantedGit().git, { roadmapIssue: ROADMAP, dryRun: true });
+
+    expect(resolved).toEqual({ outcome: 'stopped', reason: 'dry-run' });
+    // The listing is sent once, after the epic issue was read; #20
+    // under the epic is never asked about. The case above is the
+    // control: the same walk over a roadmap with no epic line lists
+    // nothing.
+    const listing = boardListingCommand(BOARD_LISTING_LIMIT).replace(/^gh /u, '');
+    expect(board.sent().filter((sent) => sent === listing)).toHaveLength(1);
+    expect(board.sent().indexOf(listing)).toBeGreaterThan(board.sent().indexOf(`issue view 50 --json ${ISSUE_VIEW_FIELDS}`));
+    expect(board.sent()).toContain(`issue view 52 --json ${ISSUE_VIEW_FIELDS}`);
+    expect(board.sent()).not.toContain(`issue view 20 --json ${ISSUE_VIEW_FIELDS}`);
+    expect(existsSync(join(root, snapshotAt(52)))).toBe(false);
   });
 
   it('stops the walk at a line whose author is untrusted, rather than skipping ahead', async () => {

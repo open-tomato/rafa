@@ -133,6 +133,19 @@
  * worth a second read, and a memo held across runs would serve a stale
  * body to the next one.
  *
+ * ## A roadmap line naming an epic
+ *
+ * The walk is `pickDescendedLine` (`./epic-walk.ts`), the one `rafa next`
+ * shares, over the same memoised reader and readings, so an epic line is
+ * told apart by labels already read and a roadmap with no epic line
+ * spends nothing more and prints the same lines. The board is listed
+ * through {@link RoadmapSeams.listing} only for an open `now` epic line.
+ * Walking into one prints its header, each open member missing from its
+ * checklist, then the walk over its lines; a blocked pick's alternative
+ * is looked for among those lines only. An epic whose every line is done
+ * or taken has run dry: the run stops `exhausted` on that sentence and
+ * never reads on into a second epic.
+ *
  * ## What `--dry-run` does, and does not
  *
  * It does every READ and every REFUSAL, and stops before the first
@@ -175,7 +188,9 @@
  * missing, and a laptop with no network still plans.
  */
 import type { AlternativeOffer, BlockedLine, PassedLine, PlannableReadings } from './blocked-line.js';
+import type { DescendedEpic, DescendedPick, DescentPass } from './epic-walk.js';
 import type { SpecIssue, SpecIssueReader, SpecSnapshot } from './issue.js';
+import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type {
   OpenPullRequestLister,
   RoadmapLine,
@@ -201,6 +216,13 @@ import {
   unaskedMessage,
 } from './blocked-line.js';
 import {
+  descentPassSentence,
+  dryEpicSentence,
+  epicHeaderSentence,
+  labelOnlySentence,
+  pickDescendedLine,
+} from './epic-walk.js';
+import {
   DRY_RUN_FLAG,
   ISSUE_FLAG,
   NEXT_FLAG,
@@ -212,7 +234,6 @@ import {
   createRoadmapReadings,
   exhaustedMessage,
   parseRoadmapBody,
-  pickNextRoadmapLine,
   resolveRoadmapIssue,
   scanClaimBranches,
   skipSentence,
@@ -374,6 +395,8 @@ export interface RoadmapSeams {
   readonly remote?: string;
   /** Lists the open pull requests the other taken reading is read from. */
   readonly pullRequests: OpenPullRequestLister;
+  /** Lists the board, once, and only when the walk meets an open `now` epic line. */
+  readonly listing: BoardListing;
   /** The checks that run on the roadmap issue as read, before a line is parsed out of it. */
   readonly inspectRoadmap?: (issue: SpecIssue) => Promise<void>;
   /**
@@ -448,6 +471,21 @@ export function skipLine(skip: RoadmapSkip): string {
   return `   ⏭  ${skipSentence(skip)}`;
 }
 
+/** The line one line the epic descent passed prints; a roadmap line's is {@link skipLine}'s. */
+export function descentPassLine(pass: DescentPass): string {
+  return `   ⏭  ${descentPassSentence(pass)}`;
+}
+
+/** The line a walk prints on walking into an epic. */
+export function epicHeaderLine(epic: DescendedEpic): string {
+  return `   🧭 ${epicHeaderSentence(epic)}`;
+}
+
+/** The line one open member missing from the epic's checklist prints. */
+export function labelOnlyLine(epic: DescendedEpic, member: BoardIssue): string {
+  return `   🏷  ${labelOnlySentence(epic, member)}`;
+}
+
 /** The line the pick prints, with the roadmap's own one-line why when it has one. */
 export function pickLine(line: RoadmapLine): string {
   const id = `▶ Next on the roadmap: issue #${String(line.issue)}`;
@@ -511,7 +549,7 @@ type RoadmapOutcome =
 interface BlockedPickOptions {
   /** Why the line the walk picked cannot be planned. */
   readonly blocked: BlockedLine;
-  /** Every line of the roadmap, in order. */
+  /** The lines walked, in order: the roadmap's, or the one epic's. */
   readonly lines: readonly RoadmapLine[];
   /** The blocked line itself; the walk for an alternative resumes under it. */
   readonly line: RoadmapLine;
@@ -589,21 +627,43 @@ async function pickRoadmapIssue(
     branches,
     pullRequests: seams.pullRequests,
   });
-  const lines = parseRoadmapBody(read.body);
-  const pick = await pickNextRoadmapLine(lines, readings);
-  pick.skipped.forEach((skip) => output.info(skipLine(skip)));
+  const walked = await pickDescendedLine(parseRoadmapBody(read.body), { issues, readings, listing: seams.listing });
+  printDescent(walked, output);
+  const { descent, pick } = walked;
 
+  if (descent.epic !== null && walked.dry) {
+    output.info(dryEpicSentence(descent.epic));
+    return { stop: 'exhausted' };
+  }
   if (pick.line === null) {
-    output.info(exhaustedMessage(roadmap, pick.skipped));
+    output.info(exhaustedMessage(roadmap, [...descent.passed, ...pick.skipped]));
     return { stop: 'exhausted' };
   }
 
   output.info(pickLine(pick.line));
-  return settlePick(pick.line, { lines, issues, readings, seams, output });
+  return settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+}
+
+/**
+ * The lines the descent and the walk over its lines passed, in the order
+ * read: the roadmap lines and epic lines passed to reach the epic, its
+ * header and its label-only members, then the lines passed inside it. A
+ * roadmap with no epic line prints its skip lines alone, as it always did.
+ */
+function printDescent(walked: DescendedPick, output: Output): void {
+  const { descent, pick } = walked;
+  descent.passed.forEach((pass) => output.info(descentPassLine(pass)));
+  const { epic } = descent;
+  if (epic !== null) {
+    output.info(epicHeaderLine(epic));
+    epic.labelOnly.forEach((member) => output.info(labelOnlyLine(epic, member)));
+  }
+  pick.skipped.forEach((skip) => output.info(skipLine(skip)));
 }
 
 /** What {@link settlePick} reads the picked line through. */
 interface PickSettlement {
+  /** The lines walked: the roadmap's, or the one epic's the walk went into. */
   readonly lines: readonly RoadmapLine[];
   readonly issues: SpecIssueReader;
   readonly readings: RoadmapReadings;

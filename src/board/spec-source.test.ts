@@ -7,7 +7,8 @@
  * Every seam is planted here and nothing spawns. The issue reader is a
  * map of planted issues that COUNTS its reads, the roadmap search, the
  * open pull request list and the git runner answer what a case recorded,
- * and the output is a `sinkOutput` handed in through the options. No
+ * the board listing is REFUSED unless a case plants one that counts its
+ * calls, and the output is a `sinkOutput` handed in through the options. No
  * case reaches GitHub, spawns `gh` or `git`, reads a real repository, or
  * touches the configuration either keeps under the home.
  *
@@ -96,6 +97,26 @@
  *    there. Only a case that answers no can see it, which is why every
  *    yes case is paired with one.
  *
+ * ## A roadmap naming an epic
+ *
+ * The epic cases each carry their control: the walk into an epic lists
+ * the board once where the same seam on a roadmap with no epic line is
+ * never called; the dry epic beside the same board with that epic
+ * closed, which reaches the second epic's spec; and the blocked pick
+ * inside an epic beside the same two lines bare, which offers the line
+ * under it. Six mutations of `spec-source.ts` were driven on 2026-09-27,
+ * one at a time, over `bun test src/board/spec-source.test.ts`, the
+ * module restored from a scratch copy and verified with `shasum -c`,
+ * against 54 pass and 0 fail:
+ *
+ *  - every issue's labels hidden from the descent, so no line is an
+ *    epic: 50 pass and 4 fail.
+ *  - the epic header and label-only lines not printed; the passed lines
+ *    not printed; the dry-epic line dropped; the exhausted message
+ *    counting the walk's own skips only; the blocked alternative looked
+ *    for over the whole roadmap: 53 pass and 1 fail each, the one case
+ *    about that line.
+ *
  * ## Mutations driven
  *
  * Eleven mutations of `spec-source.ts` were driven on 2026-09-19, one
@@ -124,7 +145,9 @@
  *  - `--dry-run` ignored on the `--spec` route: 1 fail.
  */
 import type { AlternativeOfferRequest } from './blocked-line.js';
+import type { DescendedEpic } from './epic-walk.js';
 import type { SpecIssue } from './issue.js';
+import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { RefreshOffer, RefreshOfferRequest } from './snapshot-settle.js';
 import type { RoadmapSeams, SpecSourceResolution } from './spec-source.js';
@@ -137,6 +160,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { typeOfLabels } from '../adapters/tracker/github.js';
 import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -148,6 +172,7 @@ import {
   unaskedMessage,
 } from './blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
+import { dryEpicSentence, NOW_HORIZON_LABEL } from './epic-walk.js';
 import {
   closedIssueMessage,
   ISSUE_REFUSAL_EXIT,
@@ -162,10 +187,13 @@ import { exhaustedMessage, ROADMAP_SETTING, ROADMAP_TITLE } from './roadmap.js';
 import {
   alternativeLine,
   blockedPickLine,
+  descentPassLine,
   describeIssue,
   DRY_RUN_FLAG,
   dryRunLine,
+  epicHeaderLine,
   ISSUE_FLAG,
+  labelOnlyLine,
   missingValueMessage,
   NEXT_FLAG,
   noSourceMessage,
@@ -710,6 +738,9 @@ function nextRun(options: {
       search: plantedSearch(ROADMAP),
       git: plantedGit(''),
       pullRequests: plantedPulls(),
+      // Refused, so a roadmap with no epic line that listed the board
+      // anyway reddens the case rather than passing unseen.
+      listing: () => Promise.reject(new Error('the board was listed for a roadmap with no epic line')),
       ...options.seams,
     },
   });
@@ -1135,5 +1166,233 @@ describe('resolveSpecSource over --next on a blocked line', () => {
     });
 
     expect(checked).toEqual([33]);
+  });
+});
+
+/** The epic every epic case reads, and its slug. */
+const EPIC = 50;
+const EPIC_SLUG = 'board';
+
+/** The labels an epic's member carries. */
+const MEMBER_LABELS = [SPEC_LABEL, `epic:${EPIC_SLUG}`];
+
+/** An epic body: the fields the reader expects, then `checklist` as its order. */
+function epicBody(checklist: readonly number[]): string {
+  const lines = checklist.map((item) => `- [ ] #${String(item)} spec ${String(item)}`);
+  return ['## Acceptance criteria', '', '- it works', '', 'Estimate: a week', '', ...lines].join('\n');
+}
+
+/** An epic issue labelled `horizon:now` unless `fields` say otherwise. */
+function epicIssue(number: number, slug: string, checklist: readonly number[], fields: Partial<SpecIssue> = {}): SpecIssue {
+  return issueOf(number, {
+    title: `The ${slug} epic`,
+    body: epicBody(checklist),
+    labels: ['type:epic', `epic:${slug}`, NOW_HORIZON_LABEL],
+    ...fields,
+  });
+}
+
+/**
+ * The board an epic case reads: the roadmap names epic #50 and then #20;
+ * #50's checklist is #51, closed, and #52, and #53 carries its label
+ * without being on it.
+ */
+function epicBoard(roadmapBody: string, fields: Partial<Record<number, Partial<SpecIssue>>> = {}): readonly SpecIssue[] {
+  return [
+    issueOf(ROADMAP, { title: ROADMAP_TITLE, body: roadmapBody, labels: [] }),
+    epicIssue(EPIC, EPIC_SLUG, [51, 52], fields[EPIC]),
+    issueOf(51, { state: 'CLOSED', labels: MEMBER_LABELS, ...fields[51] }),
+    issueOf(52, { labels: MEMBER_LABELS, ...fields[52] }),
+    issueOf(53, { title: 'A member off the checklist', labels: MEMBER_LABELS, ...fields[53] }),
+    issueOf(20),
+  ];
+}
+
+/** The roadmap body most epic cases read: the epic, then a spec line under it. */
+const EPIC_ROADMAP = '- [ ] #50 the board epic\n- [ ] #20 pull request commands';
+
+/** One board row as the listing answers it, for the planted issue. */
+function rowOf(issue: SpecIssue): BoardIssue {
+  return {
+    number: issue.number,
+    title: issue.title,
+    body: issue.body,
+    state: issue.state,
+    stateReason: issue.state === 'CLOSED'
+      ? 'COMPLETED'
+      : null,
+    labels: issue.labels,
+    type: typeOfLabels(issue.labels),
+    module: 'unassigned',
+  };
+}
+
+/** A listing answering `issues` as rows, counting how often it was read. */
+function plantedListing(issues: readonly SpecIssue[]): { listing: BoardListing; calls: () => number } {
+  let calls = 0;
+  const rows = issues.map(rowOf);
+  return {
+    listing: () => {
+      calls += 1;
+      return Promise.resolve(rows);
+    },
+    calls: () => calls,
+  };
+}
+
+/** The epic walked into, as the lines naming it read it: only these fields reach a sentence. */
+function descended(progress: { done: number; total: number }, labelOnly: readonly BoardIssue[] = []): DescendedEpic {
+  return {
+    line: { issue: EPIC, ticked: false, why: 'the board epic', lineNumber: 1 },
+    number: EPIC,
+    title: `The ${EPIC_SLUG} epic`,
+    slug: EPIC_SLUG,
+    progress: { ...progress, notPlanned: 0 },
+    checklist: [],
+    labelOnly,
+  };
+}
+
+/** The issue `number` on `board`; a case naming one not planted is a defect in the case. */
+function plantedOf(board: readonly SpecIssue[], number: number): SpecIssue {
+  const found = board.find((issue) => issue.number === number);
+  if (found === undefined) throw new Error(`no issue ${String(number)} is planted`);
+  return found;
+}
+
+describe('resolveSpecSource over --next on a roadmap naming an epic', () => {
+  it('walks into the epic, naming it and its member off the checklist, and plans its first open spec', async () => {
+    const { lines, output } = capture();
+    const board = epicBoard(EPIC_ROADMAP);
+    const issues = plantedIssues(board);
+    const listing = plantedListing(board);
+
+    const resolution = await nextRun({ issues, output, seams: { listing: listing.listing } });
+
+    const epic = descended({ done: 1, total: 3 }, [rowOf(plantedOf(board, 53))]);
+    expect(specOf(resolution)).toEqual({ path: snapshotAt(52), issue: 52, source: 'issue #52' });
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      epicHeaderLine(epic),
+      labelOnlyLine(epic, rowOf(plantedOf(board, 53))),
+      skipLine({ line: { issue: 51, ticked: false, why: 'spec 51', lineNumber: 7 }, reason: 'closed', detail: '' }),
+      pickLine({ issue: 52, ticked: false, why: 'spec 52', lineNumber: 8 }),
+    ]);
+    // One listing, and each issue read once: the epic's label came off
+    // the read that asked whether it was closed, and #20 under the epic
+    // is never reached.
+    expect(listing.calls()).toBe(1);
+    expect(issues.asked()).toEqual([ROADMAP, EPIC, 51, 52]);
+    expect(exists(snapshotAt(52))).toBe(true);
+  });
+
+  it('lists nothing and prints the lines it always printed for a roadmap with no epic line', async () => {
+    const { lines, output } = capture();
+    const listing = plantedListing(boardIssues());
+
+    const resolution = await nextRun({ output, seams: { listing: listing.listing } });
+
+    expect(specOf(resolution).issue).toBe(20);
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      skipLine({ line: { issue: 17, ticked: true, why: 'the pull request port, merged', lineNumber: 3 }, reason: 'ticked', detail: '' }),
+      pickLine({ issue: 20, ticked: false, why: 'pull request commands', lineNumber: 4 }),
+    ]);
+    // The control is the case above: the same seam, read once, on a
+    // roadmap whose first line is an epic.
+    expect(listing.calls()).toBe(0);
+  });
+
+  it('stops at an epic run dry, naming neither the second epic nor its member', async () => {
+    const { lines, output } = capture();
+    const roadmapBody = '- [ ] #50 the board epic\n- [ ] #60 the next epic';
+    const board = [
+      ...epicBoard(roadmapBody, { 53: { state: 'CLOSED' } }),
+      epicIssue(60, 'next', [61]),
+      issueOf(61, { labels: [SPEC_LABEL, 'epic:next'] }),
+    ];
+    const issues = plantedIssues(board);
+
+    const resolution = await nextRun({
+      issues,
+      output,
+      seams: {
+        listing: plantedListing(board).listing,
+        git: plantedGit('refs/heads/feat/rafa-52-the-board\n'),
+      },
+    });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'exhausted' });
+    expect(lines.info.at(-1)).toBe(dryEpicSentence(descended({ done: 2, total: 3 })));
+    expect(lines.info.filter((line) => line.includes('#60') || line.includes('#61'))).toEqual([]);
+    expect(issues.asked()).not.toContain(60);
+    expect(issues.asked()).not.toContain(61);
+    expect(exists(snapshotAt(52))).toBe(false);
+    expect(exists(snapshotAt(61))).toBe(false);
+
+    // The control: with the first epic closed, the walk passes it and
+    // reaches the second, so the stop above was the dry epic's.
+    const passed = [...board.filter((issue) => issue.number !== EPIC), epicIssue(EPIC, EPIC_SLUG, [51, 52], { state: 'CLOSED' })];
+    const next = await nextRun({ issues: plantedIssues(passed), seams: { listing: plantedListing(passed).listing } });
+    expect(specOf(next).issue).toBe(61);
+  });
+
+  it('passes an epic that is not now without listing the board, and plans the line under it', async () => {
+    const { lines, output } = capture();
+    const board = epicBoard(EPIC_ROADMAP, { [EPIC]: { labels: ['type:epic', `epic:${EPIC_SLUG}`, 'horizon:later'] } });
+    const listing = plantedListing(board);
+
+    const resolution = await nextRun({ issues: plantedIssues(board), output, seams: { listing: listing.listing } });
+
+    expect(specOf(resolution).issue).toBe(20);
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      descentPassLine({
+        kind: 'epic',
+        skip: { line: { issue: EPIC, ticked: false, why: 'the board epic', lineNumber: 1 }, reason: 'horizon', detail: 'horizon:later' },
+      }),
+      pickLine({ issue: 20, ticked: false, why: 'pull request commands', lineNumber: 2 }),
+    ]);
+    expect(listing.calls()).toBe(0);
+  });
+
+  it('counts a passed epic line in the exhausted message rather than calling the roadmap empty', async () => {
+    const { lines, output } = capture();
+    const board = epicBoard('- [ ] #50 the board epic', { [EPIC]: { state: 'CLOSED' } });
+
+    const resolution = await nextRun({ issues: plantedIssues(board), output, seams: { listing: plantedListing(board).listing } });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'exhausted' });
+    expect(lines.info.at(-1)).toBe(exhaustedMessage(ROADMAP, [EPIC]));
+    expect(lines.info.at(-1)).not.toBe(exhaustedMessage(ROADMAP, []));
+  });
+
+  it('looks for a blocked pick\'s alternative inside the epic only, never on the roadmap line under it', async () => {
+    const { lines, output } = capture();
+    const board = [
+      ...blockedBoard().filter((issue) => issue.number !== ROADMAP),
+      issueOf(ROADMAP, { title: ROADMAP_TITLE, body: '- [ ] #50 the board epic\n- [ ] #34 naming and close-out', labels: [] }),
+      epicIssue(EPIC, EPIC_SLUG, [20]),
+    ];
+    const issues = plantedIssues(board);
+
+    const resolution = await nextRun({
+      issues,
+      output,
+      seams: { listing: plantedListing(board).listing, offerAlternative: plantedOffer(true).offer },
+    });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(lines.info.at(-1)).toBe(noAlternativeMessage(20));
+    expect(issues.asked()).not.toContain(34);
+
+    // The control: the same two lines with no epic around the first,
+    // where the alternative under it is offered and planned.
+    const bare = [
+      ...board.filter((issue) => issue.number !== ROADMAP),
+      issueOf(ROADMAP, { title: ROADMAP_TITLE, body: '- [ ] #20 pull request commands\n- [ ] #34 naming and close-out', labels: [] }),
+    ];
+    const planned = await nextRun({ issues: plantedIssues(bare), seams: { offerAlternative: plantedOffer(true).offer } });
+    expect(specOf(planned).issue).toBe(34);
   });
 });
