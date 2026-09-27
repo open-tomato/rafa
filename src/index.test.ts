@@ -473,6 +473,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/issue/list.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
+    ['../../board/boards.js', ['createGhBoardLister']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/roadmap-epic-rows.js', ['hasEpicLines', 'readRoadmapEpicRows']],
@@ -838,6 +839,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/epics.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
+    ['../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
     ['../board/epic-problems.js', ['epicProblemMessage', 'readEpicProblems']],
     ['../board/epic-walk.js', ['epicLines', 'isNowEpic']],
     ['../board/epics.js', ['readEpics']],
@@ -845,7 +847,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/roadmap-board.js', ['createGhBoardListing']],
     ['../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams']],
     ['../board/roadmap-rows.js', ['createPlanDirNames', 'readLineRows']],
-    ['../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'resolveRoadmapIssue', 'ROADMAP_REFUSAL_EXIT']],
+    ['../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
     ['../cli/command.js', ['CommandExit']],
     ['../config-sections.js', ['messageOf']],
     ['../pr/git.js', ['createGitRunner']],

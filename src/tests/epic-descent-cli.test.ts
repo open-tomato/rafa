@@ -109,8 +109,8 @@ function shellQuoted(payload: unknown): string {
 
 /**
  * Writes the stand-in `gh`: one `issue view` answer per `issues` entry,
- * one `issue list --state all` answer over `listing`, and an empty
- * `pr list`. Anything else fails loudly, naming what it was asked, so a
+ * one `issue list --state all` answer over `listing`, an empty
+ * `type:roadmap` listing and an empty `pr list`. Anything else fails loudly, naming what it was asked, so a
  * read this suite did not plant for — the second epic's issue among
  * them — fails the run rather than passing quietly.
  */
@@ -129,6 +129,9 @@ function writeGhStub(bin: string, issues: readonly SpecIssue[], listing: readonl
     lines.push('  exit 0');
     lines.push('fi');
   }
+  // No issue carries type:roadmap: its listing answers empty, told apart
+  // from the board listing by its label flag.
+  lines.push('case "$*" in *"--label type:roadmap"*) printf \'%s\' \'[]\'; exit 0;; esac');
   lines.push('if [ "$1" = "issue" ] && [ "$2" = "list" ] && [ "$3" = "--state" ] && [ "$4" = "all" ]; then');
   lines.push(`  printf '%s' '${shellQuoted(listing.map((row) => ({
     number: row.number,

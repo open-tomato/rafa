@@ -102,6 +102,9 @@ function plant(reachable: boolean): Planted {
   const gh = join(scratch.bin, 'gh');
   writeFileSync(gh, [
     '#!/bin/sh',
+    // No issue carries type:roadmap: its listing answers empty, told
+    // apart from the board listing by its label flag.
+    'case "$*" in *"--label type:roadmap"*) printf \'%s\' \'[]\'; exit 0;; esac',
     'case "$1 $2" in',
     `  "issue view") ${printFile(join(data, 'view.json'))};;`,
     `  "pr list") ${printFile(join(data, 'pulls.json'))};;`,

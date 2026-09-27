@@ -243,6 +243,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGitRunner } from '../pr/git.js';
 import { normalizeRemote } from '../schema/project-id.js';
 
+import { createGhBoardLister } from './boards.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
@@ -419,7 +420,7 @@ export interface PlanSpecOptions {
   readonly repoRoot: string;
   /** Where snapshots live, as `specs.dir` resolved it. */
   readonly specsDir: string;
-  /** `roadmap.issue` as config resolved it, or null for the titled issue. */
+  /** `roadmap.issue` as config resolved it, or null for the default board `resolveDefaultBoard` ranks. */
   readonly roadmapIssue: number | null;
   /** `board.trustedAuthors` as config resolved it; check 0's allow-list. */
   readonly trustedAuthors: readonly string[];
@@ -530,6 +531,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     offerRefresh,
     roadmap: {
       configured: options.roadmapIssue,
+      listBoards: createGhBoardLister({ gh }),
       search: createGhRoadmapSearch({ gh }),
       git,
       pullRequests: createGhOpenPullRequests({ gh }),

@@ -17,6 +17,7 @@
  * `refs` a clean copy (#11), a copy with faults (#16), an unread copy
  * (#17) and no copy at all (every other line).
  */
+import type { BoardLister } from './boards.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRefs, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
@@ -141,6 +142,7 @@ function plantedGit(refs: readonly string[], remote: GitResult = { ok: true, std
 
 /** Everything a case counts: how often each seam was asked. */
 interface Counts {
+  boards: number;
   board: number;
   roadmap: readonly number[];
   pulls: number;
@@ -150,7 +152,13 @@ interface Counts {
 
 /** The options over the planted board, with `overrides` laid over them, and the counts. */
 function planted(overrides: Partial<RoadmapRowsOptions> = {}): { options: RoadmapRowsOptions; counts: Counts } {
-  const counts: Counts = { board: 0, roadmap: [], pulls: 0, search: 0, refs: [] };
+  const counts: Counts = { boards: 0, board: 0, roadmap: [], pulls: 0, search: 0, refs: [] };
+  // No issue carries type:roadmap, so the title rule and roadmap.issue
+  // decide as they did before boards were found by label.
+  const listBoards: BoardLister = () => {
+    counts.boards += 1;
+    return Promise.resolve([]);
+  };
   const board: BoardListing = () => {
     counts.board += 1;
     return Promise.resolve(BOARD);
@@ -174,6 +182,7 @@ function planted(overrides: Partial<RoadmapRowsOptions> = {}): { options: Roadma
   };
   const options: RoadmapRowsOptions = {
     configured: ROADMAP,
+    listBoards,
     search,
     issues,
     board,
@@ -230,14 +239,24 @@ describe('the rows over a planted board', () => {
   it('reads the board, the Roadmap, the pull requests and the saved copies once each, and searches nothing when configured', async () => {
     const { options, counts } = planted();
     await readRoadmapRows(options);
-    expect(counts).toEqual({ board: 1, roadmap: [ROADMAP], pulls: 1, search: 0, refs: [[11, 12, 13, 14, 15, 16, 17, 18]] });
+    expect(counts).toEqual({
+      boards: 1, board: 1, roadmap: [ROADMAP], pulls: 1, search: 0, refs: [[11, 12, 13, 14, 15, 16, 17, 18]],
+    });
   });
 
   it('finds the Roadmap by its title when nothing is configured', async () => {
     const { options, counts } = planted({ configured: null });
     const read = await readRoadmapRows(options);
     expect(read.roadmap).toBe(ROADMAP);
-    expect(counts).toMatchObject({ search: 1, roadmap: [ROADMAP] });
+    expect(counts).toMatchObject({ boards: 1, search: 1, roadmap: [ROADMAP] });
+  });
+
+  it('reads the lowest-numbered type:roadmap board over the issue titled Roadmap when nothing is configured', async () => {
+    const labelled = [issue(7, { title: 'Team board' }), issue(5, { title: 'Platform board' })];
+    const { options, counts } = planted({ configured: null, listBoards: () => Promise.resolve(labelled) });
+    const read = await readRoadmapRows(options);
+    expect(read.roadmap).toBe(5);
+    expect(counts.roadmap).toEqual([5]);
   });
 
   it('keeps the ticked lines in their places with all', async () => {
@@ -291,7 +310,7 @@ describe('the rows over lines handed in', () => {
       [11, 'ready', '', 'plan', '0'],
     ]);
     expect(read.warnings).toEqual([UNREAD_COPY_WARNING]);
-    expect(counts).toEqual({ board: 1, roadmap: [], pulls: 1, search: 0, refs: [[16, 11]] });
+    expect(counts).toEqual({ boards: 0, board: 1, roadmap: [], pulls: 1, search: 0, refs: [[16, 11]] });
   });
 
   it('keeps the ticked ones in their places with all', async () => {

@@ -393,7 +393,9 @@ New; it replaces no earlier text. What a row or an action added to
   differs is refused without `--refresh`, one whose local notes alone
   differ is rebuilt, and every rebuild first moves the old copy to
   `<specs.dir>/previous/`. `--next` reads the roadmap issue
-  `roadmap.issue` names, else the pinned issue titled `Roadmap`, prints
+  `roadmap.issue` names, else the lowest-numbered open `type:roadmap`
+  board, else the pinned issue titled `Roadmap` (`resolveDefaultBoard`,
+  `src/board/boards.ts`), prints
   each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal of checks 0–2
   and stops before the first write, on all three routes, so it never
@@ -406,7 +408,8 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/commands/pr/merge-tick.ts`, `src/board/roadmap-tick.ts`). GitHub
   closes an issue a merged pull request says `Closes #<n>` for and ticks
   no `- [ ] #<n>` box, so the command reads the roadmap issue
-  `roadmap.issue` names, else the issue titled `Roadmap`, and writes the
+  `roadmap.issue` names, else the lowest-numbered open `type:roadmap`
+  board, else the issue titled `Roadmap`, and writes the
   box through `gh api repos/{owner}/{repo}/issues/<n>`, GET then PATCH.
   Every unticked line naming a closed issue is ticked, a line inside a
   fenced block is none, and the line breaks are kept as the body spelled

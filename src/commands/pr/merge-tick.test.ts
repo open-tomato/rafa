@@ -15,6 +15,8 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND } from '../../board/boards.js';
+
 import { tickProblemLine, tickRoadmapAfterMerge } from './merge-tick.js';
 
 /** The roadmap body every case plants. */
@@ -25,8 +27,20 @@ function wrote(stdout: string): GhResult {
   return { ok: true, stdout, stderr: '' };
 }
 
-/** A runner answering the search, the read and the write, keeping every call. */
+/** One labelled board as the `type:roadmap` listing writes it. */
+function labelledBoard(number: number): object {
+  return { number, title: 'Team board', body: ROADMAP, state: 'OPEN', stateReason: null, labels: [{ name: 'type:roadmap' }] };
+}
+
+/**
+ * A runner answering the `type:roadmap` listing, the search, the read and
+ * the write, keeping every call. The listing answers no board unless
+ * `boards` plants some, so roadmap.issue and the title decide as before;
+ * `fail` fails every call but the listing, which `failBoards` fails.
+ */
 function stubGh(options: {
+  readonly boards?: readonly object[];
+  readonly failBoards?: boolean;
   readonly search?: string;
   readonly body?: string;
   readonly fail?: boolean;
@@ -35,6 +49,11 @@ function stubGh(options: {
   let stored = options.body ?? ROADMAP;
   const run: GhRunner = (args) => {
     calls.push([...args]);
+    if (args[0] === 'issue' && args.includes('--label')) {
+      return Promise.resolve(options.failBoards === true
+        ? { ok: false, stdout: '', stderr: 'gh could not list' }
+        : wrote(JSON.stringify(options.boards ?? [])));
+    }
     if (options.fail === true) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh said no' });
     if (args[0] === 'issue') return Promise.resolve(wrote(options.search ?? '[{"number":31,"title":"Roadmap"}]'));
     const sent = args.find((arg) => arg.startsWith('body='));
@@ -82,10 +101,12 @@ describe('tickRoadmapAfterMerge', () => {
     // `api` first, then the path: the tick sends a gh subcommand, not a
     // bare REST path (`board/roadmap-tick.ts`).
     expect(stub.calls().map((call) => call.slice(0, 2))).toEqual([
+      ['issue', 'list'],
       ['api', 'repos/{owner}/{repo}/issues/31'],
       ['api', 'repos/{owner}/{repo}/issues/31'],
     ]);
-    expect(stub.calls()[1]).toContain('body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n');
+    expect(stub.calls()[0]).toEqual([...BOARDS_LIST_ARGS]);
+    expect(stub.calls()[2]).toContain('body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n');
     expect(warnings.lines()).toEqual([]);
   });
 
@@ -99,8 +120,42 @@ describe('tickRoadmapAfterMerge', () => {
       warn: sink().warn,
     });
 
-    expect(stub.calls()[0]?.slice(0, 2)).toEqual(['issue', 'list']);
+    expect(stub.calls()[0]).toEqual([...BOARDS_LIST_ARGS]);
+    expect(stub.calls()[1]).toContain('--search');
     expect(result).toMatchObject({ roadmap: 31, status: 'ticked', ticked: [33] });
+  });
+
+  it('ticks the lowest-numbered type:roadmap board over the issue titled Roadmap when the config names none', async () => {
+    const stub = stubGh({ boards: [labelledBoard(44), labelledBoard(40)] });
+
+    const result = await tickRoadmapAfterMerge({
+      body: 'Fixes #33',
+      configured: null,
+      gh: stub.run,
+      warn: sink().warn,
+    });
+
+    expect(result).toMatchObject({ roadmap: 40, status: 'ticked', ticked: [33] });
+    const paths = stub.calls()
+      .filter((call) => call[0] === 'api')
+      .map((call) => call[1]);
+    expect(paths).toEqual(['repos/{owner}/{repo}/issues/40', 'repos/{owner}/{repo}/issues/40']);
+  });
+
+  it('warns rather than throwing when the type:roadmap listing fails', async () => {
+    const stub = stubGh({ failBoards: true });
+    const warnings = sink();
+
+    const result = await tickRoadmapAfterMerge({
+      body: 'Closes #20',
+      configured: 31,
+      gh: stub.run,
+      warn: warnings.warn,
+    });
+
+    expect(result).toBeNull();
+    expect(warnings.lines()).toEqual([tickProblemLine(`board listing: ${BOARDS_LIST_COMMAND} failed: gh could not list`)]);
+    expect(stub.calls()).toHaveLength(1);
   });
 
   it('warns rather than throwing when no issue is titled Roadmap', async () => {

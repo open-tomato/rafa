@@ -185,6 +185,7 @@ import { sinkOutput } from '../tests/output-sinks.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
+import { BOARDS_LIST_ARGS } from './boards.js';
 import { ISSUE_REFUSAL_EXIT, ISSUE_VIEW_FIELDS, snapshotDiffersMessage, snapshotText, SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
 import { notesPath, specPath } from './naming.js';
@@ -292,6 +293,9 @@ function plantedGh(
   const gh: GhRunner = (args) => {
     sent = [...sent, args.join(' ')];
     if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(said('[]'));
+    // No issue carries type:roadmap, so the label listing answers empty
+    // and roadmap.issue or the title search decides, as before.
+    if (args[0] === 'issue' && args[1] === 'list' && args.includes('--label')) return Promise.resolve(said('[]'));
     if (args[0] === 'issue' && args[1] === 'list' && args[3] === 'all') return Promise.resolve(said(boardRows(issues)));
     if (args[0] === 'issue' && args[1] === 'list') {
       return Promise.resolve(said(JSON.stringify([{ number: ROADMAP, title: 'Roadmap' }])));
@@ -535,11 +539,13 @@ describe('the spec the roadmap picks', () => {
 
     const resolved = await ask({ kind: 'next', roadmap: null }, board.gh, git.git, { roadmapIssue: ROADMAP });
 
-    // The order is the measured one: the roadmap body, check 0 on the
+    // The order is the measured one: the type:roadmap listing, which
+    // answers no board here, the roadmap body, check 0 on the
     // login that opened it, the line it picks, and the open pull
     // requests last, asked only once a line needs the reading. ONE
     // lookup answers both bodies here, since one login opened both.
     expect(board.sent()).toEqual([
+      BOARDS_LIST_ARGS.join(' '),
       `issue view ${String(ROADMAP)} --json ${ISSUE_VIEW_FIELDS}`,
       permissionCommand('octocat'),
       `issue view 20 --json ${ISSUE_VIEW_FIELDS}`,
@@ -620,6 +626,7 @@ describe('the spec the roadmap picks', () => {
     // No line of the planted roadmap was read, and neither taken
     // reading was spent on one.
     expect(board.sent()).toEqual([
+      BOARDS_LIST_ARGS.join(' '),
       `issue view ${String(ROADMAP)} --json ${ISSUE_VIEW_FIELDS}`,
       permissionCommand('outsider'),
     ]);

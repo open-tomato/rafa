@@ -187,10 +187,15 @@ interface FakeBoard {
   readonly search?: readonly { readonly number: number; readonly title: string }[];
   /** The rows the board listing (`gh issue list --state all`) answers. */
   readonly listing?: readonly ListingRow[];
+  /** The `type:roadmap` boards the label listing answers; none when left out. */
+  readonly boards?: readonly ListingRow[];
 }
 
 /** How {@link fakeGh} records the one board listing, told apart from the roadmap search. */
 const LISTING_CALL = 'issue list --state all';
+
+/** How {@link fakeGh} records the `type:roadmap` listing, told apart by its label flag. */
+const BOARDS_CALL = 'issue list --label';
 
 /** One row as the board listing answers it. */
 interface ListingRow {
@@ -219,12 +224,14 @@ function fakeGh(board: FakeBoard): { readonly gh: GhRunner; readonly calls: () =
   return {
     gh: (args) => {
       const route = args.slice(0, 2).join(' ');
-      // The listing sends --state all, the roadmap search --state open.
+      // The listing sends --state all, the roadmap search --state open,
+      // and the type:roadmap listing --label first.
       const listing = route === 'issue list' && args[3] === 'all';
       calls.push(listing
         ? LISTING_CALL
         : args.slice(0, 3).join(' '));
       if (listing) return wrote(listingPayload(board.listing ?? []));
+      if (route === 'issue list' && args.includes('--label')) return wrote(listingPayload(board.boards ?? []));
       if (route === 'issue list') return wrote(JSON.stringify(board.search ?? []));
       if (route === 'pr list') return wrote('[]');
       if (route === 'issue view') {
@@ -364,6 +371,7 @@ describe('the board the roadmap rows are read through', () => {
 
     expect([reading.roadmap, reading.line?.issue, reading.passed]).toEqual([ROADMAP, ISSUE, 1]);
     expect(gh.calls()).toEqual([
+      BOARDS_CALL,
       'issue list --state',
       `issue view ${ROADMAP}`,
       `issue view ${ISSUE}`,
@@ -382,7 +390,21 @@ describe('the board the roadmap rows are read through', () => {
     const reading = await board.next();
 
     expect(reading.roadmap).toBe(ROADMAP);
-    expect(gh.calls().filter((call) => call.startsWith('issue list'))).toEqual([]);
+    expect(gh.calls().filter((call) => call.startsWith('issue list'))).toEqual([BOARDS_CALL]);
+  });
+
+  it('walks the lowest-numbered type:roadmap board over the issue titled Roadmap when nothing names one', async () => {
+    const gh = fakeGh({
+      boards: [{ number: 9, labels: ['type:roadmap'] }, { number: 7, labels: ['type:roadmap'] }],
+      search: [{ number: ROADMAP, title: 'Roadmap' }],
+      issues: { 7: { body: ROADMAP_BODY }, [ISSUE]: {} },
+    });
+    const board = ghNextBoard({ gh: gh.gh, git: recordingGit().git, configured: null });
+
+    const reading = await board.next();
+
+    expect([reading.roadmap, reading.line?.issue]).toEqual([7, ISSUE]);
+    expect(gh.calls()).not.toContain(`issue view ${ROADMAP}`);
   });
 
   it('carries a branch scan that failed as a problem rather than throwing', async () => {

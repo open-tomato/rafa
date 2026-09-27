@@ -188,6 +188,7 @@
  * missing, and a laptop with no network still plans.
  */
 import type { AlternativeOffer, BlockedLine, PassedLine, PlannableReadings } from './blocked-line.js';
+import type { BoardLister } from './boards.js';
 import type { DescendedEpic, DescendedPick, DescentPass } from './epic-walk.js';
 import type { SpecIssue, SpecIssueReader, SpecSnapshot } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
@@ -215,6 +216,7 @@ import {
   readBlockedLine,
   unaskedMessage,
 } from './blocked-line.js';
+import { resolveDefaultBoard } from './boards.js';
 import {
   descentPassSentence,
   dryEpicSentence,
@@ -234,7 +236,6 @@ import {
   createRoadmapReadings,
   exhaustedMessage,
   parseRoadmapBody,
-  resolveRoadmapIssue,
   scanClaimBranches,
   skipSentence,
 } from './roadmap.js';
@@ -385,9 +386,11 @@ export function readSpecSourceFlags(args: readonly string[]): SpecSourceFlags {
 
 /** What `--next` reads the roadmap through; only that route needs it. */
 export interface RoadmapSeams {
-  /** `roadmap.issue` as config resolved it, or null for the titled issue. */
+  /** `roadmap.issue` as config resolved it, or null for the default board `resolveDefaultBoard` ranks. */
   readonly configured: number | null;
-  /** Finds the issue titled `Roadmap` when nothing names one. */
+  /** Lists the `type:roadmap` boards, once. */
+  readonly listBoards: BoardLister;
+  /** Finds the issue titled `Roadmap` when nothing names or labels one. */
   readonly search: RoadmapSearch;
   /** Runs the two branch reads the taken reading is taken from. */
   readonly git: GitRunner;
@@ -608,8 +611,9 @@ async function pickRoadmapIssue(
     throw new TypeError(`${PREFIX}: ${NEXT_FLAG} was resolved with no roadmap seams`);
   }
 
-  const roadmap = await resolveRoadmapIssue({
+  const { number: roadmap } = await resolveDefaultBoard({
     configured: request.roadmap ?? seams.configured,
+    listBoards: seams.listBoards,
     search: seams.search,
   });
   output.info(roadmapHeaderLine(roadmap));

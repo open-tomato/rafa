@@ -31,6 +31,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
+import { BOARDS_LIST_ARGS } from '../board/boards.js';
 import { readEpics } from '../board/epics.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../board/roadmap.js';
@@ -110,6 +111,9 @@ function plantedGh(calls: string[][], planted: Planted): GhRunner {
         ? failed('could not resolve to an issue')
         : ok(roadmap));
     }
+    // No issue carries type:roadmap, so the label listing answers empty
+    // and roadmap.issue decides, as before.
+    if (noun === 'issue' && verb === 'list' && args.includes('--label')) return Promise.resolve(ok('[]'));
     if (noun === 'issue' && verb === 'list') {
       return Promise.resolve(planted.failListing === true
         ? failed('error connecting to api.github.com')
@@ -141,9 +145,9 @@ function issuesNamed(text: string): readonly number[] {
   return [...new Set([...text.matchAll(/#(\d+)/gu)].map((match) => Number(match[1])))];
 }
 
-/** How many calls were the board listing: an `issue list` with no title search. */
+/** How many calls were the board listing: an `issue list` with no title search and no label filter. */
 function listings(calls: readonly string[][]): number {
-  return calls.filter((call) => call[0] === 'issue' && call[1] === 'list' && !call.includes('--search')).length;
+  return calls.filter((call) => call[0] === 'issue' && call[1] === 'list' && !call.includes('--search') && !call.includes('--label')).length;
 }
 
 /** The board as `BoardIssue`s, read as the listing reads them. */
@@ -246,6 +250,8 @@ describe('rafa epics, dispatched', () => {
       .filter((text) => text.startsWith('#'))
       .map((text) => text.split(' ')[0])).toEqual(['#51', '#53', '#54']);
     expect(listings(outcome.calls)).toBe(1);
+    // The Roadmap is the default board, found after one type:roadmap listing.
+    expect(outcome.calls.filter((call) => call.includes('--label'))).toEqual([[...BOARDS_LIST_ARGS]]);
   });
 
   it('names no issue of another epic, the control being the other epic\'s own reading', async () => {

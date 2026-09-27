@@ -54,6 +54,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
+import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
@@ -185,6 +186,9 @@ const ROADMAP_CONFIG = `${GH_CONFIG}roadmap:\n  issue: ${ROADMAP_ISSUE}\n`;
 /** The blocked-issue listing the unblock reading sends, as the log spells it. */
 const BLOCKED_LISTING = `issue list --state open --label ${SPEC_BLOCKED_LABEL} --limit 100 --json number,body`;
 
+/** The `type:roadmap` listing the tick finds the default board through, as the fake gh records it. */
+const BOARDS_LISTING = BOARDS_LIST_ARGS.join(' ');
+
 /** What a case's board holds for the unblock reading, beside the roadmap. */
 interface BoardIssues {
   /** The open issues labelled `spec:blocked`, each number to its body. */
@@ -205,8 +209,8 @@ interface FakeGh {
 /**
  * A runner serving the roadmap read and write, the two listings the
  * unblock reading sends and the one removal it writes, storing what a
- * PATCH sends. `broken` fails every call, which is how a board that
- * will not take the tick is driven.
+ * PATCH sends. `broken` fails every call but the `type:roadmap` listing,
+ * which is how a board that will not take the tick is driven.
  */
 function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
   const ran: string[] = [];
@@ -216,6 +220,10 @@ function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
 
   const gh: GhRunner = (args) => {
     ran.push(args.join(' '));
+    // No issue carries type:roadmap, so its listing answers empty, broken
+    // board or not, and roadmap.issue decides, as before; the other
+    // --label listing is the unblock reading's.
+    if (args.includes('--label') && args.includes('type:roadmap')) return ok('[]');
     if (broken) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
     if (args.slice(0, 2).join(' ') === 'issue edit') {
       removed.push(`#${args[2] ?? ''} ${args[4] ?? ''}`);
@@ -710,6 +718,7 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
+      BOARDS_LISTING,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
       BLOCKED_LISTING,
@@ -724,7 +733,7 @@ describe('the roadmap tick', () => {
     const { run } = await ran(seams.seams, project, ['41', '--yes']);
 
     expect(run.exitCode).toBe(1);
-    expect(seams.gh.ran()).toHaveLength(2);
+    expect(seams.gh.ran()).toHaveLength(3);
   });
 
   it('warns and merges anyway when the board will not take the tick', async () => {
@@ -735,6 +744,7 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
+      BOARDS_LISTING,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       BLOCKED_LISTING,

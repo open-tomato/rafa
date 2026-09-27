@@ -735,6 +735,9 @@ function nextRun(options: {
     output: options.output ?? capture().output,
     roadmap: {
       configured: ROADMAP,
+      // No issue carries type:roadmap, so roadmap.issue and the title
+      // decide as they did before boards were found by label.
+      listBoards: () => Promise.resolve([]),
       search: plantedSearch(ROADMAP),
       git: plantedGit(''),
       pullRequests: plantedPulls(),
@@ -938,6 +941,19 @@ describe('resolveSpecSource over --next', () => {
 
     expect(specOf(resolution).issue).toBe(20);
     expect(issues.asked()[0]).toBe(ROADMAP);
+  });
+
+  it('reads the lowest-numbered type:roadmap board over the issue titled Roadmap when nothing names one', async () => {
+    const board = issueOf(77, { title: 'Team board', body: '- [ ] #78 on the labelled board', labels: ['type:roadmap'] });
+    const issues = plantedIssues([...boardIssues(), board, issueOf(78)]);
+
+    const resolution = await nextRun({
+      issues,
+      seams: { configured: null, listBoards: () => Promise.resolve([rowOf(board)]), search: plantedSearch(ROADMAP) },
+    });
+
+    expect(specOf(resolution).issue).toBe(78);
+    expect(issues.asked()[0]).toBe(77);
   });
 
   it('carries the roadmap refusal through when the search finds none', async () => {

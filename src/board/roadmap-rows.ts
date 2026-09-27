@@ -8,8 +8,9 @@
  * Every reading here is one another module already makes, called and
  * never respelled:
  *
- *  - the order: {@link resolveRoadmapIssue} and {@link parseRoadmapBody}
- *    (`./roadmap.ts`), so `roadmap.issue` or the title search names the
+ *  - the order: {@link resolveDefaultBoard} (`./boards.ts`) and
+ *    {@link parseRoadmapBody} (`./roadmap.ts`), so `roadmap.issue`, the
+ *    lowest-numbered `type:roadmap` board or the title search names the
  *    issue exactly as `plan create --next` finds it;
  *  - `spec`: {@link findReadinessGaps} and {@link hasSpecReadyLabel}
  *    (`./readiness.ts`), the two functions `issue ready` calls;
@@ -35,9 +36,11 @@
  *
  * ## What is read, and how often
  *
- * One Roadmap read (`gh issue view`, after a title search only when
- * `roadmap.issue` names nothing), one board listing, one branch scan and
- * at most one open pull request list, whatever the number of lines. The
+ * One listing of the `type:roadmap` boards, one Roadmap read (`gh issue
+ * view`, after at most one title search, spent as
+ * {@link resolveDefaultBoard} spends it), one board listing, one branch
+ * scan and at most one open pull request list, whatever the number of
+ * lines. The
  * spec allows one `gh` read of the board and one of the Roadmap body;
  * the pull request list is the `has` column's own and is the reading
  * `plan create --next` already spends for the same question.
@@ -139,6 +142,7 @@
  *    does not stop them being read.
  */
 import type { BlockedReading } from './blocked.js';
+import type { BoardLister } from './boards.js';
 import type { SpecIssueReader } from './issue.js';
 import type { ReadinessGap } from './readiness.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
@@ -152,13 +156,13 @@ import { stubOfPlanFile } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 
 import { readBlockedBy } from './blocked.js';
+import { resolveDefaultBoard } from './boards.js';
 import { boardId } from './naming.js';
 import { findReadinessGaps, hasSpecReadyLabel, TEMPLATE_HEADINGS } from './readiness.js';
 import {
   branchClaims,
   closedIssuesIn,
   parseRoadmapBody,
-  resolveRoadmapIssue,
   scanClaimBranches,
 } from './roadmap.js';
 
@@ -254,9 +258,11 @@ export type PlanNames = () => readonly string[];
 
 /** What {@link readRoadmapRows} is made with. */
 export interface RoadmapRowsOptions {
-  /** `roadmap.issue` as the caller resolved it, or null for the title search. */
+  /** `roadmap.issue` as the caller resolved it, or null for the labelled boards and then the title search. */
   readonly configured: number | null;
-  /** The title search, asked only when `configured` is null. */
+  /** The labelled boards, listed once. */
+  readonly listBoards: BoardLister;
+  /** The title search, asked as {@link resolveDefaultBoard} asks it. */
   readonly search: RoadmapSearch;
   /** Reads the Roadmap issue; asked once. */
   readonly issues: SpecIssueReader;
@@ -276,8 +282,8 @@ export interface RoadmapRowsOptions {
   readonly all?: boolean;
 }
 
-/** What {@link readLineRows} is made with: every seam of {@link RoadmapRowsOptions} but the three the Roadmap is found through. */
-export type LineRowsOptions = Omit<RoadmapRowsOptions, 'configured' | 'search' | 'issues'>;
+/** What {@link readLineRows} is made with: every seam of {@link RoadmapRowsOptions} but the four the Roadmap is found through. */
+export type LineRowsOptions = Omit<RoadmapRowsOptions, 'configured' | 'listBoards' | 'search' | 'issues'>;
 
 /** True when `error` is Node's answer for a path that does not exist. */
 function isMissing(error: unknown): boolean {
@@ -507,13 +513,17 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
 /**
  * The Roadmap's lines as rows, in its order: the unticked ones, or every
  * one with `all`. Rejects when the Roadmap cannot be found or read —
- * {@link resolveRoadmapIssue}'s refusals included — and otherwise
+ * {@link resolveDefaultBoard}'s refusals included — and otherwise
  * answers {@link readLineRows} over its lines, carrying each failed
  * reading as a warning; the module note holds which reading degrades to
  * what.
  */
 export async function readRoadmapRows(options: RoadmapRowsOptions): Promise<RoadmapRows> {
-  const roadmap = await resolveRoadmapIssue({ configured: options.configured, search: options.search });
+  const { number: roadmap } = await resolveDefaultBoard({
+    configured: options.configured,
+    listBoards: options.listBoards,
+    search: options.search,
+  });
   const lines = parseRoadmapBody((await options.issues(roadmap)).body);
   const { rows, warnings } = await readLineRows(lines, options);
   return Object.freeze({ roadmap, rows, warnings });

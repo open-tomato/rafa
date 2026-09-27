@@ -313,6 +313,9 @@ function writeGhStub(bin: string, table: GhTable): void {
   lines.push('  exit 0');
   lines.push('fi');
   lines.push('if [ "$1" = "issue" ] && [ "$2" = "list" ]; then');
+  // No issue carries type:roadmap: its listing answers empty, told apart
+  // from the roadmap search by its label flag, and the title rule decides.
+  lines.push('  case "$*" in *"--label type:roadmap"*) printf \'%s\' \'[]\'; exit 0;; esac');
   if (table.epic !== undefined) {
     // `readEpicContext`'s own words on the same subcommand as the roadmap
     // search below; told apart by the labels it always carries, in the
@@ -675,8 +678,9 @@ function noBranches(): GitRunner {
 
 /**
  * One board, shared between a `pr merge` tick and a `plan create --next`
- * walk: `gh issue view` and `gh issue list --search` for the walk,
- * `gh pr list` answering no open pull request, and the `gh api
+ * walk: the `type:roadmap` listing answering no board, for both,
+ * `gh issue view` for the walk, `gh pr list` answering no open pull
+ * request, and the `gh api
  * repos/{owner}/{repo}/issues/<n>` pair the tick reads and writes,
  * over the SAME roadmap body, mutated in place by a write.
  */
@@ -701,6 +705,11 @@ function sharedBoard(roadmap: SpecIssue, others: readonly SpecIssue[]): { readon
       })));
     }
     if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(said('[]'));
+    // No issue carries type:roadmap, so its listing answers empty and
+    // roadmap.issue decides, as before.
+    if (args[0] === 'issue' && args[1] === 'list' && args.includes('--label') && args.includes('type:roadmap')) {
+      return Promise.resolve(said('[]'));
+    }
     if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}/collaborators/octocat/permission') {
       return Promise.resolve(said(JSON.stringify({ permission: 'admin', role_name: 'admin' })));
     }

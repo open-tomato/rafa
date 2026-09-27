@@ -129,6 +129,9 @@ function boardOf(issues: Readonly<Record<number, PlantedIssue>>): { gh: GhRunner
       return ok(JSON.stringify({ permission: PERMISSIONS[login], role_name: PERMISSIONS[login] }));
     }
     if (route === 'pr list') return ok('[]');
+    // No issue carries type:roadmap, so its listing answers empty and
+    // roadmap.issue decides, as before.
+    if (route === 'issue list' && args.includes('--label') && args.includes('type:roadmap')) return ok('[]');
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${args.join(' ')}` });
   };
   return { gh, edits: () => edits };

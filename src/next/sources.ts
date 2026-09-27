@@ -56,8 +56,11 @@
  * {@link ghNextBoard} answers the three readings {@link NextBoard}
  * declares over one `gh` runner and one memoised issue reader, out of
  * the pieces `plan create --next` walks the roadmap with: the roadmap
- * issue resolved (`roadmap.issue`, else the one open issue titled
- * `Roadmap`), its body parsed, and the walk's own done and taken
+ * issue resolved by `resolveDefaultBoard` (`src/board/boards.ts`:
+ * `roadmap.issue`, else the lowest-numbered open `type:roadmap` board,
+ * else the one open issue titled `Roadmap`, after one
+ * `gh issue list --label type:roadmap`), its body parsed, and the walk's
+ * own done and taken
  * readings. Nothing is composed here a second time.
  *
  * The walk is `pickDescendedLine` (`src/board/epic-walk.ts`), the one
@@ -66,8 +69,7 @@
  * checklist and then its labelled members, so the line `rafa next`
  * proposes is the epic's first open spec. The board is listed with one
  * `gh issue list --state all` only when the walk meets an open `now`
- * epic line; a roadmap with no epic line sends the commands it always
- * sent. An epic whose every line is done or taken has run dry and the
+ * epic line; a roadmap with no epic line sends no other listing. An epic whose every line is done or taken has run dry and the
  * walk answers no line, so row 13 reads it without naming a second
  * epic's issue; `passed` counts the lines passed on the roadmap and
  * inside the epic together.
@@ -107,6 +109,7 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
+import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
 import { pickDescendedLine } from '../board/epic-walk.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
@@ -116,7 +119,6 @@ import {
   createGhRoadmapSearch,
   createRoadmapReadings,
   parseRoadmapBody,
-  resolveRoadmapIssue,
   scanClaimBranches,
 } from '../board/roadmap.js';
 import { CommandExit } from '../cli/command.js';
@@ -155,7 +157,7 @@ export interface NextBoardOptions {
   readonly gh: GhRunner;
   /** Runs the two branch reads the taken reading is taken from. */
   readonly git: GitRunner;
-  /** `roadmap.issue` as the config resolved it, or null for the titled issue. */
+  /** `roadmap.issue` as the config resolved it, or null for the default board `resolveDefaultBoard` ranks. */
   readonly configured: number | null;
   /** The remote the pushed half of the branch scan asks; `origin` when left out. */
   readonly remote?: string;
@@ -186,7 +188,11 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
 
   return Object.freeze({
     next: async (): Promise<NextRoadmapReading> => {
-      const roadmap = await resolveRoadmapIssue({ configured, search: createGhRoadmapSearch({ gh }) });
+      const { number: roadmap } = await resolveDefaultBoard({
+        configured,
+        listBoards: createGhBoardLister({ gh }),
+        search: createGhRoadmapSearch({ gh }),
+      });
       const read = await issues(roadmap);
       const branches = scanClaimBranches(git, remote);
       const readings = createRoadmapReadings({

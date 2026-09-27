@@ -11,7 +11,9 @@
  * hold, are refused with exit code 1.
  *
  * Without it, the Roadmap is read as `rafa roadmap` reads it
- * (`roadmap.issue`, else the open issue titled Roadmap) and its unticked
+ * (`resolveDefaultBoard`, `src/board/boards.ts`: `roadmap.issue`, else
+ * the lowest-numbered open `type:roadmap` board, else the open issue
+ * titled Roadmap) and its unticked
  * lines are asked in order for the first naming an epic that is OPEN,
  * carries exactly one `horizon:` label and that label `horizon:now`
  * (`isNowEpic`, the walk's own test, `src/board/epic-walk.ts`), and whose
@@ -71,6 +73,7 @@ import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
 import { epicProblemMessage, readEpicProblems } from '../board/epic-problems.js';
 import { epicLines, isNowEpic } from '../board/epic-walk.js';
 import { readEpics } from '../board/epics.js';
@@ -82,7 +85,6 @@ import {
   createGhOpenPullRequests,
   createGhRoadmapSearch,
   parseRoadmapBody,
-  resolveRoadmapIssue,
   ROADMAP_REFUSAL_EXIT,
 } from '../board/roadmap.js';
 import { CommandExit } from '../cli/command.js';
@@ -208,7 +210,11 @@ async function readRoadmap(config: RafaConfig, gh: GhRunner): Promise<{
   readonly lines: readonly RoadmapLine[];
 }> {
   try {
-    const number = await resolveRoadmapIssue({ configured: config.roadmapIssue, search: createGhRoadmapSearch({ gh }) });
+    const { number } = await resolveDefaultBoard({
+      configured: config.roadmapIssue,
+      listBoards: createGhBoardLister({ gh }),
+      search: createGhRoadmapSearch({ gh }),
+    });
     const issue = await createGhSpecIssueReader({ gh })(number);
     return { number, lines: parseRoadmapBody(issue.body) };
   } catch (error) {
@@ -314,7 +320,8 @@ export function createEpicsCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): Raf
     description: 'Prints one epic\'s issues as `rafa roadmap` prints its spec lines, with the spec, blocked by,'
       + ' has and refs columns: the unticked lines of the epic\'s checklist in its order, then its open members'
       + ' missing from the checklist by number. The epic is the type:epic issue numbered, or, with no number,'
-      + ' the first epic the Roadmap (`roadmap.issue`, else the open issue titled Roadmap) names that is open,'
+      + ' the first epic the Roadmap (`roadmap.issue`, else the lowest-numbered open type:roadmap board, else'
+      + ' the open issue titled Roadmap) names that is open,'
       + ' horizon:now and not done, the one `rafa next` walks into. The table is headed by the epic\'s title,'
       + ' computed state and done/total, and a stored state disagreeing with the computed one is printed'
       + ' under it. No issue of another epic is named. Each label problem about the epic and each reading that'

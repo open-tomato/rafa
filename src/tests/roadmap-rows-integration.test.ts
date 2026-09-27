@@ -20,6 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGhBoardLister } from '../board/boards.js';
 import { LIST_HEADINGS, SPEC_READY_LABEL, TEMPLATE_HEADINGS } from '../board/readiness.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import {
@@ -86,6 +87,11 @@ afterAll(() => {
 function plantedGh(board: GhResult, calls: string[][]): GhRunner {
   return (args) => {
     calls.push([...args]);
+    // No issue carries type:roadmap: its listing answers empty, told
+    // apart from the board listing by its label flag.
+    if (args[0] === 'issue' && args[1] === 'list' && args.includes('--label')) {
+      return Promise.resolve({ ok: true, stdout: '[]', stderr: '' });
+    }
     if (args[0] === 'issue' && args[1] === 'list') return Promise.resolve(board);
     if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve({ ok: true, stdout: '[]', stderr: '' });
     return Promise.resolve({ ok: false, stdout: '', stderr: `unplanted: ${args.join(' ')}` });
@@ -118,6 +124,7 @@ function planted(board: GhResult): {
   };
   const options: RoadmapRowsOptions = {
     configured: ROADMAP,
+    listBoards: createGhBoardLister({ gh }),
     search: () => Promise.reject(new Error('no title search expected')),
     issues,
     board: createGhBoardListing({ gh }),
@@ -136,7 +143,7 @@ function cells(rows: readonly RoadmapRow[]): readonly (readonly [number, string,
 
 /** How many of `calls` are the board listing. */
 function listingCalls(calls: readonly string[][]): number {
-  return calls.filter((args) => args[0] === 'issue' && args[1] === 'list').length;
+  return calls.filter((args) => args[0] === 'issue' && args[1] === 'list' && !args.includes('--label')).length;
 }
 
 describe('readRoadmapRows over a planted gh, git and plan dir', () => {

@@ -12,9 +12,11 @@
  * A pull request whose body names no issue with a closing keyword ticks
  * nothing, and {@link tickRoadmapAfterMerge} answers null for it BEFORE
  * the roadmap is resolved. That matters for cost and for noise: the
- * roadmap fallback is a `gh issue list --search`, and running it after
- * every merge would spend a call on every repository that keeps no
- * roadmap and warn each of them that it found none.
+ * default board is found by `resolveDefaultBoard` (`src/board/boards.ts`)
+ * through a `gh issue list --label type:roadmap` and, failing a labelled
+ * board, a `gh issue list --search`, and running them after every merge
+ * would spend calls on every repository that keeps no roadmap and warn
+ * each of them that it found none.
  *
  * ## Why every failure is a warning
  *
@@ -23,7 +25,7 @@
  * `roadmap.issue` pointing at an issue that is gone — none of them
  * un-merge anything, and failing the command over one would tell an
  * operator their merge broke when what broke is a checkbox. So the
- * refusals `resolveRoadmapIssue` raises (`CommandExit`, exit 2 for no
+ * refusals `resolveDefaultBoard` raises (`CommandExit`, exit 2 for no
  * roadmap and for several) are caught here with everything else and
  * reported through `warn`, and `pr merge` keeps its exit code.
  *
@@ -33,15 +35,16 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 
+import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
 import { createGhRoadmapBody, tickRoadmapIssue } from '../../board/roadmap-tick.js';
-import { closedIssuesIn, createGhRoadmapSearch, resolveRoadmapIssue } from '../../board/roadmap.js';
+import { closedIssuesIn, createGhRoadmapSearch } from '../../board/roadmap.js';
 import { messageOf } from '../../config-sections.js';
 
 /** What {@link tickRoadmapAfterMerge} is asked. */
 export interface MergeTickOptions {
   /** The merged pull request's body, which the closing keywords are read out of. */
   readonly body: string;
-  /** `roadmap.issue` as config resolved it, or null for the issue titled `Roadmap`. */
+  /** `roadmap.issue` as config resolved it, or null for the default board `resolveDefaultBoard` ranks. */
   readonly configured: number | null;
   /** Runs every `gh` command the tick sends. */
   readonly gh: GhRunner;
@@ -65,8 +68,9 @@ export async function tickRoadmapAfterMerge(options: MergeTickOptions): Promise<
   if (issues.length === 0) return null;
 
   try {
-    const roadmap = await resolveRoadmapIssue({
+    const { number: roadmap } = await resolveDefaultBoard({
       configured,
+      listBoards: createGhBoardLister({ gh }),
       search: createGhRoadmapSearch({ gh }),
     });
     return await tickRoadmapIssue({ roadmap, issues, board: createGhRoadmapBody({ gh }) });
