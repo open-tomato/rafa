@@ -356,6 +356,36 @@ describe('rafa skill check over a planted tier', () => {
     expect(answered.exitCode).toBe(1);
     expect(answered.stderr).toContain('resolution missing-tool');
   });
+
+  it('fails a blank failure string, warns on a short one, and passes a usable one', async () => {
+    const root = plant({
+      'skills/blank-failure/SKILL.md': fileText(
+        [...CLEAN_SKILL_FIELDS.filter((line) => !line.startsWith('name:')), 'name: blank-failure', 'failure_strings: [\'\']'],
+        PLAIN_BODY,
+      ),
+      'skills/short-failure/SKILL.md': fileText(
+        [...CLEAN_SKILL_FIELDS.filter((line) => !line.startsWith('name:')), 'name: short-failure', 'failure_strings: [TS27]'],
+        PLAIN_BODY,
+      ),
+      'skills/usable-failure/SKILL.md': fileText(
+        [
+          ...CLEAN_SKILL_FIELDS.filter((line) => !line.startsWith('name:')),
+          'name: usable-failure',
+          'failure_strings: [\'no changes added to commit\']',
+        ],
+        PLAIN_BODY,
+      ),
+    });
+
+    const answered = await run(['skill', 'check', 'skills'], root);
+
+    expect(answered.exitCode).toBe(1);
+    expect(answered.stdout).toBe('');
+    expect(answered.stderr).toContain('schema empty-failure-string');
+    expect(answered.stderr).toContain('schema short-failure-string');
+    expect(answered.stderr).not.toContain('usable-failure');
+    expect(answered.stderr).toContain('1 failing, 1 with warnings');
+  });
 });
 
 describe('rafa instinct check over a planted scope', () => {
