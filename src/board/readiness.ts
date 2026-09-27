@@ -42,7 +42,8 @@
  * template's order. ORDER IS NOT CHECKED — the spec asks for every
  * heading present and non-empty and says nothing about their sequence,
  * and an author who moves Design above Starting position has written a
- * readable spec, not an unready one.
+ * readable spec, not an unready one. {@link OPTIONAL_HEADINGS} follow
+ * them in the template and are never asked for.
  *
  * A heading is matched on its text, normalised: trimmed, lower-cased,
  * inner whitespace collapsed, a trailing colon or full stop dropped, and
@@ -149,6 +150,16 @@ export const TEMPLATE_HEADINGS: readonly string[] = [
   'What can go wrong',
   'Tasks the plan must carry',
   'Definition of done',
+];
+
+/**
+ * The template's optional headings, after {@link TEMPLATE_HEADINGS} in
+ * the template's order. The gate asks for none of them, so a spec
+ * written before one was added stays complete; a body carrying one is
+ * read like any other section, placeholders included.
+ */
+export const OPTIONAL_HEADINGS: readonly string[] = [
+  'For the documentation writer',
 ];
 
 /** The two headings that must hold a list item, not just prose. */
