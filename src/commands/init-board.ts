@@ -3,7 +3,7 @@
  * one question it asks, and the lines it prints for what
  * {@link setUpBoard} came to.
  *
- * `src/board/setup.ts` makes the board — the six labels, the spec issue
+ * `src/board/setup.ts` makes the board — the eleven labels, the spec issue
  * template, the pinned Roadmap issue and `roadmap.issue` — and reports
  * each part as created, present or refused. This module is the half
  * that decides whether that runs, and it is where the flags, the
