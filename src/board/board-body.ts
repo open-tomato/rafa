@@ -83,6 +83,11 @@ const TEAM = '[A-Za-z0-9][A-Za-z0-9_.-]*';
 /** One owner handle, whole: `@login` or `@org/team`. */
 const HANDLE = new RegExp(`^@${LOGIN}(?:/${TEAM})?$`, 'u');
 
+/** True when `text` is one owner handle, whole: `@login` or `@org/team`. */
+export function isOwnerHandle(text: string): boolean {
+  return HANDLE.test(text);
+}
+
 /** What separates two folders on an `Owns:` line. */
 const OWNS_SEPARATOR = /[\s,]+/u;
 
@@ -158,7 +163,7 @@ export function readBoardBody(body: string): BoardBody {
   const handle = ownerLine === null
     ? null
     : undressed(ownerLine.text);
-  const isOwned = handle !== null && HANDLE.test(handle);
+  const isOwned = handle !== null && isOwnerHandle(handle);
   const folders = ownsLine === null
     ? { owns: [], rejected: [] }
     : ownedFolders(ownsLine.text);
