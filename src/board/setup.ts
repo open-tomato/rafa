@@ -40,8 +40,9 @@
  * built from `GITHUB_LABELS`, the prefixes `src/adapters/tracker/github.ts`
  * files a draft under. A label spelled twice is a label the gate looks
  * for and this command does not make. `horizon:now`, `horizon:next` and
- * `horizon:later` are the horizons an epic carries one of; no module
- * reads them yet, so this list is where they are first spelled.
+ * `horizon:later` are the horizons an epic carries one of, and this list
+ * is where they are first spelled: `./epic-problems.ts` reads only their
+ * `horizon:` prefix, and `./epic-walk.ts` builds `horizon:now` from it.
  *
  * No colour is sent. `gh label create --help` says a colour is optional
  * and a random one is chosen when it is left out, and the spec asks for
