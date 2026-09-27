@@ -207,7 +207,7 @@ describe('the type and module labels', () => {
   it('reads a missing or foreign type label as code', () => {
     const issues = parseBoardListing(JSON.stringify([
       row({ labels: [] }),
-      row({ labels: [{ name: 'type:epic' }] }),
+      row({ labels: [{ name: 'type:feature' }] }),
     ]), COMMAND);
     expect(issues.map((issue) => issue.type)).toEqual(['code', 'code']);
   });

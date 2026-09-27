@@ -92,7 +92,7 @@ const LATER = '2026-07-28T09:00:00Z';
 const REASON = 'github: gh auth status exited 1 (network)';
 
 /** The members each refusal lists. */
-const TYPES = 'code, bug, spike, adr, chore, package-api';
+const TYPES = 'code, bug, spike, adr, chore, package-api, epic';
 const STATES = 'backlog, todo, in-progress, in-review, done, released, cancelled';
 
 /** What an external id that is not an issue number is refused with, after the id. */
@@ -301,8 +301,8 @@ describe('writing an issue file', () => {
     ['a state', record({ state: 'bogus' as IssueState }), `state is "bogus", expected one of: ${STATES}`],
     [
       'a draft type',
-      record({ draft: draftFixture({ type: 'epic' as IssueType }) }),
-      `type is "epic", expected one of: ${TYPES}`,
+      record({ draft: draftFixture({ type: 'feature' as IssueType }) }),
+      `type is "feature", expected one of: ${TYPES}`,
     ],
     ['a clock reading', record({ capturedAt: 42 as unknown as string }), 'capturedAt is 42, expected a string'],
     [
@@ -523,11 +523,20 @@ describe('createLocalTracker', () => {
     expect(readFileSync(path, 'utf8')).not.toBe(before);
   });
 
+  it('writes an epic draft that get reads back as type epic', async () => {
+    const tracker = localTracker(freshDir('epic'));
+
+    const ref = await tracker.create(draftFixture({ title: 'Epics', type: 'epic' }));
+
+    expect((await tracker.get(ref)).type).toBe('epic');
+    expect(ids(await tracker.find({ type: 'epic' }))).toEqual([ref.externalId]);
+  });
+
   it('refuses a draft no read would accept, creating no file and no directory', async () => {
     const dir = freshDir('bad-draft');
 
-    await expect(localTracker(dir).create(draftFixture({ type: 'epic' as IssueType }))).rejects.toThrow(
-      `local tracker: refused to write an invalid issue: type is "epic", expected one of: ${TYPES}`,
+    await expect(localTracker(dir).create(draftFixture({ type: 'feature' as IssueType }))).rejects.toThrow(
+      `local tracker: refused to write an invalid issue: type is "feature", expected one of: ${TYPES}`,
     );
     expect(existsSync(dir)).toBe(false);
   });

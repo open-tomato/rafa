@@ -22,7 +22,9 @@
  * `check-types` with TS1360 at the record, and the record naming `epic`
  * failed it with TS2353. Each reddened six cases: the list case, the
  * copies made from the drifted module, and the type refusals in
- * `local.test.ts`, whose messages list the members.
+ * `local.test.ts`, whose messages list the members. `epic` has since
+ * joined the union, so the member planted as one the union lacks is now
+ * `feature`.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,7 +48,7 @@ const PORTS_ENTRY = fileURLToPath(new URL(PORTS_IMPORT, import.meta.url));
 
 /** A member line of the types record, and what each plant puts in its place. */
 const ADR_LINE = '  \'adr\': true,\n';
-const LAST_TYPE_LINE = '  \'package-api\': true,\n';
+const LAST_TYPE_LINE = '  \'epic\': true,\n';
 
 /** TS1360: an expression does not satisfy the type it names, here by missing a member. */
 const MISSING_MEMBER = 1360;
@@ -74,7 +76,7 @@ beforeAll(() => {
   const texts = {
     unchanged: original,
     dropped: original.replace(ADR_LINE, ''),
-    added: original.replace(LAST_TYPE_LINE, `${LAST_TYPE_LINE}  'epic': true,\n`),
+    added: original.replace(LAST_TYPE_LINE, `${LAST_TYPE_LINE}  'feature': true,\n`),
   };
   for (const [name, text] of Object.entries(texts)) {
     const file = join(tempDir, `${name}.ts`);
@@ -94,7 +96,7 @@ afterAll(() => {
 
 describe('the issue value lists', () => {
   it.each([
-    ['ISSUE_TYPES', ISSUE_TYPES, ['code', 'bug', 'spike', 'adr', 'chore', 'package-api']],
+    ['ISSUE_TYPES', ISSUE_TYPES, ['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic']],
     ['ISSUE_PRIORITIES', ISSUE_PRIORITIES, ['urgent', 'high', 'medium', 'low']],
     [
       'ISSUE_STATES',
