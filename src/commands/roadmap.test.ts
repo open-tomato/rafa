@@ -45,9 +45,12 @@ const ROADMAP = 1;
 /** The Roadmap's body: two unticked lines around a ticked one, in an order no number sorts to. */
 const ROADMAP_BODY = '- [ ] #13 — blocked bug\n- [x] #12 — shipped chore\n- [ ] #11 — ready spec\n';
 
-/** One issue as `gh issue list --json number,title,body,state,labels` writes it. */
+/** One issue as `gh issue list --json number,title,body,state,stateReason,labels` writes it. */
 function boardIssue(number: number, title: string, body: string, state: 'OPEN' | 'CLOSED', labels: readonly string[]): object {
-  return { number, title, body, state, labels: labels.map((name) => ({ name })) };
+  const stateReason = state === 'CLOSED'
+    ? 'COMPLETED'
+    : '';
+  return { number, title, body, state, stateReason, labels: labels.map((name) => ({ name })) };
 }
 
 /** The board: the three Roadmap issues and the open blocker of #13. */

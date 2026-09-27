@@ -302,9 +302,12 @@ const ROADMAP_BODY = [
   '',
 ].join('\n');
 
-/** One issue as `gh issue list --json number,title,body,state,labels` writes it. */
+/** One issue as `gh issue list --json number,title,body,state,stateReason,labels` writes it. */
 function boardIssue(number: number, title: string, body: string, state: 'OPEN' | 'CLOSED', labels: readonly string[]): object {
-  return { number, title, body, state, labels: labels.map((name) => ({ name })) };
+  const stateReason = state === 'CLOSED'
+    ? 'COMPLETED'
+    : '';
+  return { number, title, body, state, stateReason, labels: labels.map((name) => ({ name })) };
 }
 
 /** The board: the four Roadmap issues, the two blockers of #13, and one bug the Roadmap does not name. */
@@ -413,7 +416,7 @@ const ROADMAP_NARROWED: readonly (readonly [readonly string[], readonly string[]
 
 /** The warn line text mode writes, ahead of the rows, for {@link UNREACHABLE}. */
 const UNREACHABLE_WARNING = 'warn: the board could not be listed, so the spec and blocked by columns are empty: board listing:'
-  + ' gh issue list --state all --limit 1000 --json number,title,body,state,labels failed: error connecting to api.github.com';
+  + ' gh issue list --state all --limit 1000 --json number,title,body,state,stateReason,labels failed: error connecting to api.github.com';
 
 /** The first cell of each table row `stdout` holds, every line to the header dropped. */
 function listedIssues(stdout: string): readonly string[] {

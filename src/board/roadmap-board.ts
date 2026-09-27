@@ -9,7 +9,7 @@
  * closed state, so this listing asks for all of them at once:
  *
  * ```
- * gh issue list --state all --limit <n> --json number,title,body,state,labels
+ * gh issue list --state all --limit <n> --json number,title,body,state,stateReason,labels
  * ```
  *
  * `--state all` because a blocker that has closed is still a reading the
@@ -29,15 +29,27 @@
  * A row is refused, naming the command and the row's index, at the FIRST
  * field that is not what is read here: `number` a positive whole number,
  * `title` and `body` strings, `state` `OPEN` or `CLOSED` (what `gh`
- * answers for an issue, as the adapter's `get` reads it), and `labels` a
- * list whose every item is a mapping with a string `name`. A missing
- * field is refused as its `undefined` value, so a `--json` list that
- * lost a field fails loudly rather than reading as an empty body. A
- * failed command, output that is not JSON, and JSON that is not a list
- * are each refused naming the command too. Nothing is dropped silently:
+ * answers for an issue, as the adapter's `get` reads it), `stateReason`
+ * a string or null, and `labels` a list whose every item is a mapping
+ * with a string `name`. A missing field is refused as its `undefined`
+ * value, so a `--json` list that lost a field fails loudly rather than
+ * reading as an empty body. A failed command, output that is not JSON,
+ * and JSON that is not a list are each refused naming the command too. Nothing is dropped silently:
  * a row skipped here would be an issue the roadmap rows call missing.
  *
  * An empty list is an empty board, not a refusal.
+ *
+ * ## Why an issue closed
+ *
+ * `stateReason` is read by the github tracker's `get` rule (`VIEW_FIELDS`
+ * in `src/adapters/tracker/github.ts`): a string or null, anything else
+ * refused. An issue with no reason comes back as an empty string or as
+ * null (the adapter's note records `gh` 2.100.0 writing the empty string
+ * for a merged pull request), so both read here as null. Any other
+ * string is kept as `gh` wrote it, `COMPLETED` and `NOT_PLANNED` among
+ * them, and is not checked against a closed set. A closed issue whose
+ * reason is `NOT_PLANNED` was dropped, not done, and a reader counting
+ * done work reads that here.
  *
  * ## Type and module
  *
@@ -58,7 +70,7 @@ import { describeValue, isMapping, messageOf } from '../config-sections.js';
 const PREFIX = 'board listing';
 
 /** The fields the listing asks `gh issue list` for. */
-export const BOARD_LIST_FIELDS = 'number,title,body,state,labels';
+export const BOARD_LIST_FIELDS = 'number,title,body,state,stateReason,labels';
 
 /** How many issues one listing reads when the caller names no limit; see the module note. */
 export const BOARD_LISTING_LIMIT = 1000;
@@ -72,6 +84,8 @@ export interface BoardIssue {
   readonly title: string;
   readonly body: string;
   readonly state: BoardIssueState;
+  /** Why the issue closed, as `gh` wrote it (`NOT_PLANNED`, `COMPLETED`), or null when `gh` wrote an empty string or null. */
+  readonly stateReason: string | null;
   /** Every label's name, in the order `gh` answered them. */
   readonly labels: readonly string[];
   /** The type the labels carry, read as the github tracker reads it. */
@@ -121,14 +135,24 @@ function labelsProblem(value: unknown): string | null {
 /** The first thing wrong with one row, or null when every field is read. */
 function rowProblem(row: unknown): string | null {
   if (!isMapping(row)) return `${describeValue(row)}, expected a mapping`;
-  const { number, title, body, state, labels } = row;
+  const { number, title, body, state, stateReason, labels } = row;
   if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
     return `number ${describeValue(number)}, expected a positive whole number`;
   }
   if (typeof title !== 'string') return `title ${describeValue(title)}, expected a string`;
   if (typeof body !== 'string') return `body ${describeValue(body)}, expected a string`;
   if (state !== 'OPEN' && state !== 'CLOSED') return `state ${describeValue(state)}, expected "OPEN" or "CLOSED"`;
+  if (stateReason !== null && typeof stateReason !== 'string') {
+    return `stateReason ${describeValue(stateReason)}, expected a string or null`;
+  }
   return labelsProblem(labels);
+}
+
+/** A checked `stateReason`, with the empty string `gh` answers for an open issue read as null. */
+function reasonOf(value: string | null): string | null {
+  return value === ''
+    ? null
+    : value;
 }
 
 /** The issue one checked row holds. */
@@ -140,6 +164,7 @@ function issueOf(row: Readonly<Record<string, unknown>>): BoardIssue {
     title: row['title'] as string,
     body: row['body'] as string,
     state: row['state'] as BoardIssueState,
+    stateReason: reasonOf(row['stateReason'] as string | null),
     labels: Object.freeze(labels),
     type: typeOfLabels(labels),
     module: moduleOfLabels(labels),
@@ -170,7 +195,7 @@ export function parseBoardListing(stdout: string, command: string): readonly Boa
 
 /**
  * The listing over `options.gh`: one
- * `gh issue list --state all --limit <n> --json number,title,body,state,labels`
+ * `gh issue list --state all --limit <n> --json number,title,body,state,stateReason,labels`
  * per call, answered as checked issues. Throws a `TypeError`, sending
  * nothing, for a limit that is not a positive whole number; rejects,
  * naming the command, when `gh` failed or answered anything but a list

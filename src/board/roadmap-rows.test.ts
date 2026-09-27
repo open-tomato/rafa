@@ -68,6 +68,7 @@ function issue(number: number, fields: Partial<BoardIssue> = {}): BoardIssue {
     title: `Issue ${String(number)}`,
     body: completeSpecBody(`Issue ${String(number)}`),
     state: 'OPEN',
+    stateReason: null,
     labels: [SPEC_READY_LABEL],
     type: 'code',
     module: 'unassigned',
