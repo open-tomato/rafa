@@ -69,7 +69,10 @@
  * checklist and then its labelled members, so the line `rafa next`
  * proposes is the epic's first open spec. The board is listed with one
  * `gh issue list --state all` only when the walk meets an open `now`
- * epic line; a roadmap with no epic line sends no other listing. An epic whose every line is done or taken has run dry and the
+ * epic line; a roadmap with no epic line sends no other listing. A
+ * caller that reads the listing itself hands it in as
+ * {@link NextBoardOptions.listing}, so the command reads it once:
+ * `rafa status` does, for the current place (`src/status/sections.ts`). An epic whose every line is done or taken has run dry and the
  * walk answers no line, so row 13 reads it without naming a second
  * epic's issue; `passed` counts the lines passed on the roadmap and
  * inside the epic together.
@@ -101,6 +104,7 @@ import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
+import type { BoardListing } from '../board/roadmap-board.js';
 import type { RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
 import type { SessionRecord } from '../loop/sessions.js';
@@ -161,6 +165,8 @@ export interface NextBoardOptions {
   readonly configured: number | null;
   /** The remote the pushed half of the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /** The board listing the walk reads, for a caller that reads it too; `createGhBoardListing` over `gh` when left out. */
+  readonly listing?: BoardListing;
 }
 
 /** The settings the composition reads off the config. */
@@ -184,6 +190,7 @@ function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
   const { gh, git, configured, remote } = options;
+  const listing = options.listing ?? createGhBoardListing({ gh });
   const issues = memoiseIssues(createGhSpecIssueReader({ gh }));
 
   return Object.freeze({
@@ -203,7 +210,7 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
       const { descent, pick } = await pickDescendedLine(parseRoadmapBody(read.body), {
         issues,
         readings,
-        listing: createGhBoardListing({ gh }),
+        listing,
       });
       return {
         roadmap,
