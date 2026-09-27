@@ -30,6 +30,12 @@
  * That last leg reddened nothing while the counting case held no plan and
  * outcome under two statuses, SQLite answering one of them for the bare
  * column; with its seventh row it reddens that case.
+ *
+ * Six more came with `skills_used`, driven against this file alone and
+ * restored the same way: the column always bound NULL (8 red), a list
+ * left out stored as `[]` (1), the reader answering NULL as `[]` (2), the
+ * writer's list check dropped (3), the migration's CHECK dropped (1), and
+ * the version-12 entry removed (26).
  */
 import type { FindingOutcome, FindingsWriterSeams } from './findings.js';
 import type { TaskReportWrite } from './reports.js';
@@ -54,7 +60,7 @@ import { loadConfig } from '../../config-load.js';
 import { parseReport, REPORT_STATUSES } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES } from './findings.js';
-import { readTaskReportTallies, writeTaskReport } from './reports.js';
+import { readReportedSkills, readTaskReportTallies, writeTaskReport } from './reports.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 
 /** A task report row as the table holds it. */
@@ -67,6 +73,7 @@ interface StoredReport {
   status: string | null;
   outcome: string;
   collected_at: string;
+  skills_used: string | null;
 }
 
 /** The table's columns, in order. */
@@ -79,6 +86,7 @@ const COLUMNS = [
   'status',
   'outcome',
   'collected_at',
+  'skills_used',
 ];
 
 /** A fence, kept out of the template literals. */
@@ -102,6 +110,11 @@ function outputWith(...statusLines: string[]): string {
     FENCE,
     '',
   ].join('\n');
+}
+
+/** A done report's output whose `skills_used` line is `skillsLine`. */
+function outputWithSkills(skillsLine: string): string {
+  return outputWith('status: done').replace('skills_used: []', skillsLine);
 }
 
 /** One output per status a row can hold, and the status each one stores. */
@@ -341,6 +354,7 @@ describe('writeTaskReport rows', () => {
       status,
       outcome: 'failed',
       collected_at: '2026-09-14T10:00:00.000Z',
+      skills_used: '[]',
     }]);
   });
 
@@ -504,6 +518,21 @@ describe('what a task report write refuses', () => {
       () => writeOf({ report: { status: 7 as never } }),
       'has status 7, not null or one of done, blocked',
     ],
+    [
+      'skills used that are not a list',
+      () => writeOf({ report: { status: 'done', skillsUsed: 'git-workflow' as never } }),
+      'has skills used "git-workflow", not null or a list of non-blank strings',
+    ],
+    [
+      'skills used holding a blank name',
+      () => writeOf({ report: { status: 'done', skillsUsed: ['git-workflow', ' '] } }),
+      'not null or a list of non-blank strings',
+    ],
+    [
+      'skills used holding a name that is not a string',
+      () => writeOf({ report: { status: 'done', skillsUsed: [7] as never } }),
+      'not null or a list of non-blank strings',
+    ],
   ];
 
   it.each(refusals)('refuses %s whole, creating nothing', (_name, writeFor, message) => {
@@ -545,5 +574,106 @@ describe('what a task report write refuses', () => {
     expect(() => writeTaskReport(root, writeOf({ dispatch: RETRY }), seams('newer-2')))
       .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
     expect(readRaw(root)).toEqual(before);
+  });
+});
+
+describe('the skills a task report says it used', () => {
+  it('stores the list parseReport answered, in order, duplicates and plugin names kept', () => {
+    const root = freshRoot('skills-listed');
+    const report = reportOf(outputWithSkills('skills_used: ["git-workflow", "rafa:dev-planner", "git-workflow"]'));
+
+    // The control: the parser really answers this list for the output.
+    expect(report.skillsUsed).toEqual(['git-workflow', 'rafa:dev-planner', 'git-workflow']);
+
+    writeTaskReport(root, writeOf({ report }), seams('skills-listed'));
+
+    expect(rowsOf(root).map(({ skills_used }) => skills_used))
+      .toEqual(['["git-workflow","rafa:dev-planner","git-workflow"]']);
+    expect(readReportedSkills(root)).toEqual([{
+      sessionId: 'aaaa-1111',
+      planStub: 'phase-1',
+      taskLine: 'Store the report status beside the outcome',
+      outcome: 'done',
+      skillsUsed: ['git-workflow', 'rafa:dev-planner', 'git-workflow'],
+    }]);
+  });
+
+  it('stores an empty list as [] and a list left out or null as NULL, and reads them apart', () => {
+    const root = freshRoot('skills-empty');
+    writeTaskReport(root, writeOf(), seams('skills-empty'));
+    writeTaskReport(root, writeOf({ dispatch: RETRY, report: { status: 'done' } }), seams('skills-out'));
+    const third = { ...DISPATCH, sessionId: 'cccc-3333' };
+    writeTaskReport(root, writeOf({ dispatch: third, report: { status: 'done', skillsUsed: null } }), seams('skills-null'));
+
+    expect(rowsOf(root).map(({ skills_used }) => skills_used)).toEqual(['[]', null, null]);
+    expect(readReportedSkills(root).map(({ skillsUsed }) => skillsUsed)).toEqual([[], null, null]);
+  });
+
+  it('reads a row a version-11 store held as not recorded, beside a row written after', () => {
+    const root = freshRoot('skills-from-v11');
+    mkdirSync(dirname(storeFile(root)), { recursive: true });
+    const db = new Database(storeFile(root), { create: true, readwrite: true });
+    migrateSchema(db, storeFile(root), SQLITE_MIGRATIONS.slice(0, 11));
+    db.run(
+      'INSERT INTO task_reports (id, session_id, task_line, status, outcome, collected_at)'
+        + ' VALUES (?, ?, ?, ?, ?, ?)',
+      ['old-1', 'old-session', 'An old task', 'done', 'done', '2026-09-14T00:00:00.000Z'],
+    );
+    db.close();
+
+    // The control: the first eleven entries make a task reports table with
+    // no skills column, so the column came from a later entry.
+    const columns = 'SELECT name FROM pragma_table_info(?) ORDER BY cid';
+    expect(rawQuery<{ name: string }>(root, columns, 'task_reports').map(({ name }) => name))
+      .toEqual(COLUMNS.filter((name) => name !== 'skills_used'));
+
+    writeTaskReport(root, writeOf(), seams('skills-from-v11'));
+
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(readReportedSkills(root).map(({ sessionId, skillsUsed }) => [sessionId, skillsUsed]))
+      .toEqual([['old-session', null], ['aaaa-1111', []]]);
+  });
+
+  it('holds the column to NULL or a JSON array in the schema itself', () => {
+    const root = freshRoot('skills-check');
+    writeTaskReport(root, writeOf(), seams('skills-check'));
+
+    // The controls: an array and NULL go in, so each refusal below is the
+    // CHECK's and not the row's.
+    expect(() => rawInsert(root, { skills_used: '["git-workflow"]' })).not.toThrow();
+    expect(() => rawInsert(root, { skills_used: null })).not.toThrow();
+    for (const json of ['{"name":"git-workflow"}', '"git-workflow"', '3', 'null']) {
+      expect(() => rawInsert(root, { skills_used: json })).toThrow(/CHECK constraint failed/);
+    }
+    expect(() => rawInsert(root, { skills_used: 'git-workflow' })).toThrow(/malformed JSON/);
+  });
+
+  it('stores a name holding a lone surrogate as an escape, and reads it back whole', () => {
+    const root = freshRoot('skills-surrogate');
+    const name = `probe${LONE_HIGH}`;
+    writeTaskReport(root, writeOf({ report: { status: 'done', skillsUsed: [name] } }), seams('skills-surrogate'));
+
+    expect(rowsOf(root).map(({ skills_used }) => skills_used)).toEqual(['["probe\\ud800"]']);
+    expect(readReportedSkills(root).map(({ skillsUsed }) => skillsUsed)).toEqual([[name]]);
+  });
+
+  it('answers none and creates nothing when no store exists', () => {
+    const root = freshRoot('skills-absent');
+
+    expect(readReportedSkills(root)).toEqual([]);
+    expect(existsSync(root)).toBe(false);
+  });
+
+  it('refuses a stored list holding something other than names, naming the session', () => {
+    const root = freshRoot('skills-unreadable');
+    writeTaskReport(root, writeOf(), seams('skills-unreadable'));
+
+    // The control: the store reads before the row no write stores goes in.
+    expect(readReportedSkills(root)).toHaveLength(1);
+
+    rawInsert(root, { session_id: 'odd-session', skills_used: '["git-workflow", 7]' });
+
+    expect(() => readReportedSkills(root))
+      .toThrow('task report of session odd-session holds skills_used ["git-workflow", 7], not a list of names');
   });
 });

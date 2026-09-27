@@ -250,6 +250,14 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
   CREATE UNIQUE INDEX skill_invocations_by_use
     ON skill_invocations (session_id, ifnull(name, ''), ifnull(sidechain, -1));
   `,
+  // Version 12: the skills a task session's report says it used, added to
+  // the table version 5 created. `reports.ts` writes it and says why it is
+  // nullable. A row a version-11 store already holds reads NULL: not
+  // recorded, never an empty list.
+  `
+  ALTER TABLE task_reports
+    ADD COLUMN skills_used TEXT CHECK (skills_used IS NULL OR json_type(skills_used) = 'array');
+  `,
 ];
 
 /**

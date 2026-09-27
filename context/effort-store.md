@@ -211,6 +211,20 @@ exit codes it captured, the commands it ran — read `session_id` off its
 `task_reports` row and open the matching
 `~/.claude/projects/<project-slug>/<session-id>.jsonl`.
 
+**`task_reports.skills_used` arrived at schema version 12**, an `ADD
+COLUMN` holding the report's own `skills_used` as a JSON array, in the
+order written, duplicates kept and no name rewritten; its CHECK admits
+NULL or an array and nothing else. `writeTaskReport` stores it from the
+`TaskReport.skillsUsed` that `storeTaskReport` hands through
+`recordTaskReport`. NULL is "not recorded" and never an empty list: a
+row a version-11 store held reads NULL, and so does a write that leaves
+the list out, while a report that listed no skill stores `[]`.
+`readReportedSkills` (`store/reports.ts`) answers the list per row in
+append order, NULL as null. It is the session's claim; comparing it with
+`skill_invocations` under `bareSkillName` is the reader's job, not the
+writer's. Adding the column moved two expectations, both in
+`store/reports.test.ts`: the `COLUMNS` list and the whole-row `toEqual`.
+
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row
 per check keyed by `(run_id, position)`, since a run can check one item
