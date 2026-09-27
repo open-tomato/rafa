@@ -2,8 +2,9 @@
  * Tests for the epic table (`src/commands/issue/roadmap-epic-table.ts`):
  * the spec's sample row, the six columns in order, the horizon headings,
  * the disagreement line under its row, the `Specs` group, the failed
- * listing's `unknown` line, the hidden-horizon line, and a reading with
- * no epic line printing today's table unchanged.
+ * listing's `unknown` line, the hidden-horizon line, a reading with no
+ * epic line printing today's table unchanged, and each epic's members
+ * on two rows under `full`.
  *
  * Every epic is computed by the model's own `readEpics` over a planted
  * listing, so the cells are read with the states and progress the model
@@ -22,11 +23,14 @@ import {
   EPIC_COLUMNS,
   epicCells,
   hiddenLine,
+  memberLines,
+  memberState,
+  orderedMembers,
   renderEpicTable,
   SPECS_HEADING,
   unknownLine,
 } from './roadmap-epic-table.js';
-import { renderRoadmapTable, TITLE_FLOOR } from './roadmap-table.js';
+import { LABELS_FLOOR, renderRoadmapTable, TITLE_FLOOR } from './roadmap-table.js';
 
 const ROADMAP = 31;
 const TODAY = new Date(2026, 8, 27);
@@ -248,5 +252,82 @@ describe('no epic line', () => {
     const specs = [specRow(50, 'a why long enough that a narrow terminal has to cut it down')];
     expect(renderEpicTable(reading([], specs), 60)).toEqual(renderRoadmapTable(specs, 60));
     expect(renderEpicTable(reading([], specs), 60)).not.toEqual(renderRoadmapTable(specs));
+  });
+});
+
+/** An epic #80 whose checklist names #84 then #82, over four members in every state `--full` prints, #84's `Blocked by:` line naming itself. */
+const FULL_EPICS = epicsOf([
+  epicIssue(80, 'full', 'Full view', { body: '- [ ] #84\n- [ ] #82\n' }),
+  issue(81, { title: 'Dropped', labels: ['epic:full'], state: 'CLOSED', stateReason: 'NOT_PLANNED' }),
+  issue(82, { title: 'Second', labels: ['epic:full', 'type:spec'], body: 'Blocked by: #81 #84' }),
+  issue(83, { title: 'Done', labels: ['epic:full'], state: 'CLOSED', stateReason: 'COMPLETED' }),
+  issue(84, { title: 'First', labels: ['epic:full'], body: 'Blocked by: #84' }),
+]);
+const FULL_EPIC = epicAt(FULL_EPICS, 80);
+
+describe('each epic\'s members under --full', () => {
+  it('orders the members by the checklist, then the rest by number', () => {
+    expect(orderedMembers(FULL_EPIC).map((member) => member.number)).toEqual([84, 82, 81, 83]);
+  });
+
+  it('spells a member closed as not planned apart from one closed', () => {
+    expect(orderedMembers(FULL_EPIC).map(memberState)).toEqual(['open', 'open', 'not-planned', 'closed']);
+  });
+
+  it('prints two rows per member: number, state and title, then labels and blockers', () => {
+    expect(memberLines(FULL_EPIC, 5)).toEqual([
+      '     #84  open         First',
+      '          labels: epic:full  blocked by: -',
+      '     #82  open         Second',
+      '          labels: epic:full, type:spec  blocked by: #81, #84',
+      '     #81  not-planned  Dropped',
+      '          labels: epic:full  blocked by: -',
+      '     #83  closed       Done',
+      '          labels: epic:full  blocked by: -',
+    ]);
+  });
+
+  it('prints the members under their row, after the disagreement line, the number under the state column', () => {
+    const done = epicAt(epicsOf([epicIssue(252, 'epics', 'Epics and boards'), ...members(300, 'epics', 1, 1)]), 252);
+    const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(done), epicRow(SAMPLE_EPIC)] }]), undefined, true);
+    expect(lines.slice(2, 6)).toEqual([
+      '#252  done         1/1         -        Epics and boards  -',
+      '      done, but epic #252 is still open',
+      '      #300  closed  Issue 300',
+      '            labels: epic:epics  blocked by: -',
+    ]);
+    expect(lines[4]?.indexOf('#300')).toBe(lines[1]?.indexOf('state'));
+    expect(lines).toHaveLength(3 + 3 + 1 + 7 * 2);
+  });
+
+  it('adds no line for an epic with no members, and none at all without full', () => {
+    const empty = epicAt(epicsOf([epicIssue(40, 'none', 'Nothing yet')]), 40);
+    expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(empty)] }]), undefined, true)).toHaveLength(3);
+    expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(FULL_EPIC)] }]))).toHaveLength(3);
+    expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(FULL_EPIC)] }]), undefined, true)).toHaveLength(11);
+  });
+
+  it('prints today\'s table alone under full when the Roadmap names no epic', () => {
+    const specs = [specRow(50, 'a spec')];
+    expect(renderEpicTable(reading([], specs), undefined, true)).toEqual(renderRoadmapTable(specs));
+  });
+
+  it('cuts a member\'s title and then its labels to fit a terminal, each never below its floor', () => {
+    const long = epicAt(epicsOf([
+      epicIssue(90, 'long', 'Long'),
+      issue(91, {
+        title: 'A member title long enough to overflow a narrow terminal',
+        labels: ['epic:long', 'type:spec', 'module:board', 'priority:high'],
+      }),
+    ]), 90);
+    const [title = '', labels = ''] = memberLines(long, 5, 50);
+    expect([...title].length).toBe(50);
+    expect(title.endsWith('…')).toBe(true);
+    expect([...labels].length).toBe(50);
+    expect(labels.endsWith('  blocked by: -')).toBe(true);
+    const [floorTitle = '', floorLabels = ''] = memberLines(long, 5, 10);
+    expect(floorTitle.slice(floorTitle.indexOf('A member'))).toHaveLength(TITLE_FLOOR);
+    expect(floorLabels.slice(floorLabels.indexOf('epic:'), floorLabels.indexOf('  blocked'))).toHaveLength(LABELS_FLOOR);
+    expect(memberLines(long, 5)[0]).toContain(long.members[0]?.title ?? '');
   });
 });

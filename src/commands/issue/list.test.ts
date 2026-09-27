@@ -62,7 +62,7 @@ afterAll(() => {
 });
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue list [--roadmap [--all]] [--state=<state>] [--type=<type>] [--module=<name>]'
+const USAGE = 'rafa issue list [--roadmap [--all] [--full]] [--state=<state>] [--type=<type>] [--module=<name>]'
   + ' [--search=<text>] [--limit=<n>]';
 
 /** The subject the dispatched cases route under. */
@@ -456,14 +456,16 @@ const LINE_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{ all: true }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
   [{ all: true, state: 'todo' }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
   [{ all: true, roadmap: false }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
+  [{ full: true }, '--full prints the issues of each Roadmap epic, so it needs --roadmap'],
 ];
 
 describe('the line rafa issue list --roadmap reads', () => {
-  it('reads neither switch as the plain list, and --all only beside --roadmap', () => {
-    expect(readIssueListLine({})).toEqual({ roadmap: false, all: false });
-    expect(readIssueListLine({ roadmap: true, type: 'bug' })).toEqual({ roadmap: true, all: false });
-    expect(readIssueListLine({ roadmap: true, all: true })).toEqual({ roadmap: true, all: true });
-    expect(readIssueListLine({ state: 'todo' })).toEqual({ roadmap: false, all: false });
+  it('reads no switch as the plain list, and --all and --full only beside --roadmap', () => {
+    expect(readIssueListLine({})).toEqual({ roadmap: false, all: false, full: false });
+    expect(readIssueListLine({ roadmap: true, type: 'bug' })).toEqual({ roadmap: true, all: false, full: false });
+    expect(readIssueListLine({ roadmap: true, all: true })).toEqual({ roadmap: true, all: true, full: false });
+    expect(readIssueListLine({ roadmap: true, full: true })).toEqual({ roadmap: true, all: false, full: true });
+    expect(readIssueListLine({ state: 'todo' })).toEqual({ roadmap: false, all: false, full: false });
   });
 
   it.each(LINE_REFUSALS)('refuses the flags %j with exit code 1', (flags, problem) => {
@@ -818,6 +820,40 @@ describe('rafa issue list --roadmap, with epics', () => {
       '#13  open   bug   label: none, gate: ready  #20 open, #21 closed  pr #40  -     type:bug, module:board  Blocked bug',
     ]));
     expect(epics.stdout).toBe(stdoutOf([GHOST_WARNING, ...NOW_GROUP, '', 'Roadmap #1 · 1 epic not in now; --all shows every horizon']));
+  });
+
+  it('prints each now epic\'s members under its row on two rows under --full, and the same bytes under rafa roadmap', async () => {
+    const project = plantRoadmapCase();
+    const listed = await run(['issue', 'list', '--roadmap', '--full'], project, roadmapCommand(EPIC_PLANT, []));
+    const shortcut = await dispatchInProject(
+      ['roadmap', '--full'],
+      [],
+      [createRoadmapCommand({ gh: plantedGh(EPIC_PLANT, []), git: plantedGit, terminalWidth: () => undefined })],
+      project,
+    );
+
+    expect(listed.stdout).toBe(stdoutOf([
+      GHOST_WARNING,
+      ...NOW_GROUP,
+      '     #61  closed  Alpha one',
+      '          labels: epic:alpha  blocked by: -',
+      '     #62  open    Alpha two',
+      '          labels: epic:alpha  blocked by: -',
+      '',
+      'Roadmap #1 · 1 epic not in now; --all shows every horizon',
+      '',
+      ...SPECS_GROUP,
+    ]));
+    expect(shortcut).toEqual(listed);
+  });
+
+  it('prints today\'s bytes under --full for a Roadmap naming no epic', async () => {
+    const project = plantRoadmapCase();
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({}, []));
+    const full = await run(['issue', 'list', '--roadmap', '--full'], project, roadmapCommand({}, []));
+
+    expect(plain.stdout).toContain('Roadmap: #1');
+    expect(full).toEqual(plain);
   });
 
   it('prints the same bytes under rafa roadmap', async () => {

@@ -66,12 +66,48 @@
  * table is wider than it, down to {@link TITLE_FLOOR}, ending with `…`.
  * The other five columns are short by construction. With no width,
  * nothing is cut.
+ *
+ * ## Under --full
+ *
+ * With `full`, each epic row is followed, after its disagreement line,
+ * by its members, each on two rows ({@link memberLines}), indented to
+ * start under the `state` column as the disagreement line is:
+ *
+ * ```text
+ * #60  in-progress  1/2         -        Epic alpha  -
+ *        #61  closed  Alpha one
+ *             labels: epic:alpha  blocked by: -
+ *        #62  open    Alpha two
+ *             labels: epic:alpha  blocked by: #13
+ * ```
+ *
+ *  - The first row is the member's number, right-aligned to the epic's
+ *    widest, its state ({@link memberState}: `open`, `closed`, or
+ *    `not-planned` for one closed as not planned, which the `done/total`
+ *    cell counts on neither side) padded to the epic's widest, and its
+ *    title.
+ *  - The second, under the member's state, is its labels joined with
+ *    `, ` and the issues its `Blocked by:` line names, read with
+ *    `readBlockedBy` (`src/board/blocked.ts`); a line that does not read
+ *    `blocked` names nothing here, as `readEpics` acts on none of it.
+ *    Either with nothing to print is {@link EMPTY_CELL}.
+ *
+ * Members come in the epic's checklist order, then the rest by number
+ * ({@link orderedMembers}): the label says which epic, the checklist in
+ * what order. An epic with no members adds no line; its row already
+ * reads `empty`. With a terminal width, a member's title is cut to fit,
+ * and then its labels, each down to its floor as today's table cuts
+ * them; the `blocked by:` part is never cut.
  */
+import type { Epic } from '../../board/epics.js';
+import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RoadmapEpicRows, EpicHorizonGroup, EpicRow } from '../../board/roadmap-epic-rows.js';
 
+import { readBlockedBy } from '../../board/blocked.js';
+import { isNotPlanned } from '../../board/epics.js';
 import { hasEpicLines } from '../../board/roadmap-epic-rows.js';
 
-import { COLUMN_GAP, cutCell, EMPTY_CELL, renderRoadmapTable, TITLE_FLOOR } from './roadmap-table.js';
+import { COLUMN_GAP, cutCell, EMPTY_CELL, LABELS_FLOOR, renderRoadmapTable, TITLE_FLOOR } from './roadmap-table.js';
 
 /** The six columns, in order, as the header line spells them. */
 export const EPIC_COLUMNS = Object.freeze(['#', 'state', 'done/total', 'blocked', 'title', 'date'] as const);
@@ -163,16 +199,89 @@ function lineOf(cells: readonly string[], widths: readonly number[]): string {
   }).join(COLUMN_GAP);
 }
 
-/** One horizon group's lines: heading, header, then each row and its disagreement line. */
-function groupLines(roadmap: number, group: EpicHorizonGroup, width: number | undefined): string[] {
+/** A member's state as `--full` prints it; see the module note. */
+export function memberState(member: BoardIssue): string {
+  if (isNotPlanned(member)) return 'not-planned';
+  return member.state.toLowerCase();
+}
+
+/** `epic`'s members in its checklist's order, then the rest by number. */
+export function orderedMembers(epic: Epic): readonly BoardIssue[] {
+  const listed = (epic.body?.lines ?? []).map((line) => line.issue);
+  const rank = (member: BoardIssue): number => {
+    const at = listed.indexOf(member.number);
+    return at === -1
+      ? listed.length
+      : at;
+  };
+  return Object.freeze([...epic.members].sort((left, right) => rank(left) - rank(right) || left.number - right.number));
+}
+
+/** The issues `member`'s `Blocked by:` line names, when it reads `blocked`, as `#20, #21`. */
+function memberBlockers(member: BoardIssue): string {
+  const read = readBlockedBy(member.number, member.body);
+  return read.kind === 'blocked'
+    ? read.blockers.map((number) => `#${String(number)}`).join(', ')
+    : '';
+}
+
+/** What opens a member's second row. */
+const LABELS_TAG = 'labels: ';
+
+/** What opens the blockers on a member's second row. */
+const BLOCKED_TAG = 'blocked by: ';
+
+/**
+ * `text` cut toward `floor` so a line holding `rest` columns beside it
+ * fits `width`, never below the floor; uncut with no width.
+ */
+function fitCell(text: string, floor: number, rest: number, width: number | undefined): string {
+  if (width === undefined || !Number.isSafeInteger(width) || width <= 0) return text;
+  const natural = widthOf(text);
+  const excess = Math.max(0, rest + natural - width);
+  return cutCell(text, natural - Math.min(excess, Math.max(0, natural - floor)));
+}
+
+/**
+ * The two rows each of `epic`'s members prints under its epic row,
+ * starting `indent` columns in, in {@link orderedMembers} order; the
+ * module note holds what each row says. `width` is the terminal's, or
+ * undefined for none.
+ */
+export function memberLines(epic: Epic, indent: number, width?: number): string[] {
+  const members = orderedMembers(epic);
+  if (members.length === 0) return [];
+  const numberWidth = Math.max(...members.map((member) => widthOf(`#${String(member.number)}`)));
+  const stateWidth = Math.max(...members.map((member) => widthOf(memberState(member))));
+  const lead = ' '.repeat(indent);
+  const under = `${' '.repeat(indent + numberWidth + COLUMN_GAP.length)}${LABELS_TAG}`;
+  return members.flatMap((member) => {
+    const number = `#${String(member.number)}`.padStart(numberWidth);
+    const head = `${lead}${number}${COLUMN_GAP}${memberState(member).padEnd(stateWidth)}${COLUMN_GAP}`;
+    const blocked = `${COLUMN_GAP}${BLOCKED_TAG}${cell(memberBlockers(member))}`;
+    const labels = cell(member.labels.join(', '));
+    return [
+      `${head}${fitCell(cell(member.title), TITLE_FLOOR, widthOf(head), width)}`,
+      `${under}${fitCell(labels, LABELS_FLOOR, widthOf(under) + widthOf(blocked), width)}${blocked}`,
+    ];
+  });
+}
+
+/** One horizon group's lines: heading, header, then each row, its disagreement line and, with `full`, its members. */
+function groupLines(roadmap: number, group: EpicHorizonGroup, width: number | undefined, full: boolean): string[] {
   const table = [[...EPIC_COLUMNS], ...group.rows.map(epicCells)];
   const widths = columnWidths(table, width);
-  const indent = ' '.repeat((widths[NUMBER_COLUMN] ?? 0) + COLUMN_GAP.length);
+  const indentWidth = (widths[NUMBER_COLUMN] ?? 0) + COLUMN_GAP.length;
+  const indent = ' '.repeat(indentWidth);
   const rows = group.rows.flatMap((row, index) => {
     const line = lineOf(table[index + 1] ?? [], widths);
-    return row.epic.disagreement === null
-      ? [line]
-      : [line, `${indent}${row.epic.disagreement}`];
+    const disagreement = row.epic.disagreement === null
+      ? []
+      : [`${indent}${row.epic.disagreement}`];
+    const members = full
+      ? memberLines(row.epic, indentWidth, width)
+      : [];
+    return [line, ...disagreement, ...members];
   });
   return [epicGroupHeading(roadmap, group), lineOf(table[0] ?? [], widths), ...rows];
 }
@@ -180,12 +289,13 @@ function groupLines(roadmap: number, group: EpicHorizonGroup, width: number | un
 /**
  * The lines text mode prints for `rows`: today's table alone when the
  * Roadmap names no epic and the listing was read, else the groups the
- * module note lists, a blank line between two. `width` is the
- * terminal's, or undefined for none.
+ * module note lists, a blank line between two, each epic's members
+ * under it when `full` is set. `width` is the terminal's, or undefined
+ * for none.
  */
-export function renderEpicTable(rows: EpicTableRows, width?: number): string[] {
+export function renderEpicTable(rows: EpicTableRows, width?: number, full = false): string[] {
   if (!hasEpicLines(rows) && rows.unknown === null) return renderRoadmapTable(rows.specs, width);
-  const epicGroups = rows.groups.map((group) => groupLines(rows.roadmap, group, width));
+  const epicGroups = rows.groups.map((group) => groupLines(rows.roadmap, group, width, full));
   const unknown = rows.unknown === null
     ? []
     : [[unknownLine(rows.roadmap, rows.unknown)]];

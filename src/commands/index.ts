@@ -167,7 +167,7 @@
  *     project stands on one line, the one thing to do about it on the
  *     next, that action run on a yes through the command that does it,
  *     and then the same again for what follows.
- *   - `roadmap [--all] [--type=<type>] [--module=<name>]
+ *   - `roadmap [--all] [--full] [--type=<type>] [--module=<name>]
  *     [--search=<text>] [--limit=<n>]`, top-level: the Roadmap issue's
  *     lines in its order as a table, `issue list --roadmap` under a word
  *     of its own. Not an alias, since an alias prints a deprecation line.

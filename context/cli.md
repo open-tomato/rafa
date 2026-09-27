@@ -1138,6 +1138,17 @@ New; it replaces no earlier text. What a row or an action added to
   A Roadmap naming no epic, with the listing read, prints today's bytes
   and a json result with no `epics` key; a failed listing prints the
   epics `unknown` instead, since no line could be told an epic.
+  `--full` (refused without `--roadmap`, as `--all` is) prints each
+  shown epic's members under its row, after its disagreement line and
+  indented under the `state` column, two rows each: `#<n>`, the state
+  (`open`, `closed`, or `not-planned` for one closed as not planned) and
+  the title; then `labels: <labels>` and `blocked by: <#n, …>` from a
+  `Blocked by:` line that reads `blocked`, `-` for either with nothing.
+  Members come in the epic's checklist order, then the rest by number;
+  a member's title, then its labels, are cut toward their floors on a
+  narrow terminal. It is the one listing that mixes two epics' issues,
+  it changes text mode only (json's `epics` already carry every
+  member), and a Roadmap naming no epic prints today's bytes with it.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -1186,7 +1197,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `accept-refs`,
   `comment`, `stub`, `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
-  flags `roadmap`, `all`, `state`, `type`, `module`, `search` and `limit`,
+  flags `roadmap`, `all`, `full`, `state`, `type`, `module`, `search` and `limit`,
   `show` the argument `id`, `create` the flags `title`, `body`, `type`,
   `module` and `priority`, `comment` the argument `id` and the flag `body`,
   and `move` the arguments `id` and `state`; each declares `text` and
