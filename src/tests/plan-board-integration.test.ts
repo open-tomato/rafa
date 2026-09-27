@@ -3,11 +3,12 @@
  * `rafa plan create` and the roadmap tick `rafa pr merge` writes.
  *
  * `src/board/issue.ts`, `src/board/roadmap.ts`, `src/board/spec-source.ts`,
- * `src/board/plan-spec.ts`, `src/board/roadmap-tick.ts` and
- * `src/commands/pr/merge-tick.ts` each drive their own module, or a pair
- * of them, over planted fakes; this file drives none of that again. It
- * exists for the SEAM across all of them, which `src/plan.test.ts` names
- * in its own module note and does not cover itself:
+ * `src/board/spec-source-roadmap.ts`, `src/board/plan-spec.ts`,
+ * `src/board/roadmap-tick.ts` and `src/commands/pr/merge-tick.ts` each
+ * drive their own module, or a pair of them, over planted fakes; this
+ * file drives none of that again. It exists for the SEAM across all of
+ * them, which `src/plan.test.ts` names in its own module note and does
+ * not cover itself:
  *
  *  - `--issue` end to end there is one planted issue, one snapshot, one
  *    plan; nothing there plants a LOCAL NOTES file, and nothing composes
@@ -109,7 +110,8 @@ import {
   parseRoadmapBody,
   severalRoadmapsMessage,
 } from '../board/roadmap.js';
-import { describeIssue, dryRunLine, pickLine, roadmapHeaderLine, skipLine } from '../board/spec-source.js';
+import { pickLine, roadmapHeaderLine, skipLine } from '../board/spec-source-roadmap.js';
+import { describeIssue, dryRunLine } from '../board/spec-source.js';
 import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
 import { plantProjectConfig } from './cli-capture.js';

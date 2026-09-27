@@ -513,8 +513,11 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   machine paths and private hosts live there and never on the board. The plan's
   `rafa:plan` block gets `issue: <n>`.
 - `plan create --next[=<roadmap-issue>]` — the first undone line of the
-  roadmap issue. The roadmap issue is `roadmap.issue` in config, else the
-  pinned issue titled "Roadmap". Its body is parsed by code: task-list lines
+  roadmap issue. The roadmap issue is the one `--next=<n>` names; else,
+  after `rafa switch`, the current place's board, or its epic, whose
+  lines alone are walked; else the default board: `roadmap.issue` in
+  config, the lowest-numbered open `type:roadmap` board, or the pinned
+  issue titled "Roadmap". Its body is parsed by code: task-list lines
   `- [ ] #<n>` in order. A line is DONE when it is ticked or its issue is
   closed. A line is TAKEN when a branch `feat/rafa-<n>-*` exists locally or
   on the remote, or an open PR closes it. The first line neither done nor

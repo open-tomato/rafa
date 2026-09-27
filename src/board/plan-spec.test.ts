@@ -128,8 +128,8 @@
  * ## The roadmap's own author
  *
  * Check 0 runs on the ROADMAP issue too, through `inspectRoadmapIssue`
- * and the seam `./spec-source.ts` declares for it, and the three cases
- * it brings bring this file to 24. Two of them are the pair the trust
+ * and the seam `./spec-source-roadmap.ts` declares for it, and the three
+ * cases it brings bring this file to 24. Two of them are the pair the trust
  * cases are always written in — the outsider beside the write-holder
  * control that writes the snapshot — and the third is the failed
  * lookup, which plants a board answering 404 to EVERY login and so

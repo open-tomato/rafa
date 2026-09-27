@@ -84,7 +84,7 @@
  * taken" from a reading that never happened — the silent failure that
  * hands two people the same spec — and throwing it would stop `--next`
  * on a train. The policy over that list is the command's
- * (`./spec-source.ts`), not this module's; what this module owes is a
+ * (`./spec-source-roadmap.ts`), not this module's; what this module owes is a
  * reading that says which half of it is missing.
  *
  * ## What "an open pull request closes it" matches

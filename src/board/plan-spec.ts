@@ -94,9 +94,9 @@
  * `--issue=<n>` reads ONE body, the issue named, and
  * {@link inspectSpecIssue} checks it. `--next` reads TWO: the ROADMAP,
  * whose lines decide the order, and the issue the line it picks names.
- * Both are checked, through two seams `./spec-source.ts` declares —
- * `inspect` for the line, {@link inspectRoadmapIssue} for the roadmap
- * — and neither body is parsed, quoted or snapshotted before its
+ * Both are checked, through two seams — `inspect` for the line,
+ * declared by `./spec-source.ts`, and {@link inspectRoadmapIssue} for the
+ * roadmap, declared by `./spec-source-roadmap.ts` — and neither body is parsed, quoted or snapshotted before its
  * author has been read.
  *
  * The roadmap is checked for what it can TAKE, which is not what a
@@ -148,7 +148,8 @@
  * only when the run may write. A `--next` walk whose pick carries
  * `spec:blocked` with a blocker still open names what it waits on, finds
  * the first line under it that is ready, not blocked and not taken, and
- * plans that one only on a yes (`./spec-source.ts`, `./blocked-line.ts`).
+ * plans that one only on a yes (`./spec-source-roadmap.ts`,
+ * `./blocked-line.ts`).
  *
  * The question asks about the ROADMAP's order rather than about a
  * label, so no board write stands behind it and no trust reading is

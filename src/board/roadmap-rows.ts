@@ -150,7 +150,7 @@
  *    `issue`, `spec` and `blocked` are null, with no warning, since the
  *    listing has a limit and the issue may sit past it.
  *  - The branch scan's problems are carried through as warnings, as
- *    `plan create --next` warns them (`./spec-source.ts`).
+ *    `plan create --next` warns them (`./spec-source-roadmap.ts`).
  *  - The pull request list or the plan dir failing: one warning each,
  *    and no `pr` or `plan` marks.
  *  - {@link RoadmapRefs} rejecting: one warning, and every `refs` cell

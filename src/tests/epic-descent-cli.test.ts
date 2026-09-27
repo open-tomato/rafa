@@ -6,7 +6,7 @@
  *
  * `src/board/epic-walk.test.ts` drives the descent itself over planted
  * fakes, `src/next/sources.test.ts` drives `ghNextBoard`'s wiring of it
- * the same way, and `src/board/spec-source.test.ts` drives
+ * the same way, and `src/board/spec-source-roadmap.test.ts` drives
  * `pickRoadmapIssue`'s. None of the three runs the real, registered
  * `rafa next` or `rafa plan create` command over a real `gh` on the
  * `PATH`, so none of them can see the two commands agree, or that a
@@ -42,7 +42,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { parseRoadmapBody } from '../board/roadmap.js';
-import { describeIssue, dryRunLine, pickLine, roadmapHeaderLine } from '../board/spec-source.js';
+import { pickLine, roadmapHeaderLine } from '../board/spec-source-roadmap.js';
+import { describeIssue, dryRunLine } from '../board/spec-source.js';
 import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../commands/next.js';
 import { plural } from '../commands/plan/plan-files.js';
 import { projectConfigText } from '../project/scaffold.js';

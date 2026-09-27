@@ -541,9 +541,10 @@ Plan? [y] yes [N] cancel
 Then the walk continues inside the epic. A member closed as `NOT_PLANNED`
 is not walked.
 
-After `rafa switch`, `rafa next` starts from the place you switched to:
-the board's checklist for a board, or that epic's lines alone, whatever
-its horizon, for an epic.
+After `rafa switch`, `rafa next` and `rafa plan create --next` start
+from the place you switched to: the board's checklist for a board, or
+that epic's lines alone, whatever its horizon, for an epic.
+`rafa plan create --next=<n>` still reads the roadmap issue you name.
 
 ### Example: using `rafa epics`
 

@@ -383,7 +383,7 @@ New; it replaces no earlier text. What a row or an action added to
   declared on `src/commands/plan/create.ts` beside the board flags.
 - **`plan create` plans from a file, an issue or the roadmap**
   (`src/commands/plan/spec-route.ts`, `src/board/spec-source.ts`,
-  `src/board/plan-spec.ts`).
+  `src/board/spec-source-roadmap.ts`, `src/board/plan-spec.ts`).
   `--spec=<file>`, `--issue=<n>` and `--next[=<roadmap-issue>]` are
   mutually exclusive, and a line naming two, or none, is refused with
   exit code 1 — the second with the command's usage and
@@ -396,11 +396,15 @@ New; it replaces no earlier text. What a row or an action added to
   keys are `--spec`'s own; a snapshot already there whose issue body
   differs is refused without `--refresh`, one whose local notes alone
   differ is rebuilt, and every rebuild first moves the old copy to
-  `<specs.dir>/previous/`. `--next` reads the roadmap issue
-  `roadmap.issue` names, else the lowest-numbered open `type:roadmap`
-  board, else the pinned issue titled `Roadmap` (`resolveDefaultBoard`,
-  `src/board/boards.ts`), prints
-  each line it skipped with why, and exits 0 with a message when nothing
+  `<specs.dir>/previous/`. `--next=<n>` reads roadmap issue `n`. A bare
+  `--next` starts from the current place (`pickRoadmapIssue`,
+  `src/board/spec-source-roadmap.ts`): with no position file, the
+  default board — the issue `roadmap.issue` names, else the
+  lowest-numbered open `type:roadmap` board, else the pinned issue
+  titled `Roadmap` (`resolveDefaultBoard`, `src/board/boards.ts`) — and
+  otherwise the place's board, or its epic's lines alone whatever its
+  horizon, a place that no longer stands warned and fallen back from.
+  It prints each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal of checks 0–2
   and stops before the first write, on all three routes, so it never
   reaches check 4, which reads the saved copy it did not write. The generated plan records
