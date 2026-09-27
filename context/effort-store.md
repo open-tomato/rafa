@@ -161,6 +161,28 @@ and `count` — marks a session whose log the collector could not vouch for
 (log version mismatch, unreadable line, or unreadable skill call). A session
 that invoked no skill stores no row at all.
 
+**Claude Code's own usage record covers only plugin-delivered skills, never a
+project skill, so `skill_invocations` has no CLI-native count to check
+itself against.** The one persisted usage record found under `~/.claude/`
+is `pluginUsage` in `~/.claude/.claude.json`: a map keyed
+`<plugin>@<marketplace>`, each entry holding `usageCount`, `lastUsedAt` and
+`lastUsedNumStartups`, and it backs the "last used" / "never invoked" text
+the `/plugin` skill-detail view and `/skill-doctor` read. Verified on
+2026-09-27 with a real `claude -p` session under the pinned
+`SKILL_USE_CLI_VERSION` (2.1.280): a scratch repo with two project skills
+planted under `.claude/skills/`, outside any plugin, each invoked once by
+name in the one session recorded. `readSkillUse` over that session's log
+answered the expected `probe-alpha` and `probe-beta` counts of 1 each,
+while `pluginUsage` held its pre-session eight plugin entries unchanged —
+no key for either probe skill appeared, before or after, and no state file
+was written into the scratch repo's own `.claude/` either.
+`~/.claude/stats-cache.json` was checked too and holds only an aggregate
+`toolCallCount` per day, no per-skill field. So `skill_invocations` is not
+a second recording of a count the CLI already keeps for a rafa-served
+skill; for a project skill, the kind rafa serves, it is the only per-skill
+count that exists anywhere, and this collector is the sole source
+`rafa effort report --skills` can read.
+
 **The collector's exception to "no tool input".** `session-log.ts`
 and the effort port fold a session's logs into counters and identifiers
 without keeping message content. The skill-use collector in
