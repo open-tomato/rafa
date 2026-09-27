@@ -209,7 +209,12 @@ branch's stub resolved against the roster, taken verbatim when the roster
 holds none, as `release status` takes it; a branch naming no stub, or a
 queue id reaching two plans, stores no row. A CHECK keeps `failing`
 non-empty exactly when the verdict is `red`. `readPlanCi` reads every row,
-or one plan's, in append order.
+or one plan's, in append order. `pr triage` calls it from `assessOne`
+after each checks read of a pull request it assesses, re-assessments of a
+`--resolve` run and readings that assess nothing included, with
+`plan.dir` off `PrContext.planDir`; the checks the bare form reads to find
+red candidates store nothing, since a list answers no head sha.
+`commands/pr/triage-plan-ci.test.ts` holds it over the fake `gh`.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so

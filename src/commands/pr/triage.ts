@@ -125,6 +125,16 @@
  * `writeProblem`, so neither mode hides it. A `--log-failed` that
  * rejected is reported the same way (`./triage-read.ts`).
  *
+ * ## What a checks reading leaves in the store
+ *
+ * Every assessment, a resolve run's re-assessments included, hands the
+ * pull request and the rows its checks answered to `recordPlanCi`
+ * (`src/effort/store/plan-ci.ts`), which stores one `plan_ci` row for
+ * a settled verdict on a head branch that names a plan, and warns
+ * rather than throws when the store refuses. The checks the bare form
+ * reads to find the red candidates store nothing: a list answers no
+ * head commit, and the one assessed is read, and stored, again.
+ *
  * ## Refusals
  *
  * `pr-context.ts`'s: exit 2 for a provider that is not `gh`, exit 1 for
@@ -152,6 +162,7 @@ import type { TriageSelection } from '../../pr/triage/select.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { recordPlanCi } from '../../effort/store/plan-ci.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
@@ -251,6 +262,8 @@ interface AssessOptions {
   readonly at: string;
   /** The permission lookup the marker comment's author is read through. */
   readonly permissions: Permissions;
+  /** Where a checks reading the store refused is warned about. */
+  readonly warn: (message: string) => void;
 }
 
 /**
@@ -422,6 +435,14 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
   const { git, maxAttempts, number, pr } = options;
   const detail = await detailOf(pr, number);
   const checks = await onProvider(`read the checks of #${number}`, () => pr.pulls.checks(number));
+  recordPlanCi({
+    repoRoot: pr.project.root,
+    planDir: pr.planDir,
+    pullRequest: detail,
+    rows: checks.rows,
+    warn: options.warn,
+    now: () => new Date(options.at),
+  });
   const found = await triageCommentOf(options, detail);
   const existing = found.comment;
   const rerun = readTriageRerun({
@@ -510,6 +531,9 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
       maxAttempts,
       at: now(),
       permissions,
+      warn: (message) => {
+        context.output.warn(message);
+      },
     });
     const reading = await assess();
     if (!wantsResolve) {

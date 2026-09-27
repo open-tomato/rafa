@@ -209,6 +209,8 @@ export interface PrContext {
   readonly trustedAuthors: readonly string[];
   /** `roadmap.issue`, or null when nobody named one, as `pr merge` ticks it. */
   readonly roadmapIssue: number | null;
+  /** `plan.dir`, the plans a head branch's stub is resolved against when a checks reading is stored. */
+  readonly planDir: string;
   /** The branch checked out at the project root; throws when git cannot read it. */
   readonly readBranch: () => string;
 }
@@ -230,7 +232,7 @@ export interface PullPick {
 /** The pull request settings an action reads off the config. */
 type PrConfig = Pick<
   RafaConfig,
-  'prProvider' | 'prMergeMethod' | 'prBase' | 'prResolveBudget' | 'boardTrustedAuthors' | 'roadmapIssue'
+  'prProvider' | 'prMergeMethod' | 'prBase' | 'prResolveBudget' | 'boardTrustedAuthors' | 'roadmapIssue' | 'planDir'
 >;
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
@@ -289,6 +291,7 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     resolveBudget: config.prResolveBudget,
     trustedAuthors: config.boardTrustedAuthors,
     roadmapIssue: config.roadmapIssue,
+    planDir: config.planDir,
     readBranch: () => readBranch(project.root),
   };
 }
