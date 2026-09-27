@@ -69,13 +69,44 @@
  * checklist and then its labelled members, so the line `rafa next`
  * proposes is the epic's first open spec. The board is listed with one
  * `gh issue list --state all` only when the walk meets an open `now`
- * epic line; a roadmap with no epic line sends no other listing. A
+ * epic line, or when a position file is there to weigh (see "Where the
+ * walk starts"); a roadmap with no epic line and a project with no
+ * position file send no other listing. The listing is read at most once
+ * per board, the place and the walk sharing it. A
  * caller that reads the listing itself hands it in as
  * {@link NextBoardOptions.listing}, so the command reads it once:
  * `rafa status` does, for the current place (`src/status/sections.ts`). An epic whose every line is done or taken has run dry and the
  * walk answers no line, so row 13 reads it without naming a second
  * epic's issue; `passed` counts the lines passed on the roadmap and
  * inside the epic together.
+ *
+ * ## Where the walk starts
+ *
+ * The default board is resolved first, as above, and then, with
+ * {@link NextBoardOptions.root} handed in, the CURRENT PLACE is read by
+ * `readCurrentPlace` (`src/board/roadmap-rows.ts`), the reading
+ * `rafa roadmap` and `rafa epics` take: nothing at all when the root
+ * holds no position file, else `resolvePlace` (`src/board/place.ts`) over
+ * the one listing, a place that no longer stands falling back by its
+ * rule. `rafa next` hands its project root; `rafa status` hands none, so
+ * its walk starts from the default board as before.
+ *
+ * - No position file, or no root: the default board's checklist is
+ *   walked exactly as before positions, with the same `gh` commands.
+ * - A place naming a board alone: that board's checklist is walked the
+ *   same way, descending into its first open `now` epic, and
+ *   {@link NextRoadmapReading.roadmap} names that board.
+ * - A place naming an epic: that epic's lines alone are walked, in the
+ *   order `epicLines` (`src/board/epic-walk.ts`) gives them, WHATEVER
+ *   its horizon, since a switch chose it; no board body is read, and
+ *   `passed` counts the epic's lines passed. Every line done or taken
+ *   answers no line, as a dry epic does on the roadmap walk.
+ *
+ * Every notice the place reading gives, but the absent-file one, is
+ * carried out as a problem ahead of the branch scan's, which
+ * `rafa next` writes as a warning; a listing that failed while a
+ * position file is there is one such notice, the default board then
+ * walked unweighed.
  *
  * The memo lives for the length of one board, which is one `rafa next`
  * answer: the walk reads the picked line's issue to ask whether it is
@@ -103,8 +134,10 @@
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
+import type { EpicDescentSeams } from '../board/epic-walk.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
+import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
 import type { SessionRecord } from '../loop/sessions.js';
@@ -114,15 +147,18 @@ import type { ProjectFound } from '../project/scope.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
-import { pickDescendedLine } from '../board/epic-walk.js';
+import { epicLines, pickDescendedLine } from '../board/epic-walk.js';
+import { readEpics } from '../board/epics.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
+import { readCurrentPlace } from '../board/roadmap-rows.js';
 import {
   createGhOpenPullRequests,
   createGhRoadmapSearch,
   createRoadmapReadings,
   parseRoadmapBody,
+  pickNextRoadmapLine,
   scanClaimBranches,
 } from '../board/roadmap.js';
 import { CommandExit } from '../cli/command.js';
@@ -167,6 +203,8 @@ export interface NextBoardOptions {
   readonly remote?: string;
   /** The board listing the walk reads, for a caller that reads it too; `createGhBoardListing` over `gh` when left out. */
   readonly listing?: BoardListing;
+  /** The project root whose position file names the current place; left out, the walk starts from the default board. */
+  readonly root?: string;
 }
 
 /** The settings the composition reads off the config. */
@@ -182,41 +220,75 @@ function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
   };
 }
 
+/** `read`, asked on the first call only; every call answers or rejects as the first did. */
+function listOnce(read: BoardListing): BoardListing {
+  let kept: ReturnType<BoardListing> | null = null;
+  return () => {
+    kept ??= read();
+    return kept;
+  };
+}
+
+/** What one walk answers: the line it picked, and how many lines it passed. */
+interface WalkAnswer {
+  readonly line: RoadmapLine | null;
+  readonly passed: number;
+}
+
+/**
+ * The walk inside `epic` alone, whatever its horizon: its lines as
+ * `epicLines` orders them, picked with the roadmap's own readings. See
+ * the module note's "Where the walk starts".
+ */
+async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapReadings): Promise<WalkAnswer> {
+  const rows = await listing();
+  const read = readEpics({ issues: rows, claims: new Set(), today: new Date(0) }).epics
+    .find((candidate) => candidate.number === epic);
+  const row = rows.find((issue) => issue.number === epic);
+  if (read === undefined || row === undefined) {
+    throw new Error(`${PREFIX}: epic #${String(epic)}, the current place, is not on the board listing, so its members cannot be read`);
+  }
+  const pick = await pickNextRoadmapLine(epicLines(read, row).lines, readings);
+  return { line: pick.line, passed: pick.skipped.length };
+}
+
 /**
  * The board over one `gh` runner and one git runner: the roadmap walked
  * once, and the two readings over a line's issue. See the module note
- * for the memo, for what it does not do, and for the problems it
- * carries.
+ * for where the walk starts, for the memo, for what it does not do, and
+ * for the problems it carries.
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
-  const { gh, git, configured, remote } = options;
-  const listing = options.listing ?? createGhBoardListing({ gh });
+  const { gh, git, configured, remote, root } = options;
+  const listing = listOnce(options.listing ?? createGhBoardListing({ gh }));
   const issues = memoiseIssues(createGhSpecIssueReader({ gh }));
 
   return Object.freeze({
     next: async (): Promise<NextRoadmapReading> => {
-      const { number: roadmap } = await resolveDefaultBoard({
+      const { number: fallback } = await resolveDefaultBoard({
         configured,
         listBoards: createGhBoardLister({ gh }),
         search: createGhRoadmapSearch({ gh }),
       });
-      const read = await issues(roadmap);
+      const current = root === undefined
+        ? null
+        : await readCurrentPlace(root, listing, fallback);
+      const roadmap = current?.place?.board ?? fallback;
+      const epic = current?.place?.epic ?? null;
       const branches = scanClaimBranches(git, remote);
       const readings = createRoadmapReadings({
         issues,
         branches,
         pullRequests: createGhOpenPullRequests({ gh }),
       });
-      const { descent, pick } = await pickDescendedLine(parseRoadmapBody(read.body), {
-        issues,
-        readings,
-        listing,
-      });
+      const walk = epic === null
+        ? await walkBoard(roadmap, { issues, readings, listing })
+        : await walkEpic(epic, listing, readings);
       return {
         roadmap,
-        line: pick.line,
-        passed: descent.passed.length + pick.skipped.length,
-        problems: branches.problems,
+        line: walk.line,
+        passed: walk.passed,
+        problems: [...current?.notices ?? [], ...branches.problems],
       };
     },
 
@@ -227,6 +299,13 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
 
     isReady: async (issue: number): Promise<boolean> => hasSpecReadyLabel((await issues(issue)).labels),
   });
+}
+
+/** The walk down `roadmap`'s checklist, descending into its first open `now` epic. */
+async function walkBoard(roadmap: number, seams: EpicDescentSeams): Promise<WalkAnswer> {
+  const read = await seams.issues(roadmap);
+  const { descent, pick } = await pickDescendedLine(parseRoadmapBody(read.body), seams);
+  return { line: pick.line, passed: descent.passed.length + pick.skipped.length };
 }
 
 /** The project the dispatcher resolved, which it resolves for every command declaring it needs one. */
@@ -295,7 +374,7 @@ export function openNextSources(
   const gh = (seams.openGh ?? ((root: string): GhRunner => createGhRunner({ cwd: root })))(project.root);
   const loop = resolveLoopSeams({ isAlive: seams.isAlive });
 
-  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue });
+  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue, root: project.root });
   const held = {
     base: config.prBase ?? DEFAULT_BASE_BRANCH,
     plans: plansDirAt(project.root, config.planDir),

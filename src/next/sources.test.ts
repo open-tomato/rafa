@@ -3,7 +3,7 @@
  * off one config, the seams every reading arrives through, the refusal a
  * repository without a `gh` provider gets, and the three board readings
  * over one `gh` runner, including the walk into an epic a roadmap line
- * names.
+ * names and the walk from the current place a position file names.
  *
  * `./state.test.ts` drives the table over fakes and `./readings.test.ts`
  * the readings themselves; what only this file can see is the WIRING —
@@ -61,11 +61,30 @@
  *    the epic passed for its horizon. Inside a walked epic the lines
  *    passed are the walk's own, so only a line the descent passed can
  *    see it.
+ *
+ * Five more were driven on 2026-09-28 over this file alone, restored
+ * the same way, against 25 pass and 0 fail; each failed the cases of the
+ * current-place block named, and no other:
+ *
+ *  - `openNextSources` handing no root: 24 pass and 1 fail, the case
+ *    through `rafa next`'s own composition.
+ *  - the place's epic ignored: 24 pass and 1 fail, the epic case.
+ *  - the place's board ignored: 22 pass and 3 fail, the board, epic and
+ *    composition cases.
+ *  - the place's notices dropped: 24 pass and 1 fail, the lost place.
+ *  - the listing not shared between the place and the walk: 24 pass and
+ *    1 fail, the epic case's listing count.
+ *
+ * The first case of that block, no position file, passes under all five
+ * and must: its answer and its commands are compared with a board handed
+ * no root, which is the control that a project with no position reads
+ * exactly as before.
  */
 import type { NextSources } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
+import type { Place } from '../project/position.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -76,6 +95,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '../cli/command.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { positionAt, writePositionFile } from '../project/position.js';
 import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -579,6 +599,103 @@ describe('the board walking into an epic', () => {
 
     expect([reading.line?.issue, reading.passed]).toEqual([99, 1]);
     expect(gh.calls()).not.toContain(LISTING_CALL);
+  });
+});
+
+describe('the board starting from the current place', () => {
+  /** A second board, labelled, whose checklist names #42 first. */
+  const BOARD = 40;
+
+  /** An epic no board lists, `horizon:later`, so only a switch could start a walk there. */
+  const EPIC = 80;
+
+  /** The listing every case here answers: both boards, the epic and its members. */
+  const LISTING: readonly ListingRow[] = [
+    { number: ROADMAP, body: ROADMAP_BODY, labels: ['type:roadmap'] },
+    { number: BOARD, body: '- [ ] #42 the first line of the other board\n', labels: ['type:roadmap'] },
+    { number: 41, state: 'CLOSED', labels: ['type:roadmap'] },
+    { number: EPIC, body: '- [ ] #81\n- [ ] #82\n', labels: ['type:epic', 'epic:later', 'horizon:later'] },
+    { number: 81, state: 'CLOSED', stateReason: 'COMPLETED', labels: ['epic:later'] },
+    { number: 82, labels: ['epic:later'] },
+  ];
+
+  /** The issues `gh issue view` answers. */
+  const ISSUES = {
+    [ROADMAP]: { body: ROADMAP_BODY },
+    [BOARD]: { body: '- [ ] #42 the first line of the other board\n' },
+    [ISSUE]: {},
+    42: {},
+    81: { state: 'CLOSED' },
+    82: {},
+  };
+
+  /** A project root holding `place` as current and home, or none when `place` is null. */
+  function rootAt(place: Place | null): string {
+    const { root } = plantProject('pr:\n  base: main\n');
+    if (place !== null) writePositionFile(root, positionAt(place));
+    return root;
+  }
+
+  /** One walk over the fixture from `root`, with the `gh` commands it sent. */
+  async function walkFrom(root: string | undefined): Promise<{
+    readonly reading: Awaited<ReturnType<NextSources['board']['next']>>;
+    readonly calls: readonly string[];
+  }> {
+    const gh = fakeGh({ issues: ISSUES, listing: LISTING });
+    const board = ghNextBoard({ gh: gh.gh, git: recordingGit().git, configured: ROADMAP, root });
+    const reading = await board.next();
+    return { reading, calls: gh.calls() };
+  }
+
+  it('walks the default board with the same commands as no root at all when the root holds no position file', async () => {
+    const bare = await walkFrom(undefined);
+    const unplaced = await walkFrom(rootAt(null));
+
+    expect(unplaced).toEqual(bare);
+    expect([unplaced.reading.roadmap, unplaced.reading.line?.issue, unplaced.reading.problems]).toEqual([ROADMAP, ISSUE, []]);
+    expect(unplaced.calls).not.toContain(LISTING_CALL);
+  });
+
+  it('walks the board the place names, and not the default board', async () => {
+    const { reading, calls } = await walkFrom(rootAt({ board: BOARD, epic: null }));
+
+    expect([reading.roadmap, reading.line?.issue, reading.passed, reading.problems]).toEqual([BOARD, 42, 0, []]);
+    expect(calls).toContain(`issue view ${BOARD}`);
+    expect(calls).not.toContain(`issue view ${ROADMAP}`);
+    expect(calls.filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
+  });
+
+  it('walks the epic the place names alone, whatever its horizon, reading no board body and listing once', async () => {
+    const { reading, calls } = await walkFrom(rootAt({ board: BOARD, epic: EPIC }));
+
+    expect([reading.roadmap, reading.line?.issue, reading.passed, reading.problems]).toEqual([BOARD, 82, 1, []]);
+    expect(calls).not.toContain(`issue view ${BOARD}`);
+    expect(calls).not.toContain(`issue view ${ROADMAP}`);
+    expect(calls.filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
+  });
+
+  it('falls back to the default board from a place that no longer stands, carrying the notice as a problem', async () => {
+    const { reading } = await walkFrom(rootAt({ board: 41, epic: null }));
+
+    expect([reading.roadmap, reading.line?.issue]).toEqual([ROADMAP, ISSUE]);
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]).toContain('board #41, which is closed');
+  });
+
+  it('is handed the project root by rafa next, so its board starts from the place', async () => {
+    const { root, home } = plantProject(`pr:\n  base: main\nroadmap:\n  issue: ${String(ROADMAP)}\n`);
+    writePositionFile(root, positionAt({ board: BOARD, epic: null }));
+    const gh = fakeGh({ issues: ISSUES, listing: LISTING });
+    const sources = openNextSources(contextFor(root, home), {
+      readRemote: () => GITHUB_REMOTE,
+      openGh: () => gh.gh,
+      openGit: () => recordingGit().git,
+      pullRequests: () => createPullRequestsDouble({}).pulls,
+    });
+
+    const reading = await sources.board.next();
+
+    expect([reading.roadmap, reading.line?.issue]).toEqual([BOARD, 42]);
   });
 });
 

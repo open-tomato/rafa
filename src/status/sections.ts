@@ -95,10 +95,11 @@
  *
  * `place.view.next` is the walk's next line, and only where it belongs
  * to the current place: the walk's roadmap is the current board and,
- * at an epic, the line's issue is one of that epic's members. Until the
- * walk starts from the current place, a place away from the default
- * board's first `now` epic prints no `next` field rather than the
- * default board's.
+ * at an epic, the line's issue is one of that epic's members. The walk
+ * here is handed no project root, so it starts from the default board,
+ * not the current place as `rafa next`'s does; a place away from the
+ * default board's first `now` epic therefore prints no `next` field
+ * rather than the default board's.
  *
  * ## Which sessions the loops section names
  *

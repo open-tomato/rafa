@@ -541,6 +541,10 @@ Plan? [y] yes [N] cancel
 Then the walk continues inside the epic. A member closed as `NOT_PLANNED`
 is not walked.
 
+After `rafa switch`, `rafa next` starts from the place you switched to:
+the board's checklist for a board, or that epic's lines alone, whatever
+its horizon, for an epic.
+
 ### Example: using `rafa epics`
 
 ```bash
