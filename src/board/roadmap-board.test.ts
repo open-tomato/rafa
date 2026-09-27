@@ -196,6 +196,23 @@ describe('the state reason', () => {
     expect(() => parseBoardListing(JSON.stringify([row(), row({ number: 8, stateReason: 7 })]), COMMAND))
       .toThrow(`board listing: ${COMMAND} answered row 1 with stateReason 7, expected a string or null`);
   });
+
+  it('reads an epic closed as not planned with its type and its reason both carried', async () => {
+    const gh = planted([
+      row({
+        number: 12,
+        title: 'an epic dropped',
+        state: 'CLOSED',
+        stateReason: 'NOT_PLANNED',
+        labels: [{ name: 'type:epic' }, { name: 'epic:widgets' }, { name: 'horizon:later' }],
+      }),
+    ]);
+    const issues = await createGhBoardListing({ gh: gh.run })();
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.type).toBe('epic');
+    expect(issues[0]?.stateReason).toBe('NOT_PLANNED');
+    expect(issues[0]?.state).toBe('CLOSED');
+  });
 });
 
 describe('the type and module labels', () => {

@@ -391,6 +391,26 @@ describe('whether the step runs', () => {
     expect(settingUnder(root)).toBe(7);
   });
 
+  it('creates the four epic labels under --board against a recorded fake', async () => {
+    const gh = fakeGh();
+    const root = freshRoot('epic-labels');
+
+    const result = await runBoardStep({
+      wanted: true,
+      provider: 'gh',
+      root,
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+
+    const created = gh.calls()
+      .filter((args) => args[0] === 'label' && args[1] === 'create')
+      .map((args) => args[2]);
+    expect(created).toEqual(expect.arrayContaining(['type:epic', 'horizon:now', 'horizon:next', 'horizon:later']));
+    expect(result.report?.parts.filter((part) => part.kind === 'label' && part.outcome === 'created')).toHaveLength(BOARD_LABELS.length);
+  });
+
   it('creates nothing on a second run over the board it made, and says so part by part', async () => {
     const gh = fakeGh();
     const root = freshRoot('twice');
