@@ -247,15 +247,16 @@ redden.
 **`dispatches` is written for every stored session, ahead of its
 report.** `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by
 the session id, holding what the task line's declaration asked for and the
-flags the session was spawned with, one row per session. The table has
-three columns holding resolver and offer information: `resolver` (the skill
-resolver the session ran under), `skills_offered` (the bare names of skills
-its prompt offered), and `lessons_offered` (the ids of lessons its prompt
-offered). Whatever became of the task, the dispatch is written ahead of the
-task report; a refused dispatch row stores no report. A dispatch handed no
-handout stores a NULL resolver beside two `[]` offers. No column holds the
-outcome: `task_reports` and `report_absences` hold it under the same
-session id.
+flags the session was spawned with, one row per session: a second write
+for the same session id is skipped, never merged into the first. The
+table has three columns holding resolver and offer information:
+`resolver` (the skill resolver the session ran under), `skills_offered`
+(the bare names of skills its prompt offered), and `lessons_offered` (the
+ids of lessons its prompt offered). Whatever became of the task, the
+dispatch is written ahead of the task report; a refused dispatch row
+stores no report. A dispatch handed no handout stores a NULL resolver
+beside two `[]` offers. No column holds the outcome: `task_reports` and
+`report_absences` hold it under the same session id.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a
