@@ -1304,6 +1304,83 @@ describe('readSkillsReport', () => {
   });
 });
 
+/**
+ * A git repository holding three sessions under {@link SKILLS_PLAN}, `p1`
+ * dispatched under `planner` and `t1`, `t2` dispatched under `tag`: the
+ * plan split half and half. The offers and invocations are the exact
+ * fixture `report-skills.test.ts` proves the pure `skillsReportOf` reads
+ * as planner 100%/50% and tag 50%/50%, so a command-level regression in
+ * either the store writers or the CLI wiring shows the same numbers a
+ * unit-level regression would.
+ */
+function twoResolverRepo(): string {
+  const root = realpathSync(freshRoot());
+  Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+  writeConfig(root, '');
+
+  const sessions: readonly {
+    sessionId: string;
+    resolver: 'planner' | 'tag';
+    skillsOffered: readonly string[];
+    invoked: readonly string[];
+  }[] = [
+    { sessionId: 'p1', resolver: 'planner', skillsOffered: ['a', 'b'], invoked: ['a'] },
+    { sessionId: 't1', resolver: 'tag', skillsOffered: ['a'], invoked: ['a'] },
+    { sessionId: 't2', resolver: 'tag', skillsOffered: ['a'], invoked: [] },
+  ];
+
+  for (const session of sessions) {
+    const dispatch = { sessionId: session.sessionId, planStub: SKILLS_PLAN, taskLine: `task of ${session.sessionId}` };
+    writeDispatch(root, {
+      ...dispatch,
+      declaration: null,
+      flags: [],
+      resolver: session.resolver,
+      skillsOffered: session.skillsOffered,
+      lessonsOffered: [],
+    });
+    writeTaskReport(root, { dispatch, outcome: 'done', report: { status: 'done', skillsUsed: [] } });
+    writeSkillInvocations(root, [{
+      sessionId: session.sessionId,
+      uses: session.invoked.map((name) => ({ name, sidechain: false, count: 1 })),
+    }]);
+  }
+
+  return root;
+}
+
+describe('the report command with --skills over a plan run under two resolvers', () => {
+  it('holds a plan dispatched half under planner and half under tag to two resolver tables, each with its own M1 and M2', () => {
+    const root = twoResolverRepo();
+    const expected = readSkillsReport({ repoRoot: root, home: HOME, entry: RAFA_ENTRY });
+
+    const json = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`, '--output=json']);
+    const text = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`]);
+
+    expect(json.exitCode).toBe(0);
+    expect(eventsOf(json.stdout).at(-1)).toMatchObject({ ok: true, data: expected });
+    const [plan] = expected.plans;
+    expect(plan?.resolvers.map(({ resolver, sessions }) => [resolver, sessions])).toEqual([
+      ['planner', 1],
+      ['tag', 2],
+    ]);
+    expect(plan?.resolvers.map(({ resolver, m1, m2 }) => [resolver, m1.percent, m2.percent])).toEqual([
+      ['planner', 100, 50],
+      ['tag', 50, 50],
+    ]);
+
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toBe(`${formatSkillsReport(expected).join('\n')}\n`);
+    const lines = text.stdout.split('\n');
+    expect(lines).toContain('  resolver planner: 1 sessions');
+    expect(lines).toContain('  resolver tag: 2 sessions');
+    expect(lines).toContain('    M1  1/1, 100.0% (task lines invoking a skill)');
+    expect(lines).toContain('    M2  1/2, 50.0% (offered skills invoked)');
+    expect(lines).toContain('    M1  1/2, 50.0% (task lines invoking a skill)');
+    expect(lines).toContain('    M2  1/2, 50.0% (offered skills invoked)');
+  });
+});
+
 describe('the report command with --skills', () => {
   it('writes the skills report as the result in json mode and as the formatter\'s lines in text mode', () => {
     const root = skillsRepo();
