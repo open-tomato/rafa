@@ -44,12 +44,13 @@ const ROADMAP_BODY = [
 
 /** The issues on the board. */
 const BOARD = [
-  { number: 10, title: 'Done thing', body: '', state: 'CLOSED', labels: [] },
+  { number: 10, title: 'Done thing', body: '', state: 'CLOSED', stateReason: 'COMPLETED', labels: [] },
   {
     number: 11,
     title: 'First thing',
     body: completeSpecBody('First'),
     state: 'OPEN',
+    stateReason: '',
     labels: [{ name: 'spec:ready' }, { name: 'type:bug' }],
   },
   {
@@ -57,10 +58,18 @@ const BOARD = [
     title: 'Second thing',
     body: '# Second\n\nBlocked by: #11',
     state: 'OPEN',
+    stateReason: '',
     labels: [{ name: 'type:feature' }],
   },
-  { number: 13, title: 'Third thing', body: completeSpecBody('Third'), state: 'OPEN', labels: [{ name: 'type:bug' }] },
-  { number: 14, title: 'Fourth thing', body: '# Fourth', state: 'OPEN', labels: [{ name: 'type:bug' }] },
+  {
+    number: 13,
+    title: 'Third thing',
+    body: completeSpecBody('Third'),
+    state: 'OPEN',
+    stateReason: '',
+    labels: [{ name: 'type:bug' }],
+  },
+  { number: 14, title: 'Fourth thing', body: '# Fourth', state: 'OPEN', stateReason: '', labels: [{ name: 'type:bug' }] },
 ];
 
 /** The open pull requests: one closes #14. */

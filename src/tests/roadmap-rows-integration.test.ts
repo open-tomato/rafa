@@ -59,7 +59,10 @@ function bodyWith(headings: readonly string[]): string {
 
 /** One issue as `gh issue list --json` writes it. */
 function ghIssue(number: number, body: string, state: 'OPEN' | 'CLOSED', labels: readonly string[]): object {
-  return { number, title: `Issue ${String(number)}`, body, state, labels: labels.map((name) => ({ name })) };
+  const stateReason = state === 'CLOSED'
+    ? 'COMPLETED'
+    : '';
+  return { number, title: `Issue ${String(number)}`, body, state, stateReason, labels: labels.map((name) => ({ name })) };
 }
 
 const BOARD_JSON = JSON.stringify([

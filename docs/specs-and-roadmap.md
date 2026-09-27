@@ -300,3 +300,253 @@ existing request and add a 👍 to it, or open a new one, at
 [github.com/open-tomato/rafa/issues](https://github.com/open-tomato/rafa/issues?q=is%3Aissue+tracker+support).
 Votes decide the order. As requests appear, this page will link each
 one directly.
+
+## Epics: grouping specs into features
+
+An **epic** is a GitHub issue that groups related specs into a feature,
+with an ordered checklist, a date and an estimate. It is what you plan
+when a spec is too big to finish in one run, or when several specs
+belong together.
+
+### For projects with no epics yet
+
+If your roadmap has no epics, everything works as before. `rafa next`,
+`plan create --next` and `rafa roadmap` print and read the roadmap
+lines exactly as they did before, and every command stays on one issue.
+No label or line changes are needed. An epic is purely optional.
+
+### What an epic looks like
+
+An epic is an issue opened from the board using the same template as a
+spec (if you want to use `rafa init --board` to generate one, open an
+issue manually and apply the three labels yourself). It carries three
+labels:
+
+- `type:epic` — marks it as an epic
+- `epic:<slug>` — groups its members and defines its first `epic:` label
+- `horizon:now` or `horizon:next` or `horizon:later` — its time horizon
+
+An example epic body:
+
+```markdown
+## Acceptance criteria
+
+- `rafa roadmap` lists epics grouped by horizon.
+- Every spec under an epic closes when the epic closes.
+- `rafa next` descends into the first now epic that is not done.
+
+Estimate: two weeks
+Date: 2026-10-31
+Owns: src/board/, src/commands/epics.ts
+
+- [ ] #245 the board listing
+- [x] #246 the epic model
+- [ ] #247 walking into an epic
+```
+
+Every line after `Owns:` is the epic's **ordered checklist**, using the
+same format as the roadmap: `- [ ] #<n> <title>`. Ticked items are
+considered done. The order is the walk's order inside the epic.
+
+### Membership: the label
+
+An issue is a **member** of an epic when it carries the epic's
+`epic:<slug>` label. Change the label and the issue changes epics. An
+issue may carry two `epic:` labels (a fault `rafa doctor` warns about),
+which makes it a member of both.
+
+`rafa issue ready` refuses to mark a spec ready if it carries two
+`epic:` labels, so a second label must be removed before the spec can be
+planned.
+
+### Order: the checklist versus the board
+
+The epic's order is **two parts**:
+
+1. The ticked and unticked lines of its body's checklist, in the order
+   written — this is the epic's **stated order**.
+2. Every open member carrying its `epic:<slug>` label and missing from
+   the checklist, by ascending issue number — these are the **label-only
+   members**.
+
+When `rafa next` or `plan create --next` walks into an epic, it reads
+the checklist first (passing ticked lines as the roadmap walk passes
+them), then the open label-only members. A closed member missing from
+the checklist is never read: it is already done, and asking it again
+would spend a `gh issue view`.
+
+`rafa epics` prints the same order: the checklist, then the label-only
+members.
+
+### State: computed on every read
+
+An epic's state is COMPUTED from one board listing on every read, never
+stored. The `src/board/epics.ts` module's notes hold the exact rules,
+but briefly:
+
+- **`empty`** — the epic has no members.
+- **`backlog`** — no member is closed and none is claimed (has a plan,
+  branch or open pull request).
+- **`in-progress`** — some members are closed or claimed, others are
+  open.
+- **`done`** — every counted member is closed. Members closed as
+  `NOT_PLANNED` (not planned, a close reason rafa files) are not counted,
+  so an epic with no counted members reads as `backlog`, not `done`.
+- **`unknown`** — the board listing failed and the epic could not be read.
+
+### Blocked by
+
+An epic can wait on other epics when its open members name blockers. If
+member #42 has `Blocked by: #50`, and #50 is owned by another epic,
+that epic is in the first epic's `blockedBy` list.
+
+### Late: when the date has passed
+
+An epic has an optional `Date:` field in free-text format `YYYY-MM-DD`.
+An epic is **late** when its date is before today and it is not `done`.
+Dates that do not parse as a real calendar day (e.g., `2026-02-30` or
+`next week`) are reported as problems; the epic is read as having no
+date until the body is fixed.
+
+### Disagreement: when stored and computed states differ
+
+An epic issue's own state (open/closed) and close reason are set by
+whoever closed it. When the computed state and the stored one say
+different things, the epic carries a printed line:
+
+- `done` but issue is `open` — the work is done but the epic is still
+  open.
+- anything else but issue is `closed` — work has not started, or is
+  in-progress, but the epic is closed.
+
+Closing an epic as `NOT_PLANNED` is never a disagreement (it means the
+feature was dropped), so it agrees with every computed state. A
+disagreement is printed as a warning when the epic is read, never
+automatically fixed.
+
+### The body's optional fields
+
+Every epic body has three optional fields besides the checklist:
+
+- **`Estimate:`** — free text (e.g., "two weeks", "50 hours"). Rafa
+  does not parse this; the planner reads it and hands it to the plan.
+- **`Date:`** — the target date as `YYYY-MM-DD`, or left out if there
+  is none. The date is checked for being a real calendar day; malformed
+  dates are warnings but do not block the epic.
+- **`Owns:`** — a comma- or space-separated list of folder paths the
+  epic owns (e.g., `src/board/, src/commands/epics.ts`). Backticks are
+  stripped. The borders spec defines what "owns" means; rafa does not
+  validate that paths exist.
+
+Every epic must have:
+
+- **`## Acceptance criteria`** section with at least one bullet, holding
+  what "done" means.
+- **`Estimate:`** line with at least one character after the colon.
+
+### Labels: why `epic:<slug>` and `type:epic`
+
+The `type:epic` label identifies the issue as an epic. The `epic:<slug>`
+label is membership: every issue carrying it is a member of that epic.
+Why two labels?
+
+1. **Queries work.** `gh issue list type:epic` finds every epic. `gh
+   issue list epic:infrastructure` finds every issue the infrastructure
+   epic owns. In rafa code, the two are read independently.
+2. **Membership is clear.** An issue's labels list its owners at a glance.
+   An issue with `epic:auth epic:billing` belongs to two epics. An issue
+   with no `epic:` label belongs to no epic.
+3. **Renames are safe.** Changing an epic's `epic:<slug>` label changes
+   its members, but the epic's own `type:epic` label stays. Only rafa's
+   first read of the epic (`epicSlugsOf`) extracts the slug.
+
+### Edge cases and warnings
+
+The board listing warns about several issues:
+
+#### Orphan label: `epic:xyz` with no epic
+
+An issue carries `epic:xyz`, but there is no `type:epic` issue with
+`epic:xyz`. The issue is a member of a ghost epic. Relabel it to add it
+to a real epic, or remove the `epic:` label to un-member it.
+
+`rafa roadmap` prints this warning; `rafa epics <n>` does not (the epic
+might not be on the board, but the issue is).
+
+#### Several epic labels: one issue, two `epic:` labels
+
+An issue carries both `epic:auth` and `epic:billing`. It belongs to two
+epics. `rafa issue ready` refuses to mark it ready unless one label is
+removed. The planner reads the first `epic:` label it sees, but the
+board always warns about this: every epic the issue belongs to, and
+every command, should agree.
+
+#### Unlabelled checklist line: `- [ ] #99` on an epic with no `epic:` label
+
+An epic's checklist names issue #99, but the epic carries no `epic:`
+label (only `type:epic`). The epic has no members to read. Fill in an
+`epic:<slug>` label first.
+
+#### Unlisted member: issue carries the epic's label but is not in its checklist
+
+An open issue with `epic:infrastructure` is missing from the
+infrastructure epic's checklist. `rafa next` walks it after the
+checklist, by issue number, and `rafa epics` prints it as a **label-only
+member** row, indented. This is not a fault: the checklist is the
+stated order, and an issue added later might not be listed yet.
+
+### Example: the board view
+
+```bash
+rafa roadmap
+```
+
+With no epics, the output is the same as before: the spec lines and
+their columns. With epics on the board:
+
+```text
+## Roadmap
+
+- [ ] epic #254 Infrastructure (horizon:now, 0/2 done)
+  - [ ] #245 the board listing
+  - [ ] #246 the epic model
+  - [x] #247 walking into an epic (label-only)
+
+- [ ] #248 Spec without an epic
+```
+
+Epic lines show: number, title, horizon, and `done/total`. Specs under
+an epic are indented. Specs outside any epic appear alone.
+
+### Example: walking into an epic
+
+```bash
+rafa next
+```
+
+When `rafa next` reaches an epic line that is open, `horizon:now`, and
+not done, it descends into it:
+
+```text
+walking into epic #254 Infrastructure (0/2 done): its checklist,
+then its labelled members missing from it
+
+- [ ] #245 the board listing
+- [ ] #246 the epic model
+- [x] #247 walking into an epic (label-only)
+
+Plan? [y] yes [N] cancel
+```
+
+Then the walk continues inside the epic. A member closed as `NOT_PLANNED`
+is not walked.
+
+### Example: using `rafa epics`
+
+```bash
+rafa epics         # the first now epic not done on the roadmap
+rafa epics 254     # the epic #254, whatever its horizon
+```
+
+The output is the same table as `rafa roadmap` prints for spec lines,
+but only the epic's lines: its checklist, then label-only members.

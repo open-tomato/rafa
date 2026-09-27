@@ -55,6 +55,13 @@
  * stays: the tick is what the Roadmap says, and a row that disappeared
  * on close would hide a list that needs its tick.
  *
+ * The lines need not be the Roadmap's. {@link readRoadmapRows} finds and
+ * reads the Roadmap and hands its lines to {@link readLineRows}, which
+ * makes every reading below over whatever lines it is handed, the same
+ * selection applied; `rafa epics` hands it one epic's lines, its
+ * checklist then its label-only members (`src/commands/epics.ts`). Only
+ * the Roadmap read is `readRoadmapRows`' own, so only it can reject.
+ *
  * ## The spec column
  *
  * {@link SpecReading.kind}, in the order it is decided:
@@ -239,6 +246,9 @@ export interface RoadmapRows {
   readonly warnings: readonly string[];
 }
 
+/** What {@link readLineRows} answers: {@link RoadmapRows} with no Roadmap, since the lines were handed in. */
+export type LineRows = Omit<RoadmapRows, 'roadmap'>;
+
 /** The file names in the plan dir; the seam the `plan` mark reads through. */
 export type PlanNames = () => readonly string[];
 
@@ -265,6 +275,9 @@ export interface RoadmapRowsOptions {
   /** Keep the ticked lines too; `--all`. */
   readonly all?: boolean;
 }
+
+/** What {@link readLineRows} is made with: every seam of {@link RoadmapRowsOptions} but the three the Roadmap is found through. */
+export type LineRowsOptions = Omit<RoadmapRowsOptions, 'configured' | 'search' | 'issues'>;
 
 /** True when `error` is Node's answer for a path that does not exist. */
 function isMissing(error: unknown): boolean {
@@ -462,24 +475,20 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
 }
 
 /**
- * The Roadmap's lines as rows, in its order: the unticked ones, or every
- * one with `all`. Rejects when the Roadmap cannot be found or read —
- * {@link resolveRoadmapIssue}'s refusals included — and otherwise
- * answers, carrying each failed reading as a warning; the module note
- * holds which reading degrades to what.
+ * `lines` as rows, in their order: the unticked ones, or every one with
+ * `all`. Never rejects: each failed reading is carried as a warning, as
+ * the module note holds. {@link readRoadmapRows} hands in the Roadmap's
+ * lines, and `rafa epics` an epic's (`src/commands/epics.ts`).
  */
-export async function readRoadmapRows(options: RoadmapRowsOptions): Promise<RoadmapRows> {
-  const roadmap = await resolveRoadmapIssue({ configured: options.configured, search: options.search });
-  const lines = parseRoadmapBody((await options.issues(roadmap)).body)
-    .filter((line) => options.all === true || !line.ticked);
-
+export async function readLineRows(lines: readonly RoadmapLine[], options: LineRowsOptions): Promise<LineRows> {
+  const selected = lines.filter((line) => options.all === true || !line.ticked);
   const listed = await listBoard(options.board);
   const scan = scanClaimBranches(options.git, options.remote);
   const pulls = listed.issues === null
     ? { value: [], warning: null }
     : await readOrWarn(options.pullRequests, [], 'the open pull requests could not be listed, so no pr is shown');
   const plans = await readOrWarn(options.planNames, [], 'the plan dir could not be read, so no plan is shown');
-  const issues = [...new Set(lines.map((line) => line.issue))];
+  const issues = [...new Set(selected.map((line) => line.issue))];
   const refs = await readOrWarn(
     () => options.refs(issues),
     new Map<number, RefsCell>(),
@@ -488,9 +497,24 @@ export async function readRoadmapRows(options: RoadmapRowsOptions): Promise<Road
 
   const board = viewOf(listed.issues);
   const sources: HasSources = { planNames: plans.value, refs: scan.refs, pulls: pulls.value };
-  const rows = lines.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
+  const rows = selected.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
 
   const warnings = [listed.warning, ...scan.problems, pulls.warning, plans.warning, refs.warning, ...refsWarnings(refs.value)]
     .filter((warning): warning is string => warning !== null);
-  return Object.freeze({ roadmap, rows: Object.freeze(rows), warnings: Object.freeze(warnings) });
+  return Object.freeze({ rows: Object.freeze(rows), warnings: Object.freeze(warnings) });
+}
+
+/**
+ * The Roadmap's lines as rows, in its order: the unticked ones, or every
+ * one with `all`. Rejects when the Roadmap cannot be found or read —
+ * {@link resolveRoadmapIssue}'s refusals included — and otherwise
+ * answers {@link readLineRows} over its lines, carrying each failed
+ * reading as a warning; the module note holds which reading degrades to
+ * what.
+ */
+export async function readRoadmapRows(options: RoadmapRowsOptions): Promise<RoadmapRows> {
+  const roadmap = await resolveRoadmapIssue({ configured: options.configured, search: options.search });
+  const lines = parseRoadmapBody((await options.issues(roadmap)).body);
+  const { rows, warnings } = await readLineRows(lines, options);
+  return Object.freeze({ roadmap, rows, warnings });
 }

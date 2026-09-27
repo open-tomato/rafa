@@ -90,11 +90,16 @@
  * a loop over a table of `<source under src>:<name under dist>` pairs.
  * Three readings shape it:
  *
- *   - It copies `*.md` and nothing else. `src/pr/plans/` holds
- *     `load.ts` and `load.test.ts` beside the four plans, and copying
- *     the directory whole would publish both, since `files` publishes
- *     all of `dist`. A case reads `dist/plans` for a `.ts` file and
- *     names the two source modules that would land there.
+ *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
+ *     holds `load.ts` and `load.test.ts` beside the four plans, and
+ *     copying the directory whole would publish both, since `files`
+ *     publishes all of `dist`. A case reads `dist/plans` for a `.ts`
+ *     file and names the two source modules that would land there.
+ *     The `*.yml` copy is for the epic guard workflow
+ *     `src/board/templates/epic-guard.yml`, and a case resolves it
+ *     through `readEpicGuard` pointed at `dist/`. Unlike `*.md`, a tree
+ *     holding no YAML is not a failure: the `[ -e ]` guard skips the
+ *     unmatched pattern, since `src/pr/plans/` carries none.
  *   - A tree lands DIRECTLY under `dist/`, as `dist/plans` and
  *     `dist/templates`, not at its source path. A bundle reading
  *     `import.meta.url` answers its own directory, which is `dist/` for
@@ -104,7 +109,7 @@
  *     `readPinnedPlan` pointed at `dist/` rather than only comparing
  *     bytes.
  *   - A tree that is not there is SKIPPED, and a tree that is there
- *     with no markdown in it fails the build. `src/board/templates/`
+ *     with no markdown in it fails the build, whatever YAML it holds. `src/board/templates/`
  *     now carries `spec.md`, the spec issue template, and carried no
  *     tracked file when the clause was written: `cp
  *     src/board/templates/*.md` against an absent directory would have
@@ -134,7 +139,10 @@
  * planted-file case, 2 of 44, and left the plan cases green, so the two
  * table rows are read apart. Copying `*` instead of `*.md` reddened the
  * TypeScript case and the `src/pr/plans` tree case, whose file list no
- * longer matched the markdown it lists, again 2 of 44.
+ * longer matched the markdown it lists, again 2 of 44. When the `*.yml`
+ * copy joined the clause, dropping it was driven on 2026-09-27 the same
+ * way: 55 pass before, and 53 pass and 2 fail under it — the board tree
+ * case and the epic guard case — with the plan cases green.
  *
  * ## The describe case
  *
@@ -302,6 +310,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import { loadConfig } from '../config-load.js';
 import * as storeSource from '../effort/store/index.js';
 import * as rootSource from '../index.js';
@@ -471,6 +480,9 @@ const PLANTED_BOARD_TEMPLATE = 'spec-probe.md';
 
 /** What {@link PLANTED_BOARD_TEMPLATE} holds. */
 const PLANTED_BOARD_BODY = '<!-- No local paths. -->\n\n# Spec: a copied board template\n';
+
+/** What the asset-tree clause copies out of a tree; see the module note. */
+const ASSET_EXTENSIONS = ['.md', '.yml'];
 
 /** The modules sitting beside the pinned plans, which the build must not copy. */
 const PLAN_READER_MODULES = ['load.ts', 'load.test.ts'];
@@ -1093,11 +1105,11 @@ describe('the built ts-symbols over a project', () => {
 });
 
 describe('the asset trees in the build', () => {
-  it.each(ASSET_TREES)('copies every markdown file of %s into dist/%s, unchanged', (tree, name) => {
+  it.each(ASSET_TREES)('copies every markdown and YAML file of %s into dist/%s, unchanged', (tree, name) => {
     const source = join(PACKAGE_DIR, tree);
     const built = join(DIST, name);
     const names = readdirSync(source)
-      .filter((file) => file.endsWith('.md'))
+      .filter((file) => ASSET_EXTENSIONS.some((extension) => file.endsWith(extension)))
       .sort();
     const differing = names.filter(
       (file) => !existsSync(join(built, file))
@@ -1132,5 +1144,11 @@ describe('the asset trees in the build', () => {
 
     expect(PINNED_PLAN_CLASSES.length).toBeGreaterThan(0);
     expect(differing).toEqual([]);
+  });
+
+  it('lands the epic guard workflow where readEpicGuard looks for it from a bundle in dist', () => {
+    const source = readFileSync(join(PACKAGE_DIR, 'src/board/templates', EPIC_GUARD_FILE), 'utf8');
+
+    expect(readEpicGuard(DIST)).toBe(source);
   });
 });

@@ -231,6 +231,7 @@ describe('the document over the core registry', () => {
         .map((held) => held.action));
     expect(document.commands.map((entry) => entry.name)).toContain('describe');
     expect(document.commands.map((entry) => entry.name)).toContain('roadmap');
+    expect(document.commands.map((entry) => entry.name)).toContain('epics');
     expect(document.commands.map((entry) => entry.name)).toContain('cleanup');
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
@@ -247,6 +248,7 @@ describe('the document over the core registry', () => {
     expect(command('next')?.spends?.when).toBe('through');
     expect(command('describe')?.spends).toBeNull();
     expect(command('roadmap')?.spends).toBeNull();
+    expect(command('epics')?.spends).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();

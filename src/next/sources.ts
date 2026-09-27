@@ -60,6 +60,18 @@
  * `Roadmap`), its body parsed, and the walk's own done and taken
  * readings. Nothing is composed here a second time.
  *
+ * The walk is `pickDescendedLine` (`src/board/epic-walk.ts`), the one
+ * `plan create --next` takes, over the same memoised reader: a roadmap
+ * line whose issue carries `type:epic` is replaced by that epic's
+ * checklist and then its labelled members, so the line `rafa next`
+ * proposes is the epic's first open spec. The board is listed with one
+ * `gh issue list --state all` only when the walk meets an open `now`
+ * epic line; a roadmap with no epic line sends the commands it always
+ * sent. An epic whose every line is done or taken has run dry and the
+ * walk answers no line, so row 13 reads it without naming a second
+ * epic's issue; `passed` counts the lines passed on the roadmap and
+ * inside the epic together.
+ *
  * The memo lives for the length of one board, which is one `rafa next`
  * answer: the walk reads the picked line's issue to ask whether it is
  * closed, and `blocking` and `isReady` then read the LABELS and the
@@ -95,14 +107,15 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
+import { pickDescendedLine } from '../board/epic-walk.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
+import { createGhBoardListing } from '../board/roadmap-board.js';
 import {
   createGhOpenPullRequests,
   createGhRoadmapSearch,
   createRoadmapReadings,
   parseRoadmapBody,
-  pickNextRoadmapLine,
   resolveRoadmapIssue,
   scanClaimBranches,
 } from '../board/roadmap.js';
@@ -181,11 +194,15 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
         branches,
         pullRequests: createGhOpenPullRequests({ gh }),
       });
-      const pick = await pickNextRoadmapLine(parseRoadmapBody(read.body), readings);
+      const { descent, pick } = await pickDescendedLine(parseRoadmapBody(read.body), {
+        issues,
+        readings,
+        listing: createGhBoardListing({ gh }),
+      });
       return {
         roadmap,
         line: pick.line,
-        passed: pick.skipped.length,
+        passed: descent.passed.length + pick.skipped.length,
         problems: branches.problems,
       };
     },

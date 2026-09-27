@@ -7,7 +7,7 @@
  * checkout (`.rafa/specs/rafa-20-pr-commands.md`): a spec is an issue, its
  * readiness is a label, and the order is a task list in one pinned
  * issue. A repository that has none of that cannot be planned from, and
- * making it by hand is seven labels, a template file and an issue body
+ * making it by hand is eleven labels, a template file and an issue body
  * nobody remembers the shape of. This module makes all four, and
  * {@link setUpBoard} is the whole of it; the question, the flags and the
  * lines printed are `src/commands/init.ts`'s, and the present-or-missing
@@ -19,7 +19,7 @@
  * it, `present` when it was already there and nothing was written, or
  * `refused` when it was not made and the detail says why. So a second
  * run over a board already set up writes no byte and answers `present`
- * seven-plus-three times, which is what keeps `rafa init`'s "Nothing
+ * eleven-plus-three times, which is what keeps `rafa init`'s "Nothing
  * changed." true when the board step is part of it.
  *
  * A refusal is never a throw. `setUpBoard` reports a failed `gh`
@@ -30,16 +30,19 @@
  *
  * ## The labels, and where their names come from
  *
- * {@link BOARD_LABELS} is the spec's list, and not one of the seven names
- * is spelled here for the first time: `type:spec` is `./issue.ts`'s
- * {@link SPEC_LABEL}, the label an issue is refused for not carrying,
- * `spec:ready` is `./readiness.ts`'s {@link SPEC_READY_LABEL},
+ * {@link BOARD_LABELS} is the spec's list, and of its eleven names only
+ * the three horizons are spelled here for the first time: `type:spec`
+ * is `./issue.ts`'s {@link SPEC_LABEL}, the label an issue is refused
+ * for not carrying, `spec:ready` is `./readiness.ts`'s {@link SPEC_READY_LABEL},
  * `spec:needs-work` is `./gate.ts`'s {@link SPEC_NEEDS_WORK_LABEL},
  * `spec:blocked` is `./blocked.ts`'s {@link SPEC_BLOCKED_LABEL}, and
- * `type:bug`, `needs-triage` and `module:unassigned` are built from
- * `GITHUB_LABELS`, the prefixes `src/adapters/tracker/github.ts` files a
- * draft under. A label spelled twice is a label the gate looks for and
- * this command does not make.
+ * `type:bug`, `type:epic`, `needs-triage` and `module:unassigned` are
+ * built from `GITHUB_LABELS`, the prefixes `src/adapters/tracker/github.ts`
+ * files a draft under. A label spelled twice is a label the gate looks
+ * for and this command does not make. `horizon:now`, `horizon:next` and
+ * `horizon:later` are the horizons an epic carries one of, and this list
+ * is where they are first spelled: `./epic-problems.ts` reads only their
+ * `horizon:` prefix, and `./epic-walk.ts` builds `horizon:now` from it.
  *
  * No colour is sent. `gh label create --help` says a colour is optional
  * and a random one is chosen when it is left out, and the spec asks for
@@ -54,7 +57,7 @@
  * every run a write.
  *
  * That listing reads {@link LABEL_LIST_LIMIT} labels. A repository
- * holding more than that can have one of the seven fall off the end, and
+ * holding more than that can have one of the eleven fall off the end, and
  * what it costs is a refused part: `gh label create --help` says
  * `--force` is what updates a label that already exists, so the plain
  * form this sends fails, and the failure is reported as the refusal
@@ -141,7 +144,7 @@ export interface BoardLabel {
 }
 
 /**
- * The seven labels the workflow files under, in the order they are made.
+ * The eleven labels the workflow files under, in the order they are made.
  * See the module note on where each name comes from.
  */
 export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
@@ -172,6 +175,22 @@ export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
   {
     name: `${GITHUB_LABELS.modulePrefix}unassigned`,
     description: 'No module owns this yet',
+  },
+  {
+    name: `${GITHUB_LABELS.typePrefix}epic`,
+    description: 'A group of issues shipped together, its members labelled epic:<slug>',
+  },
+  {
+    name: 'horizon:now',
+    description: 'An epic being worked on now',
+  },
+  {
+    name: 'horizon:next',
+    description: 'An epic to be worked on after the ones now',
+  },
+  {
+    name: 'horizon:later',
+    description: 'An epic with no date yet',
   },
 ]);
 
@@ -315,7 +334,7 @@ export function missingBoardLabels(held: readonly string[]): readonly BoardLabel
 
 /**
  * Makes each of {@link BOARD_LABELS} the repository does not carry, and
- * answers one part per label. A failed listing refuses all seven, naming
+ * answers one part per label. A failed listing refuses all eleven, naming
  * the command, because nothing is known about any of them then.
  */
 export async function setUpLabels(gh: GhRunner): Promise<readonly BoardPart[]> {
@@ -353,7 +372,7 @@ function statOrNull(path: string): Stats | null {
 }
 
 /** True when something is at `path`, a link that resolves to nothing included. */
-function anythingAt(path: string): boolean {
+export function anythingAt(path: string): boolean {
   try {
     lstatSync(path);
     return true;
@@ -385,39 +404,65 @@ export function readSpecTemplate(moduleDir: string = MODULE_DIR): string {
   return readFileSync(source, 'utf8');
 }
 
+/** A file the build ships, and where under a project root it is written. */
+export interface ShippedFile {
+  /** Where it is written, relative to the project root; also the name of its part. */
+  readonly path: string;
+  /** Where the shipped copy is read from. */
+  readonly source: string;
+  /** What a refusal calls it: `the template`, `the workflow`. */
+  readonly what: string;
+  /** The shipped copy's text; throws, naming the path, when the build dropped it. */
+  readonly read: () => string;
+}
+
 /**
- * Writes {@link SPEC_TEMPLATE_PATH} under `root` when nothing is at that
- * path. An existing file is left byte for byte as it is, whatever it
- * holds: a repository that has edited its own template has said what it
- * wants an issue to ask for, and a symbolic link that resolves to a file
- * is one of those.
+ * Writes `file` under `root` when nothing is at its path, and answers its
+ * `template` part. An existing file is left byte for byte as it is,
+ * whatever it holds: a repository that has edited its own copy has said
+ * what it wants, and a symbolic link that resolves to a file is one of
+ * those.
  *
  * A path holding anything else is REFUSED rather than written to: a
  * directory, and a link that resolves to nothing, which `statSync`
  * answers for as loudly as an empty path does and `lstatSync` does not.
  */
-export function writeSpecTemplate(root: string, moduleDir: string = MODULE_DIR): BoardPart {
-  const path = join(root, SPEC_TEMPLATE_PATH);
-  const name = SPEC_TEMPLATE_PATH;
+export function writeShippedFile(root: string, file: ShippedFile): BoardPart {
+  const path = join(root, file.path);
+  const name = file.path;
 
   const found = statOrNull(path);
   if (found !== null) {
     return found.isFile()
       ? partOf('template', name, 'present', 'the repository already carries it')
-      : partOf('template', name, 'refused', `${path} is not a file, so the template was not written`);
+      : partOf('template', name, 'refused', `${path} is not a file, so ${file.what} was not written`);
   }
   if (anythingAt(path)) {
-    return partOf('template', name, 'refused', `${path} is a link to nothing, so the template was not written`);
+    return partOf('template', name, 'refused', `${path} is a link to nothing, so ${file.what} was not written`);
   }
 
   try {
-    const text = readSpecTemplate(moduleDir);
+    const text = file.read();
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text, { encoding: 'utf8', flag: 'wx' });
-    return partOf('template', name, 'created', `written from ${specTemplateSource(moduleDir)}`);
+    return partOf('template', name, 'created', `written from ${file.source}`);
   } catch (error) {
     return partOf('template', name, 'refused', messageOf(error));
   }
+}
+
+/**
+ * Writes {@link SPEC_TEMPLATE_PATH} under `root` when nothing is at that
+ * path, through {@link writeShippedFile}, which says what an existing
+ * path is left as or refused for.
+ */
+export function writeSpecTemplate(root: string, moduleDir: string = MODULE_DIR): BoardPart {
+  return writeShippedFile(root, {
+    path: SPEC_TEMPLATE_PATH,
+    source: specTemplateSource(moduleDir),
+    what: 'the template',
+    read: () => readSpecTemplate(moduleDir),
+  });
 }
 
 /** The body a new Roadmap issue is opened with: the empty list and the naming paragraph. */
@@ -626,7 +671,7 @@ export interface BoardSetupOptions {
 
 /**
  * Makes every part of the board that is missing and answers what each
- * came to: the seven labels, the spec issue template, the pinned Roadmap
+ * came to: the eleven labels, the spec issue template, the pinned Roadmap
  * issue and `roadmap.issue`.
  *
  * Writes nothing a second time: a run over a board already set up

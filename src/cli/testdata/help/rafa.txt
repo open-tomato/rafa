@@ -19,6 +19,7 @@ Quick start:
   rafa status
   rafa next
   rafa roadmap
+  rafa epics
   rafa init
   rafa doctor
   rafa cleanup
@@ -46,7 +47,8 @@ Subjects:
              HEAD
 
 Commands:
-  status, next 🪙, roadmap, init, doctor, cleanup, self-update, usage, describe
+  status, next 🪙, roadmap, epics, init, doctor, cleanup, self-update, usage,
+  describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)

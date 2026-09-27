@@ -48,6 +48,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
 import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
@@ -59,11 +60,17 @@ import {
   BOARD_QUESTION,
   boardPartLine,
   boardStepChanged,
+  EPIC_GUARD_FIX,
+  EPIC_GUARD_NO_BOARD_WARNING,
+  EPIC_GUARD_QUESTION,
+  epicGuardChanged,
   notGitHubWarning,
   PUBLIC_REPO_LINE,
   readVisibility,
   renderBoardStep,
+  renderEpicGuardStep,
   runBoardStep,
+  runEpicGuardStep,
   visibilityWarning,
 } from './init-board.js';
 
@@ -391,6 +398,26 @@ describe('whether the step runs', () => {
     expect(settingUnder(root)).toBe(7);
   });
 
+  it('creates the four epic labels under --board against a recorded fake', async () => {
+    const gh = fakeGh();
+    const root = freshRoot('epic-labels');
+
+    const result = await runBoardStep({
+      wanted: true,
+      provider: 'gh',
+      root,
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+
+    const created = gh.calls()
+      .filter((args) => args[0] === 'label' && args[1] === 'create')
+      .map((args) => args[2]);
+    expect(created).toEqual(expect.arrayContaining(['type:epic', 'horizon:now', 'horizon:next', 'horizon:later']));
+    expect(result.report?.parts.filter((part) => part.kind === 'label' && part.outcome === 'created')).toHaveLength(BOARD_LABELS.length);
+  });
+
   it('creates nothing on a second run over the board it made, and says so part by part', async () => {
     const gh = fakeGh();
     const root = freshRoot('twice');
@@ -452,5 +479,143 @@ describe('the rows text mode prints', () => {
     expect(madeLabel).toBe('  created  label type:spec');
     expect(refused).toBe('  refused  roadmap.issue: it would not parse');
     expect(refusedLabel).toBe('  refused  label spec:ready: gh label create failed');
+  });
+});
+
+describe('the epic guard step', () => {
+  /** The board step run under `--board` on a fresh root, so the guard has a board that ran. */
+  async function boardThatRan(label: string) {
+    const root = freshRoot(label);
+    const board = await runBoardStep({
+      wanted: true,
+      provider: 'gh',
+      root,
+      openGh: () => fakeGh().run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+    return { root, board };
+  }
+
+  /** True when the workflow file is under `root`. */
+  function guardUnder(root: string): boolean {
+    return existsSync(join(root, EPIC_GUARD_PATH));
+  }
+
+  it('installs the shipped workflow under --epic-guard without asking', async () => {
+    const { root, board } = await boardThatRan('guard-flag');
+
+    const result = await runEpicGuardStep({
+      wanted: true,
+      board,
+      root,
+      isTerminal: () => true,
+      openPrompter: noPrompter,
+    });
+
+    expect([result.status, result.asked, result.part?.outcome]).toEqual(['ran', false, 'created']);
+    expect(epicGuardChanged(result)).toBe(true);
+    expect(readFileSync(join(root, EPIC_GUARD_PATH), 'utf8')).toBe(readEpicGuard());
+    expect(renderEpicGuardStep(result)[0]).toStartWith(`  created  ${EPIC_GUARD_PATH}: written from `);
+  });
+
+  it('installs it on a yes to its own question, asked once and closed', async () => {
+    const { root, board } = await boardThatRan('guard-yes');
+    const prompter = scripted(['yes']);
+
+    const result = await runEpicGuardStep({
+      wanted: null,
+      board,
+      root,
+      isTerminal: () => true,
+      openPrompter: prompter.open,
+    });
+
+    expect([result.status, result.asked, result.part?.outcome]).toEqual(['ran', true, 'created']);
+    expect(prompter.record.asked).toEqual([EPIC_GUARD_QUESTION]);
+    expect(prompter.record.closed).toBe(1);
+    expect(guardUnder(root)).toBe(true);
+  });
+
+  it('writes nothing when its question is answered with anything but yes, or --no-epic-guard said no', async () => {
+    const answered = await boardThatRan('guard-no');
+    const flagged = await boardThatRan('guard-no-flag');
+    const prompter = scripted(['n']);
+
+    const no = await runEpicGuardStep({
+      wanted: null,
+      board: answered.board,
+      root: answered.root,
+      isTerminal: () => true,
+      openPrompter: prompter.open,
+    });
+    const noFlag = await runEpicGuardStep({
+      wanted: false,
+      board: flagged.board,
+      root: flagged.root,
+      isTerminal: () => true,
+      openPrompter: noPrompter,
+    });
+
+    expect([no.status, no.asked, no.part]).toEqual(['declined', true, null]);
+    expect([noFlag.status, noFlag.asked, noFlag.part]).toEqual(['declined', false, null]);
+    expect(prompter.record.closed).toBe(1);
+    expect(guardUnder(answered.root) || guardUnder(flagged.root)).toBe(false);
+    expect(renderEpicGuardStep(no)).toEqual([`The epic guard workflow was left out; run ${EPIC_GUARD_FIX} to install it.`]);
+  });
+
+  it('asks nothing and writes nothing without a terminal, naming the flag that would install it', async () => {
+    const { root, board } = await boardThatRan('guard-unasked');
+
+    const result = await runEpicGuardStep({
+      wanted: null,
+      board,
+      root,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+
+    expect(result).toEqual({ status: 'unasked', asked: false, part: null, warnings: [] });
+    expect(guardUnder(root)).toBe(false);
+    expect(renderEpicGuardStep(result)).toEqual([`The epic guard question needs a terminal; run ${EPIC_GUARD_FIX} to install it.`]);
+  });
+
+  it('is not asked when the board did not run, and warns only when --epic-guard asked for it', async () => {
+    const root = freshRoot('guard-no-board');
+    const board = await runBoardStep({
+      wanted: false,
+      provider: 'gh',
+      root,
+      openGh: () => fakeGh().run,
+      isTerminal: () => true,
+      openPrompter: noPrompter,
+    });
+
+    const flagged = await runEpicGuardStep({ wanted: true, board, root, isTerminal: () => true, openPrompter: noPrompter });
+    const silent = await runEpicGuardStep({ wanted: null, board, root, isTerminal: () => true, openPrompter: noPrompter });
+
+    expect([flagged.status, flagged.warnings]).toEqual(['not-run', [EPIC_GUARD_NO_BOARD_WARNING]]);
+    expect([silent.status, silent.warnings]).toEqual(['not-run', []]);
+    expect(renderEpicGuardStep(silent)).toEqual([]);
+    expect(guardUnder(root)).toBe(false);
+  });
+
+  it('leaves a workflow already present as it is, asking nothing, and changes nothing', async () => {
+    const { root, board } = await boardThatRan('guard-present');
+    mkdirSync(join(root, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(root, EPIC_GUARD_PATH), 'name: our own guard\n', 'utf8');
+
+    const result = await runEpicGuardStep({
+      wanted: null,
+      board,
+      root,
+      isTerminal: () => true,
+      openPrompter: noPrompter,
+    });
+
+    expect([result.status, result.asked, result.part?.outcome]).toEqual(['ran', false, 'present']);
+    expect(epicGuardChanged(result)).toBe(false);
+    expect(readFileSync(join(root, EPIC_GUARD_PATH), 'utf8')).toBe('name: our own guard\n');
+    expect(renderEpicGuardStep(result)).toEqual([`  present  ${EPIC_GUARD_PATH}`]);
   });
 });

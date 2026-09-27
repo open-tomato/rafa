@@ -1,5 +1,5 @@
 /**
- * Tests for the board setup (`src/board/setup.ts`): the seven labels, the
+ * Tests for the board setup (`src/board/setup.ts`): the eleven labels, the
  * spec issue template, the pinned Roadmap issue, the `roadmap.issue`
  * line written into the project config, and a second run that writes
  * nothing.
@@ -202,7 +202,7 @@ function partNamed(parts: readonly { name: string }[], name: string): { name: st
 }
 
 describe('BOARD_LABELS', () => {
-  it('names the seven labels the workflow files under, each with a description', () => {
+  it('names the eleven labels the workflow files under, each with a description', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toEqual([
       'type:spec',
       'spec:ready',
@@ -211,6 +211,10 @@ describe('BOARD_LABELS', () => {
       'type:bug',
       'needs-triage',
       'module:unassigned',
+      'type:epic',
+      'horizon:now',
+      'horizon:next',
+      'horizon:later',
     ]);
     expect(BOARD_LABELS.every((label) => label.description.trim() !== '')).toBe(true);
   });
@@ -222,6 +226,7 @@ describe('BOARD_LABELS', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toContain(SPEC_BLOCKED_LABEL);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(GITHUB_LABELS.needsTriage);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.modulePrefix}unassigned`);
+    expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.typePrefix}epic`);
   });
 });
 
@@ -239,6 +244,10 @@ describe('setUpLabels', () => {
       ['type:bug', 'present'],
       ['needs-triage', 'present'],
       ['module:unassigned', 'created'],
+      ['type:epic', 'created'],
+      ['horizon:now', 'created'],
+      ['horizon:next', 'created'],
+      ['horizon:later', 'created'],
     ]);
     expect(callsTo(gh.calls(), 'label list')).toEqual([LABEL_LIST_CALL]);
     expect(callsTo(gh.calls(), 'label create').map((args) => args[2])).toEqual([
@@ -247,6 +256,10 @@ describe('setUpLabels', () => {
       'spec:needs-work',
       'spec:blocked',
       'module:unassigned',
+      'type:epic',
+      'horizon:now',
+      'horizon:next',
+      'horizon:later',
     ]);
   });
 
@@ -311,7 +324,17 @@ describe('setUpLabels', () => {
 describe('missingBoardLabels', () => {
   it('answers the labels not held, in the order they are made', () => {
     expect(missingBoardLabels(['spec:ready', 'module:unassigned']).map((label) => label.name))
-      .toEqual(['type:spec', 'spec:needs-work', 'spec:blocked', 'type:bug', 'needs-triage']);
+      .toEqual([
+        'type:spec',
+        'spec:needs-work',
+        'spec:blocked',
+        'type:bug',
+        'needs-triage',
+        'type:epic',
+        'horizon:now',
+        'horizon:next',
+        'horizon:later',
+      ]);
     expect(missingBoardLabels(BOARD_LABELS.map((label) => label.name))).toEqual([]);
   });
 });

@@ -19,6 +19,12 @@
  * board unreachable, and in json mode. The `refs` column is read over
  * saved copies planted under the project's `specs.dir` with a verifier
  * answering by the reference's text, so no git or `gh` is asked for it.
+ *
+ * The epic cases plant a board holding two epics, one `now` and one
+ * `next`, and an issue on a slug no epic carries: the horizon groups,
+ * `--all` widening, the narrowing flags leaving the epic rows alone, the
+ * json result's `epics` beside a no-epic Roadmap's result without the
+ * key, and the unreachable board printing the epics `unknown`.
  */
 import type { LineFlags } from './issue-tracker.js';
 import type { RoadmapListResult } from './list.js';
@@ -44,6 +50,7 @@ import { CommandExit } from '../../cli/command.js';
 import { ABSENT, PRESENT, UNREADABLE } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
+import { createRoadmapCommand } from '../roadmap.js';
 
 import { createIssueListCommand, readIssueListLine, readIssueQuery, renderIssueList, renderRoadmapList } from './list.js';
 
@@ -55,7 +62,7 @@ afterAll(() => {
 });
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue list [--roadmap [--all]] [--state=<state>] [--type=<type>] [--module=<name>]'
+const USAGE = 'rafa issue list [--roadmap [--all] [--full] [--check]] [--state=<state>] [--type=<type>] [--module=<name>]'
   + ' [--search=<text>] [--limit=<n>]';
 
 /** The subject the dispatched cases route under. */
@@ -99,7 +106,7 @@ const LOCAL_ROWS = [
 /** Each set of flags the query refuses, and the problem its refusal names. */
 const QUERY_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{ state: 'open' }, '--state is "open", expected one of: backlog, todo, in-progress, in-review, done, released, cancelled'],
-  [{ type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api'],
+  [{ type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
   [{ limit: '0' }, '--limit is "0", expected a positive whole number'],
   [{ limit: '05' }, '--limit is "05", expected a positive whole number'],
   [{ limit: '2.5' }, '--limit is "2.5", expected a positive whole number'],
@@ -302,9 +309,12 @@ const ROADMAP_BODY = [
   '',
 ].join('\n');
 
-/** One issue as `gh issue list --json number,title,body,state,labels` writes it. */
+/** One issue as `gh issue list --json number,title,body,state,stateReason,labels` writes it. */
 function boardIssue(number: number, title: string, body: string, state: 'OPEN' | 'CLOSED', labels: readonly string[]): object {
-  return { number, title, body, state, labels: labels.map((name) => ({ name })) };
+  const stateReason = state === 'CLOSED'
+    ? 'COMPLETED'
+    : '';
+  return { number, title, body, state, stateReason, labels: labels.map((name) => ({ name })) };
 }
 
 /** The board: the four Roadmap issues, the two blockers of #13, and one bug the Roadmap does not name. */
@@ -388,9 +398,19 @@ const ALL_TABLE = [
   '#14  open    bug    outline                   -                     plan, branch  -     type:bug                Planned bug',
 ];
 
-/** What text mode prints with the board unreachable: the lines' own words as titles, the plan and branch still read. */
+/** The line printed for the epics with the board unreachable: no line could be told an epic. */
+const UNREACHABLE_UNKNOWN = 'Roadmap #1 · epics unknown: board listing: gh issue list --state all --limit 1000 --json'
+  + ' number,title,body,state,stateReason,labels failed: error connecting to api.github.com';
+
+/**
+ * What text mode prints with the board unreachable: the epics unknown,
+ * then the lines' own words as titles under Specs, the plan and branch
+ * still read.
+ */
 const UNREACHABLE_TABLE = [
-  'Roadmap: #1',
+  UNREACHABLE_UNKNOWN,
+  '',
+  'Specs',
   '  #  state  type  spec  blocked by  has           refs  labels  title',
   '#13  -      -     -     -           -             -     -       blocked bug',
   '#11  -      -     -     -           -             -     -       ready spec',
@@ -413,12 +433,12 @@ const ROADMAP_NARROWED: readonly (readonly [readonly string[], readonly string[]
 
 /** The warn line text mode writes, ahead of the rows, for {@link UNREACHABLE}. */
 const UNREACHABLE_WARNING = 'warn: the board could not be listed, so the spec and blocked by columns are empty: board listing:'
-  + ' gh issue list --state all --limit 1000 --json number,title,body,state,labels failed: error connecting to api.github.com';
+  + ' gh issue list --state all --limit 1000 --json number,title,body,state,stateReason,labels failed: error connecting to api.github.com';
 
-/** The first cell of each table row `stdout` holds, every line to the header dropped. */
+/** The first cell of each table row `stdout` holds, every line to the header dropped: the one under the head or under Specs. */
 function listedIssues(stdout: string): readonly string[] {
   const lines = stdout.split('\n');
-  return lines.slice(lines.findIndex((line) => line.startsWith('Roadmap: #')) + 2)
+  return lines.slice(lines.findIndex((line) => line.startsWith('Roadmap: #') || line === 'Specs') + 2)
     .filter((line) => line !== '')
     .map((line) => line.trim().split(' ')[0] ?? '');
 }
@@ -436,14 +456,19 @@ const LINE_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{ all: true }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
   [{ all: true, state: 'todo' }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
   [{ all: true, roadmap: false }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
+  [{ full: true }, '--full prints the issues of each Roadmap epic, so it needs --roadmap'],
+  [{ check: true }, '--check weighs the epics the board read finds, so it needs --roadmap'],
 ];
 
 describe('the line rafa issue list --roadmap reads', () => {
-  it('reads neither switch as the plain list, and --all only beside --roadmap', () => {
-    expect(readIssueListLine({})).toEqual({ roadmap: false, all: false });
-    expect(readIssueListLine({ roadmap: true, type: 'bug' })).toEqual({ roadmap: true, all: false });
-    expect(readIssueListLine({ roadmap: true, all: true })).toEqual({ roadmap: true, all: true });
-    expect(readIssueListLine({ state: 'todo' })).toEqual({ roadmap: false, all: false });
+  it('reads no switch as the plain list, and --all, --full and --check only beside --roadmap', () => {
+    const none = { roadmap: false, all: false, full: false, check: false };
+    expect(readIssueListLine({})).toEqual(none);
+    expect(readIssueListLine({ roadmap: true, type: 'bug' })).toEqual({ ...none, roadmap: true });
+    expect(readIssueListLine({ roadmap: true, all: true })).toEqual({ ...none, roadmap: true, all: true });
+    expect(readIssueListLine({ roadmap: true, full: true })).toEqual({ ...none, roadmap: true, full: true });
+    expect(readIssueListLine({ roadmap: true, check: true })).toEqual({ ...none, roadmap: true, check: true });
+    expect(readIssueListLine({ state: 'todo' })).toEqual(none);
   });
 
   it.each(LINE_REFUSALS)('refuses the flags %j with exit code 1', (flags, problem) => {
@@ -462,7 +487,7 @@ describe('rafa issue list --roadmap, refused', () => {
   it.each([
     [['--roadmap', '--state=open'], LINE_REFUSALS[0]?.[1]],
     [['--all'], LINE_REFUSALS[2]?.[1]],
-    [['--roadmap', '--type=feature'], '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api'],
+    [['--roadmap', '--type=feature'], '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
     [['--roadmap', '--limit=0'], '--limit is "0", expected a positive whole number'],
   ])('refuses %j with exit code 1 before running any gh', async (flags, problem) => {
     const calls: string[][] = [];
@@ -584,7 +609,7 @@ describe('rafa issue list --roadmap', () => {
     const typed = await run(['issue', 'list', '--roadmap', '--type=bug'], project, command);
     const searched = await run(['issue', 'list', '--roadmap', '--search=PLANNED'], project, command);
 
-    expect([typed.exitCode, typed.stdout]).toEqual([0, `${UNREACHABLE_WARNING}\nRoadmap: #1\nNo issues.\n`]);
+    expect([typed.exitCode, typed.stdout]).toEqual([0, `${UNREACHABLE_WARNING}\n${UNREACHABLE_UNKNOWN}\n`]);
     expect([searched.exitCode, listedIssues(searched.stdout)]).toEqual([0, ['#14']]);
   });
 
@@ -673,5 +698,303 @@ describe('rafa issue list --roadmap', () => {
     expect(events[1]).toMatchObject({ level: 'warn' });
     expect(data?.warnings).toHaveLength(1);
     expect(data?.rows.map((row) => [row.line.issue, row.issue])).toEqual([[13, null], [11, null], [14, null]]);
+  });
+});
+
+/** The Roadmap naming epics: a spec, the `now` epic, the `next` epic, a spec. */
+const EPIC_ROADMAP_BODY = [
+  '## Next, in order',
+  '',
+  '- [ ] #13 — blocked bug',
+  '- [ ] #60 — alpha epic',
+  '- [ ] #70 — beta epic',
+  '- [ ] #14 — planned bug',
+  '',
+].join('\n');
+
+/** An epic issue as the listing writes it: labelled `epic:<slug>` and `horizon`, its checklist naming `lines`. */
+function boardEpic(number: number, slug: string, horizon: string, lines: readonly number[]): object {
+  const checklist = lines.map((line) => `- [ ] #${String(line)}`).join('\n');
+  return boardIssue(number, `Epic ${slug}`, `## Acceptance criteria\n\n- it works\n\n${checklist}\n`, 'OPEN', [
+    'type:epic',
+    `epic:${slug}`,
+    horizon,
+  ]);
+}
+
+/** The board with two epics: alpha `now` with one of two members closed, beta `next`, and #30 on a slug no epic carries. */
+const EPIC_BOARD_JSON = JSON.stringify([
+  ...(JSON.parse(BOARD_JSON) as object[]).filter((issue) => (issue as { number: number }).number !== 30),
+  boardEpic(60, 'alpha', 'horizon:now', [61, 62]),
+  boardIssue(61, 'Alpha one', completeSpecBody('Alpha one'), 'CLOSED', ['epic:alpha']),
+  boardIssue(62, 'Alpha two', completeSpecBody('Alpha two'), 'OPEN', ['epic:alpha']),
+  boardEpic(70, 'beta', 'horizon:next', [71]),
+  boardIssue(71, 'Beta one', completeSpecBody('Beta one'), 'OPEN', ['epic:beta']),
+  boardIssue(30, 'Bug off the Roadmap', 'Never listed.', 'OPEN', ['type:bug', 'epic:ghost']),
+]);
+
+/** The planted reads for the Roadmap naming epics, over {@link EPIC_BOARD_JSON}. */
+const EPIC_PLANT: GhPlant = {
+  roadmap: {
+    ok: true,
+    stdout: JSON.stringify({ number: ROADMAP, title: 'Roadmap', body: EPIC_ROADMAP_BODY, state: 'OPEN', labels: [], author: { login: 'owner' } }),
+    stderr: '',
+  },
+  board: { ok: true, stdout: EPIC_BOARD_JSON, stderr: '' },
+};
+
+/** The warn line for #30's orphan label, written ahead of the rows. */
+const GHOST_WARNING = 'warn: #30 carries epic:ghost, which no type:epic issue carries; fix the slug or open the epic';
+
+/** The `now` group: alpha, one of its two members closed. */
+const NOW_GROUP = [
+  'Roadmap #1 · now',
+  '  #  state        done/total  blocked  title       date',
+  '#60  in-progress  1/2         -        Epic alpha  -',
+];
+
+/** The spec rows under their heading, #13 and #14 as today's table prints them. */
+const SPECS_GROUP = [
+  'Specs',
+  '  #  state  type  spec                      blocked by            has           refs  labels                  title',
+  '#13  open   bug   label: none, gate: ready  #20 open, #21 closed  pr #40        -     type:bug, module:board  Blocked bug',
+  '#14  open   bug   outline                   -                     plan, branch  -     type:bug                Planned bug',
+];
+
+/** `lines` as stdout holds them. */
+function stdoutOf(lines: readonly string[]): string {
+  return `${lines.join('\n')}\n`;
+}
+
+describe('rafa issue list --roadmap, with epics', () => {
+  it('prints the now epics, the count a horizon hides and the spec rows under Specs, warning each label problem', async () => {
+    const calls: string[][] = [];
+    const project = plantRoadmapCase();
+
+    const outcome = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(EPIC_PLANT, calls));
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: stdoutOf([
+        GHOST_WARNING,
+        ...NOW_GROUP,
+        '',
+        'Roadmap #1 · 1 epic not in now; --all shows every horizon',
+        '',
+        ...SPECS_GROUP,
+      ]),
+      stderr: '',
+    });
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view', 'issue list', 'pr list']);
+  });
+
+  it('widens to every horizon under --all, hiding no epic', async () => {
+    const project = plantRoadmapCase();
+
+    const outcome = await run(['issue', 'list', '--roadmap', '--all'], project, roadmapCommand(EPIC_PLANT, []));
+
+    expect(outcome.stdout).toBe(stdoutOf([
+      GHOST_WARNING,
+      ...NOW_GROUP,
+      '',
+      'Roadmap #1 · next',
+      '  #  state    done/total  blocked  title      date',
+      '#70  backlog  0/1         -        Epic beta  -',
+      '',
+      ...SPECS_GROUP,
+    ]));
+  });
+
+  it('narrows the spec rows only, the epic rows chosen by horizon alone', async () => {
+    const project = plantRoadmapCase();
+    const command = roadmapCommand(EPIC_PLANT, []);
+
+    const board = await run(['issue', 'list', '--roadmap', '--module=board'], project, command);
+    const epics = await run(['issue', 'list', '--roadmap', '--type=epic'], project, command);
+
+    expect(board.stdout).toBe(stdoutOf([
+      GHOST_WARNING,
+      ...NOW_GROUP,
+      '',
+      'Roadmap #1 · 1 epic not in now; --all shows every horizon',
+      '',
+      'Specs',
+      '  #  state  type  spec                      blocked by            has     refs  labels                  title',
+      '#13  open   bug   label: none, gate: ready  #20 open, #21 closed  pr #40  -     type:bug, module:board  Blocked bug',
+    ]));
+    expect(epics.stdout).toBe(stdoutOf([GHOST_WARNING, ...NOW_GROUP, '', 'Roadmap #1 · 1 epic not in now; --all shows every horizon']));
+  });
+
+  it('prints each now epic\'s members under its row on two rows under --full, and the same bytes under rafa roadmap', async () => {
+    const project = plantRoadmapCase();
+    const listed = await run(['issue', 'list', '--roadmap', '--full'], project, roadmapCommand(EPIC_PLANT, []));
+    const shortcut = await dispatchInProject(
+      ['roadmap', '--full'],
+      [],
+      [createRoadmapCommand({ gh: plantedGh(EPIC_PLANT, []), git: plantedGit, terminalWidth: () => undefined })],
+      project,
+    );
+
+    expect(listed.stdout).toBe(stdoutOf([
+      GHOST_WARNING,
+      ...NOW_GROUP,
+      '     #61  closed  Alpha one',
+      '          labels: epic:alpha  blocked by: -',
+      '     #62  open    Alpha two',
+      '          labels: epic:alpha  blocked by: -',
+      '',
+      'Roadmap #1 · 1 epic not in now; --all shows every horizon',
+      '',
+      ...SPECS_GROUP,
+    ]));
+    expect(shortcut).toEqual(listed);
+  });
+
+  it('prints today\'s bytes under --full for a Roadmap naming no epic', async () => {
+    const project = plantRoadmapCase();
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({}, []));
+    const full = await run(['issue', 'list', '--roadmap', '--full'], project, roadmapCommand({}, []));
+
+    expect(plain.stdout).toContain('Roadmap: #1');
+    expect(full).toEqual(plain);
+  });
+
+  it('prints the same bytes under rafa roadmap', async () => {
+    const project = plantRoadmapCase();
+    const listed = await run(['issue', 'list', '--roadmap', '--all'], project, roadmapCommand(EPIC_PLANT, []));
+    const shortcut = await dispatchInProject(
+      ['roadmap', '--all'],
+      [],
+      [createRoadmapCommand({ gh: plantedGh(EPIC_PLANT, []), git: plantedGit, terminalWidth: () => undefined })],
+      project,
+    );
+
+    expect(shortcut).toEqual(listed);
+    expect(shortcut.stdout).toContain('Roadmap #1 · next');
+  });
+
+  it('carries the epics, the spec rows and each label problem in json mode, the problem a warn log event', async () => {
+    const project = plantRoadmapCase();
+
+    const outcome = await run(['issue', 'list', '--roadmap', '--output=json'], project, roadmapCommand(EPIC_PLANT, []));
+    const events = eventsOf(outcome.stdout);
+    const data = (events.at(-1) as { data: RoadmapListResult } | undefined)?.data;
+
+    expect(outcome.exitCode).toBe(0);
+    expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
+    expect(events[1]).toMatchObject({ level: 'warn', message: GHOST_WARNING.slice('warn: '.length) });
+    expect(data?.rows.map((row) => row.line.issue)).toEqual([13, 14]);
+    expect(data?.epics?.hidden).toBe(1);
+    expect(data?.epics?.unknown).toBeNull();
+    expect(data?.epics?.problems).toEqual([{ kind: 'orphan-label', issue: 30, slug: 'ghost' }]);
+    expect(data?.epics?.groups.map((group) => [
+      group.horizon,
+      group.rows.map((row) => [row.epic.number, row.epic.state, row.epic.progress.done, row.epic.progress.total]),
+    ])).toEqual([['now', [[60, 'in-progress', 1, 2]]]]);
+    expect(data?.warnings).toEqual([GHOST_WARNING.slice('warn: '.length)]);
+  });
+
+  it('carries no epics key for a Roadmap naming no epic, where the one naming epics carries it', async () => {
+    const project = plantRoadmapCase();
+    const plain = await run(['issue', 'list', '--roadmap', '--output=json'], project, roadmapCommand({}, []));
+    const withEpics = await run(['issue', 'list', '--roadmap', '--output=json'], project, roadmapCommand(EPIC_PLANT, []));
+    const dataOf = (stdout: string): object => (eventsOf(stdout).at(-1) as { data: object } | undefined)?.data ?? {};
+
+    expect(Object.keys(dataOf(plain.stdout))).toEqual(['roadmap', 'all', 'filter', 'rows', 'warnings']);
+    expect(Object.keys(dataOf(withEpics.stdout))).toEqual(['roadmap', 'all', 'filter', 'rows', 'warnings', 'epics']);
+  });
+
+  it('prints the epics unknown with the listing\'s reason when the board is unreachable, every line a spec row', async () => {
+    const project = plantRoadmapCase();
+    const plant: GhPlant = { ...EPIC_PLANT, board: UNREACHABLE };
+
+    const outcome = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(plant, []));
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    expect(outcome.stdout.split('\n').slice(0, 4)).toEqual([UNREACHABLE_WARNING, UNREACHABLE_UNKNOWN, '', 'Specs']);
+    expect(outcome.stdout.split('\n').slice(5, -1)
+      .map((line) => line.split(' ')[0])).toEqual(['#13', '#60', '#70', '#14']);
+  });
+});
+
+/** {@link EPIC_PLANT} with `closed` closed as completed on the board. */
+function closingPlant(closed: readonly number[]): GhPlant {
+  const board = (JSON.parse(EPIC_BOARD_JSON) as { number: number; state: string; stateReason: string | null }[])
+    .map((issue) => closed.includes(issue.number)
+      ? { ...issue, state: 'CLOSED', stateReason: 'COMPLETED' }
+      : issue);
+  return { ...EPIC_PLANT, board: { ok: true, stdout: JSON.stringify(board), stderr: '' } };
+}
+
+/** What `--check` ends with when alpha, #60, is open with both its members closed. */
+const ALPHA_DONE_FAILURE = '❌ 1 epic\'s stored state disagrees with its computed one:\n  done, but epic #60 is still open';
+
+describe('rafa issue list --roadmap --check', () => {
+  it('passes the board whose epics agree, printing the bytes the line prints without it', async () => {
+    const project = plantRoadmapCase();
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(EPIC_PLANT, []));
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(EPIC_PLANT, []));
+
+    expect(checked).toEqual(plain);
+    expect(checked.exitCode).toBe(0);
+  });
+
+  it('exits 1 on an open epic whose members are all closed, the table still printed, where the line without it exits 0', async () => {
+    const project = plantRoadmapCase();
+    const plant = closingPlant([62]);
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(plant, []));
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(plant, []));
+    const shortcut = await dispatchInProject(
+      ['roadmap', '--check'],
+      [],
+      [createRoadmapCommand({ gh: plantedGh(plant, []), git: plantedGit, terminalWidth: () => undefined })],
+      project,
+    );
+
+    expect([plain.exitCode, plain.stderr]).toEqual([0, '']);
+    expect(plain.stdout).toContain('done, but epic #60 is still open');
+    expect(checked).toEqual({ exitCode: 1, stdout: plain.stdout, stderr: `${ALPHA_DONE_FAILURE}\n` });
+    expect(shortcut).toEqual(checked);
+  });
+
+  it('weighs an epic a horizon hides too, naming it', async () => {
+    const project = plantRoadmapCase();
+
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(closingPlant([71]), []));
+
+    expect(checked.stdout).not.toContain('#70');
+    expect([checked.exitCode, checked.stderr]).toEqual([
+      1,
+      '❌ 1 epic\'s stored state disagrees with its computed one:\n  done, but epic #70 is still open\n',
+    ]);
+  });
+
+  it('ends with the failure as the terminal error\'s message and no data in json mode', async () => {
+    const project = plantRoadmapCase();
+
+    const outcome = await run(['issue', 'list', '--roadmap', '--check', '--output=json'], project, roadmapCommand(closingPlant([62]), []));
+    const events = eventsOf(outcome.stdout);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
+    expect(events.at(-1)).toEqual({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_exit', message: ALPHA_DONE_FAILURE },
+      ts: expect.any(String),
+    });
+  });
+
+  it('exits 1 with the listing\'s reason when the board is unreachable, where the line without it exits 0', async () => {
+    const project = plantRoadmapCase();
+    const plant: GhPlant = { ...EPIC_PLANT, board: UNREACHABLE };
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(plant, []));
+
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(plant, []));
+
+    expect(plain.exitCode).toBe(0);
+    expect(checked.exitCode).toBe(1);
+    expect(checked.stdout).toBe(plain.stdout);
+    expect(checked.stderr).toStartWith('❌ Could not check the epics: board listing: gh issue list');
   });
 });

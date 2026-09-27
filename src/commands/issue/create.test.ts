@@ -75,7 +75,7 @@ const BUG_LINE = ['issue', 'create', '--title=Timeouts in plan show', '--type=bu
 const DRAFT_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{}, '--title is required: --title=<value>'],
   [{ title: '  ' }, '--title cannot be blank: --title=<value>'],
-  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api'],
+  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
   [{ title: 'x', priority: 'p1' }, '--priority is "p1", expected one of: urgent, high, medium, low'],
   [{ title: 'x', module: '' }, '--module cannot be blank: --module=<value>'],
   [{ title: 'x', body: true }, '--body needs a value: --body=<value>'],
@@ -126,6 +126,10 @@ describe('the draft rafa issue create makes', () => {
       module: 'cli',
       priority: 'high',
     });
+  });
+
+  it('takes --type epic', () => {
+    expect(readIssueDraft({ title: 'Epics', type: 'epic' })).toMatchObject({ title: 'Epics', type: 'epic' });
   });
 
   it.each(DRAFT_REFUSALS)('refuses the flags %j with exit code 1', (flags, problem) => {
@@ -229,7 +233,7 @@ describe('rafa issue create, dispatched', () => {
     expect(refused).toEqual({
       exitCode: 1,
       stdout: '',
-      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api\nUsage: ${USAGE}\n`,
+      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic\nUsage: ${USAGE}\n`,
     });
     expect(untitled.stderr).toBe(`❌ --title is required: --title=<value>\nUsage: ${USAGE}\n`);
     expect(argument.stderr).toBe(`❌ Expected no argument, got 1: bug\nUsage: ${USAGE}\n`);

@@ -39,7 +39,7 @@ module's note is the long form.
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
 | `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: the `dangerous.acceptStaleRefs` warn line printed first thing in the run, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and the core roster, the last imported dynamically since a static import is a load-order cycle through `src/plan.ts`; never under `--dry-run` or `--spec` |
-| `src/commands/issue/ready.ts` | `rafa issue ready <n>`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes. Exit code 0 for the normal completion; 1 for an unusable config or a swap `gh` refused; 2 for an untrusted author and for a body with gaps. The four status values are `marked`, `declined` (question answered no), `unasked` (no terminal), and `already` (label already on). There is no `--yes` flag; the question is always asked where there is a terminal. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
+| `src/commands/issue/ready.ts` | `rafa issue ready <n>`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, then a refusal for an issue carrying two or more `epic:` labels, naming each, with `readEpicProblems`'s own `several-epic-labels` sentence (`src/board/epic-problems.ts`), and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes. Exit code 0 for the normal completion; 1 for an unusable config or a swap `gh` refused; 2 for an untrusted author, for a body with gaps and for two `epic:` labels. The four status values are `marked`, `declined` (question answered no), `unasked` (no terminal), and `already` (label already on). There is no `--yes` flag; the question is always asked where there is a terminal. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state, and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal. |
 | `src/commands/issue/check.ts` | `rafa issue check <n> [--stamp]`: the references issue `<n>`'s saved copy names, each with its state, read by the verifier check 4 builds (`createPlanRefsVerifier`) and starting no session, so it declares no `spends`. The copy is found by number, the one `rafa-<n>-<slug>.md` under `specs.dir` beside the notes file; none is refused naming `rafa plan create --issue=<n>`, two naming both, each with exit code 1, as are a line it refuses, a config refused, a board issue `gh` could not read and a refs block the codec will not read. A plain check is `readCopyRefs`, which writes the first stamps of a reference it has none for; `--stamp` prints the rows read against the old stamps, then re-stamps every reference (`restampCopyRefs`) over one memoised verifier. Exit code 0 whatever the states are. Json mode gives the issue, the copy's path, `stamped` and every reference with its `kind`, `text`, `line`, `state`, `fingerprint` and `stamp` as one word each |
 | `src/commands/issue/issue-tracker.ts` | what the eight `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
@@ -57,9 +57,9 @@ module's note is the long form.
 | `src/commands/pr/pr-context.ts` | what the seven `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
-| `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
+| `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`; then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board rows over `src/board/status.ts`, the blocked issues over `src/commands/doctor-blocked.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -85,6 +85,8 @@ module's note is the long form.
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
+| `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues and the epic labels read over it in that order (`readDoctorBoard`, all three null with no runner), and their lines joined in that order (`renderDoctorBoard`) |
+| `src/commands/doctor-epics.ts` | the epic labels row of `rafa doctor`: one board listing over `src/board/roadmap-board.ts`, the `several-epic-labels` and `orphan-label` problems of `readEpicProblems` (`src/board/epic-problems.ts`) kept and worded by `epicProblemMessage`, no orphan reported when the listing came back full, and the `Epic labels:` lines, none for a board carrying no `epic:` label |
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`, and again for one other than `SKILL_USE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
@@ -163,7 +165,10 @@ New; it replaces no earlier text. What a row or an action added to
   control case in `src/cli/help.test.ts` that pins the root `Commands`
   line as a literal: `RAFA_UPDATE_HELP_SNAPSHOTS=1` rewrites `rafa.txt`
   but not that string, which is edited by hand (measured on 2026-09-24,
-  registering `roadmap`). An action
+  registering `roadmap`). Registering `epics` pushed that line past the
+  help's width, so it wraps onto a second line holding `describe`, and
+  both literals, there and in `src/tests/spends-cli-surface.test.ts`,
+  now hold the wrap (measured on 2026-09-27). An action
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
@@ -189,7 +194,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `epics`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
@@ -523,7 +528,8 @@ New; it replaces no earlier text. What a row or an action added to
   it cannot read or edit is a warning. It runs after the scopes and
   before the board step. `--release=<value>` is refused at the top of
   the run, while nothing has been written.
-- **The board step runs last, and only where there is a board**
+- **The board step runs last, but for the epic guard after it, and only
+  where there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
   `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
   anything but `gh` ends the step before a runner is opened, with a
@@ -544,6 +550,35 @@ New; it replaces no earlier text. What a row or an action added to
   made, and a run that creates no part leaves `Nothing changed.` true.
   `--board=<value>` is refused at the top of the run, while nothing has
   been written.
+- **The epic guard step follows a board that ran**
+  (`runEpicGuardStep` in `src/commands/init-board.ts`). It offers the
+  optional workflow `src/board/templates/epic-guard.yml`, written to
+  `.github/workflows/epic-guard.yml` by `src/board/epic-guard.ts`
+  through `src/board/setup.ts`'s `writeShippedFile`. GitHub's checks
+  belong to commits and pull requests, so the guard is a workflow on
+  `issues: [labeled]`: when the label added starts with `epic:` and the
+  issue carries another, it removes the one just added with
+  `gh issue edit --remove-label` and comments why. The label kept is the
+  one whose latest `labeled` event is oldest, so two labels added in one
+  edit keep the same one whichever run reads first, and each run removes
+  only its own event's label. The first answer wins: a board that did
+  not run leaves it `not-run`, warning only when `--epic-guard` asked;
+  `--no-epic-guard` declines; anything already at the path is reported,
+  `present` for a file and `refused` otherwise, and nothing is asked;
+  `--epic-guard` writes it; no terminal leaves it `unasked` with the
+  line naming `rafa init --board --epic-guard`; otherwise the question
+  `Install the epic guard workflow, which removes a second epic: label
+  from an issue? [y/N]` is asked. `--board` answers only the board's
+  question. Its row is printed under the board rows, a written file
+  counts as a change, and json mode carries it as `epicGuard`.
+  `--epic-guard=<value>` is refused at the top of the run. The step's
+  shell was measured on 2026-09-27 outside the suite, extracted with `yq`
+  and run under bash against a fake `gh` on PATH: one `epic:` label,
+  the added label kept, and the added label already gone each sent no
+  edit; a second label added after the first, and a label re-added after
+  another, each sent one `--remove-label` for the added label and one
+  comment. As a control, `min_by` swapped for `max_by` flipped four of
+  those seven readings. A failing `gh api` exits 1 with no edit.
 - **`doctor` checks what `loop start` would, and starts no run**
   (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
   first, before anything is checked, so the build that answered is read
@@ -600,7 +635,22 @@ New; it replaces no earlier text. What a row or an action added to
   all. An id is called unknown only when the whole board was read: a
   numbers listing that failed or came back full leaves every id
   unchecked and says so in a line of its own. That reading writes
-  nothing and never changes the exit code either. Every repository
+  nothing and never changes the exit code either. Through that same
+  runner it then reads the epic labels (`src/commands/doctor-epics.ts`):
+  one `gh issue list --state all --limit 1000 --json
+  number,title,body,state,stateReason,labels`, the board listing the
+  roadmap views read. Under `Epic labels:` it names every issue
+  carrying two `epic:` labels and every `epic:` label no `type:epic`
+  issue carries, in the words and order of `readEpicProblems`
+  (`src/board/epic-problems.ts`), the only reader of either; the horizon
+  and checklist faults are left to the board views. A board whose labels
+  all read is one line counting them, a board carrying no `epic:` label
+  prints nothing, and a failed listing is the heading and one line
+  naming why. An orphan is reported only when the whole board was read:
+  a listing that came back full reports none and says so in a line of
+  its own. The three board readings live in `src/commands/doctor-board.ts`,
+  which opens the runner and joins their lines; that row writes nothing
+  and never changes the exit code either. Every repository
   then gets one row counting the branches and worktrees `rafa cleanup`
   would list, `Cleanup: <n> merged, <n> stale, <n> not pushed, <n>
   worktrees; run rafa cleanup to review and remove them.`
@@ -628,9 +678,10 @@ New; it replaces no earlier text. What a row or an action added to
   ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text
   mode says so in an `info` line when the order holds. In json mode a
   preflight that did not halt gives the checks, the `known-missing:`
-  lines, the reminders, both readings, those rows and those blocked
-  issues as the result's `data`, the rows and the issues null for a
-  project with no GitHub board, the cleanup counts as its `cleanup`
+  lines, the reminders, both readings, those rows, those blocked
+  issues and those epic labels (`epics`: `labelled`, `faults`,
+  `problem`, `unchecked`) as the result's `data`, the rows, the issues
+  and the labels null for a project with no GitHub board, the cleanup counts as its `cleanup`
   (`{ ok: false, detail }` for a repository git cannot read), the
   references counts as its `refs` (`{ ok: false, detail }` for a
   `specs.dir` that cannot be listed), the `--deep` sections as its `deep`,
@@ -1097,7 +1148,8 @@ New; it replaces no earlier text. What a row or an action added to
   narrowed to the selected lines' issues, reads a same-repository issue
   through the same `gh` runner, and writes nothing. One `gh` read of the board and one of the Roadmap
   body itself: when the board is unreachable, a `warn:` line is printed
-  on stdout ahead of the rows in text mode, the rows read from the
+  on stdout ahead of the rows in text mode, then the `Roadmap #<n> ·
+  epics unknown: <reason>` line and the rows under `Specs`, read from the
   Roadmap body alone with `spec` and `blocked by` empty and `has` still
   filled, and the command exits 0. The branch reading is
   `scanClaimBranches`, which also runs `git ls-remote --heads`: a
@@ -1117,6 +1169,78 @@ New; it replaces no earlier text. What a row or an action added to
   refusing it, so the shared run sees it. Its text output is the same
   bytes as `issue list --roadmap`; in json mode only the result events
   match, since the start event names the command as typed.
+- **`issue list --roadmap` and `rafa roadmap` print the epics a Roadmap
+  names** (`src/board/roadmap-epic-rows.ts`,
+  `src/commands/issue/roadmap-epic-table.ts`). The reading is
+  `readRoadmapEpicRows`, which asks `readRoadmapRows` for the rows and
+  tells the lines whose issue the board listing labels `type:epic` from
+  the spec lines over the same one listing, so the command still spends
+  one board read. Epic rows print grouped by horizon under `Roadmap #<n>
+  · <horizon>` with the columns `#`, `state`, `done/total`, `blocked`,
+  `title` and `date`, the `now` horizon only; `--all` widens to every
+  horizon as it widens to the ticked lines, and without it a line counts
+  the epics a horizon hides. The spec rows follow under `Specs` as
+  today's table, and the `Roadmap: #<n>` head is dropped since each
+  group names the Roadmap. `--type`, `--module`, `--search` and
+  `--limit` narrow the spec rows only; an epic row is chosen by horizon
+  alone. Each label problem `readEpicProblems` finds is a `warn` line
+  (a `warn` log event in json mode), and the json result gains an
+  `epics` key holding `groups`, `hidden`, `unknown` and `problems`.
+  A Roadmap naming no epic, with the listing read, prints today's bytes
+  and a json result with no `epics` key; a failed listing prints the
+  epics `unknown` instead, since no line could be told an epic.
+  `--full` (refused without `--roadmap`, as `--all` is) prints each
+  shown epic's members under its row, after its disagreement line and
+  indented under the `state` column, two rows each: `#<n>`, the state
+  (`open`, `closed`, or `not-planned` for one closed as not planned) and
+  the title; then `labels: <labels>` and `blocked by: <#n, …>` from a
+  `Blocked by:` line that reads `blocked`, `-` for either with nothing.
+  Members come in the epic's checklist order, then the rest by number;
+  a member's title, then its labels, are cut toward their floors on a
+  narrow terminal. It is the one listing that mixes two epics' issues,
+  it changes text mode only (json's `epics` already carry every
+  member), and a Roadmap naming no epic prints today's bytes with it.
+  `--check` (refused without `--roadmap`, as `--all` is) prints what
+  the line prints without it, then weighs every `type:epic` issue on
+  the listing — not only the Roadmap's, whatever horizon is shown — its
+  stored state against its computed one (`epicCheckFailure`,
+  `src/commands/issue/roadmap-check.ts`), and exits 1 when one
+  disagrees, naming each by the disagreement line the table prints, so
+  CI can run it. A failed listing fails the check too, with its reason,
+  since nothing was compared. The message is stderr in text mode and
+  the terminal error's message in json mode, where the dispatcher
+  drops the result's data on a non-zero exit; a check that passes
+  changes nothing.
+- **`rafa epics [n]` prints one epic's lines as the Roadmap table**
+  (`src/commands/epics.ts`). The epic is the `type:epic` issue numbered
+  `n`, whatever its horizon and whether the Roadmap names it, or with no
+  number the first unticked Roadmap line naming an epic that is open,
+  carries `horizon:now` alone (`isNowEpic`, the walk's own test) and is
+  not computed `done` — the epic `rafa next` walks into. Each line is
+  told an epic by the board listing's type, never by reading the issue,
+  so the command spends one listing, plus one Roadmap read without `n`.
+  Its lines are `epicLines` (`src/board/epic-walk.ts`), the checklist
+  then the open members missing from it by number, the walk's own order,
+  read into rows by `readLineRows` (`src/board/roadmap-rows.ts`), the
+  line-taking half of `readRoadmapRows`, so the `spec`, `blocked by`,
+  `has` and `refs` columns mean what they mean on the Roadmap and ticked
+  lines are left out. The seams are `onceSeams` and the claims
+  `claimsOf` (`src/board/roadmap-epic-rows.ts`), so the listing, the pull
+  request list, the plan dir and the branch scan are each asked once
+  (measured: dropping `onceSeams` makes the spawned case count two
+  listings). Text mode prints `Epic #<n> · <title> · <state>,
+  <done>/<total> done`, the disagreement line indented under it, then
+  today's table, or `No issues.`; no issue of another epic is named.
+  Each failed reading of the rows and each label problem about this
+  epic (its horizon, its checklist, its members, a member carrying a
+  second `epic:` label; an orphan label is `rafa roadmap`'s) is a `warn`
+  line, a `warn` log event in json mode, whose result is `EpicsResult`.
+  A Roadmap naming no open `now` epic that is not done prints one line
+  and exits 0; a failed listing prints the epic, or the Roadmap's epics,
+  `unknown` with the reason and exits 0; a number the listing holds that
+  is no epic, or does not hold, is refused with exit 1; a Roadmap that
+  cannot be read, with `ROADMAP_REFUSAL_EXIT`. It declares no flag and
+  no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -1165,7 +1289,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `accept-refs`,
   `comment`, `stub`, `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
-  flags `roadmap`, `all`, `state`, `type`, `module`, `search` and `limit`,
+  flags `roadmap`, `all`, `full`, `check`, `state`, `type`, `module`, `search` and `limit`,
   `show` the argument `id`, `create` the flags `title`, `body`, `type`,
   `module` and `priority`, `comment` the argument `id` and the flag `body`,
   and `move` the arguments `id` and `state`; each declares `text` and

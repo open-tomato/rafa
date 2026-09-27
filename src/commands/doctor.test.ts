@@ -153,6 +153,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { version } from '../../package.json';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
+import { BOARD_LIST_FIELDS } from '../board/roadmap-board.js';
 import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
 import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { ROADMAP_ROW_NAME } from '../board/status.js';
@@ -180,6 +181,7 @@ import { PLAN_NEEDS_SECTION_TITLE, STACK_TOOLS_SECTION_TITLE } from './doctor-de
 import { PROVIDERS_SECTION_TITLE } from './doctor-deep-providers.js';
 import { SETTINGS_SECTION_TITLE } from './doctor-deep-settings.js';
 import { ENVIRONMENT_SECTION_TITLE } from './doctor-deep.js';
+import { EPICS_HEADING } from './doctor-epics.js';
 import { readPreviousCopies } from './doctor-previous.js';
 import { issueCheckCommand } from './doctor-refs.js';
 import { TIERS_SECTION_TITLE } from './doctor-tiers.js';
@@ -374,20 +376,38 @@ interface FakeRepo {
   readonly blocked?: readonly { number: number; body: string }[];
   /** Every issue number the board holds, open and closed. */
   readonly known?: readonly number[];
+  /** Every issue the board listing answers, with its labels; the epic labels row reads these. */
+  readonly listed?: readonly { number: number; labels: readonly string[] }[];
 }
 
-/** Which reading a command is, since three of them are `gh issue list`. */
+/** The route the board listing is recorded under, apart from the numbers listing that is also `--state all`. */
+const LISTING_CALL = 'issue list --board';
+
+/** Which reading a command is, since four of them are `gh issue list`. */
 function routeOf(args: readonly string[]): string {
   const route = args.slice(0, 2).join(' ');
   if (route !== 'issue list') return route;
+  if (args.includes(BOARD_LIST_FIELDS)) return LISTING_CALL;
   if (args.includes('--label')) return 'issue list --label';
   if (args.includes('all')) return 'issue list --state all';
   return 'issue list --search';
 }
 
+/** One issue of the board listing, as `gh` answers it: an open issue with no body, carrying `labels`. */
+function listedRow(issue: { number: number; labels: readonly string[] }): Record<string, unknown> {
+  return {
+    number: issue.number,
+    title: `issue ${String(issue.number)}`,
+    body: '',
+    state: 'OPEN',
+    stateReason: null,
+    labels: issue.labels.map((name) => ({ name })),
+  };
+}
+
 /**
- * A `gh` runner over `repo`, answering the four commands the board rows
- * and the blocked issues read and failing every other, and the readings
+ * A `gh` runner over `repo`, answering the five commands the board
+ * readings send and failing every other, and the readings
  * it was asked for. So no case of this file spawns `gh`.
  */
 function fakeGh(repo: FakeRepo = {}): { run: GhRunner; calls: () => readonly string[] } {
@@ -399,6 +419,7 @@ function fakeGh(repo: FakeRepo = {}): { run: GhRunner; calls: () => readonly str
     if (route === 'label list') return ok(JSON.stringify((repo.labels ?? []).map((name) => ({ name }))));
     if (route === 'issue list --search') return ok(JSON.stringify(repo.issues ?? []));
     if (route === 'issue list --label') return ok(JSON.stringify(repo.blocked ?? []));
+    if (route === LISTING_CALL) return ok(JSON.stringify((repo.listed ?? []).map(listedRow)));
     if (route === 'issue list --state all') {
       return ok(JSON.stringify((repo.known ?? []).map((number) => ({ number }))));
     }
@@ -438,7 +459,7 @@ function bareBoardLines(): string[] {
     `  missing  ${SPEC_TEMPLATE_PATH}: the repository carries no spec issue template`,
     `  missing  ${ROADMAP_ROW_NAME}: no open issue is titled ${ROADMAP_TITLE}`,
     `  missing  ${ROADMAP_SETTING}: the project config names no roadmap issue`,
-    `Run ${BOARD_FIX} to set up 10 parts of the board this run did not find.`,
+    `Run ${BOARD_FIX} to set up 14 parts of the board this run did not find.`,
   ];
 }
 
@@ -1265,9 +1286,9 @@ describe('the board rows', () => {
     const control = await doctor(ready, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => setUp.run) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-13)).toEqual([...bareBoardLines(), aheadLine(bare)]);
+    expect(lines(run.stdout).slice(-17)).toEqual([...bareBoardLines(), aheadLine(bare)]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-12)).toEqual([
+    expect(lines(control.stdout).slice(-16)).toEqual([
       BOARD_HEADING,
       ...BOARD_LABELS.map((label) => `  present  label ${label.name}`),
       `  present  ${SPEC_TEMPLATE_PATH}`,
@@ -1275,7 +1296,7 @@ describe('the board rows', () => {
       `  present  ${ROADMAP_SETTING}`,
       aheadLine(ready),
     ]);
-    expect(setUp.calls()).toEqual(['label list', 'issue list --label']);
+    expect(setUp.calls()).toEqual(['label list', 'issue list --label', LISTING_CALL]);
   });
 
   it('prints no row and opens no runner where the provider is not gh, where a gh provider opens one', async () => {
@@ -1344,7 +1365,7 @@ describe('the board rows', () => {
     const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [MISSING_TOOL_PROBE]: failed }) });
 
     expect(run.exitCode).toBe(1);
-    expect(lines(run.stdout).slice(-13)).toEqual([...bareBoardLines(), aheadLine(world)]);
+    expect(lines(run.stdout).slice(-17)).toEqual([...bareBoardLines(), aheadLine(world)]);
     expect(run.stderr).toContain('rafa loop start would halt here, before any session.');
   });
 });
@@ -1407,6 +1428,91 @@ describe('the blocked issues', () => {
     expect(dataOf(run.stdout)?.blocked?.problem).toBe(null);
     expect(control.exitCode).toBe(0);
     expect(dataOf(control.stdout)?.blocked).toBe(null);
+  });
+});
+
+describe('the epic labels', () => {
+  /** A board where #5 carries two epic labels and #6 a slug no epic carries, beside epic #1 `epic:auth`. */
+  const FAULTED = [
+    { number: 1, labels: ['type:epic', 'epic:auth', 'horizon:now'] },
+    { number: 2, labels: ['type:epic', 'epic:billing', 'horizon:next'] },
+    { number: 5, labels: ['type:spec', 'epic:auth', 'epic:billing'] },
+    { number: 6, labels: ['type:spec', 'epic:atuh'] },
+  ];
+  /** The same board with each label fixed: #5 carries one, #6 the slug its epic carries. */
+  const FIXED = [
+    FAULTED[0]!,
+    FAULTED[1]!,
+    { number: 5, labels: ['type:spec', 'epic:auth'] },
+    { number: 6, labels: ['type:spec', 'epic:auth'] },
+  ];
+
+  it('names an issue carrying two epic labels and a slug no epic carries, where the fixed board is one counting line', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const faulted = fakeGh({ listed: FAULTED });
+    const fixed = fakeGh({ listed: FIXED });
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => faulted.run) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => fixed.run) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout).slice(-4)).toEqual([
+      EPICS_HEADING,
+      '  #5 carries 2 epic labels (epic:auth, epic:billing); an issue belongs to one epic, so remove all but one',
+      '  #6 carries epic:atuh, which no type:epic issue carries; fix the slug or open the epic',
+      aheadLine(world),
+    ]);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout).slice(-3)).toEqual([
+      EPICS_HEADING,
+      '  4 issues with an epic: label, none with two, every slug one a type:epic issue carries',
+      aheadLine(controlWorld),
+    ]);
+    expect(faulted.calls().filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
+  });
+
+  it('prints no line for a board carrying no epic label, where a failed listing prints the heading and why', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const failing: DoctorSeams['openGh'] = () => (args) => Promise.resolve(args.includes(BOARD_LIST_FIELDS)
+      ? { ok: false, stdout: '', stderr: 'HTTP 502' }
+      : { ok: true, stdout: '[]', stderr: '' });
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, failing) });
+
+    expect(run.exitCode).toBe(0);
+    expect(lines(run.stdout)).not.toContain(EPICS_HEADING);
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout).slice(-3)).toEqual([
+      EPICS_HEADING,
+      '  the epic: labels could not be read: board listing:'
+        + ` gh issue list --state all --limit 1000 --json ${BOARD_LIST_FIELDS} failed: HTTP 502`,
+      aheadLine(controlWorld),
+    ]);
+  });
+
+  it('gives the faults as the epics of the json result, where a repository with no GitHub board gives null', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    const faulted: DoctorSeams['openGh'] = () => fakeGh({ listed: FAULTED }).run;
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    const run = await doctor(world, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN, {}, faulted) });
+    const control = await doctor(controlWorld, ['--output=json'], { seams: ghSeams(() => null, {}, faulted) });
+
+    expect(run.exitCode).toBe(0);
+    expect(dataOf(run.stdout)?.epics?.faults.map((fault) => [fault.kind, fault.issue, fault.slug])).toEqual([
+      ['several-epic-labels', 5, 'auth'],
+      ['orphan-label', 6, 'atuh'],
+    ]);
+    expect(dataOf(run.stdout)?.epics?.labelled).toBe(4);
+    expect(control.exitCode).toBe(0);
+    expect(dataOf(control.stdout)?.epics).toBe(null);
   });
 });
 

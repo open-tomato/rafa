@@ -234,8 +234,9 @@ takes a foreign-only line for "every blocker closed" and drops the label.
 ### Marking a spec ready
 
 **`rafa issue ready <n>` marks an issue as ready for planning** after
-checking two things: the author must have write access (or be listed as
-trusted in config), and the body must fill the spec template completely.
+checking three things: the author must have write access (or be listed as
+trusted in config), the body must fill the spec template completely, and
+the issue must carry at most one `epic:` label.
 The command is offered automatically by `plan create --issue` and
 `plan create --next` in a terminal, where a yes labels the issue with
 `spec:ready` and proceeds to plan it, or a no exits with the check result.

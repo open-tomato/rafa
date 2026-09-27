@@ -125,7 +125,9 @@ flowchart TD
     B -- no --> R([refuse])
     B -- yes --> C{"🧭 body fills the six spec headings?"}
     C -- no --> R
-    C -- yes --> D{already spec:ready?}
+    C -- yes --> C2{"🔒 one epic: label at most?"}
+    C2 -- no --> R
+    C2 -- yes --> D{already spec:ready?}
     D -- yes --> E[say so, print the hint]
     D -- no --> F{terminal?}
     F -- no --> G[print readings, report unasked, write nothing]

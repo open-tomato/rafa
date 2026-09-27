@@ -47,16 +47,17 @@ function row(overrides: Readonly<Record<string, unknown>> = {}): Record<string, 
     title: 'the board listing',
     body: '## Why\n\nbody',
     state: 'OPEN',
+    stateReason: '',
     labels: [{ name: 'type:code' }, { name: 'module:board' }],
     ...overrides,
   };
 }
 
 /** The command every default-limit refusal names. */
-const COMMAND = `gh issue list --state all --limit ${BOARD_LISTING_LIMIT} --json number,title,body,state,labels`;
+const COMMAND = `gh issue list --state all --limit ${BOARD_LISTING_LIMIT} --json number,title,body,state,stateReason,labels`;
 
 describe('the command', () => {
-  it('sends one gh issue list over every state with the five fields and the default limit', async () => {
+  it('sends one gh issue list over every state with the six fields and the default limit', async () => {
     const gh = planted([]);
     await createGhBoardListing({ gh: gh.run })();
     expect(gh.calls()).toEqual([
@@ -103,7 +104,7 @@ describe('the rows', () => {
   it('reads every field of every row, open and closed, in the order gh answered them', async () => {
     const gh = planted([
       row(),
-      row({ number: 3, title: 'closed one', body: '', state: 'CLOSED', labels: [] }),
+      row({ number: 3, title: 'closed one', body: '', state: 'CLOSED', stateReason: 'COMPLETED', labels: [] }),
     ]);
     const issues = await createGhBoardListing({ gh: gh.run })();
     expect(issues).toEqual([
@@ -112,11 +113,21 @@ describe('the rows', () => {
         title: 'the board listing',
         body: '## Why\n\nbody',
         state: 'OPEN',
+        stateReason: null,
         labels: ['type:code', 'module:board'],
         type: 'code',
         module: 'board',
       },
-      { number: 3, title: 'closed one', body: '', state: 'CLOSED', labels: [], type: 'code', module: 'unassigned' },
+      {
+        number: 3,
+        title: 'closed one',
+        body: '',
+        state: 'CLOSED',
+        stateReason: 'COMPLETED',
+        labels: [],
+        type: 'code',
+        module: 'unassigned',
+      },
     ]);
     expect(Object.isFrozen(issues)).toBe(true);
     expect(Object.isFrozen(issues[0])).toBe(true);
@@ -140,6 +151,7 @@ describe('the rows', () => {
       [row({ title: 3 }), 'title 3, expected a string'],
       [row({ body: null }), 'body null, expected a string'],
       [row({ state: 'open' }), 'state "open", expected "OPEN" or "CLOSED"'],
+      [row({ stateReason: 2 }), 'stateReason 2, expected a string or null'],
       [row({ labels: 'type:bug' }), 'labels "type:bug", expected a list of named labels'],
       [row({ labels: [{ name: 'ok' }, { color: 'red' }] }), 'labels[1] a mapping, expected a mapping with a string name'],
     ];
@@ -150,12 +162,56 @@ describe('the rows', () => {
   });
 
   it('refuses a row missing a field, naming the field as undefined', async () => {
-    for (const field of ['number', 'title', 'body', 'state', 'labels']) {
+    for (const field of ['number', 'title', 'body', 'state', 'stateReason', 'labels']) {
       const missing = Object.fromEntries(Object.entries(row()).filter(([key]) => key !== field));
       const gh = planted([missing]);
       await expect(createGhBoardListing({ gh: gh.run })())
         .rejects.toThrow(`board listing: ${COMMAND} answered row 0 with ${field} undefined`);
     }
+  });
+});
+
+describe('the state reason', () => {
+  it('reads a closed row NOT_PLANNED as NOT_PLANNED, beside a COMPLETED control', () => {
+    const issues = parseBoardListing(JSON.stringify([
+      row({ number: 4, state: 'CLOSED', stateReason: 'NOT_PLANNED' }),
+      row({ number: 5, state: 'CLOSED', stateReason: 'COMPLETED' }),
+    ]), COMMAND);
+    expect(issues.map((issue) => [issue.number, issue.state, issue.stateReason])).toEqual([
+      [4, 'CLOSED', 'NOT_PLANNED'],
+      [5, 'CLOSED', 'COMPLETED'],
+    ]);
+  });
+
+  it('reads an empty string and a null alike as null', () => {
+    const issues = parseBoardListing(JSON.stringify([
+      row({ number: 4, stateReason: '' }),
+      row({ number: 5, stateReason: null }),
+    ]), COMMAND);
+    expect(issues.map((issue) => issue.stateReason)).toEqual([null, null]);
+  });
+
+  it('refuses a numeric reason, naming the command and the row, beside a control that reads', () => {
+    expect(parseBoardListing(JSON.stringify([row({ stateReason: 'NOT_PLANNED' })]), COMMAND)).toHaveLength(1);
+    expect(() => parseBoardListing(JSON.stringify([row(), row({ number: 8, stateReason: 7 })]), COMMAND))
+      .toThrow(`board listing: ${COMMAND} answered row 1 with stateReason 7, expected a string or null`);
+  });
+
+  it('reads an epic closed as not planned with its type and its reason both carried', async () => {
+    const gh = planted([
+      row({
+        number: 12,
+        title: 'an epic dropped',
+        state: 'CLOSED',
+        stateReason: 'NOT_PLANNED',
+        labels: [{ name: 'type:epic' }, { name: 'epic:widgets' }, { name: 'horizon:later' }],
+      }),
+    ]);
+    const issues = await createGhBoardListing({ gh: gh.run })();
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.type).toBe('epic');
+    expect(issues[0]?.stateReason).toBe('NOT_PLANNED');
+    expect(issues[0]?.state).toBe('CLOSED');
   });
 });
 
@@ -168,7 +224,7 @@ describe('the type and module labels', () => {
   it('reads a missing or foreign type label as code', () => {
     const issues = parseBoardListing(JSON.stringify([
       row({ labels: [] }),
-      row({ labels: [{ name: 'type:epic' }] }),
+      row({ labels: [{ name: 'type:feature' }] }),
     ]), COMMAND);
     expect(issues.map((issue) => issue.type)).toEqual(['code', 'code']);
   });

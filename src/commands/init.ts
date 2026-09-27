@@ -61,8 +61,9 @@
  * `.rafa/config.yaml` this run has just made. The decision, the
  * question and the line are `./init-release.ts`'s; what is decided HERE
  * is that it runs after the scopes and BEFORE the board step, which
- * stays the last thing `init` does. Like the board step it refuses
- * nothing: a config it cannot read or write is a warning.
+ * with the epic guard after it stays the last thing `init` does. Like
+ * the board step it refuses nothing: a config it cannot read or write
+ * is a warning.
  *
  * `--release` and `--no-release` answer the question for a script, and
  * `--yes` leaves the setting unset — `--yes` is how a line says it will
@@ -75,7 +76,8 @@
  * the board step: one question, and the labels, the spec issue template
  * and the pinned Roadmap issue `src/board/setup.ts` makes. The decision,
  * the question and the lines are `./init-board.ts`'s; what is decided
- * HERE is that it runs LAST, after the scopes are on disk. The
+ * HERE is that it runs LAST, after the scopes are on disk, followed
+ * only by the epic guard step that needs a board that ran. The
  * `roadmap.issue` it may write goes into the `.rafa/config.yaml` this
  * run has just made, and nothing it asks or sends can keep the project
  * from being set up: a `gh` that is not installed, a repository nobody
@@ -86,6 +88,12 @@
  * of `--board` is read at the TOP of the run, before a root is chosen
  * and so before anything is written, because `--board=later` is a line
  * to refuse while `Nothing was written.` is still true.
+ *
+ * Once the board has run, the epic guard step asks its own question
+ * about the optional workflow that removes a second `epic:` label from
+ * an issue, and `--epic-guard` and `--no-epic-guard` answer it for a
+ * script; the order it decides in is `./init-board.ts`'s. Its flag is
+ * read at the top of the run with `--board`'s, for the same reason.
  *
  * ## A rerun
  *
@@ -156,7 +164,7 @@
  * stderr, and spawns git and `gh` in the root. The writes go to the
  * disk, under the root and the home the seams name.
  */
-import type { BoardStepResult } from './init-board.js';
+import type { BoardStepResult, EpicGuardStepResult } from './init-board.js';
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
@@ -194,7 +202,14 @@ import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
 import { gitRemoteUrl } from '../schema/project-id.js';
 
-import { boardStepChanged, renderBoardStep, runBoardStep } from './init-board.js';
+import {
+  boardStepChanged,
+  epicGuardChanged,
+  renderBoardStep,
+  renderEpicGuardStep,
+  runBoardStep,
+  runEpicGuardStep,
+} from './init-board.js';
 import { renderReleaseStep, runReleaseStep } from './init-release.js';
 
 /** What `init` reads beside its line; see the module note. */
@@ -256,6 +271,8 @@ export interface InitResult {
   readonly release: ReleaseStepResult;
   /** What the board step came to: what it made, or why it did not run (`./init-board.ts`). */
   readonly board: BoardStepResult;
+  /** What the epic guard step after it came to: the workflow file, or why it was not written. */
+  readonly epicGuard: EpicGuardStepResult;
 }
 
 /** The line every refusal ends with. */
@@ -300,6 +317,19 @@ export function readBoardFlag(value: string | boolean | undefined): boolean | nu
   if (value === false || value === 'false') return false;
   throw refusal([`rafa init: --board takes no value, and read "${value}" as one;`
     + ' set the board up with --board, or leave it alone with --no-board']);
+}
+
+/**
+ * True for `--epic-guard`, false for `--no-epic-guard` and null when the
+ * line said neither, which leaves the guard step to ask. A value refuses,
+ * for the reason {@link readBoardFlag} gives.
+ */
+export function readEpicGuardFlag(value: string | boolean | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw refusal([`rafa init: --epic-guard takes no value, and read "${value}" as one;`
+    + ' install the workflow with --epic-guard, or leave it out with --no-epic-guard']);
 }
 
 /**
@@ -420,7 +450,7 @@ function trackingWrites(applied: TrackingApplied, digestExisted: boolean): reado
 /** What the scopes came to, with the config they were written from. */
 interface ScopesWritten {
   /** The result, but for the two steps that run once these are on disk. */
-  readonly written: Omit<InitResult, 'board' | 'release'>;
+  readonly written: Omit<InitResult, 'board' | 'epicGuard' | 'release'>;
   /** The config as it resolved for the root, which the provider is read from. */
   readonly config: RafaConfig;
 }
@@ -464,8 +494,9 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
 
 /**
  * The board step for a project whose scopes are written: the provider
- * read off the config and `origin`, then `./init-board.ts`. It runs LAST
- * for two reasons — the `roadmap.issue` it may write goes into the
+ * read off the config and `origin`, then `./init-board.ts`. It runs LAST,
+ * but for the epic guard step that follows a board that ran, for two
+ * reasons — the `roadmap.issue` it may write goes into the
  * `.rafa/config.yaml` this run has just made, and nothing it asks or
  * sends can then keep the project from being set up.
  */
@@ -496,8 +527,8 @@ async function boardStep(
  * project bumps a version and writes a changelog entry with every pull
  * request, decided and written by `./init-release.ts` as
  * `release.enabled` in the `.rafa/config.yaml` this run has just made.
- * It runs before the board step, which stays the last thing `init`
- * does.
+ * It runs before the board step, which with the epic guard after it
+ * stays the last thing `init` does.
  */
 async function releaseStep(
   scopes: ScopesWritten,
@@ -534,7 +565,11 @@ export function renderInit(result: InitResult): readonly string[] {
   const changed = result.writes
     .filter((write) => write.change !== 'unchanged')
     .map((write) => `  ${write.change}   ${shownPath(write, result.root)}`);
-  const steps = [...renderReleaseStep(result.release), ...renderBoardStep(result.board)];
+  const steps = [
+    ...renderReleaseStep(result.release),
+    ...renderBoardStep(result.board),
+    ...renderEpicGuardStep(result.epicGuard),
+  ];
   return result.changed
     ? [head, ...changed, ...steps]
     : [head, ...steps, 'Nothing changed.'];
@@ -544,6 +579,7 @@ export function renderInit(result: InitResult): readonly string[] {
 async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   expectNoArgument(context.args);
   const wantsBoard = readBoardFlag(context.flags['board']);
+  const wantsGuard = readEpicGuardFlag(context.flags['epic-guard']);
   const wantsRelease = readReleaseFlag(context.flags['release']);
   const yes = readYesFlag(context.flags['yes']);
   const start = seams.cwd();
@@ -552,11 +588,19 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   const scopes = initialise(root, start, home, context, seams.entry());
   const release = await releaseStep(scopes, wantsRelease, yes, seams);
   const board = await boardStep(scopes, wantsBoard, seams);
+  const epicGuard = await runEpicGuardStep({
+    wanted: wantsGuard,
+    board,
+    root: scopes.written.root,
+    isTerminal: seams.isTerminal,
+    openPrompter: seams.openPrompter,
+  });
   const result: InitResult = {
     ...scopes.written,
-    changed: scopes.written.changed || release.changed || boardStepChanged(board),
+    changed: scopes.written.changed || release.changed || boardStepChanged(board) || epicGuardChanged(epicGuard),
     release,
     board,
+    epicGuard,
   };
 
   if (context.outputMode === 'json') context.output.result(result);
@@ -564,6 +608,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   if (result.binPath.warning !== null) context.output.warn(result.binPath.warning);
   for (const line of release.warnings) context.output.warn(line);
   for (const line of board.warnings) context.output.warn(line);
+  for (const line of epicGuard.warnings) context.output.warn(line);
   for (const line of vendorableAgentWarnings(result.vendorableAgents, result.root)) context.output.warn(line);
 }
 
@@ -587,7 +632,9 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' `plan.dir` routes to an agent that resolves only in `~/.claude/agents` and rafa does not ship,'
       + ' naming `rafa agent vendor <name>`; it writes nothing under `.claude/` itself. A repository whose pull request provider is `gh` ends with one'
       + ' question about setting up the GitHub board, which `--board` and `--no-board` answer for a'
-      + ' script. On a terminal it also asks once whether every pull request bumps the version and gains'
+      + ' script, and then, once the board has run, one question about installing the epic guard'
+      + ' workflow `.github/workflows/epic-guard.yml`, which removes a second `epic:` label from an issue'
+      + ' and comments why; `--epic-guard` and `--no-epic-guard` answer that one. On a terminal it also asks once whether every pull request bumps the version and gains'
       + ' a changelog entry, and writes the answer as `release.enabled`; `--release` and `--no-release`'
       + ' answer that one, and `--yes` leaves it unset. With `--output=json` the'
       + ' root and every path checked are the data of the terminal result event.',
@@ -608,6 +655,14 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
         description: 'Set up the GitHub board without asking: the labels, `.github/ISSUE_TEMPLATE/spec.md`'
           + ' and a pinned Roadmap issue named by `roadmap.issue`. `--no-board` leaves it alone. Without'
           + ' either, a terminal is asked once and a run with no terminal leaves it alone.',
+        type: 'boolean',
+      },
+      {
+        name: 'epic-guard',
+        description: 'Install the epic guard workflow without asking, once the board has run:'
+          + ' `.github/workflows/epic-guard.yml`, which removes a second `epic:` label from an issue and'
+          + ' comments why. `--no-epic-guard` leaves it out. Without either, a terminal is asked once and a'
+          + ' run with no terminal leaves it out. A file already at that path is left as it is.',
         type: 'boolean',
       },
       {
@@ -640,6 +695,10 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
         cmd: 'rafa init --yes --board',
         note: 'Takes the first candidate and sets up the GitHub board without asking: the labels, the spec'
           + ' issue template and a pinned Roadmap issue. Each part already there is left as it is.',
+      },
+      {
+        cmd: 'rafa init --yes --board --epic-guard',
+        note: 'Sets up the GitHub board and installs the epic guard workflow, asking nothing.',
       },
     ],
     outputs: ['text', 'json'],

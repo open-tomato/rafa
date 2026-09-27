@@ -198,6 +198,15 @@ describe('creating an issue', () => {
     expect(fake.issue(ref.externalId)?.labels).toEqual(['module:billing', 'type:spike', 'priority:high']);
   });
 
+  it('labels an epic type:epic, and get reads the label back as epic', async () => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'epic', priority: 'low' }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:epic', 'priority:low']);
+    expect((await tracker.get(ref)).type).toBe('epic');
+  });
+
   it('sends needs-triage for a null priority, and no priority label', async () => {
     const { tracker, fake } = overFake();
 
@@ -277,7 +286,7 @@ describe('creating an issue', () => {
   });
 
   it.each([
-    ['type', { type: 'feature' }, 'type is "feature", expected one of: code, bug, spike, adr, chore, package-api'],
+    ['type', { type: 'feature' }, 'type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
     ['priority', { priority: 'critical' }, 'priority is "critical", expected null or one of: urgent, high, medium, low'],
     ['module', { module: 'auth,billing' }, 'module is "auth,billing", expected a string holding no comma'],
     ['blockedBy', { blockedBy: [1.5] }, 'blockedBy is a list, expected a list of positive whole numbers'],

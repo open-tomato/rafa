@@ -45,9 +45,12 @@ const ROADMAP = 1;
 /** The Roadmap's body: two unticked lines around a ticked one, in an order no number sorts to. */
 const ROADMAP_BODY = '- [ ] #13 — blocked bug\n- [x] #12 — shipped chore\n- [ ] #11 — ready spec\n';
 
-/** One issue as `gh issue list --json number,title,body,state,labels` writes it. */
+/** One issue as `gh issue list --json number,title,body,state,stateReason,labels` writes it. */
 function boardIssue(number: number, title: string, body: string, state: 'OPEN' | 'CLOSED', labels: readonly string[]): object {
-  return { number, title, body, state, labels: labels.map((name) => ({ name })) };
+  const stateReason = state === 'CLOSED'
+    ? 'COMPLETED'
+    : '';
+  return { number, title, body, state, stateReason, labels: labels.map((name) => ({ name })) };
 }
 
 /** The board: the three Roadmap issues and the open blocker of #13. */
@@ -103,7 +106,7 @@ function startCommand(event: ReturnType<typeof eventsOf>[number]): string | null
 
 describe('the flags rafa roadmap declares', () => {
   it('are issue list\'s own flag objects, in their order, less --roadmap and --state', () => {
-    expect(ROADMAP_FLAGS.map((flag) => flag.name)).toEqual(['all', 'type', 'module', 'search', 'limit']);
+    expect(ROADMAP_FLAGS.map((flag) => flag.name)).toEqual(['all', 'full', 'check', 'type', 'module', 'search', 'limit']);
     expect(ROADMAP_FLAGS).toEqual(ISSUE_LIST_FLAGS.filter((flag) => flag.name !== 'roadmap' && flag.name !== 'state'));
     expect(ROADMAP_FLAGS.every((flag) => ISSUE_LIST_FLAGS.includes(flag))).toBe(true);
     expect(createRoadmapCommand().flags).toEqual([...ROADMAP_FLAGS]);

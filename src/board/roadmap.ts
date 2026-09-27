@@ -555,9 +555,10 @@ export async function pickNextRoadmapLine(
 /**
  * What a walk that found nothing has to say. `plan create --next` exits
  * 0 with it: an empty roadmap is a project with its work done, not a
- * command that failed.
+ * command that failed. `skipped` is every line the walk passed, roadmap
+ * or epic line (`./epic-walk.ts`); only how many is read.
  */
-export function exhaustedMessage(roadmap: number, skipped: readonly RoadmapSkip[]): string {
+export function exhaustedMessage(roadmap: number, skipped: readonly unknown[]): string {
   const id = `issue #${String(roadmap)}`;
   return skipped.length === 0
     ? `the roadmap, ${id}, carries no "- [ ] #<n>" line; add the next spec to its task list`

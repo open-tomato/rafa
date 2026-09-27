@@ -26,6 +26,16 @@
  *    (`src/board/roadmap.test.ts`). Nothing anywhere plays the two in
  *    sequence over the SAME board: a tick written by one, read as done
  *    by the other. That is the second half of this file.
+ *  - the epic context the `--next` walk hands the planner
+ *    (`src/board/epic-context.ts`, `src/plan.ts`) is unit-tested over an
+ *    in-process `gh` fake and its `{EPIC_CONTEXT}` slot rendering is
+ *    tested over a template string in `src/plan.test.ts`, but neither
+ *    proves that a real `--next` run, walked over a stubbed `gh` naming
+ *    the picked issue's `epic:` label, ends up handing the planner a
+ *    PROMPT holding the epic's acceptance criteria beside the spec it
+ *    picked. `PROBE_WITH_PROMPT` is that proof: unlike `PROBE`, it also
+ *    calls `context.planPrompt`, so the case reads the exact prompt a
+ *    real session would have been handed.
  *
  * The first half spawns `bun src/rafa.ts plan create` in a scratch git
  * repository, exactly as `src/plan.test.ts` does and for the same
@@ -161,6 +171,52 @@ const PROBE = [
   '',
 ].join('\n');
 
+/**
+ * The child for the epic-context case below: the same fixture as
+ * {@link PROBE}, but it also calls `context.planPrompt`, the closure
+ * `src/plan.ts` builds with the epic {@link readPlanEpicContext} read
+ * (`src/plan.ts`'s `planPrompt` field), and records the prompt it
+ * built alongside the spec content, so the case reads the exact prompt
+ * a real session would have been handed rather than a copy of the
+ * claim.
+ */
+const PROBE_WITH_PROMPT = [
+  'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
+  'import { join } from "node:path";',
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+  `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
+  `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
+  `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
+  '',
+  'const [record, ...args] = process.argv.slice(2);',
+  'const registry = createAdapterRegistry([{',
+  '  port: "planner",',
+  '  kind: "claude",',
+  '  portVersion: 1,',
+  '  create: (context) => ({',
+  '    create: async (request) => {',
+  '      const specContent = readFileSync(join(context.repoRoot, request.specPath), "utf8");',
+  '      const prompt = context.planPrompt(specContent, request.stub);',
+  '      const planPath = context.planDir + "/PLAN-" + request.stub + ".md";',
+  '      mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
+  '      writeFileSync(',
+  '        join(context.repoRoot, planPath),',
+  '        "# Plan\\n\\n```rafa:plan\\nstub: " + request.stub + "\\n```\\n\\n- [ ] one task\\n",',
+  '      );',
+  '      writeFileSync(record, JSON.stringify({ specPath: request.specPath, stub: request.stub, specContent, prompt }));',
+  '      return { planPath, prerequisitesPath: null };',
+  '    },',
+  '  }),',
+  '}]);',
+  'const command = wrapPhaseZeroCommand(declared, (words, root) => plan(words, root, registry));',
+  'const commands = createCommandRegistry({ subjects: [{ name: "plan", summary: "plans" }], commands: [command] });',
+  'const { exitCode } = await dispatch(["plan", "create", ...args], { registry: commands });',
+  'process.exitCode = exitCode;',
+  '',
+].join('\n');
+
 let tempDir = '';
 let planted = 0;
 
@@ -206,11 +262,21 @@ interface StubPullRequest {
   readonly body: string;
 }
 
+/** One epic row, for the `epic:<slug>` lookup `readEpicContext` sends. */
+interface StubEpic {
+  readonly slug: string;
+  readonly number: number;
+  readonly title: string;
+  readonly body: string;
+}
+
 /** What one scratch repository's stand-in `gh` answers. */
 interface GhTable {
   readonly issues: readonly SpecIssue[];
   readonly pullRequests?: readonly StubPullRequest[];
   readonly roadmapSearch?: readonly { readonly number: number; readonly title: string }[];
+  /** Answered to `readEpicContext`'s `gh issue list --label type:epic --label epic:<slug> ...`. */
+  readonly epic?: StubEpic;
 }
 
 /** A JSON payload quoted for a single-quoted shell string. */
@@ -247,6 +313,24 @@ function writeGhStub(bin: string, table: GhTable): void {
   lines.push('  exit 0');
   lines.push('fi');
   lines.push('if [ "$1" = "issue" ] && [ "$2" = "list" ]; then');
+  if (table.epic !== undefined) {
+    // `readEpicContext`'s own words on the same subcommand as the roadmap
+    // search below; told apart by the labels it always carries, in the
+    // order `epicContextArgs` writes them (`type:epic` before the slug).
+    lines.push('  case "$*" in');
+    lines.push(`    *"type:epic"*"epic:${table.epic.slug}"*)`);
+    lines.push(`      printf '%s' '${shellQuoted([{
+      number: table.epic.number,
+      title: table.epic.title,
+      body: table.epic.body,
+      state: 'OPEN',
+      stateReason: '',
+      labels: [{ name: 'type:epic' }, { name: `epic:${table.epic.slug}` }],
+    }])}'`);
+    lines.push('      exit 0');
+    lines.push('      ;;');
+    lines.push('  esac');
+  }
   lines.push(`  printf '%s' '${shellQuoted(table.roadmapSearch ?? [])}'`);
   lines.push('  exit 0');
   lines.push('fi');
@@ -271,9 +355,11 @@ interface Scratch {
  * Plants a scratch git repository holding `config`, with a bare `origin`
  * beside it (so `git ls-remote --heads origin` answers instead of
  * failing), a stand-in `claude` that must never run, and no `gh` yet:
- * {@link writeGhStub} writes that once a case knows its table.
+ * {@link writeGhStub} writes that once a case knows its table. `probeSource`
+ * is {@link PROBE} unless a case names {@link PROBE_WITH_PROMPT} instead,
+ * to read the prompt the command built rather than only the spec it read.
  */
-function plantScratch(config: string): Scratch {
+function plantScratch(config: string, probeSource: string = PROBE): Scratch {
   planted += 1;
   const root = join(tempDir, `run-${String(planted)}`);
   const repo = join(root, 'repo');
@@ -298,7 +384,7 @@ function plantScratch(config: string): Scratch {
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
   const probe = join(root, 'probe.ts');
-  writeFileSync(probe, PROBE, 'utf8');
+  writeFileSync(probe, probeSource, 'utf8');
 
   return { root, repo, path, home, probe };
 }
@@ -330,6 +416,16 @@ function runPlan(scratch: Scratch, recordName: string, args: readonly string[]):
 /** What the fixture recorded, once a run wrote it. */
 function readRecord(run: CommandRun): { readonly specPath: string; readonly stub: string; readonly specContent: string } {
   return JSON.parse(readFileSync(run.record, 'utf8')) as { specPath: string; stub: string; specContent: string };
+}
+
+/** What {@link PROBE_WITH_PROMPT} recorded: {@link readRecord}'s fields plus the built prompt. */
+function readPromptRecord(run: CommandRun): { readonly specPath: string; readonly stub: string; readonly specContent: string; readonly prompt: string } {
+  return JSON.parse(readFileSync(run.record, 'utf8')) as {
+    specPath: string;
+    stub: string;
+    specContent: string;
+    prompt: string;
+  };
 }
 
 /** Every index `needles` is found at in `haystack`, in the order given; -1 for a miss. */
@@ -450,6 +546,41 @@ describe('plan create --next, walked end to end over one stubbed gh', () => {
     expect(run.stdout).toContain('is done or taken (2 of them)');
     expect(existsSync(run.record)).toBe(false);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
+  }, 30_000);
+});
+
+describe('plan create --next, carrying the epic context into the prompt', () => {
+  /** The slug the picked issue's `epic:` label and the epic issue share. */
+  const EPIC_SLUG = 'board';
+  /** The epic's acceptance criteria, as its body's own section holds them. */
+  const EPIC_CRITERIA = '- The planner sees the epic.\n- A member closed as not planned is never done.';
+  const EPIC_BODY = ['## Acceptance criteria', '', ...EPIC_CRITERIA.split('\n'), ''].join('\n');
+  const EPIC: StubEpic = { slug: EPIC_SLUG, number: 244, title: 'Epics group issues', body: EPIC_BODY };
+
+  const ROADMAP_BODY = '- [ ] #20 — the board routes\n';
+  const ROADMAP = issueOf({ number: 31, title: 'Roadmap', body: ROADMAP_BODY });
+  const PICKED_BODY = completeSpecBody('The board routes', 'Read the board, snapshot the issue, and plan from it.');
+  const PICKED = issueOf({
+    number: 20,
+    title: 'The board routes',
+    body: PICKED_BODY,
+    labels: [SPEC_LABEL, SPEC_READY_LABEL, `epic:${EPIC_SLUG}`],
+  });
+
+  it('hands the planner a prompt naming the epic and its acceptance criteria beside the spec', () => {
+    const scratch = plantScratch('roadmap:\n  issue: 31\n', PROBE_WITH_PROMPT);
+    writeGhStub(join(scratch.root, 'bin'), { issues: [ROADMAP, PICKED], epic: EPIC });
+
+    const run = runPlan(scratch, 'epic-context', ['--next', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    const record = readPromptRecord(run);
+    expect(record.specContent).toContain(PICKED_BODY.trim());
+    expect(record.prompt).toContain(`epic #${String(EPIC.number)}, "${EPIC.title}" (\`epic:${EPIC_SLUG}\`)`);
+    // "Beside the spec": the criteria sit right before the `## Spec`
+    // heading, with nothing of the spec itself between them.
+    expect(record.prompt).toContain(`${EPIC_CRITERIA}\n\n## Spec\n`);
+    expect(record.prompt.indexOf(EPIC_CRITERIA)).toBeLessThan(record.prompt.indexOf(record.specContent));
   }, 30_000);
 });
 

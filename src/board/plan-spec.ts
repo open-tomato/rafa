@@ -247,6 +247,7 @@ import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
 import { hasSpecReadyLabel, requireCompleteSpec, requireSpecReadyLabel } from './readiness.js';
+import { createGhBoardListing } from './roadmap-board.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
 import { resolveSpecSource } from './spec-source.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from './trust.js';
@@ -532,6 +533,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
       search: createGhRoadmapSearch({ gh }),
       git,
       pullRequests: createGhOpenPullRequests({ gh }),
+      listing: createGhBoardListing({ gh }),
       inspectRoadmap: (issue) => inspectRoadmapIssue(issue, trust()),
       offerAlternative: alternative,
     },

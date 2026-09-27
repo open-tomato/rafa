@@ -43,9 +43,10 @@
  *     commit recorded, so the monorepo can later be pointed at this
  *     export and the port does not live twice. Member types and their
  *     TSDoc are carried over as written, so they speak of open-tomato's
- *     OPT numbers, CLI and ledger, with two exceptions: {@link TrackerKind}
- *     is opened, and the note on `IssueRef.externalId` names the `local`
- *     adapter's issue number where the source named a file path. Left
+ *     OPT numbers, CLI and ledger, with three exceptions: {@link TrackerKind}
+ *     is opened, {@link IssueType} gains `epic`, and the note on
+ *     `IssueRef.externalId` names the `local` adapter's issue number
+ *     where the source named a file path. Left
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
  *     `LedgerEntry`, the local ledger's line. rafa ports no OPT ledger,
@@ -174,8 +175,12 @@ export type PortType = keyof PortVersions;
  */
 export type TrackerKind = 'github' | 'linear' | 'local' | (string & {});
 
-/** What an issue is for. */
-export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api';
+/**
+ * What an issue is for. `epic` is rafa's own member, absent from the
+ * source: an issue labelled `type:epic` groups the issues carrying its
+ * `epic:<slug>` label.
+ */
+export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api' | 'epic';
 
 /** How urgent an issue is, once triage has set it. */
 export type IssuePriority = 'urgent' | 'high' | 'medium' | 'low';

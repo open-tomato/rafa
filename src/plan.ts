@@ -152,6 +152,23 @@
  * renders a sentence saying no skill reaches a session, so the slot never
  * vanishes silently.
  *
+ * ## The epic context
+ *
+ * The template carries an `{EPIC_CONTEXT}` slot glued to the end of
+ * `{SKILL_INDEX}`, on no line of its own, and {@link buildPlanPrompt}
+ * fills it with {@link formatEpicContextSection}: the epic the spec
+ * issue belongs to, its number, title and acceptance criteria verbatim,
+ * with the instruction to carry those criteria into the plan's
+ * `rafa:context` block, so every task of the plan is shown them. The
+ * command reads the epic with {@link readPlanEpicContext}, which hands
+ * the issue's labels, already read by the board route, to
+ * `readEpicContext` (`board/epic-context.ts`): one `gh issue list` for
+ * an issue with an `epic:` label, none for one without, and none under
+ * `--spec`, which has no issue. No epic renders the empty string, so the
+ * prompt for a spec outside any epic is byte for byte the prompt made
+ * before the slot existed; a lookup that finds none or two epics has
+ * already warned, and plans without one.
+ *
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
@@ -161,6 +178,9 @@
  * the loop cannot run on refuses the command before any session starts.
  */
 import type { AdapterRegistry } from './adapters/registry.js';
+import type { GhRunner } from './adapters/tracker/github.js';
+import type { EpicContext } from './board/epic-context.js';
+import type { ResolvedSpec } from './board/spec-source.js';
 import type { GateBase } from './commands/plan/review-gate.js';
 import type { RouteTarget } from './config-sections.js';
 import type { RafaConfig } from './config.js';
@@ -174,6 +194,8 @@ import { fileURLToPath } from 'url';
 import { activeOutput } from './adapters/output/active.js';
 import { planFilePath } from './adapters/planner/claude.js';
 import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
+import { createGhRunner } from './adapters/tracker/github.js';
+import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
 import { CommandExit } from './cli/command.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
@@ -361,6 +383,58 @@ export function readPlanSkillIndex(
   return renderSkillIndex(resolveSessionTiers({ root: repoRoot, home, settings, entry }));
 }
 
+/** The heading {@link formatEpicContextSection} opens the `{EPIC_CONTEXT}` slot with. */
+export const EPIC_CONTEXT_HEADING = '## Epic (the epic this spec belongs to)';
+
+/**
+ * Renders the `{EPIC_CONTEXT}` slot: nothing at all for no epic, so the
+ * prompt reads as it did before the slot; otherwise two newlines, a
+ * heading, the epic's number and title, its acceptance criteria as
+ * written and the instruction to carry them into the plan's
+ * `rafa:context` block. An epic whose body holds no criteria says so
+ * rather than dropping the section. See "The epic context". Exported for
+ * tests.
+ */
+export function formatEpicContextSection(epic: EpicContext | null): string {
+  if (epic === null) return '';
+  const named = `This spec belongs to epic #${String(epic.number)}, "${epic.title}" (\`epic:${epic.slug}\`).`;
+  if (epic.criteria === null) {
+    return [
+      '',
+      '',
+      EPIC_CONTEXT_HEADING,
+      '',
+      named,
+      'Its body holds no acceptance criteria section, so there is none to carry into the plan.',
+    ].join('\n');
+  }
+  return [
+    '',
+    '',
+    EPIC_CONTEXT_HEADING,
+    '',
+    named,
+    'Carry the epic\'s acceptance criteria below, verbatim, into the plan\'s `rafa:context` block,',
+    'under a line naming the epic, so every task is shown them; plan the spec so that it serves',
+    'them, and name in the plan any criterion the spec leaves to another issue of the epic.',
+    '',
+    '### Acceptance criteria',
+    '',
+    epic.criteria,
+  ].join('\n');
+}
+
+/**
+ * The epic `spec` belongs to, for the `{EPIC_CONTEXT}` slot, or null:
+ * without asking `gh` under `--spec`, which has no issue read, and
+ * otherwise as `readEpicContext` answers over the issue's labels. See
+ * "The epic context". Exported for tests.
+ */
+export async function readPlanEpicContext(spec: ResolvedSpec, gh: GhRunner): Promise<EpicContext | null> {
+  if (spec.read === null) return null;
+  return readEpicContext({ issue: spec.read.number, labels: spec.read.labels, gh });
+}
+
 /** The slots a plan-prompt template carries. */
 export const PLAN_PROMPT_SLOTS = [
   'PLAN_FILE',
@@ -369,6 +443,7 @@ export const PLAN_PROMPT_SLOTS = [
   'PLAN_FORMAT',
   'ROUTING',
   'SKILL_INDEX',
+  'EPIC_CONTEXT',
   'SPEC_CONTENT',
 ] as const;
 
@@ -390,6 +465,9 @@ const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
  * rafa's defaults unless one is handed over. `skillIndex` is the index
  * the `{SKILL_INDEX}` slot renders ({@link formatSkillIndexSection}), as
  * {@link readPlanSkillIndex} reads it; empty unless one is handed over.
+ * `epic` is the epic the `{EPIC_CONTEXT}` slot renders
+ * ({@link formatEpicContextSection}), as {@link readPlanEpicContext}
+ * reads it; null, which renders nothing, unless one is handed over.
  *
  * Every slot is filled in ONE pass over the template, through a replacer
  * function. Filled text is never scanned again, so a spec, a progress
@@ -408,6 +486,7 @@ export function buildPlanPrompt(
   progressContent?: string,
   routing: ReadonlyMap<string, RouteTarget> = DEFAULT_ROUTING,
   skillIndex = '',
+  epic: EpicContext | null = null,
 ): string {
   const values: Record<PlanPromptSlot, string> = {
     PLAN_FILE: planFilePath(planDir, `PLAN-${stub}.md`),
@@ -416,6 +495,7 @@ export function buildPlanPrompt(
     PLAN_FORMAT: planFormatBody(planFormat),
     ROUTING: formatRoutingSection(routing),
     SKILL_INDEX: formatSkillIndexSection(skillIndex),
+    EPIC_CONTEXT: formatEpicContextSection(epic),
     SPEC_CONTENT: specContent,
   };
   return template.replace(SLOT_PATTERN, (_slot: string, name: PlanPromptSlot) => values[name]);
@@ -526,6 +606,10 @@ export default async function plan(
     activeOutput().info('📎 Including findings from progress.txt (disable with --no-progress).');
   }
 
+  // The epic the spec issue belongs to, with its criteria: one `gh` read
+  // for an issue with an `epic:` label, none otherwise ("The epic context").
+  const epic = await readPlanEpicContext(resolved.spec, createGhRunner({ cwd: repoRoot }));
+
   const template = fs.readFileSync(path.join(__dirname, 'plan-prompt.md'), 'utf8');
   const planFormat = readPlanFormat(__dirname);
   const skillIndex = readPlanSkillIndex(repoRoot, home, config, fileURLToPath(import.meta.url));
@@ -542,6 +626,7 @@ export default async function plan(
       progressContent,
       routing,
       skillIndex,
+      epic,
     ),
   });
 
