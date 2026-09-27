@@ -23,6 +23,15 @@
  *     calls are two round trips; the drift would be a refusal naming
  *     the wrong problem.
  *
+ * ## What the checks reading leaves in the store
+ *
+ * Straight after the checks are read, before any refusal, the pull
+ * request and the rows its checks answered go to `recordPlanCi`
+ * (`src/effort/store/plan-ci.ts`), which stores one `plan_ci` row for a
+ * settled verdict on a head branch that names a plan. So a merge refused
+ * on red checks, or on none, still records what it read. A store that
+ * refuses the row is warned about and never changes the exit code.
+ *
  * ## The question
  *
  * `rafa init` reads an answer only when standard input is a TTY and
@@ -167,6 +176,7 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
+import { recordPlanCi } from '../../effort/store/plan-ci.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import {
   cleanUpSteps,
@@ -592,6 +602,15 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     throw lineRefusal(`No pull request #${pick.number} at ${pr.project.root}`, USAGE);
   }
   const checks = await onProvider(`read the checks of #${pick.number}`, () => pr.pulls.checks(pick.number));
+  recordPlanCi({
+    repoRoot: pr.project.root,
+    planDir: pr.planDir,
+    pullRequest: detail,
+    rows: checks.rows,
+    warn: (message) => {
+      context.output.warn(message);
+    },
+  });
   refuseFromGit(git, detail, checks, skipChecks);
 
   const summary = summaryLine(detail, method);

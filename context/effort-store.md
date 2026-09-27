@@ -215,6 +215,10 @@ after each checks read of a pull request it assesses, re-assessments of a
 `plan.dir` off `PrContext.planDir`; the checks the bare form reads to find
 red candidates store nothing, since a list answers no head sha.
 `commands/pr/triage-plan-ci.test.ts` holds it over the fake `gh`.
+`pr merge` calls it from `runMerge` straight after its one checks read and
+before any refusal, so a merge refused on red checks, or on none, still
+stores what it read; it has no clock seam, so the row is stamped by the
+clock. `commands/pr/merge-plan-ci.test.ts` holds it over the fake `gh`.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
