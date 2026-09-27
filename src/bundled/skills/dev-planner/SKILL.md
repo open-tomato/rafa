@@ -205,6 +205,26 @@ Prose that the loop injects into the context of **only the tasks of one stage**:
 
 One `rafa:stage-context` block per stage (optional). The block binds to the nearest `# Stage:` heading above it whether it sits before that stage's tasks or after them, so place it straight after the heading, where a reader looks for it. When one stage holds two, the first is read and each later one is reported as `duplicate-block`. A block above every `# Stage:` heading belongs to no stage: the parser reports it as `orphan-stage-context` and does not read it.
 
+#### The documentation writer's section
+
+A spec may end with `## For the documentation writer`: the use cases,
+edge cases, config examples, analogies and rejected alternatives from its
+design session. Carry it into the plan as context for documentation tasks
+only, so it shapes the examples those tasks write: which situations they
+show and in what order, which config examples they give, lightest first,
+and which analogies they keep.
+
+* Put it in the `rafa:stage-context` of the stage holding the plan's
+  documentation tasks, the ones declared `{agent=doc-updater}`, trimmed
+  to what those tasks document. Never put it in `rafa:context`, which
+  reaches every task.
+* It never becomes tasks of its own. The plan's tasks come from the
+  spec's "Tasks the plan must carry"; a use case or example listed in the
+  section is material for a documentation task, not a deliverable.
+* When no stage holds such a task, because every documentation edit
+  folds into the task whose change it documents, the section stays out
+  of the plan. The spec keeps it for whoever documents the change later.
+
 ### `rafa:report` (agent output only)
 
 Agents return a structured report block at the end of their output. The loop parses this to record findings, blockers, and other metadata.
