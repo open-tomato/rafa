@@ -1,6 +1,7 @@
 /**
- * `rafa roadmap`: the Roadmap issue's lines in its order, as a table —
- * the top-level shortcut for `rafa issue list --roadmap`.
+ * `rafa roadmap`: the Roadmap issue's lines in its order, as a table,
+ * the epics it names grouped by horizon — the top-level shortcut for
+ * `rafa issue list --roadmap`.
  *
  * A top-level command of its own, its action spelled as its subject, and
  * not an alias of `issue list`: typing an alias prints a deprecation
@@ -49,16 +50,23 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
       + ' table with four columns the plain list has not got: spec, whether the body passes the readiness'
       + ' gate; blocked by, each blocker and whether it is open; has, a plan, a branch or a pull request'
       + ' already made for it; and refs, how many references of the issue\'s saved copy under `specs.dir` read'
-      + ' suspect or dangling, `-` with no copy. `--all` keeps the ticked lines, and `--type`, `--module`, `--search` and'
-      + ' `--limit` narrow the rows, keeping their order. An unreachable board is warned about with the rows'
-      + ' still printed. With `--output=json` the roadmap, the rows and the warnings are the data of the'
-      + ' terminal result event.',
+      + ' suspect or dangling, `-` with no copy. A line naming an epic prints as an epic row instead, grouped'
+      + ' by horizon under a `Roadmap #<n> · <horizon>` heading with the columns #, state, done/total, blocked,'
+      + ' title and date, and the spec rows follow under Specs. `--all` keeps the ticked lines and shows the'
+      + ' epics of every horizon, not only now, and `--type`, `--module`, `--search` and `--limit` narrow the'
+      + ' spec rows, keeping their order. An unreachable board is warned about with the rows still printed.'
+      + ' With `--output=json` the roadmap, the rows, the epics and the warnings are the data of the terminal'
+      + ' result event.',
     args: [],
     flags: [...ROADMAP_FLAGS],
     examples: [
       {
         cmd: 'rafa roadmap',
         note: 'Prints the Roadmap\'s unticked lines in its order, as `rafa issue list --roadmap` does.',
+      },
+      {
+        cmd: 'rafa roadmap --all',
+        note: 'Prints the epics of every horizon, not only now, and every line, ticked ones included.',
       },
       {
         cmd: 'rafa roadmap --all --type=bug',

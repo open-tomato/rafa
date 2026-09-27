@@ -475,7 +475,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../board/roadmap-rows.js', ['createPlanDirNames', 'readRoadmapRows']],
+    ['../../board/roadmap-epic-rows.js', ['hasEpicLines', 'readRoadmapEpicRows']],
+    ['../../board/roadmap-rows.js', ['createPlanDirNames']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'ROADMAP_REFUSAL_EXIT']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
@@ -493,6 +494,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'readTextFlag',
       'resolveIssueTracker',
     ]],
+    ['./roadmap-epic-table.js', ['renderEpicTable']],
     ['./roadmap-table.js', ['renderRoadmapTable']],
   ]],
   ['./commands/issue/show.js', [

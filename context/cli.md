@@ -1097,7 +1097,8 @@ New; it replaces no earlier text. What a row or an action added to
   narrowed to the selected lines' issues, reads a same-repository issue
   through the same `gh` runner, and writes nothing. One `gh` read of the board and one of the Roadmap
   body itself: when the board is unreachable, a `warn:` line is printed
-  on stdout ahead of the rows in text mode, the rows read from the
+  on stdout ahead of the rows in text mode, then the `Roadmap #<n> ·
+  epics unknown: <reason>` line and the rows under `Specs`, read from the
   Roadmap body alone with `spec` and `blocked by` empty and `has` still
   filled, and the command exits 0. The branch reading is
   `scanClaimBranches`, which also runs `git ls-remote --heads`: a
@@ -1117,6 +1118,26 @@ New; it replaces no earlier text. What a row or an action added to
   refusing it, so the shared run sees it. Its text output is the same
   bytes as `issue list --roadmap`; in json mode only the result events
   match, since the start event names the command as typed.
+- **`issue list --roadmap` and `rafa roadmap` print the epics a Roadmap
+  names** (`src/board/roadmap-epic-rows.ts`,
+  `src/commands/issue/roadmap-epic-table.ts`). The reading is
+  `readRoadmapEpicRows`, which asks `readRoadmapRows` for the rows and
+  tells the lines whose issue the board listing labels `type:epic` from
+  the spec lines over the same one listing, so the command still spends
+  one board read. Epic rows print grouped by horizon under `Roadmap #<n>
+  · <horizon>` with the columns `#`, `state`, `done/total`, `blocked`,
+  `title` and `date`, the `now` horizon only; `--all` widens to every
+  horizon as it widens to the ticked lines, and without it a line counts
+  the epics a horizon hides. The spec rows follow under `Specs` as
+  today's table, and the `Roadmap: #<n>` head is dropped since each
+  group names the Roadmap. `--type`, `--module`, `--search` and
+  `--limit` narrow the spec rows only; an epic row is chosen by horizon
+  alone. Each label problem `readEpicProblems` finds is a `warn` line
+  (a `warn` log event in json mode), and the json result gains an
+  `epics` key holding `groups`, `hidden`, `unknown` and `problems`.
+  A Roadmap naming no epic, with the listing read, prints today's bytes
+  and a json result with no `epics` key; a failed listing prints the
+  epics `unknown` instead, since no line could be told an epic.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading

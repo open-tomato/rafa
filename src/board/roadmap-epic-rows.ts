@@ -147,7 +147,7 @@ export interface RoadmapEpicRowsOptions extends RoadmapRowsOptions {
 }
 
 /** True when `rows` holds an epic line, shown or hidden by horizon. */
-export function hasEpicLines(rows: RoadmapEpicRows): boolean {
+export function hasEpicLines(rows: Pick<RoadmapEpicRows, 'groups' | 'hidden'>): boolean {
   return rows.groups.length > 0 || rows.hidden > 0;
 }
 

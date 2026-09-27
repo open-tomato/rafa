@@ -76,6 +76,9 @@ import { COLUMN_GAP, cutCell, EMPTY_CELL, renderRoadmapTable, TITLE_FLOOR } from
 /** The six columns, in order, as the header line spells them. */
 export const EPIC_COLUMNS = Object.freeze(['#', 'state', 'done/total', 'blocked', 'title', 'date'] as const);
 
+/** What the table is printed from: the reading's shown parts, `specs` as the caller narrowed them. */
+export type EpicTableRows = Pick<RoadmapEpicRows, 'roadmap' | 'groups' | 'hidden' | 'unknown' | 'specs'>;
+
 /** The heading over the spec rows when the Roadmap also names epics. */
 export const SPECS_HEADING = 'Specs';
 
@@ -180,7 +183,7 @@ function groupLines(roadmap: number, group: EpicHorizonGroup, width: number | un
  * module note lists, a blank line between two. `width` is the
  * terminal's, or undefined for none.
  */
-export function renderEpicTable(rows: RoadmapEpicRows, width?: number): string[] {
+export function renderEpicTable(rows: EpicTableRows, width?: number): string[] {
   if (!hasEpicLines(rows) && rows.unknown === null) return renderRoadmapTable(rows.specs, width);
   const epicGroups = rows.groups.map((group) => groupLines(rows.roadmap, group, width));
   const unknown = rows.unknown === null
