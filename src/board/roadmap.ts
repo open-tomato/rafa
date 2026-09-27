@@ -275,6 +275,11 @@ export function createGhRoadmapSearch(options: { readonly gh: GhRunner }): Roadm
   };
 }
 
+/** True when `title` is {@link ROADMAP_TITLE}, trimmed and case-folded: the exact match the loose search is narrowed by. */
+export function isRoadmapTitle(title: string): boolean {
+  return title.trim().toLowerCase() === ROADMAP_TITLE.toLowerCase();
+}
+
 /** The sentence a repository with no roadmap issue is refused with. */
 export function noRoadmapMessage(): string {
   return `no open issue is titled ${ROADMAP_TITLE}, so there is no roadmap to read;`
@@ -305,8 +310,7 @@ export async function resolveRoadmapIssue(options: {
   const { configured, search } = options;
   if (configured !== null) return configured;
 
-  const wanted = ROADMAP_TITLE.toLowerCase();
-  const titled = (await search()).filter((issue) => issue.title.trim().toLowerCase() === wanted);
+  const titled = (await search()).filter((issue) => isRoadmapTitle(issue.title));
   if (titled.length === 0) throw new CommandExit(ROADMAP_REFUSAL_EXIT, noRoadmapMessage());
   if (titled.length > 1) {
     throw new CommandExit(ROADMAP_REFUSAL_EXIT, severalRoadmapsMessage(titled.map((issue) => issue.number)));
