@@ -62,7 +62,7 @@ afterAll(() => {
 });
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue list [--roadmap [--all] [--full]] [--state=<state>] [--type=<type>] [--module=<name>]'
+const USAGE = 'rafa issue list [--roadmap [--all] [--full] [--check]] [--state=<state>] [--type=<type>] [--module=<name>]'
   + ' [--search=<text>] [--limit=<n>]';
 
 /** The subject the dispatched cases route under. */
@@ -457,15 +457,18 @@ const LINE_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{ all: true, state: 'todo' }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
   [{ all: true, roadmap: false }, '--all keeps the ticked Roadmap lines, so it needs --roadmap'],
   [{ full: true }, '--full prints the issues of each Roadmap epic, so it needs --roadmap'],
+  [{ check: true }, '--check weighs the epics the board read finds, so it needs --roadmap'],
 ];
 
 describe('the line rafa issue list --roadmap reads', () => {
-  it('reads no switch as the plain list, and --all and --full only beside --roadmap', () => {
-    expect(readIssueListLine({})).toEqual({ roadmap: false, all: false, full: false });
-    expect(readIssueListLine({ roadmap: true, type: 'bug' })).toEqual({ roadmap: true, all: false, full: false });
-    expect(readIssueListLine({ roadmap: true, all: true })).toEqual({ roadmap: true, all: true, full: false });
-    expect(readIssueListLine({ roadmap: true, full: true })).toEqual({ roadmap: true, all: false, full: true });
-    expect(readIssueListLine({ state: 'todo' })).toEqual({ roadmap: false, all: false, full: false });
+  it('reads no switch as the plain list, and --all, --full and --check only beside --roadmap', () => {
+    const none = { roadmap: false, all: false, full: false, check: false };
+    expect(readIssueListLine({})).toEqual(none);
+    expect(readIssueListLine({ roadmap: true, type: 'bug' })).toEqual({ ...none, roadmap: true });
+    expect(readIssueListLine({ roadmap: true, all: true })).toEqual({ ...none, roadmap: true, all: true });
+    expect(readIssueListLine({ roadmap: true, full: true })).toEqual({ ...none, roadmap: true, full: true });
+    expect(readIssueListLine({ roadmap: true, check: true })).toEqual({ ...none, roadmap: true, check: true });
+    expect(readIssueListLine({ state: 'todo' })).toEqual(none);
   });
 
   it.each(LINE_REFUSALS)('refuses the flags %j with exit code 1', (flags, problem) => {
@@ -911,5 +914,87 @@ describe('rafa issue list --roadmap, with epics', () => {
     expect(outcome.stdout.split('\n').slice(0, 4)).toEqual([UNREACHABLE_WARNING, UNREACHABLE_UNKNOWN, '', 'Specs']);
     expect(outcome.stdout.split('\n').slice(5, -1)
       .map((line) => line.split(' ')[0])).toEqual(['#13', '#60', '#70', '#14']);
+  });
+});
+
+/** {@link EPIC_PLANT} with `closed` closed as completed on the board. */
+function closingPlant(closed: readonly number[]): GhPlant {
+  const board = (JSON.parse(EPIC_BOARD_JSON) as { number: number; state: string; stateReason: string | null }[])
+    .map((issue) => closed.includes(issue.number)
+      ? { ...issue, state: 'CLOSED', stateReason: 'COMPLETED' }
+      : issue);
+  return { ...EPIC_PLANT, board: { ok: true, stdout: JSON.stringify(board), stderr: '' } };
+}
+
+/** What `--check` ends with when alpha, #60, is open with both its members closed. */
+const ALPHA_DONE_FAILURE = '❌ 1 epic\'s stored state disagrees with its computed one:\n  done, but epic #60 is still open';
+
+describe('rafa issue list --roadmap --check', () => {
+  it('passes the board whose epics agree, printing the bytes the line prints without it', async () => {
+    const project = plantRoadmapCase();
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(EPIC_PLANT, []));
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(EPIC_PLANT, []));
+
+    expect(checked).toEqual(plain);
+    expect(checked.exitCode).toBe(0);
+  });
+
+  it('exits 1 on an open epic whose members are all closed, the table still printed, where the line without it exits 0', async () => {
+    const project = plantRoadmapCase();
+    const plant = closingPlant([62]);
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(plant, []));
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(plant, []));
+    const shortcut = await dispatchInProject(
+      ['roadmap', '--check'],
+      [],
+      [createRoadmapCommand({ gh: plantedGh(plant, []), git: plantedGit, terminalWidth: () => undefined })],
+      project,
+    );
+
+    expect([plain.exitCode, plain.stderr]).toEqual([0, '']);
+    expect(plain.stdout).toContain('done, but epic #60 is still open');
+    expect(checked).toEqual({ exitCode: 1, stdout: plain.stdout, stderr: `${ALPHA_DONE_FAILURE}\n` });
+    expect(shortcut).toEqual(checked);
+  });
+
+  it('weighs an epic a horizon hides too, naming it', async () => {
+    const project = plantRoadmapCase();
+
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(closingPlant([71]), []));
+
+    expect(checked.stdout).not.toContain('#70');
+    expect([checked.exitCode, checked.stderr]).toEqual([
+      1,
+      '❌ 1 epic\'s stored state disagrees with its computed one:\n  done, but epic #70 is still open\n',
+    ]);
+  });
+
+  it('ends with the failure as the terminal error\'s message and no data in json mode', async () => {
+    const project = plantRoadmapCase();
+
+    const outcome = await run(['issue', 'list', '--roadmap', '--check', '--output=json'], project, roadmapCommand(closingPlant([62]), []));
+    const events = eventsOf(outcome.stdout);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
+    expect(events.at(-1)).toEqual({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_exit', message: ALPHA_DONE_FAILURE },
+      ts: expect.any(String),
+    });
+  });
+
+  it('exits 1 with the listing\'s reason when the board is unreachable, where the line without it exits 0', async () => {
+    const project = plantRoadmapCase();
+    const plant: GhPlant = { ...EPIC_PLANT, board: UNREACHABLE };
+    const plain = await run(['issue', 'list', '--roadmap'], project, roadmapCommand(plant, []));
+
+    const checked = await run(['issue', 'list', '--roadmap', '--check'], project, roadmapCommand(plant, []));
+
+    expect(plain.exitCode).toBe(0);
+    expect(checked.exitCode).toBe(1);
+    expect(checked.stdout).toBe(plain.stdout);
+    expect(checked.stderr).toStartWith('❌ Could not check the epics: board listing: gh issue list');
   });
 });

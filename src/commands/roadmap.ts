@@ -53,7 +53,9 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
       + ' suspect or dangling, `-` with no copy. A line naming an epic prints as an epic row instead, grouped'
       + ' by horizon under a `Roadmap #<n> · <horizon>` heading with the columns #, state, done/total, blocked,'
       + ' title and date, and the spec rows follow under Specs. `--full` prints each epic\'s issues under its'
-      + ' row, on two rows each: number, state and title, then labels and blockers. `--all` keeps the ticked lines and shows the'
+      + ' row, on two rows each: number, state and title, then labels and blockers. `--check` exits 1 when any'
+      + ' type:epic issue\'s stored state disagrees with its computed one, or the board could not be read, so CI'
+      + ' can run it. `--all` keeps the ticked lines and shows the'
       + ' epics of every horizon, not only now, and `--type`, `--module`, `--search` and `--limit` narrow the'
       + ' spec rows, keeping their order. An unreachable board is warned about with the rows still printed.'
       + ' With `--output=json` the roadmap, the rows, the epics and the warnings are the data of the terminal'
@@ -72,6 +74,10 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
       {
         cmd: 'rafa roadmap --full',
         note: 'Prints the now epics with each epic\'s issues underneath, then the spec lines.',
+      },
+      {
+        cmd: 'rafa roadmap --check',
+        note: 'Prints the Roadmap, then exits 1 when an epic is open with its work done or closed with it not done.',
       },
       {
         cmd: 'rafa roadmap --all --type=bug',

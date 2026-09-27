@@ -88,6 +88,17 @@
  * no epic prints today's bytes with it too. `--full` without
  * `--roadmap` is refused, as `--all` is.
  *
+ * `--check` prints what the line would print without it, then weighs
+ * every `type:epic` issue on the listing — not only the Roadmap's, and
+ * whatever horizon is shown — its stored state against its computed one,
+ * as `epicCheckFailure` (`./roadmap-check.ts`) reads them, and ends with
+ * exit code 1 when one disagrees or the listing failed, naming each
+ * disagreement on stderr in text mode and as the terminal error's message
+ * in json mode. The dispatcher drops the payload of a non-zero ending,
+ * so a failed check in json mode writes no result. A check that passes
+ * changes nothing. `--check` without `--roadmap` is refused, as `--all`
+ * is.
+ *
  * When the Roadmap names at least one epic, shown or hidden by horizon,
  * or when the board listing failed so no line could be told an epic,
  * the table is the one `renderEpicTable` (`./roadmap-epic-table.ts`)
@@ -129,17 +140,20 @@
  *
  * Exit code 1, as `issue-tracker.ts` words them: an argument, a switch
  * typed with a value, a flag value outside its set, a `--limit` that is
- * no positive whole number, `--state` beside `--roadmap`, `--all` or
- * `--full` without it, a config refused, a chain landing nowhere, and a `find` or
+ * no positive whole number, `--state` beside `--roadmap`, `--all`,
+ * `--full` or `--check` without it, a config refused, a chain landing nowhere, and a `find` or
  * a `get` that rejects. One `get` rejecting refuses the whole list, so no
  * row is left out unannounced.
  *
  * Under `--roadmap`, a Roadmap that cannot be found or read refuses with
  * `ROADMAP_REFUSAL_EXIT` (`board/roadmap.ts`), `plan create --next`'s
- * code for the same: there is no order to print.
+ * code for the same: there is no order to print. Under `--check`, a
+ * stored state disagreeing with its computed one, or a listing that
+ * failed, ends with `EPIC_CHECK_EXIT`, 1.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
 import type { EpicProblem } from '../../board/epic-problems.js';
+import type { Epics } from '../../board/epics.js';
 import type { EpicHorizonGroup } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
@@ -169,11 +183,12 @@ import {
   readTextFlag,
   resolveIssueTracker,
 } from './issue-tracker.js';
+import { EPIC_CHECK_EXIT, epicCheckFailure } from './roadmap-check.js';
 import { renderEpicTable } from './roadmap-epic-table.js';
 import { renderRoadmapTable } from './roadmap-table.js';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue list [--roadmap [--all] [--full]] [--state=<state>] [--type=<type>] [--module=<name>]'
+const USAGE = 'rafa issue list [--roadmap [--all] [--full] [--check]] [--state=<state>] [--type=<type>] [--module=<name>]'
   + ' [--search=<text>] [--limit=<n>]';
 
 /** What a switch typed with a value is told. */
@@ -222,11 +237,22 @@ export interface RoadmapListResult {
   readonly warnings: readonly string[];
 }
 
-/** Which listing a line asks for: the tracker's, or the Roadmap's with or without its ticked lines and epic members. */
+/** What {@link listRoadmap} answers: the result json mode writes, and every epic on the listing for `--check`. */
+export interface RoadmapListing {
+  readonly result: RoadmapListResult;
+  /** Every `type:epic` issue on the listing, read, or why the listing failed. */
+  readonly epics: Epics;
+}
+
+/**
+ * Which listing a line asks for: the tracker's, or the Roadmap's with or
+ * without its ticked lines and epic members, checked or not.
+ */
 export interface IssueListLine {
   readonly roadmap: boolean;
   readonly all: boolean;
   readonly full: boolean;
+  readonly check: boolean;
 }
 
 /** The `--limit` a line gives, or undefined when it gives none; a refusal for any value but a positive whole number. */
@@ -258,13 +284,14 @@ export function readIssueQuery(flags: LineFlags): IssueQuery {
 /**
  * Which listing a line asks for, read before anything else on it; a
  * refusal with exit code 1 for a switch typed with a value, `--state`
- * beside `--roadmap`, and `--all` or `--full` without it. See the module
- * note.
+ * beside `--roadmap`, and `--all`, `--full` or `--check` without it. See
+ * the module note.
  */
 export function readIssueListLine(flags: LineFlags): IssueListLine {
   const roadmap = readSwitch('roadmap', flags['roadmap'], SWITCH_HINT);
   const all = readSwitch('all', flags['all'], SWITCH_HINT);
   const full = readSwitch('full', flags['full'], SWITCH_HINT);
+  const check = readSwitch('check', flags['check'], SWITCH_HINT);
   if (roadmap && flags['state'] !== undefined) {
     throw lineRefusal(
       '--state cannot narrow --roadmap: the Roadmap is read off the GitHub board, which holds an issue open or'
@@ -274,7 +301,8 @@ export function readIssueListLine(flags: LineFlags): IssueListLine {
   }
   if (all && !roadmap) throw lineRefusal('--all keeps the ticked Roadmap lines, so it needs --roadmap', USAGE);
   if (full && !roadmap) throw lineRefusal('--full prints the issues of each Roadmap epic, so it needs --roadmap', USAGE);
-  return { roadmap, all, full };
+  if (check && !roadmap) throw lineRefusal('--check weighs the epics the board read finds, so it needs --roadmap', USAGE);
+  return { roadmap, all, full, check };
 }
 
 /** The lines text mode writes for a list; see the module note. */
@@ -344,7 +372,7 @@ export async function listRoadmap(
   seams: IssueSeams,
   all: boolean,
   filter: RoadmapFilter,
-): Promise<RoadmapListResult> {
+): Promise<RoadmapListing> {
   const project = issueProject(context);
   const warn = (message: string): void => {
     context.output.warn(message);
@@ -386,9 +414,10 @@ export async function listRoadmap(
     rows: narrowRoadmapRows(read.specs, filter),
     warnings: read.warnings,
   };
-  if (!hasEpicLines(read) && read.unknown === null) return Object.freeze(listed);
+  if (!hasEpicLines(read) && read.unknown === null) return Object.freeze({ result: Object.freeze(listed), epics: read.epics });
   const { groups, hidden, unknown, problems } = read;
-  return Object.freeze({ ...listed, epics: Object.freeze({ groups, hidden, unknown, problems }) });
+  const result = Object.freeze({ ...listed, epics: Object.freeze({ groups, hidden, unknown, problems }) });
+  return Object.freeze({ result, epics: read.epics });
 }
 
 /** Lists the issues a line asks for; see the module note. */
@@ -416,16 +445,22 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
 
   expectNoArgument(context.args, USAGE);
   const filter: RoadmapFilter = readIssueQuery(context.flags);
-  const listed = await listRoadmap(context, seams, line.all, filter);
+  const { result, epics } = await listRoadmap(context, seams, line.all, filter);
+  const failure = line.check
+    ? epicCheckFailure(epics)
+    : null;
   if (context.outputMode === 'json') {
-    context.output.result(listed);
+    // A non-zero ending drops the payload, so the failure is its message alone; see the module note.
+    if (failure !== null) throw new CommandExit(EPIC_CHECK_EXIT, failure);
+    context.output.result(result);
     return;
   }
   const width = (seams.terminalWidth ?? ((): number | undefined => process.stdout.columns))();
-  for (const text of renderRoadmapList(listed, width, line.full)) context.output.info(text);
+  for (const text of renderRoadmapList(result, width, line.full)) context.output.info(text);
+  if (failure !== null) throw new CommandExit(EPIC_CHECK_EXIT, failure);
 }
 
-/** The flags `issue list` declares, `--roadmap`, `--all` and `--full` first. */
+/** The flags `issue list` declares, `--roadmap`, `--all`, `--full` and `--check` first. */
 export const ISSUE_LIST_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
   {
     name: 'roadmap',
@@ -444,6 +479,12 @@ export const ISSUE_LIST_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
     name: 'full',
     description: 'With --roadmap, print each epic\'s issues under its row, on two rows each: number, state and'
       + ' title, then labels and blockers. Refused without --roadmap.',
+    type: 'boolean',
+  },
+  {
+    name: 'check',
+    description: 'With --roadmap, exit 1 when any type:epic issue on the board is open with its work done, or'
+      + ' closed with it not done, or when the board could not be read, naming each. Refused without --roadmap.',
     type: 'boolean',
   },
   {
@@ -495,7 +536,8 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       + ' instead, grouped by horizon under a `Roadmap #<n> · <horizon>` heading with the columns #, state,'
       + ' done/total, blocked, title and date, the now horizon only unless `--all`, and the spec rows follow'
       + ' under Specs; `--full` prints each epic\'s issues under its row, on two rows each: number, state and'
-      + ' title, then labels and blockers. `--type`, `--module`, `--search` and `--limit` then narrow the spec rows, keeping their'
+      + ' title, then labels and blockers; `--check` exits 1 when any type:epic issue\'s stored state'
+      + ' disagrees with its computed one. `--type`, `--module`, `--search` and `--limit` then narrow the spec rows, keeping their'
       + ' order, and an unreachable board is warned about with the rows still printed. With `--output=json`'
       + ' the tracker, the query and every issue, or under `--roadmap` the roadmap, the rows, the epics and the'
       + ' warnings, are the data of the terminal result event.',
@@ -521,6 +563,10 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       {
         cmd: 'rafa issue list --roadmap --full',
         note: 'Prints the Roadmap\'s now epics with each epic\'s issues underneath, then its spec lines.',
+      },
+      {
+        cmd: 'rafa issue list --roadmap --check',
+        note: 'Prints the Roadmap, then exits 1 when an epic is open with its work done or closed with it not done.',
       },
       {
         cmd: 'rafa issue list --roadmap --all --type=bug',

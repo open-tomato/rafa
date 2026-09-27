@@ -1149,6 +1149,17 @@ New; it replaces no earlier text. What a row or an action added to
   narrow terminal. It is the one listing that mixes two epics' issues,
   it changes text mode only (json's `epics` already carry every
   member), and a Roadmap naming no epic prints today's bytes with it.
+  `--check` (refused without `--roadmap`, as `--all` is) prints what
+  the line prints without it, then weighs every `type:epic` issue on
+  the listing — not only the Roadmap's, whatever horizon is shown — its
+  stored state against its computed one (`epicCheckFailure`,
+  `src/commands/issue/roadmap-check.ts`), and exits 1 when one
+  disagrees, naming each by the disagreement line the table prints, so
+  CI can run it. A failed listing fails the check too, with its reason,
+  since nothing was compared. The message is stderr in text mode and
+  the terminal error's message in json mode, where the dispatcher
+  drops the result's data on a non-zero exit; a check that passes
+  changes nothing.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -1197,7 +1208,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `accept-refs`,
   `comment`, `stub`, `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
-  flags `roadmap`, `all`, `full`, `state`, `type`, `module`, `search` and `limit`,
+  flags `roadmap`, `all`, `full`, `check`, `state`, `type`, `module`, `search` and `limit`,
   `show` the argument `id`, `create` the flags `title`, `body`, `type`,
   `module` and `priority`, `comment` the argument `id` and the flag `body`,
   and `move` the arguments `id` and `state`; each declares `text` and

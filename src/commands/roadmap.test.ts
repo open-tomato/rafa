@@ -106,7 +106,7 @@ function startCommand(event: ReturnType<typeof eventsOf>[number]): string | null
 
 describe('the flags rafa roadmap declares', () => {
   it('are issue list\'s own flag objects, in their order, less --roadmap and --state', () => {
-    expect(ROADMAP_FLAGS.map((flag) => flag.name)).toEqual(['all', 'full', 'type', 'module', 'search', 'limit']);
+    expect(ROADMAP_FLAGS.map((flag) => flag.name)).toEqual(['all', 'full', 'check', 'type', 'module', 'search', 'limit']);
     expect(ROADMAP_FLAGS).toEqual(ISSUE_LIST_FLAGS.filter((flag) => flag.name !== 'roadmap' && flag.name !== 'state'));
     expect(ROADMAP_FLAGS.every((flag) => ISSUE_LIST_FLAGS.includes(flag))).toBe(true);
     expect(createRoadmapCommand().flags).toEqual([...ROADMAP_FLAGS]);

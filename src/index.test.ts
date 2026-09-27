@@ -494,6 +494,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'readTextFlag',
       'resolveIssueTracker',
     ]],
+    ['./roadmap-check.js', ['EPIC_CHECK_EXIT', 'epicCheckFailure']],
     ['./roadmap-epic-table.js', ['renderEpicTable']],
     ['./roadmap-table.js', ['renderRoadmapTable']],
   ]],
