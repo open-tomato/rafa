@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epics`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -835,6 +835,25 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
     ['./issue/list.js', ['ISSUE_LIST_FLAGS', 'runIssueList']],
   ]],
+  ['./commands/epics.js', [
+    ['../adapters/tracker/github.js', ['createGhRunner']],
+    ['../board/epic-problems.js', ['epicProblemMessage', 'readEpicProblems']],
+    ['../board/epic-walk.js', ['epicLines', 'isNowEpic']],
+    ['../board/epics.js', ['readEpics']],
+    ['../board/issue.js', ['createGhSpecIssueReader']],
+    ['../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams']],
+    ['../board/roadmap-rows.js', ['createPlanDirNames', 'readLineRows']],
+    ['../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'resolveRoadmapIssue', 'ROADMAP_REFUSAL_EXIT']],
+    ['../cli/command.js', ['CommandExit']],
+    ['../config-sections.js', ['messageOf']],
+    ['../pr/git.js', ['createGitRunner']],
+    ['./doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
+    ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueProject', 'issueSubjectConfig', 'lineRefusal']],
+    ['./issue/roadmap-epic-table.js', ['unknownLine']],
+    ['./issue/roadmap-table.js', ['renderRoadmapTable']],
+    ['./plan/plan-files.js', ['plansDirAt']],
+  ]],
   ['./commands/init.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
@@ -1100,6 +1119,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',
+      './commands/epics.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/cleanup.js',

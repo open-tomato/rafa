@@ -82,7 +82,7 @@
 import type { EpicProblem } from './epic-problems.js';
 import type { Epic, Epics } from './epics.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
-import type { RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
+import type { LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapPullRequest } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
@@ -200,8 +200,12 @@ function gitOnce(git: GitRunner): GitRunner {
   };
 }
 
-/** `options` with every seam `readRoadmapRows` reads through asked at most once. */
-function onceSeams(options: RoadmapEpicRowsOptions): RoadmapEpicRowsOptions {
+/**
+ * `options` with every seam `readLineRows` reads through asked at most
+ * once, every later ask answered as the first was; see the module note.
+ * `rafa epics` reads its epic and its rows through it too.
+ */
+export function onceSeams<T extends LineRowsOptions>(options: T): T {
   return {
     ...options,
     board: asyncOnce(options.board),
@@ -229,8 +233,15 @@ async function orEmpty<T>(read: () => Promise<T> | T, fallback: T): Promise<T> {
   }
 }
 
-/** Every issue on `issues` a plan, a branch or an open pull request claims. */
-async function claimsOf(issues: readonly BoardIssue[], seams: RoadmapEpicRowsOptions): Promise<ReadonlySet<number>> {
+/** The seams {@link claimsOf} reads through. */
+export type ClaimSeams = Pick<LineRowsOptions, 'planNames' | 'git' | 'remote' | 'pullRequests'>;
+
+/**
+ * Every issue on `issues` a plan, a branch or an open pull request
+ * claims; a reading that fails adds no claim, since the rows' reading
+ * over the same seams has warned it already. See the module note.
+ */
+export async function claimsOf(issues: readonly BoardIssue[], seams: ClaimSeams): Promise<ReadonlySet<number>> {
   const names = await orEmpty(seams.planNames, []);
   const refs = scanClaimBranches(seams.git, seams.remote).refs;
   const pulls = await orEmpty<readonly RoadmapPullRequest[]>(seams.pullRequests, []);

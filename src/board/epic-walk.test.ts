@@ -35,6 +35,7 @@ import {
   descentPassSentence,
   dryEpicSentence,
   epicHeaderSentence,
+  epicLines,
   epicSkipSentence,
   isEpicIssue,
   isNowEpic,
@@ -42,6 +43,7 @@ import {
   NOW_HORIZON_LABEL,
   pickDescendedLine,
 } from './epic-walk.js';
+import { readEpics } from './epics.js';
 import { createRoadmapReadings, parseRoadmapBody, pickNextRoadmapLine } from './roadmap.js';
 
 /** The fields a case may set on an issue. */
@@ -300,6 +302,20 @@ describe('label-only members', () => {
 
     expect(numbers.slice(1)).toEqual([bodyLines + 1, bodyLines + 2]);
     expect(new Set(numbers).size).toBe(numbers.length);
+  });
+
+  it('are the lines epicLines answers for the epic read, the one spelling rafa epics prints', async () => {
+    const { seams } = world(board);
+    const [row] = board;
+    const read = readEpics({ issues: board, claims: new Set(), today: new Date(0) }).epics[0];
+    if (row === undefined || read === undefined) throw new Error('the board holds no epic');
+
+    const descent = await descendRoadmap(roadmap('10'), seams);
+    const lines = epicLines(read, row);
+
+    expect(lines.lines).toEqual(descent.lines);
+    expect(lines.checklist.map((line) => line.issue)).toEqual([12]);
+    expect(lines.labelOnly.map((issue) => issue.number)).toEqual([15, 17]);
   });
 
   it('reports each by name with its label', async () => {

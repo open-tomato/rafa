@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-eight registered so far wrap a
+ * of each is its command. Five of the fifty-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -27,7 +27,8 @@
  * `unblock` read and label issues on the GitHub board and `check` reads
  * the references of a spec's saved copy, all eight sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
- * run with `--roadmap` set, nor `self-update`, which installs the
+ * run with `--roadmap` set, nor `epics`, which reads one epic's lines
+ * into the same rows through `src/board/roadmap-rows.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -171,6 +172,8 @@
  *     [--module=<name>] [--search=<text>] [--limit=<n>]`, top-level: the Roadmap issue's
  *     lines in its order as a table, `issue list --roadmap` under a word
  *     of its own. Not an alias, since an alias prints a deprecation line.
+ *   - `epics [<n>]`, top-level: one epic's lines as the same table, the
+ *     epic numbered or the first `now` epic on the Roadmap not done.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -211,6 +214,7 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
+import epics from './epics.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
@@ -328,6 +332,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   status,
   next,
   roadmap,
+  epics,
   init,
   doctor,
   cleanup,

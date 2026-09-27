@@ -86,6 +86,11 @@
  * after a blocked line by its number, and every number in one epic's
  * lines is distinct that way.
  *
+ * {@link epicLines} answers that order for an epic already read, and is
+ * the one spelling of it: `rafa epics` (`src/commands/epics.ts`) prints
+ * the same lines as its table's rows, so the view and the walk cannot
+ * order one epic two ways.
+ *
  * ## The dry epic
  *
  * An epic walked into whose every line is done or taken has RUN DRY:
@@ -231,8 +236,22 @@ function epicOnListing(number: number, listing: readonly BoardIssue[]): { readon
   return { epic, row };
 }
 
-/** The epic's lines: its checklist, then its label-only members; the module note holds the order. */
-function descended(line: RoadmapLine, epic: Epic, row: BoardIssue): EpicLineOutcome {
+/** An epic's lines in walk order, and the two parts they are made of. */
+export interface EpicLines {
+  /** Its checklist's lines, as its body writes them. */
+  readonly checklist: readonly RoadmapLine[];
+  /** Its open members missing from the checklist, in ascending number. */
+  readonly labelOnly: readonly BoardIssue[];
+  /** The checklist, then one line per label-only member, numbered past the body's last line. */
+  readonly lines: readonly RoadmapLine[];
+}
+
+/**
+ * `epic`'s lines, read off its listing row `row`: its checklist, then its
+ * label-only members; the module note holds the order and the numbering.
+ * The walk reads these, and `rafa epics` prints them as rows.
+ */
+export function epicLines(epic: Epic, row: Pick<BoardIssue, 'body'>): EpicLines {
   const checklist = epic.body?.lines ?? [];
   const listed = new Set(checklist.map((item) => item.issue));
   const labelOnly = epic.members.filter((member) => member.state === 'OPEN' && !listed.has(member.number));
@@ -243,7 +262,16 @@ function descended(line: RoadmapLine, epic: Epic, row: BoardIssue): EpicLineOutc
     why: member.title,
     lineNumber: past + index + 1,
   }));
+  return Object.freeze({
+    checklist,
+    labelOnly: Object.freeze([...labelOnly]),
+    lines: Object.freeze([...checklist, ...extra]),
+  });
+}
 
+/** The epic walked into, with its lines. */
+function descended(line: RoadmapLine, epic: Epic, row: BoardIssue): EpicLineOutcome {
+  const { checklist, labelOnly, lines } = epicLines(epic, row);
   return {
     epic: Object.freeze({
       line,
@@ -252,9 +280,9 @@ function descended(line: RoadmapLine, epic: Epic, row: BoardIssue): EpicLineOutc
       slug: epic.slug,
       progress: epic.progress,
       checklist,
-      labelOnly: Object.freeze([...labelOnly]),
+      labelOnly,
     }),
-    lines: Object.freeze([...checklist, ...extra]),
+    lines,
   };
 }
 

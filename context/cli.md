@@ -163,7 +163,10 @@ New; it replaces no earlier text. What a row or an action added to
   control case in `src/cli/help.test.ts` that pins the root `Commands`
   line as a literal: `RAFA_UPDATE_HELP_SNAPSHOTS=1` rewrites `rafa.txt`
   but not that string, which is edited by hand (measured on 2026-09-24,
-  registering `roadmap`). An action
+  registering `roadmap`). Registering `epics` pushed that line past the
+  help's width, so it wraps onto a second line holding `describe`, and
+  both literals, there and in `src/tests/spends-cli-surface.test.ts`,
+  now hold the wrap (measured on 2026-09-27). An action
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
@@ -189,7 +192,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `epics`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct` and `release`: a subject is
@@ -1160,6 +1163,36 @@ New; it replaces no earlier text. What a row or an action added to
   the terminal error's message in json mode, where the dispatcher
   drops the result's data on a non-zero exit; a check that passes
   changes nothing.
+- **`rafa epics [n]` prints one epic's lines as the Roadmap table**
+  (`src/commands/epics.ts`). The epic is the `type:epic` issue numbered
+  `n`, whatever its horizon and whether the Roadmap names it, or with no
+  number the first unticked Roadmap line naming an epic that is open,
+  carries `horizon:now` alone (`isNowEpic`, the walk's own test) and is
+  not computed `done` — the epic `rafa next` walks into. Each line is
+  told an epic by the board listing's type, never by reading the issue,
+  so the command spends one listing, plus one Roadmap read without `n`.
+  Its lines are `epicLines` (`src/board/epic-walk.ts`), the checklist
+  then the open members missing from it by number, the walk's own order,
+  read into rows by `readLineRows` (`src/board/roadmap-rows.ts`), the
+  line-taking half of `readRoadmapRows`, so the `spec`, `blocked by`,
+  `has` and `refs` columns mean what they mean on the Roadmap and ticked
+  lines are left out. The seams are `onceSeams` and the claims
+  `claimsOf` (`src/board/roadmap-epic-rows.ts`), so the listing, the pull
+  request list, the plan dir and the branch scan are each asked once
+  (measured: dropping `onceSeams` makes the spawned case count two
+  listings). Text mode prints `Epic #<n> · <title> · <state>,
+  <done>/<total> done`, the disagreement line indented under it, then
+  today's table, or `No issues.`; no issue of another epic is named.
+  Each failed reading of the rows and each label problem about this
+  epic (its horizon, its checklist, its members, a member carrying a
+  second `epic:` label; an orphan label is `rafa roadmap`'s) is a `warn`
+  line, a `warn` log event in json mode, whose result is `EpicsResult`.
+  A Roadmap naming no open `now` epic that is not done prints one line
+  and exits 0; a failed listing prints the epic, or the Roadmap's epics,
+  `unknown` with the reason and exits 0; a number the listing holds that
+  is no epic, or does not hold, is refused with exit 1; a Roadmap that
+  cannot be read, with `ROADMAP_REFUSAL_EXIT`. It declares no flag and
+  no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading

@@ -2,7 +2,8 @@
  * Tests for the roadmap rows (`src/board/roadmap-rows.ts`): the Roadmap's
  * lines joined to one planted board listing, each row's `spec`,
  * `blocked by`, `has` and `refs` readings, the unticked and `all` selections,
- * and what each failed reading degrades to.
+ * and what each failed reading degrades to; and `readLineRows` handed
+ * lines of its own, reading no Roadmap.
  *
  * Every read is planted: the board is a {@link BoardListing} answering a
  * fixed list, the Roadmap a reader answering one body, git a runner
@@ -38,6 +39,7 @@ import {
   hasPlanFor,
   hasText,
   OUTLINE_HEADINGS,
+  readLineRows,
   readRoadmapRows,
   readSpecColumn,
   refsText,
@@ -270,6 +272,40 @@ describe('the rows over a planted board', () => {
       unknown: [99],
     });
     expect(rowFor(read.rows, 11).blocked?.kind).toBe('no-line');
+  });
+});
+
+describe('the rows over lines handed in', () => {
+  const handed = [
+    { issue: 16, ticked: false, why: 'blocked', lineNumber: 3 },
+    { issue: 10, ticked: true, why: 'shipped', lineNumber: 4 },
+    { issue: 11, ticked: false, why: 'ready', lineNumber: 5 },
+  ];
+
+  it('reads the handed lines in their order, the unticked ones, and never the Roadmap', async () => {
+    const { options, counts } = planted();
+    const read = await readLineRows(handed, options);
+
+    expect(cells(read.rows)).toEqual([
+      [16, 'ready', '#20 open, #21 closed, #99 unknown, open-tomato/agentic-research#3 unknown', 'branch', '3'],
+      [11, 'ready', '', 'plan', '0'],
+    ]);
+    expect(read.warnings).toEqual([UNREAD_COPY_WARNING]);
+    expect(counts).toEqual({ board: 1, roadmap: [], pulls: 1, search: 0, refs: [[16, 11]] });
+  });
+
+  it('keeps the ticked ones in their places with all', async () => {
+    const { options } = planted({ all: true });
+    const read = await readLineRows(handed, options);
+
+    expect(read.rows.map((row) => row.line.issue)).toEqual([16, 10, 11]);
+  });
+
+  it('answers the rows readRoadmapRows answers when handed the Roadmap\'s own lines', async () => {
+    const { options } = planted();
+    const lines = (await readRoadmapRows(options)).rows.map((row) => row.line);
+
+    expect((await readLineRows(lines, planted().options)).rows).toEqual((await readRoadmapRows(planted().options)).rows);
   });
 });
 
