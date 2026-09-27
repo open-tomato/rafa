@@ -151,7 +151,19 @@
  * the gate's refusal in place of the session's own failure. Four other
  * mutations driven the same day over `gate.ts` are recorded in
  * `src/board/gate.test.ts`; two of them redden cases in this file.
+ *
+ * ## The epic context
+ *
+ * The `{EPIC_CONTEXT}` slot and `readPlanEpicContext` are held in
+ * process, over the source template and a planted `GhRunner`: a prompt
+ * with no epic is held byte for byte equal to the one the template made
+ * before the slot, with the same comparison failing once an epic is
+ * handed over as its control. The `--issue=20` fixture carries no
+ * `epic:` label, so the stand-in `gh` is asked nothing more for it.
  */
+import type { GhRunner } from './adapters/tracker/github.js';
+import type { EpicContext } from './board/epic-context.js';
+import type { ResolvedSpec } from './board/spec-source.js';
 import type { CliEvent } from './ports/index.js';
 
 import {
@@ -170,14 +182,18 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { epicContextArgs } from './board/epic-context.js';
 import { specPath } from './board/naming.js';
 import { acceptStaleRefsPassLine } from './board/refs-gate.js';
 import { loadConfig } from './config-load.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
   buildPlanPrompt,
+  EPIC_CONTEXT_HEADING,
+  formatEpicContextSection,
   formatSkillIndexSection,
   PLAN_PROMPT_SLOTS,
+  readPlanEpicContext,
   readPlanFormat,
   readPlanSkillIndex,
   ROUTING_HEADING,
@@ -556,6 +572,137 @@ describe('the {SKILL_INDEX} slot', () => {
 
     expect(prompt).toContain(`\n${index}\n`);
     expect(prompt.split(FIXTURE_SPEC)).toHaveLength(2);
+  });
+});
+
+describe('the {EPIC_CONTEXT} slot', () => {
+  const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
+  const EPIC: EpicContext = Object.freeze({
+    number: 244,
+    title: 'Epics group issues',
+    slug: 'auth',
+    criteria: '- The planner sees the epic.\n- A member closed as not planned is never done.',
+  });
+
+  /** The prompt over `source`, the source skill and every optional slot filled, with `epic` handed over. */
+  function promptOver(source: string, epic?: EpicContext | null): string {
+    return buildPlanPrompt(
+      source,
+      readPlanFormat(SRC_DIR),
+      FIXTURE_SPEC,
+      'spec',
+      DEFAULT_PLAN_DIR,
+      PROGRESS,
+      undefined,
+      'git-workflow — git — a push to main',
+      epic,
+    );
+  }
+
+  it('is a slot the template carries once, glued to {SKILL_INDEX} on no line of its own', () => {
+    expect(PLAN_PROMPT_SLOTS).toContain('EPIC_CONTEXT');
+    expect(template.split('{EPIC_CONTEXT}')).toHaveLength(2);
+    expect(template).toContain('{SKILL_INDEX}{EPIC_CONTEXT}\n\n## Spec\n');
+  });
+
+  it('leaves a prompt with no epic byte for byte the prompt the template made before the slot', () => {
+    // The template before this slot is this one with the token deleted:
+    // the token was added glued to `{SKILL_INDEX}`, with no newline of its own.
+    const before = template.replace('{EPIC_CONTEXT}', '');
+    const today = promptOver(before);
+
+    expect(promptOver(template, null)).toBe(today);
+    expect(promptOver(template)).toBe(today);
+    expect(formatEpicContextSection(null)).toBe('');
+    // The control: the same comparison fails once an epic is handed over.
+    expect(promptOver(template, EPIC)).not.toBe(today);
+  });
+
+  it('renders the epic and its criteria between the skill index and the spec, told to go into rafa:context', () => {
+    const prompt = promptOver(template, EPIC);
+    const section = formatEpicContextSection(EPIC);
+
+    expect(prompt).not.toContain('{EPIC_CONTEXT}');
+    expect(prompt).toContain(`${section}\n\n## Spec\n`);
+    expect(section.startsWith(`\n\n${EPIC_CONTEXT_HEADING}\n`)).toBe(true);
+    expect(section).toContain('epic #244, "Epics group issues" (`epic:auth`)');
+    expect(section).toContain('`rafa:context`');
+    expect(section.endsWith(`\n\n${EPIC.criteria ?? ''}`)).toBe(true);
+    expect(prompt.indexOf(SKILL_INDEX_HEADING)).toBeLessThan(prompt.indexOf(EPIC_CONTEXT_HEADING));
+    expect(prompt.indexOf(EPIC_CONTEXT_HEADING)).toBeLessThan(prompt.indexOf(FIXTURE_SPEC));
+  });
+
+  it('names an epic whose body holds no criteria rather than dropping it, and asks for no rafa:context', () => {
+    const section = formatEpicContextSection({ ...EPIC, criteria: null });
+
+    expect(section).toContain('epic #244');
+    expect(section).toContain('no acceptance criteria');
+    expect(section).not.toContain('`rafa:context`');
+  });
+
+  it('keeps criteria naming a slot or a replacement pattern as written', () => {
+    const criteria = '- names {SPEC_CONTENT} and $& and {PLAN_FILE}';
+
+    const prompt = promptOver(template, { ...EPIC, criteria });
+
+    expect(prompt).toContain(`\n${criteria}\n\n## Spec\n`);
+    expect(prompt.split(FIXTURE_SPEC)).toHaveLength(2);
+  });
+});
+
+describe('the epic context the command reads', () => {
+  /** A gh answering one epic row to every call, and recording each. */
+  function epicGh(): { gh: GhRunner; calls: (readonly string[])[] } {
+    const calls: (readonly string[])[] = [];
+    const row = {
+      number: 244,
+      title: 'Epics group issues',
+      body: '## Acceptance criteria\n\n- The planner sees the epic.\n',
+      state: 'OPEN',
+      stateReason: '',
+      labels: [{ name: 'type:epic' }, { name: 'epic:auth' }],
+    };
+    const gh: GhRunner = (args) => {
+      calls.push(args);
+      return Promise.resolve({ ok: true, stdout: JSON.stringify([row]), stderr: '' });
+    };
+    return { gh, calls };
+  }
+
+  /** A resolved board spec for issue #250 carrying `labels`. */
+  function boardSpec(labels: readonly string[]): ResolvedSpec {
+    return {
+      path: '.rafa/specs/rafa-250-probe.md',
+      kind: 'issue',
+      source: 'issue #250',
+      issue: 250,
+      read: { number: 250, title: 'Probe', body: '', state: 'OPEN', labels, author: 'someone' },
+      snapshot: null,
+    };
+  }
+
+  it('asks gh nothing under --spec, which has no issue', async () => {
+    const { gh, calls } = epicGh();
+    const spec: ResolvedSpec = { ...boardSpec([]), kind: 'spec', source: 'spec.md', issue: null, read: null };
+
+    expect(await readPlanEpicContext(spec, gh)).toBe(null);
+    expect(calls).toEqual([]);
+  });
+
+  it('asks gh nothing for an issue with no epic: label', async () => {
+    const { gh, calls } = epicGh();
+
+    expect(await readPlanEpicContext(boardSpec(['type:spec', 'spec:ready']), gh)).toBe(null);
+    expect(calls).toEqual([]);
+  });
+
+  it('answers the epic the issue\'s epic: label names, after one gh command', async () => {
+    const { gh, calls } = epicGh();
+
+    const epic = await readPlanEpicContext(boardSpec(['type:spec', 'epic:auth']), gh);
+
+    expect(epic).toEqual({ number: 244, title: 'Epics group issues', slug: 'auth', criteria: '- The planner sees the epic.' });
+    expect(calls).toEqual([epicContextArgs('auth')]);
   });
 });
 
