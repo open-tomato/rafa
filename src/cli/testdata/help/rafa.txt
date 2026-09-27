@@ -16,6 +16,7 @@ Quick start:
   rafa skill check .claude/skills --project=.
   rafa instinct check .rafa/instincts
   rafa release status
+  rafa board list
   rafa status
   rafa next
   rafa roadmap
@@ -46,6 +47,8 @@ Subjects:
              records
   release    read the release state of the project; tag the release branch's
              HEAD
+  board      list the boards with their owner, epic count, and which is current
+             and home
 
 Commands:
   status, next 🪙, roadmap, epics, switch, init, doctor, cleanup, self-update,

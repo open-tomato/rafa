@@ -236,6 +236,7 @@ describe('the document over the core registry', () => {
     expect(document.commands.map((entry) => entry.name)).toContain('cleanup');
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
+    expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -251,6 +252,7 @@ describe('the document over the core registry', () => {
     expect(command('roadmap')?.spends).toBeNull();
     expect(command('epics')?.spends).toBeNull();
     expect(command('switch')?.spends).toBeNull();
+    expect(spendsOf('board', 'list')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();

@@ -29,6 +29,7 @@ module's note is the long form.
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; and `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing |
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
+| `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -197,10 +198,10 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `roadmap`, `epics`, `switch`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `roadmap`, `epics`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
-  `module`, `agent`, `skill`, `instinct` and `release`: a subject is
+  `module`, `agent`, `skill`, `instinct`, `release` and `board`: a subject is
   declared with its first action, never ahead of it.
   `skill index` is in the command tree and is registered by none of it
   yet, so no roster names it.
@@ -1277,6 +1278,32 @@ New; it replaces no earlier text. What a row or an action added to
   cannot be read are refused with exit code 2 and write nothing; a line
   naming no target, an unusable config and a file that cannot be written,
   with 1. It declares no `spends`.
+- **`rafa board list` lists the open boards**
+  (`src/commands/board/list.ts`), the one action of the `board` subject.
+  It reads the board listing once, as `switch` does, and ranks the
+  default board over that listing through `defaultBoardOnce` and
+  `openBoards`, which it imports from `src/commands/switch.ts`. The
+  boards are the listing's open `type:roadmap` rows, lowest first, plus
+  the default board when it is open on the listing without the label (an
+  issue titled "Roadmap" while nothing is labelled, or `roadmap.issue`),
+  so a project that never labelled a board lists its one Roadmap. A line
+  is `#<n> <title> · <owner> · <count> epics`, then `· current` and
+  `· home`. The owner is the `Owner:` line `readBoardBody` reads, asked
+  of GitHub through one `createOwnerResolver` for the whole command, so
+  a handle two boards name (in any case) is asked once: bare when it
+  resolves, followed by `(unresolved)` on a 404 and `(unknown)` when it
+  could not be asked, the last with a `warn` line naming why; a missing
+  or malformed line reads `no owner`. The epic count is the distinct
+  issues the checklist names that the listing types `epic`, a spec line
+  left out. `current` and `home` are the boards of the places
+  `resolvePlace` answers, so with no position file both mark the
+  default; its notices are `warn` lines as `switch` prints them, the
+  absent-file one left out. Json mode's result is `BoardListResult`: the
+  rows, each owner with its `OwnerResolution`, and the two places. A
+  board listing or default board that cannot be read, a project with no
+  board at all among them, is refused with exit code 2; a stray word and
+  an unusable config, with 1. An owner that does not resolve is a
+  column, not a failure. It declares no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -1754,7 +1781,9 @@ message naming the command as typed after `rafa` and saying to declare
   summary changed with `plan risk` reddened those three and no other
   (measured on 2026-09-23). An action under an existing subject reddens
   none, and its summary shows only in its subject's roster, which is not
-  snapshotted.
+  snapshotted. Registering the `board` subject with `board list`
+  reddened the same three and moved `rafa.txt` alone, by one Quick start
+  line and one Subjects entry (measured on 2026-09-28).
 
 ### Describe
 

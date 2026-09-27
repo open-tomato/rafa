@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epics`, `switch`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epics`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -813,6 +813,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../pr/merge-followups.js', ['versionTag']],
     ['./status.js', ['changelogVersions', 'DEFAULT_RELEASE_SEAMS', 'readTags']],
   ]],
+  ['./commands/board/list.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/board-body.js', ['readBoardBody']],
+    ['../../board/owner-resolve.js', ['createOwnerResolver']],
+    ['../../board/place.js', ['resolvePlace']],
+    ['../../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../../board/setup.js', ['ROADMAP_LABEL']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
+    ['../switch.js', ['defaultBoardOnce', 'openBoards']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../status/render.js', ['renderStatus', 'statusData']],
@@ -1139,6 +1151,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/instinct/promote.js',
       './commands/release/status.js',
       './commands/release/tag.js',
+      './commands/board/list.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

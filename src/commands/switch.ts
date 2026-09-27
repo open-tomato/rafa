@@ -290,7 +290,7 @@ export function placeLine(place: Place, board: Pick<SwitchBoard, 'rows'>, epics:
 }
 
 /** `thunk`, asked at most once, any failure refused with {@link SWITCH_REFUSAL_EXIT}. */
-function defaultBoardOnce(config: RafaConfig, gh: GhRunner, listing: readonly BoardIssue[]): () => Promise<number> {
+export function defaultBoardOnce(config: RafaConfig, gh: GhRunner, listing: readonly BoardIssue[]): () => Promise<number> {
   let answer: Promise<number> | null = null;
   const read = async (): Promise<number> => {
     try {

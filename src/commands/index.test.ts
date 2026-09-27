@@ -1,6 +1,6 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the sixty commands it registers: what the registry
+ * declarations of the sixty-one commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
@@ -8,7 +8,7 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
- * `release status`, `release tag`,
+ * `release status`, `release tag`, `board list`,
  * and the seven `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
@@ -161,6 +161,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'describe': ['text', 'json'],
   'release status': ['text', 'json'],
   'release tag': ['text', 'json'],
+  'board list': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -209,6 +210,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct promote': [[], []],
   'release status': [[], ['plan']],
   'release tag': [[], []],
+  'board list': [[], []],
   'status': [[], []],
   'next': [[], ['dry-run', 'yes']],
   'roadmap': [[], ['all', 'full', 'check', 'type', 'module', 'search', 'limit']],
@@ -309,6 +311,8 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['epics 252', 'epics', ['252'], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
+  ['board list', 'board list', [], ''],
+  ['boards list', 'board list', [], ''],
   ['self-update', 'self-update', [], ''],
   ['describe', 'describe', [], ''],
 ];
@@ -403,12 +407,12 @@ function numberWord(word: string): number {
 const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
 
 describe('the core roster', () => {
-  it('registers the ten subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release']);
+  it('registers the eleven subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the two release actions, status, next, roadmap, epics, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the two release actions, board list, status, next, roadmap, epics, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -459,6 +463,7 @@ describe('the core roster', () => {
       'instinct promote',
       'release status',
       'release tag',
+      'board list',
       'status',
       'next',
       'roadmap',
