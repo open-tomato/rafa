@@ -212,7 +212,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'next': [[], ['dry-run', 'yes']],
   'roadmap': [[], ['all', 'full', 'check', 'type', 'module', 'search', 'limit']],
   'epics': [['n'], []],
-  'init': [[], ['root', 'yes', 'board', 'release']],
+  'init': [[], ['root', 'yes', 'board', 'epic-guard', 'release']],
   'doctor': [[], ['plan', 'deep']],
   'cleanup': [[], ['dry-run']],
   'effort fix-schema': [[], ['dry-run']],

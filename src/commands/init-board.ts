@@ -1,7 +1,8 @@
 /**
  * The board step `rafa init` ends with: whether to run it at all, the
  * one question it asks, and the lines it prints for what
- * {@link setUpBoard} came to.
+ * {@link setUpBoard} came to; then the optional epic guard workflow,
+ * with a question of its own.
  *
  * `src/board/setup.ts` makes the board — the eleven labels, the spec issue
  * template, the pinned Roadmap issue and `roadmap.issue` — and reports
@@ -53,6 +54,30 @@
  * as a warning: a private-looking question on a public repository is
  * exactly the false negative worth hearing about.
  *
+ * ## The epic guard, asked after the board
+ *
+ * Once the board has run, {@link runEpicGuardStep} decides whether to
+ * write the optional workflow `src/board/epic-guard.ts` ships, which
+ * removes a second `epic:` label from an issue as it lands. It has its
+ * own question because it is a file in the repository's workflows and
+ * not part of the board: a board without it is read exactly as before.
+ * The first answer wins:
+ *
+ *   - The board step did not run: nothing is asked or written, and a
+ *     line that said `--epic-guard` is told so through the warnings.
+ *   - `--no-epic-guard`: declined, nothing read.
+ *   - Something is already at `.github/workflows/epic-guard.yml`: it is
+ *     reported, `present` for a file and `refused` for anything else,
+ *     and nothing is asked — there is nothing left to decide.
+ *   - `--epic-guard`: written, asking nothing.
+ *   - No terminal: not asked and not written, and the line naming
+ *     `rafa init --board --epic-guard` is printed.
+ *   - Otherwise its own `[y/N]` question, read as the board's is.
+ *
+ * `--board` answers the board's question only, so a terminal is still
+ * asked about the guard under it; a script says `--epic-guard` or
+ * `--no-epic-guard`.
+ *
  * ## Nothing here spawns
  *
  * GitHub arrives through the {@link GhRunner} `src/commands/init.ts`
@@ -69,7 +94,10 @@ import type { BoardPart, BoardSetupReport } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { PrProvider } from '../config-sections.js';
 
-import { boardChanged, setUpBoard } from '../board/setup.js';
+import { join } from 'node:path';
+
+import { EPIC_GUARD_PATH, writeEpicGuard } from '../board/epic-guard.js';
+import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
@@ -298,6 +326,113 @@ export function renderBoardStep(result: BoardStepResult): readonly string[] {
   if (result.status === 'declined') return [`The GitHub board was left alone; run ${BOARD_FIX} to set it up.`];
   if (result.status === 'unanswered') {
     return [`The GitHub board step needs a terminal; run ${BOARD_FIX} to set it up.`];
+  }
+  return [];
+}
+
+/** The epic guard's own question, asked after the board has run. */
+export const EPIC_GUARD_QUESTION = 'Install the epic guard workflow, which removes a second epic: label from an issue? [y/N] ';
+
+/** What a run that did not install the epic guard names as the way to install it. */
+export const EPIC_GUARD_FIX = 'rafa init --board --epic-guard';
+
+/** What the epic guard step came to. */
+export type EpicGuardStatus =
+  /** The workflow was written, or found, or refused: `part` says which. */
+  | 'ran'
+  /** `--no-epic-guard`, or its question answered with anything but yes. */
+  | 'declined'
+  /** Nobody said and there was no terminal to ask on. */
+  | 'unasked'
+  /** The board step did not run, so neither did this one. */
+  | 'not-run';
+
+/** What one run of {@link runEpicGuardStep} came to. */
+export interface EpicGuardStepResult {
+  readonly status: EpicGuardStatus;
+  /** True when its question was put to an operator. */
+  readonly asked: boolean;
+  /** What the workflow file came to, or null when the step wrote nothing and found nothing. */
+  readonly part: BoardPart | null;
+  /** A sentence per flag the step could not act on. */
+  readonly warnings: readonly string[];
+}
+
+/** What {@link runEpicGuardStep} is asked. */
+export interface EpicGuardStepOptions {
+  /** True for `--epic-guard`, false for `--no-epic-guard`, null when the line said neither. */
+  readonly wanted: boolean | null;
+  /** What the board step came to; the guard runs only after a board that ran. */
+  readonly board: BoardStepResult;
+  /** The project root: where the workflow is written. */
+  readonly root: string;
+  /** True when a question can be answered. */
+  readonly isTerminal: () => boolean;
+  /** Opens the prompter the question is asked through. Called only to ask. */
+  readonly openPrompter: () => Prompter;
+  /** Where the shipped workflow is looked for; `src/board/epic-guard.ts`'s own when left out. */
+  readonly moduleDir?: string | undefined;
+}
+
+/** What a line asking for `--epic-guard` is told when the board step did not run. */
+export const EPIC_GUARD_NO_BOARD_WARNING = '--epic-guard installs the epic guard workflow with the GitHub board,'
+  + ` and the board step did not run, so it was not installed; run ${EPIC_GUARD_FIX}.`;
+
+/** A guard step that wrote nothing and found nothing. */
+function noGuard(status: EpicGuardStatus, asked: boolean, warnings: readonly string[] = []): EpicGuardStepResult {
+  return { status, asked, part: null, warnings: Object.freeze([...warnings]) };
+}
+
+/** Asks the guard's question; true only for `y` or `yes`, and the prompter closed either way. */
+async function askEpicGuard(openPrompter: () => Prompter): Promise<boolean> {
+  const prompter = openPrompter();
+  try {
+    const answer = await prompter.ask(EPIC_GUARD_QUESTION);
+    return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
+  } finally {
+    prompter.close();
+  }
+}
+
+/**
+ * Writes the epic guard workflow, having decided whether to and asked
+ * when nobody said; see the module note for the order. Never throws for
+ * a path that would not take a write: that is a refused part.
+ */
+export async function runEpicGuardStep(options: EpicGuardStepOptions): Promise<EpicGuardStepResult> {
+  const { wanted, board, root, isTerminal, openPrompter, moduleDir } = options;
+  if (board.status !== 'ran') {
+    return noGuard('not-run', false, wanted === true
+      ? [EPIC_GUARD_NO_BOARD_WARNING]
+      : []);
+  }
+  if (wanted === false) return noGuard('declined', false);
+
+  const write = (asked: boolean): EpicGuardStepResult => ({
+    status: 'ran',
+    asked,
+    part: writeEpicGuard(root, moduleDir),
+    warnings: [],
+  });
+  if (anythingAt(join(root, EPIC_GUARD_PATH))) return write(false);
+  if (wanted === true) return write(false);
+  if (!isTerminal()) return noGuard('unasked', false);
+  return await askEpicGuard(openPrompter)
+    ? write(true)
+    : noGuard('declined', true);
+}
+
+/** True when the guard step wrote the workflow. */
+export function epicGuardChanged(result: EpicGuardStepResult): boolean {
+  return result.part?.outcome === 'created';
+}
+
+/** The lines text mode writes for the guard step, and none when it has nothing to say. */
+export function renderEpicGuardStep(result: EpicGuardStepResult): readonly string[] {
+  if (result.part !== null) return [boardPartLine(result.part)];
+  if (result.status === 'declined') return [`The epic guard workflow was left out; run ${EPIC_GUARD_FIX} to install it.`];
+  if (result.status === 'unasked') {
+    return [`The epic guard question needs a terminal; run ${EPIC_GUARD_FIX} to install it.`];
   }
   return [];
 }

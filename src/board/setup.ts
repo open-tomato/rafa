@@ -372,7 +372,7 @@ function statOrNull(path: string): Stats | null {
 }
 
 /** True when something is at `path`, a link that resolves to nothing included. */
-function anythingAt(path: string): boolean {
+export function anythingAt(path: string): boolean {
   try {
     lstatSync(path);
     return true;
@@ -404,39 +404,65 @@ export function readSpecTemplate(moduleDir: string = MODULE_DIR): string {
   return readFileSync(source, 'utf8');
 }
 
+/** A file the build ships, and where under a project root it is written. */
+export interface ShippedFile {
+  /** Where it is written, relative to the project root; also the name of its part. */
+  readonly path: string;
+  /** Where the shipped copy is read from. */
+  readonly source: string;
+  /** What a refusal calls it: `the template`, `the workflow`. */
+  readonly what: string;
+  /** The shipped copy's text; throws, naming the path, when the build dropped it. */
+  readonly read: () => string;
+}
+
 /**
- * Writes {@link SPEC_TEMPLATE_PATH} under `root` when nothing is at that
- * path. An existing file is left byte for byte as it is, whatever it
- * holds: a repository that has edited its own template has said what it
- * wants an issue to ask for, and a symbolic link that resolves to a file
- * is one of those.
+ * Writes `file` under `root` when nothing is at its path, and answers its
+ * `template` part. An existing file is left byte for byte as it is,
+ * whatever it holds: a repository that has edited its own copy has said
+ * what it wants, and a symbolic link that resolves to a file is one of
+ * those.
  *
  * A path holding anything else is REFUSED rather than written to: a
  * directory, and a link that resolves to nothing, which `statSync`
  * answers for as loudly as an empty path does and `lstatSync` does not.
  */
-export function writeSpecTemplate(root: string, moduleDir: string = MODULE_DIR): BoardPart {
-  const path = join(root, SPEC_TEMPLATE_PATH);
-  const name = SPEC_TEMPLATE_PATH;
+export function writeShippedFile(root: string, file: ShippedFile): BoardPart {
+  const path = join(root, file.path);
+  const name = file.path;
 
   const found = statOrNull(path);
   if (found !== null) {
     return found.isFile()
       ? partOf('template', name, 'present', 'the repository already carries it')
-      : partOf('template', name, 'refused', `${path} is not a file, so the template was not written`);
+      : partOf('template', name, 'refused', `${path} is not a file, so ${file.what} was not written`);
   }
   if (anythingAt(path)) {
-    return partOf('template', name, 'refused', `${path} is a link to nothing, so the template was not written`);
+    return partOf('template', name, 'refused', `${path} is a link to nothing, so ${file.what} was not written`);
   }
 
   try {
-    const text = readSpecTemplate(moduleDir);
+    const text = file.read();
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text, { encoding: 'utf8', flag: 'wx' });
-    return partOf('template', name, 'created', `written from ${specTemplateSource(moduleDir)}`);
+    return partOf('template', name, 'created', `written from ${file.source}`);
   } catch (error) {
     return partOf('template', name, 'refused', messageOf(error));
   }
+}
+
+/**
+ * Writes {@link SPEC_TEMPLATE_PATH} under `root` when nothing is at that
+ * path, through {@link writeShippedFile}, which says what an existing
+ * path is left as or refused for.
+ */
+export function writeSpecTemplate(root: string, moduleDir: string = MODULE_DIR): BoardPart {
+  return writeShippedFile(root, {
+    path: SPEC_TEMPLATE_PATH,
+    source: specTemplateSource(moduleDir),
+    what: 'the template',
+    read: () => readSpecTemplate(moduleDir),
+  });
 }
 
 /** The body a new Roadmap issue is opened with: the empty list and the naming paragraph. */

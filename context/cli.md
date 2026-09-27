@@ -57,7 +57,7 @@ module's note is the long form.
 | `src/commands/pr/pr-context.ts` | what the seven `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
-| `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts` |
+| `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`; then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
 | `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
@@ -528,7 +528,8 @@ New; it replaces no earlier text. What a row or an action added to
   it cannot read or edit is a warning. It runs after the scopes and
   before the board step. `--release=<value>` is refused at the top of
   the run, while nothing has been written.
-- **The board step runs last, and only where there is a board**
+- **The board step runs last, but for the epic guard after it, and only
+  where there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
   `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
   anything but `gh` ends the step before a runner is opened, with a
@@ -549,6 +550,35 @@ New; it replaces no earlier text. What a row or an action added to
   made, and a run that creates no part leaves `Nothing changed.` true.
   `--board=<value>` is refused at the top of the run, while nothing has
   been written.
+- **The epic guard step follows a board that ran**
+  (`runEpicGuardStep` in `src/commands/init-board.ts`). It offers the
+  optional workflow `src/board/templates/epic-guard.yml`, written to
+  `.github/workflows/epic-guard.yml` by `src/board/epic-guard.ts`
+  through `src/board/setup.ts`'s `writeShippedFile`. GitHub's checks
+  belong to commits and pull requests, so the guard is a workflow on
+  `issues: [labeled]`: when the label added starts with `epic:` and the
+  issue carries another, it removes the one just added with
+  `gh issue edit --remove-label` and comments why. The label kept is the
+  one whose latest `labeled` event is oldest, so two labels added in one
+  edit keep the same one whichever run reads first, and each run removes
+  only its own event's label. The first answer wins: a board that did
+  not run leaves it `not-run`, warning only when `--epic-guard` asked;
+  `--no-epic-guard` declines; anything already at the path is reported,
+  `present` for a file and `refused` otherwise, and nothing is asked;
+  `--epic-guard` writes it; no terminal leaves it `unasked` with the
+  line naming `rafa init --board --epic-guard`; otherwise the question
+  `Install the epic guard workflow, which removes a second epic: label
+  from an issue? [y/N]` is asked. `--board` answers only the board's
+  question. Its row is printed under the board rows, a written file
+  counts as a change, and json mode carries it as `epicGuard`.
+  `--epic-guard=<value>` is refused at the top of the run. The step's
+  shell was measured on 2026-09-27 outside the suite, extracted with `yq`
+  and run under bash against a fake `gh` on PATH: one `epic:` label,
+  the added label kept, and the added label already gone each sent no
+  edit; a second label added after the first, and a label re-added after
+  another, each sent one `--remove-label` for the added label and one
+  comment. As a control, `min_by` swapped for `max_by` flipped four of
+  those seven readings. A failing `gh api` exits 1 with no edit.
 - **`doctor` checks what `loop start` would, and starts no run**
   (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
   first, before anything is checked, so the build that answered is read

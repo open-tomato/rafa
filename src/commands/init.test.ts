@@ -112,6 +112,7 @@ import {
   createInitCommand,
   DEFAULT_INIT_SEAMS,
   readBoardFlag,
+  readEpicGuardFlag,
   readReleaseFlag,
   readRootFlag,
   readYesFlag,
@@ -493,6 +494,12 @@ describe('choosing the root', () => {
     expect(() => readBoardFlag('later')).toThrow('--board takes no value');
   });
 
+  it('reads --epic-guard as true, --no-epic-guard as false and neither as nobody having said, refusing a value', () => {
+    expect([readEpicGuardFlag(undefined), readEpicGuardFlag(true), readEpicGuardFlag('true')]).toEqual([null, true, true]);
+    expect([readEpicGuardFlag(false), readEpicGuardFlag('false')]).toEqual([false, false]);
+    expect(() => readEpicGuardFlag('later')).toThrow('--epic-guard takes no value');
+  });
+
   it('reads --release as true, --no-release as false and neither as nobody having said, refusing a value', () => {
     expect([readReleaseFlag(undefined), readReleaseFlag(true), readReleaseFlag('true')]).toEqual([null, true, true]);
     expect([readReleaseFlag(false), readReleaseFlag('false')]).toEqual([false, false]);
@@ -837,10 +844,10 @@ describe('the board step', () => {
     expect(existsSync(join(world.repo, '.github'))).toBe(false);
   });
 
-  it('asks the release question and then the board one on a terminal, and sets the board up on a yes', async () => {
+  it('asks the release question, the board one and the epic guard one on a terminal, and sets both up on a yes', async () => {
     const world = plantWorld();
     const gh = fakeGh();
-    const prompter = scripted(['n', 'y']);
+    const prompter = scripted(['n', 'y', 'y']);
 
     const run = await init(world, [`--root=${world.repo}`, '--output=json'], seamsFor(world, {
       readRemote: () => 'https://github.com/acme/widgets.git',
@@ -850,9 +857,11 @@ describe('the board step', () => {
     }));
 
     expect(run.exitCode).toBe(0);
-    expect(prompter.record.asked).toBe(2);
+    expect(prompter.record.asked).toBe(3);
     expect(resultOf(run.stdout).release).toMatchObject({ status: 'set', asked: true, enabled: false });
     expect(resultOf(run.stdout).board).toMatchObject({ status: 'ran', asked: true });
+    expect(resultOf(run.stdout).epicGuard).toMatchObject({ status: 'ran', asked: true, part: { outcome: 'created' } });
+    expect(existsSync(join(world.repo, '.github', 'workflows', 'epic-guard.yml'))).toBe(true);
     expect(gh.routes()[0]).toBe('repo view');
   });
 

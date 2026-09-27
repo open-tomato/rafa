@@ -870,7 +870,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../project/roots.js', ['DISK_ROOTS_FILE_SYSTEM', 'gitToplevel', 'rootCandidates']],
     ['../project/scaffold.js', ['scaffoldConflicts', 'writeProjectScope', 'writeUserScope']],
     ['../schema/project-id.js', ['gitRemoteUrl']],
-    ['./init-board.js', ['boardStepChanged', 'renderBoardStep', 'runBoardStep']],
+    ['./init-board.js', [
+      'boardStepChanged',
+      'epicGuardChanged',
+      'renderBoardStep',
+      'renderEpicGuardStep',
+      'runBoardStep',
+      'runEpicGuardStep',
+    ]],
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
   ['./commands/doctor.js', [

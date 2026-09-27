@@ -1,0 +1,50 @@
+# The rafa epic guard: an issue belongs to one epic at most.
+#
+# Installed by `rafa init --board --epic-guard`, or by a yes to its own
+# question. When an issue gains an `epic:<slug>` label while it already
+# carries another, this removes the label just added and comments why.
+#
+# The label an issue keeps is the one whose latest add is the oldest,
+# read from the issue's events, so two labels added in one edit leave the
+# same one whichever run reads first. Each run removes only the label its
+# own event added, so no two runs remove the same label or comment twice.
+#
+# rafa never reads this file. `rafa doctor` lists an issue carrying two
+# `epic:` labels whether or not the guard is installed.
+name: Epic guard
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  one-epic:
+    if: startsWith(github.event.label.name, 'epic:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep one epic label
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          ADDED: ${{ github.event.label.name }}
+        run: |
+          set -euo pipefail
+          held=$(gh issue view "$ISSUE" --json labels --jq '[.labels[].name | select(startswith("epic:"))]')
+          if [ "$(jq 'length' <<<"$held")" -lt 2 ]; then exit 0; fi
+          if ! jq -e --arg added "$ADDED" 'any(.[]; . == $added)' <<<"$held" >/dev/null; then exit 0; fi
+          kept=$(gh api --paginate "repos/$GH_REPO/issues/$ISSUE/events" \
+              --jq '.[] | select(.event == "labeled") | .label.name' \
+            | jq -R -s -r --argjson held "$held" '
+                split("\n") | map(select(. != "")) | to_entries
+                | map(select(.value as $name | $held | any(.[]; . == $name)))
+                | group_by(.value) | map(max_by(.key)) | min_by(.key)
+                | .value // $held[0]')
+          if [ "$kept" = "$ADDED" ]; then exit 0; fi
+          gh issue edit "$ISSUE" --remove-label "$ADDED"
+          body=$(printf 'This issue already belongs to the epic labelled `%s`, so `%s` was removed: an issue is a member of one epic at most. To move it, remove `%s` first, then add `%s`.' "$kept" "$ADDED" "$kept" "$ADDED")
+          gh issue comment "$ISSUE" --body "$body"
