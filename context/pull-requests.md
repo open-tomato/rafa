@@ -561,6 +561,9 @@ refuses a body matching a home path or a token shape, naming the line.
 `spec:needs-work`, and the ones triage already files under (`type:bug`,
 `needs-triage`, `module:unassigned`); `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
+The Roadmap issue is opened with `--label type:roadmap`, and an open issue
+titled "Roadmap" that it adopts instead gets that label added when it
+lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.

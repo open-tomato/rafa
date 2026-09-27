@@ -451,6 +451,9 @@ function ghSeams(
   };
 }
 
+/** How many rows the board prints: one per label, then the template, the issue and the setting. */
+const BOARD_ROW_COUNT = BOARD_LABELS.length + 3;
+
 /** The lines a bare board prints: every row missing, and the fix. */
 function bareBoardLines(): string[] {
   return [
@@ -459,7 +462,7 @@ function bareBoardLines(): string[] {
     `  missing  ${SPEC_TEMPLATE_PATH}: the repository carries no spec issue template`,
     `  missing  ${ROADMAP_ROW_NAME}: no open issue is titled ${ROADMAP_TITLE}`,
     `  missing  ${ROADMAP_SETTING}: the project config names no roadmap issue`,
-    `Run ${BOARD_FIX} to set up 14 parts of the board this run did not find.`,
+    `Run ${BOARD_FIX} to set up ${String(BOARD_ROW_COUNT)} parts of the board this run did not find.`,
   ];
 }
 
@@ -1286,9 +1289,9 @@ describe('the board rows', () => {
     const control = await doctor(ready, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => setUp.run) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-17)).toEqual([...bareBoardLines(), aheadLine(bare)]);
+    expect(lines(run.stdout).slice(-(BOARD_ROW_COUNT + 3))).toEqual([...bareBoardLines(), aheadLine(bare)]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-16)).toEqual([
+    expect(lines(control.stdout).slice(-(BOARD_ROW_COUNT + 2))).toEqual([
       BOARD_HEADING,
       ...BOARD_LABELS.map((label) => `  present  label ${label.name}`),
       `  present  ${SPEC_TEMPLATE_PATH}`,
@@ -1365,7 +1368,7 @@ describe('the board rows', () => {
     const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [MISSING_TOOL_PROBE]: failed }) });
 
     expect(run.exitCode).toBe(1);
-    expect(lines(run.stdout).slice(-17)).toEqual([...bareBoardLines(), aheadLine(world)]);
+    expect(lines(run.stdout).slice(-(BOARD_ROW_COUNT + 3))).toEqual([...bareBoardLines(), aheadLine(world)]);
     expect(run.stderr).toContain('rafa loop start would halt here, before any session.');
   });
 });

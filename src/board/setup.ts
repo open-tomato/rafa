@@ -7,7 +7,7 @@
  * checkout (`.rafa/specs/rafa-20-pr-commands.md`): a spec is an issue, its
  * readiness is a label, and the order is a task list in one pinned
  * issue. A repository that has none of that cannot be planned from, and
- * making it by hand is eleven labels, a template file and an issue body
+ * making it by hand is twelve labels, a template file and an issue body
  * nobody remembers the shape of. This module makes all four, and
  * {@link setUpBoard} is the whole of it; the question, the flags and the
  * lines printed are `src/commands/init.ts`'s, and the present-or-missing
@@ -16,10 +16,10 @@
  * ## Every part is idempotent, and says which it was
  *
  * Each part answers one {@link BoardPart}: `created` when this run made
- * it, `present` when it was already there and nothing was written, or
+ * it or wrote to it, `present` when it was already there and nothing was written, or
  * `refused` when it was not made and the detail says why. So a second
  * run over a board already set up writes no byte and answers `present`
- * eleven-plus-three times, which is what keeps `rafa init`'s "Nothing
+ * twelve-plus-three times, which is what keeps `rafa init`'s "Nothing
  * changed." true when the board step is part of it.
  *
  * A refusal is never a throw. `setUpBoard` reports a failed `gh`
@@ -30,8 +30,9 @@
  *
  * ## The labels, and where their names come from
  *
- * {@link BOARD_LABELS} is the spec's list, and of its eleven names only
- * the three horizons are spelled here for the first time: `type:spec`
+ * {@link BOARD_LABELS} is the spec's list, and of its twelve names only
+ * the three horizons and {@link ROADMAP_LABEL} are spelled here for the
+ * first time: `type:spec`
  * is `./issue.ts`'s {@link SPEC_LABEL}, the label an issue is refused
  * for not carrying, `spec:ready` is `./readiness.ts`'s {@link SPEC_READY_LABEL},
  * `spec:needs-work` is `./gate.ts`'s {@link SPEC_NEEDS_WORK_LABEL},
@@ -43,6 +44,9 @@
  * `horizon:later` are the horizons an epic carries one of, and this list
  * is where they are first spelled: `./epic-problems.ts` reads only their
  * `horizon:` prefix, and `./epic-walk.ts` builds `horizon:now` from it.
+ * `type:roadmap` marks an issue as a board, built from the same
+ * `GITHUB_LABELS` type prefix, and is exported from here as
+ * {@link ROADMAP_LABEL} for the readers that find boards by it.
  *
  * No colour is sent. `gh label create --help` says a colour is optional
  * and a random one is chosen when it is left out, and the spec asks for
@@ -57,7 +61,7 @@
  * every run a write.
  *
  * That listing reads {@link LABEL_LIST_LIMIT} labels. A repository
- * holding more than that can have one of the eleven fall off the end, and
+ * holding more than that can have one of the twelve fall off the end, and
  * what it costs is a refused part: `gh label create --help` says
  * `--force` is what updates a label that already exists, so the plain
  * form this sends fails, and the failure is reported as the refusal
@@ -82,6 +86,24 @@
  * Two open issues titled Roadmap are REFUSED, with `./roadmap.ts`'s own
  * sentence, for the reason it gives: which one holds the order is not
  * this command to guess.
+ *
+ * ## The roadmap carries {@link ROADMAP_LABEL}
+ *
+ * A board is an open issue labelled `type:roadmap`, so the Roadmap issue
+ * this command opens is opened with `--label type:roadmap`; the labels
+ * are made before the issue, so the label is there to be added. An
+ * existing issue the title search ADOPTS is read with its labels, and
+ * one that lacks the label gets it through
+ * `gh issue edit <n> --add-label type:roadmap`. That write is what makes
+ * its `issue` part `created` rather than `present`: the issue was not
+ * opened by this run, but it was written to, and {@link boardChanged}
+ * has to say so. An edit that fails leaves the part `present` and comes
+ * back as a {@link BoardSetupReport.problems} sentence, the way a failed
+ * pin does: `roadmap.issue` still names the issue, which is what every
+ * reader ranks first.
+ *
+ * An issue `roadmap.issue` already names is not read at all, as before,
+ * so it is not labelled either: that path sends nothing to GitHub.
  *
  * The pin is `gh issue pin <n>` (measured present in `gh` 2.100.0 on
  * 2026-09-19). A pin that fails does not make the part refused: the
@@ -143,8 +165,11 @@ export interface BoardLabel {
   readonly description: string;
 }
 
+/** The label that marks an open issue as a board; see the module note. */
+export const ROADMAP_LABEL = `${GITHUB_LABELS.typePrefix}roadmap`;
+
 /**
- * The eleven labels the workflow files under, in the order they are made.
+ * The twelve labels the workflow files under, in the order they are made.
  * See the module note on where each name comes from.
  */
 export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
@@ -191,6 +216,10 @@ export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
   {
     name: 'horizon:later',
     description: 'An epic with no date yet',
+  },
+  {
+    name: ROADMAP_LABEL,
+    description: 'A board: its body is the ordered checklist of epics and specs to take next',
   },
 ]);
 
@@ -334,7 +363,7 @@ export function missingBoardLabels(held: readonly string[]): readonly BoardLabel
 
 /**
  * Makes each of {@link BOARD_LABELS} the repository does not carry, and
- * answers one part per label. A failed listing refuses all eleven, naming
+ * answers one part per label. A failed listing refuses all twelve, naming
  * the command, because nothing is known about any of them then.
  */
 export async function setUpLabels(gh: GhRunner): Promise<readonly BoardPart[]> {
@@ -557,11 +586,29 @@ function roadmapRefused(why: string): RoadmapStep {
   };
 }
 
+/** One open issue titled {@link ROADMAP_TITLE}, and whether it already carries {@link ROADMAP_LABEL}. */
+interface TitledRoadmap {
+  readonly number: number;
+  readonly labelled: boolean;
+}
+
+/** The label names a row carries at `labels`, checked. */
+function rowLabels(row: unknown, command: string, where: string): readonly string[] {
+  const value = isMapping(row)
+    ? row['labels']
+    : null;
+  if (!Array.isArray(value)) {
+    throw new Error(`${PREFIX}: ${command} answered ${where}.labels as ${describeValue(value)}, expected a list`);
+  }
+  return (value as readonly unknown[])
+    .map((label, index) => rowText(label, 'name', command, `${where}.labels ${String(index)}`));
+}
+
 /** Every open issue titled {@link ROADMAP_TITLE}, by an exact fold of the title. */
-async function searchRoadmapIssues(gh: GhRunner): Promise<readonly number[]> {
+async function searchRoadmapIssues(gh: GhRunner): Promise<readonly TitledRoadmap[]> {
   const search = `${ROADMAP_TITLE} in:title`;
-  const args = ['issue', 'list', '--state', 'open', '--search', search, '--json', 'number,title'];
-  const command = `gh issue list --state open --search "${search}" --json number,title`;
+  const args = ['issue', 'list', '--state', 'open', '--search', search, '--json', 'number,title,labels'];
+  const command = `gh issue list --state open --search "${search}" --json number,title,labels`;
 
   const result = await gh(args);
   if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
@@ -570,15 +617,16 @@ async function searchRoadmapIssues(gh: GhRunner): Promise<readonly number[]> {
     .map((row, index) => ({
       number: rowNumber(row, 'number', command, `issue ${String(index)}`),
       title: rowText(row, 'title', command, `issue ${String(index)}`),
+      labels: rowLabels(row, command, `issue ${String(index)}`),
     }))
     .filter((row) => row.title.trim().toLowerCase() === wanted)
-    .map((row) => row.number));
+    .map((row) => ({ number: row.number, labelled: holdsLabel(row.labels, ROADMAP_LABEL) })));
 }
 
 /** Opens the Roadmap issue and answers its number, or throws naming the command. */
 async function createRoadmapIssue(gh: GhRunner): Promise<number> {
-  const command = `gh issue create --title ${ROADMAP_TITLE}`;
-  const result = await gh(['issue', 'create', '--title', ROADMAP_TITLE, '--body', roadmapIssueBody()]);
+  const command = `gh issue create --title ${ROADMAP_TITLE} --label ${ROADMAP_LABEL}`;
+  const result = await gh(['issue', 'create', '--title', ROADMAP_TITLE, '--label', ROADMAP_LABEL, '--body', roadmapIssueBody()]);
   if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
 
   const url = result.stdout.trim().split('\n')
@@ -601,6 +649,26 @@ async function pinRoadmapIssue(gh: GhRunner, issue: number): Promise<string | nu
 }
 
 /**
+ * The `issue` part of an adopted Roadmap issue: `present` when it
+ * already carries {@link ROADMAP_LABEL}, else `created` once the label
+ * was added, with a problem sentence and `present` when it could not be.
+ */
+async function adoptRoadmapIssue(gh: GhRunner, found: TitledRoadmap): Promise<{ part: BoardPart; problem: string | null }> {
+  const issue = String(found.number);
+  const titled = `issue #${issue} is open and titled ${ROADMAP_TITLE}`;
+  if (found.labelled) return { part: partOf('issue', ISSUE_PART_NAME, 'present', titled), problem: null };
+
+  const command = `gh issue edit ${issue} --add-label ${ROADMAP_LABEL}`;
+  const result = await gh(['issue', 'edit', issue, '--add-label', ROADMAP_LABEL]);
+  return result.ok
+    ? { part: partOf('issue', ISSUE_PART_NAME, 'created', `${titled}, and now carries ${ROADMAP_LABEL}`), problem: null }
+    : {
+      part: partOf('issue', ISSUE_PART_NAME, 'present', titled),
+      problem: `issue #${issue} was adopted but not labelled ${ROADMAP_LABEL}: ${detailOf(result, command)}`,
+    };
+}
+
+/**
  * The roadmap issue and the setting that names it: `roadmap.issue` when
  * the project config names one, else the open issue titled
  * {@link ROADMAP_TITLE}, else a new one. See the module note on why the
@@ -620,23 +688,23 @@ export async function setUpRoadmap(gh: GhRunner, root: string): Promise<RoadmapS
     };
   }
 
-  let found: readonly number[];
+  let found: readonly TitledRoadmap[];
   try {
     found = await searchRoadmapIssues(gh);
   } catch (error) {
     return roadmapRefused(messageOf(error));
   }
-  if (found.length > 1) return roadmapRefused(severalRoadmapsMessage(found));
+  if (found.length > 1) return roadmapRefused(severalRoadmapsMessage(found.map((row) => row.number)));
 
   const existing = found[0] ?? null;
   if (existing !== null) {
+    const adopted = await adoptRoadmapIssue(gh, existing);
     return {
-      parts: [
-        partOf('issue', ISSUE_PART_NAME, 'present', `issue #${String(existing)} is open and titled ${ROADMAP_TITLE}`),
-        writeRoadmapSetting(root, existing, reading),
-      ],
-      issue: existing,
-      problems: [],
+      parts: [adopted.part, writeRoadmapSetting(root, existing.number, reading)],
+      issue: existing.number,
+      problems: adopted.problem === null
+        ? []
+        : [adopted.problem],
     };
   }
 
@@ -649,7 +717,7 @@ export async function setUpRoadmap(gh: GhRunner, root: string): Promise<RoadmapS
   const pin = await pinRoadmapIssue(gh, opened);
   return {
     parts: [
-      partOf('issue', ISSUE_PART_NAME, 'created', `issue #${String(opened)} opened and pinned`),
+      partOf('issue', ISSUE_PART_NAME, 'created', `issue #${String(opened)} opened with ${ROADMAP_LABEL} and pinned`),
       writeRoadmapSetting(root, opened, reading),
     ],
     issue: opened,
@@ -671,7 +739,7 @@ export interface BoardSetupOptions {
 
 /**
  * Makes every part of the board that is missing and answers what each
- * came to: the eleven labels, the spec issue template, the pinned Roadmap
+ * came to: the twelve labels, the spec issue template, the pinned Roadmap
  * issue and `roadmap.issue`.
  *
  * Writes nothing a second time: a run over a board already set up
