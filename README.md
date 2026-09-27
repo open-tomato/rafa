@@ -327,24 +327,34 @@ from GitHub Issues:
   `rafa plan create --next` takes the first line that is neither done
   nor already being worked on, and stops rather than skipping ahead when
   that issue is not ready. `rafa plan create --issue=<n>` plans from one
-  issue directly.
+  issue directly. Epic lines on the roadmap are descended into when they
+  are open, `horizon:now` and not done, making their specs the walk's
+  focus; `rafa epics` shows one epic's specs as a table.
+- **Epics group specs into features.** An epic is a bigger issue with an
+  acceptance criteria, an estimate and an ordered checklist of its specs.
+  Specs carry the epic's label to join it, and rafa never plans across
+  two epics. Projects with no epics work exactly as before; an epic is
+  purely optional.
 - **A few labels carry the state**: `type:spec`, `spec:ready` (a person
   says a plan may be made from it), `spec:needs-work` (details pending,
-  or the planner's review found gaps and listed them), and `type:bug`
-  with `needs-triage` for what a run files on its own.
+  or the planner's review found gaps and listed them), `type:bug`
+  with `needs-triage` for what a run files on its own, `type:epic` and
+  `epic:<slug>` (the epic and its member specs).
 - **Safety, in short.** An issue's text ends up in an agent's prompt, so
   rafa plans only from an issue whose author can write to the
   repository, that a maintainer has labelled `spec:ready`, that is
   complete, and that holds no local path or token. Comments are never
   read into a plan, rafa never applies `spec:ready` by itself, and
   machine-specific failures a run meets stay off your public tracker.
+  Specs in an epic may not carry two `epic:` labels; `rafa issue ready`
+  refuses the second one.
 - **Other trackers.** GitHub Issues is what works today. Linear support
   is being ported from the project rafa grew out of, as an optional
   add-on in a later version. For anything else, open or upvote a request
   in [the issues](https://github.com/open-tomato/rafa/issues).
 
 The full guide, with the spec template explained, a prompt for drafting
-a spec and every gate in order, is
+a spec, epics and every gate in order, is
 [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md).
 
 ## From a checkout
