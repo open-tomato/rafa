@@ -7,12 +7,13 @@ of files — understand which files your change touches, and which gates can
 actually reach them.
 
 **These gates are the WHOLE of verification: there is no hosted one.** The
-repository carries no `.github/` directory on any branch, so no workflow
-runs against a PR and `gh pr checks <n>` answers `no checks reported`
+repository carries no `.github/workflows/` on any branch (its
+`.github/` holds only the spec issue template), so no workflow runs
+against a PR and `gh pr checks <n>` answers `no checks reported`
 forever rather than for a moment. That is the expected reading here and
 never a symptom — in a repository that DOES have workflows it would be
-ambiguous between a run not yet scheduled and a conflicting PR that will
-never get one, which is why the reading to take is the ref check
+ambiguous between a run not yet scheduled and a conflicting PR that
+will never get one, which is why the reading to take is the ref check
 (`git ls-remote origin 'refs/pull/<n>/*'`, where a mergeable PR exposes
 `merge` beside `head`) and not the checks list. Nothing catches a red
 gate after the push, so capture the three exit codes at the commit that
