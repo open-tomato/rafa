@@ -1330,4 +1330,32 @@ describe('the report command with --skills', () => {
     expect(run.stderr).toBe('rafa effort report: --plan narrows the skills report and needs --skills\n');
     expect(run.stdout).toBe('');
   });
+
+  it('refuses --plan=x without --skills, and reads an unknown plan stub as an empty report', () => {
+    const root = skillsRepo();
+
+    const refused = runReport(root, ['--plan=x']);
+    const unknown = runReport(root, ['--skills', '--plan=no-such-plan', '--output=json']);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toBe('rafa effort report: --plan narrows the skills report and needs --skills\n');
+    expect(refused.stdout).toBe('');
+    expect(unknown.exitCode).toBe(0);
+    expect(eventsOf(unknown.stdout).at(-1)).toMatchObject({ ok: true, data: { plans: [] } });
+  });
+
+  it('holds --skills --output=json over a scratch store to the SkillsReport type\'s documented keys, and the text output\'s first line to the fixed header', () => {
+    const root = skillsRepo();
+
+    const json = runReport(root, ['--skills', '--output=json']);
+    const text = runReport(root, ['--skills']);
+
+    expect(json.exitCode).toBe(0);
+    const result = eventsOf(json.stdout).at(-1);
+    expect(result).toMatchObject({ ok: true });
+    const data = (result as { data: Record<string, unknown> }).data;
+    expect(Object.keys(data).sort()).toEqual(['plans']);
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout.split('\n')[0]).toBe(SKILLS_REPORT_HEADER);
+  });
 });
