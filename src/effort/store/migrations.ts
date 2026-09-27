@@ -258,6 +258,23 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
   ALTER TABLE task_reports
     ADD COLUMN skills_used TEXT CHECK (skills_used IS NULL OR json_type(skills_used) = 'array');
   `,
+  // Version 13: one row per settled reading of a pull request's checks,
+  // outside the port's row map and filled from no task report. `plan-ci.ts`
+  // writes it and says why a pending reading has no row, and why
+  // `(pr, head_sha, read_at)` is its key.
+  `
+  CREATE TABLE plan_ci (
+    seq       INTEGER PRIMARY KEY,
+    plan_stub TEXT NOT NULL CHECK (plan_stub <> ''),
+    pr        INTEGER NOT NULL CHECK (typeof(pr) = 'integer' AND pr > 0),
+    head_sha  TEXT NOT NULL CHECK (head_sha <> ''),
+    verdict   TEXT NOT NULL CHECK (verdict IN ('green', 'red', 'none')),
+    failing   TEXT NOT NULL CHECK (json_valid(failing) AND json_type(failing) = 'array'),
+    read_at   TEXT NOT NULL CHECK (read_at <> ''),
+    UNIQUE (pr, head_sha, read_at),
+    CHECK ((verdict = 'red') = (json_array_length(failing) > 0))
+  );
+  `,
 ];
 
 /**

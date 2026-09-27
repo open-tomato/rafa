@@ -69,8 +69,8 @@ is not additive, and the repair refuses it rather than copy around it.
 ### Tables outside the port
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
-`report_absences`, `task_reports`, `preflight`, `dispatches` and
-`skill_invocations` are SQLite-only and stay out of the port's row map.
+`report_absences`, `task_reports`, `preflight`, `dispatches`,
+`skill_invocations` and `plan_ci` are SQLite-only and stay out of the port's row map.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
@@ -94,11 +94,12 @@ render.
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
 `reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts`,
-`changes.test.ts` and `skill-invocations.test.ts`, and the filter the
-version-5 case of `preflight.test.ts` takes the later tables out with,
-beside the version-6 filter of `dispatches.test.ts`, the two version-7
-filters of `changes.test.ts`, and the version-11 filter of
-`skill-invocations.test.ts`.
+`changes.test.ts`, `skill-invocations.test.ts` and `plan-ci.test.ts`,
+and the filter the version-5 case of `preflight.test.ts` takes the later
+tables out with, beside the version-6 filter of `dispatches.test.ts`, the
+two version-7 filters of `changes.test.ts`, the two version-10 filters of
+`skill-invocations.test.ts`, and the two version-12 filters of
+`plan-ci.test.ts`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what
@@ -194,6 +195,21 @@ counts it answers can therefore be stored beside the session rows without
 the store becoming a copy of a transcript. The collector vouches for the log
 format by comparing each record's `version` against `SKILL_USE_CLI_VERSION`;
 a session read as `unknown` is never averaged as a session that used no skill.
+
+**`plan_ci` is written by `pr triage` and `pr merge`, not by a task
+report.** It arrived at schema version 13: one row per settled reading of
+a pull request's checks, holding the plan stub, the number, the head sha,
+the verdict (`green`, `red` or `none`), the failing checks' names as a
+JSON array and the reading's time, keyed by `(pr, head_sha, read_at)`.
+Both commands call one helper, `recordPlanCi` (`store/plan-ci.ts`),
+handing it the pull request, the `CheckRow`s and `plan.dir`; it never
+throws, and a failed write is only warned about. A `pending` reading
+stores no row, and the CHECK refuses one. The plan stub is the head
+branch's stub resolved against the roster, taken verbatim when the roster
+holds none, as `release status` takes it; a branch naming no stub, or a
+queue id reaching two plans, stores no row. A CHECK keeps `failing`
+non-empty exactly when the verdict is `red`. `readPlanCi` reads every row,
+or one plan's, in append order.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
