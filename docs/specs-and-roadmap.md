@@ -24,7 +24,8 @@ CLI, `gh`, installed and logged in.
 ## What a spec is
 
 One issue, one plan, one pull request. A spec is an issue opened from the
-"Spec" template, with six headings the planner reads:
+"Spec" template, with six headings the planner reads and one optional
+heading after them:
 
 | Heading | What goes there |
 | --- | --- |
@@ -34,6 +35,19 @@ One issue, one plan, one pull request. A spec is an issue opened from the
 | What can go wrong | The failure modes, and the check that would catch each. |
 | Tasks the plan must carry | One list item per piece of work, each naming what it changes. |
 | Definition of done | One list item per thing a command can show. "Works well" is not one. |
+| For the documentation writer | Optional. The examples from the design session, grouped by situation. |
+
+The optional section keeps what a design session produces and a later
+writer would otherwise have to dig out of old sessions: the use cases,
+grouped by situation from a solo project up to many teams, lightest
+first; the edge cases worth an example; config examples in the same
+order, from the empty config up; the analogies used; and the
+alternatives rejected, each with its reason. A spec without it is still
+complete, so delete the heading when you skip it. The planner hands it
+to the plan's documentation tasks only, to shape their examples, and
+never turns it into tasks. When a spec adds a command or a config key
+and has no such section, the planner's review names that as a gap which
+does not block the plan.
 
 The template's first line reminds you that an issue on a public
 repository is public: no local paths, no internal host names, no
@@ -82,6 +96,14 @@ Rules:
   changes and how it is tested. No item is a paragraph.
 - "Definition of done" is a list of things a command can show, each
   with the command or the observable result.
+- End with "For the documentation writer", taken from our conversation:
+  the use cases grouped by situation, lightest first (a solo project,
+  then a team, then many teams); the edge cases worth an example; config
+  examples in the same order, starting from the empty config; the
+  analogies we used; and the alternatives we rejected, each with its
+  reason. Keep my wording for the analogies. Leave it out only when the
+  change adds no command, config key or behaviour a user would read
+  about.
 - Nothing may be left as TBD or TODO. If you cannot decide something
   from the code, stop and ask me instead of guessing.
 - This will be public: no absolute paths from this machine, no internal

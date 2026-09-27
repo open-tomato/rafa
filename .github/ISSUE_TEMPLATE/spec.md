@@ -35,3 +35,7 @@ assignees: ''
 <!-- One list item per thing that can be shown by a command. "Works well" is not an item; "bun test is green with the new cases" is. -->
 
 -
+
+## For the documentation writer
+
+<!-- Optional: a spec without it is still complete, so delete this heading and comment when you skip it. The examples from the design session, kept for whoever writes the docs later: use cases grouped by situation, from a solo project up to many teams, lightest first; edge cases worth an example; config examples in the same order, from the empty config up; the analogies used; the alternatives rejected, each with its reason. Never tasks: the plan reads this only for its documentation tasks. -->

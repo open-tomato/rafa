@@ -43,6 +43,12 @@ on the `open-tomato/rafa` board.
   plan guess?
 * Inspect the headers the spec names: are they the ones the dev-planner
   format requires, and does each hold actual content or only placeholders?
+* Inspect whether the spec adds a user-facing command or config key: when it
+  does and carries no `## For the documentation writer` section, report a
+  gap under that heading naming the command or key, always `blocking: false`,
+  with the assumption that the documentation tasks draw their examples from
+  the Design section alone. The section is optional in every other spec, and
+  its absence there is no gap.
 * If any inspection finds a gap, write its heading as it appears in the spec,
   the `what` explaining the gap clearly, `blocking:` for whether it must be
   answered before anything is planned, the `assumption:` you would plan under

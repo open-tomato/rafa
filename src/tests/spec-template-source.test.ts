@@ -17,10 +17,13 @@
  *    ({@link SPEC_LABEL}), read through `Bun.YAML.parse` rather than a
  *    substring search, so `type:spec` appearing anywhere else in the
  *    body cannot satisfy it;
- *  - its headings are {@link TEMPLATE_HEADINGS}, in that order and with
- *    nothing else at their level. Order is not checked by the gate
- *    (`readiness.ts` says why), and it is checked here, because the
- *    order is what the author reads down;
+ *  - its headings are {@link TEMPLATE_HEADINGS} and then
+ *    {@link OPTIONAL_HEADINGS}, in that order and with nothing else at
+ *    their level. Order is not checked by the gate (`readiness.ts` says
+ *    why), and it is checked here, because the order is what the author
+ *    reads down;
+ *  - a body carrying only the required headings answers no gap, so a
+ *    spec written before an optional heading was added stays complete;
  *  - its first comment line is the one that says no local paths, since
  *    issue bodies are public (`.specs/rafa-20-pr-commands.md`), and it
  *    sits above every section so it is read before anything is typed.
@@ -46,7 +49,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 import { SPEC_LABEL } from '../board/issue.js';
-import { findReadinessGaps, LIST_HEADINGS, TEMPLATE_HEADINGS } from '../board/readiness.js';
+import {
+  findReadinessGaps, LIST_HEADINGS, OPTIONAL_HEADINGS, TEMPLATE_HEADINGS,
+} from '../board/readiness.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -93,13 +98,20 @@ function filledTemplate(): string {
     .replace(/(## [^\n]+\n)\n(?=\n*(?:## |$))/gu, '$1\nWhat this section says.\n');
 }
 
+/** `body` up to its first optional heading: the part every spec carries. */
+function requiredPart(body: string): string {
+  const at = body.indexOf(`## ${OPTIONAL_HEADINGS[0] ?? ''}`);
+  if (at === -1) throw new Error(`${TEMPLATE_PATH} carries no optional heading`);
+  return body.slice(0, at);
+}
+
 describe('the spec issue template', () => {
   it('labels the issue type:spec, which is the label the issue read refuses without', () => {
     expect(frontMatter()['labels']).toBe(SPEC_LABEL);
   });
 
   it('carries the template headings, in the order the code declares them', () => {
-    expect(headings()).toEqual([...TEMPLATE_HEADINGS]);
+    expect(headings()).toEqual([...TEMPLATE_HEADINGS, ...OPTIONAL_HEADINGS]);
   });
 
   it('opens with the comment saying the issue is public and takes no local path', () => {
@@ -119,5 +131,15 @@ describe('the spec issue template', () => {
     expect(findReadinessGaps(filledTemplate())).toEqual([]);
     // The control: the template as tracked is a template, not a ready spec.
     expect(findReadinessGaps(TEMPLATE).length).toBeGreaterThan(0);
+  });
+
+  it('answers no gap for a filled body without the optional sections, as an older spec is', () => {
+    expect(findReadinessGaps(requiredPart(filledTemplate()))).toEqual([]);
+  });
+
+  it('answers a gap for an optional heading left holding its template comment', () => {
+    const optional = TEMPLATE.slice(TEMPLATE.indexOf(`## ${OPTIONAL_HEADINGS[0] ?? ''}`));
+    const gaps = findReadinessGaps(`${requiredPart(filledTemplate())}${optional}`);
+    expect(gaps.map((gap) => gap.heading)).toEqual([...OPTIONAL_HEADINGS]);
   });
 });
