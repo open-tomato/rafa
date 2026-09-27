@@ -9,6 +9,17 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.22.0 — 2026-09-27, Epics group issues into features
+
+- Board: the board listing reads why each issue closed (`stateReason`), so a member closed as not planned is never counted as done; `rafa init --board` also creates the `type:epic`, `horizon:now`, `horizon:next` and `horizon:later` labels, and with `--epic-guard` or a yes to its own question installs a workflow that removes a second `epic:` label from an issue and comments why.
+- Issues: `epic` is an issue type (`type:epic`) that `rafa issue create --type` and `rafa issue list --type` accept, and `rafa issue ready` refuses an issue carrying two `epic:` labels with exit 2, naming both.
+- Walk: `rafa next` and `plan create --next` walk into the first `now` epic on the Roadmap that is not done, in its checklist order then its label-only members by number (each reported), propose its first open spec, and stop at an epic that has run dry without moving on to another; a Roadmap with no epic line prints what it printed before.
+- CLI: `rafa roadmap` and `rafa issue list --roadmap` show the epics the Roadmap names, grouped by horizon with state, done/total, blocked, title and date, then any spec lines under `Specs`; `--all` shows every horizon, `--full` prints each epic's issues under it, `--check` exits 1 when an epic's open or closed state disagrees with its computed one or the board cannot be read, an unreachable board reads the epics as `unknown` with the reason, and the json result carries the epics; new `rafa epics [n]` prints one epic's issues as the Roadmap table, the numbered epic or the first `now` epic that is not done; every such read warns about label and checklist problems.
+- Doctor: `rafa doctor` lists, under `Epic labels:`, issues carrying two `epic:` labels and `epic:` labels no epic carries.
+- Plan: `plan create` shows the planner the epic a spec issue belongs to and has it carry the epic's acceptance criteria into the plan's context; a spec outside any epic gets the same prompt as before.
+- Tests: epic parsing, states and problems are held from one planted `gh issue list` answer, and spawned CLI tests hold `rafa next`, `plan create --next`, `rafa roadmap` with `--full` and `--check`, `rafa epics`, `issue ready`, `doctor` and the planner prompt over fixture epics, plus a byte-identical no-epic Roadmap.
+- Docs: the README's Roadmap section and `docs/specs-and-roadmap.md` cover epics from the solo project with none up: the sample view, membership by label versus order by checklist, state, and each edge case.
+
 ## 0.21.0 — 2026-09-27, Know which skills earn their place
 
 - Effort store: each stored task report records the skills its session said it used (a report stored before reads as not recorded, never as none), and a new SQLite-only `plan_ci` table keeps each settled reading of a plan's pull request checks: its head commit, verdict (`green`, `red` or `none`), failing check names and time.
