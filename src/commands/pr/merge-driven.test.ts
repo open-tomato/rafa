@@ -333,6 +333,36 @@ describe('the question answered y, and the clean-up observed in git', () => {
   });
 });
 
+describe('a head branch pushed from elsewhere, with no local branch here', () => {
+  it('skips the local delete, still deletes the remote branch and prunes, and ends 0', async () => {
+    const repo = plantMergeRepo();
+    // The shape of a branch pushed from another clone or worktree under a
+    // different local name: origin holds BRANCH, this checkout's
+    // refs/heads does not. Only the remote-tracking ref stays behind.
+    expect(git(repo.work, repo.home, 'switch', '-q', BASE).ok).toBe(true);
+    expect(git(repo.work, repo.home, 'branch', '-q', '-D', BRANCH).ok).toBe(true);
+    expect(git(repo.work, repo.home, 'show-ref', '--verify', `refs/heads/${BRANCH}`).ok).toBe(false);
+    expect(git(repo.bare, repo.home, 'show-ref', '--verify', `refs/heads/${BRANCH}`).ok).toBe(true);
+    const stub = stubPulls();
+
+    const run = await ran(repo, stub.pulls, [String(NUMBER)]);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(run.lines).toContain(`pull ${BASE}, fast-forward only: done`);
+    expect(run.lines).toContain(
+      `delete the local branch ${BRANCH}: skipped — no local branch ${BRANCH}; nothing to delete`,
+    );
+    expect(run.lines).toContain(`delete origin/${BRANCH}: done`);
+    expect(run.lines).toContain('prune deleted remote branches: done');
+    expect(run.lines.at(-1)).toBe(
+      `${BASE} is checked out and pulled, and ${BRANCH} is gone on origin; there was no local branch to delete.`,
+    );
+
+    expect(git(repo.bare, repo.home, 'show-ref', '--verify', `refs/heads/${BRANCH}`).ok).toBe(false);
+    expect(git(repo.work, repo.home, 'branch', '-r').stdout).not.toContain(`origin/${BRANCH}`);
+  });
+});
+
 describe('a failure injected after the merge', () => {
   it('stops at the failing step, prints the rest as commands, and leaves the merge and the branches alone', async () => {
     const repo = plantMergeRepo();

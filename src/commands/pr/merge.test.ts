@@ -625,6 +625,7 @@ describe('the clean-up', () => {
       'worktree list --porcelain',
       'rev-parse --show-toplevel',
       `ls-remote --heads origin ${BRANCH}`,
+      `show-ref --verify --quiet refs/heads/${BRANCH}`,
       `switch ${BASE}`,
       'pull --ff-only',
       `branch -D ${BRANCH}`,
@@ -662,6 +663,50 @@ describe('the clean-up', () => {
     expect(run.stdout).toContain('origin could not be asked whether it still holds');
     expect(seams.git.ran()).not.toContain(`push origin --delete ${BRANCH}`);
     expect(seams.git.ran()).toContain('fetch --prune');
+  });
+
+  it('skips the local delete where this checkout has no such branch, and runs every step after it', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`show-ref --verify --quiet refs/heads/${BRANCH}`]: failed('') },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.git.ran()).not.toContain(`branch -D ${BRANCH}`);
+    expect(seams.git.ran()).toContain(`push origin --delete ${BRANCH}`);
+    expect(seams.git.ran()).toContain('fetch --prune');
+    expect(lines).toContain(`delete the local branch ${BRANCH}: skipped — no local branch ${BRANCH}; nothing to delete`);
+    expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled, and ${BRANCH} is gone on origin; there was no local branch to delete.`);
+  });
+
+  it('says both were already gone where neither this checkout nor the remote holds the branch', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: {
+        [`show-ref --verify --quiet refs/heads/${BRANCH}`]: failed(''),
+        [`ls-remote --heads origin ${BRANCH}`]: ok(''),
+      },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled; ${BRANCH} had no local branch, and origin had already deleted it.`);
+  });
+
+  it('warns about a local probe that failed and runs the local delete, which reports for itself', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`show-ref --verify --quiet refs/heads/${BRANCH}`]: failed('fatal: bad object HEAD') },
+    });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`could not read whether this checkout holds a local branch ${BRANCH}`);
+    expect(seams.git.ran()).toContain(`branch -D ${BRANCH}`);
   });
 
   it('stops at the step that failed, prints the rest as commands, and leaves the merge alone', async () => {

@@ -92,6 +92,15 @@
  * "automatically delete head branches" turned on has no branch left to
  * delete and the step would fail on a merge that went perfectly.
  *
+ * The LOCAL delete stays in the list when the caller found no local
+ * branch, but as a skipped step ({@link MergeStep.skip}): a branch
+ * pushed from another clone, or from a worktree under another local
+ * name, has nothing in this checkout's `refs/heads` to delete, and
+ * `git branch -D` would fail with `branch '<name>' not found` and stop
+ * the remote delete and the prune behind it. It is kept rather than
+ * dropped so the report still names it in its place; {@link remainingFrom}
+ * leaves it out of the commands to paste, since running it would fail.
+ *
  * ## What is kept verbatim
  *
  * A {@link WorkingTreeStatus} entry is the porcelain line as git wrote
@@ -434,6 +443,11 @@ export interface MergeStep {
   readonly label: string;
   /** The whole command, `git` included, ready to spawn or to print. */
   readonly argv: readonly string[];
+  /**
+   * Why the step is not run, when it is not: the runner reports this in
+   * place of spawning `argv`. Absent for a step that runs.
+   */
+  readonly skip?: string;
 }
 
 /** What the clean-up after a merge is built from. */
@@ -445,6 +459,11 @@ export interface CleanUpPlan {
   /** The remote the branch was pushed to. `origin` when absent. */
   readonly remote?: string;
   /**
+   * Whether this checkout holds the branch under `refs/heads`. False
+   * keeps the local delete as a skipped step; see the module note.
+   */
+  readonly localBranchPresent: boolean;
+  /**
    * Whether the remote branch is still there AFTER the merge. False
    * drops the remote delete from the list; see the module note.
    */
@@ -453,12 +472,12 @@ export interface CleanUpPlan {
 
 /**
  * The clean-up after a merge, in the order it runs: switch to the base,
- * pull it fast-forward only, delete the local branch, delete the remote
- * branch when it is still there, prune. Frozen, and the same array the
+ * pull it fast-forward only, delete the local branch (skipped when there
+ * is none), delete the remote branch when it is still there, prune. Frozen, and the same array the
  * runner walks and a failure prints the tail of.
  */
 export function cleanUpSteps(plan: CleanUpPlan): readonly MergeStep[] {
-  const { base, branch, remote = DEFAULT_REMOTE, remoteBranchPresent } = plan;
+  const { base, branch, remote = DEFAULT_REMOTE, localBranchPresent, remoteBranchPresent } = plan;
   const steps: MergeStep[] = [
     { id: 'switch-base', label: `switch to ${base}`, argv: ['git', 'switch', base] },
     {
@@ -470,6 +489,9 @@ export function cleanUpSteps(plan: CleanUpPlan): readonly MergeStep[] {
       id: 'delete-local',
       label: `delete the local branch ${branch}`,
       argv: ['git', 'branch', '-D', branch],
+      ...(localBranchPresent
+        ? {}
+        : { skip: `no local branch ${branch}; nothing to delete` }),
     },
   ];
   if (remoteBranchPresent) {
@@ -501,8 +523,9 @@ export function commandLine(step: MergeStep): string {
 
 /**
  * The steps still to do once `failed` has failed: that step itself,
- * because it did not finish, and every step after it. An id that is not
- * in `steps` answers nothing, since there is no tail to name.
+ * because it did not finish, and every step after it that is not
+ * skipped. An id that is not in `steps` answers nothing, since there is
+ * no tail to name.
  */
 export function remainingFrom(
   steps: readonly MergeStep[],
@@ -511,5 +534,5 @@ export function remainingFrom(
   const at = steps.findIndex((step) => step.id === failed);
   return at === -1
     ? Object.freeze([])
-    : Object.freeze(steps.slice(at));
+    : Object.freeze(steps.slice(at).filter((step) => step.skip === undefined));
 }
