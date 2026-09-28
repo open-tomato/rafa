@@ -618,7 +618,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
     ['../../start/runtime.js', ['RUNTIME_SUBDIR']],
     ['./merge-followups.js', ['readFollowUps', 'readPackageFacts', 'versionTag']],
-    ['./merge-tick.js', ['noBoardListsLine', 'tickRoadmapAfterMerge']],
+    ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
     ['./merge-unchecked.js', ['confirmUncheckedMerge', 'postUncheckedComment', 'readUncheckedMerge']],
     ['./pr-context.js', [

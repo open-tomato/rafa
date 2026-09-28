@@ -55,13 +55,14 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
-import { noBoardListsLine } from './merge-tick.js';
+import { epicTickSentence, noBoardListsLine } from './merge-tick.js';
 import { createPrMergeCommand, summaryLine } from './merge.js';
 import { PR_USAGE } from './pr-context.js';
 
@@ -190,6 +191,19 @@ const BLOCKED_LISTING = `issue list --state open --label ${SPEC_BLOCKED_LABEL} -
 /** The `type:roadmap` listing the tick finds the default board through, as the fake gh records it. */
 const BOARDS_LISTING = BOARDS_LIST_ARGS.join(' ');
 
+/** The board listing the epic tick finds each closed issue's epic through, as the fake gh records it. */
+const EPIC_LISTING = boardListingCommand(BOARD_LISTING_LIMIT).slice('gh '.length);
+
+/** One row of the board listing, as `gh` writes it. */
+interface ListedRow {
+  readonly number: number;
+  readonly title: string;
+  readonly body: string;
+  readonly state: 'OPEN' | 'CLOSED';
+  readonly stateReason: string | null;
+  readonly labels: readonly { readonly name: string }[];
+}
+
 /** What a case's board holds for the unblock reading, beside the roadmap. */
 interface BoardIssues {
   /** The open issues labelled `spec:blocked`, each number to its body. */
@@ -198,6 +212,8 @@ interface BoardIssues {
   readonly states?: Readonly<Record<string, 'OPEN' | 'CLOSED'>>;
   /** The open `type:roadmap` boards, each number to its body; none when left out. */
   readonly labelled?: Readonly<Record<string, string>>;
+  /** The rows the epic tick's board listing answers, as `gh` writes them; none when left out. */
+  readonly listing?: readonly ListedRow[];
 }
 
 /** The `type:roadmap` listing's rows for `labelled`, as `gh` writes them. */
@@ -222,16 +238,18 @@ interface FakeGh {
 }
 
 /**
- * A runner serving the roadmap read and write, the two listings the
- * unblock reading sends and the one removal it writes, storing what a
- * PATCH sends. `broken` fails every call but the `type:roadmap` listing,
- * which is how a board that will not take the tick is driven.
+ * A runner serving the epic tick's board listing, the roadmap read and
+ * write, the two listings the unblock reading sends and the one removal
+ * it writes, storing what a PATCH sends. `broken` fails every call but
+ * the `type:roadmap` listing and the board listing, which is how a board
+ * that will not take the tick is driven.
  */
 function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
   const ran: string[] = [];
   const removed: string[] = [];
   const stored = new Map<number, string>([
     [ROADMAP_ISSUE, ROADMAP_BODY],
+    ...(board.listing ?? []).map((row): [number, string] => [row.number, row.body]),
     ...Object.entries(board.labelled ?? {}).map(([number, body]): [number, string] => [Number(number), body]),
   ]);
   const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
@@ -242,6 +260,9 @@ function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
     // so its listing answers empty, broken board or not, and roadmap.issue
     // decides, as before; the other --label listing is the unblock reading's.
     if (args.includes('--label') && args.includes('type:roadmap')) return ok(labelledRows(board.labelled ?? {}));
+    // The epic tick's board listing, told from the unblock reading's
+    // `--state all` listing by its whole argument list, answers as planted.
+    if (args.join(' ') === EPIC_LISTING) return ok(JSON.stringify(board.listing ?? []));
     if (broken) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
     if (args.slice(0, 2).join(' ') === 'issue edit') {
       removed.push(`#${args[2] ?? ''} ${args[4] ?? ''}`);
@@ -737,12 +758,46 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
       BOARDS_LISTING,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
       BLOCKED_LISTING,
     ]);
     expect(lines).toContain(`Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`);
+    expect(lines.filter((line) => line.includes('epic'))).toEqual([]);
+  });
+
+  it('ticks a member on its epic before the roadmap listing it, one line each, the epic line first', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const epicBody = '## Specs\n\n- [ ] #20 plans from the board\n';
+    const labels = (...names: readonly string[]): readonly { readonly name: string }[] => names.map((name) => ({ name }));
+    const seams = caseSeams(stub.pulls, project, {
+      board: {
+        listing: [
+          { number: 252, title: 'Epic', body: epicBody, state: 'OPEN', stateReason: null, labels: labels('type:epic', 'epic:boards') },
+          { number: 20, title: 'Spec', body: '', state: 'CLOSED', stateReason: null, labels: labels('type:spec', 'epic:boards') },
+        ],
+      },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
+      'api repos/{owner}/{repo}/issues/252',
+      'api repos/{owner}/{repo}/issues/252 -X PATCH -f body=## Specs\n\n- [x] #20 plans from the board\n',
+      'api repos/{owner}/{repo}/issues/252',
+      BOARDS_LISTING,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
+      BLOCKED_LISTING,
+    ]);
+    const epicLine = epicTickSentence({ issue: 252, status: 'edited', attempts: 1, problem: '', members: [20] });
+    const roadmapLine = `Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`;
+    expect(lines).toContain(epicLine);
+    expect(lines.indexOf(epicLine)).toBeLessThan(lines.indexOf(roadmapLine));
   });
 
   it('ticks every labelled board whose checklist lists the closed issue, and no other, one line each', async () => {
@@ -755,6 +810,7 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
       BOARDS_LISTING,
       'api repos/{owner}/{repo}/issues/40',
       'api repos/{owner}/{repo}/issues/40 -X PATCH -f body=- [x] #20 plans\n',
@@ -773,7 +829,7 @@ describe('the roadmap tick', () => {
     const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
 
     expect(run.exitCode).toBe(0);
-    expect(seams.gh.ran()).toEqual([BOARDS_LISTING, BLOCKED_LISTING]);
+    expect(seams.gh.ran()).toEqual([EPIC_LISTING, BOARDS_LISTING, BLOCKED_LISTING]);
     expect(lines).toContain(noBoardListsLine([20]));
   });
 
@@ -784,7 +840,7 @@ describe('the roadmap tick', () => {
     const { run } = await ran(seams.seams, project, ['41', '--yes']);
 
     expect(run.exitCode).toBe(1);
-    expect(seams.gh.ran()).toHaveLength(3);
+    expect(seams.gh.ran()).toHaveLength(4);
   });
 
   it('warns and merges anyway when the board will not take the tick', async () => {
@@ -795,6 +851,7 @@ describe('the roadmap tick', () => {
 
     expect(run.exitCode).toBe(0);
     expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
       BOARDS_LISTING,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
       `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,

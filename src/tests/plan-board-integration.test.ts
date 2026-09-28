@@ -75,6 +75,7 @@
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { RoadmapLine, RoadmapSkip } from '../board/roadmap.js';
+import type { EpicTickResult } from '../commands/pr/merge-tick.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
@@ -105,6 +106,7 @@ import {
 import { notesPath as localNotesPath, specPath } from '../board/naming.js';
 import { resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
 import {
   noRoadmapMessage,
   parseRoadmapBody,
@@ -682,7 +684,8 @@ function noBranches(): GitRunner {
  * One board, shared between a `pr merge` tick and a `plan create --next`
  * walk: the `type:roadmap` listing answering no board, for both,
  * `gh issue view` for the walk, `gh pr list` answering no open pull
- * request, and the `gh api
+ * request, the board listing the epic tick reads, holding every planted
+ * issue and no epic, and the `gh api
  * repos/{owner}/{repo}/issues/<n>` pair the tick reads and writes,
  * over the SAME roadmap body, mutated in place by a write.
  */
@@ -711,6 +714,16 @@ function sharedBoard(roadmap: SpecIssue, others: readonly SpecIssue[]): { readon
     // roadmap.issue decides, as before.
     if (args[0] === 'issue' && args[1] === 'list' && args.includes('--label') && args.includes('type:roadmap')) {
       return Promise.resolve(said('[]'));
+    }
+    if (`gh ${args.join(' ')}` === boardListingCommand(BOARD_LISTING_LIMIT)) {
+      return Promise.resolve(said(JSON.stringify([...issues.values()].map((issue) => ({
+        number: issue.number,
+        title: issue.title,
+        body: issue.body,
+        state: issue.state,
+        stateReason: null,
+        labels: issue.labels.map((name) => ({ name })),
+      })))));
     }
     if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}/collaborators/octocat/permission') {
       return Promise.resolve(said(JSON.stringify({ permission: 'admin', role_name: 'admin' })));
@@ -745,13 +758,16 @@ describe('the tick pr merge writes, read back by the very walk plan create --nex
   /** Ticks `board` for a pull request closing `issue`, over a root of its own, with no board failure. */
   async function tick(board: ReturnType<typeof sharedBoard>, issue: number): Promise<void> {
     const warnings: string[] = [];
+    const epics: EpicTickResult[] = [];
     const result = await tickRoadmapAfterMerge({
       body: `Closes #${String(issue)}`,
       configured: ROADMAP_NUMBER,
       gh: board.gh,
       warn: (message) => warnings.push(message),
+      epicTicked: (epic) => epics.push(epic),
     });
     expect(warnings).toEqual([]);
+    expect(epics).toEqual([]);
     expect(result).toEqual([expect.objectContaining({ status: 'ticked', ticked: [issue] })]);
   }
 

@@ -87,7 +87,9 @@
  * clean-up is local git and can fail, and a tick behind it would be the
  * one piece of the merge that a failed `git pull` silently dropped —
  * where the board write has nothing to do with this checkout and is as
- * true then as it is after.
+ * true then as it is after. Before the boards, the closed issue's line
+ * is ticked on the checklist of the epic its `epic:` label names, one
+ * line printed per epic (`./merge-tick.ts`, `epicTickSentence`).
  *
  * Nothing it comes to fails the command, so a roadmap that cannot be
  * read, an edit that would not land and a pull request closing no issue
@@ -195,7 +197,7 @@ import {
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
-import { noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
+import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
 import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
 import {
@@ -462,9 +464,9 @@ async function reportUnblock(
 }
 
 /**
- * Ticks every board listing an issue the merge that just went through
- * closes and prints the one line each board came to; see the module
- * note. A tick that could not be written is a warning and nothing else.
+ * Ticks each epic and every board listing an issue the merge that just
+ * went through closes and prints the one line each came to; see the
+ * module note. A tick that could not be written is a warning and nothing else.
  */
 async function reportTick(
   context: RafaContext,
@@ -480,6 +482,10 @@ async function reportTick(
     configured: pr.roadmapIssue,
     gh: openGh(pr, seams),
     warn,
+    epicTicked: (epic) => {
+      if (epic.status === 'failed') warn(epicTickSentence(epic));
+      else context.output.info(epicTickSentence(epic));
+    },
   });
   if (tick === null) return null;
   if (tick.length === 0) context.output.info(noBoardListsLine(closedIssuesIn(detail.body)));
