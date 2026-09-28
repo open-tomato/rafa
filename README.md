@@ -348,13 +348,23 @@ from GitHub Issues:
   machine-specific failures a run meets stay off your public tracker.
   Specs in an epic may not carry two `epic:` labels; `rafa issue ready`
   refuses the second one.
+- **Boards and switching.** Most projects stay on one board. A project
+  with several teams can hold one board per team, each with its own
+  owner and owned folders listed in `Owner:` and `Owns:` lines, and tied
+  to the repository's `CODEOWNERS` file. `rafa switch <n>` moves to that
+  board's epic and position, `rafa board list` shows all boards, and
+  `rafa status` prints where you stand. A switch made by hand re-homes; pass
+  `--no-rehome` to keep your home and go back to it later. The position
+  file `.rafa/position.json` holds your current place, where you were, and
+  where you came from — the same two-slot pattern as `cd -` and
+  `git checkout -`, plus a home anchor.
 - **Other trackers.** GitHub Issues is what works today. Linear support
   is being ported from the project rafa grew out of, as an optional
   add-on in a later version. For anything else, open or upvote a request
   in [the issues](https://github.com/open-tomato/rafa/issues).
 
 The full guide, with the spec template explained, a prompt for drafting
-a spec, epics and every gate in order, is
+a spec, epics, boards and every gate in order, is
 [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md).
 
 ## From a checkout

@@ -44,3 +44,24 @@ the retrospective, say); until then they are words for prose.
   catch.
 - Never use "lore" or "hindsight" in a code identifier, a config key, a
   command, a heading that names a spec, or a table name.
+
+### Boards and positions
+
+**A board** is a GitHub issue labelled `type:roadmap`, holding an ordered
+checklist of epics. Most projects have one default board (named by
+`roadmap.issue` in `.rafa/config.yaml`). Projects with several teams can
+have several boards, each with its own owner and owned folders listed in
+`Owner:` and `Owns:` lines. Use "board" in prose once the formal name is
+given and in command names, settings and specifications. No colloquial
+variant is needed.
+
+**A position** is a (board, epic) pair: where you are in the roadmap. The
+file `.rafa/position.json` holds three positions: `current` (where you are
+now), `previous` (where you were before the last switch), and `home`
+(your anchor, where you came from). Formal use only; no colloquial name.
+
+**Home** is your anchor position, the place a switch made by hand marks
+to come back to later with `rafa switch -`. The home moves when you switch
+by hand; pass `--no-rehome` to keep it still. Use "home" in prose and in
+settings, commands and specifications to name the anchor slot of the
+position triple.
