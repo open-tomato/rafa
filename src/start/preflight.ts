@@ -58,7 +58,18 @@
  *   5. **Prints the reminders** that file carries, through `info`: each
  *      `human` item, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
- *      operator steps for after the merge stop nothing.
+ *      operator steps for after the merge stop nothing. It then **warns
+ *      once for each unknown additive migration** the project's effort
+ *      store logs, through `warn`, in the words of
+ *      `unknownAdditiveWarning` (`effort/store/schema-report.ts`):
+ *      `⚠ effort store holds migration <id> this rafa does not know
+ *      (applied by <by>); it is additive, so this run reads and writes
+ *      the store as it is`. The store is read read-only through
+ *      `readSchemaReport`, which adopts and applies nothing; a store
+ *      that is absent or holds no such migration prints nothing, a store
+ *      this rafa refuses prints nothing here either (its first open
+ *      refuses it with its own next step), and one that cannot be read
+ *      is one warning naming why. None of it halts.
  *   6. **Decides the start-only tier**, through `isFirstDispatch`
  *      (`preflight/first-dispatch.ts`): the plan's `[start]` items are
  *      probed ahead of the configured required tier on a first
@@ -237,7 +248,7 @@ import type { TierSettings } from '../tiers/resolve.js';
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename } from 'path';
+import { basename, join } from 'path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import {
@@ -252,7 +263,10 @@ import {
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS } from '../config.js';
+import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
+import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';
+import { SQLITE_STORE_FILE_NAME } from '../effort/store/sqlite.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
@@ -504,6 +518,21 @@ function announceReminders(planPath: string, reminders: readonly PrerequisiteRem
   for (const reminder of reminders) output.info(`   line ${reminder.line}: ${reminder.description}`);
 }
 
+/**
+ * Warns once for each unknown additive migration the project's store
+ * logs, or once naming why the store could not be read; see the module
+ * note.
+ */
+function announceUnknownMigrations(repoRoot: string): void {
+  const output = activeOutput();
+  try {
+    const report = readSchemaReport(join(effortStoreDir(repoRoot), SQLITE_STORE_FILE_NAME));
+    for (const migration of unknownAdditive(report)) output.warn(unknownAdditiveWarning(migration));
+  } catch (error) {
+    output.warn(`⚠ the effort store's migrations could not be read: ${messageOf(error)}`);
+  }
+}
+
 /** Stores the report's checks, answering why they could not be stored, or null. */
 function storeChecks(options: StartPreflightOptions, runId: string, report: PreflightReport): string | null {
   try {
@@ -541,6 +570,7 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
   const items = await loadItems(options);
   refuseMalformedItems(options.planPath, items);
   announceReminders(options.planPath, items.reminders);
+  announceUnknownMigrations(options.repoRoot);
 
   const tiers: PreflightTiers = {
     required: [...automaticItems(options), ...startTier(options.planPath, items), ...items.required],

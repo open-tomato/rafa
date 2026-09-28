@@ -89,6 +89,9 @@ export interface DevelopmentProbe {
   readonly isAlive?: PidProbe;
 }
 
+/** What follows the version in the `applied_by` of a row a development build logged, ahead of its checkout. */
+export const DEVELOPMENT_MARK = '+dev:';
+
 /**
  * The running rafa as a migration log's `applied_by` names it: its
  * version for an installed runtime, and `<version>+dev:<checkout>` for a
@@ -96,7 +99,7 @@ export interface DevelopmentProbe {
  */
 export function appliedByName(identity: RuntimeIdentity): string {
   return identity.kind === 'development'
-    ? `${RAFA_VERSION}+dev:${identity.checkout}`
+    ? `${RAFA_VERSION}${DEVELOPMENT_MARK}${identity.checkout}`
     : RAFA_VERSION;
 }
 

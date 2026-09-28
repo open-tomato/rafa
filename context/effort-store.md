@@ -161,6 +161,33 @@ rebuild over non-null rows migrates, names the backup, refuses beside a
 planted live loop, and spawns `bun src/rafa.ts`: refused over a project's
 store, migrating a copy under `RAFA_EFFORT_DIR`.
 
+**A loop never records to a copy, and says what it does not know.**
+`loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
+empty string, right after the detached refusal and before `--runtime`
+hands the run on (`refuseEffortDirRun`, `src/start/run-config.ts`):
+`❌ RAFA_EFFORT_DIR is set (<dir>); a loop records to the project's own
+store. Unset it and run again.` Its preflight then reads the project's
+store through `readSchemaReport`, read-only, and warns once for each
+logged migration this rafa does not know whose `breaks` is empty, in
+the words of `unknownAdditiveWarning` (`schema-report.ts`): `⚠ effort
+store holds migration <id> this rafa does not know (applied by <by>);
+it is additive, so this run reads and writes the store as it is`. A
+refused store gets no warning there, since its first open refuses it;
+one that cannot be read is one warning naming why, and none halts.
+`rafa doctor` prints an `effort store schema` row
+(`src/commands/doctor-effort-schema.ts`) over the store `effort schema`
+reads: `fail`, and exit 1 with the next safe step, wherever
+`effort schema --check` fails, a refused `RAFA_EFFORT_DIR` and a file
+that is no store included; `warn` for each unknown additive migration
+and, in the project's own store alone, for each `applied_by` holding
+`DEVELOPMENT_MARK` (`+dev:`, `development-build.ts`), which a copy
+under `RAFA_EFFORT_DIR` is expected to hold. `loop-start-effort-store.test.ts`
+spawns the refusal beside an empty variable that goes on, and the
+warning beside a store holding no unknown migration; each run halts
+at a failing required item, so no session is spawned.
+`doctor-effort-schema.test.ts` spawns `doctor` and `effort schema
+--check` over the same stores and holds their exit codes together.
+
 ### The schema history
 
 **SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and

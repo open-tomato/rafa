@@ -148,13 +148,28 @@
  *
  * A warning never changes the exit code.
  *
+ * ## The effort store schema row
+ *
+ * Every run that got past the preflight's refusals reads the
+ * `effort store schema` row (`./doctor-effort-schema.ts`, whose note
+ * says what it reads): `fail` wherever `rafa effort schema --check`
+ * fails, `warn` for an unknown additive migration the store logs and
+ * for a development build's `applied_by` in the project's own store,
+ * and `ok` otherwise. Its line follows the skill tier rows, a halt's
+ * included, and a project with no store yet gets none; its warnings are
+ * `warn` lines, like the three below.
+ *
  * ## The exit code
  *
- * 0 when no required item failed, whatever failed among the optional ones
- * and whatever was warned. 1 when a required item failed or timed out,
+ * 0 when no required item failed and the effort store schema row did
+ * not fail, whatever failed among the optional ones and whatever was
+ * warned. 1 when a required item failed or timed out,
  * which is when `loop start` would halt before any session: the refusal
  * opens with the runner's halt, which names each such item, its probe,
- * and its exit code with the first line of stderr. 1 as well, each
+ * and its exit code with the first line of stderr. 1 when the effort
+ * store schema row fails, the refusal naming the store, why this rafa
+ * refuses it and its next safe step, after a halt's text when both
+ * happen. 1 as well, each
  * ending `Nothing was checked.`, for a positional word, a `--plan` with
  * no file, a `--deep` holding a value, a plan named that is no file, a plan path that cannot be
  * checked, such as one under a file (`stat` answers `ENOTDIR`, measured
@@ -175,13 +190,16 @@
  * its rows, then any blocked issues, then any epic labels — and none for
  * one that has not; then the cleanup row, when there is anything to
  * clean; then the references row, when there is a saved copy; then the `Skill tiers` rows
- * (`./doctor-tiers.ts`), when there is any; then, under `--deep`, `renderDeep`'s sections. A halt
+ * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then, under `--deep`,
+ * `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
- * absolute, for a preflight that did not halt. A halt gives no `data`:
+ * absolute, for a preflight that did not halt and an effort store schema
+ * row that did not fail. A halt gives no `data`, nor does a failing row:
  * the terminal event is the `command_exit` error, whose message is the
- * halt naming every failed required item. In either mode each warning is
+ * halt naming every failed required item, then the row's refusal with
+ * its next safe step. In either mode each warning is
  * a `warn` line, a `log` event in json mode, and so is the risk total, at
  * `info`.
  *
@@ -199,6 +217,7 @@
 import type { DoctorBoardReadings, DoctorBoardSeams } from './doctor-board.js';
 import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
+import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
@@ -239,6 +258,7 @@ import { trackerPathFor } from '../utils/tracker.js';
 import { boardRunner, readDoctorBoard, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
+import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { renderDoctor } from './doctor-render.js';
@@ -304,7 +324,7 @@ export interface DoctorPreflight {
   readonly deep: boolean;
 }
 
-/** What json mode gives as the terminal result's `data`, for a preflight that did not halt. */
+/** What json mode gives as the terminal result's `data`, for a run `doctor` exits 0 from. */
 export interface DoctorResult {
   /** The project root each probe ran in. */
   readonly root: string;
@@ -344,6 +364,8 @@ export interface DoctorResult {
   readonly refs: DoctorRefsReading;
   /** The skill tier rows and the Claude Code version they were read against (`./doctor-tiers.ts`). */
   readonly tiers: DoctorTiersReading;
+  /** The `effort store schema` row (`./doctor-effort-schema.ts`); a failing one gives no `data`. */
+  readonly effortSchema: DoctorEffortSchemaReading;
   /** Every `--deep` section as it was read; null without `--deep`. */
   readonly deep: DeepReading | null;
 }
@@ -353,6 +375,7 @@ interface BoardReadings extends DoctorBoardReadings {
   readonly cleanup: DoctorCleanupReading;
   readonly refs: DoctorRefsReading;
   readonly tiers: DoctorTiersReading;
+  readonly effortSchema: DoctorEffortSchemaReading;
 }
 
 /** The line every refusal before a check ends with. */
@@ -535,12 +558,24 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   });
 }
 
-/** The refusal for a halt: the runner's own text, then what `loop start` would do. */
-function haltRefusal(halt: string): CommandExit {
-  return new CommandExit(1, [
+/**
+ * The refusal for a halt, a failing `effort store schema` row, or both:
+ * the runner's own text and what `loop start` would do, then the row's
+ * refusal; null for neither.
+ */
+function doctorRefusal(halt: string | null, schema: string | null): CommandExit | null {
+  if (halt === null) {
+    return schema === null
+      ? null
+      : new CommandExit(1, schema);
+  }
+  const lines = [
     `rafa doctor: ${halt}`,
     'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
-  ].join('\n'));
+  ];
+  return new CommandExit(1, [...lines, ...(schema === null
+    ? []
+    : [schema])].join('\n'));
 }
 
 /**
@@ -556,7 +591,7 @@ async function checkDeep(context: RafaContext, preflight: DoctorPreflight, seams
   return readDeep({ project: projectOf(context), env: context.env, resolved: preflight.resolved, plan }, seams);
 }
 
-/** The data json mode gives for a preflight that did not halt. */
+/** The data json mode gives for a run `doctor` exits 0 from. */
 function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings: BoardReadings, deep: DeepReading | null): DoctorResult {
   return {
     root: preflight.root,
@@ -578,6 +613,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     cleanup: readings.cleanup,
     refs: readings.refs,
     tiers: readings.tiers,
+    effortSchema: readings.effortSchema,
     deep,
   };
 }
@@ -618,17 +654,21 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
     const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
-    const readings: BoardReadings = { ...await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue), cleanup, refs, tiers };
+    const effortSchema = readDoctorEffortSchema(project.root, context.env);
+    const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue);
+    const readings: BoardReadings = { ...board, cleanup, refs, tiers, effortSchema };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
     writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
     writeText(context, renderDoctorTiers(readings.tiers));
+    writeDoctorEffortSchema(context, effortSchema);
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
       : renderDeep(deep));
-    if (preflight.report.halt !== null) throw haltRefusal(preflight.report.halt);
+    const refusal = doctorRefusal(preflight.report.halt, effortSchemaRefusal(effortSchema));
+    if (refusal !== null) throw refusal;
     if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings, deep));
   } finally {
     writeInstall(context, install);
@@ -654,7 +694,11 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' one `--plan=<file>` names, relative to the project root, or the default plan `rafa loop start`'
       + ` runs. Each probe runs in the project root with stdin closed and a ${String(PROBE_TIMEOUT_MS / 1000)}-second`
       + ' timeout. It exits 1 when a required item fails, naming the item, its probe and its exit code or'
-      + ' first line of stderr, where `rafa loop start` would halt, and 0 otherwise. It warns when'
+      + ' first line of stderr, where `rafa loop start` would halt. It reads the effort store as'
+      + ' `rafa effort schema --check` does, changing nothing, and prints its `effort store schema` row:'
+      + ' it exits 1 where that check fails, naming the next safe step, and warns on a migration this rafa'
+      + ' does not know that is additive and on one the project\'s own store logs as applied by a development'
+      + ' build. It exits 0 otherwise. It warns when'
       + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
       + ' not on PATH ahead of `~/.bun/bin`, and when `previous/` under `specs.dir` holds more than fifty'
       + ' previous copies of issue specs, which are safe to delete; a warning never changes the exit code. On a repository whose'

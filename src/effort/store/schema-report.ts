@@ -46,6 +46,18 @@
  *   - `unknown`: each logged id this build does not know, with what it
  *     breaks and who applied it when;
  *   - `edited`: each logged id this build knows under another checksum.
+ *
+ * ## The warnings
+ *
+ * A store this rafa uses may still hold something worth a warning, and
+ * `loop start`'s preflight and `rafa doctor` both word it from here:
+ * {@link unknownAdditive} is each unknown migration that breaks nothing
+ * (this rafa reads and writes the store as it is, so it is used, and
+ * named), worded by {@link unknownAdditiveWarning}; and
+ * {@link developmentApplied} is each logged migration a development
+ * build applied, which a live store should never hold, since a
+ * development build migrates only a copy. A refused report has neither:
+ * its refusal is the one thing to say.
  */
 import type { DevelopmentProbe } from './development-build.js';
 import type { SqliteMigration } from './migrations.js';
@@ -56,7 +68,12 @@ import { existsSync } from 'node:fs';
 import { Database } from 'bun:sqlite';
 
 import { readStoreSchema, writeNames } from './bring-forward.js';
-import { DEVELOPMENT_NEXT_STEP, DevelopmentBuildRefusedError, refuseUnownedDevelopmentWrite } from './development-build.js';
+import {
+  DEVELOPMENT_MARK,
+  DEVELOPMENT_NEXT_STEP,
+  DevelopmentBuildRefusedError,
+  refuseUnownedDevelopmentWrite,
+} from './development-build.js';
 import { guardTestProcess } from './location.js';
 import { LEGACY_GATE_CLOSED, LEGACY_GATE_OPEN, SQLITE_MIGRATIONS } from './migrations.js';
 import { planSchema, sqliteCatalogue } from './schema-plan.js';
@@ -238,4 +255,38 @@ export function gateMeaning(userVersion: number): string {
   if (userVersion === LEGACY_GATE_OPEN) return 'open: a release before the migration log reads and writes the store';
   if (userVersion === LEGACY_GATE_CLOSED) return 'closed: a release before the migration log refuses the store';
   return 'neither gate';
+}
+
+/** The unknown migrations of a usable store that break nothing; none for a refused one. See the module note. */
+export function unknownAdditive(report: SchemaReport): readonly LoggedMigration[] {
+  if (report.refused) return [];
+  return report.unknown.filter(({ breaks }) => breaks.length === 0);
+}
+
+/** The warning `loop start`'s preflight prints once for `migration`, an unknown additive one. */
+export function unknownAdditiveWarning(migration: Pick<LoggedMigration, 'id' | 'appliedBy'>): string {
+  return `⚠ effort store holds migration ${migration.id} this rafa does not know (applied by ${migration.appliedBy});`
+    + ' it is additive, so this run reads and writes the store as it is';
+}
+
+/** One logged migration and the development build that applied it. */
+export interface DevelopmentApplied {
+  readonly id: string;
+  readonly appliedBy: string;
+}
+
+/**
+ * Each logged migration of a usable store whose `applied_by` names a
+ * development build, known ones first, in log order; none for a
+ * refused one. See the module note.
+ */
+export function developmentApplied(report: SchemaReport): readonly DevelopmentApplied[] {
+  if (report.refused) return [];
+  const logged = [
+    ...report.applied.flatMap(({ id, appliedBy }) => (appliedBy === null
+      ? []
+      : [{ id, appliedBy }])),
+    ...report.unknown.map(({ id, appliedBy }) => ({ id, appliedBy })),
+  ];
+  return logged.filter(({ appliedBy }) => appliedBy.includes(DEVELOPMENT_MARK));
 }

@@ -966,7 +966,9 @@ describe('the warnings beside the report', () => {
     mkdirSync(join(left.root, '.rafa', 'effort'));
     const moved = plantWorld();
     plant(moved.root, '.ralph/effort/effort.sqlite');
-    plant(moved.root, '.rafa/effort/effort.sqlite');
+    // Zero bytes, which SQLite reads as an empty store: the effort store
+    // schema row fails a file that is no store, as `effort schema --check` does.
+    plant(moved.root, '.rafa/effort/effort.sqlite', '');
 
     const warned = await doctor(left);
     const quiet = await doctor(moved);
