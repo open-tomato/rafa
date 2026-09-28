@@ -27,7 +27,8 @@
  * count. Nothing reads issues one by one. The listing goes through the
  * {@link GhRunner} `rafa doctor` opens for its other board readings
  * (`./doctor-board.ts`), so a repository whose provider is not `gh`
- * sends it not at all.
+ * sends it not at all, and that module reads it once per run and hands
+ * the same answer to the boards row (`./doctor-boards.ts`).
  *
  * ## An orphan is reported only when the whole board was read
  *
@@ -58,7 +59,7 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { EpicProblem } from '../board/epic-problems.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
+import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 
 import { epicProblemMessage, readEpicProblems } from '../board/epic-problems.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../board/epics.js';
@@ -91,6 +92,11 @@ export interface DoctorEpicsOptions {
   readonly gh: GhRunner;
   /** How many issues the listing asks for. `BOARD_LISTING_LIMIT` when left out. */
   readonly limit?: number;
+  /**
+   * The listing, already made over `gh` with `limit`, when a caller shares
+   * one between rows (`./doctor-board.ts`); a fresh one when left out.
+   */
+  readonly listing?: BoardListing;
 }
 
 /** The faults of `issues` this row reports, orphans left out when the board was not read whole. */
@@ -113,7 +119,7 @@ export async function readDoctorEpics(options: DoctorEpicsOptions): Promise<Doct
 
   let issues: readonly BoardIssue[];
   try {
-    issues = await createGhBoardListing({ gh, limit })();
+    issues = await (options.listing ?? createGhBoardListing({ gh, limit }))();
   } catch (error) {
     return Object.freeze({ labelled: 0, faults: [], problem: messageOf(error), unchecked: null });
   }
