@@ -1,5 +1,5 @@
 /**
- * Tests that exactly the seven commands the plans name declare `spends`
+ * Tests that exactly the eight commands the plans name declare `spends`
  * in the core registry (`src/commands/index.ts`), each with the `when`
  * and flag the plans' tables give it, and that the `start` alias reaches
  * the same declaration as `loop start`.
@@ -8,7 +8,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { CORE_REGISTRY } from '../commands/index.js';
 
-/** The seven commands the plans' tables name, by subject and action. */
+/** The eight commands the plans' tables name, by subject and action. */
 const EXPECTED_SPENDERS: ReadonlyArray<{
   readonly subject: string;
   readonly action: string;
@@ -22,10 +22,11 @@ const EXPECTED_SPENDERS: ReadonlyArray<{
   { subject: 'agent', action: 'search', when: 'unless', flag: '--no-model' },
   { subject: 'skill', action: 'search', when: 'unless', flag: '--no-model' },
   { subject: 'next', action: 'next', when: 'through' },
+  { subject: 'epic', action: 'close', when: 'always' },
 ];
 
 describe('the core registry\'s spends roster', () => {
-  it('declares spends on exactly the seven commands the plans name', () => {
+  it('declares spends on exactly the eight commands the plans name', () => {
     const spenders = CORE_REGISTRY.commands({ includeHidden: true })
       .filter((command) => command.spends !== undefined)
       .map((command) => (command.subject === command.action

@@ -742,3 +742,164 @@ rafa epics 254     # the epic #254, whatever its horizon
 
 The output is the same table as `rafa roadmap` prints for spec lines,
 but only the epic's lines: its checklist, then label-only members.
+
+## Epic lifecycle: every change to an epic is a command with a trail
+
+An epic goes through four states: backlog (no work started), in-progress
+(some members closed or claimed), done (every member closed), and empty
+(no members). Every change to an epic is a command that leaves a comment
+on the epic issue, so the board's history is readable. Epics are optional:
+a project with no epics works exactly as before.
+
+### Creating an epic
+
+```bash
+rafa epic new "Feature name" --slug feature-name [--horizon now|next|later]
+```
+
+`rafa epic new` creates:
+
+1. A GitHub issue from the epic template, with:
+   - The epic's title
+   - An `## Acceptance criteria` section (edit this to list what "done" means)
+   - `Estimate:` (free text, e.g., "two weeks")
+   - `Date:` (optional target date as YYYY-MM-DD)
+   - `Owns:` (optional list of folders the epic owns)
+   - An empty `- [ ] ` checklist for its members
+2. Three labels: `type:epic`, `epic:<slug>`, and `horizon:now` (or
+   `next`/`later` if you pass `--horizon`)
+3. A line on the current board's checklist
+
+The epic's slug becomes its member-joining label, so `epic:feature-name`
+joins all its specs. Later, when a spec is ready, you mark it with
+`spec:ready` and use `rafa epic move <issue> --to feature-name` to add it
+to the epic.
+
+### Changing an epic's priority: defer and promote
+
+When priorities change, move an epic between horizons without recreating
+it. Each move leaves a comment on the epic issue:
+
+```bash
+rafa epic defer 254 --to later --reason "waiting on #118"
+rafa epic promote 254 --to now --reason "now critical"
+```
+
+Both `defer` and `promote`:
+
+1. Swap the horizon label (`horizon:now` ⟷ `horizon:next` ⟷ `horizon:later`)
+2. Comment on the epic: `Moved now → later: waiting on #118`
+3. Ask if you want to keep open branches and pull requests
+
+When you defer an epic that is in-progress, the command names its open
+branches and pull requests and asks whether to keep them. They stay on
+disk and stay listed in `rafa status` but the epic's checklist does not
+wait for them.
+
+**Scenario: A team at standup.** The team meets every morning and
+priorities change every day. `promote` and `defer` are how the board
+changes. Each move leaves a comment, so the history answers "why is this
+later now?". Since `rafa next` reads the board fresh on every turn, a
+change made at nine is there for the loop's next pick at ten.
+
+### Moving an issue between epics
+
+When an issue is filed in the wrong epic, move it without recreating it,
+so its comments, branches and pull requests stay attached:
+
+```bash
+rafa epic move 42 --to infrastructure --reason "belongs in the backend"
+```
+
+`rafa epic move`:
+
+1. Swaps the issue's `epic:` label
+2. Moves its checklist line from the old epic's body to the new one's
+3. Leaves a breadcrumb comment on the issue: `Moved from epic #254 to
+   #255: belongs in the backend`
+
+The issue's title and body never change. Its branches and pull requests
+stay linked to it and to their original epic at the time of the move, so
+the cost summary at close time reflects where the work was done.
+
+### Closing an epic: the verification gate
+
+An epic closes only when every member is closed AND a verification pass
+of its acceptance criteria runs against main:
+
+```bash
+rafa epic close 254   # 🪙
+```
+
+`rafa epic close` (the only epic command that spends Claude usage):
+
+1. Refuses if any member is still open
+2. Plans a verification-only run from the epic's acceptance criteria —
+   each criterion becomes a check a Claude session reads and verifies
+   against `origin/main`
+3. If a criterion cannot be checked (prose that cannot be turned into a
+   runnable check), the close refuses unless you pass `--accept-unchecked`
+4. If a check fails, the failure is filed as a bug (routed by the owning
+   epic once the border rules spec #249 is done), and the close refuses
+5. On success, closes the epic as completed and prints what it cost:
+   - Total sessions and tokens across all its members' runs
+   - Wall time from the first member's start to the last member's close
+   - The estimate from the epic's body (free text, no ratio)
+
+**Scenario: Solo.** The closing gate is the part worth showing. "Every
+issue closed" is not the same as "the feature works". A solo developer
+can run this once and move on; for a team, it is the proof before the
+epic leaves the board.
+
+### Cancelling an epic
+
+An epic can be cancelled by hand on GitHub (closed as "Not Planned") or
+with a command:
+
+```bash
+rafa epic cancel 254
+```
+
+`rafa epic cancel`:
+
+1. Lists every issue in another epic that this epic's open members block
+2. For each blocked issue, asks: move it, unblock it, or cancel it
+3. With no terminal, nothing changes and the list is printed
+
+Why ask? Because cancelling an epic leaves its members closed and unlisted,
+but blocks a parallel epic's work. The cancel makes sure somebody looks at
+those blocks instead of leaving them forever.
+
+**Scenario: Several teams.** When the backend team cancels an epic, it can
+strand work in the frontend team's epic if the frontend was waiting on it.
+The cancel asks about each such issue instead of leaving it blocked
+forever. If you move those issues, they stay open in their epic's scope.
+
+### When an epic runs dry: the end-of-epic lines
+
+When `rafa next` finds the current epic is done (every member closed), it
+ends with three lines:
+
+```text
+The epic #254 is done.
+rafa epic close 254    # 🪙 verify and close it
+rafa roadmap           # to see the board's epics
+rafa release tag       # if the version is untagged
+```
+
+The first line says the epic is done. The second is the next step (close
+the epic, which spends one Claude session). The third is how to see the
+board. The fourth appears only if `rafa release status` says there is an
+untagged version.
+
+### The epic tick: when `rafa pr merge` closes a member
+
+When you merge a pull request that closes an issue, `rafa pr merge`:
+
+1. Ticks the issue's line on the roadmap (as it did before)
+2. Also ticks the issue's line in its epic's checklist (if it belongs to
+   one)
+
+So when you merge a member of an epic, both the board and the epic's own
+checklist update, keeping them in sync. The roadmap shows `done/total` on
+each epic line, which stays accurate as members close.

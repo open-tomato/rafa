@@ -1,5 +1,5 @@
 /**
- * Tests for the issue board (`src/board/issue-board.ts`): the five
+ * Tests for the issue board (`src/board/issue-board.ts`): the nine
  * commands it sends, the comment shape it reads back, and the arguments
  * it refuses before any command leaves.
  *
@@ -232,5 +232,168 @@ describe('removeLabel', () => {
     expect(stub.calls()).toEqual([]);
     // The control: an ordinary label on an ordinary issue sends the command.
     await expect(board.removeLabel(7, 'spec:blocked')).resolves.toBeUndefined();
+  });
+});
+
+describe('closeIssue', () => {
+  it('closes with the reason and the comment in one gh issue close', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).closeIssue(7, 'not planned', 'Cancelled: superseded by #9');
+
+    expect(stub.calls()).toEqual([[
+      'issue',
+      'close',
+      '7',
+      '--reason=not planned',
+      '--comment=Cancelled: superseded by #9',
+    ]]);
+  });
+
+  it('keeps a comment opening with a hyphen as the flag value', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).closeIssue(7, 'completed', '--repo x');
+
+    expect(stub.calls()).toEqual([['issue', 'close', '7', '--reason=completed', '--comment=--repo x']]);
+  });
+
+  it('rejects a failed close, naming the command', async () => {
+    const stub = stubGh(failed('gh: issue not found'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).closeIssue(7, 'completed', 'Closed'))
+      .rejects.toThrow('board issue: gh issue close 7 --reason=completed failed: gh: issue not found');
+  });
+
+  it('refuses an unknown reason, an empty comment and an issue that is no number, and sends no command', async () => {
+    const stub = stubGh(wrote(''));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.closeIssue(7, 'duplicate' as 'completed', 'x')).rejects.toThrow(TypeError);
+    await expect(board.closeIssue(7, 'completed', '  ')).rejects.toThrow('refused an empty comment');
+    await expect(board.closeIssue(0, 'completed', 'x')).rejects.toThrow(TypeError);
+    expect(stub.calls()).toEqual([]);
+    // The control: a known reason with a comment sends the command.
+    await expect(board.closeIssue(7, 'completed', 'x')).resolves.toBeUndefined();
+  });
+});
+
+describe('createLabel', () => {
+  it('creates the label with its description, with no --force', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).createLabel('epic:auth', 'Issues of the auth epic');
+
+    expect(stub.calls()).toEqual([['label', 'create', 'epic:auth', '--description=Issues of the auth epic']]);
+  });
+
+  it('rejects a failed create, naming the command', async () => {
+    const stub = stubGh(failed('label "epic:auth" already exists'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).createLabel('epic:auth', 'x'))
+      .rejects.toThrow('board issue: gh label create epic:auth failed: label "epic:auth" already exists');
+  });
+
+  it('refuses a name that would reach gh as a flag and an empty one, and sends no command', async () => {
+    const stub = stubGh(wrote(''));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.createLabel('--force', 'x')).rejects.toThrow('createLabel refused the label');
+    await expect(board.createLabel('', 'x')).rejects.toThrow(TypeError);
+    expect(stub.calls()).toEqual([]);
+    // The control: an ordinary name sends the command.
+    await expect(board.createLabel('epic:auth', '')).resolves.toBeUndefined();
+  });
+});
+
+describe('createIssue', () => {
+  const url = 'https://github.com/acme/app/issues/41';
+
+  it('creates the issue with its title, body and every label in one gh issue create, and answers it off the URL', async () => {
+    const stub = stubGh(wrote(`Creating issue in acme/app\n\n${url}\n`));
+
+    const created = await createGhIssueBoard({ gh: stub.run })
+      .createIssue('Sign-in', '## Acceptance criteria\n\n- works\n', ['type:epic', 'epic:sign-in', 'horizon:later']);
+
+    expect(stub.calls()).toEqual([[
+      'issue',
+      'create',
+      '--title=Sign-in',
+      '--body=## Acceptance criteria\n\n- works\n',
+      '--label=type:epic',
+      '--label=epic:sign-in',
+      '--label=horizon:later',
+    ]]);
+    expect(created).toEqual({ number: 41, url });
+  });
+
+  it('keeps a title and a body opening with a hyphen as flag values', async () => {
+    const stub = stubGh(wrote(url));
+
+    await createGhIssueBoard({ gh: stub.run }).createIssue('--repo x', '--web', []);
+
+    expect(stub.calls()).toEqual([['issue', 'create', '--title=--repo x', '--body=--web']]);
+  });
+
+  it('rejects a failed create, naming the command', async () => {
+    const stub = stubGh(failed('could not add label: \'epic:x\' not found'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).createIssue('X', '', ['epic:x']))
+      .rejects.toThrow('board issue: gh issue create failed: could not add label: \'epic:x\' not found');
+  });
+
+  it('rejects an exit 0 that printed no issue URL, saying the issue may exist', async () => {
+    const stub = stubGh(wrote('Creating issue in acme/app\n'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).createIssue('X', '', []))
+      .rejects.toThrow('gh issue create exited 0 and printed no issue URL, so the issue may exist unrecorded');
+  });
+
+  it('refuses a blank title, a title spanning lines and a label that would reach gh as a flag, and sends no command', async () => {
+    const stub = stubGh(wrote(url));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.createIssue('  ', '', [])).rejects.toThrow('createIssue refused the title');
+    await expect(board.createIssue('one\ntwo', '', [])).rejects.toThrow('createIssue refused the title');
+    await expect(board.createIssue('X', '', ['type:epic', '--force'])).rejects.toThrow('createIssue refused the label');
+    expect(stub.calls()).toEqual([]);
+    // The control: an ordinary title and labels send the command.
+    await expect(board.createIssue('X', '', ['type:epic'])).resolves.toEqual({ number: 41, url });
+  });
+});
+
+describe('closePullRequest', () => {
+  it('closes the pull request with the comment in one gh pr close, with no --delete-branch', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).closePullRequest(7, 'Closed: epic #40 was deferred');
+
+    expect(stub.calls()).toEqual([['pr', 'close', '7', '--comment=Closed: epic #40 was deferred']]);
+  });
+
+  it('keeps a comment opening with a hyphen as the flag value', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).closePullRequest(7, '--delete-branch');
+
+    expect(stub.calls()).toEqual([['pr', 'close', '7', '--comment=--delete-branch']]);
+  });
+
+  it('rejects a failed close, naming the command', async () => {
+    const stub = stubGh(failed('no pull requests found for 7'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).closePullRequest(7, 'Closed'))
+      .rejects.toThrow('board issue: gh pr close 7 failed: no pull requests found for 7');
+  });
+
+  it('refuses an empty comment and a number that is no number, and sends no command', async () => {
+    const stub = stubGh(wrote(''));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.closePullRequest(7, '  ')).rejects.toThrow('closePullRequest refused an empty comment');
+    await expect(board.closePullRequest(0, 'x')).rejects.toThrow(TypeError);
+    expect(stub.calls()).toEqual([]);
+    // The control: a number with a comment sends the command.
+    await expect(board.closePullRequest(7, 'x')).resolves.toBeUndefined();
   });
 });

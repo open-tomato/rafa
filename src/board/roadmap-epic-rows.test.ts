@@ -24,6 +24,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
+import { renderCancelledEpicNotice } from './epic-cancel-notice.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import {
   FALLBACK_HORIZON,
@@ -282,6 +283,45 @@ describe('readRoadmapEpicRows on a mixed roadmap', () => {
     const read = await readRoadmapEpicRows({ ...planted(MIXED, { all: true }, board).options, today: TODAY });
     expect(read.specs.map((row) => row.line.issue)).toEqual([50, 300, 51]);
     expect(read.groups.flatMap((group) => group.rows).map((row) => row.line.issue)).toEqual([100, 200, 100, 400]);
+  });
+});
+
+describe('readRoadmapEpicRows with an epic closed as not planned', () => {
+  /** Epic #500 closed as not planned, its open member #501, and spec #51 waiting on #501. */
+  const CANCELLED: readonly BoardIssue[] = [
+    ...BOARD.filter((one) => one.number !== 51),
+    { ...epic(500, 'omega', ['horizon:now'], [501]), state: 'CLOSED', stateReason: 'NOT_PLANNED' },
+    member(501, 'omega'),
+    issue(51, { body: `${completeSpecBody('Issue 51')}\nBlocked by: #501\n` }),
+  ];
+  const NOTICE = renderCancelledEpicNotice({ epic: 500, dependents: [51] });
+
+  it('warns the notice last, from the one listing, on a mixed roadmap', async () => {
+    const { options, counts } = planted(MIXED, {}, CANCELLED);
+    const read = await readRoadmapEpicRows({ ...options, today: TODAY });
+
+    expect(read.warnings.at(-1)).toBe(NOTICE);
+    expect(read.warnings.filter((warning) => warning === NOTICE)).toHaveLength(1);
+    expect(counts.board).toBe(1);
+  });
+
+  it('warns it on a roadmap naming no epic, too', async () => {
+    const read = await readRoadmapEpicRows({ ...planted(roadmapBody([50, 51]), {}, CANCELLED).options, today: TODAY });
+
+    expect(read.warnings).toEqual([NOTICE]);
+  });
+
+  it('warns no notice when no epic is cancelled (control)', async () => {
+    const read = await readRoadmapEpicRows({ ...planted(MIXED).options, today: TODAY });
+
+    expect(read.warnings.some((warning) => warning.includes('closed as not planned'))).toBe(false);
+  });
+
+  it('warns no notice when the listing failed', async () => {
+    const failing = planted(MIXED, { board: () => Promise.reject(new Error('gh: HTTP 502')) }, CANCELLED);
+    const read = await readRoadmapEpicRows({ ...failing.options, today: TODAY });
+
+    expect(read.warnings.some((warning) => warning.includes('closed as not planned'))).toBe(false);
   });
 });
 

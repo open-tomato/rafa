@@ -126,7 +126,9 @@
  *
  * A command reached through one of its aliases, or declaring
  * `deprecated`, writes one line to stderr before it runs, in either
- * mode: `rafa: "rafa start" is deprecated; use "rafa loop start"`, with
+ * mode: `rafa: "rafa start" is deprecated; use "rafa loop start"`. A
+ * lasting alias writes none: the route carries no `alias` for it
+ * (`route.ts`), so `rafa epics` runs `epic show` silently. The line has
  * ` since <version>` after `deprecated` and the declared `use` when the
  * command declares one. A help request names a command without running
  * it, and prints none.

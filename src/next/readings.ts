@@ -90,6 +90,21 @@ export interface NextRoadmapReading {
   readonly passed: number;
   /** One sentence per reading that failed, carried and never thrown. */
   readonly problems: readonly string[];
+  /**
+   * The epic the walk ran dry in: walked into, or named by the current
+   * place, with every line done or taken. The key is LEFT OUT, not set
+   * to undefined, when no epic ran dry, so a board with no epic reads
+   * with the four keys it always had.
+   */
+  readonly dryEpic?: DryEpic;
+}
+
+/** An epic whose every line is done or taken, as {@link NextRoadmapReading.dryEpic} names it. */
+export interface DryEpic {
+  /** The epic issue's number. */
+  readonly number: number;
+  /** The epic issue's title. */
+  readonly title: string;
 }
 
 /**

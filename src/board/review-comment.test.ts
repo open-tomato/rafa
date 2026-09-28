@@ -106,6 +106,22 @@ function fakeBoard(held: readonly BoardComment[] = []): { board: IssueBoard; cal
       calls.push({ member: 'removeLabel', args: [issue, label] });
       return Promise.resolve();
     },
+    closeIssue: (issue, reason, comment) => {
+      calls.push({ member: 'closeIssue', args: [issue, reason, comment] });
+      return Promise.resolve();
+    },
+    createLabel: (name, description) => {
+      calls.push({ member: 'createLabel', args: [name, description] });
+      return Promise.resolve();
+    },
+    createIssue: (title, body, labels) => {
+      calls.push({ member: 'createIssue', args: [title, body, [...labels]] });
+      return Promise.resolve({ number: 1, url: 'https://github.com/o/r/issues/1' });
+    },
+    closePullRequest: (pullRequest, comment) => {
+      calls.push({ member: 'closePullRequest', args: [pullRequest, comment] });
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }

@@ -316,6 +316,27 @@ describe('what a registry refuses to be built from', () => {
     expect(error.message).toBe(message);
   });
 
+  it('refuses a lasting alias the command does not also declare among its aliases', () => {
+    const input = withCommands(command('plan', 'create', { aliases: ['plan'], lastingAliases: ['plans'] }));
+
+    expect(() => createCommandRegistry(input)).toThrow(
+      'command registry: command "plan create" has lasting alias "plans", which is not one of its aliases',
+    );
+  });
+
+  it('answers each alias as lasting only when the command declares it among its lasting aliases', () => {
+    const registry = createCommandRegistry(withCommands(
+      command('plan', 'create', { aliases: ['plan', 'go  now'], lastingAliases: ['go now'] }),
+      command('loop', 'start', { aliases: ['start'] }),
+    ));
+
+    expect(registry.aliases().map(({ words, lasting }) => [words.join(' '), lasting])).toEqual([
+      ['go now', true],
+      ['plan', false],
+      ['start', false],
+    ]);
+  });
+
   it('accepts an alias spelled as a subject alone, as its plural, and one longer than a subject action', () => {
     const registry = createCommandRegistry(withCommands(
       PLAN_LIST,

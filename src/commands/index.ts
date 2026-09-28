@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-one registered so far wrap a
+ * of each is its command. Five of the sixty-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -27,8 +27,7 @@
  * `unblock` read and label issues on the GitHub board and `check` reads
  * the references of a spec's saved copy, all eight sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
- * run with `--roadmap` set, nor `epics`, which reads one epic's lines
- * into the same rows through `src/board/roadmap-rows.ts`, nor `switch`,
+ * run with `--roadmap` set, nor `switch`,
  * which moves the checkout's place through `src/board/place.ts` and
  * `src/project/position.ts`, nor `board list`, which lists the open
  * boards off the same listing through `src/board/board-body.ts` and
@@ -62,7 +61,21 @@
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
  * `src/cleanup/` and removes the ticked ones through its steps, nor
- * `status`, which reads the five sections through `src/status/`.
+ * `status`, which reads the five sections through `src/status/`, nor
+ * `epic show`, which reads one epic's lines into the same rows as
+ * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
+ * creates an epic's label, issue and board line through
+ * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `epic defer` and `epic promote`, which move an epic between horizons
+ * over `src/board/epic-horizon.ts` through `./epic/horizon-change.ts`,
+ * nor `epic move`, which moves an issue between epics through
+ * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `epic close`, which plans and runs its verification through
+ * `src/epic/verify-plan.ts` and `src/epic/verify-run.ts` and closes the
+ * epic through `src/board/issue-board.ts`, nor `epic cancel`, which asks
+ * about the epic's dependents (`src/board/epic-dependents.ts`), applies
+ * each answer through `./epic/move.ts`, `src/board/epic-checklist.ts`
+ * and `src/board/issue-board.ts`, and closes the epic through the last.
  *
  * ## What is registered
  *
@@ -181,8 +194,48 @@
  *     [--module=<name>] [--search=<text>] [--limit=<n>]`, top-level: the Roadmap issue's
  *     lines in its order as a table, `issue list --roadmap` under a word
  *     of its own. Not an alias, since an alias prints a deprecation line.
- *   - `epics [<n>]`, top-level: one epic's lines as the same table, the
- *     epic numbered or the first `now` epic on the Roadmap not done.
+ *   - `epic show [<n>]`, aliased `epic` for good: one epic's lines as the
+ *     same table, the epic numbered or the first `now` epic on the Roadmap
+ *     not done. The alias is typed by the subject's plural too, so
+ *     `rafa epics` and `rafa epics <n>`, its top-level spelling until the
+ *     `epic` subject was declared, still run it, and print no deprecation
+ *     line, since it is one of the command's `lastingAliases`.
+ *   - `epic new "<title>" --slug=<slug> [--horizon=now|next|later]`: the
+ *     `epic:<slug>` label, the epic issue from the epic template labelled
+ *     `type:epic`, `epic:<slug>` and its horizon (`later` by default), and
+ *     its line on the current board; a slug that is no kebab word or that
+ *     an issue already carries refused with exit code 2.
+ *   - `epic defer <n> --to=next|later` and `epic promote <n>
+ *     --to=now|next`, each with `[--reason="<why>"]`: the epic's
+ *     `horizon:` label swapped and the reason commented, asked once
+ *     where `--reason` is left out; a defer of an in-progress epic names
+ *     its open branches and pull requests and asks whether to keep them,
+ *     a no closing each pull request with a comment and deleting no
+ *     branch; a target that is not an open epic's, its own horizon or
+ *     the other way refused with exit code 2.
+ *   - `epic move <issue> --to=<epic> [--reason="<why>"]`: the issue's
+ *     `epic:` label swapped for the target epic's, its checklist line
+ *     moved from the old epic's body to the new one's, and the move
+ *     commented on the issue naming its open branches and pull
+ *     requests; an issue with no epic label, a target that is not an
+ *     open epic and a move to its own epic refused with exit code 2.
+ *   - `epic close <n> [--accept-unchecked]`: the closing gate, refused
+ *     with exit code 2 naming the open members while any is open, then
+ *     one planning session turning each acceptance criterion into a
+ *     check, each check run as its own session against `origin/main`,
+ *     an uncheckable criterion refused unless `--accept-unchecked`, each
+ *     failed check filed as a bug and refused, and otherwise the epic
+ *     closed as completed with a comment and its cost printed beside its
+ *     estimate. It is the one `epic` action that declares `spends`.
+ *   - `epic cancel <n> [--reason="<why>"]`: every open issue outside the
+ *     epic that its open members block, listed and asked about in turn
+ *     where there is a terminal — moved to another epic, unblocked with
+ *     an "Updated" note and `spec:blocked` taken off, or closed as not
+ *     planned — then the epic closed as not planned with a comment, the
+ *     close skipped for an epic closed so already; with no terminal and
+ *     an issue to ask about, the list printed and nothing changed; an
+ *     issue that is no epic and an epic closed as completed refused
+ *     with exit code 2.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -206,9 +259,10 @@
  *     was routed through.
  *
  * Typing an alias prints one deprecation line on stderr before the
- * command runs (`src/cli/dispatch.ts`).
+ * command runs (`src/cli/dispatch.ts`), unless the command declares it
+ * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the eleven with an action registered: a subject with
+ * The subjects are the twelve with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -229,7 +283,13 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
-import epics from './epics.js';
+import epicCancel from './epic/cancel.js';
+import epicClose from './epic/close.js';
+import epicDefer from './epic/defer.js';
+import epicMove from './epic/move.js';
+import epicNew from './epic/new.js';
+import epicPromote from './epic/promote.js';
+import epicShow from './epic/show.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
@@ -293,6 +353,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
+  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
 ]);
 
 /** The core commands, in roster order. */
@@ -347,10 +408,16 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseStatus,
   releaseTag,
   boardList,
+  epicShow,
+  epicNew,
+  epicDefer,
+  epicPromote,
+  epicMove,
+  epicClose,
+  epicCancel,
   status,
   next,
   roadmap,
-  epics,
   switchCommand,
   init,
   doctor,

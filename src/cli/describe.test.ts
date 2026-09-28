@@ -231,12 +231,13 @@ describe('the document over the core registry', () => {
         .map((held) => held.action));
     expect(document.commands.map((entry) => entry.name)).toContain('describe');
     expect(document.commands.map((entry) => entry.name)).toContain('roadmap');
-    expect(document.commands.map((entry) => entry.name)).toContain('epics');
+    expect(document.commands.map((entry) => entry.name)).not.toContain('epics');
     expect(document.commands.map((entry) => entry.name)).toContain('switch');
     expect(document.commands.map((entry) => entry.name)).toContain('cleanup');
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
     expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
+    expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -250,7 +251,20 @@ describe('the document over the core registry', () => {
     expect(command('next')?.spends?.when).toBe('through');
     expect(command('describe')?.spends).toBeNull();
     expect(command('roadmap')?.spends).toBeNull();
-    expect(command('epics')?.spends).toBeNull();
+    expect(spendsOf('epic', 'show')).toBeNull();
+    expect(actionOf(document, 'epic', 'show')?.aliases).toEqual(['epic']);
+    expect(spendsOf('epic', 'new')).toBeNull();
+    expect(actionOf(document, 'epic', 'new')?.aliases).toEqual([]);
+    expect(spendsOf('epic', 'defer')).toBeNull();
+    expect(spendsOf('epic', 'promote')).toBeNull();
+    expect(actionOf(document, 'epic', 'defer')?.aliases).toEqual([]);
+    expect(actionOf(document, 'epic', 'promote')?.aliases).toEqual([]);
+    expect(spendsOf('epic', 'move')).toBeNull();
+    expect(actionOf(document, 'epic', 'move')?.aliases).toEqual([]);
+    expect(spendsOf('epic', 'close')).toStrictEqual({ when: 'always', what: 'one verification planning session and one session per check' });
+    expect(actionOf(document, 'epic', 'close')?.aliases).toEqual([]);
+    expect(spendsOf('epic', 'cancel')).toBeNull();
+    expect(actionOf(document, 'epic', 'cancel')?.aliases).toEqual([]);
     expect(command('switch')?.spends).toBeNull();
     expect(spendsOf('board', 'list')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();

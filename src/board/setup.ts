@@ -526,9 +526,11 @@ export function roadmapIssueBody(): string {
  * the concern either module is about, and the shared alternative is
  * exporting a regular expression from the tracker adapter, which is a
  * copied shape open-tomato owns: a second reader of it would be one more
- * thing a change there has to look at.
+ * thing a change there has to look at. This copy is the board's own, so
+ * it is exported for `./issue-board.ts`, whose `createIssue` reads the
+ * same line.
  */
-const CREATED_ISSUE_URL = /^https:\/\/[^\s/]+\/[\w.-]+\/[\w.-]+\/issues\/([1-9]\d*)$/u;
+export const CREATED_ISSUE_URL = /^https:\/\/[^\s/]+\/[\w.-]+\/[\w.-]+\/issues\/([1-9]\d*)$/u;
 
 /** What a roadmap issue step came to: the parts it made and the issue, when there is one. */
 export interface RoadmapStep {

@@ -14,11 +14,13 @@
  *
  * The two directories worktrees are made in on a person's behalf:
  * Claude Code's `<repo>/.claude/worktrees/<name>`, and
- * `rafa pr triage --resolve`'s `<home>/.rafa/worktrees/pr-<n>`
- * (`WORKTREES_SUBDIR`, `src/pr/worktree.ts`). `<repo>` is the main
- * worktree, the block git lists first, so the reading is the same from
- * whichever checkout the command runs in. Any other checkout is somebody's
- * own and is not listed.
+ * `<home>/.rafa/worktrees/` (`WORKTREES_SUBDIR`, `src/pr/worktree.ts`),
+ * which holds `rafa pr triage --resolve`'s `pr-<n>` and the epic
+ * verification run's detached `epic-<n>` (`src/epic/verify-run.ts`), the
+ * second left there only when its run could not remove it.
+ * `<repo>` is the main worktree, the block git lists first, so the
+ * reading is the same from whichever checkout the command runs in. Any
+ * other checkout is somebody's own and is not listed.
  *
  * Git writes each path resolved — `/private/var/...` for a macOS
  * temporary directory spelled `/var/...` (`src/pr/merge.ts`'s note) —

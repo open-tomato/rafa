@@ -57,6 +57,7 @@ your accounts.
   | `rafa skill search` | 🪙 one `haiku` session reading the twelve best-ranked files, one per kind with `--all`; with `--no-model`, nothing |
   | `rafa agent search` | 🪙 the same as `rafa skill search`, over agent definitions |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
+  | `rafa epic close` | 🪙 one verification planning session and one session per check; nothing while a member is open |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
 
@@ -490,6 +491,9 @@ and a line here is ticked by the change that finishes the feature.
 - ✅ Know which skills earn their place and which are ignored
 - ✅ rafa learns from its own runs: what one task works out is handed
   to the tasks that need it later
+- ✅ Every change to an epic is a command that leaves a trail: `rafa epic new`,
+  `defer`, `promote`, `move`, `close` with a verification gate, `cancel`, and
+  the end-of-epic lines in `rafa next`
 - ⬜ Skills and lessons shared across projects and machines
 - ⬜ Config as code: a typed `rafa.config.ts` holding your settings, your
   passes and your flows, with today's behaviour as the default

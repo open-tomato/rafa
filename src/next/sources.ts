@@ -14,7 +14,7 @@
  * ## What the config answers
  *
  * One `loadConfig` for the whole composition, which is what keeps the
- * four settings it reads on one reading of the file:
+ * five settings it reads on one reading of the file:
  *
  * | Setting | Field | What it answers |
  * | --- | --- | --- |
@@ -22,6 +22,7 @@
  * | `pr.base` | `prBase` | the base rows 2 and 9 to 13 are read against |
  * | `pr.provider` | `prProvider` | whether this repository has a provider at all |
  * | `roadmap.issue` | `roadmapIssue` | the roadmap issue, when a layer named one |
+ * | `release.changelog` | `releaseChangelog` | the changelog the end of an epic reads for an untagged version (`./epic-end.ts`) |
  *
  * `pr.base` unset is {@link DEFAULT_BASE_BRANCH}: `main`, which is what
  * `release tag` resolves the same setting to and the first of the two
@@ -78,7 +79,11 @@
  * `rafa status` does, for the current place (`src/status/sections.ts`). An epic whose every line is done or taken has run dry and the
  * walk answers no line, so row 13 reads it without naming a second
  * epic's issue; `passed` counts the lines passed on the roadmap and
- * inside the epic together.
+ * inside the epic together. The dry epic's number and title are
+ * carried out as {@link NextRoadmapReading.dryEpic}, the `dry` that
+ * `pickDescendedLine` answers; the key is left out of a reading where no
+ * epic ran dry, so a roadmap with no epic line answers the same four
+ * keys it did before.
  *
  * ## Where the walk starts
  *
@@ -100,13 +105,22 @@
  *   order `epicLines` (`src/board/epic-walk.ts`) gives them, WHATEVER
  *   its horizon, since a switch chose it; no board body is read, and
  *   `passed` counts the epic's lines passed. Every line done or taken
- *   answers no line, as a dry epic does on the roadmap walk.
+ *   answers no line, as a dry epic does on the roadmap walk, and names
+ *   the epic as {@link NextRoadmapReading.dryEpic} the same way.
  *
  * Every notice the place reading gives, but the absent-file one, is
  * carried out as a problem ahead of the branch scan's, which
  * `rafa next` writes as a warning; a listing that failed while a
  * position file is there is one such notice, the default board then
  * walked unweighed.
+ *
+ * With {@link NextBoardOptions.noticeCancelled} set, as `rafa next` sets
+ * it, the cancelled-epic notice (`src/board/epic-cancel-notice.ts`) is
+ * carried out as problems after the place's notices, one line per epic
+ * closed as not planned that open issues outside it still wait on — but
+ * only when the walk or the place read the listing already, so it costs
+ * no `gh` command of its own, and a roadmap walked with no epic line and
+ * no position file prints no notice. A failed listing adds none.
  *
  * The memo lives for the length of one board, which is one `rafa next`
  * answer: the walk reads the picked line's issue to ask whether it is
@@ -131,7 +145,8 @@
  * reaches both spends two `git for-each-ref` calls — both local, both
  * free of the network, and each memoised where it is taken.
  */
-import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
+import type { EpicEndRelease } from './epic-end.js';
+import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { EpicDescentSeams } from '../board/epic-walk.js';
@@ -147,6 +162,7 @@ import type { ProjectFound } from '../project/scope.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
+import { cancelledEpicNoticeLines } from '../board/epic-cancel-notice.js';
 import { epicLines, pickDescendedLine } from '../board/epic-walk.js';
 import { readEpics } from '../board/epics.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
@@ -167,6 +183,8 @@ import { plansDirAt } from '../commands/plan/plan-files.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
+
+import { readEpicEndRelease } from './epic-end.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */
 const PREFIX = 'rafa next';
@@ -205,10 +223,15 @@ export interface NextBoardOptions {
   readonly listing?: BoardListing;
   /** The project root whose position file names the current place; left out, the walk starts from the default board. */
   readonly root?: string;
+  /**
+   * Carry the cancelled-epic notice's lines as problems when the walk read
+   * the listing; `rafa next` sets it, and `rafa status` leaves it out.
+   */
+  readonly noticeCancelled?: boolean;
 }
 
 /** The settings the composition reads off the config. */
-type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'roadmapIssue'>;
+type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue'>;
 
 /** `read`, called at most once per issue; the module note holds how long the memo lives. */
 function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
@@ -229,10 +252,20 @@ function listOnce(read: BoardListing): BoardListing {
   };
 }
 
-/** What one walk answers: the line it picked, and how many lines it passed. */
+/** The cancelled-epic notice's lines over the kept listing; none when it failed, which the place reading says. */
+async function cancelledNotices(listing: BoardListing): Promise<readonly string[]> {
+  try {
+    return cancelledEpicNoticeLines(await listing());
+  } catch {
+    return [];
+  }
+}
+
+/** What one walk answers: the line it picked, how many lines it passed, and the epic it ran dry in. */
 interface WalkAnswer {
   readonly line: RoadmapLine | null;
   readonly passed: number;
+  readonly dry: DryEpic | null;
 }
 
 /**
@@ -249,7 +282,13 @@ async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapRe
     throw new Error(`${PREFIX}: epic #${String(epic)}, the current place, is not on the board listing, so its members cannot be read`);
   }
   const pick = await pickNextRoadmapLine(epicLines(read, row).lines, readings);
-  return { line: pick.line, passed: pick.skipped.length };
+  return {
+    line: pick.line,
+    passed: pick.skipped.length,
+    dry: pick.line === null
+      ? { number: read.number, title: read.title }
+      : null,
+  };
 }
 
 /**
@@ -260,7 +299,12 @@ async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapRe
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
   const { gh, git, configured, remote, root } = options;
-  const listing = listOnce(options.listing ?? createGhBoardListing({ gh }));
+  const listed = options.listing ?? createGhBoardListing({ gh });
+  let asked = false;
+  const listing = listOnce(() => {
+    asked = true;
+    return listed();
+  });
   const issues = memoiseIssues(createGhSpecIssueReader({ gh }));
 
   return Object.freeze({
@@ -284,11 +328,17 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
       const walk = epic === null
         ? await walkBoard(roadmap, { issues, readings, listing })
         : await walkEpic(epic, listing, readings);
+      const cancelled = options.noticeCancelled === true && asked
+        ? await cancelledNotices(listing)
+        : [];
       return {
         roadmap,
         line: walk.line,
         passed: walk.passed,
-        problems: [...current?.notices ?? [], ...branches.problems],
+        problems: [...current?.notices ?? [], ...cancelled, ...branches.problems],
+        ...walk.dry === null
+          ? {}
+          : { dryEpic: walk.dry },
       };
     },
 
@@ -304,8 +354,14 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
 /** The walk down `roadmap`'s checklist, descending into its first open `now` epic. */
 async function walkBoard(roadmap: number, seams: EpicDescentSeams): Promise<WalkAnswer> {
   const read = await seams.issues(roadmap);
-  const { descent, pick } = await pickDescendedLine(parseRoadmapBody(read.body), seams);
-  return { line: pick.line, passed: descent.passed.length + pick.skipped.length };
+  const { descent, pick, dry } = await pickDescendedLine(parseRoadmapBody(read.body), seams);
+  return {
+    line: pick.line,
+    passed: descent.passed.length + pick.skipped.length,
+    dry: dry && descent.epic !== null
+      ? { number: descent.epic.number, title: descent.epic.title }
+      : null,
+  };
 }
 
 /** The project the dispatcher resolved, which it resolves for every command declaring it needs one. */
@@ -314,7 +370,7 @@ function nextProject(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The four settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
+/** The five settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
 function nextConfig(project: ProjectFound, warn: (message: string) => void): NextConfig {
   try {
     return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
@@ -354,6 +410,12 @@ export interface OpenedNextSources extends NextSources {
    * chain takes a new answer per turn.
    */
   readonly answer: () => NextSources;
+  /**
+   * The released versions `release.changelog` names that carry no tag,
+   * read afresh each call and only when called: `rafa next` asks it once
+   * an epic ran dry, and nothing else does (`./epic-end.ts`).
+   */
+  readonly release: () => EpicEndRelease;
 }
 
 export function openNextSources(
@@ -374,7 +436,7 @@ export function openNextSources(
   const gh = (seams.openGh ?? ((root: string): GhRunner => createGhRunner({ cwd: root })))(project.root);
   const loop = resolveLoopSeams({ isAlive: seams.isAlive });
 
-  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue, root: project.root });
+  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue, root: project.root, noticeCancelled: true });
   const held = {
     base: config.prBase ?? DEFAULT_BASE_BRANCH,
     plans: plansDirAt(project.root, config.planDir),
@@ -387,5 +449,6 @@ export function openNextSources(
     ...held,
     board: board(),
     answer: () => Object.freeze({ ...held, board: board() }),
+    release: () => readEpicEndRelease(git, project.root, config.releaseChangelog),
   });
 }

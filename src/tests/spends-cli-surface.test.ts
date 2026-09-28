@@ -61,13 +61,26 @@ describe('rafa --help, spawned', () => {
     expect(run.stdout).toContain('🪙  starts Claude Code sessions, which spend your Claude usage\n');
   }, RUN_TIMEOUT);
 
+  it('marks the epic subject line, which epic close spends on', () => {
+    const scratch = plantScratchRepo(tempBase);
+
+    const run = runRafa(scratch, scratch.repo, ['--help']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(
+      '  epic       show one epic\'s issues as the Roadmap table; create an epic; defer\n'
+      + '             or promote it; move an issue to it; close it through the gate or\n'
+      + '             cancel it 🪙\n',
+    );
+  }, RUN_TIMEOUT);
+
   it('lists the top-level commands with next alone marked, roadmap among the unmarked', () => {
     const scratch = plantScratchRepo(tempBase);
 
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
     expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain('Commands:\n  status, next 🪙, roadmap, epics, switch, init, doctor, cleanup, self-update,\n  usage, describe\n');
+    expect(run.stdout).toContain('Commands:\n  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,\n  describe\n');
   }, RUN_TIMEOUT);
 });
 
@@ -108,7 +121,7 @@ describe('rafa describe --output=json, spawned', () => {
     expect(result?.ok).toBe(true);
 
     const document = result?.data as DescribeDocument;
-    expect(spendersOf(document).sort()).toEqual(['agent search', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
+    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
     expect(document.commands.find((command) => command.name === 'roadmap')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'cleanup')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'status')?.spends).toBeNull();

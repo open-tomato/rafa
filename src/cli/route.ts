@@ -32,7 +32,11 @@
  * among three: a subject, by its name or plural, and one of its actions;
  * a top-level command's one word; and a core command's alias. On equal
  * length the subject's action wins over a top-level command, and both
- * over an alias; the registry refuses an alias either would shadow.
+ * over an alias; the registry refuses an alias either would shadow. An
+ * alias spelled as a subject alone is typed by the subject's name or by
+ * its plural, as the subject is: `rafa epics 252` runs `epic show`
+ * through its alias `epic`, and `rafa plans --spec=<file>` runs
+ * `plan create` through `plan`.
  *
  * A command declaring `exec` reads on. The next word names a module
  * mounted as `module/<name>` and the word after it one of that module's
@@ -64,11 +68,14 @@
  * word routed by. `label` is what the start event calls the invocation:
  * the canonical spelling of the command run, with the module and its
  * action for a mounted one, `help` for a help request, `version` for a
- * version request, and the words typed for a refusal. `alias` is the routing words typed when an alias
- * routed the line, and null otherwise.
+ * version request, and the words typed for a refusal. `alias` is the
+ * routing words typed when an alias routed the line, and null otherwise,
+ * a lasting alias's included: a spelling kept for good is typed as
+ * freely as the canonical one, so the dispatcher writes no deprecation
+ * line for it (`dispatch.ts`).
  */
 import type { RafaCommand } from './command.js';
-import type { CommandRegistry, ModuleMount, SubjectSpec } from './registry.js';
+import type { CommandAlias, CommandRegistry, ModuleMount, SubjectSpec } from './registry.js';
 
 import { commandSpelling } from './command.js';
 import { HELP_WORD, mountKey } from './registry.js';
@@ -129,7 +136,7 @@ export interface CommandRoute extends RouteBase {
   readonly command: RafaCommand;
   /** The mount the command came from, or null for a core command. */
   readonly module: ModuleMount | null;
-  /** The routing words typed when an alias routed the line, or null. */
+  /** The routing words typed when an alias other than a lasting one routed the line, or null. */
   readonly alias: string | null;
   /** The words after the last word routed by. */
   readonly argv: readonly string[];
@@ -206,6 +213,30 @@ function refusal(code: RouteRefusalCode, message: string, words: readonly string
   return { kind: 'refusal', code, message, consumed, label: words.slice(0, consumed).join(' ') };
 }
 
+/** True when `words` open with `held`'s words, each typed as declared. */
+function typesAlias(held: CommandAlias, words: readonly string[]): boolean {
+  return held.words.every((word, index) => words[index] === word);
+}
+
+/** True when `held` is spelled as a subject alone and `words` open with that subject's plural. */
+function typesAliasPlural(registry: CommandRegistry, held: CommandAlias, words: readonly string[]): boolean {
+  const [only] = held.words;
+  const [first] = words;
+  return held.words.length === 1 && only !== undefined && first !== undefined && first !== only
+    && registry.subjectOf(only)?.name === only && registry.subjectOf(first)?.name === only;
+}
+
+/**
+ * The alias `words` open with: the longest typed as declared, else one
+ * spelled as a subject alone typed as its plural, so an alias declared as
+ * the plural itself wins over the plural reading of another.
+ */
+function aliasTyped(registry: CommandRegistry, words: readonly string[]): CommandAlias | undefined {
+  const aliases = registry.aliases();
+  return aliases.find((held) => typesAlias(held, words))
+    ?? aliases.find((held) => typesAliasPlural(registry, held, words));
+}
+
 /** Resolves the words among core commands, subject actions and aliases; see the module note. */
 function resolveCore(registry: CommandRegistry, words: readonly string[]): Resolution {
   const [first = '', second] = words;
@@ -214,12 +245,17 @@ function resolveCore(registry: CommandRegistry, words: readonly string[]): Resol
     ? undefined
     : registry.find(subject.name, second);
   const topLevel = registry.topLevel(first);
-  const alias = registry.aliases().find((held) => held.words.every((word, index) => words[index] === word));
+  const alias = aliasTyped(registry, words);
 
   const candidates: Resolution[] = [];
   if (canonical !== undefined) candidates.push(commandResolution(canonical, 2, null));
   if (topLevel !== undefined) candidates.push(commandResolution(topLevel, 1, null));
-  if (alias !== undefined) candidates.push(commandResolution(alias.command, alias.words.length, alias.words.join(' ')));
+  if (alias !== undefined) {
+    const typed = alias.lasting
+      ? null
+      : words.slice(0, alias.words.length).join(' ');
+    candidates.push(commandResolution(alias.command, alias.words.length, typed));
+  }
   const best = candidates.reduce<Resolution | undefined>(
     (held, candidate) => (held === undefined || candidate.consumed > held.consumed
       ? candidate

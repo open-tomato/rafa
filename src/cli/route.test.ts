@@ -52,6 +52,7 @@ const SUBJECTS = [
   { name: 'loop', summary: 'the loop' },
   { name: 'module', summary: 'modules' },
   { name: 'issue', summary: 'the tracker' },
+  { name: 'epic', summary: 'the epics' },
 ];
 
 const CORE = createCommandRegistry({
@@ -64,6 +65,8 @@ const CORE = createCommandRegistry({
     command('loop', 'debug', { hidden: true }),
     command('module', 'exec', { exec: true, aliases: ['exec'] }),
     command('usage', 'usage'),
+    command('epic', 'show', { aliases: ['epic'], lastingAliases: ['epic'] }),
+    command('epic', 'list'),
   ],
 });
 
@@ -191,6 +194,27 @@ describe('a line routed to a command', () => {
       ['plan', 'list'],
       ran('plan list', 'plan list', [], []),
     ],
+    [
+      'an alias spelled as a subject, typed as its plural, keeping the plural as typed',
+      ['plans', '--spec=x.md'],
+      ran('plan create', 'plan create', ['--spec=x.md'], ['--spec=x.md'], { alias: 'plans' }),
+    ],
+    [
+      'a lasting alias spelled as a subject, with a word that is none of its actions, carrying no alias',
+      ['epic', '252'],
+      ran('epic show', 'epic show', ['252'], ['252']),
+    ],
+    [
+      'a lasting alias spelled as a subject, typed as its plural',
+      ['epics', '252', '--output=json'],
+      ran('epic show', 'epic show', ['252', '--output=json'], ['252', '--output=json']),
+    ],
+    ['a lasting alias spelled as a subject, typed as its bare plural', ['epics'], ran('epic show', 'epic show', [], [])],
+    [
+      'a subject action typed through the plural, ahead of the alias spelled as that subject',
+      ['epics', 'list'],
+      ran('epic list', 'epic list', [], []),
+    ],
     ['a hidden action', ['loop', 'debug'], ran('loop debug', 'loop debug', [], [])],
     [
       'an exec action with no module word',
@@ -232,6 +256,7 @@ describe('a line asking for help', () => {
     ['the help word and a plural subject', ['help', 'loops'], helped('subject loop', [])],
     ['a subject and --help', ['loop', '--help'], helped('subject loop', ['--help'])],
     ['a subject an alias is spelled as, and -h', ['plan', '-h'], helped('subject plan', ['-h'])],
+    ['the plural of a subject a lasting alias is spelled as, and --help', ['epics', '--help'], helped('subject epic', ['--help'])],
     ['the help word and an action', ['help', 'loop', 'start'], helped('action loop start', [])],
     ['an alias and --help', ['start', '--help'], helped('action loop start', ['--help'])],
     [
@@ -351,6 +376,18 @@ describe('the longest spelling', () => {
 
   it('routes the top-level command when the next word is not the alias', () => {
     expect(summaryOf(routeLine(registry, ['usage', 'later']))).toEqual(ran('usage', 'usage', ['later'], ['later']));
+  });
+});
+
+describe('an alias typed as a subject\'s plural', () => {
+  const registry = createCommandRegistry({
+    subjects: SUBJECTS,
+    commands: [command('plan', 'create', { aliases: ['plan'] }), command('loop', 'start', { aliases: ['plans'] })],
+  });
+
+  it('routes the alias declared as the plural itself, not the plural reading of the one spelled as the subject', () => {
+    expect(summaryOf(routeLine(registry, ['plans']))).toEqual(ran('loop start', 'loop start', [], [], { alias: 'plans' }));
+    expect(summaryOf(routeLine(registry, ['plan']))).toEqual(ran('plan create', 'plan create', [], [], { alias: 'plan' }));
   });
 });
 

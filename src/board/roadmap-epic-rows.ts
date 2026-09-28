@@ -72,6 +72,12 @@
  * carries no problem, so its output stays today's; `rafa doctor` is the
  * reader that reports problems on a board whose roadmap names no epic.
  *
+ * Last, whenever the listing was read and whether or not the roadmap
+ * names an epic, each line of the cancelled-epic notice
+ * (`cancelledEpicNoticeLines`, `./epic-cancel-notice.ts`): one per epic
+ * closed as not planned that open issues outside it still wait on. A
+ * board with no such epic adds none, so its output stays today's.
+ *
  * ## What is carried for other readers
  *
  * {@link RoadmapEpicRows.epics} is `readEpics`' whole answer, every
@@ -88,6 +94,7 @@ import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { messageOf } from '../config-sections.js';
 
+import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
 import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems } from './epic-problems.js';
 import { readEpics } from './epics.js';
 import { hasPlanFor, readRoadmapRows } from './roadmap-rows.js';
@@ -136,7 +143,7 @@ export interface RoadmapEpicRows {
   readonly unknown: string | null;
   /** Every label problem on the listing; empty when the roadmap names no epic. */
   readonly problems: readonly EpicProblem[];
-  /** `readRoadmapRows`' warnings, then one sentence per problem. */
+  /** `readRoadmapRows`' warnings, then one sentence per problem, then the cancelled-epic notice's lines. */
   readonly warnings: readonly string[];
 }
 
@@ -310,6 +317,9 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
   const problems = epicRows.length === 0 || listed.issues === null
     ? []
     : readEpicProblems(listed.issues);
+  const cancelled = listed.issues === null
+    ? []
+    : cancelledEpicNoticeLines(listed.issues);
 
   return Object.freeze({
     roadmap: read.roadmap,
@@ -319,6 +329,6 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
     epics,
     unknown: epics.unknown,
     problems: Object.freeze([...problems]),
-    warnings: Object.freeze([...read.warnings, ...problems.map(epicProblemMessage)]),
+    warnings: Object.freeze([...read.warnings, ...problems.map(epicProblemMessage), ...cancelled]),
   });
 }

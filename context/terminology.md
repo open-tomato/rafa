@@ -65,3 +65,31 @@ to come back to later with `rafa switch -`. The home moves when you switch
 by hand; pass `--no-rehome` to keep it still. Use "home" in prose and in
 settings, commands and specifications to name the anchor slot of the
 position triple.
+
+### Epic lifecycle: the closing gate and the trail
+
+**The closing gate** is the verification step `rafa epic close` runs
+before closing an epic. Every member must be closed first. Then rafa
+plans a verification-only run from the epic's acceptance criteria,
+where each criterion is a check against `origin/main`. If a criterion
+cannot be checked (it is prose, not runnable), the close refuses unless
+you pass `--accept-unchecked`. If a check fails, the failure is filed
+as a bug and the close refuses. On success, the epic closes as
+completed. Use "closing gate" in prose and specifications when the
+step between "all members done" and "epic closed" is what you mean.
+Use "verification" when the step itself, without the "gate" framing,
+is the subject. "Acceptance criteria" stays as is (the epic's
+acceptance criteria, not the close's verification); they are input,
+not the close's own thing.
+
+**The trail** is the comment each epic lifecycle command leaves on the
+issue it changes. `rafa epic new` leaves no comment (the issue is new).
+`rafa epic defer`, `rafa epic promote`, and `rafa epic move` each
+leave one: `Moved now → later: <reason>`, `Moved later → now: <reason>`,
+`Moved from epic #A to #B: <reason>`. `rafa epic cancel` leaves one on
+the epic it cancels: `Cancelled` or `Cancelled, moved/unblocked its
+dependents`. The comment makes the board's history readable: every change
+is a line in the issue's thread, not a silent label swap. Use "trail" in
+prose when you mean the history a reader sees. Use "comment" for the one
+message itself. "Breadcrumb" is colloquial: `rafa epic move` leaves a
+breadcrumb comment.

@@ -111,7 +111,10 @@
  * table. Each group names the Roadmap, so the `Roadmap: #<n>` head is
  * not written. Every label problem on the board is a warning, written
  * as the other warnings are; the reading adds none when the Roadmap
- * names no epic.
+ * names no epic. Whenever the listing was read, the cancelled-epic
+ * notice (`src/board/epic-cancel-notice.ts`) follows as warnings too,
+ * one line per epic closed as not planned that open issues outside it
+ * still wait on; a board with no such epic adds none.
  *
  * A Roadmap naming no epic, with the listing read, prints today's bytes:
  * the head, today's table over the spec rows (every row), and in json

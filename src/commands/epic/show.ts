@@ -1,7 +1,21 @@
 /**
- * `rafa epics [n]`: one epic's issues as the table `rafa roadmap` prints
- * for its spec lines — the epic numbered, or the first `now` epic on the
- * Roadmap that is not done (`.rafa/specs/rafa-244-epics-group-issues-features.md`).
+ * `rafa epic show [n]`: one epic's issues as the table `rafa roadmap`
+ * prints for its spec lines — the epic numbered, or the first `now` epic
+ * on the Roadmap that is not done (`.rafa/specs/rafa-244-epics-group-issues-features.md`).
+ *
+ * ## Its spellings
+ *
+ * It was the top-level `rafa epics` until the `epic` subject was
+ * declared (`.rafa/specs/rafa-246-epic-lifecycle.md`), and the registry
+ * refuses a top-level command spelled as a subject's plural. It keeps
+ * that spelling through its lasting alias `epic`, which a line types by
+ * the subject's name or its plural (`src/cli/route.ts`): `rafa epics`,
+ * `rafa epics <n>`, `rafa epic` and `rafa epic <n>` all run it, with no
+ * deprecation line, and print what `rafa epics` printed before the move
+ * (`src/tests/epic-show-cli.test.ts`). So its refusals still name
+ * `rafa epics [<n>]`, the spelling people type. A word after the subject
+ * that is one of its actions runs that action instead, so `rafa epic
+ * show` is the spelling to type when the number could be read as one.
  *
  * ## Which epic
  *
@@ -64,46 +78,53 @@
  * `warn` log event in json mode. In json mode the terminal result's
  * `data` is an {@link EpicsResult}.
  *
+ * Whenever the listing was read, whichever epic is shown or none, each
+ * line of the cancelled-epic notice (`cancelledEpicNoticeLines`,
+ * `src/board/epic-cancel-notice.ts`) is a `warn` line too, written last:
+ * one per epic closed as not planned that open issues outside it still
+ * wait on, naming them and `rafa epic cancel <n>`. A board with no such
+ * epic writes none.
+ *
  * A failed listing is not guessed at: the command prints the epic, or
  * the Roadmap's epics, `unknown` with the listing's reason, no rows, and
  * exits 0, as `rafa roadmap` exits 0 on the same failure.
  *
  * It starts no session, so it declares no `spends`.
  */
-import type { IssueSeams } from './issue/issue-tracker.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { EpicProblem } from '../board/epic-problems.js';
-import type { Epic, Epics } from '../board/epics.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
-import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../board/roadmap-rows.js';
-import type { RoadmapLine } from '../board/roadmap.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { RafaConfig } from '../config.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
+import type { EpicProblem } from '../../board/epic-problems.js';
+import type { Epic, Epics } from '../../board/epics.js';
+import type { BoardIssue } from '../../board/roadmap-board.js';
+import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
+import type { RoadmapLine } from '../../board/roadmap.js';
+import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaConfig } from '../../config.js';
+import type { IssueSeams } from '../issue/issue-tracker.js';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
-import { epicProblemMessage, readEpicProblems } from '../board/epic-problems.js';
-import { epicLines, isNowEpic } from '../board/epic-walk.js';
-import { readEpics } from '../board/epics.js';
-import { createGhSpecIssueReader } from '../board/issue.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { claimsOf, onceSeams } from '../board/roadmap-epic-rows.js';
-import { createPlanDirNames, readCurrentPlace, readLineRows } from '../board/roadmap-rows.js';
+import { createGhRunner } from '../../adapters/tracker/github.js';
+import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
+import { cancelledEpicNoticeLines } from '../../board/epic-cancel-notice.js';
+import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
+import { epicLines, isNowEpic } from '../../board/epic-walk.js';
+import { readEpics } from '../../board/epics.js';
+import { createGhSpecIssueReader } from '../../board/issue.js';
+import { createGhBoardListing } from '../../board/roadmap-board.js';
+import { claimsOf, onceSeams } from '../../board/roadmap-epic-rows.js';
+import { createPlanDirNames, readCurrentPlace, readLineRows } from '../../board/roadmap-rows.js';
 import {
   createGhOpenPullRequests,
   createGhRoadmapSearch,
   parseRoadmapBody,
   ROADMAP_REFUSAL_EXIT,
-} from '../board/roadmap.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
-import { createGitRunner } from '../pr/git.js';
-
-import { readDoctorRefs, roadmapRefsCells } from './doctor-refs.js';
-import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
-import { unknownLine } from './issue/roadmap-epic-table.js';
-import { renderRoadmapTable } from './issue/roadmap-table.js';
-import { plansDirAt } from './plan/plan-files.js';
+} from '../../board/roadmap.js';
+import { CommandExit } from '../../cli/command.js';
+import { messageOf } from '../../config-sections.js';
+import { createGitRunner } from '../../pr/git.js';
+import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
+import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
+import { unknownLine } from '../issue/roadmap-epic-table.js';
+import { renderRoadmapTable } from '../issue/roadmap-table.js';
+import { plansDirAt } from '../plan/plan-files.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa epics [<n>]';
@@ -317,12 +338,16 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   const epic = asked === null
     ? placeEpic(roadmap, listing, epics)
     : askedEpic(asked, listing, epics);
+  const cancelled = cancelledEpicNoticeLines(listing);
   const row = listing.find((issue) => issue.number === epic?.number);
-  if (epic === null || row === undefined) return Object.freeze({ ...empty, epic: null, unknown: null });
+  if (epic === null || row === undefined) {
+    for (const line of cancelled) warn(line);
+    return Object.freeze({ ...empty, epic: null, unknown: null, warnings: Object.freeze([...notices, ...cancelled]) });
+  }
 
   const rows = await readLineRows(epicLines(epic, row).lines, read);
   const problems = readEpicProblems(listing).filter((problem) => isProblemOf(problem, epic));
-  const warnings = [...rows.warnings, ...problems.map(epicProblemMessage)];
+  const warnings = [...rows.warnings, ...problems.map(epicProblemMessage), ...cancelled];
   for (const warning of warnings) warn(warning);
   return Object.freeze({
     ...empty,
@@ -334,7 +359,7 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   });
 }
 
-/** Runs one `epics` line with `seams`, writing it in the line's output mode. */
+/** Runs one `epic show` line with `seams`, writing it in the line's output mode. */
 export async function runEpics(context: RafaContext, seams: IssueSeams): Promise<void> {
   const result = await readEpicsView(context, seams);
   if (context.outputMode === 'json') {
@@ -346,11 +371,11 @@ export async function runEpics(context: RafaContext, seams: IssueSeams): Promise
 }
 
 /** The command, reading the board with `seams`; see the module note. */
-export function createEpicsCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
+export function createEpicShowCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'epics',
-    subject: 'epics',
-    action: 'epics',
+    name: 'epic show',
+    subject: 'epic',
+    action: 'show',
     summary: 'list one epic\'s issues as the Roadmap table: the epic numbered, or the first now epic not done',
     description: 'Prints one epic\'s issues as `rafa roadmap` prints its spec lines, with the spec, blocked by,'
       + ' has and refs columns: the unticked lines of the epic\'s checklist in its order, then its open members'
@@ -363,7 +388,7 @@ export function createEpicsCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): Raf
       + ' under it. No issue of another epic is named. Each label problem about the epic and each reading that'
       + ' failed is warned about; an unreachable board prints the epic unknown with the reason. With'
       + ' `--output=json` the epic, its rows, its problems and the warnings are the data of the terminal result'
-      + ' event.',
+      + ' event. `rafa epics` and `rafa epic` are the same command, typed by the subject alone.',
     args: [
       {
         name: 'n',
@@ -375,22 +400,25 @@ export function createEpicsCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): Raf
     flags: [],
     examples: [
       {
-        cmd: 'rafa epics',
-        note: 'Prints the issues of the epic `rafa next` is walking: the first now epic on the Roadmap not done.',
+        cmd: 'rafa epic show',
+        note: 'Prints the issues of the epic `rafa next` is walking: the first now epic on the Roadmap not done.'
+          + ' `rafa epics` prints the same.',
       },
       {
-        cmd: 'rafa epics 252',
-        note: 'Prints the issues of epic #252, whatever its horizon, in its checklist\'s order.',
+        cmd: 'rafa epic show 252',
+        note: 'Prints the issues of epic #252, whatever its horizon, in its checklist\'s order, as `rafa epics 252` does.',
       },
       {
-        cmd: 'rafa epics 252 --output=json',
+        cmd: 'rafa epic show 252 --output=json',
         note: 'Writes a result event whose data holds epic #252 as computed, its rows and its label problems.',
       },
     ],
     outputs: ['text', 'json'],
+    aliases: ['epic'],
+    lastingAliases: ['epic'],
     run: (context) => runEpics(context, seams),
   };
   return Object.freeze(command);
 }
 
-export default createEpicsCommand();
+export default createEpicShowCommand();

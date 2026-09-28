@@ -111,6 +111,16 @@
  *    `--resolve` case here and the table and `--resolve` cases of
  *    `src/next/actions.test.ts`.
  *
+ * Two more were driven on 2026-09-28 over `env -u CLAUDECODE bun test
+ * src/commands/next.test.ts`, against 35 pass and 0 fail either side,
+ * the module restored from a scratch copy and checked with `cmp`:
+ *
+ *  - the end-of-epic call dropped from `runNext`: 32 pass and 3 fail,
+ *    the three dry-epic cases of `the end of an epic`.
+ *  - the release read ahead of the dry-epic guard, so every run lists
+ *    the tags: 34 pass and 1 fail, the no-epic case, which reads the git
+ *    calls because its output alone would not change.
+ *
  * Those totals are what the scope answered on the day each mutation was
  * driven. It answers 197 pass and 0 fail now: the `--yes` reading moved
  * to `src/next/ceiling.ts` and took its cases with it, the exit-2
@@ -133,6 +143,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '../cli/command.js';
 import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
+import { epicEndLines } from '../next/epic-end.js';
 import { nextQuestion } from '../next/hint.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
@@ -931,6 +942,151 @@ describe('the command, dispatched', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.data).toMatchObject({ stop: 'unchanged' });
     expect(run.exitCode).toBe(0);
+  });
+});
+
+/** The epic the dry-epic fixture's roadmap names, and the one member it lists. */
+const DRY_EPIC = 80;
+const DRY_MEMBER = 81;
+
+/** The changelog the dry-epic cases plant: 0.2.0 over 0.1.0. */
+const DRY_CHANGELOG = ['# Changelog', '', '## 0.2.0', '', '- two', '', '## 0.1.0', '', '- one', ''].join('\n');
+
+/** The issue view payload of `number`. */
+function viewPayload(number: number, body: string, labels: readonly string[]): string {
+  return JSON.stringify({
+    number,
+    title: `Issue ${String(number)}`,
+    body,
+    state: 'OPEN',
+    labels: labels.map((name) => ({ name })),
+    author: { login: 'maintainer' },
+  });
+}
+
+/**
+ * A `gh` runner over a roadmap naming one `now` epic whose one member is
+ * open. The board listing (`--state all`) and the `type:roadmap` listing
+ * (`--label`) are told apart by those flags, never by the first two words.
+ */
+function dryEpicGh(): (args: readonly string[]) => Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const epicLabels = ['type:epic', 'epic:walk', 'horizon:now'];
+  const epicBody = `- [ ] #${String(DRY_MEMBER)}\n`;
+  return (args) => {
+    const route = args.slice(0, 2).join(' ');
+    const wrote = (stdout: string): Promise<{ ok: boolean; stdout: string; stderr: string }> => Promise.resolve({ ok: true, stdout, stderr: '' });
+    if (route === 'issue list' && args.includes('--label')) return wrote('[]');
+    if (route === 'issue list' && args.includes('all')) {
+      return wrote(JSON.stringify([
+        { number: DRY_EPIC, title: `Issue ${String(DRY_EPIC)}`, body: epicBody, state: 'OPEN', stateReason: '', labels: epicLabels.map((name) => ({ name })) },
+        { number: DRY_MEMBER, title: `Issue ${String(DRY_MEMBER)}`, body: '', state: 'OPEN', stateReason: '', labels: [{ name: 'epic:walk' }] },
+      ]));
+    }
+    if (route === 'issue view' && args[2] === String(ROADMAP)) return wrote(viewPayload(ROADMAP, `- [ ] #${String(DRY_EPIC)} the epic\n`, []));
+    if (route === 'issue view' && args[2] === String(DRY_EPIC)) return wrote(viewPayload(DRY_EPIC, epicBody, epicLabels));
+    if (route === 'issue view' && args[2] === String(DRY_MEMBER)) return wrote(viewPayload(DRY_MEMBER, '', ['epic:walk']));
+    return wrote('[]');
+  };
+}
+
+/**
+ * A git runner on the base, level with its remote, whose branches take
+ * the epic's one member, so the epic runs dry, and whose tags are `tags`.
+ */
+function dryEpicGit(tags: readonly string[]): { readonly git: GitRunner; readonly calls: () => readonly string[] } {
+  const calls: string[] = [];
+  return {
+    git: (args) => {
+      const line = args.join(' ');
+      calls.push(line);
+      if (line === 'rev-parse --abbrev-ref HEAD') return said(`${BASE}\n`);
+      if (line.startsWith('rev-list --left-right --count')) return said('0\t0\n');
+      if (args[0] === 'for-each-ref') return said(`refs/heads/feat/rafa-${String(DRY_MEMBER)}-taken\n`);
+      if (line === 'tag --list') return said(tags.map((tag) => `${tag}\n`).join(''));
+      return said('');
+    },
+    calls: () => calls,
+  };
+}
+
+/** The command over the dry-epic fixture, or over the empty roadmap where `gh` is handed. */
+function dryEpicCommand(git: GitRunner, gh = dryEpicGh()): RafaCommand {
+  return createNextCommand({
+    isTerminal: () => true,
+    readRemote: () => 'git@github.com:open-tomato/rafa.git',
+    openGit: () => git,
+    openGh: () => gh,
+    pullRequests: () => createPullRequestsDouble({ findOpen: () => Promise.resolve(null) }).pulls,
+    openPrompter: () => {
+      throw new Error('the dry run opened a prompter');
+    },
+  });
+}
+
+/** A planted project holding the dry-epic changelog. */
+function plantChangelogProject(): { readonly root: string; readonly home: string } {
+  const planted = plantProject();
+  writeFileSync(join(planted.root, 'CHANGELOG.md'), DRY_CHANGELOG, 'utf8');
+  return planted;
+}
+
+describe('the end of an epic', () => {
+  const epic = { number: DRY_EPIC, title: `Issue ${String(DRY_EPIC)}` };
+  const head = [
+    `📍 the roadmap, issue #${String(ROADMAP)}, has no line left that is not done or taken (1 line passed).`,
+    '👉 open the next spec issue and add it to the roadmap',
+    `⏹ --${DRY_RUN_FLAG}: nothing ran.`,
+  ];
+
+  it('ends a dry epic with the closing gate, the roadmap and the release line for the untagged version', async () => {
+    const git = dryEpicGit(['v0.1.0']);
+
+    const run = await dispatchInProject(['next', `--${DRY_RUN_FLAG}`], [], [dryEpicCommand(git.git)], plantChangelogProject());
+
+    const lines = epicEndLines(epic, { changelog: 'CHANGELOG.md', versions: ['0.2.0'], problem: null });
+    expect(lines.length).toBe(3);
+    expect(run.stdout).toBe([...head, ...lines, ''].join('\n'));
+    expect(lines[0]).toBe(`👉 epic #${String(DRY_EPIC)} Issue ${String(DRY_EPIC)} has run dry: close it through its gate — rafa epic close ${String(DRY_EPIC)}`);
+    expect(run.exitCode).toBe(0);
+  });
+
+  it('leaves the release line out where every released version is tagged, which is the control beside it', async () => {
+    const git = dryEpicGit(['v0.1.0', 'v0.2.0']);
+
+    const run = await dispatchInProject(['next', `--${DRY_RUN_FLAG}`], [], [dryEpicCommand(git.git)], plantChangelogProject());
+
+    expect(run.stdout).toBe([...head, ...epicEndLines(epic, null), ''].join('\n'));
+    expect(run.stdout).not.toContain('rafa release tag');
+    expect(git.calls()).toContain('tag --list');
+  });
+
+  it('warns and leaves the release line out where the changelog cannot be read', async () => {
+    const git = dryEpicGit([]);
+    const planted = plantProject();
+
+    const run = await dispatchInProject(['next', `--${DRY_RUN_FLAG}`], [], [dryEpicCommand(git.git)], planted);
+
+    const warning = `warn: the release line is left out: the changelog could not be read at ${join(planted.root, 'CHANGELOG.md')}`;
+    expect(run.stdout).toBe([...head, warning, ...epicEndLines(epic, null), ''].join('\n'));
+  });
+
+  it('prints no end-of-epic line and lists no tag on a roadmap with no epic', async () => {
+    const git = dryEpicGit(['v0.1.0']);
+
+    const run = await dispatchInProject(
+      ['next', `--${DRY_RUN_FLAG}`],
+      [],
+      [dryEpicCommand(git.git, emptyRoadmapGh())],
+      plantChangelogProject(),
+    );
+
+    expect(run.stdout).toBe([
+      `📍 the roadmap, issue #${String(ROADMAP)}, has no line left that is not done or taken (0 lines passed).`,
+      '👉 open the next spec issue and add it to the roadmap',
+      `⏹ --${DRY_RUN_FLAG}: nothing ran.`,
+      '',
+    ].join('\n'));
+    expect(git.calls()).not.toContain('tag --list');
   });
 });
 

@@ -20,7 +20,7 @@
  *    next` proposes nothing and neither `--dry-run` nor `--yes` is
  *    needed to keep the run from acting. Every line printed is hand
  *    derived from the source each command's row is read off
- *    (`src/next/state.ts`'s row 13, `src/commands/epics.ts`'s
+ *    (`src/next/state.ts`'s row 13, `src/commands/epic/show.ts`'s
  *    `noNowEpicLine`, `src/status/render.ts`'s five section lines), the
  *    same way `epic-descent-cli.test.ts`'s own byte-for-byte case is.
  *
@@ -42,7 +42,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { noNowEpicLine } from '../commands/epics.js';
+import { noNowEpicLine } from '../commands/epic/show.js';
 import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { projectConfigText } from '../project/scaffold.js';
 
