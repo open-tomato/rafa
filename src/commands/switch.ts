@@ -36,7 +36,9 @@
  * - An epic moves to that epic and to the board whose checklist lists
  *   it, ticked or not: the current board first, then the default board,
  *   then the lowest-numbered open labelled board. An epic that no board
- *   lists moves with the default board.
+ *   lists moves with the default board. That pick is `boardOfEpic`
+ *   (`src/board/epic-board.ts`), which the blocker epic
+ *   locator (`src/board/blocker-epic.ts`) reads too.
  * - `-` moves to the position's `previous` place, as `cd -` does. That
  *   place is checked as a number is: a board or an epic closed or
  *   relabelled since is refused, naming what it lost.
@@ -76,6 +78,7 @@
  * It starts no session, so it declares no `spends`.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BoardView } from '../board/epic-board.js';
 import type { Epics } from '../board/epics.js';
 import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
@@ -85,6 +88,7 @@ import type { Place, Position } from '../project/position.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveDefaultBoard } from '../board/boards.js';
+import { boardOfEpic, openBoards } from '../board/epic-board.js';
 import { readEpics } from '../board/epics.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
@@ -176,19 +180,9 @@ export function readRehome(flags: RafaContext['flags']): boolean {
 }
 
 /** Everything the one listing answers, and the default board asked at most once. */
-export interface SwitchBoard {
-  readonly listing: readonly BoardIssue[];
-  readonly rows: ReadonlyMap<number, BoardIssue>;
+export interface SwitchBoard extends BoardView {
   /** `roadmap.issue`, or null when no layer names one. */
   readonly configured: number | null;
-  readonly defaultBoard: () => Promise<number>;
-}
-
-/** The listing's open `type:roadmap` rows, lowest number first. */
-export function openBoards(listing: readonly BoardIssue[]): readonly BoardIssue[] {
-  return listing
-    .filter((issue) => issue.state === 'OPEN' && issue.labels.includes(ROADMAP_LABEL))
-    .sort((a, b) => a.number - b.number);
 }
 
 /** What a number reads as, or why it is refused; see the module note. */
@@ -210,21 +204,6 @@ export async function kindOf(
   return row.state === 'CLOSED'
     ? { why: `${id(number)} is a closed ${kind}` }
     : { kind };
-}
-
-/** True when board `number` is open on the listing and its checklist lists `epic`. */
-function lists(number: number, epic: number, board: SwitchBoard): boolean {
-  const row = board.rows.get(number);
-  if (row?.state !== 'OPEN') return false;
-  return parseRoadmapBody(row.body).some((line) => line.issue === epic);
-}
-
-/** The board epic `epic` moves with: the current board, the default, the lowest listing it, else the default. */
-export async function boardOfEpic(epic: number, current: Place, board: SwitchBoard): Promise<number> {
-  if (lists(current.board, epic, board)) return current.board;
-  const fallback = await board.defaultBoard();
-  if (lists(fallback, epic, board)) return fallback;
-  return openBoards(board.listing).find((row) => lists(row.number, epic, board))?.number ?? fallback;
 }
 
 /** Board `number` at its first `now` epic that is not done; the epic null when it names none. */

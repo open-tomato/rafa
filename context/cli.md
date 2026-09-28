@@ -1593,8 +1593,9 @@ New; it replaces no earlier text. What a row or an action added to
 - **`rafa board list` lists the open boards**
   (`src/commands/board/list.ts`), the one action of the `board` subject.
   It reads the board listing once, as `switch` does, and ranks the
-  default board over that listing through `defaultBoardOnce` and
-  `openBoards`, which it imports from `src/commands/switch.ts`. The
+  default board over that listing through `defaultBoardOnce`, which it imports from
+  `src/commands/switch.ts`, and `openBoards`, from
+  `src/board/epic-board.ts`. The
   boards are the listing's open `type:roadmap` rows, lowest first, plus
   the default board when it is open on the listing without the label (an
   issue titled "Roadmap" while nothing is labelled, or `roadmap.issue`),

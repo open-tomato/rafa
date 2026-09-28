@@ -820,6 +820,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/board/list.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/board-body.js', ['readBoardBody']],
+    ['../../board/epic-board.js', ['openBoards']],
     ['../../board/owner-resolve.js', ['createOwnerResolver']],
     ['../../board/place.js', ['resolvePlace']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
@@ -827,7 +828,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-    ['../switch.js', ['defaultBoardOnce', 'openBoards']],
+    ['../switch.js', ['defaultBoardOnce']],
   ]],
   ['./commands/epic/show.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -962,6 +963,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/switch.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../board/boards.js', ['resolveDefaultBoard']],
+    ['../board/epic-board.js', ['boardOfEpic', 'openBoards']],
     ['../board/epics.js', ['readEpics']],
     ['../board/place.js', ['resolvePlace']],
     ['../board/roadmap-board.js', ['createGhBoardListing']],
