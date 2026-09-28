@@ -34,6 +34,7 @@ import {
 const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['version', 'version'],
   ['store', 'store'],
+  ['effortBusyTimeoutMs', 'effort.busyTimeoutMs'],
   ['inject', 'plan.inject'],
   ['planDir', 'plan.dir'],
   ['specsDir', 'specs.dir'],
@@ -92,6 +93,7 @@ const COMMAND_LINE: readonly ConfigSetting[] = [
 const TOP = [
   'version',
   'store',
+  'effort',
   'plan',
   'specs',
   'tracker',
@@ -168,6 +170,7 @@ describe('SECTIONS', () => {
       'board',
       'cleanup',
       'dangerous',
+      'effort',
       'learning',
       'learning.bless',
       'learning.promote',

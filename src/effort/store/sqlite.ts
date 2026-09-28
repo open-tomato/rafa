@@ -148,13 +148,13 @@
  * Every call opens the store, does its work and closes it before
  * returning, because the port has no `close`. Measured, thirty
  * open-append-close cycles left no descriptor on the file open, where
- * one open connection holds one. Every open sets a busy timeout of
- * five seconds, so a call that finds another process holding the write
- * lock waits up to that long for its turn and throws `SQLITE_BUSY`
- * past it. Measured without it, an open that found a migration pending
- * while another process held the lock threw `SQLITE_BUSY` at once. The
- * `effort.busyTimeoutMs` key the spec names does not exist yet, so the
- * five seconds are its default, fixed here.
+ * one open connection holds one. Every open sets `PRAGMA busy_timeout`
+ * to `effort.busyTimeoutMs`, read off `activeStoreSettings`
+ * (`settings.ts`) at each open and five seconds by default, so a call
+ * that finds another process holding the write lock waits up to that
+ * long for its turn and throws `SQLITE_BUSY` past it. Measured without
+ * it, an open that found a migration pending while another process held
+ * the lock threw `SQLITE_BUSY` at once.
  *
  * ## Bringing a store forward
  *
@@ -208,19 +208,13 @@ import { EFFORT_STORE_DIR } from '../store.js';
 
 import { bringForward } from './bring-forward.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import { activeStoreSettings } from './settings.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
 export { SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './migrations.js';
 
 /** The store's file, inside `EFFORT_STORE_DIR`. */
 const STORE_FILE_NAME = 'effort.sqlite';
-
-/**
- * How long an open waits for another process's write lock before it
- * throws `SQLITE_BUSY`: the default the spec gives `effort.busyTimeoutMs`,
- * fixed here until that key exists.
- */
-const STORE_BUSY_TIMEOUT_MS = 5000;
 
 /**
  * The file the SQLite store lives in under one repo root, whether or
@@ -391,7 +385,8 @@ export function migrateSchema(
 }
 
 /**
- * Opens the store at `path`, sets its busy timeout, brings its schema
+ * Opens the store at `path`, sets its busy timeout to the active
+ * `effort.busyTimeoutMs` (`settings.ts`), brings its schema
  * forward through `bringForward` for an open with `access`, hands it to
  * `use`, and closes it whatever `use` did. A refused store throws
  * `SchemaRefusedError` before `use` runs. Only a caller with a row to
@@ -416,7 +411,7 @@ export function withSqliteStore<T>(
 
   const db = new Database(path, { readwrite: true, create });
   try {
-    db.run(`PRAGMA busy_timeout = ${String(STORE_BUSY_TIMEOUT_MS)}`);
+    db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
     bringForward(db, path, access, 'open');
     return use(db);
   } finally {

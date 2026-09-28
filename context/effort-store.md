@@ -123,9 +123,8 @@ build's package version unless the caller names another.
 caller states `access`.** `keys`, `read` and every reader outside the
 port pass `'read'`; every writer passes `'write'`, and so does
 `writeSqliteStore` for an empty write. The open sets `PRAGMA
-busy_timeout` to 5000 ms, fixed in `sqlite.ts` until the
-`effort.busyTimeoutMs` key exists, then calls `bringForward(db, path,
-access, 'open')` before `use`. A read of a current store writes nothing;
+busy_timeout` to `effort.busyTimeoutMs`, then calls `bringForward(db,
+path, access, 'open')` before `use`. A read of a current store writes nothing;
 a read of a pre-log store adopts it, since adoption counts as a write; a
 store logging an unknown migration that breaks only writers is read and
 refused a write. Without the busy timeout, an open that found migrations
@@ -133,8 +132,22 @@ pending while another process held the lock threw `SQLITE_BUSY` at
 once; with it, `sqlite.test.ts` has two processes open one fresh store
 while a third holds the lock, and one applies every migration while the
 other finds nothing pending. A test that expects an open to throw on a
-held lock now waits out those five seconds, as the lock case of
-`tracker-refs.test.ts` does.
+held lock waits out the timeout, five seconds by default, as the lock
+case of `tracker-refs.test.ts` does; one that sets a short timeout
+through `setActiveStoreSettings` puts `null` back after it.
+
+**`effort.busyTimeoutMs` reaches every open through
+`activeStoreSettings` (`src/effort/store/settings.ts`).** It is a whole
+number of milliseconds from 1 to 60000, 5000 by default, and the reader
+refuses `0`, negatives, `60001`, fractions, quoted numbers and `false`.
+`loadConfig` hands the store the value it resolved each time it runs, so
+a command that reads its config opens the store with it, and one that
+never does opens with the default. The setter refuses a value the
+reader would, with a `RangeError`. It is module state, so a test that
+sets it sets `null` after. `settings.test.ts` has an open wait on a lock
+a child process holds and get in once it is let go, and an open past a
+100 ms timeout throw `SQLITE_BUSY`. The two `fix-schema` opens set no
+busy timeout.
 
 ### Tables outside the port
 
