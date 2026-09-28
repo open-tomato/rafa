@@ -106,6 +106,8 @@ const MEMBERS: readonly Member[] = [
     name: 'checks',
     lines: ['  checks: async (_n: number) => ({ rows: [], verdict: "none" as const }),'],
   },
+  { name: 'changedFiles', lines: ['  changedFiles: async (_n: number) => ["src/pr/gh.ts"],'] },
+  { name: 'reviews', lines: ['  reviews: async (_n: number) => [review],'] },
   { name: 'browse', lines: ['  browse: async (_n: number) => {},'] },
   {
     name: 'merge',
@@ -142,6 +144,11 @@ const RECORDS = [
   'export const merged: T.MergedPullRequest = {',
   '  number: 33, headRefName: "feat/rafa-20-pr-commands", headRefOid: "deadbeef",',
   '  mergedAt: "2026-09-18T10:00:00Z",',
+  '};',
+  // Exported for the reason `merged` is: the probe omitting `reviews`
+  // and the method-signature control both leave it unread.
+  'export const review: T.PullRequestReview = {',
+  '  login: "marcos", state: "APPROVED", submittedAt: "2026-09-18T10:00:00Z",',
   '};',
   'const comment: T.PullRequestComment = {',
   '  id: "IC_1", author, body: "<!-- rafa:pr-triage v1 -->",',
@@ -274,6 +281,20 @@ const REFUSALS: readonly Refusal[] = [
     source: probeSource(...adapterSource({ omit: 'workflowCount' })),
     code: 2741,
     names: '\'workflowCount\'',
+  },
+  {
+    title: 'an adapter with no changedFiles',
+    file: 'omits-changed-files.ts',
+    source: probeSource(...adapterSource({ omit: 'changedFiles' })),
+    code: 2741,
+    names: '\'changedFiles\'',
+  },
+  {
+    title: 'an adapter with no reviews',
+    file: 'omits-reviews.ts',
+    source: probeSource(...adapterSource({ omit: 'reviews' })),
+    code: 2741,
+    names: '\'reviews\'',
   },
   {
     title: 'an adapter with no listMerged',
