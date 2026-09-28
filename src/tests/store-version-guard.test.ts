@@ -21,6 +21,20 @@
  *     and, with nothing to insert, still opens a store that exists for
  *     its schema check, so the same refusal is thrown before
  *     `writeTriage` ever runs.
+ *   - `rafa effort collect`, spawned as a development build (this
+ *     repository's own `src/rafa.ts`), over a project's own store
+ *     planted one migration behind this rafa: no migration log yet, and
+ *     `plan-ci`, the last of `SQLITE_MIGRATIONS`, still pending. A live
+ *     loop record sits under the project's `.rafa/runs/`, its pid the
+ *     test process's own so a real `isPidAlive` reads it alive. The
+ *     child's `TMPDIR` is pointed at a directory of its own elsewhere,
+ *     so the store is not one this build owns, and `RAFA_TEST` is
+ *     unset, so `guardTestProcess` (`store/location.ts`) never fires and
+ *     the refusal reached is `refuseUnownedDevelopmentWrite`'s own
+ *     (`store/development-build.ts`), not the test guard's. The run is
+ *     refused before `keys('sessions')` does anything else, naming the
+ *     adoption, the pending migration and the live loop, and the store's
+ *     bytes are exactly as they were before the run.
  *
  * The command has no seam for its root or its session log directory:
  * the root is the project the dispatcher resolves from the working
@@ -46,6 +60,7 @@
  * exercised in-process below, and unit-level in each module's own
  * suite.
  */
+import type { SessionRecord } from '../loop/sessions.js';
 import type { TaskReportInput } from '../report/record.js';
 
 import {
@@ -54,19 +69,21 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { sessionLogDir } from '../effort/collect.js';
-import { sqliteStorePath, SQLITE_SCHEMA_VERSION } from '../effort/store/sqlite.js';
+import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../effort/store/sqlite.js';
+import { runsDir, sessionFilePath } from '../loop/sessions.js';
 import { recordTaskReport } from '../report/record.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 /** The command every black-boxed run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -246,5 +263,68 @@ describe('recordTaskReport over a future-version store', () => {
     expect(() => recordTaskReport(root, inputOf(outputOf(EMPTY_REPORT), 'bbbb-2222')))
       .toThrow(VERSION_REFUSAL);
     expect(readFileSync(path)).toEqual(planted);
+  });
+});
+
+describe('effort collect spawned as a development build, over a project store a migration behind, a loop running', () => {
+  /** The pid a real `isPidAlive` reads alive throughout this case: the test process's own. */
+  const LOOP_SESSION_ID = 'guard-loop-0001';
+  const LOOP_PLAN_STUB = 'rafa-234-effort-store-migrations-older';
+
+  /**
+   * Plants the project's own store one migration behind this rafa: the
+   * legacy entries up to but not including `plan-ci` are run directly, as
+   * a pre-log release left it, so opening it with the full catalogue
+   * needs both the adoption (`schema_migrations`) and `plan-ci` itself.
+   */
+  function plantPendingMigrationStore(root: string): string {
+    const path = sqliteStorePath(root);
+    mkdirSync(dirname(path), { recursive: true });
+    const db = new Database(path, { create: true, readwrite: true });
+    try {
+      migrateSchema(db, path, SQLITE_MIGRATIONS.slice(0, SQLITE_MIGRATIONS.length - 1));
+    } finally {
+      db.close();
+    }
+    return path;
+  }
+
+  /** Writes a `running` loop record under `root`, as `loop start` writes one. */
+  function plantLiveLoop(root: string): void {
+    const record: SessionRecord = {
+      sessionId: LOOP_SESSION_ID,
+      planStub: LOOP_PLAN_STUB,
+      plan: `.rafa/plans/PLAN-${LOOP_PLAN_STUB}.md`,
+      branch: 'feat/rafa-234',
+      pid: process.pid,
+      startedAt: '2026-09-28T09:00:00.000Z',
+      state: 'running',
+      task: null,
+    };
+    mkdirSync(runsDir(root), { recursive: true });
+    writeFileSync(sessionFilePath(root, LOOP_SESSION_ID), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+  }
+
+  it('refuses with the development-build text, naming the pending migration and the live loop, byte-identical after', () => {
+    const scratch = plantScratchRepo(makeScratch());
+    const path = plantPendingMigrationStore(scratch.repo);
+    mkdirSync(sessionLogDir(scratch.repo, scratch.home), { recursive: true });
+    plantLiveLoop(scratch.repo);
+    const before = readFileSync(path);
+
+    // The child's TMPDIR points elsewhere, so this build does not own the store, and RAFA_TEST is
+    // unset, so the test guard never fires: the refusal reached is the development-build one.
+    const childTmp = realpathSync(makeScratch());
+    const run = runRafa(scratch, scratch.repo, ['effort', 'collect'], { TMPDIR: childTmp, RAFA_TEST: '' });
+
+    expect(run.exitCode).not.toBe(0);
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toContain(`effort store: ${path} needs migration schema_migrations, plan-ci and this rafa is a`
+      + ' development build (');
+    expect(run.stderr).toContain('a development build migrates only a store under the temp directory or RAFA_EFFORT_DIR.'
+      + ' Copy it with \'rafa effort copy\' and run this command with RAFA_EFFORT_DIR=<the copy>.');
+    expect(run.stderr).toContain(`Loop ${LOOP_SESSION_ID} (pid ${String(process.pid)}, plan ${LOOP_PLAN_STUB})`
+      + ' is running on this store.');
+    expect(readFileSync(path)).toEqual(before);
   });
 });
