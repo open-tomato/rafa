@@ -105,6 +105,33 @@ a store holds. The open path reads the names and the gate through
 `migrateSchema` still counts by position; only `fix-schema` builds with
 it, and the next open adopts what it built.
 
+**`classifyMigration` (`src/effort/store/migration-shapes.ts`) reads what
+an entry's SQL breaks, and `migrations.test.ts` holds every entry to it.**
+It strips comments, splits statements (a trigger body stays whole) and
+gives each one a row of the spec's additive table: a new table, nullable
+column, plain index or view breaks nothing; a unique index does too when
+its table is new in the same entry, or when it covers a column the same
+entry adds and its `WHERE` holds `c IS NOT NULL` as a top-level
+conjunct. Any other unique index, a dropped index or a trigger breaks
+`writers`; a dropped or renamed table or column, or a statement matching
+no row, breaks both sides. The test fails an entry that declares less
+than that, and an additive entry holding a column added `NOT NULL` or
+with a non-NULL `DEFAULT`, a PRAGMA, a data statement or an unknown
+shape. A breaking rebuild may carry its `INSERT … SELECT`. The test also
+checks unique kebab-case ids and `contract` exactly when `breaks` is
+not empty. It applies each entry to `:memory:` and requires every object
+its text names in a `CREATE` to be in `sqlite_master`. The names are read
+before comments are stripped, so a statement a comment swallowed fails
+here, and so does a `TEMP` table. SQLite also refuses an `ADD COLUMN`
+whose statement ends in a `--` comment before its `;` (`error in table
+<t> after add column: incomplete input`). Last, it reads
+`migrations.lock.json` at the newest `v*` tag by version order through
+`git show`, and fails a line changed or dropped since. The case is
+skipped, its title naming why, when git, the tag or the lock at the tag
+is absent. At v0.24.1 the lock is absent, since that release predates it.
+Each rule has a near-miss control, including a planted `DROP COLUMN`
+declared `[]`.
+
 **`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
 decision, and `bringForward` is its one caller.** It takes what a store holds (its
 `schema_migrations` rows, or none, and `user_version`), this build's
