@@ -11,8 +11,9 @@
  * 2. Refuse when the parallel file or the backup is already there
  *    ({@link rebuildAside}), so two runs never overwrite each other.
  * 3. Build the parallel file. What goes into it is the caller's: the
- *    repair (`fix-schema.ts`) migrates a fresh file and copies the known
- *    tables into it. The caller checks it with {@link checkedCounts},
+ *    repair (`fix-schema.ts`) brings a fresh file to this rafa's
+ *    migrations through the log-aware apply and copies the known tables
+ *    into it. The caller checks it with {@link checkedCounts},
  *    every table's row count against the store's, and
  *    {@link refuseCorrupt}, SQLite's `integrity_check`.
  * 4. Any failure while building removes the parallel file and its

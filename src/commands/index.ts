@@ -120,8 +120,9 @@
  *     prompt, the reading left as one comment per pull request. Each
  *     refuses with exit code 2 where `pr.provider` is not `gh`.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's,
- *     and `effort fix-schema [--dry-run]`, a store a newer rafa migrated
- *     rebuilt at the version this one knows, the original kept whole, and
+ *     and `effort fix-schema [--dry-run]`, a store this rafa refuses for
+ *     a reason a rebuild repairs rebuilt at the migrations this one
+ *     knows, with a migration log, the original kept whole, and
  *     `effort copy [--to=<dir>]`, the store copied into a scratch
  *     directory for `RAFA_EFFORT_DIR` to point a command at, and
  *     `effort schema [--check]`, whether this rafa can use the store,

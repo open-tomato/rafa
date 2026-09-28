@@ -60,6 +60,7 @@ import type { RuntimeIdentity } from '../../runtime/identity.js';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute } from 'node:path';
 
+import { RAFA_VERSION } from '../../cli/version.js';
 import { messageOf } from '../../config-sections.js';
 import { isPidAlive, readSessions, runsDir } from '../../loop/sessions.js';
 import { SCOPE_DIR } from '../../project/scope.js';
@@ -86,6 +87,17 @@ export interface DevelopmentProbe {
   readonly tempDir?: string;
   /** Whether a loop record's pid is alive; `isPidAlive` by default. */
   readonly isAlive?: PidProbe;
+}
+
+/**
+ * The running rafa as a migration log's `applied_by` names it: its
+ * version for an installed runtime, and `<version>+dev:<checkout>` for a
+ * development build, so a row a checkout logged says which one.
+ */
+export function appliedByName(identity: RuntimeIdentity): string {
+  return identity.kind === 'development'
+    ? `${RAFA_VERSION}+dev:${identity.checkout}`
+    : RAFA_VERSION;
 }
 
 /** A development build refused a write to a store it does not own. */

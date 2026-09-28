@@ -62,9 +62,9 @@
  * from `id`, `breaks` and the gate, and keeps the migration log.
  * `migrateSchema` in `sqlite.ts` still applies these entries by array
  * position and writes the array's length, {@link SQLITE_SCHEMA_VERSION},
- * to `user_version`, as the pre-log releases do; only `fix-schema.ts`
- * builds with it, and no open goes through it. No module outside this
- * one and its test reads the lock.
+ * to `user_version`, as the pre-log releases do; tests plant pre-log
+ * stores with it, and no open or command goes through it. No module
+ * outside this one and its test reads the lock.
  */
 import { createHash } from 'node:crypto';
 
@@ -413,7 +413,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
 
 /**
  * The length of the history. `migrateSchema` in `sqlite.ts`, which
- * `fix-schema.ts` builds its rebuild with, brings a store to this
+ * tests plant pre-log stores with, brings a store to this
  * `user_version` and refuses one past it, as the pre-log releases do.
  */
 export const SQLITE_SCHEMA_VERSION = SQLITE_MIGRATIONS.length;

@@ -66,20 +66,37 @@ versions 10 and 11 reached the store through `rafa effort collect` run from
 the branch, and the 0.18.0 loop stopped.
 
 **`rafa effort fix-schema` repairs such a store**
-(`src/effort/store/fix-schema.ts`). It builds `effort.sqlite.fix-<stamp>`
-at this rafa's version, copies every table and column this rafa knows,
-checks the row counts and `integrity_check`, and lists the tables and
-columns only the newer schema holds. The original is then renamed to
-`effort.sqlite.v<version>-<stamp>.bak`, whole, and the rebuild takes its
-place. `--dry-run` deletes the rebuild instead, so it can be repeated and
-runs beside a live loop; the swap refuses while a loop session is running
-or paused. A newer schema that dropped a table or column this rafa writes
-is not additive, and the repair refuses it rather than copy around it.
-The steps around the build, from the in-flight journal refusal through
-the row-count check, `integrity_check` and the swap to removal on
-failure, are `rebuildAside` (`src/effort/store/rebuild-aside.ts`), which
-takes the two file names and the build from its caller and opens no
-store itself; `SchemaFixRefusal` is its `RebuildRefusal`.
+(`src/effort/store/fix-schema.ts`). It decides through `planSchema`,
+asked for a write: a store this rafa uses is `current` or `behind` and
+left alone, unknown additive migrations included, and it rebuilds only
+on `pre-log-unreleased`, `gate-mismatch`, `edited` and both
+`unknown-breaks-*`; the two `breaking-*` refusals are passed on with
+their own next step. It builds `effort.sqlite.fix-<stamp>` through
+`bringForward` (with `builtAside`, so the open does not ask the
+development-build question of a file in the store's directory), which
+logs every id this rafa knows with `applied_by` from `appliedByName`
+(`development-build.ts`: the version, `+dev:<checkout>` for a
+development build). It copies every table and column this rafa knows
+except the log, checks the row counts, `integrity_check` and that
+`planSchema` finds the rebuild current, and lists the unknown
+migrations, tables and columns only the newer schema holds, which stay
+in the backup alone. The original is then renamed to
+`effort.sqlite.v<user_version>-<stamp>.bak`, whole, and the rebuild
+takes its place. `--dry-run` deletes the rebuild instead, so it can be
+repeated and runs beside a live loop and from a development build; the
+swap refuses while a loop session is running or paused, and from a
+development build before anything is built. A newer schema that dropped
+a table or column this rafa writes is not additive, and the repair
+refuses it rather than copy around it. `fix-schema.test.ts` (store and
+command) rebuilds a pre-log store at 15 with a log, reports a logged
+store with an unknown additive migration `current`, and spawns
+`bun src/rafa.ts` over a store outside the child's temp directory:
+the swap is refused, the dry run runs. The steps around the build, from
+the in-flight journal refusal through the row-count check,
+`integrity_check` and the swap to removal on failure, are `rebuildAside`
+(`src/effort/store/rebuild-aside.ts`), which takes the two file names
+and the build from its caller and opens no store itself;
+`SchemaFixRefusal` is its `RebuildRefusal`.
 
 **`rafa effort copy [--to=<dir>]` is how branch code gets real data**
 (`src/commands/effort/copy.ts` over `copyEffortStore`,
@@ -140,8 +157,8 @@ lock line in the same commit. `LEGACY_GATE_OPEN` (13) and
 pre-log release in or keep it out, and `legacyGate` picks one from what
 a store holds. The open path reads the names and the gate through
 `bringForward`, and nothing outside `migrations.test.ts` reads the lock.
-`migrateSchema` still counts by position; only `fix-schema` builds with
-it, and the next open adopts what it built.
+`migrateSchema` still counts by position and writes no log; no open or
+command goes through it, and tests plant pre-log stores with it.
 
 **`classifyMigration` (`src/effort/store/migration-shapes.ts`) reads what
 an entry's SQL breaks, and `migrations.test.ts` holds every entry to it.**

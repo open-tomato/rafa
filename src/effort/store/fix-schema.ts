@@ -1,38 +1,61 @@
 /**
- * The repair `rafa effort fix-schema` runs: a SQLite store past the
- * version this rafa knows, rebuilt at that version beside the live file,
- * checked, and swapped in with the original kept as a backup.
+ * The repair `rafa effort fix-schema` runs: a SQLite store this rafa
+ * refuses, rebuilt at the migrations this rafa knows beside the live
+ * file, checked, and swapped in with the original kept as a backup.
  *
- * ## Why a store gets ahead of the rafa reading it
+ * ## Which stores it repairs
  *
- * A pre-log release refuses a store past the last version its history
- * holds, and every read and write it makes goes through that check. A
- * store gets there when newer code opens it: a branch's own code run
- * from its working tree against the project's store, while the loop
- * driving that branch is an installed runtime that predates it. From
- * then on the runtime refuses the store, and a task report the loop
- * collects is not stored. This rafa's own opens go through
- * `bringForward` (`bring-forward.ts`) instead, which refuses such a
- * store with no migration log and names this repair as the way out.
+ * The decision is `planSchema`'s (`schema-plan.ts`), asked for a write
+ * from an ordinary open, as `rafa effort schema` asks it: a runtime that
+ * reads and writes the store is refused whatever a read alone would be.
+ * The store's `user_version` and migration log are read on a read-only
+ * connection, so a store that needs no repair keeps its bytes.
+ *
+ *   - A store the plan lets this rafa use is left alone: `current` when
+ *     nothing is to be adopted or applied, `behind` when the next
+ *     ordinary open brings it forward. A store logging migrations this
+ *     rafa does not know, each additive, is one of these, since this
+ *     rafa already reads and writes through them.
+ *   - Five refusals are repaired by a rebuild ({@link REPAIRABLE_REASONS}):
+ *     `pre-log-unreleased`, a store a branch build migrated past the
+ *     legacy entries with no log; `gate-mismatch`, a logged store a
+ *     build older than the log migrated; `edited`, a logged checksum
+ *     this rafa holds otherwise; and `unknown-breaks-readers` and
+ *     `unknown-breaks-writers`, a logged migration this rafa does not
+ *     know which breaks it.
+ *   - The other two, `breaking-out-of-order` and `breaking-pending`, are
+ *     about migrations this rafa knows and has not applied, which a
+ *     rebuild at those same migrations does not answer. They are refused
+ *     with the plan's own text, which ends with the command to run next.
+ *
+ * Installing a rafa that knows the store's migrations comes first
+ * wherever it can: a rebuild leaves what only the newer schema holds in
+ * the backup.
  *
  * ## The rebuild
  *
- * A parallel file, `<store>.fix-<stamp>`, is migrated with this rafa's
- * own history, so its layout is exactly the one this rafa writes. The
- * live store is attached, and every table the parallel file holds is
- * filled from the live table of the same name, over the columns the
- * parallel table has. Nothing needs to know what the newer migrations
- * did: a table or column this rafa does not know is simply not copied,
- * and it is reported as left behind with how many rows or values it
- * held. The rebuild is refused when the live store lacks a table or a
- * column this rafa knows, since a newer history that removed one is not
- * additive, and copying around it would lose what this rafa writes.
+ * A parallel file, `<store>.fix-<stamp>`, is brought to this rafa's
+ * migrations by the log-aware apply (`bringForward`, `bring-forward.ts`),
+ * so it holds exactly the tables this rafa writes and a migration log
+ * with a row for every id this rafa knows, each `applied_by` naming this
+ * runtime ({@link appliedByName}: its version, with `+dev:<checkout>`
+ * for a development build). The live store is attached, and every table
+ * the parallel file holds, the log apart, is filled from the live table
+ * of the same name over the columns the parallel table has. A table or
+ * column this rafa does not know is not copied, and is reported as left
+ * behind with how many rows or values it held. So are the unknown
+ * migrations the live log names: they stay in the backup only, since an
+ * object copied into the rebuild with no log row would make the release
+ * that ships its migration fail on `CREATE TABLE`. The rebuild is
+ * refused when the live store lacks a table or a column this rafa
+ * knows, since copying around it would lose what this rafa writes.
  *
  * The parallel file is checked before anything else happens: the row
- * count of every table copied must equal the live one, and SQLite's
- * `integrity_check` must answer `ok`. Under `dryRun` it is then deleted,
- * so a dry run can be repeated and leaves the directory as it found it.
- * Otherwise the live file is renamed to `<store>.v<version>-<stamp>.bak`
+ * count of every table copied must equal the live one, SQLite's
+ * `integrity_check` must answer `ok`, and `planSchema` must find it a
+ * store this rafa uses as it is. Under `dryRun` it is then deleted, so a
+ * dry run can be repeated and leaves the directory as it found it.
+ * Otherwise the live file is renamed to `<store>.v<user_version>-<stamp>.bak`
  * and the parallel file renamed into its place. The backup is the whole
  * original, left-behind data included, and restoring it is renaming it
  * back.
@@ -47,18 +70,35 @@
  * with its own file names and its own build. `SchemaFixRefusal` is that
  * module's `RebuildRefusal` under the name the command catches.
  *
+ * ## A development build never swaps
+ *
+ * A development build (`readRuntimeIdentity`, `src/runtime/identity.ts`)
+ * builds, checks and deletes a rebuild under `dryRun`, and is refused
+ * the swap before anything is built: its migrations may be a branch's,
+ * which no installed runtime knows. The parallel file is brought forward
+ * with `builtAside`, so the open's own development-build question, which
+ * would refuse a file in the project's store directory, is not asked of
+ * it; this refusal is that question, asked of the swap.
+ *
  * It opens the store itself rather than through `withSqliteStore`, so it
  * runs the test guard (`guardTestProcess`, `location.ts`) itself too,
  * before it reads or makes anything.
  */
 import type { SqliteMigration } from './migrations.js';
 import type { TableRows } from './rebuild-aside.js';
+import type { LoggedMigration, RefusalReason, StoreSchema } from './schema-plan.js';
+import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { existsSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
 
+import { readRuntimeIdentity } from '../../runtime/identity.js';
+
+import { bringForward, MIGRATION_LOG_TABLE, readStoreSchema, writeNames } from './bring-forward.js';
+import { appliedByName } from './development-build.js';
 import { guardTestProcess } from './location.js';
+import { SQLITE_MIGRATIONS } from './migrations.js';
 import {
   checkedCounts,
   count,
@@ -68,20 +108,32 @@ import {
   refuseCorrupt,
   refuseInFlight,
 } from './rebuild-aside.js';
-import { migrateSchema, SQLITE_MIGRATIONS } from './sqlite.js';
+import { planSchema, sqliteCatalogue } from './schema-plan.js';
 
 /** What the repair found, and what it did about it. */
 export type FixSchemaStatus =
   /** No store file: nothing to repair, and none is created. */
   | 'missing'
-  /** At this rafa's version: nothing to repair. */
+  /** This rafa uses it as it is: nothing to repair. */
   | 'current'
-  /** Behind it: the next ordinary open migrates it, so nothing to repair. */
+  /** This rafa uses it once the next ordinary open brings it forward: nothing to repair. */
   | 'behind'
-  /** Past it, under `dryRun`: the rebuild was made, checked and deleted. */
+  /** Refused for a reason a rebuild repairs, under `dryRun`: the rebuild was made, checked and deleted. */
   | 'would-rebuild'
-  /** Past it: the rebuild was swapped in and the original kept as a backup. */
+  /** Refused for a reason a rebuild repairs: the rebuild was swapped in and the original kept as a backup. */
   | 'rebuilt';
+
+/** The `planSchema` refusals a rebuild at this rafa's migrations repairs, in the order they are tried. */
+export const REPAIRABLE_REASONS = [
+  'pre-log-unreleased',
+  'gate-mismatch',
+  'edited',
+  'unknown-breaks-readers',
+  'unknown-breaks-writers',
+] as const satisfies readonly RefusalReason[];
+
+/** A refusal a rebuild repairs. */
+export type RepairReason = typeof REPAIRABLE_REASONS[number];
 
 /** A table the rebuild copies, with the rows it holds. */
 export type KeptTable = TableRows;
@@ -104,10 +156,26 @@ export interface FixSchemaResult {
   /** The live store's file. */
   readonly path: string;
   readonly status: FixSchemaStatus;
-  /** The live store's version, or null when there is no file. */
+  /** The live store's `user_version`, or null when there is no file. */
   readonly storeVersion: number | null;
-  /** The version this rafa knows, and the one a rebuild is made at. */
-  readonly knownVersion: number;
+  /** Whether the live store holds a migration log. */
+  readonly logged: boolean;
+  /** The refusal a rebuild repairs, or null when the store needs none. */
+  readonly reason: RepairReason | null;
+  /** That refusal's text without its way out, since the repair is that way out, or null. */
+  readonly refusal: string | null;
+  /** The ids this rafa knows, in catalogue order: the ones a rebuild logs. */
+  readonly known: readonly string[];
+  /** Who a rebuild's log rows name as applying them. */
+  readonly appliedBy: string;
+  /** What the next ordinary open records, for `behind`: the log first when it adopts, then each pending id. */
+  readonly pending: readonly string[];
+  /**
+   * Logged migrations this rafa does not know. For `current` and
+   * `behind` each is one this rafa uses the store through; for a
+   * rebuild they stay in the backup only.
+   */
+  readonly unknown: readonly LoggedMigration[];
   /** Every table copied; empty unless a rebuild was made. */
   readonly kept: readonly KeptTable[];
   readonly leftTables: readonly LeftTable[];
@@ -124,8 +192,12 @@ export interface FixSchemaOptions {
   readonly dryRun: boolean;
   /** Names the parallel and backup files, so two runs never collide. */
   readonly stamp: string;
-  /** The history to rebuild with: the store's own unless another is passed. */
+  /** The migrations to rebuild at: this build's unless another list is passed. */
   readonly migrations?: readonly SqliteMigration[];
+  /** Which build runs; `readRuntimeIdentity()` by default. */
+  readonly identity?: RuntimeIdentity;
+  /** The clock a rebuild's `applied_at` is read from. */
+  readonly now?: () => Date;
 }
 
 /** A repair refused before the live store was changed: the build-aside steps' refusal. */
@@ -134,13 +206,13 @@ export { RebuildRefusal as SchemaFixRefusal } from './rebuild-aside.js';
 /** The name the attached live store is reached by. */
 const LIVE = 'live';
 
-/** The user tables one attached schema holds, by name. */
+/** The user tables one attached schema holds, by name, the migration log apart. */
 function tableNames(db: Database, schema: string): string[] {
   return db
-    .query<{ name: string }, []>(
-      `SELECT name FROM ${schema}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+    .query<{ name: string }, [string]>(
+      `SELECT name FROM ${schema}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> ? ORDER BY name`,
     )
-    .all()
+    .all(MIGRATION_LOG_TABLE)
     .map((row) => row.name);
 }
 
@@ -152,11 +224,11 @@ function columnNames(db: Database, schema: string, table: string): string[] {
     .map((row) => row.name);
 }
 
-/** The file's `user_version`, read without migrating it. */
-function versionOf(path: string): number {
+/** The file's `user_version` and migration log, read on a read-only connection. */
+function readOnlySchema(path: string): StoreSchema {
   const db = new Database(path, { readonly: true });
   try {
-    return db.query<{ user_version: number }, []>('PRAGMA user_version').get()?.user_version ?? 0;
+    return readStoreSchema(db, path);
   } finally {
     db.close();
   }
@@ -210,11 +282,30 @@ function leftBehind(db: Database, known: ReadonlySet<string>, live: readonly str
   return { leftTables, leftColumns };
 }
 
+/** Refuses a rebuild `planSchema` would not let this rafa use as it is. */
+function refuseUnusable(db: Database, parallelPath: string, migrations: readonly SqliteMigration[]): void {
+  const plan = planSchema(readStoreSchema(db, parallelPath), sqliteCatalogue(migrations), 'write', 'open');
+  if (plan.verdict === 'refuse') throw new RebuildRefusal(`the rebuilt store is refused as ${plan.reason}: ${plan.message}`);
+  const needs = writeNames(plan);
+  if (needs.length > 0) throw new RebuildRefusal(`the rebuilt store still needs ${needs.join(', ')}`);
+}
+
+/** How the rebuild's log rows are stamped. */
+interface RebuildStamp {
+  readonly appliedBy: string;
+  readonly now: () => Date;
+}
+
 /** Builds and checks the parallel file, answering what it copied and left behind. */
-function buildParallel(path: string, parallelPath: string, migrations: readonly SqliteMigration[]): Pick<FixSchemaResult, 'kept' | 'leftTables' | 'leftColumns'> {
+function buildParallel(
+  path: string,
+  parallelPath: string,
+  migrations: readonly SqliteMigration[],
+  stamp: RebuildStamp,
+): Pick<FixSchemaResult, 'kept' | 'leftTables' | 'leftColumns'> {
   const db = new Database(parallelPath, { create: true, readwrite: true });
   try {
-    migrateSchema(db, parallelPath, migrations);
+    bringForward(db, parallelPath, 'write', 'open', { migrations, ...stamp, builtAside: true });
     db.run(`ATTACH DATABASE ? AS ${LIVE}`, [path]);
     const known = tableNames(db, 'main');
     const live = tableNames(db, LIVE);
@@ -224,6 +315,7 @@ function buildParallel(path: string, parallelPath: string, migrations: readonly 
     const left = leftBehind(db, new Set(known), live);
     db.run(`DETACH DATABASE ${LIVE}`);
     refuseCorrupt(db);
+    refuseUnusable(db, parallelPath, migrations);
     return { kept, ...left };
   } finally {
     db.close();
@@ -235,28 +327,76 @@ function asidePaths(path: string, version: number, stamp: string): { parallelPat
   return { parallelPath: `${path}.fix-${stamp}`, backupPath: `${path}.v${String(version)}-${stamp}.bak` };
 }
 
+/** Whether a rebuild repairs `reason`. */
+function isRepairable(reason: RefusalReason): reason is RepairReason {
+  return (REPAIRABLE_REASONS as readonly RefusalReason[]).includes(reason);
+}
+
+/** Refuses the swap from a development build; see the module note. */
+function refuseDevelopmentSwap(path: string, reason: RepairReason, identity: RuntimeIdentity): void {
+  if (identity.kind !== 'development') return;
+  throw new RebuildRefusal(
+    `${path} needs a rebuild (${reason}), and this rafa is a development build (${identity.checkout}), whose`
+      + ' migrations may be a branch\'s; a development build never swaps a rebuild in. Nothing was changed, and'
+      + ' --dry-run runs from here. Run the swap from an installed rafa. Next safe step: rafa effort fix-schema',
+  );
+}
+
 /** Repairs the store at `options.path`. See the module note. */
 export function fixStoreSchema(options: FixSchemaOptions): FixSchemaResult {
   const { path, dryRun, stamp } = options;
   guardTestProcess(path);
   const migrations = options.migrations ?? SQLITE_MIGRATIONS;
-  const knownVersion = migrations.length;
-  const nothing = { kept: [], leftTables: [], leftColumns: [], backupPath: null };
-  if (!existsSync(path)) return { path, status: 'missing', storeVersion: null, knownVersion, ...nothing };
+  const identity = options.identity ?? readRuntimeIdentity();
+  const appliedBy = appliedByName(identity);
+  const known = migrations.map(({ id }) => id);
+  const nothing = { known, appliedBy, pending: [], kept: [], leftTables: [], leftColumns: [], backupPath: null };
+  if (!existsSync(path)) {
+    return { path, status: 'missing', storeVersion: null, logged: false, reason: null, refusal: null, unknown: [], ...nothing };
+  }
 
   refuseInFlight(path);
-  const storeVersion = versionOf(path);
-  if (storeVersion === knownVersion) return { path, status: 'current', storeVersion, knownVersion, ...nothing };
-  if (storeVersion < knownVersion) return { path, status: 'behind', storeVersion, knownVersion, ...nothing };
+  const store = readOnlySchema(path);
+  const knownIds = new Set(known);
+  const found = {
+    path,
+    storeVersion: store.userVersion,
+    logged: store.log !== null,
+    unknown: (store.log ?? []).filter(({ id }) => !knownIds.has(id)),
+  };
+  const plan = planSchema(store, sqliteCatalogue(migrations), 'write', 'open');
+  if (plan.verdict === 'use') {
+    const pending = writeNames(plan);
+    const status = pending.length === 0
+      ? 'current'
+      : 'behind';
+    return { ...found, ...nothing, status, reason: null, refusal: null, pending };
+  }
+  if (!isRepairable(plan.reason)) {
+    throw new RebuildRefusal(`a rebuild at this rafa's migrations does not repair ${plan.reason}. ${plan.message}`);
+  }
+  if (!dryRun) refuseDevelopmentSwap(path, plan.reason, identity);
 
   const { built, backupPath } = rebuildAside({
     path,
-    ...asidePaths(path, storeVersion, stamp),
+    ...asidePaths(path, store.userVersion, stamp),
     dryRun,
-    build: (parallelPath) => buildParallel(path, parallelPath, migrations),
+    build: (parallelPath) => buildParallel(path, parallelPath, migrations, {
+      appliedBy,
+      now: options.now ?? ((): Date => new Date()),
+    }),
   });
   const status = dryRun
     ? 'would-rebuild'
     : 'rebuilt';
-  return { path, status, storeVersion, knownVersion, ...built, backupPath };
+  const refusal = withoutWayOut(plan.message, plan.nextStep);
+  return { ...found, ...nothing, status, reason: plan.reason, refusal, ...built, backupPath };
+}
+
+/** A plan's refusal text with its `Next safe step:` ending taken off. */
+function withoutWayOut(message: string, nextStep: string): string {
+  const ending = ` Next safe step: ${nextStep}`;
+  return message.endsWith(ending)
+    ? message.slice(0, -ending.length)
+    : message;
 }

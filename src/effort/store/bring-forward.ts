@@ -53,6 +53,14 @@
  * a development build uses a current store as any rafa does. That
  * module's note says which stores it owns and what the text names.
  *
+ * An open with {@link BringForwardOptions.builtAside} set skips that
+ * question: its file is one the caller built beside a store, which
+ * reaches the store only through the build-aside swap
+ * (`rebuild-aside.ts`), so the caller asks the question of the swap.
+ * `fix-schema.ts` builds its rebuild this way, since the parallel file
+ * sits in the project's store directory where the question would
+ * otherwise refuse even a dry run.
+ *
  * ## What this module does not decide
  *
  * `planSchema` owns every refusal and its text. Which rafa counts as the
@@ -122,6 +130,12 @@ export interface BringForwardOptions extends DevelopmentProbe {
   readonly appliedBy?: string;
   /** The clock `applied_at` is read from. */
   readonly now?: () => Date;
+  /**
+   * True when `db` is a file the caller built beside a store and swaps
+   * in only through the build-aside steps; the development-build
+   * question is then the caller's, and this open does not ask it.
+   */
+  readonly builtAside?: boolean;
 }
 
 /** What an open wrote. Both lists are empty when it wrote nothing. */
@@ -151,7 +165,7 @@ export function bringForward(
   const catalogue = sqliteCatalogue(migrations);
   const first = usablePlan(readStoreSchema(db, path), catalogue, access, caller);
   if (!hasWork(first)) return nothingWritten(db);
-  refuseUnownedDevelopmentWrite(path, writeNames(first), options);
+  if (options.builtAside !== true) refuseUnownedDevelopmentWrite(path, writeNames(first), options);
 
   const apply = db.transaction((): BroughtForward => {
     const store = readStoreSchema(db, path);

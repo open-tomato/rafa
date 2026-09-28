@@ -196,8 +196,9 @@
  *     which breaks only older writers, is read and refused a write.
  *
  * {@link migrateSchema} counts the history by position and keeps no
- * log. No open goes through it; `fix-schema.ts` builds its rebuild with
- * it, and the next open adopts that rebuild.
+ * log. No open and no command goes through it; `fix-schema.ts` builds
+ * its rebuild through `bringForward`, and tests plant pre-log stores
+ * with it.
  */
 import type { SqliteMigration } from './migrations.js';
 import type { StoreAccess } from './schema-plan.js';
@@ -349,9 +350,9 @@ function checkedVersion(db: Database, path: string, latest: number): number {
 }
 
 /**
- * The pre-log way of bringing a database forward, which no open takes:
- * `fix-schema.ts` builds its rebuild with it, and the rebuild carries no
- * migration log until an open adopts it.
+ * The pre-log way of bringing a database forward, which no open and no
+ * command takes: it writes no migration log, which is what lets a test
+ * plant a store as a release before the log left it.
  *
  * Brings a database's schema up to the last version a migrations array
  * holds: the store's own history unless another is passed, which is
