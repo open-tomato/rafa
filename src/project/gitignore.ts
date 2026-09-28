@@ -23,8 +23,8 @@
  *     set: `!/.rafa/`, `.rafa/*`, then `!.rafa/specs/` and
  *     `!.rafa/plans/` for the flags set, in that order.
  *   - `tracking.all`, whatever the other two say: `!/.rafa/`,
- *     `.rafa/triage/private/`, `.rafa/tracking.digest` and
- *     `.rafa/position.json`.
+ *     `.rafa/triage/private/`, `.rafa/tracking.digest`,
+ *     `.rafa/position.json` and `.rafa/cache/`.
  *
  * `.rafa/*` ignores every entry of `.rafa/` but not the directory
  * itself, so a `!` line after it re-includes one sub-path. The store
@@ -32,14 +32,18 @@
  * therefore stay ignored under either individual flag with no line of
  * their own, and the config file and `instincts/` with them.
  *
- * `tracking.all` keeps three paths ignored. The private triage directory
+ * `tracking.all` keeps four paths ignored. The private triage directory
  * holds security bugs, which the phase 1 plan keeps out of reach of
  * every tracking flag, and the notice does not name them. The digest
  * file is this checkout's record of the notice (below): tracked, it
  * would travel to a clone whose operator never read the notice and keep
  * it from printing there. The position file (`position.ts`) is this
  * checkout's place on the board for the same reason: tracked, one
- * operator's switch would move every clone that pulls it. A block
+ * operator's switch would move every clone that pulls it. The cache
+ * directory holds what rafa read from GitHub and from `ts-symbols` to
+ * spare the next command the reading (`src/board/board-cache.ts`,
+ * `src/refs/outline-cache.ts`): tracked, every read would be a diff, and
+ * a clone would start from another checkout's reading. A block
  * written before that line existed is rewritten with it on the next
  * {@link writeTrackingGitignore}, as any stale block is.
  *
@@ -136,6 +140,9 @@ const DIGEST_NAME = 'tracking.digest';
 /** The private triage directory inside the scope directory, as a `.gitignore` spells it. */
 const PRIVATE_TRIAGE = 'triage/private';
 
+/** The cache directory inside the scope directory, as a `.gitignore` spells it. */
+const CACHE_DIR = 'cache';
+
 /** The digest of the flags the notice last saw, relative to the project root. */
 export const TRACKING_DIGEST_FILE = join(SCOPE_DIR, DIGEST_NAME);
 
@@ -203,6 +210,7 @@ export function trackingEntry(flags: TrackingFlags): readonly string[] {
       `${SCOPE_DIR}/${PRIVATE_TRIAGE}/`,
       `${SCOPE_DIR}/${DIGEST_NAME}`,
       `${SCOPE_DIR}/${POSITION_FILE}`,
+      `${SCOPE_DIR}/${CACHE_DIR}/`,
     ];
   }
   const tracked = SUB_PATHS

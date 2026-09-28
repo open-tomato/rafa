@@ -70,7 +70,12 @@
  * In text mode, the head {@link epicHead} — `Epic #<n> · <title> ·
  * <state>, <done>/<total> done` — then the epic's disagreement line when
  * its stored state and computed one differ, indented, and then the
- * table, or `No issues.` when no line is left. Each failed reading of the
+ * table, or `No issues.` when no line is left. The table is spelled as
+ * `rafa roadmap` spells it: `--labels` prints each issue's labels on a
+ * row under it, `--texts` (`-t`) spells spec and blocked by in words,
+ * and `--refresh` reads the whole board rather than what changed since
+ * the listing kept under `.rafa/cache/` (`roadmapBoard`,
+ * `../issue/list.ts`). Each failed reading of the
  * rows and each label problem about this epic (`readEpicProblems`,
  * `src/board/epic-problems.ts`: its horizon, its checklist, its members
  * and a member carrying a second `epic:` label; an orphan label belongs
@@ -100,6 +105,7 @@ import type { RoadmapLine } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
+import type { TableStyle } from '../issue/roadmap-table.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
@@ -108,7 +114,6 @@ import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.
 import { epicLines, isNowEpic } from '../../board/epic-walk.js';
 import { readEpics } from '../../board/epics.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
-import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { claimsOf, onceSeams } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames, readCurrentPlace, readLineRows } from '../../board/roadmap-rows.js';
 import {
@@ -122,12 +127,16 @@ import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
+import { roadmapBoard } from '../issue/list.js';
 import { unknownLine } from '../issue/roadmap-epic-table.js';
 import { renderRoadmapTable } from '../issue/roadmap-table.js';
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt, readSwitch } from '../plan/plan-files.js';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa epics [<n>]';
+const USAGE = 'rafa epics [<n>] [--labels] [--texts] [--refresh]';
+
+/** What a switch typed with a value is told. */
+const SWITCH_HINT = `Type it bare: ${USAGE}`;
 
 /** An issue number as written: a whole number from 1, no leading zero. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
@@ -216,8 +225,8 @@ export function epicUnknownLine(number: number, reason: string): string {
   return `Epic #${String(number)} · unknown: ${reason}`;
 }
 
-/** The lines text mode writes for `result`, the table fitted to `width`; see the module note. */
-export function renderEpics(result: EpicsResult, width?: number): string[] {
+/** The lines text mode writes for `result`, the table fitted to `width` and spelled in `style`; see the module note. */
+export function renderEpics(result: EpicsResult, width?: number, style?: TableStyle): string[] {
   if (result.unknown !== null) {
     return [result.asked === null
       ? unknownLine(result.roadmap ?? 0, result.unknown)
@@ -229,7 +238,7 @@ export function renderEpics(result: EpicsResult, width?: number): string[] {
     : [`  ${result.epic.disagreement}`];
   const table = result.rows.length === 0
     ? ['No issues.']
-    : renderRoadmapTable(result.rows, width);
+    : renderRoadmapTable(result.rows, width, style);
   return [epicHead(result.epic), ...disagreement, ...table];
 }
 
@@ -293,12 +302,13 @@ function placeEpic(board: ChosenBoard | null, listing: readonly BoardIssue[], ep
 /** The seams the rows and the claims read through, each asked once; see the module note. */
 function rowSeams(context: RafaContext, seams: IssueSeams, config: RafaConfig, gh: GhRunner): LineRowsOptions {
   const { root } = issueProject(context);
+  const board = roadmapBoard(seams, gh, root, readSwitch('refresh', context.flags['refresh'], SWITCH_HINT));
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
-    { root, specsDir: config.specsDir, gh, env: context.env, issues },
+    { root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
   ));
   return onceSeams({
-    board: createGhBoardListing({ gh }),
+    board,
     git: seams.git ?? createGitRunner(root),
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: (seams.planNames ?? createPlanDirNames)(plansDirAt(root, config.planDir).path),
@@ -367,7 +377,11 @@ export async function runEpics(context: RafaContext, seams: IssueSeams): Promise
     return;
   }
   const width = (seams.terminalWidth ?? ((): number | undefined => process.stdout.columns))();
-  for (const text of renderEpics(result, width)) context.output.info(text);
+  const style: TableStyle = {
+    labels: readSwitch('labels', context.flags['labels'], SWITCH_HINT),
+    texts: readSwitch('texts', context.flags['texts'], SWITCH_HINT),
+  };
+  for (const text of renderEpics(result, width, style)) context.output.info(text);
 }
 
 /** The command, reading the board with `seams`; see the module note. */
@@ -397,7 +411,24 @@ export function createEpicShowCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): 
         required: false,
       },
     ],
-    flags: [],
+    flags: [
+      {
+        name: 'labels',
+        description: 'Print each issue\'s labels on a row of their own under it; they are no column.',
+        type: 'boolean',
+      },
+      {
+        name: 'texts',
+        description: 'Spell the spec and blocked by columns in words instead of symbols, with no legend.',
+        type: 'boolean',
+        aliases: ['t'],
+      },
+      {
+        name: 'refresh',
+        description: 'Read the whole board again instead of only what changed since the listing kept under .rafa/cache/.',
+        type: 'boolean',
+      },
+    ],
     examples: [
       {
         cmd: 'rafa epic show',

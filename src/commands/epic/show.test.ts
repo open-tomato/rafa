@@ -431,7 +431,8 @@ describe('rafa epics, dispatched', () => {
   it('is epic show, aliased epic for good, declaring no spends, one optional argument and no flag', () => {
     const command = createEpicShowCommand();
 
-    expect([command.subject, command.action, command.spends, command.flags]).toEqual(['epic', 'show', undefined, []]);
+    expect([command.subject, command.action, command.spends, command.flags.map((flag) => flag.name)])
+      .toEqual(['epic', 'show', undefined, ['labels', 'texts', 'refresh']]);
     expect([command.aliases, command.lastingAliases]).toEqual([['epic'], ['epic']]);
     expect(command.args.map((arg) => [arg.name, arg.required])).toEqual([['n', false]]);
   });

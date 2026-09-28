@@ -1200,9 +1200,27 @@ New; it replaces no earlier text. What a row or an action added to
   <heading>, …`, `outline` (fewer than three template headings, no
   label), or a disagreement with the label, `label: ready, gate: gaps`
   or `label: none, gate: ready` — and is read for every row whatever its
-  type, not only `type:spec`. `blocked by` is each blocker as `#<n>
-  open`, `#<n> closed`, `#<n> unknown` (not on the board listing), or
-  `owner/repo#<n> unknown` for one on another repository, else blank.
+  type, not only `type:spec`. It prints as a symbol and, under
+  `--texts` (`-t`), in words written for a reader who has never met the
+  readiness gate, naming the stages a spec moves through: `📝` outline
+  only, `🚧` needs refinement, `👀` refined, waiting for approval, `🚀`
+  ready to dev, and `🟠` approved, needs refinement where label and body
+  disagree — "refined" being a body the gate finds nothing missing in and
+  "approved" the `spec:ready` label, and the legend printing them in that
+  order. A green check is left out because it reads as done. `--texts`
+  names the sections that need work after `needs refinement:`; #318
+  specifies reading unchecked boxes and taking the words from config.
+  `blocked by` groups the blockers by state, what still blocks first —
+  `🔴 #20 ❔ o/r#3 🟢 #21`, or `open #20 · unknown o/r#3 · closed #21`
+  under `--texts` — `unknown` for one not on the board listing or on
+  another repository. The legend under the table has one line per
+  column that printed a symbol, headed
+  `spec:` or `blocked by:`, naming each symbol printed (`🔴` still open,
+  `🟢` closed, `❔` state unknown for blockers), and none under
+  `--texts`. Width is counted in terminal cells (`Bun.stringWidth`), so
+  a symbol's two cells keep the columns aligned, and only `title` is
+  cut. Labels are no column: `--labels` prints each issue's labels on a
+  row of their own under it, led by `└→` and indented under `state`.
   `has` is every one of `plan`, `branch` and `pr #<n>` that exists,
   joined with `, `. `refs` is how many references of the issue's saved
   copies under `specs.dir` read `suspect` or `dangling`, `0` for a clean
@@ -1210,7 +1228,22 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa issue check <n>`), and `-` with no copy; it is `rafa doctor`'s
   references reading (`readDoctorRefs`, `src/commands/doctor-refs.ts`)
   narrowed to the selected lines' issues, reads a same-repository issue
-  through the same `gh` runner, and writes nothing. One `gh` read of the board and one of the Roadmap
+  through the same `gh` runner, and writes nothing. A same-repository
+  issue the board listing holds is answered from the listing already
+  read (`listedIssueReader`), and a `ts-symbols` outline is kept by the
+  outlined file's content under `.rafa/cache/outline/v1/`
+  (`src/refs/outline-cache.ts`), so a second run outlines nothing that
+  has not changed. In text mode over a Roadmap naming an epic the column
+  is not read at all (`refsWhen: 'plain'` in `src/board/roadmap-rows.ts`),
+  since nothing printed there shows it; json mode still reads it. The
+  board listing is kept under `.rafa/cache/board.json`
+  (`src/board/board-cache.ts`): a first read takes a watermark (the
+  newest `updated_at` on the repository) and then the full listing, and
+  every later read sends one `gh api --paginate` for the issues changed
+  since, laying them over the kept rows; `--refresh` reads the whole
+  board again, the only way to drop a deleted or transferred issue. A
+  case planting `gh` reads uncached unless it sets
+  `IssueSeams.boardCache`. One `gh` read of the board and one of the Roadmap
   body itself: when the board is unreachable, a `warn:` line is printed
   on stdout ahead of the rows in text mode, then the `Roadmap #<n> ·
   epics unknown: <reason>` line and the rows under `Specs`, read from the
@@ -1241,11 +1274,14 @@ New; it replaces no earlier text. What a row or an action added to
   the spec lines over the same one listing, so the command still spends
   one board read. Epic rows print grouped by horizon under `Roadmap #<n>
   · <horizon>` with the columns `#`, `state`, `done/total`, `blocked`,
-  `title` and `date`, the `now` horizon only; `--all` widens to every
+  `date` and `title`, the `now` horizon only; `--all` widens to every
   horizon as it widens to the ticked lines, and without it a line counts
-  the epics a horizon hides. The spec rows follow under `Specs` as
-  today's table, and the `Roadmap: #<n>` head is dropped since each
-  group names the Roadmap. `--type`, `--module`, `--search` and
+  the epics a horizon hides. A Roadmap is a list of epics, so no issue
+  row prints beside them: lines naming no epic are counted on one line,
+  `Roadmap #<n> · <k> lines name no epic: #13 #14; --full lists them`,
+  the first eight named, and `--full` lists them as the issue table
+  under `Roadmap #<n> · no epic`. The `Roadmap: #<n>` head is dropped
+  since each group names the Roadmap. `--type`, `--module`, `--search` and
   `--limit` narrow the spec rows only; an epic row is chosen by horizon
   alone. Each label problem `readEpicProblems` finds is a `warn` line
   (a `warn` log event in json mode), and the json result gains an
@@ -1255,13 +1291,16 @@ New; it replaces no earlier text. What a row or an action added to
   epics `unknown` instead, since no line could be told an epic.
   `--full` (refused without `--roadmap`, as `--all` is) prints each
   shown epic's members under its row, after its disagreement line and
-  indented under the `state` column, two rows each: `#<n>`, the state
-  (`open`, `closed`, or `not-planned` for one closed as not planned) and
-  the title; then `labels: <labels>` and `blocked by: <#n, …>` from a
-  `Blocked by:` line that reads `blocked`, `-` for either with nothing.
+  indented under the `state` column: `#<n>`, the state (`open`,
+  `closed`, or `not-planned` for one closed as not planned) and the
+  title; then, only for an open member with blockers or under
+  `--labels`, a row led by `└→` holding its blockers from a `Blocked
+  by:` line that reads `blocked`, grouped by their state on the listing
+  as the issue table groups them, and under `--labels` its labels after
+  them. A closed member's blockers are history and are not printed.
   Members come in the epic's checklist order, then the rest by number;
-  a member's title, then its labels, are cut toward their floors on a
-  narrow terminal. It is the one listing that mixes two epics' issues,
+  a member's title, then its second row, are cut toward their floors on
+  a narrow terminal. It is the one listing that mixes two epics' issues,
   it changes text mode only (json's `epics` already carry every
   member), and a Roadmap naming no epic prints today's bytes with it.
   `--check` (refused without `--roadmap`, as `--all` is) prints what
@@ -1280,11 +1319,15 @@ New; it replaces no earlier text. What a row or an action added to
   the `epic` subject was declared, and the registry refuses a top-level
   command spelled as a subject's plural; its lasting alias `epic`, typed
   by the subject or its plural, keeps `rafa epics` and `rafa epics <n>`
-  printing what they printed before, byte for byte in text mode
-  (`src/tests/epic-show-cli.test.ts` compares both against captures the
-  top-level command wrote at `b32ebb4`, kept in
-  `src/tests/fixtures/epics-pre-move.json`; never re-record them, since
-  that command is gone). Its refusals still name `rafa epics [<n>]`. In
+  printing what they printed before (`src/tests/epic-show-cli.test.ts`
+  compares both against captures the top-level command wrote at
+  `b32ebb4`, kept in `src/tests/fixtures/epics-pre-move.json`; never
+  re-record them, since that command is gone). Since the table's own
+  spelling changed after the move — the labels column left for
+  `--labels`, spec and blocked by became symbols — the comparison holds
+  the exit code, stderr and every line above the table byte for byte,
+  and the rows by issue number and title. `--labels`, `--texts` and
+  `--refresh` mean here what they mean on the Roadmap. Its refusals still name `rafa epics [<n>]`. In
   json mode the start event names `epic show`, as it names every
   command by its canonical spelling, and `rafa epics --help` is now the
   `epic` subject's roster. The epic is the `type:epic` issue numbered

@@ -49,13 +49,19 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
       + ' (the current place\'s board, the one `rafa switch` moved to; with no position file `roadmap.issue`,'
       + ' else the lowest-numbered open type:roadmap board, else the open issue titled Roadmap) in its order,'
       + ' read off the GitHub board, as a'
-      + ' table with four columns the plain list has not got: spec, whether the body passes the readiness'
-      + ' gate; blocked by, each blocker and whether it is open; has, a plan, a branch or a pull request'
-      + ' already made for it; and refs, how many references of the issue\'s saved copy under `specs.dir` read'
-      + ' suspect or dangling, `-` with no copy. A line naming an epic prints as an epic row instead, grouped'
-      + ' by horizon under a `Roadmap #<n> · <horizon>` heading with the columns #, state, done/total, blocked,'
-      + ' title and date, and the spec rows follow under Specs. `--full` prints each epic\'s issues under its'
-      + ' row, on two rows each: number, state and title, then labels and blockers. `--check` exits 1 when any'
+      + ' table with four columns the plain list has not got: spec, whether the issue can be planned (every'
+      + ' section of the spec template filled, and the spec:ready label on it), as a symbol; blocked by, the'
+      + ' blockers grouped by whether they are still open; has, a plan, a branch'
+      + ' or a pull request already made for it; and refs, how many references of the issue\'s saved copy under'
+      + ' `specs.dir` read suspect or dangling, `-` with no copy. A legend under the table names each symbol'
+      + ' in plain words, one line per column,'
+      + ' and `--texts` (`-t`) spells both columns in words instead. Labels are no column: `--labels` prints'
+      + ' them on a row under each issue. A Roadmap naming epics prints them alone, grouped by horizon under a'
+      + ' `Roadmap #<n> · <horizon>` heading with the columns #, state, done/total, blocked, date and title,'
+      + ' and one line counts the lines naming no epic. `--full` prints each epic\'s issues under its row, a'
+      + ' second row led by └→ for a member\'s blockers, and the lines naming no epic as the issue table. The'
+      + ' board listing is kept under .rafa/cache/ and read for what changed since; `--refresh` reads the whole'
+      + ' board again. `--check` exits 1 when any'
       + ' type:epic issue\'s stored state disagrees with its computed one, or the board could not be read, so CI'
       + ' can run it. `--all` keeps the ticked lines and shows the'
       + ' epics of every horizon, not only now, and `--type`, `--module`, `--search` and `--limit` narrow the'
@@ -76,6 +82,14 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
       {
         cmd: 'rafa roadmap --full',
         note: 'Prints the now epics with each epic\'s issues underneath, then the spec lines.',
+      },
+      {
+        cmd: 'rafa roadmap --labels --texts',
+        note: 'Prints each line\'s labels on a row under it, and the spec and blocked by columns in words.',
+      },
+      {
+        cmd: 'rafa roadmap --refresh',
+        note: 'Reads the whole board again instead of only what changed since the kept listing.',
       },
       {
         cmd: 'rafa roadmap --check',

@@ -32,6 +32,23 @@
  * one `gh issue view` between them. Same-repository issues go through
  * the `gh` runner `doctor` opened for the board.
  *
+ * A caller that has read the board listing already hands it in as
+ * {@link DoctorRefsInput.listing}, and a same-repository issue the listing
+ * holds is answered from it: title, body and state are the fields a
+ * `gh issue view` read would answer, and the listing carries all three
+ * for every issue. Measured on 2026-09-28, `rafa roadmap` spent eight
+ * sequential `gh issue view` reads, about 5 s, on issues its own listing
+ * had just read. An issue the listing does not hold — a pull request, one
+ * past its limit, another repository's — is read with `gh` as before,
+ * and so is every issue when the listing itself fails.
+ *
+ * ## Outlines are kept
+ *
+ * The default verifier outlines through `withOutlineCache`
+ * (`../refs/outline-cache.ts`), so a file whose content has not changed
+ * since an earlier check answers its outline without starting
+ * `ts-symbols` again.
+ *
  * ## An unreadable board is `unknown`
  *
  * A board issue `gh` could not read rejects `plan create`'s check 4,
@@ -62,6 +79,7 @@
  * folds the copies into one cell per issue.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { RefsCell } from '../board/roadmap-rows.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
@@ -73,6 +91,7 @@ import { ID_PREFIX, notesFileName, SPEC_EXTENSION } from '../board/naming.js';
 import { memoiseVerifier } from '../board/refs-gate.js';
 import { messageOf } from '../config-sections.js';
 import { createGitRunner } from '../pr/git.js';
+import { withOutlineCache } from '../refs/outline-cache.js';
 import { readRefsText } from '../refs/reading.js';
 import { UNREADABLE } from '../refs/stamp.js';
 import { createRefVerifier, ghIssueReader, RefVerifyError, tsSymbolsOutliner } from '../refs/verify.js';
@@ -112,6 +131,8 @@ export interface DoctorRefsInput {
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Read only the copies of these issues; every copy when left out. */
   readonly issues?: readonly number[];
+  /** The board listing the caller read already; a board issue it holds is answered from it. See the module note. */
+  readonly listing?: BoardListing;
 }
 
 /** One saved copy's counts. */
@@ -188,12 +209,38 @@ export function memoiseIssueReader(issues: IssueReader): IssueReader {
   };
 }
 
+/**
+ * `fallback` with every same-repository issue `listing` holds answered
+ * from it; any other issue, and every issue when the listing fails, read
+ * with `fallback`. See the module note.
+ */
+export function listedIssueReader(listing: BoardListing, fallback: IssueReader): IssueReader {
+  let indexed: Promise<ReadonlyMap<number, BoardIssue> | null> | null = null;
+  const index = async (): Promise<ReadonlyMap<number, BoardIssue> | null> => {
+    try {
+      return new Map((await listing()).map((issue) => [issue.number, issue]));
+    } catch {
+      return null;
+    }
+  };
+  return async (number, repo) => {
+    if (repo !== undefined) return fallback(number, repo);
+    indexed ??= index();
+    const issue = (await indexed)?.get(number);
+    if (issue === undefined) return fallback(number, repo);
+    const state = issue.state === 'OPEN'
+      ? 'open'
+      : 'closed';
+    return { kind: 'found', title: issue.title, body: issue.body, state };
+  };
+}
+
 /** The verifier the row reads with by default; see {@link DoctorRefsSeams.refsVerifier}. */
 async function defaultVerifier(input: DoctorRefsInput, issues: IssueReader): Promise<RefVerifier> {
   return createRefVerifier({
     issues,
     git: createGitRunner(input.root),
-    outline: tsSymbolsOutliner({ cwd: input.root, env: input.env }),
+    outline: withOutlineCache(tsSymbolsOutliner({ cwd: input.root, env: input.env }), input.root),
     roster: await coreRoster(),
   });
 }
@@ -257,9 +304,12 @@ export async function readDoctorRefs(input: DoctorRefsInput, seams: DoctorRefsSe
     return { ok: false, detail: messageOf(error) };
   }
 
-  const issues = memoiseIssueReader(input.gh === null
+  const board = input.gh === null
     ? noBoardReader()
-    : ghIssueReader(input.gh));
+    : ghIssueReader(input.gh);
+  const issues = memoiseIssueReader(input.listing === undefined
+    ? board
+    : listedIssueReader(input.listing, board));
   const make = seams.refsVerifier ?? ((root: string, reader: IssueReader) => defaultVerifier({ ...input, root }, reader));
   let made: Promise<RefVerifier> | null = null;
   const verify = async (): Promise<RefVerifier> => {

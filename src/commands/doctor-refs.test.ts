@@ -39,6 +39,7 @@ import { createRefVerifier } from '../refs/verify.js';
 
 import {
   issueCheckCommand,
+  listedIssueReader,
   memoiseIssueReader,
   NO_BOARD_DETAIL,
   readDoctorRefs,
@@ -338,5 +339,51 @@ describe('the no-board detail', () => {
     await readDoctorRefs({ root, specsDir: SPECS, gh: null }, seams);
 
     expect(seen).toEqual([[root, { kind: 'failed', detail: NO_BOARD_DETAIL }]]);
+  });
+});
+
+describe('listedIssueReader', () => {
+  const listed = [
+    Object.freeze({
+      number: 7, title: 'a spec', body: '## What you get', state: 'OPEN' as const, stateReason: null,
+      labels: Object.freeze([]), type: 'spec' as const, module: 'unassigned',
+    }),
+    Object.freeze({
+      number: 8, title: 'done', body: 'body', state: 'CLOSED' as const, stateReason: 'COMPLETED',
+      labels: Object.freeze([]), type: 'code' as const, module: 'unassigned',
+    }),
+  ];
+  /** A fallback reader recording what it was asked. */
+  function fallback(asked: string[]): (number: number, repo?: string) => Promise<{ kind: 'missing' }> {
+    return (number, repo) => {
+      asked.push(`${repo ?? ''}#${String(number)}`);
+      return Promise.resolve({ kind: 'missing' });
+    };
+  }
+
+  it('answers a board issue the listing holds with its title, body and state, asking nothing else', async () => {
+    const asked: string[] = [];
+    const read = listedIssueReader(() => Promise.resolve(listed), fallback(asked));
+
+    expect(await read(7)).toEqual({ kind: 'found', title: 'a spec', body: '## What you get', state: 'open' });
+    expect(await read(8)).toEqual({ kind: 'found', title: 'done', body: 'body', state: 'closed' });
+    expect(asked).toEqual([]);
+  });
+
+  it('reads with the fallback an issue the listing does not hold, and every other repository\'s', async () => {
+    const asked: string[] = [];
+    const read = listedIssueReader(() => Promise.resolve(listed), fallback(asked));
+    await read(9);
+    await read(7, 'owner/other');
+
+    expect(asked).toEqual(['#9', 'owner/other#7']);
+  });
+
+  it('reads every issue with the fallback when the listing fails', async () => {
+    const asked: string[] = [];
+    const read = listedIssueReader(() => Promise.reject(new Error('offline')), fallback(asked));
+    await read(7);
+
+    expect(asked).toEqual(['#7']);
   });
 });

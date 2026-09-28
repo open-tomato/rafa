@@ -338,6 +338,38 @@ describe('the rows over lines handed in', () => {
   });
 });
 
+describe('when the refs column is read', () => {
+  const lines = [
+    { issue: 16, ticked: false, why: 'a spec', lineNumber: 3 },
+    { issue: 50, ticked: false, why: 'an epic', lineNumber: 4 },
+  ];
+  const epicBoard: readonly BoardIssue[] = [...BOARD, issue(50, { labels: ['type:epic', 'epic:x', 'horizon:now'], type: 'epic' })];
+  const withEpic = { board: (): Promise<readonly BoardIssue[]> => Promise.resolve(epicBoard) };
+
+  it('reads it for every selected line when refsWhen is left out, an epic line among them', async () => {
+    const { options, counts } = planted(withEpic);
+    await readLineRows(lines, options);
+
+    expect(counts.refs).toEqual([[16, 50]]);
+  });
+
+  it('reads nothing with refsWhen plain when a line names an epic, and warns nothing about it', async () => {
+    const { options, counts } = planted({ ...withEpic, refsWhen: 'plain' });
+    const read = await readLineRows(lines, options);
+
+    expect(counts.refs).toEqual([]);
+    expect(read.rows.map((row) => row.refs)).toEqual([null, null]);
+    expect(read.warnings).toEqual([]);
+  });
+
+  it('reads it with refsWhen plain when no line names an epic, as before', async () => {
+    const { options, counts } = planted({ refsWhen: 'plain' });
+    await readLineRows([lines[0] ?? { issue: 16, ticked: false, why: '', lineNumber: 3 }], options);
+
+    expect(counts.refs).toEqual([[16]]);
+  });
+});
+
 describe('the board unreachable', () => {
   it('warns once, keeps the order, empties spec and blocked by, and asks no pull request', async () => {
     const { options, counts } = planted({

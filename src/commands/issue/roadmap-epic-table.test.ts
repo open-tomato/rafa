@@ -1,15 +1,17 @@
 /**
  * Tests for the epic table (`src/commands/issue/roadmap-epic-table.ts`):
  * the spec's sample row, the six columns in order, the horizon headings,
- * the disagreement line under its row, the `Specs` group, the failed
- * listing's `unknown` line, the hidden-horizon line, a reading with no
- * epic line printing today's table unchanged, and each epic's members
- * on two rows under `full`.
+ * the disagreement line under its row, the one line naming the lines
+ * that name no epic, the failed listing's `unknown` line and `Specs`
+ * table, the hidden-horizon line, a reading with no epic line printing
+ * the issue table, and each epic's members under `full`, a second row
+ * only for a member with blockers or, under `--labels`, labels.
  *
  * Every epic is computed by the model's own `readEpics` over a planted
  * listing, so the cells are read with the states and progress the model
  * answers and never a copy of them.
  */
+import type { TableStyle } from './roadmap-table.js';
 import type { Epic } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup, EpicRow, Horizon, RoadmapEpicRows } from '../../board/roadmap-epic-rows.js';
@@ -23,6 +25,9 @@ import {
   EPIC_COLUMNS,
   epicCells,
   hiddenLine,
+  LOOSE_NAMED,
+  looseHeading,
+  looseLine,
   memberLines,
   memberState,
   orderedMembers,
@@ -30,16 +35,19 @@ import {
   SPECS_HEADING,
   unknownLine,
 } from './roadmap-epic-table.js';
-import { LABELS_FLOOR, renderRoadmapTable, TITLE_FLOOR } from './roadmap-table.js';
+import { LABELS_FLOOR, LABELS_LEAD, renderRoadmapTable, TITLE_FLOOR, widthOf } from './roadmap-table.js';
+
+/** Symbols, with a labels row under each member. */
+const LABELLED: TableStyle = { labels: true, texts: false };
 
 const ROADMAP = 31;
 const TODAY = new Date(2026, 8, 27);
 
-/** The spec's sample, as `.rafa/specs/rafa-244-epics-group-issues-features.md` draws it. */
+/** The spec's sample (`.rafa/specs/rafa-244-epics-group-issues-features.md`), `date` moved before `title`. */
 const SAMPLE = [
   'Roadmap #31 · now',
-  '   #  state        done/total  blocked  title                  date',
-  '#252  in-progress  3/7         -        Epics and boards       -',
+  '   #  state        done/total  blocked  date  title',
+  '#252  in-progress  3/7         -        -     Epics and boards',
 ];
 
 /** One issue on the planted listing. */
@@ -118,6 +126,7 @@ function reading(
     unknown: null,
     problems: [],
     warnings: [],
+    states: new Map(),
     ...fields,
   };
 }
@@ -132,28 +141,16 @@ describe('the spec sample', () => {
     expect(SAMPLE_EPIC.progress).toMatchObject({ done: 3, total: 7 });
   });
 
-  it('prints the heading and header, and the row byte for byte up to its title', () => {
+  it('prints the heading, the header and the row byte for byte, the title last', () => {
     const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(SAMPLE_EPIC)] }]));
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe(SAMPLE[0] ?? '');
-    const titleAt = (SAMPLE[1] ?? '').indexOf('title');
-    expect(lines[1]?.slice(0, titleAt)).toBe(SAMPLE[1]?.slice(0, titleAt));
-    expect(lines[2]?.slice(0, titleAt)).toBe(SAMPLE[2]?.slice(0, titleAt));
-  });
-
-  it('prints the sample title and date cells, the title padded to its widest cell', () => {
-    // Control: the sample pads title to 21 columns; the renderer pads to the widest cell, 16.
-    const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(SAMPLE_EPIC)] }]));
-    expect(lines[1]?.endsWith('title             date')).toBe(true);
-    expect(lines[2]?.endsWith('Epics and boards  -')).toBe(true);
-    expect(lines[2]).not.toBe(SAMPLE[2]);
+    expect(lines).toEqual(SAMPLE);
   });
 });
 
 describe('the columns', () => {
   it('heads each group with the six columns, in order', () => {
     const [, head] = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(SAMPLE_EPIC)] }]));
-    expect(EPIC_COLUMNS).toEqual(['#', 'state', 'done/total', 'blocked', 'title', 'date']);
+    expect(EPIC_COLUMNS).toEqual(['#', 'state', 'done/total', 'blocked', 'date', 'title']);
     expect(head?.trim().split(/\s{2,}/)).toEqual([...EPIC_COLUMNS]);
   });
 
@@ -167,24 +164,24 @@ describe('the columns', () => {
     ]);
     const alpha = epicAt(epics, 10);
     expect(alpha.late).toBe(true);
-    expect(epicCells(epicRow(alpha))).toEqual(['#10', 'backlog', '0/1', '#20', 'Alpha', '2026-01-02 late']);
+    expect(epicCells(epicRow(alpha))).toEqual(['#10', 'backlog', '0/1', '#20', '2026-01-02 late', 'Alpha']);
   });
 
   it('prints an empty epic as empty with 0/0, never done', () => {
     const empty = epicAt(epicsOf([epicIssue(40, 'none', 'Nothing yet')]), 40);
-    expect(epicCells(epicRow(empty))).toEqual(['#40', 'empty', '0/0', '-', 'Nothing yet', '-']);
+    expect(epicCells(epicRow(empty))).toEqual(['#40', 'empty', '0/0', '-', '-', 'Nothing yet']);
   });
 
   it('falls back to the roadmap line for an epic with no title', () => {
     const untitled = { ...SAMPLE_EPIC, title: '' };
-    expect(epicCells(epicRow(untitled, 'now', 'the line'))[4]).toBe('the line');
+    expect(epicCells(epicRow(untitled, 'now', 'the line'))[5]).toBe('the line');
   });
 
   it('cuts the title to fit a terminal, never below its floor', () => {
     const long = { ...SAMPLE_EPIC, title: 'A title long enough to push the table past forty columns wide' };
     const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(long)] }]), 70);
     expect(lines[2]).toContain('…');
-    expect([...(lines[1] ?? '')].length).toBe(70);
+    expect(widthOf(lines[2] ?? '')).toBe(70);
     expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(long)] }]))[2]).toContain(long.title);
     const floored = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(long)] }]), 30)[2] ?? '';
     expect(floored.slice(floored.indexOf('A title')).split('  ')[0]).toHaveLength(TITLE_FLOOR);
@@ -218,17 +215,29 @@ describe('the groups', () => {
     expect(lines[3]).toBe('');
   });
 
-  it('prints the spec rows as today\'s table under the Specs heading', () => {
+  it('names the lines that name no epic on one line, and prints no issue row beside the epics', () => {
     const specs = [specRow(50, 'a spec')];
     const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(SAMPLE_EPIC)] }], specs));
-    expect(lines.slice(3)).toEqual(['', SPECS_HEADING, ...renderRoadmapTable(specs)]);
+    expect(lines.slice(3)).toEqual(['', looseLine(ROADMAP, specs)]);
+    expect(looseLine(ROADMAP, specs)).toBe('Roadmap #31 · 1 line names no epic: #50; --full lists them');
+  });
+
+  it('names the first few of many lines that name no epic and counts the rest', () => {
+    const specs = Array.from({ length: LOOSE_NAMED + 3 }, (_, index) => specRow(50 + index, 'a spec'));
+    expect(looseLine(ROADMAP, specs)).toBe('Roadmap #31 · 11 lines name no epic: #50 #51 #52 #53 #54 #55 #56 #57 and 3 more; --full lists them');
+  });
+
+  it('lists the lines that name no epic as the issue table under their heading with --full', () => {
+    const specs = [specRow(50, 'a spec')];
+    const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(SAMPLE_EPIC)] }], specs), undefined, true);
+    expect(lines.slice(-(renderRoadmapTable(specs).length + 1))).toEqual([looseHeading(ROADMAP), ...renderRoadmapTable(specs)]);
   });
 
   it('prints the hidden line when every epic sits under a horizon not shown', () => {
     const lines = renderEpicTable(reading([], [specRow(50, 'a spec')], { hidden: 2 }));
     expect(lines[0]).toBe(hiddenLine(ROADMAP, 2));
     expect(hiddenLine(ROADMAP, 1)).toContain('1 epic not in now');
-    expect(lines[2]).toBe(SPECS_HEADING);
+    expect(lines[2]).toBe(looseLine(ROADMAP, [specRow(50, 'a spec')]));
   });
 
   it('prints unknown with the reason when the listing failed, the lines kept as specs', () => {
@@ -274,37 +283,64 @@ describe('each epic\'s members under --full', () => {
     expect(orderedMembers(FULL_EPIC).map(memberState)).toEqual(['open', 'open', 'not-planned', 'closed']);
   });
 
-  it('prints two rows per member: number, state and title, then labels and blockers', () => {
+  it('prints one row per member, and a second, led by └→, only for a member with blockers', () => {
     expect(memberLines(FULL_EPIC, 5)).toEqual([
       '     #84  open         First',
-      '          labels: epic:full  blocked by: -',
       '     #82  open         Second',
-      '          labels: epic:full, type:spec  blocked by: #81, #84',
+      `          ${LABELS_LEAD}❔ #81 #84`,
       '     #81  not-planned  Dropped',
-      '          labels: epic:full  blocked by: -',
       '     #83  closed       Done',
-      '          labels: epic:full  blocked by: -',
+    ]);
+  });
+
+  it('prints no blocker row under a closed member: its blockers are history', () => {
+    const closed = epicAt(epicsOf([
+      epicIssue(90, 'history', 'History'),
+      issue(91, { labels: ['epic:history'], state: 'CLOSED', stateReason: 'COMPLETED', body: 'Blocked by: #92' }),
+      issue(92, { labels: ['epic:history'], body: 'Blocked by: #91' }),
+    ]), 90);
+    expect(memberLines(closed, 5)).toEqual([
+      '     #91  closed  Issue 91',
+      '     #92  open    Issue 92',
+      `          ${LABELS_LEAD}❔ #91`,
+    ]);
+    expect(memberLines(closed, 5, undefined, LABELLED)[1]).toBe(`          ${LABELS_LEAD}epic:history`);
+  });
+
+  it('groups a member\'s blockers by their state on the listing, what still blocks first', () => {
+    const states = new Map([[81, 'CLOSED' as const], [84, 'OPEN' as const]]);
+    expect(memberLines(FULL_EPIC, 5, undefined, undefined, states)[2]).toBe(`          ${LABELS_LEAD}🔴 #84 🟢 #81`);
+    expect(memberLines(FULL_EPIC, 5, undefined, { labels: false, texts: true }, states)[2])
+      .toBe(`          ${LABELS_LEAD}open #84 · closed #81`);
+  });
+
+  it('adds each member\'s labels to its second row under --labels', () => {
+    const states = new Map([[81, 'CLOSED' as const], [84, 'OPEN' as const]]);
+    expect(memberLines(FULL_EPIC, 5, undefined, LABELLED, states).slice(0, 4)).toEqual([
+      '     #84  open         First',
+      `          ${LABELS_LEAD}epic:full`,
+      '     #82  open         Second',
+      `          ${LABELS_LEAD}🔴 #84 🟢 #81 · epic:full, type:spec`,
     ]);
   });
 
   it('prints the members under their row, after the disagreement line, the number under the state column', () => {
     const done = epicAt(epicsOf([epicIssue(252, 'epics', 'Epics and boards'), ...members(300, 'epics', 1, 1)]), 252);
     const lines = renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(done), epicRow(SAMPLE_EPIC)] }]), undefined, true);
-    expect(lines.slice(2, 6)).toEqual([
-      '#252  done         1/1         -        Epics and boards  -',
+    expect(lines.slice(2, 5)).toEqual([
+      '#252  done         1/1         -        -     Epics and boards',
       '      done, but epic #252 is still open',
       '      #300  closed  Issue 300',
-      '            labels: epic:epics  blocked by: -',
     ]);
     expect(lines[4]?.indexOf('#300')).toBe(lines[1]?.indexOf('state'));
-    expect(lines).toHaveLength(3 + 3 + 1 + 7 * 2);
+    expect(lines).toHaveLength(2 + 3 + 1 + 7);
   });
 
   it('adds no line for an epic with no members, and none at all without full', () => {
     const empty = epicAt(epicsOf([epicIssue(40, 'none', 'Nothing yet')]), 40);
     expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(empty)] }]), undefined, true)).toHaveLength(3);
     expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(FULL_EPIC)] }]))).toHaveLength(3);
-    expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(FULL_EPIC)] }]), undefined, true)).toHaveLength(11);
+    expect(renderEpicTable(reading([{ horizon: 'now', rows: [epicRow(FULL_EPIC)] }]), undefined, true)).toHaveLength(8);
   });
 
   it('prints today\'s table alone under full when the Roadmap names no epic', () => {
@@ -320,14 +356,15 @@ describe('each epic\'s members under --full', () => {
         labels: ['epic:long', 'type:spec', 'module:board', 'priority:high'],
       }),
     ]), 90);
-    const [title = '', labels = ''] = memberLines(long, 5, 50);
-    expect([...title].length).toBe(50);
+    const [title = '', labels = ''] = memberLines(long, 5, 50, LABELLED);
+    expect(widthOf(title)).toBe(50);
     expect(title.endsWith('…')).toBe(true);
-    expect([...labels].length).toBe(50);
-    expect(labels.endsWith('  blocked by: -')).toBe(true);
-    const [floorTitle = '', floorLabels = ''] = memberLines(long, 5, 10);
+    expect(widthOf(labels)).toBe(50);
+    expect(labels.endsWith('…')).toBe(true);
+    const [floorTitle = '', floorLabels = ''] = memberLines(long, 5, 10, LABELLED);
     expect(floorTitle.slice(floorTitle.indexOf('A member'))).toHaveLength(TITLE_FLOOR);
-    expect(floorLabels.slice(floorLabels.indexOf('epic:'), floorLabels.indexOf('  blocked'))).toHaveLength(LABELS_FLOOR);
+    expect(widthOf(floorLabels.slice(floorLabels.indexOf('epic:')))).toBe(LABELS_FLOOR);
     expect(memberLines(long, 5)[0]).toContain(long.members[0]?.title ?? '');
+    expect(memberLines(long, 5)).toHaveLength(1);
   });
 });

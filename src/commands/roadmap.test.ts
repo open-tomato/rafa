@@ -140,7 +140,8 @@ function startCommand(event: ReturnType<typeof eventsOf>[number]): string | null
 
 describe('the flags rafa roadmap declares', () => {
   it('are issue list\'s own flag objects, in their order, less --roadmap and --state', () => {
-    expect(ROADMAP_FLAGS.map((flag) => flag.name)).toEqual(['all', 'full', 'check', 'type', 'module', 'search', 'limit']);
+    expect(ROADMAP_FLAGS.map((flag) => flag.name))
+      .toEqual(['all', 'full', 'check', 'labels', 'texts', 'refresh', 'type', 'module', 'search', 'limit']);
     expect(ROADMAP_FLAGS).toEqual(ISSUE_LIST_FLAGS.filter((flag) => flag.name !== 'roadmap' && flag.name !== 'state'));
     expect(ROADMAP_FLAGS.every((flag) => ISSUE_LIST_FLAGS.includes(flag))).toBe(true);
     expect(createRoadmapCommand().flags).toEqual([...ROADMAP_FLAGS]);
@@ -161,7 +162,7 @@ describe('rafa roadmap, beside rafa issue list --roadmap', () => {
     expect(shortcut).toEqual(long);
     expect(shortcut.exitCode).toBe(0);
     expect(shortcut.stderr).toBe('');
-    expect(shortcut.stdout.split('\n').map((line) => line.split(' ')[0])).toEqual(['Roadmap:', '', '#13', '#11', '']);
+    expect(shortcut.stdout.split('\n').map((line) => line.split(' ')[0])).toEqual(['Roadmap:', '', '#13', '#11', 'spec:', 'blocked', '']);
   });
 
   it.each([
@@ -204,7 +205,7 @@ describe('rafa roadmap, beside rafa issue list --roadmap', () => {
     expect(bare.exitCode).toBe(1);
     expect(bare.stderr).toStartWith('❌ --all keeps the ticked Roadmap lines, so it needs --roadmap');
     expect(shortcut.exitCode).toBe(0);
-    expect(shortcut.stdout.split('\n').map((line) => line.split(' ')[0])).toEqual(['Roadmap:', '', '#13', '#12', '#11', '']);
+    expect(shortcut.stdout.split('\n').map((line) => line.split(' ')[0])).toEqual(['Roadmap:', '', '#13', '#12', '#11', 'spec:', 'blocked', '']);
   });
 });
 
@@ -218,14 +219,14 @@ describe('rafa roadmap on the current place', () => {
     expect(shortcut.exitCode).toBe(0);
     expect(shortcut.stderr).toBe('');
     expect(shortcut.stdout.split('\n')[0]).toBe(`Roadmap: #${String(SECOND)}`);
-    expect(heads(shortcut.stdout)).toEqual(['Roadmap:', '', '#11', '']);
+    expect(heads(shortcut.stdout)).toEqual(['Roadmap:', '', '#11', 'spec:', '']);
     expect(shortcut.calls.filter((call) => call[1] === 'view').map((call) => call[2])).toEqual([String(SECOND)]);
-    expect(heads(control.stdout)).toEqual(['Roadmap:', '', '#13', '#11', '']);
+    expect(heads(control.stdout)).toEqual(['Roadmap:', '', '#13', '#11', 'spec:', 'blocked', '']);
   });
 
   it('keeps --all as it is, the ticked line of the current place\'s board included', async () => {
     const outcome = await run(['roadmap', '--all'], { board: SECOND, epic: null });
 
-    expect(heads(outcome.stdout)).toEqual(['Roadmap:', '', '#12', '#11', '']);
+    expect(heads(outcome.stdout)).toEqual(['Roadmap:', '', '#12', '#11', 'spec:', '']);
   });
 });

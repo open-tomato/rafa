@@ -87,7 +87,7 @@
  */
 import type { EpicProblem } from './epic-problems.js';
 import type { Epic, Epics } from './epics.js';
-import type { BoardIssue, BoardListing } from './roadmap-board.js';
+import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapPullRequest } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
@@ -145,6 +145,8 @@ export interface RoadmapEpicRows {
   readonly problems: readonly EpicProblem[];
   /** `readRoadmapRows`' warnings, then one sentence per problem, then the cancelled-epic notice's lines. */
   readonly warnings: readonly string[];
+  /** Each issue's state on the listing, by number, for a member's blockers; empty when the listing failed. */
+  readonly states: ReadonlyMap<number, BoardIssueState>;
 }
 
 /** What {@link readRoadmapEpicRows} is made with: the rows' own options, and today. */
@@ -330,5 +332,6 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
     unknown: epics.unknown,
     problems: Object.freeze([...problems]),
     warnings: Object.freeze([...read.warnings, ...problems.map(epicProblemMessage), ...cancelled]),
+    states: new Map((listed.issues ?? []).map((issue) => [issue.number, issue.state])),
   });
 }
