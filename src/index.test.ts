@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -846,6 +846,24 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/roadmap-table.js', ['renderRoadmapTable']],
     ['../plan/plan-files.js', ['plansDirAt']],
   ]],
+  ['./commands/epic/new.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/epic-checklist.js', ['appendLine', 'editChecklist']],
+    ['../../board/epic-context.js', ['EPIC_TYPE_LABEL']],
+    ['../../board/epic-problems.js', ['HORIZON_LABEL_PREFIX']],
+    ['../../board/epic-template.js', ['renderEpicBody']],
+    ['../../board/epics.js', ['EPIC_LABEL_PREFIX']],
+    ['../../board/issue-board.js', ['createGhIssueBoard']],
+    ['../../board/place.js', ['resolvePlace']],
+    ['../../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../../board/roadmap-epic-rows.js', ['HORIZONS']],
+    ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
+    ['../../board/setup.js', ['LABEL_LIST_LIMIT', 'listBoardLabels']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
+    ['../switch.js', ['defaultBoardOnce']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../status/render.js', ['renderStatus', 'statusData']],
@@ -1154,6 +1172,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/release/tag.js',
       './commands/board/list.js',
       './commands/epic/show.js',
+      './commands/epic/new.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

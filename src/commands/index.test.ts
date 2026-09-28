@@ -1,10 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the sixty-one commands it registers: what the registry
+ * declarations of the sixty-two commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `cleanup`, `describe`, `doctor`, `epic show`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
+ * `cleanup`, `describe`, `doctor`, `epic show`, `epic new`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
@@ -152,6 +152,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'next': ['text', 'json'],
   'roadmap': ['text', 'json'],
   'epic show': ['text', 'json'],
+  'epic new': ['text', 'json'],
   'switch': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
@@ -215,6 +216,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'next': [[], ['dry-run', 'yes']],
   'roadmap': [[], ['all', 'full', 'check', 'type', 'module', 'search', 'limit']],
   'epic show': [['n'], []],
+  'epic new': [['title'], ['slug', 'horizon']],
   'switch': [['target'], ['rehome']],
   'init': [[], ['root', 'yes', 'board', 'epic-guard', 'release']],
   'doctor': [[], ['plan', 'deep']],
@@ -313,6 +315,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['epic', 'epic show', [], ''],
   ['epic show 252', 'epic show', ['252'], ''],
   ['epics show', 'epic show', [], ''],
+  ['epic new Auth --slug=auth', 'epic new', ['Auth', '--slug=auth'], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -416,7 +419,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the two release actions, board list, epic show, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the two release actions, board list, epic show, epic new, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -469,6 +472,7 @@ describe('the core roster', () => {
       'release tag',
       'board list',
       'epic show',
+      'epic new',
       'status',
       'next',
       'roadmap',

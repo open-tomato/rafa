@@ -1,5 +1,5 @@
 /**
- * Tests for the issue board (`src/board/issue-board.ts`): the seven
+ * Tests for the issue board (`src/board/issue-board.ts`): the eight
  * commands it sends, the comment shape it reads back, and the arguments
  * it refuses before any command leaves.
  *
@@ -303,5 +303,61 @@ describe('createLabel', () => {
     expect(stub.calls()).toEqual([]);
     // The control: an ordinary name sends the command.
     await expect(board.createLabel('epic:auth', '')).resolves.toBeUndefined();
+  });
+});
+
+describe('createIssue', () => {
+  const url = 'https://github.com/acme/app/issues/41';
+
+  it('creates the issue with its title, body and every label in one gh issue create, and answers it off the URL', async () => {
+    const stub = stubGh(wrote(`Creating issue in acme/app\n\n${url}\n`));
+
+    const created = await createGhIssueBoard({ gh: stub.run })
+      .createIssue('Sign-in', '## Acceptance criteria\n\n- works\n', ['type:epic', 'epic:sign-in', 'horizon:later']);
+
+    expect(stub.calls()).toEqual([[
+      'issue',
+      'create',
+      '--title=Sign-in',
+      '--body=## Acceptance criteria\n\n- works\n',
+      '--label=type:epic',
+      '--label=epic:sign-in',
+      '--label=horizon:later',
+    ]]);
+    expect(created).toEqual({ number: 41, url });
+  });
+
+  it('keeps a title and a body opening with a hyphen as flag values', async () => {
+    const stub = stubGh(wrote(url));
+
+    await createGhIssueBoard({ gh: stub.run }).createIssue('--repo x', '--web', []);
+
+    expect(stub.calls()).toEqual([['issue', 'create', '--title=--repo x', '--body=--web']]);
+  });
+
+  it('rejects a failed create, naming the command', async () => {
+    const stub = stubGh(failed('could not add label: \'epic:x\' not found'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).createIssue('X', '', ['epic:x']))
+      .rejects.toThrow('board issue: gh issue create failed: could not add label: \'epic:x\' not found');
+  });
+
+  it('rejects an exit 0 that printed no issue URL, saying the issue may exist', async () => {
+    const stub = stubGh(wrote('Creating issue in acme/app\n'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).createIssue('X', '', []))
+      .rejects.toThrow('gh issue create exited 0 and printed no issue URL, so the issue may exist unrecorded');
+  });
+
+  it('refuses a blank title, a title spanning lines and a label that would reach gh as a flag, and sends no command', async () => {
+    const stub = stubGh(wrote(url));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.createIssue('  ', '', [])).rejects.toThrow('createIssue refused the title');
+    await expect(board.createIssue('one\ntwo', '', [])).rejects.toThrow('createIssue refused the title');
+    await expect(board.createIssue('X', '', ['type:epic', '--force'])).rejects.toThrow('createIssue refused the label');
+    expect(stub.calls()).toEqual([]);
+    // The control: an ordinary title and labels send the command.
+    await expect(board.createIssue('X', '', ['type:epic'])).resolves.toEqual({ number: 41, url });
   });
 });

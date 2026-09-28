@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-one registered so far wrap a
+ * of each is its command. Five of the sixty-two registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -63,7 +63,9 @@
  * `src/cleanup/` and removes the ticked ones through its steps, nor
  * `status`, which reads the five sections through `src/status/`, nor
  * `epic show`, which reads one epic's lines into the same rows as
- * `roadmap` through `src/board/roadmap-rows.ts`.
+ * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
+ * creates an epic's label, issue and board line through
+ * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`.
  *
  * ## What is registered
  *
@@ -188,6 +190,11 @@
  *     `rafa epics` and `rafa epics <n>`, its top-level spelling until the
  *     `epic` subject was declared, still run it, and print no deprecation
  *     line, since it is one of the command's `lastingAliases`.
+ *   - `epic new "<title>" --slug=<slug> [--horizon=now|next|later]`: the
+ *     `epic:<slug>` label, the epic issue from the epic template labelled
+ *     `type:epic`, `epic:<slug>` and its horizon (`later` by default), and
+ *     its line on the current board; a slug that is no kebab word or that
+ *     an issue already carries refused with exit code 2.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -235,6 +242,7 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
+import epicNew from './epic/new.js';
 import epicShow from './epic/show.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
@@ -299,7 +307,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
-  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table' },
+  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic' },
 ]);
 
 /** The core commands, in roster order. */
@@ -355,6 +363,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseTag,
   boardList,
   epicShow,
+  epicNew,
   status,
   next,
   roadmap,

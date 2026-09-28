@@ -1,8 +1,8 @@
 /**
  * The writes and one read made on an issue: the comments of an issue,
  * a comment posted, a comment edited, one label swapped for another,
- * one label taken off, an issue closed with a reason and a comment, and
- * a label created in the repository.
+ * one label taken off, an issue closed with a reason and a comment, a
+ * label created in the repository, and an issue created with its labels.
  *
  * The readiness gate's not-ready branch posts the planner's gaps as one
  * comment, edits that comment on a rerun, and swaps `spec:ready` for
@@ -32,7 +32,9 @@
  * epic closes or is cancelled through one `gh issue close` carrying its
  * reason and its trail comment together, so the issue never closes
  * without the comment saying why, and `rafa epic new` creates the
- * `epic:<slug>` label its epic will carry.
+ * `epic:<slug>` label its epic will carry. {@link IssueBoard.createIssue}
+ * is `rafa epic new`'s too: the epic issue, created with its labels in the
+ * same command, so it never stands on the board unlabelled.
  *
  * ## Why not the Tracker port
  *
@@ -55,6 +57,7 @@
  * | `removeLabel` | `gh issue edit <n> --remove-label <label>` |
  * | `closeIssue` | `gh issue close <n> --reason=<reason> --comment=<comment>` |
  * | `createLabel` | `gh label create <name> --description=<description>` |
+ * | `createIssue` | `gh issue create --title=<title> --body=<body> --label=<label>…` |
  *
  * The close reason is one of {@link CLOSE_REASONS}, the two `gh issue
  * close --reason` accepts, and the comment must be non-empty, since
@@ -65,6 +68,12 @@
  * What `gh label create` does with a name the repository already has
  * was not measured here: it is sent without `--force`, so an existing
  * label is never overwritten, and a failure is rejected to the caller.
+ * The issue's title, body and labels are all sent in that form too, and
+ * the issue is read off the URL `gh issue create` prints last
+ * ({@link CREATED_ISSUE_URL}, the pattern `./setup.ts` reads the new
+ * Roadmap issue off): an exit 0 printing no such URL is rejected, saying
+ * the issue may exist unrecorded, since it may. A title is refused blank
+ * or spanning lines.
  *
  * The comment paths are the REST ones the pull request provider reads
  * and writes, for the reason it records: a pull request IS an issue to
@@ -109,6 +118,8 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
+import { CREATED_ISSUE_URL } from './setup.js';
+
 /** What every refusal this module raises opens with. */
 const PREFIX = 'board issue';
 
@@ -123,6 +134,13 @@ export const CLOSE_REASONS = Object.freeze(['completed', 'not planned'] as const
 
 /** One of {@link CLOSE_REASONS}. */
 export type CloseReason = (typeof CLOSE_REASONS)[number];
+
+/** An issue {@link IssueBoard.createIssue} created. */
+export interface CreatedIssue {
+  readonly number: number;
+  /** The URL `gh issue create` printed. */
+  readonly url: string;
+}
 
 /** One comment on an issue: what the gate needs of it, and nothing more. */
 export interface BoardComment {
@@ -154,6 +172,8 @@ export interface IssueBoard {
   readonly closeIssue: (issue: number, reason: CloseReason, comment: string) => Promise<void>;
   /** Creates the label `name` in the repository, described by `description`. */
   readonly createLabel: (name: string, description: string) => Promise<void>;
+  /** Creates an issue titled `title` with `body`, carrying every one of `labels`, and answers it. */
+  readonly createIssue: (title: string, body: string, labels: readonly string[]) => Promise<CreatedIssue>;
 }
 
 /** What {@link createGhIssueBoard} is made with. */
@@ -231,6 +251,31 @@ function labelName(value: string, member: string, what: string): string {
     );
   }
   return value;
+}
+
+/** The title `createIssue` was handed: one line holding some text. */
+function issueTitle(value: string): string {
+  if (typeof value !== 'string' || value.trim() === '' || /[\r\n]/u.test(value)) {
+    throw new TypeError(
+      `${PREFIX}: createIssue refused the title ${describeValue(value)}, expected one line holding some text`,
+    );
+  }
+  return value;
+}
+
+/** The issue `gh issue create` printed the URL of, last; see the module note. */
+function createdIssue(stdout: string): CreatedIssue {
+  const url = stdout.trim().split('\n')
+    .at(-1)
+    ?.trim() ?? '';
+  const number = CREATED_ISSUE_URL.exec(url)?.[1];
+  if (number === undefined) {
+    throw new Error(
+      `${PREFIX}: gh issue create exited 0 and printed no issue URL, so the issue may exist`
+        + ` unrecorded; it wrote ${describeValue(stdout)}`,
+    );
+  }
+  return Object.freeze({ number: Number(number), url });
 }
 
 /** What `command` wrote, parsed. Refuses, naming the command, when it is not JSON. */
@@ -349,6 +394,17 @@ export function createGhIssueBoard(options: GhIssueBoardOptions): IssueBoard {
         ['label', 'create', label, `--description=${text}`],
         `gh label create ${label}`,
       );
+    },
+
+    createIssue: async (title: string, body: string, labels: readonly string[]): Promise<CreatedIssue> => {
+      const heading = issueTitle(title);
+      const text = commentBody(body, 'createIssue');
+      const names = labels.map((label) => labelName(label, 'createIssue', 'the label'));
+      const stdout = await succeed(
+        ['issue', 'create', `--title=${heading}`, `--body=${text}`, ...names.map((name) => `--label=${name}`)],
+        'gh issue create',
+      );
+      return createdIssue(stdout);
     },
   };
   return Object.freeze(board);

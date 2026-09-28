@@ -259,6 +259,10 @@ function fakeBoard(): { board: IssueBoard; calls: BoardCall[] } {
       calls.push(['createLabel', name, description]);
       return Promise.resolve();
     },
+    createIssue: (title, body, labels) => {
+      calls.push(['createIssue', title, body, [...labels]]);
+      return Promise.resolve({ number: 1, url: 'https://github.com/o/r/issues/1' });
+    },
   };
   return { board, calls };
 }

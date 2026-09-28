@@ -49,7 +49,7 @@ Subjects:
              HEAD
   board      list the boards with their owner, epic count, and which is current
              and home
-  epic       show one epic's issues as the Roadmap table
+  epic       show one epic's issues as the Roadmap table; create an epic
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,

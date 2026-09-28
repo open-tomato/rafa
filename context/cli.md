@@ -30,7 +30,7 @@ module's note is the long form.
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
-| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; and `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -204,7 +204,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
-  `epic` for good; `roadmap`, `switch`, `next`, `init`,
+  `epic` for good; `epic new`, `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board` and `epic`: a
@@ -1311,6 +1311,37 @@ New; it replaces no earlier text. What a row or an action added to
   is no epic, or does not hold, is refused with exit 1; a Roadmap that
   cannot be read, with `ROADMAP_REFUSAL_EXIT`. It declares no flag and
   no `spends`.
+- **`rafa epic new "<title>" --slug=<slug> [--horizon=now|next|later]`
+  creates one epic whole** (`src/commands/epic/new.ts`): the
+  `epic:<slug>` label, the epic issue, and its line on the current board.
+  The title is the one argument, one line; `--slug` is required;
+  `--horizon` defaults to `later`, so a new epic is not picked unasked.
+  Those are refused with exit 1, but the slug's own refusals exit 2
+  (`EPIC_NEW_REFUSAL_EXIT`), before `gh` is asked anything or before
+  anything is written: a slug that is not a kebab word (`KEBAB_SLUG`,
+  lowercase letters and digits joined by single hyphens), and a slug
+  ALREADY LABELLED, one any issue on the board listing carries as
+  `epic:<slug>`, open or closed, compared without case, the refusal
+  naming the issues. A repository label `epic:<slug>` no issue carries is
+  kept, not created again, so a rerun after a failed issue create goes
+  through; the labels are read with `listBoardLabels`, the first
+  `LABEL_LIST_LIMIT`. It reads the board listing once, for the slug check
+  and for `resolvePlace` with `defaultBoardOnce` (`src/commands/switch.ts`);
+  a listing, label list or default board that cannot be read also exits
+  2 with nothing created. The writes then go in order through
+  `IssueBoard` (`src/board/issue-board.ts`): `createLabel` when needed,
+  then `createIssue` with the body `renderEpicBody` answers
+  (`src/board/epic-template.ts`) and the labels `type:epic`,
+  `epic:<slug>` and `horizon:<horizon>` in one `gh issue create`; then
+  `- [ ] #<n> <title>` appended to the current board with `appendLine`
+  and `editChecklist` (`src/board/epic-checklist.ts`), every other byte
+  of the board kept. A failed label or issue create exits 1, the second
+  naming the label it left; a board line that ends `failed` exits 1 after
+  the epic exists, naming it, its URL and the line to add by hand. No
+  comment is posted: `src/board/epic-trail.ts` holds none for a new epic.
+  Text mode prints the epic with its horizon and label, where its line
+  went, and its URL; json mode's result is `EpicNewResult`. It declares
+  no `spends` and reads no terminal.
 - **`rafa switch <n | -> [--no-rehome]` moves this checkout's place**
   (`src/commands/switch.ts`) and writes it to `.rafa/position.json`
   through `writePositionFile` (`src/project/position.ts`). It reads the
