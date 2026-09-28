@@ -40,9 +40,11 @@
  * The search runner (`inventory/search/index.ts`) captures its one
  * session through the same spawner without going through
  * `runClaudeCaptured`: it builds its argument list with
- * {@link claudeArgs} and hands the spawner the one option no other
- * caller passes, {@link CapturedSpawnOptions.cwd}, since that session
- * runs inside the scratch copy of its candidates.
+ * {@link claudeArgs} and hands the spawner the one option the loop's
+ * callers never pass, {@link CapturedSpawnOptions.cwd}, since that
+ * session runs inside the scratch copy of its candidates. The epic
+ * verification runner (`epic/verify-run.ts`) does the same for each
+ * check session, which runs inside a worktree made for the run.
  *
  * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
  * rather than before, and the ordering is load-bearing rather than
@@ -444,9 +446,11 @@ export interface CapturedSession {
  */
 export interface CapturedSpawnOptions {
   /**
-   * The session's working directory, or the loop's own when absent. The
-   * search session (`src/inventory/search/index.ts`) is the one caller
-   * that names one: it runs inside the scratch copy of its candidates.
+   * The session's working directory, or the loop's own when absent. Two
+   * callers name one: the search session (`src/inventory/search/index.ts`),
+   * which runs inside the scratch copy of its candidates, and each check
+   * session of the epic verification run (`src/epic/verify-run.ts`), which
+   * runs inside a detached worktree of main.
    */
   readonly cwd?: string;
 }

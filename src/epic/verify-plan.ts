@@ -361,7 +361,7 @@ export function readVerifyPrompt(moduleDir: string = MODULE_DIR): string {
 }
 
 /** A backtick fence longer than any backtick run in `text`. */
-function fenceFor(text: string): string {
+export function fenceFor(text: string): string {
   const longestRun = Math.max(0, ...(text.match(/`+/gu) ?? []).map((run) => run.length));
   return '`'.repeat(Math.max(MIN_FENCE_LENGTH, longestRun + 1));
 }
