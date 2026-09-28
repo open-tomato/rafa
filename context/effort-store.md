@@ -75,6 +75,11 @@ place. `--dry-run` deletes the rebuild instead, so it can be repeated and
 runs beside a live loop; the swap refuses while a loop session is running
 or paused. A newer schema that dropped a table or column this rafa writes
 is not additive, and the repair refuses it rather than copy around it.
+The steps around the build, from the in-flight journal refusal through
+the row-count check, `integrity_check` and the swap to removal on
+failure, are `rebuildAside` (`src/effort/store/rebuild-aside.ts`), which
+takes the two file names and the build from its caller and opens no
+store itself; `SchemaFixRefusal` is its `RebuildRefusal`.
 
 **`rafa effort copy [--to=<dir>]` is how branch code gets real data**
 (`src/commands/effort/copy.ts` over `copyEffortStore`,

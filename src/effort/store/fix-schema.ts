@@ -42,17 +42,32 @@
  * refused while either is there. Any failure while building removes the
  * parallel file and leaves the live one untouched.
  *
+ * Those steps, from the in-flight refusal to the swap, are the
+ * build-aside convention of `rebuild-aside.ts`, which this module runs
+ * with its own file names and its own build. `SchemaFixRefusal` is that
+ * module's `RebuildRefusal` under the name the command catches.
+ *
  * It opens the store itself rather than through `withSqliteStore`, so it
  * runs the test guard (`guardTestProcess`, `location.ts`) itself too,
  * before it reads or makes anything.
  */
 import type { SqliteMigration } from './migrations.js';
+import type { TableRows } from './rebuild-aside.js';
 
-import { existsSync, renameSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
 
 import { guardTestProcess } from './location.js';
+import {
+  checkedCounts,
+  count,
+  quoted,
+  rebuildAside,
+  RebuildRefusal,
+  refuseCorrupt,
+  refuseInFlight,
+} from './rebuild-aside.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from './sqlite.js';
 
 /** What the repair found, and what it did about it. */
@@ -69,10 +84,7 @@ export type FixSchemaStatus =
   | 'rebuilt';
 
 /** A table the rebuild copies, with the rows it holds. */
-export interface KeptTable {
-  readonly table: string;
-  readonly rows: number;
-}
+export type KeptTable = TableRows;
 
 /** A table only the newer schema knows, with the rows the backup keeps. */
 export interface LeftTable {
@@ -116,21 +128,11 @@ export interface FixSchemaOptions {
   readonly migrations?: readonly SqliteMigration[];
 }
 
-/** A repair refused before the live store was changed. */
-export class SchemaFixRefusal extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SchemaFixRefusal';
-  }
-}
+/** A repair refused before the live store was changed: the build-aside steps' refusal. */
+export { RebuildRefusal as SchemaFixRefusal } from './rebuild-aside.js';
 
 /** The name the attached live store is reached by. */
 const LIVE = 'live';
-
-/** A name quoted as an SQL identifier. */
-function quoted(name: string): string {
-  return `"${name.replaceAll('"', '""')}"`;
-}
 
 /** The user tables one attached schema holds, by name. */
 function tableNames(db: Database, schema: string): string[] {
@@ -150,11 +152,6 @@ function columnNames(db: Database, schema: string, table: string): string[] {
     .map((row) => row.name);
 }
 
-/** One count query's answer. */
-function count(db: Database, sql: string): number {
-  return db.query<{ n: number }, []>(sql).get()?.n ?? 0;
-}
-
 /** The file's `user_version`, read without migrating it. */
 function versionOf(path: string): number {
   const db = new Database(path, { readonly: true });
@@ -165,28 +162,16 @@ function versionOf(path: string): number {
   }
 }
 
-/** Refuses while a journal or log beside `path` says a write is in flight or was interrupted. */
-function refuseInFlight(path: string): void {
-  for (const suffix of ['-journal', '-wal']) {
-    if (existsSync(`${path}${suffix}`)) {
-      throw new SchemaFixRefusal(
-        `${path}${suffix} is there, so a write is in flight or was interrupted; stop whatever uses the store`
-          + ' and open it once with rafa before repairing it',
-      );
-    }
-  }
-}
-
 /** Refuses when the live store lacks a table or a column the rebuild holds. */
 function refuseRemoved(db: Database, known: readonly string[], live: ReadonlySet<string>): void {
   for (const table of known) {
     if (!live.has(table)) {
-      throw new SchemaFixRefusal(`the store holds no table ${table}, which this rafa writes; its newer schema is not additive`);
+      throw new RebuildRefusal(`the store holds no table ${table}, which this rafa writes; its newer schema is not additive`);
     }
     const liveColumns = new Set(columnNames(db, LIVE, table));
     const missing = columnNames(db, 'main', table).filter((column) => !liveColumns.has(column));
     if (missing.length > 0) {
-      throw new SchemaFixRefusal(
+      throw new RebuildRefusal(
         `the store holds no column ${missing.map((column) => `${table}.${column}`).join(', ')}, which this rafa`
           + ' writes; its newer schema is not additive',
       );
@@ -203,18 +188,6 @@ function copyKnown(db: Database, known: readonly string[]): void {
       db.run(`INSERT INTO main.${quoted(table)} (${columns}) SELECT ${columns} FROM ${LIVE}.${quoted(table)}`);
     }
   })();
-}
-
-/** Every copied table with its rows, refusing one whose counts differ. */
-function checkedCounts(db: Database, known: readonly string[]): KeptTable[] {
-  return known.map((table) => {
-    const rows = count(db, `SELECT count(*) AS n FROM main.${quoted(table)}`);
-    const liveRows = count(db, `SELECT count(*) AS n FROM ${LIVE}.${quoted(table)}`);
-    if (rows !== liveRows) {
-      throw new SchemaFixRefusal(`the rebuilt ${table} holds ${String(rows)} rows, the store ${String(liveRows)}`);
-    }
-    return { table, rows };
-  });
 }
 
 /** What the live store holds that the rebuild does not. */
@@ -237,12 +210,6 @@ function leftBehind(db: Database, known: ReadonlySet<string>, live: readonly str
   return { leftTables, leftColumns };
 }
 
-/** Refuses a rebuilt file SQLite does not vouch for. */
-function refuseCorrupt(db: Database): void {
-  const answer = db.query<{ integrity_check: string }, []>('PRAGMA main.integrity_check').get()?.integrity_check;
-  if (answer !== 'ok') throw new SchemaFixRefusal(`the rebuilt store failed integrity_check: ${answer ?? 'no answer'}`);
-}
-
 /** Builds and checks the parallel file, answering what it copied and left behind. */
 function buildParallel(path: string, parallelPath: string, migrations: readonly SqliteMigration[]): Pick<FixSchemaResult, 'kept' | 'leftTables' | 'leftColumns'> {
   const db = new Database(parallelPath, { create: true, readwrite: true });
@@ -253,7 +220,7 @@ function buildParallel(path: string, parallelPath: string, migrations: readonly 
     const live = tableNames(db, LIVE);
     refuseRemoved(db, known, new Set(live));
     copyKnown(db, known);
-    const kept = checkedCounts(db, known);
+    const kept = checkedCounts(db, known, LIVE);
     const left = leftBehind(db, new Set(known), live);
     db.run(`DETACH DATABASE ${LIVE}`);
     refuseCorrupt(db);
@@ -263,31 +230,9 @@ function buildParallel(path: string, parallelPath: string, migrations: readonly 
   }
 }
 
-/** Deletes the parallel file and any journal it left. */
-function removeParallel(parallelPath: string): void {
-  rmSync(parallelPath, { force: true });
-  rmSync(`${parallelPath}-journal`, { force: true });
-}
-
-/** Renames the original to its backup and the rebuild into its place, undoing the first on a failed second. */
-function swapIn(path: string, parallelPath: string, backupPath: string): void {
-  renameSync(path, backupPath);
-  try {
-    renameSync(parallelPath, path);
-  } catch (error) {
-    renameSync(backupPath, path);
-    throw error;
-  }
-}
-
-/** The files a rebuild writes, refusing either when it is already there. */
-function freshPaths(path: string, version: number, stamp: string): { parallelPath: string; backupPath: string } {
-  const parallelPath = `${path}.fix-${stamp}`;
-  const backupPath = `${path}.v${String(version)}-${stamp}.bak`;
-  for (const taken of [parallelPath, backupPath]) {
-    if (existsSync(taken)) throw new SchemaFixRefusal(`${taken} is already there; move it aside or pass another stamp`);
-  }
-  return { parallelPath, backupPath };
+/** The parallel file a rebuild is made in, and the backup the original goes to. */
+function asidePaths(path: string, version: number, stamp: string): { parallelPath: string; backupPath: string } {
+  return { parallelPath: `${path}.fix-${stamp}`, backupPath: `${path}.v${String(version)}-${stamp}.bak` };
 }
 
 /** Repairs the store at `options.path`. See the module note. */
@@ -304,19 +249,14 @@ export function fixStoreSchema(options: FixSchemaOptions): FixSchemaResult {
   if (storeVersion === knownVersion) return { path, status: 'current', storeVersion, knownVersion, ...nothing };
   if (storeVersion < knownVersion) return { path, status: 'behind', storeVersion, knownVersion, ...nothing };
 
-  const { parallelPath, backupPath } = freshPaths(path, storeVersion, stamp);
-  let built: Pick<FixSchemaResult, 'kept' | 'leftTables' | 'leftColumns'>;
-  try {
-    built = buildParallel(path, parallelPath, migrations);
-  } catch (error) {
-    removeParallel(parallelPath);
-    throw error;
-  }
-
-  if (dryRun) {
-    removeParallel(parallelPath);
-    return { path, status: 'would-rebuild', storeVersion, knownVersion, ...built, backupPath: null };
-  }
-  swapIn(path, parallelPath, backupPath);
-  return { path, status: 'rebuilt', storeVersion, knownVersion, ...built, backupPath };
+  const { built, backupPath } = rebuildAside({
+    path,
+    ...asidePaths(path, storeVersion, stamp),
+    dryRun,
+    build: (parallelPath) => buildParallel(path, parallelPath, migrations),
+  });
+  const status = dryRun
+    ? 'would-rebuild'
+    : 'rebuilt';
+  return { path, status, storeVersion, knownVersion, ...built, backupPath };
 }
