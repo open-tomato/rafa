@@ -42,20 +42,30 @@
  *      tracker is created after this preflight; a document that cannot
  *      be read is passed over, as the plan's own absence is refused by
  *      `start()` before this runs.
- *   3. **Reads the items** through `loadPlanPrerequisites`: the config's
+ *   3. **Checks the effort-store rules** `rafa plan validate` checks,
+ *      through `plan/store-rules.ts`, over the same checklist and the
+ *      plan's `PREREQUISITES-<stub>.md`: no store change pinned by
+ *      number, and in a plan whose task names ``migration `<id>` ``, no
+ *      still-to-run code span running `src/rafa.ts`, `dist/cli.js` or
+ *      `bun run rafa` without a leading `RAFA_EFFORT_DIR=`, and an
+ *      `[auto]` item probing `rafa effort schema --check`. A broken rule
+ *      refuses the run before any item is read, since a plan that pins a
+ *      number or runs branch store code over the live store is wrong
+ *      before any probe could say so.
+ *   4. **Reads the items** through `loadPlanPrerequisites`: the config's
  *      two tiers, with the plan's `PREREQUISITES-<stub>.md` merged in for
  *      this plan alone (`preflight/prerequisites-md.ts`). A file there
  *      that cannot be read refuses the run before any probe runs, and
  *      so does one holding a MALFORMED item: an `auto` or `start` item
  *      no command ends after a final `: `, which asked for a check and
  *      names none to run.
- *   4. **Adds the pull request provider's automatic items**, through
+ *   5. **Adds the pull request provider's automatic items**, through
  *      `pr/preflight-items.ts`: `gh` on `PATH` and `gh auth status` for
  *      `origin`'s host, both REQUIRED, when the provider resolves to
  *      `gh`. They go AHEAD of the configured required tier, because a
  *      run whose pull request could never be opened should halt at its
  *      cheapest check rather than after the tiers a repository added.
- *   5. **Prints the reminders** that file carries, through `info`: each
+ *   6. **Prints the reminders** that file carries, through `info`: each
  *      `human` item, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing. It then **warns
@@ -70,20 +80,20 @@
  *      this rafa refuses prints nothing here either (its first open
  *      refuses it with its own next step), and one that cannot be read
  *      is one warning naming why. None of it halts.
- *   6. **Decides the start-only tier**, through `isFirstDispatch`
+ *   7. **Decides the start-only tier**, through `isFirstDispatch`
  *      (`preflight/first-dispatch.ts`): the plan's `[start]` items are
  *      probed ahead of the configured required tier on a first
  *      dispatch, and on a resume each is skipped with one line naming
  *      it and why. See below.
- *   7. **Checks every item** through `runPreflight`
+ *   8. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
  *      optional item is warned about as it is found.
- *   8. **Stores a row per check** through `writePreflightChecks`
+ *   9. **Stores a row per check** through `writePreflightChecks`
  *      (`effort/store/preflight.ts`), under the repo root in the SQLite
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
- *   9. **Halts, or answers.** A failed required item, or rows that could
+ *  10. **Halts, or answers.** A failed required item, or rows that could
  *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
  *      code 1. Otherwise the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
@@ -168,6 +178,19 @@
  * `loop.settingSources: user, project, local` the same run goes on to
  * its probes. A name no tier holds is refused the same way, with the
  * sentence `agents/roster.ts` words for it.
+ *
+ * A broken effort-store rule refuses after the roster, one line per
+ * problem as `plan validate` words it (`storeRuleLine`):
+ *
+ *     ❌ Refusing to start: PLAN-demo.md breaks 1 effort-store rule(s)
+ *        that `rafa plan validate` checks.
+ *        PLAN-demo.md:4: unprefixed-command: runs `bun src/rafa.ts effort
+ *        collect` without a leading RAFA_EFFORT_DIR=, in a plan that
+ *        carries a migration; copy the store first with ... and write
+ *        the command as RAFA_EFFORT_DIR=<absolute path of that dir> ...
+ *        Nothing was checked and nothing was dispatched.
+ *
+ * That is `preflight.test.ts`'s reading, wrapped and shortened here.
  *
  * A malformed item in the plan's PREREQUISITES file refuses before any
  * probe too, naming each by its line and the one shape a probed item
@@ -267,6 +290,7 @@ import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';
 import { SQLITE_STORE_FILE_NAME } from '../effort/store/sqlite.js';
+import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
@@ -431,6 +455,34 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   ].join('\n'));
 }
 
+/**
+ * Refuses the run when the plan breaks an effort-store rule
+ * `rafa plan validate` checks, naming each; see the module note.
+ */
+function refuseStoreRuleBreaks(planPath: string): void {
+  const path = agentSourcePath(planPath);
+  const markdown = readIfReadable(path);
+  if (markdown === null) return;
+
+  const prerequisitesPath = prerequisitesPathForPlan(planPath);
+  const prerequisites = prerequisitesPath === null
+    ? null
+    : readIfReadable(prerequisitesPath);
+  const problems = findStoreRuleProblems({
+    plan: markdown,
+    prerequisites,
+    prerequisitesName: basename(prerequisitesPath ?? 'PREREQUISITES-<stub>.md'),
+  });
+  if (problems.length === 0) return;
+
+  const file = basename(path);
+  throw new CommandExit(1, [
+    `❌ Refusing to start: ${file} breaks ${problems.length} effort-store rule(s) that \`rafa plan validate\` checks.`,
+    ...problems.map((problem) => `   ${storeRuleLine(file, problem)}`),
+    '   Nothing was checked and nothing was dispatched.',
+  ].join('\n'));
+}
+
 /** No item at all, for a tier that contributes none. */
 const NO_ITEMS: readonly PrerequisiteItem[] = Object.freeze([]);
 
@@ -567,6 +619,7 @@ function refusalOf(runId: string, halt: string | null, storeProblem: string | nu
 export async function runStartPreflight(options: StartPreflightOptions): Promise<StartPreflight> {
   const runId = (options.newRunId ?? randomUUID)();
   refuseUnresolvableAgents(options);
+  refuseStoreRuleBreaks(options.planPath);
   const items = await loadItems(options);
   refuseMalformedItems(options.planPath, items);
   announceReminders(options.planPath, items.reminders);

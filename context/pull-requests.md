@@ -391,7 +391,9 @@ the session check 3 is part of, so a refusal from it spends no session:
    heading present and non-empty, "Tasks the plan must carry" and
    "Definition of done" each holding at least one list item, no
    placeholder surviving (`TBD`, `TODO`, `???`, an unfilled template
-   comment), each gap listed with its heading, exit 2 before the
+   comment), no effort-store change pinned by number (`migration 12`,
+   `schema version 9`) outside a fence or code span, each gap listed
+   with its heading, exit 2 before the
    snapshot. It refuses every spec opened before
    `src/board/templates/spec.md` existed, which is the cost the spec
    chose to pay: such a body carries none of the six headings, so the

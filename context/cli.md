@@ -345,17 +345,25 @@ New; it replaces no earlier text. What a row or an action added to
   pin line. Then each other `skills=` name the resolution resolves to no
   winner, as `<file>: <the line `unresolvedSkillLine` words>`: held by no
   tier, switched off, or held only by a tier the session does not load,
-  each with what settles it. It throws exit code 1 when there is any of
-  the four, with a message counting each. That is the check `loop start`'s
-  preflight halts on, so a plan the loop would refuse is refused here
-  too. The roster is the project the dispatcher found and the config that
+  each with what settles it. Then each effort-store rule the plan breaks
+  (`src/plan/store-rules.ts`), as `<file>:<line>: <rule>: <text>`: a
+  store change pinned by number anywhere in the plan, and, in a plan one
+  of whose task lines names ``migration `<id>` ``, a still-to-run code
+  span running `src/rafa.ts`, `dist/cli.js` or `bun run rafa` without a
+  leading `RAFA_EFFORT_DIR=` (`effort copy` excepted), and a
+  `PREREQUISITES-<stub>.md` with no `[auto]` probe of
+  `rafa effort schema --check`. It throws exit code 1 when there is any
+  of the five, with a message counting each. That is the check `loop
+  start`'s preflight halts on, so a plan the loop would refuse is
+  refused here too. The roster is the project the dispatcher found and the config that
   resolves there, which is the only thing this command reads beyond the
   file; handed no project it says so and checks no agent and no skill.
   In json mode a list, a plan and a clean validation are the terminal
   result's `data`, the validation carrying an empty `issues`, an empty
-  `missingAgents`, an empty `skillCollisions` and an empty
-  `unresolvedSkills`, and each issue, missing agent, skill collision and
-  unresolved skill is an `error` `log` event; text
+  `missingAgents`, an empty `skillCollisions`, an empty
+  `unresolvedSkills` and an empty `storeProblems`, and each issue,
+  missing agent, skill collision, unresolved skill and broken store rule
+  is an `error` `log` event; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
@@ -480,8 +488,9 @@ New; it replaces no earlier text. What a row or an action added to
   `--next` STOPS at a line that is not ready rather than skipping it.
   The completeness refusal names every template heading that is missing
   or empty, either of "Tasks the plan must carry" and "Definition of
-  done" holding no list item, and every placeholder left in the text,
-  in one sentence. It costs an issue
+  done" holding no list item, every placeholder left in the text, and
+  every effort-store change pinned by number (`migration 12`, `schema
+  version 9`, outside fences and code spans), in one sentence. It costs an issue
   opened before `src/board/templates/spec.md` a hand edit, since such a
   body carries none of the six headings and is refused whole; the module
   note in `src/board/plan-spec.ts` holds that trade. The WARNING that

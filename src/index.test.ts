@@ -407,6 +407,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-load.js', ['loadConfig']],
     ['../../config.js', ['ConfigError']],
     ['../../plan/index.js', ['parsePlan']],
+    ['../../plan/store-rules.js', ['findStoreRuleProblems', 'storeRuleLine']],
+    ['../../preflight/prerequisites-md.js', ['prerequisitesPathForPlan']],
     ['./plan-files.js', ['countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'plural']],
   ]],
   ['./commands/plan/risk.js', [
