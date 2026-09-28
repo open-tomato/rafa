@@ -31,13 +31,29 @@
  * dated {@link SCRATCH_NOW}, so a reading taken with that clock finds
  * `stale` 90 days idle and nothing else old.
  *
+ * ## The worktrees are dated too
+ *
+ * The idle rule reads a worktree's age off file times, not commits:
+ * the worktree directory and the {@link ADMIN_FILES} of its
+ * administrative directory (`./worktrees.ts`). Git writes those at the
+ * real moment the repository is built, so each of them is set to
+ * {@link SCRATCH_NOW} once everything else is done. Left at the real
+ * time, a reading with the {@link SCRATCH_NOW} clock would find every
+ * worktree modified AFTER its own clock once the calendar passed that
+ * date; a negative age is below any `cleanup.worktreeIdleDays`, zero
+ * included, so each worktree read `recent`. That is why three cases of
+ * `./scratch-repository.test.ts` read red from 2026-09-24 12:00 UTC on,
+ * measured on 2026-09-28 in a plain clone and in a linked worktree alike.
+ *
  * Git runs with a fixed identity and without the user's or the
  * system's configuration.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { ADMIN_FILES, GIT_DIR } from './worktrees.js';
 
 /** The moment every commit is dated, except `stale`'s. */
 export const SCRATCH_NOW = new Date('2026-09-24T12:00:00Z');
@@ -154,6 +170,13 @@ export function createScratchRepository(): ScratchRepository {
     git(['worktree', 'add', '--quiet', worktrees.locked, 'wt-locked']);
     writeFileSync(join(worktrees.dirty, 'scratch.txt'), 'uncommitted\n');
     git(['worktree', 'lock', '--reason', LOCK_REASON, worktrees.locked]);
+    // Last, so no git call after it moves a time again; see the module note.
+    for (const path of Object.values(worktrees)) {
+      const adminDir = git(GIT_DIR, path).trim();
+      for (const file of [path, ...ADMIN_FILES.map((name) => join(adminDir, name))]) {
+        utimesSync(file, SCRATCH_NOW, SCRATCH_NOW);
+      }
+    }
 
     return {
       root,
