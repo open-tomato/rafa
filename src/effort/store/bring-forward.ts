@@ -203,8 +203,13 @@ function hasWork(plan: SchemaUse): boolean {
   return plan.adopted.length > 0 || plan.pending.length > 0;
 }
 
-/** What a plan's write would record: the log first when it adopts, then each pending id. */
-function writeNames(plan: SchemaUse): readonly string[] {
+/**
+ * What a plan's write would record: the log first when it adopts, then
+ * each pending id. Empty when the plan writes nothing. `rafa effort
+ * schema` names the same list when it asks the development-build
+ * question an open would ask (`schema-report.ts`).
+ */
+export function writeNames(plan: SchemaUse): readonly string[] {
   const adoption = plan.adopted.length > 0
     ? [ADOPTION_NAME]
     : [];

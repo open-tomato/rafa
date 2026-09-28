@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-eight registered so far wrap a
+ * of each is its command. Five of the sixty-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -123,7 +123,9 @@
  *     and `effort fix-schema [--dry-run]`, a store a newer rafa migrated
  *     rebuilt at the version this one knows, the original kept whole, and
  *     `effort copy [--to=<dir>]`, the store copied into a scratch
- *     directory for `RAFA_EFFORT_DIR` to point a command at.
+ *     directory for `RAFA_EFFORT_DIR` to point a command at, and
+ *     `effort schema [--check]`, whether this rafa can use the store,
+ *     read-only, ending with the next safe step.
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
@@ -286,6 +288,7 @@ import effortCollect from './effort/collect.js';
 import effortCopy from './effort/copy.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
+import effortSchema from './effort/schema.js';
 import epicCancel from './epic/cancel.js';
 import epicClose from './epic/close.js';
 import epicDefer from './epic/defer.js';
@@ -392,6 +395,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortReport,
   effortFixSchema,
   effortCopy,
+  effortSchema,
   moduleList,
   moduleExec,
   agentVendor,

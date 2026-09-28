@@ -674,6 +674,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject']],
     ['./fix-schema.js', ['fileStamp']],
   ]],
+  ['./commands/effort/schema.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../effort/store/location.js', ['effortStoreDir']],
+    ['../../effort/store/schema-report.js', ['gateMeaning', 'readSchemaReport']],
+    ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
+  ]],
   ['./commands/module/list.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
@@ -1231,6 +1239,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/triage.js',
       './commands/effort/fix-schema.js',
       './commands/effort/copy.js',
+      './commands/effort/schema.js',
       './commands/module/list.js',
       './commands/module/exec.js',
       './commands/agent/vendor.js',

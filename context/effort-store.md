@@ -93,6 +93,22 @@ is set, when the directory holds no store file, or when the target is a
 file or a non-empty directory; exit 2 on a read or write failure, with
 every file it wrote and every directory it made removed.
 
+**`rafa effort schema [--check]` says whether this rafa can use the
+store, and what to run next when it cannot** (`src/commands/effort/schema.ts`
+over `readSchemaReport`, `src/effort/store/schema-report.ts`). It opens
+the store `effortStoreDir` answers read-only, never through
+`bringForward`, and prints the applied, pending, unknown and edited
+migrations, the gate, and the verdict: `absent`, `current`, `behind`, one
+of `planSchema`'s seven reasons (asked for a write, so an unknown
+`writers` row is refused), or `development-build` when a development
+build would be refused the adoption or apply a `behind` store needs. It
+ends with `Next safe step: <command>` (json `nextStep`), the refusal's
+own, `rafa effort copy` for `development-build`, or `none`. `--check`
+exits 1 on any refusal; the report alone exits 0, and 2 when the file is
+no store. `schema.test.ts` leaves a pre-log store at 12 and a logged store
+with a synthetic entry pending byte-identical, and holds
+`REFUSAL_REASONS` to the seven `nextStep` values in order.
+
 ### The schema history
 
 **SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and
