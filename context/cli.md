@@ -97,6 +97,85 @@ module's note is the long form.
 | `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
+### `rafa next --roadmap`: the hop rows
+
+The `--roadmap` flag enables five additional rows in the state table
+(`src/next/hop-rows.ts`, read under `--roadmap` alone), each proposing `hop`
+or `home` and none read without it. They sit just before their corresponding
+base rows in the action order:
+
+- `pr-owner-review` (action `none`) sits just before row 7, `pr-no-checks`.
+  It holds back an otherwise mergeable pull request when the owner gate
+  (`src/next/owner-gate.ts`) answers anything but `not-gated` or `approved`.
+  C is the hop record's target when the record names this pull request,
+  else its own number since the issue it closes is not read there. The gate
+  reading rejects a bad `gh` call and lets nothing through on it.
+- `away-ended` (action `home`) sits just before row 9, `plan-unstarted`.
+  It sends C back home when its work ended: C closed (closing `merged`), C
+  has an open pull request (closing `waiting`), or C became the line and
+  lacks `spec:ready` and is not blocked (closing `halted`).
+- `hop-halt` (action `home`) and `hop-blocked` (action `hop`) both sit just
+  before row 11, `issue-blocked`. `hop-halt` takes any halt the walk's
+  decision carries and proposes `home`, reading the halt's chain
+  (`halt: #H ← #C ← #B: …`). `hop-blocked` takes a hop decision at home
+  and proposes `hop`, reading the spec line (`hop from epic #e: #H blocked by
+  #C, in epic #f`).
+- `hop-dry` (action `hop`) sits just before row 13, `nothing-left`.
+  It takes a dry epic with a next `now` epic following it, when the move
+  passes the one-hop rule, and proposes `hop` to that next epic.
+
+The two rows `hop-halt` and `hop-blocked` partition a blocked-line reading
+between them: one that halts, and one that hops. The walk that read C closed
+never reaches either. When a loop action (`start`, `resume`) runs while a
+hop is away, `readHomeAfterLoop` (`src/next/state.ts`) asks the board afresh
+and answers `home` before the chain stops, reading the record's state as
+`away-ended` does — `merged` for C closed, `waiting` for C's open pull
+request — and `halted` where the loop left C open with no pull request.
+
+The `hop` and `home` action ids can be listed under `--yes` (as `hop,home` in
+the comma list), and they are proposed only by the hop rows, so a plain run
+prints nothing but what it printed before these rows existed. The stop lines
+that rafa prints omit the proposal words `hop` and `home` unless the run was
+typed with `--roadmap`.
+
+The hop record (`.rafa/hop.json`): Where a hop is under way, this per-project
+file holds the one record `src/next/hop-record.ts` defines. It names the kind
+(`blocker` for a hop to C's epic, `dry` for a hop to the next `now` epic),
+the places the hop comes back to (the position's `home`) and leaves from,
+the issue numbers H and C (null on a dry hop), the epic and board the hop
+goes to, the state (`away` while working, `waiting` with C's pull request
+open, `merged` with C closed, `halted` from a halt), C's open pull request
+number or null, and the hop's start time. A person switched by hand
+(`rafa switch <n>`), and the position's `home` no longer equals the record's,
+when the record is `staleAgainst` the position. Every turn reads the position
+and the record afresh; a stale record is dropped and no hop is away that
+turn. The `home` action writes the record's `state`, `pullRequest` and
+nothing else; every later write keeps the record.
+
+The owner gate reading: The gate (`src/next/owner-gate.ts`, read once per
+turn by `pr-owner-review`) composes `readOwnerApproval` (`src/pr/owner-approval.ts`)
+over the home board (the position's `home`, or the default board when there is
+no position file), every open `type:roadmap` board and their `Owner:` and `Owns:`
+lines, and CODEOWNERS. The gate answers `not-gated`, `approved`, `waiting`,
+`unresolved` or `unknown`; `waiting` and `unresolved` hold the merge back, and
+a failed reading is read as `unknown`, which also holds it back.
+
+The `--roadmap` flag passes through to `plan create` (so a hop can `--next`
+instead of checking the roadmap by hand) and to `loop start` (so the loop
+knows whether a hop is away), via `ROADMAP_PASSED_ACTIONS` (`src/next/actions.ts`).
+The plan route reads it to decide how to pick an issue: with the flag, a hop
+record that is `away` on a blocker names the target C to pick, and a C whose
+blocker is still open stops `blocked`; without it, `plan create --next` picks
+as a bare `--next` does. The loop reads it to read the hop record and stamp
+it as its `hop` when the record is `away` of either kind and its `home` is
+still the position's.
+
+The session record's `hop` field: When `loop start --roadmap` runs while a hop
+is `away`, its run record (`.rafa/runs/<session-id>.json`) carries the hop record
+itself as `hop` (`start/session.ts`). A record that came back home, a stale one,
+none, and no position file stamp nothing. `parseSessionRecord` (`loop/sessions.ts`)
+refuses a `hop` key holding anything but a hop record, and every later write keeps
+it whole.
 
 ### Changing the `rafa next` table
 
