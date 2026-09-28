@@ -419,6 +419,14 @@ New; it replaces no earlier text. What a row or an action added to
   titled `Roadmap` (`resolveDefaultBoard`, `src/board/boards.ts`) — and
   otherwise the place's board, or its epic's lines alone whatever its
   horizon, a place that no longer stands warned and fallen back from.
+  `--roadmap`, which `rafa next --roadmap` passes, is refused with exit
+  code 2 on a line without `--next`; with it, a hop record
+  (`.rafa/hop.json`) that is `away` on a blocker, and whose home is
+  still the position's, has the pick answer the record's target C on
+  its own board with no roadmap read (`readAwayHop`), a C whose
+  blocker is still open stopping `blocked`, and C then going through
+  the same checks as any pick. Any other record, or none, picks as a
+  bare `--next` does, a record that cannot be read warned first.
   It prints each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal of checks 0–2
   and stops before the first write, on all three routes, so it never
@@ -516,7 +524,7 @@ New; it replaces no earlier text. What a row or an action added to
   readiness reading recognises. `src/tests/spec-template-source.test.ts`
   holds the file to the code and the filled template to no gap.
 - **The words `plan create` reads live in `src/board/flags.ts`**, the
-  eight of the board routes and the gate, because
+  nine of the board routes and the gate, because
   `src/commands/index.test.ts` holds the command's declared flags equal
   to the quoted `--` literals of the modules named for it and a module
   that also quotes a `gh` argument, as `src/board/issue.ts` does, cannot
