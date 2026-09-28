@@ -6,6 +6,7 @@ import { readBlockedBy } from './blocked.js';
 import {
   blankReasonMessage,
   cancelMoveReason,
+  carriesUnblockNote,
   codeSpan,
   normaliseReason,
   readReason,
@@ -167,6 +168,17 @@ describe('dependent comments', () => {
     expect(renderMoveComment({ kind: 'move', issue: 14, from: 50, to: 40 }, cancelMoveReason(30))).toBe(
       'Moved from epic #50 to #40: epic #30, which it was blocked by, was cancelled',
     );
+  });
+});
+
+describe('carriesUnblockNote', () => {
+  test('reads the note renderUnblockNote writes below a body, for its own epic only', () => {
+    const body = `Blocked by: #21\n\n${renderUnblockNote('2026-09-28', 30, [21], [])}`;
+    expect(carriesUnblockNote(body, 30)).toBe(true);
+    // Controls: the same body for another epic, one whose number #30 opens, and no note at all.
+    expect(carriesUnblockNote(body, 3)).toBe(false);
+    expect(carriesUnblockNote(body, 300)).toBe(false);
+    expect(carriesUnblockNote('Blocked by: #21', 30)).toBe(false);
   });
 });
 

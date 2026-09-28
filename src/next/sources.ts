@@ -108,6 +108,14 @@
  * position file is there is one such notice, the default board then
  * walked unweighed.
  *
+ * With {@link NextBoardOptions.noticeCancelled} set, as `rafa next` sets
+ * it, the cancelled-epic notice (`src/board/epic-cancel-notice.ts`) is
+ * carried out as problems after the place's notices, one line per epic
+ * closed as not planned that open issues outside it still wait on — but
+ * only when the walk or the place read the listing already, so it costs
+ * no `gh` command of its own, and a roadmap walked with no epic line and
+ * no position file prints no notice. A failed listing adds none.
+ *
  * The memo lives for the length of one board, which is one `rafa next`
  * answer: the walk reads the picked line's issue to ask whether it is
  * closed, and `blocking` and `isReady` then read the LABELS and the
@@ -147,6 +155,7 @@ import type { ProjectFound } from '../project/scope.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
+import { cancelledEpicNoticeLines } from '../board/epic-cancel-notice.js';
 import { epicLines, pickDescendedLine } from '../board/epic-walk.js';
 import { readEpics } from '../board/epics.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
@@ -205,6 +214,11 @@ export interface NextBoardOptions {
   readonly listing?: BoardListing;
   /** The project root whose position file names the current place; left out, the walk starts from the default board. */
   readonly root?: string;
+  /**
+   * Carry the cancelled-epic notice's lines as problems when the walk read
+   * the listing; `rafa next` sets it, and `rafa status` leaves it out.
+   */
+  readonly noticeCancelled?: boolean;
 }
 
 /** The settings the composition reads off the config. */
@@ -227,6 +241,15 @@ function listOnce(read: BoardListing): BoardListing {
     kept ??= read();
     return kept;
   };
+}
+
+/** The cancelled-epic notice's lines over the kept listing; none when it failed, which the place reading says. */
+async function cancelledNotices(listing: BoardListing): Promise<readonly string[]> {
+  try {
+    return cancelledEpicNoticeLines(await listing());
+  } catch {
+    return [];
+  }
 }
 
 /** What one walk answers: the line it picked, and how many lines it passed. */
@@ -260,7 +283,12 @@ async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapRe
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
   const { gh, git, configured, remote, root } = options;
-  const listing = listOnce(options.listing ?? createGhBoardListing({ gh }));
+  const listed = options.listing ?? createGhBoardListing({ gh });
+  let asked = false;
+  const listing = listOnce(() => {
+    asked = true;
+    return listed();
+  });
   const issues = memoiseIssues(createGhSpecIssueReader({ gh }));
 
   return Object.freeze({
@@ -284,11 +312,14 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
       const walk = epic === null
         ? await walkBoard(roadmap, { issues, readings, listing })
         : await walkEpic(epic, listing, readings);
+      const cancelled = options.noticeCancelled === true && asked
+        ? await cancelledNotices(listing)
+        : [];
       return {
         roadmap,
         line: walk.line,
         passed: walk.passed,
-        problems: [...current?.notices ?? [], ...branches.problems],
+        problems: [...current?.notices ?? [], ...cancelled, ...branches.problems],
       };
     },
 
@@ -374,7 +405,7 @@ export function openNextSources(
   const gh = (seams.openGh ?? ((root: string): GhRunner => createGhRunner({ cwd: root })))(project.root);
   const loop = resolveLoopSeams({ isAlive: seams.isAlive });
 
-  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue, root: project.root });
+  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue, root: project.root, noticeCancelled: true });
   const held = {
     base: config.prBase ?? DEFAULT_BASE_BRANCH,
     plans: plansDirAt(project.root, config.planDir),

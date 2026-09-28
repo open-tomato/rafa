@@ -32,7 +32,8 @@
  * `**Updated <date>, epic #E cancelled:**` and the members it no longer
  * waits on, since a body is changed only by a note below the original.
  * The note never opens a line with `Blocked by:`, so it is not read as
- * the field.
+ * the field; {@link carriesUnblockNote} reads it back, so the
+ * cancelled-epic notice stops naming a dependent once it is unblocked.
  *
  * The first line of each comment is the sentence the spec names; what
  * follows it, after a blank line, is detail. The move comment names the
@@ -308,6 +309,16 @@ export function renderUnblockNote(day: string, epic: number, dropped: readonly n
     ? 'nothing else blocks it.'
     : `it is still blocked by ${wordList(still)}.`;
   return `**Updated ${day}, epic ${ref(epic)} cancelled:** ${refList(dropped)} no longer ${verb} this issue; ${rest}`;
+}
+
+/**
+ * True when `body` carries the note {@link renderUnblockNote} writes for
+ * epic `epic`, on any day: the dependent was unblocked from it already.
+ * The cancelled-epic notice (`./epic-cancel-notice.ts`) reads it, since
+ * the note leaves the dependent's `Blocked by:` line as it was.
+ */
+export function carriesUnblockNote(body: string, epic: number): boolean {
+  return new RegExp(String.raw`\*\*Updated \d{4}-\d{2}-\d{2}, epic #${String(epic)} cancelled:\*\*`, 'u').test(body);
 }
 
 /** The question asked for a change's reason when `--reason` was not passed. */

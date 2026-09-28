@@ -1492,6 +1492,25 @@ New; it replaces no earlier text. What a row or an action added to
   that first line and not the note, so `readEpicDependents` keeps
   listing a moved or unblocked dependent. Json mode's result is
   `EpicCancelResult`. It declares no `spends`.
+- **An epic closed as not planned is noticed by `rafa epic show`,
+  `rafa roadmap` and `rafa next`** (`src/board/epic-cancel-notice.ts`),
+  each over the board listing it already reads, so the notice sends no
+  `gh` command of its own. `cancelledEpicNoticeLines` answers one `warn`
+  line per `type:epic` issue closed as `NOT_PLANNED` whose
+  `readEpicDependents` list, less each dependent whose body carries that
+  epic's unblock note (`carriesUnblockNote`, `src/board/epic-trail.ts`),
+  is not empty, naming them and `rafa epic cancel <n>`; a closed
+  dependent is gone from the list already. A MOVED dependent is still
+  named while its line names an open member, since nothing on the
+  listing says which cancel it was answered for. `epic show` warns the
+  lines last, in its result's `warnings` too, whichever epic it shows;
+  `rafa roadmap` (`issue list --roadmap`) carries them last in
+  `readRoadmapEpicRows`' warnings, epic lines or none; `rafa next`
+  carries them as board problems only when the walk or the place read
+  the listing (`NextBoardOptions.noticeCancelled`, which `rafa status`
+  leaves off). A board with no such epic, or a failed listing, writes
+  no line, so a project that never cancels an epic prints what it
+  printed before.
 - **`rafa switch <n | -> [--no-rehome]` moves this checkout's place**
   (`src/commands/switch.ts`) and writes it to `.rafa/position.json`
   through `writePositionFile` (`src/project/position.ts`). It reads the

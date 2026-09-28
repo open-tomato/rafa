@@ -78,6 +78,13 @@
  * `warn` log event in json mode. In json mode the terminal result's
  * `data` is an {@link EpicsResult}.
  *
+ * Whenever the listing was read, whichever epic is shown or none, each
+ * line of the cancelled-epic notice (`cancelledEpicNoticeLines`,
+ * `src/board/epic-cancel-notice.ts`) is a `warn` line too, written last:
+ * one per epic closed as not planned that open issues outside it still
+ * wait on, naming them and `rafa epic cancel <n>`. A board with no such
+ * epic writes none.
+ *
  * A failed listing is not guessed at: the command prints the epic, or
  * the Roadmap's epics, `unknown` with the listing's reason, no rows, and
  * exits 0, as `rafa roadmap` exits 0 on the same failure.
@@ -96,6 +103,7 @@ import type { IssueSeams } from '../issue/issue-tracker.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
+import { cancelledEpicNoticeLines } from '../../board/epic-cancel-notice.js';
 import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
 import { epicLines, isNowEpic } from '../../board/epic-walk.js';
 import { readEpics } from '../../board/epics.js';
@@ -330,12 +338,16 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   const epic = asked === null
     ? placeEpic(roadmap, listing, epics)
     : askedEpic(asked, listing, epics);
+  const cancelled = cancelledEpicNoticeLines(listing);
   const row = listing.find((issue) => issue.number === epic?.number);
-  if (epic === null || row === undefined) return Object.freeze({ ...empty, epic: null, unknown: null });
+  if (epic === null || row === undefined) {
+    for (const line of cancelled) warn(line);
+    return Object.freeze({ ...empty, epic: null, unknown: null, warnings: Object.freeze([...notices, ...cancelled]) });
+  }
 
   const rows = await readLineRows(epicLines(epic, row).lines, read);
   const problems = readEpicProblems(listing).filter((problem) => isProblemOf(problem, epic));
-  const warnings = [...rows.warnings, ...problems.map(epicProblemMessage)];
+  const warnings = [...rows.warnings, ...problems.map(epicProblemMessage), ...cancelled];
   for (const warning of warnings) warn(warning);
   return Object.freeze({
     ...empty,

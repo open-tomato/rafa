@@ -829,6 +829,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/epic/show.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
+    ['../../board/epic-cancel-notice.js', ['cancelledEpicNoticeLines']],
     ['../../board/epic-problems.js', ['epicProblemMessage', 'readEpicProblems']],
     ['../../board/epic-walk.js', ['epicLines', 'isNowEpic']],
     ['../../board/epics.js', ['readEpics']],

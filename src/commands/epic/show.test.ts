@@ -41,6 +41,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
+import { renderCancelledEpicNotice } from '../../board/epic-cancel-notice.js';
 import { readEpics } from '../../board/epics.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { unweighedPositionNotice } from '../../board/roadmap-rows.js';
@@ -110,6 +111,8 @@ interface Planted {
   readonly second?: 'OPEN' | 'CLOSED';
   /** Plant a position file at this place, current and home. */
   readonly position?: Place;
+  /** Rows appended to the listing. */
+  readonly extra?: readonly object[];
 }
 
 /** A `gh` answering the Roadmap read, the board listing and the open pull requests, recording each call. */
@@ -125,9 +128,10 @@ function plantedGh(calls: string[][], planted: Planted): GhRunner {
     author: { login: 'owner' },
   });
   const second = JSON.stringify({ number: SECOND, title: 'Team board', body: SECOND_BODY, state: 'OPEN', labels: [], author: { login: 'owner' } });
-  const board = planted.second === undefined
-    ? BOARD
-    : [...BOARD, boardIssue(SECOND, 'Team board', SECOND_BODY, planted.second, ['type:roadmap'])];
+  const seconds = planted.second === undefined
+    ? []
+    : [boardIssue(SECOND, 'Team board', SECOND_BODY, planted.second, ['type:roadmap'])];
+  const board = [...BOARD, ...seconds, ...planted.extra ?? []];
   return (args) => {
     calls.push([...args]);
     const [noun, verb, number] = args;
@@ -430,5 +434,45 @@ describe('rafa epics, dispatched', () => {
     expect([command.subject, command.action, command.spends, command.flags]).toEqual(['epic', 'show', undefined, []]);
     expect([command.aliases, command.lastingAliases]).toEqual([['epic'], ['epic']]);
     expect(command.args.map((arg) => [arg.name, arg.required])).toEqual([['n', false]]);
+  });
+});
+
+describe('rafa epics, with an epic closed as not planned', () => {
+  /** Epic #40 closed as not planned, its open member #41, and #43, in no epic, waiting on #41. */
+  const CANCELLED = [
+    { ...boardIssue(40, 'Epic omega', 'Omega.', 'CLOSED', ['type:epic', 'epic:omega', 'horizon:now']), stateReason: 'NOT_PLANNED' },
+    boardIssue(41, 'Omega one', 'Open still.', 'OPEN', ['epic:omega']),
+    boardIssue(43, 'Waiting', 'Prose.\n\nBlocked by: #41\n', 'OPEN', []),
+  ];
+  const NOTICE = renderCancelledEpicNotice({ epic: 40, dependents: [43] });
+
+  it('warns the notice last, over the one listing, whichever epic is shown', async () => {
+    const outcome = await run(['epics', '60'], { extra: CANCELLED });
+    const lines = outcome.stdout.split('\n');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines[0]).toBe(`warn: ${NOTICE}`);
+    expect(lines[1]).toBe('Epic #60 · Epic beta · backlog, 0/2 done');
+    expect(listings(outcome.calls)).toBe(1);
+  });
+
+  it('writes no notice line when no epic is cancelled (control)', async () => {
+    const outcome = await run(['epics', '60']);
+
+    expect(outcome.stdout).not.toContain('closed as not planned');
+    expect(outcome.stdout.split('\n')[0]).toBe('Epic #60 · Epic beta · backlog, 0/2 done');
+  });
+
+  it('warns it when no now epic is left to show, too', async () => {
+    const outcome = await run(['epics'], { extra: CANCELLED, roadmapBody: '- [ ] #80 — later work\n' });
+
+    expect(outcome.stdout.split('\n')).toEqual([`warn: ${NOTICE}`, noNowEpicLine(ROADMAP), '']);
+  });
+
+  it('carries it among the json warnings', async () => {
+    const outcome = await run(['epics', '60', '--output=json'], { extra: CANCELLED });
+    const result = eventsOf(outcome.stdout).find((event) => event.type === 'result') as { data: EpicsResult } | undefined;
+
+    expect(result?.data.warnings).toEqual([NOTICE]);
   });
 });
