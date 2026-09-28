@@ -13,7 +13,9 @@
  * 3. Build the parallel file. What goes into it is the caller's: the
  *    repair (`fix-schema.ts`) brings a fresh file to this rafa's
  *    migrations through the log-aware apply and copies the known tables
- *    into it. The caller checks it with {@link checkedCounts},
+ *    into it, and the forward move (`migrate.ts`) writes the store out
+ *    with `VACUUM INTO` and applies its pending migrations there. The
+ *    caller checks it with {@link checkedCounts},
  *    every table's row count against the store's, and
  *    {@link refuseCorrupt}, SQLite's `integrity_check`.
  * 4. Any failure while building removes the parallel file and its

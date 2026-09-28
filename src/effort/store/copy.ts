@@ -112,7 +112,7 @@ function refuseUsedTarget(target: string): void {
 }
 
 /** Writes `source`'s SQLite store to `target` as one snapshot, reading only. */
-function vacuumInto(source: string, target: string): void {
+export function vacuumInto(source: string, target: string): void {
   const db = new Database(source, { readonly: true });
   try {
     db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);

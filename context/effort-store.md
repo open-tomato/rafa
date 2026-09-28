@@ -96,7 +96,8 @@ the in-flight journal refusal through the row-count check,
 `integrity_check` and the swap to removal on failure, are `rebuildAside`
 (`src/effort/store/rebuild-aside.ts`), which takes the two file names
 and the build from its caller and opens no store itself;
-`SchemaFixRefusal` is its `RebuildRefusal`.
+`SchemaFixRefusal` is its `RebuildRefusal`, and so is `effort migrate`'s
+`MigrateRefusal`.
 
 **`rafa effort copy [--to=<dir>]` is how branch code gets real data**
 (`src/commands/effort/copy.ts` over `copyEffortStore`,
@@ -130,6 +131,35 @@ exits 1 on any refusal; the report alone exits 0, and 2 when the file is
 no store. `schema.test.ts` leaves a pre-log store at 12 and a logged store
 with a synthetic entry pending byte-identical, and holds
 `REFUSAL_REASONS` to the seven `nextStep` values in order.
+
+**`rafa effort migrate [--dry-run]` applies a migration that breaks
+older runtimes** (`src/commands/effort/migrate.ts` over `migrateStore`,
+`src/effort/store/migrate.ts`), and any other pending one with it. It
+plans as the `migrate` caller, so `breaking-pending` never refuses it;
+any other refusal is passed on with its own next step, and a store with
+nothing to adopt or apply is `current` and left alone. It writes the
+store `effortStoreDir` answers to `effort.sqlite.migrate-<stamp>` with
+`vacuumInto` (`copy.ts`), brings that file forward through
+`bringForward` with `builtAside`, checks the row count of every table
+both files hold against the live store (`checkedCounts`: a table rebuild
+that lost a row is refused), `integrity_check` and that `planSchema`
+finds it current, then renames the original to
+`effort.sqlite.before-<id>-<stamp>.bak`, `<id>` being the first migration
+applied or `schema_migrations` for an adoption alone, and swaps the new
+file in through `rebuildAside`. `--dry-run` deletes it instead and is
+refused nothing. The swap is refused before anything is built from a
+development build over a store it does not own, with
+`refuseUnownedDevelopmentWrite`'s text, and while a loop record under
+the project reads `running` or `paused`: `REFUSED — migration <id>
+breaks older runtimes, and loop <sessionId> (pid <pid>, plan <stub>) is
+running on this store. Nothing was migrated. Finish or stop that loop,
+then run it again.`, or, with only additive migrations pending, the loop
+and the writes a swap under it would lose. `migrate.test.ts` leaves the
+directory byte-identical under a dry run that built the closed gate,
+refuses a synthetic rebuild that drops a null-note row while the same
+rebuild over non-null rows migrates, names the backup, refuses beside a
+planted live loop, and spawns `bun src/rafa.ts`: refused over a project's
+store, migrating a copy under `RAFA_EFFORT_DIR`.
 
 ### The schema history
 
@@ -188,7 +218,8 @@ Each rule has a near-miss control, including a planted `DROP COLUMN`
 declared `[]`.
 
 **`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
-decision, and `bringForward` is its one caller.** It takes what a store holds (its
+decision, and every open asks it through `bringForward`;** `fix-schema`,
+`effort schema` and `effort migrate` ask it directly. It takes what a store holds (its
 `schema_migrations` rows, or none, and `user_version`), this build's
 catalogue with checksums (`sqliteCatalogue`), `read` or `write`, and
 whether `rafa effort migrate` asks. It answers "use", with the legacy

@@ -207,7 +207,7 @@ export { RebuildRefusal as SchemaFixRefusal } from './rebuild-aside.js';
 const LIVE = 'live';
 
 /** The user tables one attached schema holds, by name, the migration log apart. */
-function tableNames(db: Database, schema: string): string[] {
+export function tableNames(db: Database, schema: string): string[] {
   return db
     .query<{ name: string }, [string]>(
       `SELECT name FROM ${schema}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> ? ORDER BY name`,
@@ -225,7 +225,7 @@ function columnNames(db: Database, schema: string, table: string): string[] {
 }
 
 /** The file's `user_version` and migration log, read on a read-only connection. */
-function readOnlySchema(path: string): StoreSchema {
+export function readOnlySchema(path: string): StoreSchema {
   const db = new Database(path, { readonly: true });
   try {
     return readStoreSchema(db, path);
@@ -283,7 +283,7 @@ function leftBehind(db: Database, known: ReadonlySet<string>, live: readonly str
 }
 
 /** Refuses a rebuild `planSchema` would not let this rafa use as it is. */
-function refuseUnusable(db: Database, parallelPath: string, migrations: readonly SqliteMigration[]): void {
+export function refuseUnusable(db: Database, parallelPath: string, migrations: readonly SqliteMigration[]): void {
   const plan = planSchema(readStoreSchema(db, parallelPath), sqliteCatalogue(migrations), 'write', 'open');
   if (plan.verdict === 'refuse') throw new RebuildRefusal(`the rebuilt store is refused as ${plan.reason}: ${plan.message}`);
   const needs = writeNames(plan);

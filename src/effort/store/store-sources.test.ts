@@ -16,7 +16,7 @@
  *     `plan-ci.ts`, `skill-invocations.ts`, `tracker-refs.ts`,
  *     `sqlite.ts`'s row store, `bring-forward.ts`'s log insert).
  *   - No `new Database(` outside `sqlite.ts`, `fix-schema.ts`,
- *     `copy.ts` and `schema-report.ts`. Every other opener of a SQLite
+ *     `copy.ts`, `schema-report.ts` and `migrate.ts`. Every other opener of a SQLite
  *     handle is expected to go through `withSqliteStore` (`sqlite.ts`)
  *     so every open runs the test guard, the busy timeout and
  *     `bringForward` alike; `fix-schema.ts` opens the store itself on
@@ -25,7 +25,10 @@
  *     must never call `bringForward`: an open through `withSqliteStore`
  *     would adopt a pre-log store it copies, and `schema-report.ts`,
  *     whose read-only report must leave a store with a migration
- *     pending as it found it.
+ *     pending as it found it, and `migrate.ts`, which opens only the
+ *     file it built beside the store, and must bring that file forward
+ *     as the `migrate` caller, the one a breaking migration is applied
+ *     for, rather than as the ordinary open `withSqliteStore` makes.
  *
  * A fourth guard reads `schema-plan.ts` alone: it imports neither
  * `bun:sqlite` nor `sqlite.ts`, which is `schema-plan.ts`'s own module
@@ -93,6 +96,7 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'src/effort/store/fix-schema.ts',
   'src/effort/store/copy.ts',
   'src/effort/store/schema-report.ts',
+  'src/effort/store/migrate.ts',
 ]);
 
 /** An `import … from 'bun:sqlite'` or from a `sqlite.{js,ts}` module. */
