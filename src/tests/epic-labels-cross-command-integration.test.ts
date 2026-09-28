@@ -117,6 +117,9 @@ function fixtureGh(): { run: GhRunner; edits: () => readonly string[] } {
       edits.push(`#${args[2] ?? ''} -${args[4] ?? ''} +${args[6] ?? ''}`);
       return ok('');
     }
+    // No issue carries type:roadmap: its listing answers empty, told
+    // apart from the board listing, which asks the same fields, by its label flag.
+    if (route === 'issue list' && args.includes('--label') && args.includes('type:roadmap')) return ok('[]');
     if (route === 'issue list' && args.includes(BOARD_LIST_FIELDS)) {
       return ok(JSON.stringify(Object.entries(ISSUES).map(([number, issue]) => listedRow(Number(number), issue))));
     }

@@ -79,9 +79,10 @@
  *
  * GitHub closes an issue the merged pull request says `Closes #<n>` for
  * and does not tick the `- [ ] #<n>` box naming it on the roadmap, so
- * this command ticks it (per the PR commands spec). The rule and the two
- * `gh` calls are `src/board/roadmap-tick.ts`'s and the decision to make
- * them at all is `./merge-tick.ts`'s; what is decided HERE is WHEN, and
+ * this command ticks it (per the PR commands spec), on every open board
+ * whose checklist lists it. The rule and the two `gh` calls per board are
+ * `src/board/roadmap-tick.ts`'s and the decision to make them at all, and
+ * on which boards, is `./merge-tick.ts`'s; what is decided HERE is WHEN, and
  * it is straight after the provider merged, before the clean-up. The
  * clean-up is local git and can fail, and a tick behind it would be the
  * one piece of the merge that a failed `git pull` silently dropped —
@@ -174,6 +175,7 @@ import { join } from 'node:path';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
+import { closedIssuesIn } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { recordPlanCi } from '../../effort/store/plan-ci.js';
@@ -193,7 +195,7 @@ import {
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
-import { tickRoadmapAfterMerge } from './merge-tick.js';
+import { noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
 import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
 import {
@@ -278,8 +280,10 @@ export interface PrMergeResult {
   readonly steps: readonly MergeStepReport[];
   /** The follow-ups that apply, empty when neither does. */
   readonly followUps: readonly FollowUp[];
-  /** What the roadmap tick came to, or null when the pull request closes no issue. */
+  /** What the tick of the first board in `roadmapTicks` came to, the default board's when it was ticked; null when none was. */
   readonly roadmapTick: RoadmapTickResult | null;
+  /** What the tick of every board listing a closed issue came to, or null when the pull request closes no issue. */
+  readonly roadmapTicks: readonly RoadmapTickResult[] | null;
   /** What the unblock reading came to, or null when the pull request closes no issue. */
   readonly unblocked: UnblockReport | null;
   /** What `--skip-checks` read and posted, or null when the flag was not given. */
@@ -458,16 +462,16 @@ async function reportUnblock(
 }
 
 /**
- * Ticks the roadmap for the merge that just went through and prints the
- * one line it came to; see the module note. A tick that could not be
- * written is a warning and nothing else.
+ * Ticks every board listing an issue the merge that just went through
+ * closes and prints the one line each board came to; see the module
+ * note. A tick that could not be written is a warning and nothing else.
  */
 async function reportTick(
   context: RafaContext,
   pr: PrContext,
   seams: MergeSeams,
   detail: PullRequestDetail,
-): Promise<RoadmapTickResult | null> {
+): Promise<readonly RoadmapTickResult[] | null> {
   const warn = (message: string): void => {
     context.output.warn(message);
   };
@@ -478,9 +482,12 @@ async function reportTick(
     warn,
   });
   if (tick === null) return null;
+  if (tick.length === 0) context.output.info(noBoardListsLine(closedIssuesIn(detail.body)));
 
-  if (tick.status === 'failed') warn(tickSentence(tick));
-  else context.output.info(tickSentence(tick));
+  for (const board of tick) {
+    if (board.status === 'failed') warn(tickSentence(board));
+    else context.output.info(tickSentence(board));
+  }
   return tick;
 }
 
@@ -629,6 +636,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     steps: [],
     followUps: [],
     roadmapTick: null,
+    roadmapTicks: null,
     unblocked: null,
     unchecked: uncheckedReport(answer.unchecked, null),
   };
@@ -643,7 +651,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   }
   context.output.info(`Merged #${detail.number} into ${detail.baseRefName} (${method}).`);
   const commentUrl = await commentIfUnchecked(context, pr, detail.number, answer.unchecked);
-  const roadmapTick = await reportTick(context, pr, seams, detail);
+  const roadmapTicks = await reportTick(context, pr, seams, detail);
 
   const remoteBranchPresent = remoteHoldsBranch(git, detail.headRefName, (message) => {
     context.output.warn(message);
@@ -665,7 +673,8 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     detail: outcome.detail,
     steps,
     followUps,
-    roadmapTick,
+    roadmapTick: roadmapTicks?.[0] ?? null,
+    roadmapTicks,
     unblocked,
     unchecked: uncheckedReport(answer.unchecked, commentUrl),
   };
@@ -689,7 +698,7 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow),'
       + ' and after the merge posts one comment on the pull request saying so. A step that fails never undoes the merge: it'
       + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
-      + ' every issue the pull request closes on the roadmap issue, warning rather than failing when that write'
+      + ' every issue the pull request closes on every open board whose checklist lists it, or on the roadmap issue while no issue carries `type:roadmap`, warning rather than failing when that write'
       + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'
       + ' request closes, asking whether to remove `spec:blocked` from each one whose blockers have all closed;'
       + ' `--yes` does not answer that question, and every failure of that reading is a warning. With'

@@ -60,20 +60,23 @@
  *
  * ## The board readings
  *
- * A repository that resolves to `pr.provider: gh` also gets three
+ * A repository that resolves to `pr.provider: gh` also gets four
  * readings of its GitHub board, through one runner opened once
  * (`./doctor-board.ts`, which holds the runner, the order and what the
- * three share): a row per part `rafa init --board` makes, each open
+ * four share): a row per part `rafa init --board` makes, each open
  * `spec:blocked` issue whose `Blocked by:` line is missing or unreadable
- * (`./doctor-blocked.ts`), and each issue carrying two `epic:` labels or
- * an `epic:` label no epic carries (`./doctor-epics.ts`).
+ * (`./doctor-blocked.ts`), each issue carrying two `epic:` labels or
+ * an `epic:` label no epic carries (`./doctor-epics.ts`), and each board
+ * whose owner does not resolve, unlabelled "Roadmap" beside labelled
+ * boards, and position slot on a board or epic that no longer stands
+ * (`./doctor-boards.ts`).
  *
  * The provider is resolved ONCE per run, by the same reading that
  * decides the automatic items, so `pr.provider: none` costs no `gh`
  * command and no board line. It is read AFTER the preflight, because the
  * `gh` commands it sends are worth nothing on a repository whose `gh` is
  * missing or logged out, and the preflight is what says so. None of the
- * three writes to the board or changes the exit code, and a halt prints
+ * four writes to the board or changes the exit code, and a halt prints
  * them before its refusal.
  *
  * ## The cleanup row
@@ -333,6 +336,8 @@ export interface DoctorResult {
   readonly blocked: DoctorBoardReadings['blocked'];
   /** Every issue carrying two `epic:` labels and every orphan `epic:` label; null for a project with no GitHub board. */
   readonly epics: DoctorBoardReadings['epics'];
+  /** Every unresolved board owner, unlabelled Roadmap and lost position slot; null for a project with no GitHub board. */
+  readonly boards: DoctorBoardReadings['boards'];
   /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
   readonly cleanup: DoctorCleanupReading;
   /** The suspect, dangling and unknown references of every saved copy under `specs.dir`, or why it could not be listed. */
@@ -569,6 +574,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     board: readings.board,
     blocked: readings.blocked,
     epics: readings.epics,
+    boards: readings.boards,
     cleanup: readings.cleanup,
     refs: readings.refs,
     tiers: readings.tiers,
@@ -612,7 +618,7 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
     const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
-    const readings: BoardReadings = { ...await readDoctorBoard(gh, project.root), cleanup, refs, tiers };
+    const readings: BoardReadings = { ...await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue), cleanup, refs, tiers };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
@@ -660,7 +666,11 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' issue, names itself, or names an id the board has no issue for, with what an author does about'
       + ' it; that reading writes nothing and never changes the exit code either. It then names, under'
       + ' `Epic labels:`, every issue carrying two `epic:` labels and every `epic:` label no `type:epic` issue'
-      + ' carries, read off one board listing, writing nothing and never changing the exit code. It then counts, without'
+      + ' carries, read off one board listing, writing nothing and never changing the exit code. It then names, under'
+      + ' `Boards:`, every type:roadmap board whose Owner: handle resolves to nobody GitHub shows, every open issue titled'
+      + ' "Roadmap" without type:roadmap while labelled boards exist, and every slot of this checkout\'s position on a'
+      + ' board or epic that is closed, unlabelled or gone, read off that same listing and printing nothing when there is'
+      + ' none; it writes nothing and never changes the exit code. It then counts, without'
       + ' fetching, the branches and worktrees `rafa cleanup` would list, and prints them in one row naming'
       + ' `rafa cleanup` when any group holds one. It then counts the suspect, dangling and unknown references'
       + ' of every saved copy under `specs.dir`, writing nothing, and names `rafa issue check <n>` for each'
@@ -669,7 +679,7 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' add-on item, and for an installed Claude Code other than the version skill serving was probed'
       + ' against, and a note per byte-identical copy that can be deleted and per user-tier item with no'
       + ' `provenance`; none changes the exit code. With `--output=json` the'
-      + ' checks, both readings, those rows, those issues and those labels are the data of the terminal result event,'
+      + ' checks, both readings, those rows, those issues, those labels and those boards are the data of the terminal result event,'
       + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
       + ' `rafa loop start` prints before its notices, which never changes the exit code. With `--deep` it'
       + ' also prints the machine as a loop session sees it, starting no session: the session\'s'

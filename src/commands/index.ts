@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the fifty-nine registered so far wrap a
+ * of each is its command. Five of the sixty-one registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -28,7 +28,11 @@
  * the references of a spec's saved copy, all eight sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `epics`, which reads one epic's lines
- * into the same rows through `src/board/roadmap-rows.ts`, nor `self-update`, which installs the
+ * into the same rows through `src/board/roadmap-rows.ts`, nor `switch`,
+ * which moves the checkout's place through `src/board/place.ts` and
+ * `src/project/position.ts`, nor `board list`, which lists the open
+ * boards off the same listing through `src/board/board-body.ts` and
+ * `src/board/owner-resolve.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -160,6 +164,11 @@
  *     publish lines rather than running them, refusing on another
  *     branch, on a tag already there, and where the two release files
  *     disagree.
+ *   - `board list`, every open `type:roadmap` board, and the default
+ *     board when it lacks the label, one line each: its number and
+ *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
+ *     did not confirm it, its epic count, and `current` and `home` on
+ *     the boards this checkout's position holds; writing nothing.
  *   - `status`, top-level: where the project stands in five sections,
  *     branch and plan, loops, pull request, board and housekeeping, a
  *     section that cannot be read one warning; exit code 1 only for a
@@ -174,6 +183,11 @@
  *     of its own. Not an alias, since an alias prints a deprecation line.
  *   - `epics [<n>]`, top-level: one epic's lines as the same table, the
  *     epic numbered or the first `now` epic on the Roadmap not done.
+ *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
+ *     moved to a board or an epic by its number, or back to the previous
+ *     place with `-`, re-homing unless `--no-rehome`, and written to
+ *     `.rafa/position.json`; a number that is no open board or epic, and
+ *     `-` with no previous place, refused with exit code 2.
  *   - `init [--root=<path>] [--yes]`, top-level: the project root, its
  *     `.rafa/` scope and `.gitignore` entry, and the user scope.
  *   - `doctor [--plan=<file>]`, top-level: the preflight `loop start`
@@ -194,7 +208,7 @@
  * Typing an alias prints one deprecation line on stderr before the
  * command runs (`src/cli/dispatch.ts`).
  *
- * The subjects are the ten with an action registered: a subject with
+ * The subjects are the eleven with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -208,6 +222,7 @@ import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
+import boardList from './board/list.js';
 import cleanup from './cleanup.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
@@ -262,6 +277,7 @@ import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
+import switchCommand from './switch.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -276,6 +292,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
+  { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
 ]);
 
 /** The core commands, in roster order. */
@@ -329,10 +346,12 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctPromote,
   releaseStatus,
   releaseTag,
+  boardList,
   status,
   next,
   roadmap,
   epics,
+  switchCommand,
   init,
   doctor,
   cleanup,

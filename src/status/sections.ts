@@ -8,7 +8,7 @@
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
  * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/commands/loop/loop-sessions.ts`), `blockedTasks` (`src/commands/loop/status.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
- * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedIssues` (`src/commands/doctor-blocked.ts`) | `gh`, git |
+ * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedIssues` (`src/commands/doctor-blocked.ts`), `resolvePlace` (`src/board/place.ts`) | `gh`, git, `.rafa/position.json` |
  * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/commands/doctor-cleanup.ts`) | git, the disk, `gh` for merged pull requests |
  *
  * Nothing here prints, and nothing spawns except through
@@ -72,6 +72,35 @@
  * with no provider at all, as `rafa doctor` does, so Merged holds only
  * what git reads as merged.
  *
+ * ## The current place
+ *
+ * The board section carries `place`, where this checkout stands, only
+ * when the project has taken up boards: a position file exists at
+ * `.rafa/position.json`, or an open issue on the board listing carries
+ * `type:roadmap`. A project with neither gets no `place` key at all, so
+ * its text and its JSON are what they were before boards.
+ *
+ * The board listing (`createGhBoardListing`, `src/board/roadmap-board.ts`)
+ * is read once per `rafa status`: the same memoised read is handed to
+ * `ghNextBoard` as its `listing`, so a walk that meets an epic line
+ * spends no second one. The place is `resolvePlace` over that listing,
+ * its default board the roadmap the walk resolved, so no default board
+ * is ranked twice either. The place is read after the walk, under the
+ * board section's deadline; a listing that fails costs the place alone,
+ * carried as a note.
+ *
+ * `place.notices` are the resolver's sentences, all but the `absent`
+ * one: a labelled project that never switched stands on the fallback by
+ * design, and saying so on every `rafa status` would be noise.
+ *
+ * `place.view.next` is the walk's next line, and only where it belongs
+ * to the current place: the walk's roadmap is the current board and,
+ * at an epic, the line's issue is one of that epic's members. The walk
+ * here is handed no project root, so it starts from the default board,
+ * not the current place as `rafa next`'s does; a place away from the
+ * default board's first `now` epic therefore prints no `next` field
+ * rather than the default board's.
+ *
  * ## Which sessions the loops section names
  *
  * `live` is every record reading `running` or `paused`, a record whose
@@ -89,19 +118,30 @@
  * within `cleanup.worktreeIdleDays` (`src/cleanup/worktrees.ts`). A
  * worktree blocked for being dirty or locked is still idle by that rule.
  */
+import type { EpicView, PlaceView } from './place-line.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { Epic } from '../board/epics.js';
+import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
 import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
 import type { BlockedTask } from '../commands/loop/status.js';
 import type { PlanListing } from '../commands/plan/list.js';
 import type { RafaConfig } from '../config.js';
 import type { PidProbe, SessionRecord } from '../loop/sessions.js';
-import type { NextBoard, NextSources, OpenPull, PickedLine } from '../next/readings.js';
+import type { NextBoard, NextRoadmapReading, NextSources, OpenPull, PickedLine } from '../next/readings.js';
 import type { NextBoardOptions } from '../next/sources.js';
 import type { GitRunner, PrProviderReading, PullRequests } from '../pr/index.js';
+import type { Place } from '../project/position.js';
+
+import { existsSync } from 'node:fs';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
+import { readEpics } from '../board/epics.js';
+import { resolvePlace } from '../board/place.js';
+import { createGhBoardListing } from '../board/roadmap-board.js';
+import { horizonOf } from '../board/roadmap-epic-rows.js';
+import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { readBlockedIssues } from '../commands/doctor-blocked.js';
 import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
@@ -113,6 +153,7 @@ import { readSessions } from '../loop/sessions.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
+import { positionFilePath } from '../project/position.js';
 
 /** How long the network sections may take together, in milliseconds; see the module note. */
 export const STATUS_NETWORK_TIMEOUT_MS = 5_000;
@@ -173,8 +214,20 @@ export interface BoardReading {
   readonly passed: number;
   /** How many open issues carry `spec:blocked`, or null when they could not be listed. */
   readonly blockedIssues: number | null;
-  /** What was read around: a branch scan, a blocked listing that failed. */
+  /** What was read around: a branch scan, a blocked listing that failed, a place not read. */
   readonly notes: readonly string[];
+  /** Where this checkout stands; left out for a project with no position file and no board label. */
+  readonly place?: PlaceReading;
+}
+
+/** Where this checkout stands; see the module note. */
+export interface PlaceReading {
+  readonly current: Place;
+  readonly home: Place;
+  /** What the place line spells. */
+  readonly view: PlaceView;
+  /** The resolver's notices worth printing: every one but the absent-file one. */
+  readonly notices: readonly string[];
 }
 
 /** What `rafa cleanup` would list, counted. */
@@ -228,6 +281,8 @@ export interface StatusSeams {
   readonly pullRequests?: (gh: GhRunner) => PullRequests;
   /** The board over the bounded runner. `ghNextBoard` when left out. */
   readonly board?: (options: NextBoardOptions) => NextBoard;
+  /** The board listing over the bounded runner, read once. `createGhBoardListing` when left out. */
+  readonly listing?: (gh: GhRunner) => BoardListing;
   /** The blocked-issue listing over the bounded runner. `readBlockedIssues` when left out. */
   readonly blockedIssues?: (gh: GhRunner) => Promise<BlockedIssuesReport>;
   /** The `origin` probe `resolvePrProvider` takes. `gitRemoteUrl` when left out. */
@@ -404,8 +459,87 @@ async function readPull(sources: NextSources, branch: string): Promise<PullReadi
   return { pull, notes };
 }
 
-/** The roadmap's next line and the count of blocked issues, the two read together. */
-async function readBoard(board: NextBoard, blocked: Promise<BlockedIssuesReport>): Promise<BoardReading> {
+/** `thunk`, asked at most once. */
+function once<T>(thunk: () => Promise<T>): () => Promise<T> {
+  let answer: Promise<T> | null = null;
+  return () => {
+    answer ??= thunk();
+    return answer;
+  };
+}
+
+/**
+ * What the place line says about `epic`, or null when it was not read.
+ * `resolvePlace` only answers an epic the listing holds typed `epic`, and
+ * `readEpics` reads every one, so the null is for a caller's own listing.
+ */
+function epicView(epic: Epic | undefined, listing: readonly BoardIssue[]): EpicView | null {
+  const row = listing.find((issue) => issue.number === epic?.number);
+  if (epic === undefined || row === undefined) return null;
+  return {
+    number: epic.number,
+    title: epic.title,
+    horizon: horizonOf(row.labels),
+    done: epic.progress.done,
+    total: epic.progress.total,
+  };
+}
+
+/** The walk's next issue when it belongs to the current place; see the module note. */
+function nextOfPlace(current: Place, epic: Epic | undefined, walk: NextRoadmapReading): number | null {
+  const { line } = walk;
+  if (line === null || walk.roadmap !== current.board) return null;
+  if (current.epic === null) return line.issue;
+  return epic?.members.some((member) => member.number === line.issue) === true
+    ? line.issue
+    : null;
+}
+
+/** True when the project has taken up boards: a position file, or an open `type:roadmap` issue. */
+function hasBoards(root: string, listing: readonly BoardIssue[]): boolean {
+  if (existsSync(positionFilePath(root))) return true;
+  return listing.some((issue) => issue.state === 'OPEN' && issue.labels.includes(ROADMAP_LABEL));
+}
+
+/** Where this checkout stands, or null for a project with no boards; see the module note. */
+async function readPlace(root: string, walk: NextRoadmapReading, listing: readonly BoardIssue[]): Promise<PlaceReading | null> {
+  if (!hasBoards(root, listing)) return null;
+  const resolved = await resolvePlace({ root, listing, defaultBoard: () => Promise.resolve(walk.roadmap) });
+  const { current, home } = resolved;
+  const epic = current.epic === null
+    ? undefined
+    : readEpics({ issues: listing, claims: new Set(), today: new Date() }).epics.find((one) => one.number === current.epic);
+  const view: PlaceView = {
+    board: current.board,
+    epic: epicView(epic, listing),
+    next: nextOfPlace(current, epic, walk),
+  };
+  const notices = resolved.notices
+    .filter((notice) => notice.kind === 'lost' || notice.reason !== 'absent')
+    .map((notice) => notice.message);
+  return { current, home, view, notices };
+}
+
+/** The place, or the note saying why it was not read. */
+async function placeOrNote(
+  root: string,
+  walk: NextRoadmapReading,
+  listing: BoardListing,
+): Promise<{ readonly place: PlaceReading | null; readonly notes: readonly string[] }> {
+  try {
+    return { place: await readPlace(root, walk, await listing()), notes: [] };
+  } catch (error) {
+    return { place: null, notes: [`the current place could not be read: ${messageOf(error)}`] };
+  }
+}
+
+/** The roadmap's next line, the count of blocked issues and the current place, read together. */
+async function readBoard(
+  root: string,
+  board: NextBoard,
+  listing: BoardListing,
+  blocked: Promise<BlockedIssuesReport>,
+): Promise<BoardReading> {
   const [walk, report] = await Promise.all([board.next(), blocked]);
   const { line } = walk;
   const next = line === null
@@ -414,15 +548,19 @@ async function readBoard(board: NextBoard, blocked: Promise<BlockedIssuesReport>
   const listed = report.problem === null
     ? []
     : [`the issues labelled ${SPEC_BLOCKED_LABEL} could not be read: ${report.problem}`];
-  return {
+  const { place, notes } = await placeOrNote(root, walk, listing);
+  const reading: BoardReading = {
     roadmap: walk.roadmap,
     next,
     passed: walk.passed,
     blockedIssues: report.problem === null
       ? report.readings.length
       : null,
-    notes: [...walk.problems, ...listed],
+    notes: [...walk.problems, ...listed, ...notes],
   };
+  return place === null
+    ? reading
+    : { ...reading, place };
 }
 
 /** What `rafa cleanup` would list, counted, read without fetching; see the module note. */
@@ -454,7 +592,8 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
   const deadline = openDeadline(seams.timeoutMs ?? STATUS_NETWORK_TIMEOUT_MS);
   const gh = boundedRunner(openGh, root, deadline);
   const pulls = (seams.pullRequests ?? ((runner: GhRunner): PullRequests => createGhPullRequests({ gh: runner })))(gh);
-  const board = (seams.board ?? ghNextBoard)({ gh, git, configured: config.roadmapIssue });
+  const listing = once((seams.listing ?? ((runner: GhRunner): BoardListing => createGhBoardListing({ gh: runner })))(gh));
+  const board = (seams.board ?? ghNextBoard)({ gh, git, configured: config.roadmapIssue, listing });
   const sources: NextSources = {
     base: config.prBase ?? DEFAULT_BASE_BRANCH,
     plans: plansDirAt(root, config.planDir),
@@ -478,7 +617,7 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
   deadline.start();
   const pull = pullSection(sources, branch, provider, deadline);
   const boardSection = isGh
-    ? networkSection('board', deadline, () => readBoard(board, blockedIssues(gh)))
+    ? networkSection('board', deadline, () => readBoard(root, board, listing, blockedIssues(gh)))
     : Promise.resolve(unread(notGhProblem('board', provider)));
   const housekeeping = readHousekeeping(input, cleanup, now);
 

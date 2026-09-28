@@ -9,6 +9,18 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.23.0 — 2026-09-28, Boards — several roadmaps per project
+
+- Boards: a board is an open issue labelled `type:roadmap`, and a project can hold several; the default board is `roadmap.issue`, else the lowest-numbered labelled board, else the one issue titled "Roadmap" as before, and `rafa init --board` creates the label, opens the Roadmap with it and adds it to an existing Roadmap it adopts; a board's `Owner:` line names a user or team, resolved through GitHub as `resolved`, `unresolved` or `unknown` with the reason, and its folders come from CODEOWNERS (last matching line wins), else its `Owns:` line (deepest folder wins), else the whole repository.
+- Position: each checkout keeps its current, previous and home place (a board and an epic) in `.rafa/position.json`, written atomically and kept out of git even under `tracking.all` (an older managed `.gitignore` block gets the line on its next write); a position on a closed or unlabelled board or a closed epic falls back to the default board's first `now` epic with a notice naming what was lost.
+- CLI: new `rafa switch <n | ->` moves to a board or an epic by number, or back with `-`, re-homing unless `--no-rehome` is given, and refuses an unknown or closed number with exit 2; new `rafa board list` shows each open board with its owner and whether it resolves, its epic count, and the `current` and `home` marks, with a `--json` result; `rafa roadmap`, `rafa issue list --roadmap` and a bare `rafa epics` read the current board and epic.
+- Status: `rafa status` shows, under the Board line, where the checkout stands (`board #31 · epic #252 … · 3/7 done · next #245`), an `away from home` line while current is not home, and any fallback notice, once a project has a position file or a `type:roadmap` board.
+- Walk: `rafa next` and `plan create --next` start from the current board and epic; `--next=<n>` still ranks first, and a project with no position and no label reads as before.
+- Pull requests: `rafa pr merge` ticks the closed issue's line on every open board that lists it, says so when none does, and its JSON result carries every tick as `roadmapTicks` beside `roadmapTick`.
+- Doctor: `rafa doctor` names, under `Boards:`, a board whose owner does not resolve, an unlabelled "Roadmap" issue beside labelled boards, and a position on a closed or unlabelled board or a closed epic.
+- Tests: spawned CLI and integration tests hold the default-board ranking, ownership over a real CODEOWNERS file and `Owns:` fallback, the position file's git exclusion, racing writers and fallback, `rafa switch`, `rafa board list`, `rafa roadmap` and `rafa status` over two boards, `next` and `plan create --next` from a switched-to epic, the doctor row, and byte-identical `rafa roadmap`, `rafa next`, `rafa epics` and `rafa status` for a project with no position and no label.
+- Docs: the README's roadmap section, `docs/specs-and-roadmap.md` and `context/terminology.md` cover boards from the solo project up: switching, `rafa board list`, the status lines, `Owner:`/`Owns:` with CODEOWNERS, the fallback notice, and the `cd -` analogy for position and home.
+
 ## 0.22.0 — 2026-09-27, Epics group issues into features
 
 - Board: the board listing reads why each issue closed (`stateReason`), so a member closed as not planned is never counted as done; `rafa init --board` also creates the `type:epic`, `horizon:now`, `horizon:next` and `horizon:later` labels, and with `--epic-guard` or a yes to its own question installs a workflow that removes a second `epic:` label from an issue and comments why.

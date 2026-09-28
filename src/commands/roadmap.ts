@@ -46,7 +46,9 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
     action: 'roadmap',
     summary: 'list the Roadmap\'s lines in its order, with spec, blocked by, has and refs',
     description: 'Runs `rafa issue list --roadmap` with the flags typed: the unticked lines of the Roadmap issue'
-      + ' (`roadmap.issue`, else the open issue titled Roadmap) in its order, read off the GitHub board, as a'
+      + ' (the current place\'s board, the one `rafa switch` moved to; with no position file `roadmap.issue`,'
+      + ' else the lowest-numbered open type:roadmap board, else the open issue titled Roadmap) in its order,'
+      + ' read off the GitHub board, as a'
       + ' table with four columns the plain list has not got: spec, whether the body passes the readiness'
       + ' gate; blocked by, each blocker and whether it is open; has, a plan, a branch or a pull request'
       + ' already made for it; and refs, how many references of the issue\'s saved copy under `specs.dir` read'

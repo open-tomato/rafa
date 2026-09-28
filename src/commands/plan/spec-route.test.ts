@@ -5,9 +5,9 @@
  * what the resolution is handed.
  *
  * The routes themselves are driven elsewhere and this file drives none
- * of them again: `src/board/spec-source.test.ts` walks the roadmap and
- * `src/board/plan-spec.test.ts` runs the board checks over planted `gh`
- * and `git` runners. What is measured here is the half that is the
+ * of them again: `src/board/spec-source-roadmap.test.ts` walks the
+ * roadmap and `src/board/plan-spec.test.ts` runs the board checks over
+ * planted `gh` and `git` runners. What is measured here is the half that is the
  * COMMAND's — that the words reach `readSpecSourceFlags`, that the
  * `findSpec` handed over is this module's candidate rule and not the
  * bare path, and that both offers are handed over rather than left out,

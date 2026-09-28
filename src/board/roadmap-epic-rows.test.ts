@@ -13,6 +13,7 @@
  * and one open, #200 `now` whose one member is claimed only by a branch,
  * #300 `next`, and #400 with no `horizon:` label. #50 and #51 are specs.
  */
+import type { BoardLister } from './boards.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRowsOptions } from './roadmap-rows.js';
@@ -128,12 +129,15 @@ function planted(
     return Promise.resolve(read);
   };
   const search: RoadmapSearch = () => Promise.resolve([{ number: ROADMAP, title: 'Roadmap' }]);
+  // No issue carries type:roadmap, so roadmap.issue decides as before.
+  const listBoards: BoardLister = () => Promise.resolve([]);
   const pullRequests = (): Promise<readonly RoadmapPullRequest[]> => {
     counts.pulls += 1;
     return Promise.resolve([]);
   };
   const options: RoadmapRowsOptions = {
     configured: ROADMAP,
+    listBoards,
     search,
     issues,
     board: listing,

@@ -49,7 +49,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
-import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
+import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
@@ -103,6 +103,8 @@ interface FakeOptions {
   readonly fails?: Readonly<Record<string, string>>;
   /** What `gh repo view` writes instead of an object, when it should write something else. */
   readonly repoView?: string;
+  /** The open issues `gh issue list` answers, each with its label names; none when left out. */
+  readonly issues?: readonly { number: number; title: string; labels: readonly string[] }[];
 }
 
 /** A `gh` runner over one imaginary repository; see the module note. */
@@ -130,9 +132,13 @@ function fakeGh(options: FakeOptions = {}): {
       labels.push(args[2] ?? '');
       return ok('');
     }
-    if (route === 'issue list') return ok('[]');
+    if (route === 'issue list') {
+      const issues = options.issues ?? [];
+      return ok(JSON.stringify(issues.map((issue) => ({ ...issue, labels: issue.labels.map((name) => ({ name })) }))));
+    }
     if (route === 'issue create') return ok('https://github.com/acme/widgets/issues/7\n');
     if (route === 'issue pin') return ok('');
+    if (route === 'issue edit') return ok(`https://github.com/acme/widgets/issues/${args[2] ?? ''}\n`);
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${route}` });
   };
 
@@ -416,6 +422,54 @@ describe('whether the step runs', () => {
       .map((args) => args[2]);
     expect(created).toEqual(expect.arrayContaining(['type:epic', 'horizon:now', 'horizon:next', 'horizon:later']));
     expect(result.report?.parts.filter((part) => part.kind === 'label' && part.outcome === 'created')).toHaveLength(BOARD_LABELS.length);
+  });
+
+  it('creates the Roadmap issue with --label type:roadmap under --board, after the label is made', async () => {
+    const gh = fakeGh();
+    const root = freshRoot('roadmap-label');
+
+    const result = await runBoardStep({
+      wanted: true,
+      provider: 'gh',
+      root,
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+
+    const creates = gh.calls().filter((args) => args[0] === 'issue' && args[1] === 'create');
+    const labelAt = gh.calls().findIndex((args) => args[1] === 'create' && args[2] === ROADMAP_LABEL);
+    const issueAt = gh.calls().findIndex((args) => args[0] === 'issue' && args[1] === 'create');
+    expect(creates).toHaveLength(1);
+    expect(creates[0]?.slice(0, 6)).toEqual(['issue', 'create', '--title', 'Roadmap', '--label', ROADMAP_LABEL]);
+    expect(labelAt).toBeGreaterThan(-1);
+    expect(labelAt).toBeLessThan(issueAt);
+    expect(result.report?.roadmapIssue).toBe(7);
+  });
+
+  it('adds type:roadmap to an existing titled Roadmap it adopts, and sends no edit to one already carrying it', async () => {
+    const bare = fakeGh({ issues: [{ number: 4, title: 'Roadmap', labels: [] }] });
+    const labelled = fakeGh({ issues: [{ number: 4, title: 'Roadmap', labels: [ROADMAP_LABEL] }] });
+    const options = (gh: ReturnType<typeof fakeGh>, label: string) => ({
+      wanted: true,
+      provider: 'gh',
+      root: freshRoot(label),
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    }) as const;
+
+    const adopted = await runBoardStep(options(bare, 'adopt-bare'));
+    const kept = await runBoardStep(options(labelled, 'adopt-labelled'));
+
+    const edits = (gh: ReturnType<typeof fakeGh>) => gh.calls().filter((args) => args[0] === 'issue' && args[1] === 'edit');
+    expect(edits(bare)).toEqual([['issue', 'edit', '4', '--add-label', ROADMAP_LABEL]]);
+    expect(edits(labelled)).toEqual([]);
+    expect(bare.routes()).not.toContain('issue create');
+    expect(labelled.routes()).not.toContain('issue create');
+    expect(renderBoardStep(adopted)).toContain(`  created  Roadmap issue: issue #4 is open and titled Roadmap, and now carries ${ROADMAP_LABEL}`);
+    expect(renderBoardStep(kept)).toContain('  present  Roadmap issue');
+    expect([adopted.report?.roadmapIssue, kept.report?.roadmapIssue]).toEqual([4, 4]);
   });
 
   it('creates nothing on a second run over the board it made, and says so part by part', async () => {

@@ -17,17 +17,25 @@
  * | `board` | the roadmap's next issue and whether it is ready, then how many issues carry `spec:blocked` |
  * | `housekeeping` | the four `rafa cleanup` group counts, and how many worktrees are idle |
  *
- * The loops line alone has lines under it, indented two spaces: one per
- * running loop (`sessionLine`, which names a paused one `paused`), then
- * one per blocked task, naming its plan, its line in the checklist and
- * the blocker its line trails, when it trails one.
+ * Two lines have lines under them, indented two spaces. The loops line
+ * has one per running loop (`sessionLine`, which names a paused one
+ * `paused`), then one per blocked task, naming its plan, its line in the
+ * checklist and the blocker its line trails, when it trails one.
+ *
+ * The board line has the place lines, only when the board reading
+ * carries a `place` (a position file, or an open `type:roadmap` issue;
+ * see `./sections.ts`): the place line (`placeLine`, `./place-line.ts`),
+ * the away line (`awayLine`) while the current place is not home, then
+ * each notice the place fell back with, at the `warn` level. A project
+ * with neither gets the board line alone, as it did before boards.
  *
  * ## A section not read
  *
  * A section `./sections.ts` could not read is still one line, at the
  * `warn` level rather than `info`: `<title>: not read: <problem>`. So a
  * section is never left out, and a `gh` that timed out is exactly one
- * `warn` line for each section it cost. It has no lines under it.
+ * `warn` line for each section it cost. It has no lines under it. The
+ * place notices are the only other `warn` lines.
  *
  * ## What the text leaves to the JSON
  *
@@ -64,6 +72,8 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { planLabel, sessionLine } from '../commands/loop/loop-sessions.js';
 import { formatCounts } from '../commands/plan/plan-files.js';
 
+import { awayLine, placeLine } from './place-line.js';
+
 /** Each section's title, in the order the text lists them. */
 export const STATUS_SECTION_TITLES = Object.freeze({
   branch: 'Branch',
@@ -96,7 +106,7 @@ const VERDICT_WORDS: Readonly<Record<ChecksVerdict, string>> = Object.freeze({
 
 /** One text line, and the level it is written at; see the module note. */
 export interface StatusLine {
-  /** `warn` for a section not read, `info` for every other line. */
+  /** `warn` for a section not read and a place notice, `info` for every other line. */
   readonly level: 'info' | 'warn';
   readonly text: string;
 }
@@ -166,6 +176,20 @@ function boardText(reading: BoardReading): string {
   return `${next}; ${blocked}`;
 }
 
+/** The lines under the board line: the place, the away line, the notices; none without a place. */
+function boardBody(reading: BoardReading): readonly StatusLine[] {
+  const { place } = reading;
+  if (place === undefined) return [];
+  const away = awayLine(place.current, place.home);
+  return [
+    info(`${INDENT}${placeLine(place.view)}`),
+    ...away === null
+      ? []
+      : [info(`${INDENT}${away}`)],
+    ...place.notices.map((notice): StatusLine => ({ level: 'warn', text: `${INDENT}${notice}` })),
+  ];
+}
+
 /** Whether the next line can be planned: what blocks it, else whether it is ready. */
 function nextStanding(next: NonNullable<BoardReading['next']>): string {
   if (next.blocked !== null) return blockedLineSentence(next.blocked);
@@ -199,7 +223,7 @@ export function renderStatus(sections: StatusSections): readonly StatusLine[] {
     ...sectionLines('branch', sections.branch, branchText),
     ...sectionLines('loops', sections.loops, loopsText, loopsBody),
     ...sectionLines('pull', sections.pull, pullText),
-    ...sectionLines('board', sections.board, boardText),
+    ...sectionLines('board', sections.board, boardText, boardBody),
     ...sectionLines('housekeeping', sections.housekeeping, housekeepingText),
   ];
 }

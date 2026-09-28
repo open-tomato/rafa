@@ -44,6 +44,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { createGithubTracker } from '../../adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
+import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
@@ -339,15 +340,18 @@ interface GhPlant {
   readonly board?: GhResult;
   /** The title search. */
   readonly search?: GhResult;
+  /** The `type:roadmap` listing; no board unless planted, so roadmap.issue and the title decide as before. */
+  readonly boards?: GhResult;
 }
 
-/** A `gh` answering the four reads `--roadmap` makes, recording every call in `calls`. */
+/** A `gh` answering the five reads `--roadmap` makes, recording every call in `calls`. */
 function plantedGh(plant: GhPlant, calls: string[][]): GhRunner {
   const ok = (stdout: string): GhResult => ({ ok: true, stdout, stderr: '' });
   const roadmap = ok(JSON.stringify({ number: ROADMAP, title: 'Roadmap', body: ROADMAP_BODY, state: 'OPEN', labels: [], author: { login: 'owner' } }));
   return (args) => {
     calls.push([...args]);
     const [noun, verb, , value] = args;
+    if (noun === 'issue' && verb === 'list' && args.includes('--label')) return Promise.resolve(plant.boards ?? ok('[]'));
     if (noun === 'issue' && verb === 'view' && args[2] === String(ROADMAP)) return Promise.resolve(plant.roadmap ?? roadmap);
     if (noun === 'issue' && verb === 'list' && value === 'all') return Promise.resolve(plant.board ?? ok(BOARD_JSON));
     if (noun === 'issue' && verb === 'list' && value === 'open') return Promise.resolve(plant.search ?? ok('[]'));
@@ -524,7 +528,7 @@ describe('rafa issue list --roadmap, refused', () => {
     expect(refused.exitCode).toBe(ROADMAP_REFUSAL_EXIT);
     expect(refused.stdout).toBe('');
     expect(refused.stderr).toStartWith('❌ Could not read the roadmap: no open issue is titled Roadmap');
-    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue list']);
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue list', 'issue list']);
   });
 
   it('refuses with the roadmap exit code when the Roadmap issue cannot be read, reading no board', async () => {
@@ -537,7 +541,7 @@ describe('rafa issue list --roadmap, refused', () => {
     expect(refused.exitCode).toBe(ROADMAP_REFUSAL_EXIT);
     expect(refused.stderr).toStartWith('❌ Could not read the roadmap: ');
     expect(refused.stderr).toContain('HTTP 404: Not Found');
-    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view']);
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue list', 'issue view']);
   });
 });
 
@@ -549,7 +553,8 @@ describe('rafa issue list --roadmap', () => {
     const outcome = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({}, calls));
 
     expect(outcome).toEqual({ exitCode: 0, stdout: `${UNTICKED_TABLE.join('\n')}\n`, stderr: '' });
-    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view', 'issue list', 'pr list']);
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue list', 'issue view', 'issue list', 'pr list']);
+    expect(calls[0]).toEqual([...BOARDS_LIST_ARGS]);
   });
 
   it('keeps the ticked lines in their places under --all', async () => {
@@ -570,7 +575,21 @@ describe('rafa issue list --roadmap', () => {
     const outcome = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({ search }, calls));
 
     expect(outcome).toEqual({ exitCode: 0, stdout: `${UNTICKED_TABLE.join('\n')}\n`, stderr: '' });
-    expect(calls[0]?.slice(0, 4)).toEqual(['issue', 'list', '--state', 'open']);
+    expect(calls[1]?.slice(0, 4)).toEqual(['issue', 'list', '--state', 'open']);
+  });
+
+  it('reads the type:roadmap board over an unlabelled issue titled Roadmap when the config names none', async () => {
+    const calls: string[][] = [];
+    const project = plantRoadmapCase(LOCAL_CONFIG);
+    const labelled = { number: ROADMAP, title: 'Team board', body: '', state: 'OPEN', stateReason: null, labels: [{ name: 'type:roadmap' }] };
+    const boards: GhResult = { ok: true, stdout: JSON.stringify([labelled]), stderr: '' };
+    // The search names #90, which the planted gh cannot read: reading it would fail the run.
+    const search: GhResult = { ok: true, stdout: JSON.stringify([{ number: 90, title: 'Roadmap' }]), stderr: '' };
+
+    const outcome = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({ boards, search }, calls));
+
+    expect(outcome).toEqual({ exitCode: 0, stdout: `${UNTICKED_TABLE.join('\n')}\n`, stderr: '' });
+    expect(calls.filter((call) => call[1] === 'view').map((call) => call[2])).toEqual([String(ROADMAP)]);
   });
 
   it.each(ROADMAP_NARROWED)('narrows the Roadmap\'s rows by %j after its selection, keeping its order', async (flags, issues) => {
@@ -599,7 +618,7 @@ describe('rafa issue list --roadmap', () => {
     const outcome = await run(['issue', 'list', '--roadmap'], project, roadmapCommand({ board: UNREACHABLE }, calls));
 
     expect(outcome).toEqual({ exitCode: 0, stdout: `${[UNREACHABLE_WARNING, ...UNREACHABLE_TABLE].join('\n')}\n`, stderr: '' });
-    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view', 'issue list']);
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue list', 'issue view', 'issue list']);
   });
 
   it('matches no --type on a row the unreachable board did not answer, and searches its line\'s own words', async () => {
@@ -683,7 +702,9 @@ describe('rafa issue list --roadmap', () => {
     ]);
     expect(asked).toContain('src/gone.ts');
     expect(asked).not.toContain('src/off.ts');
-    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view', 'issue list', 'pr list', 'issue view', 'issue list', 'pr list']);
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual([
+      'issue list', 'issue view', 'issue list', 'pr list', 'issue list', 'issue view', 'issue list', 'pr list',
+    ]);
   });
 
   it('carries the unreachable board as a warning in json mode, a warn log event ahead of the result', async () => {
@@ -785,7 +806,7 @@ describe('rafa issue list --roadmap, with epics', () => {
       ]),
       stderr: '',
     });
-    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue view', 'issue list', 'pr list']);
+    expect(calls.map((call) => call.slice(0, 2).join(' '))).toEqual(['issue list', 'issue view', 'issue list', 'pr list']);
   });
 
   it('widens to every horizon under --all, hiding no epic', async () => {

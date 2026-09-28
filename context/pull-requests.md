@@ -513,8 +513,11 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   machine paths and private hosts live there and never on the board. The plan's
   `rafa:plan` block gets `issue: <n>`.
 - `plan create --next[=<roadmap-issue>]` — the first undone line of the
-  roadmap issue. The roadmap issue is `roadmap.issue` in config, else the
-  pinned issue titled "Roadmap". Its body is parsed by code: task-list lines
+  roadmap issue. The roadmap issue is the one `--next=<n>` names; else,
+  after `rafa switch`, the current place's board, or its epic, whose
+  lines alone are walked; else the default board: `roadmap.issue` in
+  config, the lowest-numbered open `type:roadmap` board, or the pinned
+  issue titled "Roadmap". Its body is parsed by code: task-list lines
   `- [ ] #<n>` in order. A line is DONE when it is ticked or its issue is
   closed. A line is TAKEN when a branch `feat/rafa-<n>-*` exists locally or
   on the remote, or an open PR closes it. The first line neither done nor
@@ -541,8 +544,10 @@ but `dangerous.acceptStaleRefs`, passes check 4.
 
 Both routes are mutually exclusive with `--spec` and with each other.
 
-Ticking: `pr merge` ticks the PR's `Closes #<n>` line in the roadmap issue
-after the merge (GitHub closes the issue; it does not tick a task-list box).
+Ticking: `pr merge` ticks the PR's `Closes #<n>` line on every open
+`type:roadmap` board whose checklist lists it, or in the roadmap issue while
+no issue carries the label, after the merge (GitHub closes the issue; it does
+not tick a task-list box).
 An edit conflict re-reads and retries once — and the only conflict signal
 there is, is the body the PATCH answers with. The issues REST API takes no
 `If-Match` and `gh` sends no conditional request, so a lost update comes
@@ -561,6 +566,9 @@ refuses a body matching a home path or a token shape, naming the line.
 `spec:needs-work`, and the ones triage already files under (`type:bug`,
 `needs-triage`, `module:unassigned`); `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
+The Roadmap issue is opened with `--label type:roadmap`, and an open issue
+titled "Roadmap" that it adopts instead gets that label added when it
+lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.

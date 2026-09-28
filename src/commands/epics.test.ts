@@ -15,6 +15,11 @@
  * issue numbers, not by a missing substring alone: the control is the
  * same reading over `rafa epics 60`, which must find #61 and #62, so a
  * reading that found nothing could not pass both.
+ *
+ * The current place is a position file planted in the case's project.
+ * A second board, #90 (`type:roadmap`), names #60 alone, so a bare
+ * `rafa epics` on it lands on #60 where the default board lands on #50;
+ * the bare case with no position file is the control for each.
  */
 import type { EpicsResult } from './epics.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -22,6 +27,7 @@ import type { EpicProblem } from '../board/epic-problems.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RoadmapLine } from '../board/roadmap.js';
 import type { GitRunner } from '../pr/git.js';
+import type { Place } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -31,9 +37,12 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
+import { BOARDS_LIST_ARGS } from '../board/boards.js';
 import { readEpics } from '../board/epics.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
+import { unweighedPositionNotice } from '../board/roadmap-rows.js';
 import { ROADMAP_REFUSAL_EXIT } from '../board/roadmap.js';
+import { positionAt, writePositionFile } from '../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
@@ -83,11 +92,21 @@ const BOARD = [
   boardIssue(80, 'Epic delta', '## Acceptance criteria\n\nDelta works.\n\nEstimate: 1 month\n', 'OPEN', ['type:epic', 'epic:delta', 'horizon:next']),
 ];
 
+/** The second board, labelled `type:roadmap`, naming #60 alone. */
+const SECOND = 90;
+
+/** The second board's body. */
+const SECOND_BODY = '- [ ] #60 — beta\n';
+
 /** How the planted `gh` answers. */
 interface Planted {
   readonly roadmapBody?: string;
   readonly failListing?: boolean;
   readonly failRoadmap?: boolean;
+  /** Plant the second board on the listing, open or in this state. */
+  readonly second?: 'OPEN' | 'CLOSED';
+  /** Plant a position file at this place, current and home. */
+  readonly position?: Place;
 }
 
 /** A `gh` answering the Roadmap read, the board listing and the open pull requests, recording each call. */
@@ -102,18 +121,26 @@ function plantedGh(calls: string[][], planted: Planted): GhRunner {
     labels: [],
     author: { login: 'owner' },
   });
+  const second = JSON.stringify({ number: SECOND, title: 'Team board', body: SECOND_BODY, state: 'OPEN', labels: [], author: { login: 'owner' } });
+  const board = planted.second === undefined
+    ? BOARD
+    : [...BOARD, boardIssue(SECOND, 'Team board', SECOND_BODY, planted.second, ['type:roadmap'])];
   return (args) => {
     calls.push([...args]);
-    const [noun, verb] = args;
+    const [noun, verb, number] = args;
     if (noun === 'issue' && verb === 'view') {
-      return Promise.resolve(planted.failRoadmap === true
-        ? failed('could not resolve to an issue')
-        : ok(roadmap));
+      if (planted.failRoadmap === true) return Promise.resolve(failed('could not resolve to an issue'));
+      return Promise.resolve(ok(number === String(SECOND)
+        ? second
+        : roadmap));
     }
+    // No issue carries type:roadmap, so the label listing answers empty
+    // and roadmap.issue decides, as before.
+    if (noun === 'issue' && verb === 'list' && args.includes('--label')) return Promise.resolve(ok('[]'));
     if (noun === 'issue' && verb === 'list') {
       return Promise.resolve(planted.failListing === true
         ? failed('error connecting to api.github.com')
-        : ok(JSON.stringify(BOARD)));
+        : ok(JSON.stringify(board)));
     }
     if (noun === 'pr' && verb === 'list') return Promise.resolve(ok('[]'));
     return Promise.resolve(failed(`unplanted: gh ${args.join(' ')}`));
@@ -132,7 +159,9 @@ function plantCase(): PlantedProject {
 async function run(words: readonly string[], planted: Planted = {}) {
   const calls: string[][] = [];
   const seams = { gh: plantedGh(calls, planted), git: plantedGit, planNames: () => () => [], terminalWidth: () => undefined };
-  const outcome = await dispatchInProject(words, [], [createEpicsCommand(seams)], plantCase());
+  const project = plantCase();
+  if (planted.position !== undefined) writePositionFile(project.root, positionAt(planted.position));
+  const outcome = await dispatchInProject(words, [], [createEpicsCommand(seams)], project);
   return { ...outcome, calls };
 }
 
@@ -141,9 +170,9 @@ function issuesNamed(text: string): readonly number[] {
   return [...new Set([...text.matchAll(/#(\d+)/gu)].map((match) => Number(match[1])))];
 }
 
-/** How many calls were the board listing: an `issue list` with no title search. */
+/** How many calls were the board listing: an `issue list` with no title search and no label filter. */
 function listings(calls: readonly string[][]): number {
-  return calls.filter((call) => call[0] === 'issue' && call[1] === 'list' && !call.includes('--search')).length;
+  return calls.filter((call) => call[0] === 'issue' && call[1] === 'list' && !call.includes('--search') && !call.includes('--label')).length;
 }
 
 /** The board as `BoardIssue`s, read as the listing reads them. */
@@ -246,6 +275,8 @@ describe('rafa epics, dispatched', () => {
       .filter((text) => text.startsWith('#'))
       .map((text) => text.split(' ')[0])).toEqual(['#51', '#53', '#54']);
     expect(listings(outcome.calls)).toBe(1);
+    // The Roadmap is the default board, found after one type:roadmap listing.
+    expect(outcome.calls.filter((call) => call.includes('--label'))).toEqual([[...BOARDS_LIST_ARGS]]);
   });
 
   it('names no issue of another epic, the control being the other epic\'s own reading', async () => {
@@ -313,6 +344,56 @@ describe('rafa epics, dispatched', () => {
 
     expect(outcome.exitCode).toBe(ROADMAP_REFUSAL_EXIT);
     expect(outcome.stderr).toContain('Could not read the roadmap');
+  });
+
+  it('prints the current place\'s epic, whatever its horizon, reading no board body, the control being no position file', async () => {
+    const moved = await run(['epics'], { position: { board: ROADMAP, epic: 80 } });
+    const control = await run(['epics']);
+
+    expect(moved.exitCode).toBe(0);
+    expect(moved.stdout).toBe('Epic #80 · Epic delta · empty, 0/0 done\nNo issues.\n');
+    expect(moved.calls.filter((call) => call[1] === 'view')).toEqual([]);
+    expect(listings(moved.calls)).toBe(1);
+    expect(control.stdout).toContain('Epic #50 · Epic alpha');
+  });
+
+  it('takes the first now epic not done on the current place\'s board when the place names a board alone', async () => {
+    const moved = await run(['epics', '--output=json'], { second: 'OPEN', position: { board: SECOND, epic: null } });
+    const control = await run(['epics', '--output=json'], { second: 'OPEN' });
+    const data = (text: string): EpicsResult | undefined => (eventsOf(text).find((event) => event.type === 'result') as { data?: EpicsResult } | undefined)?.data;
+
+    expect(data(moved.stdout)?.roadmap).toBe(SECOND);
+    expect(data(moved.stdout)?.epic?.number).toBe(60);
+    expect(moved.calls.filter((call) => call[1] === 'view').map((call) => call[2])).toEqual([String(SECOND)]);
+    expect(listings(moved.calls)).toBe(1);
+    expect(data(control.stdout)?.roadmap).toBe(ROADMAP);
+    expect(data(control.stdout)?.epic?.number).toBe(50);
+  });
+
+  it('keeps an explicit number over the current place', async () => {
+    const outcome = await run(['epics', '60'], { position: { board: ROADMAP, epic: 80 } });
+
+    expect(outcome.stdout.split('\n')[0]).toBe('Epic #60 · Epic beta · backlog, 0/2 done');
+  });
+
+  it('warns a lost place and falls back to the default board\'s first now epic', async () => {
+    const outcome = await run(['epics'], { second: 'CLOSED', position: { board: SECOND, epic: 60 } });
+    const [warning, ...lines] = outcome.stdout.split('\n');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(warning).toStartWith(`warn: The current place and home lost board #${String(SECOND)}, which is closed;`);
+    expect(lines.find((text) => text.startsWith('Epic #'))).toBe('Epic #50 · Epic alpha · in-progress, 1/4 done');
+  });
+
+  it('warns that the position was not weighed when the listing fails, and prints the default board\'s epics unknown', async () => {
+    const outcome = await run(['epics'], { failListing: true, position: { board: ROADMAP, epic: 60 } });
+
+    expect(outcome.exitCode).toBe(0);
+    const [warning, unknown] = outcome.stdout.split('\n');
+
+    expect(warning).toBe(`warn: ${unweighedPositionNotice(ROADMAP)}`);
+    expect(unknown).toStartWith(`Roadmap #${String(ROADMAP)} · epics unknown: `);
+    expect(unknown).toContain('error connecting to api.github.com');
   });
 
   it('gives the epic, its rows and its problems as the result data in json mode', async () => {

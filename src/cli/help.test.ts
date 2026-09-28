@@ -262,8 +262,8 @@ describe('the frozen help snapshots', () => {
     expect(renderHelp({ level: 'root' }, CORE_REGISTRY)).toBe(snapshot);
     expect(renderHelp({ level: 'root' }, lessUsage)).not.toBe(snapshot);
     expect(blockOf(snapshot, 'Commands')).toEqual([
-      '  status, next 🪙, roadmap, epics, init, doctor, cleanup, self-update, usage,',
-      '  describe',
+      '  status, next 🪙, roadmap, epics, switch, init, doctor, cleanup, self-update,',
+      '  usage, describe',
     ]);
   });
 

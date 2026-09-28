@@ -8,7 +8,7 @@
  * case where the same section was read and printed at `info`, so a
  * renderer that always warned, or never did, would fail.
  */
-import type { BlockedSession, SectionUnread, StatusSections } from './sections.js';
+import type { BlockedSession, PlaceReading, SectionUnread, StatusSections } from './sections.js';
 import type { SessionRecord } from '../loop/sessions.js';
 
 import { describe, expect, it } from 'bun:test';
@@ -206,6 +206,96 @@ describe('renderStatus', () => {
       level: 'warn',
       text: `${title}: not read: nothing answered`,
     })));
+  });
+});
+
+describe('the place lines under the board line', () => {
+  /** The board line every case here prints first. */
+  const BOARD_LINE = 'Board: next is #102 on roadmap #31, ready; 3 issues labelled spec:blocked';
+
+  /** A place at epic #252 on board #31, home. */
+  const HOME: PlaceReading = {
+    current: { board: 31, epic: 252 },
+    home: { board: 31, epic: 252 },
+    view: { board: 31, epic: { number: 252, title: 'Epics and boards', horizon: 'now', done: 3, total: 7 }, next: 102 },
+    notices: [],
+  };
+
+  /** `allRead` with the board reading carrying `place`. */
+  function withPlace(place: PlaceReading): StatusSections {
+    const sections = allRead();
+    if (!sections.board.read) throw new Error('the fixture reads its board');
+    return { ...sections, board: { ...sections.board, place } };
+  }
+
+  /** The board line and the lines under it. */
+  function boardLines(sections: StatusSections): readonly { readonly level: string; readonly text: string }[] {
+    const lines = renderStatus(sections);
+    const from = lines.findIndex((line) => line.text.startsWith('Board:'));
+    const to = lines.findIndex((line) => line.text.startsWith('Housekeeping:'));
+    return lines.slice(from, to);
+  }
+
+  it('prints today\'s lines, byte for byte, for a board reading with no place', () => {
+    const lines = renderStatus(allRead());
+
+    expect(lines.map((line) => line.text).join('\n')).toBe([
+      'Branch: `feat/rafa-101-rafa-status`, plan `rafa-101-rafa-status` (2/5 done, 2 blocked, 1 open)',
+      'Loops: 1 running, 2 tasks blocked',
+      '  session-0100: plan `rafa-101-rafa-status` on `feat/rafa-101-rafa-status`, running, pid 4242, started 2026-09-24T10:00:00.000Z',
+      '  blocked: plan `rafa-101-rafa-status` line 12: Add the spawned test (gh never answers)',
+      '  blocked: plan `rafa-101-rafa-status` line 14: Write the docs',
+      'Pull request: #120 rafa status, mergeable, checks green',
+      BOARD_LINE,
+      'Housekeeping: 1 merged, 0 stale, 2 not pushed, 3 worktrees (1 idle)',
+    ].join('\n'));
+    expect(boardLines(allRead())).toEqual([{ level: 'info', text: BOARD_LINE }]);
+  });
+
+  it('prints the place line under the board line, and no away line at home', () => {
+    expect(boardLines(withPlace(HOME))).toEqual([
+      { level: 'info', text: BOARD_LINE },
+      { level: 'info', text: '  board #31 · epic #252 Epics and boards (now) · 3/7 done · next #102' },
+    ]);
+  });
+
+  it('prints the away line while the current place is not home', () => {
+    const away: PlaceReading = { ...HOME, home: { board: 40, epic: 247 } };
+
+    expect(boardLines(withPlace(away)).map((line) => line.text)).toEqual([
+      BOARD_LINE,
+      '  board #31 · epic #252 Epics and boards (now) · 3/7 done · next #102',
+      '  away from home: working #252 for #247',
+    ]);
+  });
+
+  it('prints the board-only place line, and each notice at warn', () => {
+    const notice = 'The current place and home lost board #41, which is closed; falling back to the default board #31';
+    const fallen: PlaceReading = {
+      current: { board: 31, epic: null },
+      home: { board: 31, epic: null },
+      view: { board: 31, epic: null, next: null },
+      notices: [notice],
+    };
+
+    expect(boardLines(withPlace(fallen))).toEqual([
+      { level: 'info', text: BOARD_LINE },
+      { level: 'info', text: '  board #31 · no epic' },
+      { level: 'warn', text: `  ${notice}` },
+    ]);
+  });
+
+  it('prints no place lines under a board section not read', () => {
+    const lines = renderStatus({ ...allRead(), board: unread('nothing answered') });
+
+    expect(lines.filter((line) => line.text.startsWith('  board #'))).toEqual([]);
+  });
+
+  it('carries the place in the JSON data only when the reading has one', () => {
+    const data = statusData(withPlace(HOME));
+
+    expect(data.board.read && data.board.place).toEqual(HOME);
+    expect(Object.keys(statusData(allRead()).board)).toEqual(['read', 'roadmap', 'next', 'passed', 'blockedIssues', 'notes']);
   });
 });
 

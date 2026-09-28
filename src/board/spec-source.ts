@@ -19,15 +19,19 @@
  * ```
  *
  * `--next` is `--issue` with the number read off the roadmap rather
- * than typed, which is why the two share every line below the pick.
+ * than typed, which is why the two share every line below the pick. The
+ * pick itself — where the walk starts, the walk, the lines it prints, a
+ * blocked line and the roadmap's own checks — is
+ * `./spec-source-roadmap.ts`'s, handed this module's memoised reader and
+ * {@link SpecSourceOptions.repoRoot}, and answering a number or a stop.
  *
  * Nothing here spawns and nothing here reads a flag it was not handed.
- * The issue arrives through `./issue.ts`'s {@link SpecIssueReader}, the
- * roadmap through `./roadmap.ts`'s seams and git through the
- * {@link GitRunner} declared in `src/pr/git.ts`, so every case in
- * `./spec-source.test.ts` drives fakes of its own and writes in its own
- * temporary directory: none reaches GitHub, spawns `gh` or `git`, or
- * touches a real home.
+ * The issue arrives through `./issue.ts`'s {@link SpecIssueReader} and
+ * the roadmap through the seams `./spec-source-roadmap.ts` declares, so
+ * every case in `./spec-source.test.ts` and
+ * `./spec-source-roadmap.test.ts` drives fakes of its own and writes in
+ * its own temporary directory: none reaches GitHub, spawns `gh` or
+ * `git`, or touches a real home.
  *
  * ## Mutual exclusion, and what it costs to get wrong
  *
@@ -64,59 +68,10 @@
  * ready rather than skip past it, which the spec asks for in so many
  * words: `inspect` throws, the throw leaves the walk finished, and
  * nothing here catches it to try the line below. Skipping ahead would
- * reorder the roadmap with nobody saying so.
- *
- * ## The one line the walk moves past, and what moves it
- *
- * A BLOCKED pick is the exception, and it is one because an operator
- * said yes to it. A line whose issue carries `spec:blocked` with a
- * blocker still open is work that cannot start whatever anyone types,
- * so the run neither plans it nor stops silently: it names what the
- * line waits on ({@link blockedPickLine}, `#57 is blocked by #24
- * (open)`), walks on for the first line under it that is ready, not
- * blocked and not taken (`./blocked-line.ts`), names that one by number
- * and asks. Only a yes plans it; no answer, no alternative on the
- * roadmap and no terminal to ask on each end the run with a sentence
- * saying which, and all three stop at {@link SpecSourceStop} `blocked`.
- *
- * So the rule above holds where it is about the roadmap's order: the
- * walk reorders nothing by itself, and the only thing that moves past a
- * line is an answer. A run handed no offer
- * ({@link RoadmapSeams.offerAlternative}) plans nothing at all, which is
- * what a `--dry-run` run and a run with no terminal both get
- * (`./plan-spec.ts`).
- *
- * The blocked reading costs NO command of its own: the label and the
- * `Blocked by:` line are read off the issue the walk already read to
- * ask whether it was closed, and each blocker's state goes through the
- * same memoised reader.
- *
- * It runs BEFORE {@link SpecSourceOptions.inspect}, so a blocked pick is
- * never offered the `spec:ready` label on its way past: that offer is a
- * question about whether the spec may be planned, and this line is not
- * about to be planned whatever the answer. The line the offer names goes
- * through `inspect` in full, exactly as a typed `--issue=<n>` would.
- *
- * ## The roadmap's own body, and why it has a seam of its own
- *
- * `inspect` runs on the line the walk PICKS. The roadmap is a second
- * body the `--next` route reads, and it is board text as much as the
- * spec is: what its lines decide is the ORDER, so whoever can write it
- * can point the next session at an issue of their choosing.
- *
- * It goes through {@link RoadmapSeams.inspectRoadmap} rather than
- * through `inspect`, because the two bodies are asked different
- * questions. The roadmap carries no `spec:ready` label, fills no spec
- * template and is never snapshotted, so the checks `inspect` composes
- * would refuse every roadmap there is; what is left to ask about it is
- * its AUTHOR, and that is the caller's to compose too
- * (`./plan-spec.ts`).
- *
- * It is called on the issue as READ and before a line is parsed out of
- * it, which is also before the branch scan and the pull request list
- * are spent: a roadmap whose author the caller refuses costs the read
- * that found the author and nothing else, and no line of it reaches
- * the walk, the output or a snapshot.
+ * reorder the roadmap with nobody saying so. The one line the walk does
+ * move past, a blocked one and only on a yes, is
+ * `./spec-source-roadmap.ts`'s to settle, and it settles it before
+ * `inspect` runs, so the line an offer names is inspected in full.
  *
  * ## One read per issue
  *
@@ -125,26 +80,13 @@
  * title and body. That is one `gh issue view` per issue too many, so
  * the reader is memoised for the length of one resolution
  * ({@link memoiseIssues}) and the walk and the snapshot share the
- * answer. `./spec-source.test.ts` counts the reads rather than assuming
- * it: a memo that stopped working costs a call per line and changes no
- * answer, so nothing but a count can see it.
+ * answer. `./spec-source-roadmap.test.ts` counts the reads rather than
+ * assuming it: a memo that stopped working costs a call per line and
+ * changes no answer, so nothing but a count can see it.
  *
  * The memo lives for one call. An issue edited mid-run is not a case
  * worth a second read, and a memo held across runs would serve a stale
  * body to the next one.
- *
- * ## A roadmap line naming an epic
- *
- * The walk is `pickDescendedLine` (`./epic-walk.ts`), the one `rafa next`
- * shares, over the same memoised reader and readings, so an epic line is
- * told apart by labels already read and a roadmap with no epic line
- * spends nothing more and prints the same lines. The board is listed
- * through {@link RoadmapSeams.listing} only for an open `now` epic line.
- * Walking into one prints its header, each open member missing from its
- * checklist, then the walk over its lines; a blocked pick's alternative
- * is looked for among those lines only. An epic whose every line is done
- * or taken has run dry: the run stops `exhausted` on that sentence and
- * never reads on into a second epic.
  *
  * ## What `--dry-run` does, and does not
  *
@@ -176,52 +118,15 @@
  * input or no offer at all — the refusal a changed body always met. The
  * offer is a seam this module only passes on; `./plan-spec.ts` hands
  * none under `--dry-run`, and this module never reaches it there.
- *
- * ## The branch scan's problems are printed, never swallowed
- *
- * `scanClaimBranches` carries a failed remote read out as sentences
- * rather than throwing, because "nothing is taken" read off a check
- * that never ran is how two people end up on one spec
- * (`./roadmap.ts`). This module is the caller that decides what to do
- * with them, and the policy is: WARN each one and carry on. The walk
- * still has the local half, the operator is told which half is
- * missing, and a laptop with no network still plans.
  */
-import type { AlternativeOffer, BlockedLine, PassedLine, PlannableReadings } from './blocked-line.js';
-import type { DescendedEpic, DescendedPick, DescentPass } from './epic-walk.js';
 import type { SpecIssue, SpecIssueReader, SpecSnapshot } from './issue.js';
-import type { BoardIssue, BoardListing } from './roadmap-board.js';
-import type {
-  OpenPullRequestLister,
-  RoadmapLine,
-  RoadmapReadings,
-  RoadmapSearch,
-  RoadmapSkip,
-} from './roadmap.js';
 import type { RefreshOffer } from './snapshot-settle.js';
+import type { RoadmapOutcome, RoadmapSeams, RoadmapStop } from './spec-source-roadmap.js';
 import type { Output } from '../ports/index.js';
-import type { GitRunner } from '../pr/git.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 
-import {
-  blockedLineSentence,
-  blockerStatesOf,
-  declinedMessage,
-  noAlternativeMessage,
-  pickPlannableLine,
-  plannableReadings,
-  readBlockedLine,
-  unaskedMessage,
-} from './blocked-line.js';
-import {
-  descentPassSentence,
-  dryEpicSentence,
-  epicHeaderSentence,
-  labelOnlySentence,
-  pickDescendedLine,
-} from './epic-walk.js';
 import {
   DRY_RUN_FLAG,
   ISSUE_FLAG,
@@ -230,15 +135,8 @@ import {
   SPEC_FLAG,
 } from './flags.js';
 import { requireSpecIssue } from './issue.js';
-import {
-  createRoadmapReadings,
-  exhaustedMessage,
-  parseRoadmapBody,
-  resolveRoadmapIssue,
-  scanClaimBranches,
-  skipSentence,
-} from './roadmap.js';
 import { settleSpecSnapshot } from './snapshot-settle.js';
+import { pickRoadmapIssue } from './spec-source-roadmap.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board spec source';
@@ -383,30 +281,6 @@ export function readSpecSourceFlags(args: readonly string[]): SpecSourceFlags {
   });
 }
 
-/** What `--next` reads the roadmap through; only that route needs it. */
-export interface RoadmapSeams {
-  /** `roadmap.issue` as config resolved it, or null for the titled issue. */
-  readonly configured: number | null;
-  /** Finds the issue titled `Roadmap` when nothing names one. */
-  readonly search: RoadmapSearch;
-  /** Runs the two branch reads the taken reading is taken from. */
-  readonly git: GitRunner;
-  /** The remote the pushed half of the scan asks; `origin` when left out. */
-  readonly remote?: string;
-  /** Lists the open pull requests the other taken reading is read from. */
-  readonly pullRequests: OpenPullRequestLister;
-  /** Lists the board, once, and only when the walk meets an open `now` epic line. */
-  readonly listing: BoardListing;
-  /** The checks that run on the roadmap issue as read, before a line is parsed out of it. */
-  readonly inspectRoadmap?: (issue: SpecIssue) => Promise<void>;
-  /**
-   * Asks whether to plan the line offered in place of a blocked one;
-   * left out for a run with nobody to ask, which plans nothing and says
-   * so ({@link unaskedMessage}). See the blocked-line note below.
-   */
-  readonly offerAlternative?: AlternativeOffer;
-}
-
 /** What {@link resolveSpecSource} is asked. */
 export interface SpecSourceOptions {
   /** The source the command line named, as {@link readSpecSourceFlags} read it. */
@@ -454,63 +328,12 @@ export interface ResolvedSpec {
 }
 
 /** Why a resolution stopped without a spec. */
-export type SpecSourceStop = 'dry-run' | 'exhausted' | 'blocked';
+export type SpecSourceStop = 'dry-run' | RoadmapStop;
 
 /** What a resolution answers: one spec, or a reason it stopped. */
 export type SpecSourceResolution =
   | { readonly outcome: 'spec'; readonly spec: ResolvedSpec }
   | { readonly outcome: 'stopped'; readonly reason: SpecSourceStop };
-
-/** The line a `--next` walk opens with, naming the roadmap it is reading. */
-export function roadmapHeaderLine(roadmap: number): string {
-  return `🗺  Reading the roadmap, issue #${String(roadmap)}, for the next spec...`;
-}
-
-/** The line one skipped roadmap line prints; `./roadmap.ts` spells the sentence. */
-export function skipLine(skip: RoadmapSkip): string {
-  return `   ⏭  ${skipSentence(skip)}`;
-}
-
-/** The line one line the epic descent passed prints; a roadmap line's is {@link skipLine}'s. */
-export function descentPassLine(pass: DescentPass): string {
-  return `   ⏭  ${descentPassSentence(pass)}`;
-}
-
-/** The line a walk prints on walking into an epic. */
-export function epicHeaderLine(epic: DescendedEpic): string {
-  return `   🧭 ${epicHeaderSentence(epic)}`;
-}
-
-/** The line one open member missing from the epic's checklist prints. */
-export function labelOnlyLine(epic: DescendedEpic, member: BoardIssue): string {
-  return `   🏷  ${labelOnlySentence(epic, member)}`;
-}
-
-/** The line the pick prints, with the roadmap's own one-line why when it has one. */
-export function pickLine(line: RoadmapLine): string {
-  const id = `▶ Next on the roadmap: issue #${String(line.issue)}`;
-  return line.why === ''
-    ? id
-    : `${id} — ${line.why}`;
-}
-
-/** The line a blocked pick prints, naming what it waits on. */
-export function blockedPickLine(blocked: BlockedLine): string {
-  return `   🚧 ${blockedLineSentence(blocked)}`;
-}
-
-/** The line one line passed on the way to the alternative prints. */
-export function passedLine(passed: PassedLine): string {
-  return `   ⏭  ${passed.sentence}`;
-}
-
-/** The line naming what a run would plan in place of the blocked one. */
-export function alternativeLine(line: RoadmapLine): string {
-  const id = `▶ Ready instead: issue #${String(line.issue)}`;
-  return line.why === ''
-    ? id
-    : `${id} — ${line.why}`;
-}
 
 /** What the dry-run line calls an issue: its number and its title. */
 export function describeIssue(issue: SpecIssue): string {
@@ -520,6 +343,14 @@ export function describeIssue(issue: SpecIssue): string {
 /** The line `--dry-run` stops on, naming what a real run would have planned from. */
 export function dryRunLine(what: string): string {
   return `🔎 ${DRY_RUN_FLAG}: would plan from ${what}. Nothing was written.`;
+}
+
+/** The seams `--next` reads through; a `--next` resolution handed none is a defect in the caller. */
+function requireRoadmapSeams(seams: RoadmapSeams | undefined): RoadmapSeams {
+  if (seams === undefined) {
+    throw new TypeError(`${PREFIX}: ${NEXT_FLAG} was resolved with no roadmap seams`);
+  }
+  return seams;
 }
 
 /** A resolution that answers no spec. */
@@ -538,159 +369,6 @@ function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
     read.set(issue, taken);
     return taken;
   };
-}
-
-/** What a `--next` walk came to: the issue to plan from, or why the run stops. */
-type RoadmapOutcome =
-  | { readonly issue: number }
-  | { readonly stop: SpecSourceStop };
-
-/** What {@link settleBlockedPick} is handed, everything the walk already read. */
-interface BlockedPickOptions {
-  /** Why the line the walk picked cannot be planned. */
-  readonly blocked: BlockedLine;
-  /** The lines walked, in order: the roadmap's, or the one epic's. */
-  readonly lines: readonly RoadmapLine[];
-  /** The blocked line itself; the walk for an alternative resumes under it. */
-  readonly line: RoadmapLine;
-  /** The three readings the alternative is looked for through. */
-  readonly readings: PlannableReadings;
-  /** Asks whether to plan the alternative, or undefined for a run with nobody to ask. */
-  readonly offer: AlternativeOffer | undefined;
-  /** Where the lines go. */
-  readonly output: Output;
-}
-
-/**
- * What a walk whose pick is BLOCKED comes to: the blocker named, the
- * first line under it that is ready, not blocked and not taken offered
- * by number, and the issue to plan only where the answer was yes.
- *
- * Three of the four endings plan nothing and each says which it is — no
- * alternative on the roadmap at all, nobody to ask, and an answer that
- * was not yes — because a `--next` run that printed one blocked line and
- * stopped would read as a command that did nothing. The module note
- * holds why the offer is the only thing that reorders the roadmap.
- */
-async function settleBlockedPick(options: BlockedPickOptions): Promise<RoadmapOutcome> {
-  const { blocked, output } = options;
-  output.info(blockedPickLine(blocked));
-
-  const plannable = await pickPlannableLine(options.lines, options.line, options.readings);
-  plannable.passed.forEach((passed) => output.info(passedLine(passed)));
-  if (plannable.line === null) {
-    output.info(noAlternativeMessage(blocked.issue));
-    return { stop: 'blocked' };
-  }
-
-  output.info(alternativeLine(plannable.line));
-  const { offer } = options;
-  if (offer === undefined) {
-    output.info(unaskedMessage(blocked.issue, plannable.line.issue));
-    return { stop: 'blocked' };
-  }
-  if (!await offer({ blocked, line: plannable.line })) {
-    output.info(declinedMessage(plannable.line.issue));
-    return { stop: 'blocked' };
-  }
-  return { issue: plannable.line.issue };
-}
-
-/** What the `--next` walk answers: the issue to plan from, or why it stops. */
-async function pickRoadmapIssue(
-  request: { readonly roadmap: number | null },
-  options: SpecSourceOptions,
-  issues: SpecIssueReader,
-  output: Output,
-): Promise<RoadmapOutcome> {
-  const seams = options.roadmap;
-  if (seams === undefined) {
-    throw new TypeError(`${PREFIX}: ${NEXT_FLAG} was resolved with no roadmap seams`);
-  }
-
-  const roadmap = await resolveRoadmapIssue({
-    configured: request.roadmap ?? seams.configured,
-    search: seams.search,
-  });
-  output.info(roadmapHeaderLine(roadmap));
-
-  // The roadmap as read, checked before a line is parsed out of it and
-  // before either taken reading is spent. See the module note.
-  const read = await issues(roadmap);
-  await seams.inspectRoadmap?.(read);
-
-  const branches = scanClaimBranches(seams.git, seams.remote);
-  branches.problems.forEach((problem) => output.warn(problem));
-
-  const readings = createRoadmapReadings({
-    issues,
-    branches,
-    pullRequests: seams.pullRequests,
-  });
-  const walked = await pickDescendedLine(parseRoadmapBody(read.body), { issues, readings, listing: seams.listing });
-  printDescent(walked, output);
-  const { descent, pick } = walked;
-
-  if (descent.epic !== null && walked.dry) {
-    output.info(dryEpicSentence(descent.epic));
-    return { stop: 'exhausted' };
-  }
-  if (pick.line === null) {
-    output.info(exhaustedMessage(roadmap, [...descent.passed, ...pick.skipped]));
-    return { stop: 'exhausted' };
-  }
-
-  output.info(pickLine(pick.line));
-  return settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
-}
-
-/**
- * The lines the descent and the walk over its lines passed, in the order
- * read: the roadmap lines and epic lines passed to reach the epic, its
- * header and its label-only members, then the lines passed inside it. A
- * roadmap with no epic line prints its skip lines alone, as it always did.
- */
-function printDescent(walked: DescendedPick, output: Output): void {
-  const { descent, pick } = walked;
-  descent.passed.forEach((pass) => output.info(descentPassLine(pass)));
-  const { epic } = descent;
-  if (epic !== null) {
-    output.info(epicHeaderLine(epic));
-    epic.labelOnly.forEach((member) => output.info(labelOnlyLine(epic, member)));
-  }
-  pick.skipped.forEach((skip) => output.info(skipLine(skip)));
-}
-
-/** What {@link settlePick} reads the picked line through. */
-interface PickSettlement {
-  /** The lines walked: the roadmap's, or the one epic's the walk went into. */
-  readonly lines: readonly RoadmapLine[];
-  readonly issues: SpecIssueReader;
-  readonly readings: RoadmapReadings;
-  readonly seams: RoadmapSeams;
-  readonly output: Output;
-}
-
-/**
- * The picked line as it stands, or the blocked reading of it settled.
- *
- * The issue is read off the memoised reader the walk has been using, so
- * the label and the `Blocked by:` line cost no `gh issue view` of their
- * own: the walk read that issue to ask whether it was closed.
- */
-async function settlePick(line: RoadmapLine, settlement: PickSettlement): Promise<RoadmapOutcome> {
-  const { issues } = settlement;
-  const blocked = await readBlockedLine(await issues(line.issue), blockerStatesOf(issues));
-  if (blocked === null) return { issue: line.issue };
-
-  return settleBlockedPick({
-    blocked,
-    lines: settlement.lines,
-    line,
-    readings: plannableReadings({ issues, readings: settlement.readings }),
-    offer: settlement.seams.offerAlternative,
-    output: settlement.output,
-  });
 }
 
 /**
@@ -736,7 +414,13 @@ export async function resolveSpecSource(options: SpecSourceOptions): Promise<Spe
   const issues = memoiseIssues(options.issues);
   const picked: RoadmapOutcome = request.kind === 'issue'
     ? { issue: request.issue }
-    : await pickRoadmapIssue(request, options, issues, output);
+    : await pickRoadmapIssue({
+      roadmap: request.roadmap,
+      seams: requireRoadmapSeams(options.roadmap),
+      root: repoRoot,
+      issues,
+      output,
+    });
   if ('stop' in picked) return stopped(picked.stop);
   const number = picked.issue;
 

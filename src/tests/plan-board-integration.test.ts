@@ -3,11 +3,12 @@
  * `rafa plan create` and the roadmap tick `rafa pr merge` writes.
  *
  * `src/board/issue.ts`, `src/board/roadmap.ts`, `src/board/spec-source.ts`,
- * `src/board/plan-spec.ts`, `src/board/roadmap-tick.ts` and
- * `src/commands/pr/merge-tick.ts` each drive their own module, or a pair
- * of them, over planted fakes; this file drives none of that again. It
- * exists for the SEAM across all of them, which `src/plan.test.ts` names
- * in its own module note and does not cover itself:
+ * `src/board/spec-source-roadmap.ts`, `src/board/plan-spec.ts`,
+ * `src/board/roadmap-tick.ts` and `src/commands/pr/merge-tick.ts` each
+ * drive their own module, or a pair of them, over planted fakes; this
+ * file drives none of that again. It exists for the SEAM across all of
+ * them, which `src/plan.test.ts` names in its own module note and does
+ * not cover itself:
  *
  *  - `--issue` end to end there is one planted issue, one snapshot, one
  *    plan; nothing there plants a LOCAL NOTES file, and nothing composes
@@ -109,7 +110,8 @@ import {
   parseRoadmapBody,
   severalRoadmapsMessage,
 } from '../board/roadmap.js';
-import { describeIssue, dryRunLine, pickLine, roadmapHeaderLine, skipLine } from '../board/spec-source.js';
+import { pickLine, roadmapHeaderLine, skipLine } from '../board/spec-source-roadmap.js';
+import { describeIssue, dryRunLine } from '../board/spec-source.js';
 import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
 import { plantProjectConfig } from './cli-capture.js';
@@ -313,6 +315,9 @@ function writeGhStub(bin: string, table: GhTable): void {
   lines.push('  exit 0');
   lines.push('fi');
   lines.push('if [ "$1" = "issue" ] && [ "$2" = "list" ]; then');
+  // No issue carries type:roadmap: its listing answers empty, told apart
+  // from the roadmap search by its label flag, and the title rule decides.
+  lines.push('  case "$*" in *"--label type:roadmap"*) printf \'%s\' \'[]\'; exit 0;; esac');
   if (table.epic !== undefined) {
     // `readEpicContext`'s own words on the same subcommand as the roadmap
     // search below; told apart by the labels it always carries, in the
@@ -675,8 +680,9 @@ function noBranches(): GitRunner {
 
 /**
  * One board, shared between a `pr merge` tick and a `plan create --next`
- * walk: `gh issue view` and `gh issue list --search` for the walk,
- * `gh pr list` answering no open pull request, and the `gh api
+ * walk: the `type:roadmap` listing answering no board, for both,
+ * `gh issue view` for the walk, `gh pr list` answering no open pull
+ * request, and the `gh api
  * repos/{owner}/{repo}/issues/<n>` pair the tick reads and writes,
  * over the SAME roadmap body, mutated in place by a write.
  */
@@ -701,6 +707,11 @@ function sharedBoard(roadmap: SpecIssue, others: readonly SpecIssue[]): { readon
       })));
     }
     if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(said('[]'));
+    // No issue carries type:roadmap, so its listing answers empty and
+    // roadmap.issue decides, as before.
+    if (args[0] === 'issue' && args[1] === 'list' && args.includes('--label') && args.includes('type:roadmap')) {
+      return Promise.resolve(said('[]'));
+    }
     if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}/collaborators/octocat/permission') {
       return Promise.resolve(said(JSON.stringify({ permission: 'admin', role_name: 'admin' })));
     }
@@ -741,7 +752,7 @@ describe('the tick pr merge writes, read back by the very walk plan create --nex
       warn: (message) => warnings.push(message),
     });
     expect(warnings).toEqual([]);
-    expect(result).toMatchObject({ status: 'ticked', ticked: [issue] });
+    expect(result).toEqual([expect.objectContaining({ status: 'ticked', ticked: [issue] })]);
   }
 
   /** Walks `--next` over `board`'s roadmap, in a scratch root of its own, removed after. */

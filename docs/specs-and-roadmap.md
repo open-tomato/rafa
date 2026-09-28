@@ -223,7 +223,7 @@ rafa issue list --roadmap --all    # including done items
 ```
 
 `rafa roadmap` reads the roadmap issue once and prints each line as a table
-row. The table has four columns beyond the item itself: **spec** (readiness,
+row. After `rafa switch`, the roadmap it reads is the board you switched to. The table has four columns beyond the item itself: **spec** (readiness,
 whether the issue carries `spec:ready`), **blocked by** (each blocker and
 whether it is open, `-` when there is none), **has** (what already exists: a plan, a branch, or an
 open pull request), and **refs** (how many references in the issue's saved
@@ -285,6 +285,193 @@ Related, and worth knowing: bugs a run meets that are about one machine
 (a broken toolchain, a failed package build) are kept local and not
 filed on your public tracker. And the run itself is unsandboxed; see
 "Before you run it" in the [README](../README.md).
+
+## Boards: multiple roadmaps per project
+
+A **board** is a GitHub issue labelled `type:roadmap`, holding an ordered
+checklist of epics. The `.rafa/config.yaml` setting `roadmap.issue` names
+the DEFAULT board (for example, `roadmap.issue: 31`). Most projects need
+only one; for the rest, this section shows how boards work.
+
+### Solo or one team: you stay on one board
+
+If your project has no `type:roadmap` label and no `.rafa/position.json`
+file, rafa behaves exactly as before. The pinned "Roadmap" issue is your
+board. `rafa roadmap`, `rafa next`, `rafa epics`, `plan create --next`
+and `rafa status` print and read it without change. You never see boards
+or switching: they are optional and invisible when you have one.
+
+### Later work is not a second board
+
+Current versus later work is **not** a second board. Instead, every epic
+carries a `horizon` label — `horizon:now`, `horizon:next` or
+`horizon:later` — to control when it is walked. `rafa roadmap` shows the
+`now` epics by default, and `--all` shows all three horizons. A switch does
+not change which horizon you see; `--all` is a flag, not a board choice.
+
+### Several teams, one repository: one board per team
+
+When several teams work in the same repository, each gets its own board:
+
+```bash
+rafa board list          # all boards with their owners and folders
+```
+
+Each board is an open `type:roadmap` issue. Beyond the checklist it holds
+the same as the default board, it may have two optional lines:
+
+```text
+Owner: @org/backend-team
+Owns: src/api/, src/database/
+```
+
+The **`Owner:` line** names the team or person responsible. It appears in
+`rafa board list` and `rafa status` to tell you who the board belongs to.
+It is free text: `@org/team`, `@person`, or any other label is fine.
+
+The **`Owns:` line** names the folders that team owns, and links to the
+repository's `CODEOWNERS` file. When a run finds a bug in one of those
+folders, rafa files it under the owning epic, keeping bugs with the code
+that owns them. The line is a comma- or space-separated list of paths, with
+backticks stripped: `src/api/, src/database/` or `src/api/ src/database/`
+both work.
+
+#### Switching between boards
+
+```bash
+rafa switch 254          # move to board #254
+rafa switch 252          # move to board #252
+rafa switch -            # go back to the previous board
+```
+
+A switch moves you to that board's **current place**: the first open epic
+in its `horizon:now` checklist that is not done, or the default board's
+first such epic if the board has no epics. After you switch, `rafa next`,
+`rafa epics`, `rafa roadmap` and `plan create --next` all work inside that
+board.
+
+By default, a switch **re-homes** your position. Your home (the board you
+came from) becomes your anchor, so `rafa switch -` takes you back. Pass
+`--no-rehome` to keep your home and just move:
+
+```bash
+rafa switch 254 --no-rehome   # move to #254, home stays where it is
+```
+
+#### Where rafa keeps your position
+
+The file `.rafa/position.json` holds three places:
+
+```json
+{
+  "current": { "board": 254, "epic": 246 },
+  "previous": { "board": 31, "epic": 245 },
+  "home": { "board": 31, "epic": 245 }
+}
+```
+
+**`current`** is where you are now. **`previous`** is where you were before
+the last switch (so `rafa switch -` goes back to it). **`home`** is where
+you came from, an anchor you can return to at any time. It moves when you
+switch by hand; `--no-rehome` keeps it still.
+
+If the file is missing or unreadable, rafa reads your place as the default
+board's first open `now` epic that is not done, and prints:
+
+```text
+position file missing: starting at board #31, epic #245
+```
+
+This is not an error; it just tells you where rafa put you.
+
+### A monorepo package with its own rafa
+
+A monorepo with nested packages can have its own `.rafa/config.yaml` and
+its own rafa setup. A nested rafa project is independent: it keeps its own
+`.rafa/position.json`, its own default board, and its own boards and
+switches. Boards are per-repository, not global.
+
+### Seeing where you stand
+
+```bash
+rafa status              # everything in one snapshot
+```
+
+With boards, `rafa status` adds lines for the current place:
+
+```text
+Current: board #254 Infrastructure (owner: @org/backend-team)
+Epic: #246 the epic model
+Position file: .rafa/position.json ✓
+```
+
+If you have switched around, you also see:
+
+```text
+Home: board #31 Roadmap, epic #245 (can return with rafa switch -)
+```
+
+### The board listing
+
+`rafa board list` shows all open `type:roadmap` issues once per command:
+
+```text
+#31   Roadmap
+#254  Infrastructure (owner: @org/backend-team)
+#257  Frontend (owner: @org/frontend-team)
+```
+
+Each board shows its number, title, owner if present, and owned folders if
+present. The list is used to read the board field of a position when
+switching or reporting; narrower queries are refused so rafa always reads
+the same answer from the same board state.
+
+### The analogy: position like `cd` and `git checkout`
+
+rafa's position pattern mirrors what Unix shells do with `cd` and git does
+with `git checkout`. In a shell:
+
+- `pwd` shows where you are
+- `cd <dir>` moves you, and saves where you were in `OLDPWD`
+- `cd -` goes back to where you were
+
+With `git checkout`:
+
+- `git status` shows your branch
+- `git checkout <branch>` moves you, and saves the previous branch internally
+- `git checkout -` goes back
+
+rafa adds a home slot, turning two slots into three:
+
+- `rafa status` shows where you are (current) and where you came from (home)
+- `rafa switch <n>` moves to a board, saves your old place in previous, and marks
+  the new place as home (so you can come back)
+- `rafa switch -` goes back to where you were
+- `rafa switch <n> --no-rehome` moves without changing home (you hold your anchor)
+
+A longer trail you want to walk back, like a stack with `pushd`/`popd`, is
+not part of this. That belongs to the hyperloop (#28), planned for a future
+version.
+
+### Example: a workflow with boards
+
+You are on board #31 (Roadmap). A bug comes in for the backend team:
+
+```bash
+rafa switch 254          # move to board #254 Infrastructure
+# ... work on the bug under the backend team's epic and board ...
+rafa switch -            # back to board #31 Roadmap when done
+```
+
+Or you are working across both:
+
+```bash
+rafa switch 254 --no-rehome   # move to #254, home stays #31
+# ... work on something under #254 ...
+rafa switch -                 # back to #254's previous place
+# ... keep working under #254 ...
+rafa switch 31                # move to home (#31)
+```
 
 ## Other trackers
 
@@ -541,10 +728,15 @@ Plan? [y] yes [N] cancel
 Then the walk continues inside the epic. A member closed as `NOT_PLANNED`
 is not walked.
 
+After `rafa switch`, `rafa next` and `rafa plan create --next` start
+from the place you switched to: the board's checklist for a board, or
+that epic's lines alone, whatever its horizon, for an epic.
+`rafa plan create --next=<n>` still reads the roadmap issue you name.
+
 ### Example: using `rafa epics`
 
 ```bash
-rafa epics         # the first now epic not done on the roadmap
+rafa epics         # the epic you switched to, else the first now epic not done on the roadmap
 rafa epics 254     # the epic #254, whatever its horizon
 ```
 

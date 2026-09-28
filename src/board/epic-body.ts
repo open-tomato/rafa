@@ -147,19 +147,19 @@ export interface EpicBody {
 }
 
 /** One body line and whether it sits inside a fence. */
-interface BodyLine {
+export interface BodyLine {
   readonly text: string;
   readonly fenced: boolean;
 }
 
 /** One field line: its 1-based number and the text after its colon. */
-interface FieldLine {
+export interface FieldLine {
   readonly number: number;
   readonly text: string;
 }
 
 /** `body` split as {@link parseRoadmapBody} splits it, each line marked fenced or not. */
-function bodyLines(body: string): readonly BodyLine[] {
+export function bodyLines(body: string): readonly BodyLine[] {
   let fenced = false;
   return body.split(/\r\n?|\n/u).map((text) => {
     if (FENCE.test(text)) {
@@ -176,7 +176,7 @@ function fieldPattern(name: string): RegExp {
 }
 
 /** The first line outside a fence carrying the field `name`, or null. */
-function findField(lines: readonly BodyLine[], name: string): FieldLine | null {
+export function findField(lines: readonly BodyLine[], name: string): FieldLine | null {
   const pattern = fieldPattern(name);
   for (const [index, line] of lines.entries()) {
     if (line.fenced) continue;

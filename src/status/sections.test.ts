@@ -23,6 +23,7 @@
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
+import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
@@ -30,6 +31,7 @@ import type { SessionRecord } from '../loop/sessions.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/types.js';
+import type { Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,12 +40,14 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { typeOfLabels } from '../adapters/tracker/github.js';
 import { readBlockedBy } from '../board/blocked.js';
 import { defaultCleanupSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { readDoctorCleanup } from '../commands/doctor-cleanup.js';
 import { runsDir } from '../loop/sessions.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { positionFilePath, writePositionFile } from '../project/position.js';
 import {
   BRANCH,
   DEMO_TRACKER_PATH,
@@ -139,6 +143,8 @@ interface WorldOptions {
   readonly blockedIssues?: (gh: GhRunner) => Promise<BlockedIssuesReport>;
   readonly gh?: (args: readonly string[]) => Promise<GhResult>;
   readonly isAlive?: (pid: number) => boolean;
+  /** The board listing; an empty one when left out, and the system's own over the gh opener when null. */
+  readonly listing?: BoardListing | null;
 }
 
 /** The seams of one case, and what each was handed. */
@@ -167,6 +173,9 @@ function world(options: WorldOptions = {}): World {
     },
     pullRequests: () => options.pulls ?? createPullRequestsDouble({ findOpen: () => Promise.resolve(null) }).pulls,
     board: () => options.board ?? scriptedBoard(() => Promise.resolve(NO_LINE), true, null, log),
+    ...options.listing === null
+      ? {}
+      : { listing: () => options.listing ?? ((): Promise<readonly BoardIssue[]> => Promise.resolve([])) },
     blockedIssues: options.blockedIssues ?? ((): Promise<BlockedIssuesReport> => Promise.resolve(NO_BLOCKED)),
     readRemote: () => {
       log.push('origin');
@@ -458,6 +467,189 @@ describe('the board section', () => {
       problem: `the board was not read within the ${String(CASE_TIMEOUT_MS)}ms network deadline`,
     });
     expect(elapsed).toBeLessThan(CASE_TIMEOUT_MS + MARGIN_MS);
+  });
+});
+
+describe('the current place on the board section', () => {
+  /** One listing row, its type read from its labels. */
+  function row(number: number, labels: readonly string[], fields: { body?: string; state?: 'OPEN' | 'CLOSED' } = {}): BoardIssue {
+    return {
+      number,
+      title: `issue ${String(number)}`,
+      body: fields.body ?? '',
+      state: fields.state ?? 'OPEN',
+      stateReason: null,
+      labels,
+      type: typeOfLabels(labels),
+      module: 'unassigned',
+    };
+  }
+
+  /** A checklist naming `issues`, unticked. */
+  function checklist(...issues: readonly number[]): string {
+    return issues.map((number) => `- [ ] #${String(number)}`).join('\n');
+  }
+
+  /**
+   * Board #31 lists the now epics #50 (members #51 open, #52 closed) and
+   * #60 (member #61 open); #41 is a closed board. `boardLabels` is what
+   * #31 carries: `type:roadmap`, or nothing for a project with no label.
+   */
+  function boards(boardLabels: readonly string[]): readonly BoardIssue[] {
+    return [
+      row(31, boardLabels, { body: checklist(50, 60) }),
+      row(41, ['type:roadmap'], { state: 'CLOSED' }),
+      row(50, ['type:epic', 'epic:alpha', 'horizon:now']),
+      row(51, ['epic:alpha']),
+      row(52, ['epic:alpha'], { state: 'CLOSED' }),
+      row(60, ['type:epic', 'epic:beta', 'horizon:now']),
+      row(61, ['epic:beta']),
+    ];
+  }
+
+  const LABELLED = boards(['type:roadmap']);
+  const UNLABELLED = boards([]);
+
+  /** The walk the default board #31 answers: next is #51, inside epic #50. */
+  const WALK: NextRoadmapReading = { roadmap: 31, line: { issue: 51, ticked: false, why: 'rafa status', lineNumber: 3 }, passed: 1, problems: [] };
+
+  /** The seams of a case over `listing`, the walk answering {@link WALK}. */
+  function placeWorld(listing: readonly BoardIssue[]): World {
+    return world({ board: scriptedBoard(() => Promise.resolve(WALK), true, null, []), listing: () => Promise.resolve(listing) });
+  }
+
+  /** A project whose position file holds `position`. */
+  function projectAt(position: Position): PlantedProject {
+    const project = projectWith();
+    writePositionFile(project.root, position);
+    return project;
+  }
+
+  /** What the section reads with no place, exactly as before boards. */
+  const TODAY = {
+    read: true,
+    roadmap: 31,
+    next: { line: WALK.line, ready: true, blocked: null },
+    passed: 1,
+    blockedIssues: 0,
+    notes: [],
+  };
+
+  it('carries no place key for a project with no position file and no type:roadmap label, reading as before', async () => {
+    const project = projectWith();
+
+    const read = await sections(project, placeWorld(UNLABELLED).seams);
+    const labelled = await sections(project, placeWorld(LABELLED).seams);
+
+    expect(read.board).toEqual(TODAY);
+    expect(Object.keys(read.board)).toEqual(['roadmap', 'next', 'passed', 'blockedIssues', 'notes', 'read']);
+    expect(labelled.board.read && labelled.board.place).toBeDefined();
+  });
+
+  it('reads the fallback place when a type:roadmap label is carried and there is no position file, without the absent notice', async () => {
+    const read = await sections(projectWith(), placeWorld(LABELLED).seams);
+
+    expect(read.board).toEqual({
+      ...TODAY,
+      place: {
+        current: { board: 31, epic: 50 },
+        home: { board: 31, epic: 50 },
+        view: { board: 31, epic: { number: 50, title: 'issue 50', horizon: 'now', done: 1, total: 2 }, next: 51 },
+        notices: [],
+      },
+    });
+  });
+
+  it('reads the position file with no label, and leaves next out when the walk\'s line is not the current epic\'s', async () => {
+    const project = projectAt({ current: { board: 31, epic: 60 }, previous: { board: 31, epic: 50 }, home: { board: 31, epic: 50 } });
+
+    const read = await sections(project, placeWorld(UNLABELLED).seams);
+
+    if (!read.board.read) throw new Error(read.board.problem);
+    expect(read.board.place).toEqual({
+      current: { board: 31, epic: 60 },
+      home: { board: 31, epic: 50 },
+      view: { board: 31, epic: { number: 60, title: 'issue 60', horizon: 'now', done: 0, total: 1 }, next: null },
+      notices: [],
+    });
+  });
+
+  it('reads the board-only place, taking the walk\'s next on that board', async () => {
+    const project = projectAt({ current: { board: 31, epic: null }, previous: null, home: { board: 31, epic: null } });
+
+    const read = await sections(project, placeWorld(LABELLED).seams);
+
+    expect(read.board.read && read.board.place?.view).toEqual({ board: 31, epic: null, next: 51 });
+  });
+
+  it('carries the fallback notice when the position names a closed board', async () => {
+    const project = projectAt({ current: { board: 41, epic: null }, previous: null, home: { board: 41, epic: null } });
+
+    const read = await sections(project, placeWorld(LABELLED).seams);
+
+    if (!read.board.read) throw new Error(read.board.problem);
+    expect(read.board.place?.current).toEqual({ board: 31, epic: 50 });
+    expect(read.board.place?.notices).toEqual([
+      'The current place and home lost board #41, which is closed; falling back to the default board #31 at epic #50',
+    ]);
+  });
+
+  it('carries the unset notice for a position file that holds no JSON', async () => {
+    const project = projectWith();
+    mkdirSync(join(project.root, '.rafa'), { recursive: true });
+    writeFileSync(positionFilePath(project.root), '{ not json');
+
+    const read = await sections(project, placeWorld(UNLABELLED).seams);
+
+    if (!read.board.read) throw new Error(read.board.problem);
+    expect(read.board.place?.current).toEqual({ board: 31, epic: 50 });
+    expect(read.board.place?.notices).toHaveLength(1);
+    expect(read.board.place?.notices[0]).toStartWith(`${positionFilePath(project.root)} holds no JSON`);
+  });
+
+  it('reads the board without its place when the listing fails, naming why in a note', async () => {
+    const project = projectAt({ current: { board: 31, epic: 50 }, previous: null, home: { board: 31, epic: 50 } });
+    const { seams } = world({
+      board: scriptedBoard(() => Promise.resolve(WALK), true, null, []),
+      listing: () => Promise.reject(new Error('gh issue list failed')),
+    });
+
+    const read = await sections(project, seams);
+
+    expect(read.board).toEqual({ ...TODAY, notes: ['the current place could not be read: gh issue list failed'] });
+  });
+
+  it('reads the board listing once, handing the walk the same read', async () => {
+    const handed: (BoardListing | undefined)[] = [];
+    const answer = (args: readonly string[]): Promise<GhResult> => Promise.resolve({
+      ok: true,
+      stdout: args.includes('--state')
+        ? JSON.stringify(LABELLED.map((issue) => ({
+          number: issue.number,
+          title: issue.title,
+          body: issue.body,
+          state: issue.state,
+          stateReason: '',
+          labels: issue.labels.map((name) => ({ name })),
+        })))
+        : '[]',
+      stderr: '',
+    });
+    const base = world({ listing: null, gh: answer });
+    const seams: StatusSeams = {
+      ...base.seams,
+      board: (options) => {
+        handed.push(options.listing);
+        return scriptedBoard(() => Promise.resolve(WALK), true, null, []);
+      },
+    };
+
+    const read = await sections(projectWith(), seams);
+    await handed[0]?.();
+
+    const listings = base.opened.filter((open) => open.args.startsWith('issue list --state all'));
+    expect(listings).toHaveLength(1);
+    expect(read.board.read && read.board.place?.current).toEqual({ board: 31, epic: 50 });
   });
 });
 

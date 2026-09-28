@@ -26,8 +26,11 @@
  *
  * The rows are the Roadmap issue's lines, read by `readRoadmapRows`
  * (`board/roadmap-rows.ts`), which owns every reading on them: which
- * issue is the Roadmap (`roadmap.issue`, else the one open issue titled
- * `Roadmap`), the unticked lines in body order — every line under
+ * issue is the Roadmap (the current place's board, handed the project
+ * root so `.rafa/position.json` is weighed; with no position file the
+ * default board, `roadmap.issue`, else the lowest-numbered open
+ * `type:roadmap` board, else the one open issue titled `Roadmap`), the
+ * unticked lines in body order — every line under
  * `--all` — and the `spec`, `blocked by`, `has` and `refs` columns. This
  * module resolves what it is handed and prints what it answers.
  *
@@ -161,6 +164,7 @@ import type { Issue, IssueQuery, TrackerKind } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
+import { createGhBoardLister } from '../../board/boards.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows.js';
@@ -390,6 +394,7 @@ export async function listRoadmap(
   try {
     read = await readRoadmapEpicRows({
       configured: config.roadmapIssue,
+      listBoards: createGhBoardLister({ gh }),
       search: createGhRoadmapSearch({ gh }),
       issues: createGhSpecIssueReader({ gh }),
       board: createGhBoardListing({ gh }),
@@ -398,6 +403,7 @@ export async function listRoadmap(
       planNames,
       refs,
       all,
+      root: project.root,
     });
   } catch (error) {
     const code = error instanceof CommandExit
@@ -528,7 +534,8 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       + ' Prints the tracker, then one row per issue: its id, state, type and title. Each flag narrows the'
       + ' list, and a flag left out narrows by nothing. The github tracker holds an issue open or closed, so'
       + ' it refuses `--state`, and lists 30 issues unless `--limit` says otherwise. With `--roadmap` it lists'
-      + ' the unticked lines of the Roadmap issue (`roadmap.issue`, else the open issue titled Roadmap) in its'
+      + ' the unticked lines of the Roadmap issue (`roadmap.issue`, else the lowest-numbered open type:roadmap'
+      + ' board, else the open issue titled Roadmap) in its'
       + ' order instead, read off the GitHub board, as a table adding four columns: spec, whether the body'
       + ' passes the readiness gate; blocked by, each blocker and whether it is open; has, a plan, a branch'
       + ' or a pull request already made for it; and refs, how many references of the issue\'s saved copy under'

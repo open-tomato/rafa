@@ -102,6 +102,9 @@ function writeGhStub(scratch: ScratchRepo, view: object, board: readonly object[
   const gh = join(scratch.bin, 'gh');
   writeFileSync(gh, [
     '#!/bin/sh',
+    // No issue carries type:roadmap: its listing answers empty, told
+    // apart from the board listing by its label flag.
+    'case "$*" in *"--label type:roadmap"*) printf \'%s\' \'[]\'; exit 0;; esac',
     'case "$1 $2" in',
     `  "issue view") ${printFile(join(data, 'view.json'))};;`,
     `  "pr list") ${printFile(join(data, 'pulls.json'))};;`,
@@ -256,6 +259,7 @@ describe('rafa roadmap over a fixture naming no epic at all, spawned', () => {
     const roadmapIssue: SpecIssue = { number: ROADMAP, title: 'Roadmap', body: NO_EPIC_BODY, state: 'OPEN', labels: [], author: 'me' };
     const read = await readRoadmapRows({
       configured: ROADMAP,
+      listBoards: () => Promise.resolve([]),
       search: () => Promise.reject(new Error('no title search expected: roadmap.issue names one')),
       issues: () => Promise.resolve(roadmapIssue),
       board: () => Promise.resolve(board),

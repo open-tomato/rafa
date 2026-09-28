@@ -23,7 +23,8 @@
  *     set: `!/.rafa/`, `.rafa/*`, then `!.rafa/specs/` and
  *     `!.rafa/plans/` for the flags set, in that order.
  *   - `tracking.all`, whatever the other two say: `!/.rafa/`,
- *     `.rafa/triage/private/` and `.rafa/tracking.digest`.
+ *     `.rafa/triage/private/`, `.rafa/tracking.digest` and
+ *     `.rafa/position.json`.
  *
  * `.rafa/*` ignores every entry of `.rafa/` but not the directory
  * itself, so a `!` line after it re-includes one sub-path. The store
@@ -31,12 +32,16 @@
  * therefore stay ignored under either individual flag with no line of
  * their own, and the config file and `instincts/` with them.
  *
- * `tracking.all` keeps two paths ignored. The private triage directory
+ * `tracking.all` keeps three paths ignored. The private triage directory
  * holds security bugs, which the phase 1 plan keeps out of reach of
  * every tracking flag, and the notice does not name them. The digest
  * file is this checkout's record of the notice (below): tracked, it
  * would travel to a clone whose operator never read the notice and keep
- * it from printing there.
+ * it from printing there. The position file (`position.ts`) is this
+ * checkout's place on the board for the same reason: tracked, one
+ * operator's switch would move every clone that pulls it. A block
+ * written before that line existed is rewritten with it on the next
+ * {@link writeTrackingGitignore}, as any stale block is.
  *
  * ## The re-include
  *
@@ -119,6 +124,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { activeOutput } from '../adapters/output/active.js';
 import { describeValue, messageOf } from '../config-sections.js';
 
+import { POSITION_FILE } from './position.js';
 import { SCOPE_DIR } from './scope.js';
 
 /** The file the entry is written to, under the project root. */
@@ -192,7 +198,12 @@ export interface TrackingApplied {
  */
 export function trackingEntry(flags: TrackingFlags): readonly string[] {
   if (flags.trackingAll) {
-    return [`!/${SCOPE_DIR}/`, `${SCOPE_DIR}/${PRIVATE_TRIAGE}/`, `${SCOPE_DIR}/${DIGEST_NAME}`];
+    return [
+      `!/${SCOPE_DIR}/`,
+      `${SCOPE_DIR}/${PRIVATE_TRIAGE}/`,
+      `${SCOPE_DIR}/${DIGEST_NAME}`,
+      `${SCOPE_DIR}/${POSITION_FILE}`,
+    ];
   }
   const tracked = SUB_PATHS
     .filter((sub) => flags[sub.flag])

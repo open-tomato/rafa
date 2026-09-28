@@ -97,7 +97,7 @@ export interface NextRoadmapReading {
  * readings over that line's issue.
  *
  * The three are the walk `plan create --next` makes
- * (`src/board/spec-source.ts`) and the readings beside it
+ * (`src/board/spec-source-roadmap.ts`) and the readings beside it
  * (`src/board/blocked-line.ts`), behind one interface, so neither this
  * module nor the table composes any `gh` of its own.
  */

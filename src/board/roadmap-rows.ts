@@ -8,9 +8,8 @@
  * Every reading here is one another module already makes, called and
  * never respelled:
  *
- *  - the order: {@link resolveRoadmapIssue} and {@link parseRoadmapBody}
- *    (`./roadmap.ts`), so `roadmap.issue` or the title search names the
- *    issue exactly as `plan create --next` finds it;
+ *  - the order: the current place's board ({@link readCurrentPlace}) read
+ *    with {@link parseRoadmapBody} (`./roadmap.ts`); see "Which board";
  *  - `spec`: {@link findReadinessGaps} and {@link hasSpecReadyLabel}
  *    (`./readiness.ts`), the two functions `issue ready` calls;
  *  - `blocked by`: {@link readBlockedBy} (`./blocked.ts`), with each
@@ -33,11 +32,31 @@
  * --roadmap` takes `plan.dir` off the config it already loaded and
  * hands it to `plansDirAt`. This module never loads a config.
  *
+ * ## Which board
+ *
+ * The DEFAULT board is found first, by {@link resolveDefaultBoard}
+ * (`./boards.ts`), so `roadmap.issue`, the lowest-numbered `type:roadmap`
+ * board or the title search names it exactly as `plan create --next`
+ * finds it, and its refusals stay this reading's. The board whose lines
+ * are read is then the CURRENT PLACE's, {@link readCurrentPlace}: with
+ * {@link RoadmapRowsOptions.root} handed in and a position file there,
+ * `resolvePlace` (`./place.ts`) over the one board listing, which the
+ * rows then read again from the kept answer rather than asking twice.
+ * With no root, or no position file, the default board is read as it
+ * was before positions, the listing asked after the Roadmap as before;
+ * a position whose place no longer stands falls back to the default
+ * board by `resolvePlace`'s own rule. Each notice it gives but the
+ * absent-file one is a warning, ahead of the rows' own, and so is a
+ * listing that failed, since the default board is then read without
+ * the position being weighed.
+ *
  * ## What is read, and how often
  *
- * One Roadmap read (`gh issue view`, after a title search only when
- * `roadmap.issue` names nothing), one board listing, one branch scan and
- * at most one open pull request list, whatever the number of lines. The
+ * One listing of the `type:roadmap` boards, one Roadmap read (`gh issue
+ * view`, after at most one title search, spent as
+ * {@link resolveDefaultBoard} spends it), one board listing, one branch
+ * scan and at most one open pull request list, whatever the number of
+ * lines. The
  * spec allows one `gh` read of the board and one of the Roadmap body;
  * the pull request list is the `has` column's own and is the reading
  * `plan create --next` already spends for the same question.
@@ -131,7 +150,7 @@
  *    `issue`, `spec` and `blocked` are null, with no warning, since the
  *    listing has a limit and the issue may sit past it.
  *  - The branch scan's problems are carried through as warnings, as
- *    `plan create --next` warns them (`./spec-source.ts`).
+ *    `plan create --next` warns them (`./spec-source-roadmap.ts`).
  *  - The pull request list or the plan dir failing: one warning each,
  *    and no `pr` or `plan` marks.
  *  - {@link RoadmapRefs} rejecting: one warning, and every `refs` cell
@@ -139,26 +158,30 @@
  *    does not stop them being read.
  */
 import type { BlockedReading } from './blocked.js';
+import type { BoardLister } from './boards.js';
 import type { SpecIssueReader } from './issue.js';
 import type { ReadinessGap } from './readiness.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapLine, RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { GitRunner } from '../pr/git.js';
+import type { Place } from '../project/position.js';
 
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 
 import { issueCheckCommand } from '../commands/doctor-refs.js';
 import { stubOfPlanFile } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
+import { positionFilePath } from '../project/position.js';
 
 import { readBlockedBy } from './blocked.js';
+import { resolveDefaultBoard } from './boards.js';
 import { boardId } from './naming.js';
+import { resolvePlace } from './place.js';
 import { findReadinessGaps, hasSpecReadyLabel, TEMPLATE_HEADINGS } from './readiness.js';
 import {
   branchClaims,
   closedIssuesIn,
   parseRoadmapBody,
-  resolveRoadmapIssue,
   scanClaimBranches,
 } from './roadmap.js';
 
@@ -254,9 +277,11 @@ export type PlanNames = () => readonly string[];
 
 /** What {@link readRoadmapRows} is made with. */
 export interface RoadmapRowsOptions {
-  /** `roadmap.issue` as the caller resolved it, or null for the title search. */
+  /** `roadmap.issue` as the caller resolved it, or null for the labelled boards and then the title search. */
   readonly configured: number | null;
-  /** The title search, asked only when `configured` is null. */
+  /** The labelled boards, listed once. */
+  readonly listBoards: BoardLister;
+  /** The title search, asked as {@link resolveDefaultBoard} asks it. */
   readonly search: RoadmapSearch;
   /** Reads the Roadmap issue; asked once. */
   readonly issues: SpecIssueReader;
@@ -274,10 +299,56 @@ export interface RoadmapRowsOptions {
   readonly refs: RoadmapRefs;
   /** Keep the ticked lines too; `--all`. */
   readonly all?: boolean;
+  /** The project root whose position file names the current place; left out, the default board is read. */
+  readonly root?: string;
 }
 
-/** What {@link readLineRows} is made with: every seam of {@link RoadmapRowsOptions} but the three the Roadmap is found through. */
-export type LineRowsOptions = Omit<RoadmapRowsOptions, 'configured' | 'search' | 'issues'>;
+/** What {@link readLineRows} is made with: every seam of {@link RoadmapRowsOptions} but the five the Roadmap is found through. */
+export type LineRowsOptions = Omit<RoadmapRowsOptions, 'configured' | 'listBoards' | 'search' | 'issues' | 'root'>;
+
+/** What {@link readCurrentPlace} answers. */
+export interface CurrentPlaceReading {
+  /** The current place, or null with no position file or with the listing failed. */
+  readonly place: Place | null;
+  /** A sentence per notice to warn, in the order given; see the module note. */
+  readonly notices: readonly string[];
+}
+
+/** The warning a failed listing gives while a position file is there. */
+export function unweighedPositionNotice(defaultBoard: number): string {
+  return `the board could not be listed, so the position file was not weighed and the default board #${String(defaultBoard)} is read`;
+}
+
+/**
+ * The current place under `root`, read by `resolvePlace` over `board`'s
+ * listing with `defaultBoard` as the fallback's board; a null place with
+ * no notice when `root` holds no position file, and without asking
+ * `board`. Never rejects: a failed listing is a null place and one
+ * notice. See the module note's "Which board".
+ */
+export async function readCurrentPlace(root: string, board: BoardListing, defaultBoard: number): Promise<CurrentPlaceReading> {
+  if (!existsSync(positionFilePath(root))) return Object.freeze({ place: null, notices: Object.freeze([]) });
+  let listing: readonly BoardIssue[];
+  try {
+    listing = await board();
+  } catch {
+    return Object.freeze({ place: null, notices: Object.freeze([unweighedPositionNotice(defaultBoard)]) });
+  }
+  const resolved = await resolvePlace({ root, listing, defaultBoard: () => Promise.resolve(defaultBoard) });
+  const notices = resolved.notices
+    .filter((notice) => notice.kind === 'lost' || notice.reason !== 'absent')
+    .map((notice) => notice.message);
+  return Object.freeze({ place: resolved.current, notices: Object.freeze(notices) });
+}
+
+/** `read`, asked on the first call only; every call answers or rejects as the first did. */
+function keptListing(read: BoardListing): BoardListing {
+  let kept: ReturnType<BoardListing> | null = null;
+  return () => {
+    kept ??= read();
+    return kept;
+  };
+}
 
 /** True when `error` is Node's answer for a path that does not exist. */
 function isMissing(error: unknown): boolean {
@@ -505,16 +576,25 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
 }
 
 /**
- * The Roadmap's lines as rows, in its order: the unticked ones, or every
- * one with `all`. Rejects when the Roadmap cannot be found or read —
- * {@link resolveRoadmapIssue}'s refusals included — and otherwise
- * answers {@link readLineRows} over its lines, carrying each failed
- * reading as a warning; the module note holds which reading degrades to
- * what.
+ * The current board's lines as rows, in its order: the unticked ones, or
+ * every one with `all`. Rejects when the default board cannot be found
+ * — {@link resolveDefaultBoard}'s refusals included — or the board read
+ * cannot be, and otherwise answers {@link readLineRows} over its lines,
+ * carrying each failed reading as a warning; the module note holds which
+ * board is read and which reading degrades to what.
  */
 export async function readRoadmapRows(options: RoadmapRowsOptions): Promise<RoadmapRows> {
-  const roadmap = await resolveRoadmapIssue({ configured: options.configured, search: options.search });
+  const { number: fallback } = await resolveDefaultBoard({
+    configured: options.configured,
+    listBoards: options.listBoards,
+    search: options.search,
+  });
+  const board = keptListing(options.board);
+  const current = options.root === undefined
+    ? null
+    : await readCurrentPlace(options.root, board, fallback);
+  const roadmap = current?.place?.board ?? fallback;
   const lines = parseRoadmapBody((await options.issues(roadmap)).body);
-  const { rows, warnings } = await readLineRows(lines, options);
-  return Object.freeze({ roadmap, rows, warnings });
+  const { rows, warnings } = await readLineRows(lines, { ...options, board });
+  return Object.freeze({ roadmap, rows, warnings: Object.freeze([...current?.notices ?? [], ...warnings]) });
 }

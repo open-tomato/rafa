@@ -1,5 +1,5 @@
 /**
- * Tests for the board setup (`src/board/setup.ts`): the eleven labels, the
+ * Tests for the board setup (`src/board/setup.ts`): the twelve labels, the
  * spec issue template, the pinned Roadmap issue, the `roadmap.issue`
  * line written into the project config, and a second run that writes
  * nothing.
@@ -77,6 +77,7 @@ import {
   boardRefusals,
   LABEL_LIST_LIMIT,
   missingBoardLabels,
+  ROADMAP_LABEL,
   roadmapIssueBody,
   setUpBoard,
   setUpLabels,
@@ -115,6 +116,8 @@ function settingUnder(root: string): number | null {
 interface FakeIssue {
   readonly number: number;
   readonly title: string;
+  /** The label names it carries; none when left out. */
+  readonly labels?: readonly string[];
 }
 
 /** What a fake repository starts with, and which commands fail on it. */
@@ -139,7 +142,7 @@ function fakeBoard(options: FakeOptions = {}): {
 } {
   const calls: (readonly string[])[] = [];
   const labels: string[] = [...options.labels ?? []];
-  const issues: FakeIssue[] = [...options.issues ?? []];
+  let issues: FakeIssue[] = [...options.issues ?? []];
   const pinned: number[] = [];
   const fails = options.fails ?? {};
 
@@ -165,12 +168,28 @@ function fakeBoard(options: FakeOptions = {}): {
     if (route === 'issue list') {
       const wanted = (args.at(-3) ?? '').split(' ')[0] ?? '';
       const found = issues.filter((issue) => issue.title.toLowerCase().includes(wanted.toLowerCase()));
-      return ok(JSON.stringify(found));
+      return ok(JSON.stringify(found.map((issue) => ({
+        number: issue.number,
+        title: issue.title,
+        labels: (issue.labels ?? []).map((name) => ({ name })),
+      }))));
     }
     if (route === 'issue create') {
       const number = issues.reduce((highest, issue) => Math.max(highest, issue.number), 0) + 1;
-      issues.push({ number, title: args[3] ?? '' });
+      const label = args.indexOf('--label');
+      const labelled = label === -1
+        ? []
+        : [args[label + 1] ?? ''];
+      issues = [...issues, { number, title: args[3] ?? '', labels: labelled }];
       return ok(options.createdUrl ?? `https://github.com/acme/widgets/issues/${String(number)}\n`);
+    }
+    if (route === 'issue edit') {
+      const number = Number.parseInt(args[2] ?? '0', 10);
+      const added = args[4] ?? '';
+      issues = issues.map((issue) => (issue.number === number
+        ? { ...issue, labels: [...issue.labels ?? [], added] }
+        : issue));
+      return ok(`https://github.com/acme/widgets/issues/${String(number)}\n`);
     }
     if (route === 'issue pin') {
       pinned.push(Number.parseInt(args[2] ?? '0', 10));
@@ -202,7 +221,7 @@ function partNamed(parts: readonly { name: string }[], name: string): { name: st
 }
 
 describe('BOARD_LABELS', () => {
-  it('names the eleven labels the workflow files under, each with a description', () => {
+  it('names the twelve labels the workflow files under, each with a description', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toEqual([
       'type:spec',
       'spec:ready',
@@ -215,6 +234,7 @@ describe('BOARD_LABELS', () => {
       'horizon:now',
       'horizon:next',
       'horizon:later',
+      'type:roadmap',
     ]);
     expect(BOARD_LABELS.every((label) => label.description.trim() !== '')).toBe(true);
   });
@@ -227,6 +247,8 @@ describe('BOARD_LABELS', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toContain(GITHUB_LABELS.needsTriage);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.modulePrefix}unassigned`);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.typePrefix}epic`);
+    expect(BOARD_LABELS.map((label) => label.name)).toContain(ROADMAP_LABEL);
+    expect(ROADMAP_LABEL).toBe('type:roadmap');
   });
 });
 
@@ -248,6 +270,7 @@ describe('setUpLabels', () => {
       ['horizon:now', 'created'],
       ['horizon:next', 'created'],
       ['horizon:later', 'created'],
+      ['type:roadmap', 'created'],
     ]);
     expect(callsTo(gh.calls(), 'label list')).toEqual([LABEL_LIST_CALL]);
     expect(callsTo(gh.calls(), 'label create').map((args) => args[2])).toEqual([
@@ -260,6 +283,7 @@ describe('setUpLabels', () => {
       'horizon:now',
       'horizon:next',
       'horizon:later',
+      'type:roadmap',
     ]);
   });
 
@@ -334,6 +358,7 @@ describe('missingBoardLabels', () => {
         'horizon:now',
         'horizon:next',
         'horizon:later',
+        'type:roadmap',
       ]);
     expect(missingBoardLabels(BOARD_LABELS.map((label) => label.name))).toEqual([]);
   });
@@ -438,9 +463,9 @@ describe('setUpRoadmap', () => {
     expect(gh.calls()).toEqual([]);
   });
 
-  it('names the open Roadmap issue in the config when one is already there', async () => {
+  it('names the open Roadmap issue in the config when one is already there, and leaves its label as it is', async () => {
     const root = freshRoot('roadmap-found');
-    const gh = fakeBoard({ issues: [{ number: 4, title: 'Roadmap' }] });
+    const gh = fakeBoard({ issues: [{ number: 4, title: 'Roadmap', labels: [ROADMAP_LABEL] }] });
 
     const step = await setUpRoadmap(gh.run, root);
 
@@ -449,6 +474,63 @@ describe('setUpRoadmap', () => {
       .toEqual([['issue', 'present'], ['setting', 'created']]);
     expect(settingUnder(root)).toBe(4);
     expect(callsTo(gh.calls(), 'issue create')).toEqual([]);
+    expect(callsTo(gh.calls(), 'issue edit')).toEqual([]);
+    expect(step.problems).toEqual([]);
+  });
+
+  it('adds type:roadmap to an open Roadmap issue it adopts that lacks it, and reports the issue part as written', async () => {
+    const root = freshRoot('roadmap-adopt');
+    const gh = fakeBoard({ issues: [{ number: 4, title: 'Roadmap', labels: ['pinned-by-hand'] }] });
+
+    const step = await setUpRoadmap(gh.run, root);
+
+    expect(step.issue).toBe(4);
+    expect(step.parts.map((part) => [part.kind, part.outcome]))
+      .toEqual([['issue', 'created'], ['setting', 'created']]);
+    expect(step.parts[0]?.detail).toBe(`issue #4 is open and titled ${ROADMAP_TITLE}, and now carries ${ROADMAP_LABEL}`);
+    expect(callsTo(gh.calls(), 'issue edit')).toEqual([['issue', 'edit', '4', '--add-label', ROADMAP_LABEL]]);
+    expect(gh.issues()[0]?.labels).toEqual(['pinned-by-hand', ROADMAP_LABEL]);
+    expect(callsTo(gh.calls(), 'issue create')).toEqual([]);
+    expect(step.problems).toEqual([]);
+  });
+
+  it('reads the label on an adopted issue however it is cased, and sends no edit for it', async () => {
+    const root = freshRoot('roadmap-adopt-cased');
+    const gh = fakeBoard({ issues: [{ number: 4, title: 'Roadmap', labels: ['Type:Roadmap'] }] });
+
+    const step = await setUpRoadmap(gh.run, root);
+
+    expect(step.parts[0]?.outcome).toBe('present');
+    expect(callsTo(gh.calls(), 'issue edit')).toEqual([]);
+  });
+
+  it('reports a label edit that failed as a problem, keeps the issue part present, and still names the issue', async () => {
+    const root = freshRoot('roadmap-adopt-failed');
+    const gh = fakeBoard({ issues: [{ number: 4, title: 'Roadmap' }], fails: { 'issue edit': 'gh: HTTP 403' } });
+
+    const step = await setUpRoadmap(gh.run, root);
+
+    expect(step.parts.map((part) => [part.kind, part.outcome]))
+      .toEqual([['issue', 'present'], ['setting', 'created']]);
+    expect(step.problems).toEqual([
+      `issue #4 was adopted but not labelled ${ROADMAP_LABEL}: gh issue edit 4 --add-label ${ROADMAP_LABEL} failed: gh: HTTP 403`,
+    ]);
+    expect(settingUnder(root)).toBe(4);
+  });
+
+  it('refuses both parts when the search answered an issue whose labels are not a list, and edits nothing', async () => {
+    const root = freshRoot('roadmap-bad-labels');
+    const gh = fakeBoard();
+    const broken: GhRunner = (args) => args[0] === 'issue' && args[1] === 'list'
+      ? Promise.resolve({ ok: true, stdout: JSON.stringify([{ number: 4, title: 'Roadmap', labels: 'type:roadmap' }]), stderr: '' })
+      : gh.run(args);
+
+    const step = await setUpRoadmap(broken, root);
+
+    expect(step.parts.every((part) => part.outcome === 'refused')).toBe(true);
+    expect(step.parts[0]?.detail).toContain('issue 0.labels as');
+    expect(callsTo(gh.calls(), 'issue edit')).toEqual([]);
+    expect(settingUnder(root)).toBe(null);
   });
 
   it('opens the Roadmap issue, pins it and writes the setting when there is none', async () => {
@@ -460,8 +542,9 @@ describe('setUpRoadmap', () => {
     expect(step.issue).toBe(7);
     expect(step.parts.map((part) => part.outcome)).toEqual(['created', 'created']);
     expect(callsTo(gh.calls(), 'issue create')).toEqual([
-      ['issue', 'create', '--title', ROADMAP_TITLE, '--body', roadmapIssueBody()],
+      ['issue', 'create', '--title', ROADMAP_TITLE, '--label', ROADMAP_LABEL, '--body', roadmapIssueBody()],
     ]);
+    expect(step.parts[0]?.detail).toBe(`issue #7 opened with ${ROADMAP_LABEL} and pinned`);
     expect(gh.pinned()).toEqual([7]);
     expect(settingUnder(root)).toBe(7);
     expect(step.problems).toEqual([]);
@@ -579,7 +662,9 @@ describe('setUpBoard', () => {
     expect(boardRefusals(report)).toEqual([]);
     expect(report.roadmapIssue).toBe(1);
     expect(gh.labels()).toEqual(BOARD_LABELS.map((label) => label.name));
-    expect(gh.issues()).toEqual([{ number: 1, title: ROADMAP_TITLE }]);
+    expect(gh.issues()).toEqual([{ number: 1, title: ROADMAP_TITLE, labels: [ROADMAP_LABEL] }]);
+    const sent = gh.calls().map((args) => args.slice(0, 3).join(' '));
+    expect(sent.indexOf(`label create ${ROADMAP_LABEL}`)).toBeLessThan(sent.indexOf('issue create --title'));
     expect(partNamed(report.parts, `${ROADMAP_TITLE} issue`)).toBeDefined();
     expect(partNamed(report.parts, ROADMAP_SETTING)).toBeDefined();
   });
