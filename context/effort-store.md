@@ -14,10 +14,20 @@ The runner reads the log with `collectSessionRow` and appends it under
 
 ### Where it lives
 
-**Both backends write under `.rafa/effort/` in the project root.**
-`EFFORT_STORE_DIR` in `src/effort/store.ts` spells the directory once, and
-`effortStorePath` and `sqliteStorePath` (`store/sqlite.ts`) join it under
-the root. It moved there from `.ralph/effort/` (Q20), and no backend and no
+**Both backends write under `.rafa/effort/` in the project root, unless
+`RAFA_EFFORT_DIR` names another directory.** `EFFORT_STORE_DIR` in
+`src/effort/store.ts` spells the directory, and `effortStoreDir`
+(`store/location.ts`) resolves it once for both backends:
+`sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's files join
+their names under it. `effortStorePath` in `store.ts` still joins under
+`.rafa/effort/` whatever the variable holds, and no backend calls it.
+`RAFA_EFFORT_DIR` moves the SQLite and NDJSON files together for one
+command line; it is a variable and not a config key so that it never
+moves the loop's own store. A relative value is refused (`is not an
+absolute path`), and so is one resolving to the project's own store,
+symlinks and `..` spellings included, so it cannot bypass the rule that
+branch code never migrates the live store. An empty value counts as
+unset. The store moved to `.rafa/effort/` from `.ralph/effort/` (Q20), and no backend and no
 command reads a store left under `.ralph/effort/`: `rafa doctor` only
 looks for the store's file names there, and warns while `.rafa/effort/`
 holds none of them (`store/legacy.ts`). A test that plants or
@@ -517,6 +527,17 @@ sibling's roster and read no config. **Never run this branch's code
 against `.rafa/effort/` directly.** Tests over the store open a copy under
 a temporary root, or read the store through `readStoreRows` and pass no
 path; both patterns keep the real `.rafa/effort/` untouched.
+
+**A test opens stores under `tmpdir()` only, and the store throws
+otherwise.** `guardTestProcess` (`store/location.ts`) runs before any file
+or directory is made, at every open of either backend and at
+`fix-schema`'s. In a process whose `Bun.main` ends in `.test.ts`, or whose
+environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (or its
+real path) throws `effort store: a test opened <path>, outside the temp
+directory <tmp>; a test opens stores under tmpdir() only`. `runRafa` sets
+`RAFA_TEST=1` and the suite's `TMPDIR` on its child. A SQLite read of a
+file that does not exist opens nothing and so is not guarded; an NDJSON
+read or append is guarded whether or not its file exists.
 
 **Compare the two backends' rows by `JSON.stringify(row)`, paired by key
 rather than by position.** `toEqual` ignores field order, and

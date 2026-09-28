@@ -17,10 +17,11 @@
  * Spawned, the child runs under a scratch repository whose HOME, `bin/`
  * directory and call log sit beside it in a temporary directory, never
  * the real home. Its environment holds a PATH of that `bin/` directory
- * then git's own, the scratch HOME, and nothing else but what the case
- * names. So `claude` resolves to the stand-in {@link plantStandInClaude}
- * writes there, or to nothing: {@link runRafa} refuses to spawn when it
- * resolves anywhere else.
+ * then git's own, the scratch HOME, `RAFA_TEST=1` and the suite's
+ * `TMPDIR` for the effort store's test guard, and nothing else but what
+ * the case names. So `claude` resolves to the stand-in
+ * {@link plantStandInClaude} writes there, or to nothing: {@link runRafa}
+ * refuses to spawn when it resolves anywhere else.
  *
  * {@link plantScratchRepo} makes the scratch repository a project with
  * {@link plantProjectConfig}, as every spawn of a command needing a
@@ -220,6 +221,12 @@ export function plantStandInClaude(scratch: ScratchRepo): string {
 /**
  * Spawns `bun src/rafa.ts` with `words` in `cwd`, under the scratch PATH
  * and HOME and the variables `env` names; see the module note.
+ *
+ * The child also gets `RAFA_TEST=1`, which makes it a test process to
+ * the effort store's test guard (`src/effort/store/location.ts`), and
+ * this suite's temporary directory as `TMPDIR`, so the guard judges its
+ * opens by the directory the scratch project was built under. A case
+ * naming either in `env` overrides it.
  */
 export function runRafa(
   scratch: ScratchRepo,
@@ -233,7 +240,7 @@ export function runRafa(
   }
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd,
-    env: { ...env, PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, HOME: scratch.home },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

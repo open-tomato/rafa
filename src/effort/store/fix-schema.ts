@@ -41,6 +41,10 @@
  * beside it means a write in flight or interrupted, so the repair is
  * refused while either is there. Any failure while building removes the
  * parallel file and leaves the live one untouched.
+ *
+ * It opens the store itself rather than through `withSqliteStore`, so it
+ * runs the test guard (`guardTestProcess`, `location.ts`) itself too,
+ * before it reads or makes anything.
  */
 import type { SqliteMigration } from './migrations.js';
 
@@ -48,6 +52,7 @@ import { existsSync, renameSync, rmSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
 
+import { guardTestProcess } from './location.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from './sqlite.js';
 
 /** What the repair found, and what it did about it. */
@@ -288,6 +293,7 @@ function freshPaths(path: string, version: number, stamp: string): { parallelPat
 /** Repairs the store at `options.path`. See the module note. */
 export function fixStoreSchema(options: FixSchemaOptions): FixSchemaResult {
   const { path, dryRun, stamp } = options;
+  guardTestProcess(path);
   const migrations = options.migrations ?? SQLITE_MIGRATIONS;
   const knownVersion = migrations.length;
   const nothing = { kept: [], leftTables: [], leftColumns: [], backupPath: null };

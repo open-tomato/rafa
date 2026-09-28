@@ -46,12 +46,12 @@
 import type { EffortRowKind } from '../store.js';
 
 import { statSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 
 import { messageOf } from '../../config-sections.js';
-import { EFFORT_STORE_DIR, effortStorePath } from '../store.js';
+import { EFFORT_STORE_DIR, effortStoreFileName } from '../store.js';
 
-import { sqliteStorePath } from './sqlite.js';
+import { SQLITE_STORE_FILE_NAME } from './sqlite.js';
 
 /** Where the store sat before phase 1, under the project root: `.ralph/effort`. */
 export const LEGACY_EFFORT_STORE_DIR = join('.ralph', 'effort');
@@ -62,11 +62,12 @@ const NDJSON_KINDS: Readonly<Record<EffortRowKind, true>> = { sessions: true, co
 /**
  * The names of the store's files, in the order a reading lists them: the
  * SQLite file, then one NDJSON file per row kind. Read off the backends'
- * own path functions, so each name is spelled once.
+ * own names, so each is spelled once, and never off their path functions,
+ * which read `RAFA_EFFORT_DIR` and would throw on a bad one at import.
  */
 export const STORE_FILE_NAMES: readonly string[] = Object.freeze([
-  basename(sqliteStorePath('')),
-  ...Object.keys(NDJSON_KINDS).map((kind) => basename(effortStorePath('', kind as EffortRowKind))),
+  SQLITE_STORE_FILE_NAME,
+  ...Object.keys(NDJSON_KINDS).map((kind) => effortStoreFileName(kind as EffortRowKind)),
 ]);
 
 /** What {@link readLegacyStore} answers. */

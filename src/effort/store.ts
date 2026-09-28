@@ -145,12 +145,21 @@ function normaliseKey(key: string | null | undefined): string | null {
     : null;
 }
 
-/** Resolves one store file under a repo root. */
+/** The name of one row kind's store file, without its directory. */
+export function effortStoreFileName(kind: EffortRowKind): string {
+  return STORE_FILE_NAMES[kind];
+}
+
+/**
+ * Resolves one store file under a repo root, always under
+ * {@link EFFORT_STORE_DIR}. The NDJSON backend resolves its files
+ * through `store/location.ts` instead, which `RAFA_EFFORT_DIR` can move.
+ */
 export function effortStorePath(
   repoRoot: string,
   kind: EffortRowKind,
 ): string {
-  return join(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAMES[kind]);
+  return join(repoRoot, EFFORT_STORE_DIR, effortStoreFileName(kind));
 }
 
 /**

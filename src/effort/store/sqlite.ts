@@ -5,9 +5,11 @@
  * ## Layout
  *
  * One file, `effort.sqlite`, in the directory the NDJSON backend's
- * files live in: `EFFORT_STORE_DIR`, `.rafa/effort/`, spelled once in
- * `effort/store.ts` and ignored by the project's `.gitignore` entry for
- * `.rafa/`. The two backends can therefore hold a store side by side, and
+ * files live in, which `effortStoreDir` (`location.ts`) spells once for
+ * both: `.rafa/effort/` (`EFFORT_STORE_DIR` in `effort/store.ts`),
+ * ignored by the project's `.gitignore` entry for `.rafa/`, or the
+ * directory `RAFA_EFFORT_DIR` names, which moves both backends together.
+ * The two backends can therefore hold a store side by side, and
  * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
@@ -204,25 +206,25 @@ import { dirname, join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
-import { EFFORT_STORE_DIR } from '../store.js';
-
 import { bringForward } from './bring-forward.js';
+import { effortStoreDir, guardTestProcess } from './location.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 import { activeStoreSettings } from './settings.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
 export { SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './migrations.js';
 
-/** The store's file, inside `EFFORT_STORE_DIR`. */
-const STORE_FILE_NAME = 'effort.sqlite';
+/** The store's file name, inside the directory `effortStoreDir` answers. */
+export const SQLITE_STORE_FILE_NAME = 'effort.sqlite';
 
 /**
  * The file the SQLite store lives in under one repo root, whether or
- * not it exists yet. Every kind's table, and every table the report
- * writers fill, sit in it.
+ * not it exists yet: in `RAFA_EFFORT_DIR` when it is set, and under
+ * `<root>/.rafa/effort` otherwise (`location.ts`). Every kind's table,
+ * and every table the report writers fill, sit in it.
  */
 export function sqliteStorePath(repoRoot: string): string {
-  return join(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAME);
+  return join(effortStoreDir(repoRoot), SQLITE_STORE_FILE_NAME);
 }
 
 /** Where one kind's rows live in the schema. */
@@ -385,7 +387,9 @@ export function migrateSchema(
 }
 
 /**
- * Opens the store at `path`, sets its busy timeout to the active
+ * Refuses a test process opening a store outside the temporary
+ * directory before anything is made (`guardTestProcess`, `location.ts`),
+ * then opens the store at `path`, sets its busy timeout to the active
  * `effort.busyTimeoutMs` (`settings.ts`), brings its schema
  * forward through `bringForward` for an open with `access`, hands it to
  * `use`, and closes it whatever `use` did. A refused store throws
@@ -407,6 +411,7 @@ export function withSqliteStore<T>(
   create: boolean,
   use: (db: Database) => T,
 ): T {
+  guardTestProcess(path);
   if (create) mkdirSync(dirname(path), { recursive: true });
 
   const db = new Database(path, { readwrite: true, create });
