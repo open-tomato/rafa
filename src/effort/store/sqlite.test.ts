@@ -49,6 +49,7 @@
  * record compiled in the port and failed in this module's table record
  * (TS2741).
  */
+import type { SqliteMigration } from './migrations.js';
 import type {
   AppendResult,
   CommitEffortRow,
@@ -639,10 +640,15 @@ describe('schema versioning', () => {
 });
 
 describe('migrateSchema', () => {
+  /** A named, additive migration running `sql`. */
+  function named(id: string, sql: string): SqliteMigration {
+    return { id, breaks: [], sql };
+  }
+
   const HISTORY = [
-    'CREATE TABLE a (x)',
-    'CREATE TABLE b (x)',
-    'CREATE TABLE c (x)',
+    named('a', 'CREATE TABLE a (x)'),
+    named('b', 'CREATE TABLE b (x)'),
+    named('c', 'CREATE TABLE c (x)'),
   ];
 
   /** An in-memory database, set up by the SQL given. */
@@ -700,7 +706,11 @@ describe('migrateSchema', () => {
 
   it('rolls every pending migration back when one fails', () => {
     const db = memoryDb();
-    const broken = ['CREATE TABLE a (x)', 'CREATE TABLE b (', 'CREATE c'];
+    const broken = [
+      named('a', 'CREATE TABLE a (x)'),
+      named('b', 'CREATE TABLE b ('),
+      named('c', 'CREATE c'),
+    ];
 
     expect(() => migrateSchema(db, 'memory', broken)).toThrow();
     expect(tablesIn(db)).toEqual([]);

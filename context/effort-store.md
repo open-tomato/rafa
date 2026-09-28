@@ -80,6 +80,19 @@ length rather than a constant beside it, so an appended entry cannot be
 forgotten. Measured, a throw inside the transaction rolls `user_version`
 back as well.
 
+**Each entry is a named `SqliteMigration`: an `id`, what it `breaks` and
+its `sql`.** The `id` is kebab-case and is never reused. `breaks` is `[]`
+for an additive entry, and a breaking one also carries a `contract`. The
+thirteen entries 0.23.0 to 0.24.1 shipped are all `breaks: []`.
+`src/effort/store/migrations.lock.json` holds each entry's sha256 by id,
+and `migrations.test.ts` fails when an entry's SQL no longer matches its
+lock line, or when an entry has no lock line. So a new entry adds its
+lock line in the same commit. `LEGACY_GATE_OPEN` (13) and
+`LEGACY_GATE_CLOSED` (1000) are the `user_version` values that let a
+pre-log release in or keep it out, and `legacyGate` picks one from what
+a store holds. The open path does not read the names, the lock or the
+gate yet: `migrateSchema` still counts by position.
+
 ### Tables outside the port
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,

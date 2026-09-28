@@ -40,7 +40,11 @@ function plantNewerStore(project: PlantedProject): string {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true, readwrite: true });
   try {
-    migrateSchema(db, path, [...SQLITE_MIGRATIONS, 'ALTER TABLE sessions ADD COLUMN resolver TEXT;', 'CREATE TABLE extra (seq INTEGER PRIMARY KEY);']);
+    migrateSchema(db, path, [
+      ...SQLITE_MIGRATIONS,
+      { id: 'sessions-resolver', breaks: [], sql: 'ALTER TABLE sessions ADD COLUMN resolver TEXT;' },
+      { id: 'extra', breaks: [], sql: 'CREATE TABLE extra (seq INTEGER PRIMARY KEY);' },
+    ]);
     db.run('INSERT INTO sessions (session_id, row_json) VALUES (\'s-1\', \'{}\')');
   } finally {
     db.close();

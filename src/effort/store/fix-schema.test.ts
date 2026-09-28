@@ -4,6 +4,8 @@
  * history plus extra entries, the way a branch that adds migrations
  * leaves the project's store when its code opens it.
  */
+import type { SqliteMigration } from './migrations.js';
+
 import {
   existsSync,
   mkdirSync,
@@ -38,25 +40,38 @@ function caseDir(): string {
 }
 
 /** A column added to a table this rafa knows, as a later rafa's migration might. */
-const ADDED_COLUMN = 'ALTER TABLE sessions ADD COLUMN future_note TEXT;';
+const ADDED_COLUMN: SqliteMigration = {
+  id: 'future-note',
+  breaks: [],
+  sql: 'ALTER TABLE sessions ADD COLUMN future_note TEXT;',
+};
 
 /** A table this rafa does not know, as a later rafa's migration might. */
-const ADDED_TABLE = `
+const ADDED_TABLE: SqliteMigration = {
+  id: 'future-readings',
+  breaks: [],
+  sql: `
   CREATE TABLE future_readings (
     seq INTEGER PRIMARY KEY,
     session_id TEXT NOT NULL,
     name TEXT
   );
   CREATE UNIQUE INDEX future_readings_by_use ON future_readings (session_id, ifnull(name, ''));
-`;
+`,
+};
 
 /** A newer history that drops a column this rafa writes: not additive. */
-const DROPPED_COLUMN = 'ALTER TABLE commits DROP COLUMN row_json;';
+const DROPPED_COLUMN: SqliteMigration = {
+  id: 'commits-drop-row-json',
+  breaks: ['readers', 'writers'],
+  contract: { expand: null, why: 'a fixture: a newer history no older rafa can use' },
+  sql: 'ALTER TABLE commits DROP COLUMN row_json;',
+};
 
 const STAMP = '20260926T101500Z';
 
 /** Plants a store at `path` migrated with `migrations`, then runs `fill` on it. */
-function plantStore(path: string, migrations: readonly string[], fill: (db: Database) => void = () => {}): void {
+function plantStore(path: string, migrations: readonly SqliteMigration[], fill: (db: Database) => void = () => {}): void {
   const db = new Database(path, { create: true, readwrite: true });
   try {
     migrateSchema(db, path, migrations);

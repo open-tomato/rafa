@@ -151,12 +151,14 @@
  *
  * ## Schema versioning
  *
- * The schema's history, `SQLITE_MIGRATIONS`, and its version,
+ * The schema's history, `SQLITE_MIGRATIONS`, and its length,
  * `SQLITE_SCHEMA_VERSION`, live in `./migrations.ts`, whose module note
- * says how versions are counted and recorded. Both are re-exported
- * here. Every call brings an existing store forward before using it;
- * {@link migrateSchema} names the two stores it refuses instead.
+ * says what each named entry declares and why this module still counts
+ * them by position. Both are re-exported here. Every call brings an
+ * existing store forward before using it; {@link migrateSchema} names
+ * the two stores it refuses instead.
  */
+import type { SqliteMigration } from './migrations.js';
 import type {
   AppendResult,
   EffortRow,
@@ -330,14 +332,14 @@ function checkedVersion(db: Database, path: string, latest: number): number {
 export function migrateSchema(
   db: Database,
   path: string,
-  migrations: readonly string[] = SQLITE_MIGRATIONS,
+  migrations: readonly SqliteMigration[] = SQLITE_MIGRATIONS,
 ): void {
   const latest = migrations.length;
   if (checkedVersion(db, path, latest) === latest) return;
 
   const applyPending = db.transaction(() => {
     const from = checkedVersion(db, path, latest);
-    for (const sql of migrations.slice(from)) db.run(sql);
+    for (const { sql } of migrations.slice(from)) db.run(sql);
     db.run(`PRAGMA user_version = ${latest}`);
   });
   applyPending.immediate();

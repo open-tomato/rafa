@@ -40,6 +40,8 @@
  * refused while either is there. Any failure while building removes the
  * parallel file and leaves the live one untouched.
  */
+import type { SqliteMigration } from './migrations.js';
+
 import { existsSync, renameSync, rmSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
@@ -104,7 +106,7 @@ export interface FixSchemaOptions {
   /** Names the parallel and backup files, so two runs never collide. */
   readonly stamp: string;
   /** The history to rebuild with: the store's own unless another is passed. */
-  readonly migrations?: readonly string[];
+  readonly migrations?: readonly SqliteMigration[];
 }
 
 /** A repair refused before the live store was changed. */
@@ -235,7 +237,7 @@ function refuseCorrupt(db: Database): void {
 }
 
 /** Builds and checks the parallel file, answering what it copied and left behind. */
-function buildParallel(path: string, parallelPath: string, migrations: readonly string[]): Pick<FixSchemaResult, 'kept' | 'leftTables' | 'leftColumns'> {
+function buildParallel(path: string, parallelPath: string, migrations: readonly SqliteMigration[]): Pick<FixSchemaResult, 'kept' | 'leftTables' | 'leftColumns'> {
   const db = new Database(parallelPath, { create: true, readwrite: true });
   try {
     migrateSchema(db, parallelPath, migrations);
