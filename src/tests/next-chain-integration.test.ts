@@ -81,8 +81,8 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { planStub } from '../board/naming.js';
-import { DRY_RUN_FLAG } from '../commands/next.js';
 import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
+import { DRY_RUN_FLAG } from '../next/lines.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import {

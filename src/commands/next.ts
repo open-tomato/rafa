@@ -11,9 +11,10 @@
  * command that does it, `sync.ts` holds the one action that runs none,
  * `ceiling.ts` reads `--yes` as how far a run may go by itself, and
  * `hint.ts` words the question and the command line, which the six
- * commands that end by naming what follows say the same way. This
- * module owns the loop, the action and the exit code, and of the eight
- * only `hint.ts` also prints — the one line it leaves a run that has
+ * commands that end by naming what follows say the same way, and
+ * `lines.ts` words the two lines and the stop line and reads
+ * `--dry-run`. This module owns the loop, the action and the exit code,
+ * and of the nine only `hint.ts` also prints — the one line it leaves a run that has
  * no terminal to be asked on.
  *
  * ## One turn of the chain
@@ -186,6 +187,7 @@ import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
+import type { NextDryRun, NextStop } from '../next/lines.js';
 import type { DryEpic, NextSources } from '../next/readings.js';
 import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
@@ -197,6 +199,7 @@ import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACT
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines, watchDryEpic } from '../next/epic-end.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
+import { DRY_RUN_FLAG, dryRunOf, MAX_ACTIONS, NEXT_USAGE, proposalLine, readDryRun, stateLine, stopLine } from '../next/lines.js';
 import { openNextSources } from '../next/sources.js';
 import { readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
@@ -204,24 +207,6 @@ import { REMOTE } from '../start/branch-decision.js';
 
 import { lazyPrompter } from './issue/ready.js';
 import { expectNoArgument } from './plan/plan-files.js';
-
-/** The usage line every refusal here names. */
-export const NEXT_USAGE = 'rafa next [--dry-run] [--yes[=<action ids>]]';
-
-/** The flag that prints the two lines and stops. */
-export const DRY_RUN_FLAG = 'dry-run';
-
-/** The mark the state line opens with. */
-const STATE_MARK = '📍';
-
-/** The mark the proposal line opens with. */
-const PROPOSAL_MARK = '👉';
-
-/** The mark a line saying why the chain stopped opens with. */
-const STOP_MARK = '⏹';
-
-/** How many actions may run in one chain; see the module note. */
-export const MAX_ACTIONS = 12;
 
 /** The actions that hand the checkout to a loop, after which the chain stops. */
 const LOOP_ACTIONS: readonly NextActionId[] = Object.freeze(['start', 'resume']);
@@ -234,13 +219,6 @@ export const QUESTION_HANDED_OVER: ReadonlySet<NextActionId> = new Set<NextActio
 
 /** Puts one question and answers whether it was said yes to. */
 export type NextAsk = (question: string) => Promise<boolean>;
-
-/**
- * Why a run prints the two lines and stops without running anything:
- * `flag` for the `--dry-run` that asked for it, `no-terminal` for the
- * run that has no terminal to answer on and named no `--yes`.
- */
-export type NextDryRun = 'flag' | 'no-terminal';
 
 /** What one state the chain read came to. */
 export interface NextStep {
@@ -255,16 +233,6 @@ export interface NextStep {
   /** Whether the action ran. */
   readonly ran: boolean;
 }
-
-/** Why the chain stopped; the module note holds each one. */
-export type NextStop =
-  | 'dry-run'
-  | 'nothing-to-run'
-  | 'declined'
-  | 'unasked'
-  | 'loop-started'
-  | 'unchanged'
-  | 'capped';
 
 /** What one chain came to. */
 export interface NextChainReport {
@@ -297,62 +265,6 @@ export interface NextChainOptions {
   /** Where a reading that failed goes. */
   readonly warn: (line: string) => void;
 }
-
-/** What is true, on one line. */
-export function stateLine(state: NextState): string {
-  return `${STATE_MARK} ${state.reading}.`;
-}
-
-/** What to do about it, on one line, with the command that does it when an action runs one. */
-export function proposalLine(state: NextState, invocation: NextInvocation | null): string {
-  const runs = invocation === null
-    ? ''
-    : ` — rafa ${commandWords(invocation)}`;
-  return `${PROPOSAL_MARK} ${state.proposal}${runs}`;
-}
-
-/** The ids a ceiling names, as a sentence lists them. */
-function namedIds(ceiling: readonly NextActionId[]): string {
-  return ceiling.length === 0
-    ? 'no action'
-    : ceiling.join(', ');
-}
-
-/** Why a run that ran nothing ran nothing: the flag, or the terminal it has not got. */
-function dryRunLine(dryRun: NextDryRun | null): string {
-  if (dryRun === 'no-terminal') {
-    return `${STOP_MARK} There is no terminal to answer on, so nothing ran; run rafa next where you can answer,`
-      + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`;
-  }
-  return `${STOP_MARK} --${DRY_RUN_FLAG}: nothing ran.`;
-}
-
-/** Why the chain stopped, or null for an ending the two lines have already said. */
-export function stopLine(stop: NextStop, state: NextState, ceiling: NextCeiling, dryRun: NextDryRun | null): string | null {
-  if (stop === 'dry-run') return dryRunLine(dryRun);
-  if (stop === 'declined') return `${STOP_MARK} Nothing ran.`;
-  if (stop === 'unasked') {
-    const allows = `${STOP_MARK} --${YES_FLAG} allows ${namedIds(ceiling ?? [])}, and this step is ${state.action},`
-      + ' so nothing ran;';
-    if (ALWAYS_ASKED.has(state.action)) {
-      return `${allows} no --${YES_FLAG} list allows it, so drop --${YES_FLAG} to be asked.`;
-    }
-    return `${allows} type --${YES_FLAG}=${[...ceiling ?? [], state.action].join(',')} to allow it,`
-      + ` or drop --${YES_FLAG} to be asked.`;
-  }
-  if (stop === 'loop-started') {
-    return `${STOP_MARK} The loop has run; rafa next reads where it left the project.`;
-  }
-  if (stop === 'unchanged') {
-    return `${STOP_MARK} That last step left the project where it was, so the chain stops rather than repeating it.`;
-  }
-  if (stop === 'capped') {
-    return `${STOP_MARK} ${MAX_ACTIONS} actions have run, which is as many as one chain runs; run rafa next again.`;
-  }
-  return null;
-}
-
-/** True when a state read back names the same thing as the one an action just ran for. */
 function repeats(previous: NextState | null, state: NextState): boolean {
   if (previous === null) return false;
   return previous.id === state.id
@@ -433,44 +345,6 @@ export async function runNextChain(options: NextChainOptions): Promise<NextChain
     previous = state;
   }
 }
-
-/** A refusal of the line with exit code 1: the problem, then the usage line. */
-function lineRefusal(problem: string): CommandExit {
-  return new CommandExit(1, `❌ ${problem}\nUsage: ${NEXT_USAGE}`);
-}
-
-/**
- * True under `--dry-run`, false without it. A value that is neither
- * `true` nor `false` is refused: `parseArgs` hands a flag the word after
- * it whatever the flag declares, so `rafa next --dry-run sync` would
- * otherwise read `sync` as the flag's value and say nothing about it.
- */
-export function readDryRun(flags: RafaContext['flags']): boolean {
-  const value = flags[DRY_RUN_FLAG];
-  if (value === undefined) return false;
-  if (typeof value === 'boolean') return value;
-  if (value === 'true' || value === 'false') return value === 'true';
-  throw lineRefusal(`--${DRY_RUN_FLAG} takes no value, and read "${value}" as one`);
-}
-
-/**
- * Why the run prints the two lines and stops, or null for a run that
- * proposes and acts: `flag` where `--dry-run` asked for it, and
- * `no-terminal` where it did not, `--yes` named no ceiling and there is
- * no terminal to answer the question on.
- *
- * A ceiling is what makes a terminal beside the point: under `--yes`
- * every step either runs unasked or stops the chain, so nothing is ever
- * asked and the run is the same with a terminal and without one. The
- * flag outranks both, so `--dry-run` reads as itself wherever it is
- * typed.
- */
-export function dryRunOf(flag: boolean, ceiling: NextCeiling, hasTerminal: boolean): NextDryRun | null {
-  if (flag) return 'flag';
-  if (ceiling === null && !hasTerminal) return 'no-terminal';
-  return null;
-}
-
 /** How the command reaches the sources and the terminal; each left out is the system's own. */
 export interface NextCommandSeams extends NextSourceSeams {
   /** True when a question can be answered. `process.stdin.isTTY` when left out. */
