@@ -64,7 +64,7 @@
  *    to offer the plan's branch; rows 3 and 4 are read on that branch
  *    already.
  *
- * ## The one action with no command
+ * ## The actions with no command
  *
  * `sync`, row 2, is not here. Fast-forwarding the base is not a
  * registered command: it runs through the `GitRunner` seam of
@@ -72,6 +72,12 @@
  * step and its refusals. {@link actionInvocation} answers null for it,
  * as it does for `none`, and {@link runAction} refuses it as the
  * caller's mistake.
+ *
+ * `hop` and `home`, the actions the hop rows of `rafa next --roadmap`
+ * propose (`./hop-rows.ts`), are not here either: they move the position
+ * and write the hop record rather than run a command of their own.
+ * {@link actionInvocation} answers null for both, and {@link runAction}
+ * refuses them the same way.
  *
  * ## The context an action runs with
  *
@@ -115,8 +121,8 @@ import { HINT_FLAG } from './hint.js';
 /** What a defect and a refusal this module raises open with. */
 const PREFIX = 'rafa next';
 
-/** An action id that runs a registered command: every one but `none` and `sync`. */
-export type NextCommandActionId = Exclude<NextActionId, 'none' | 'sync'>;
+/** An action id that runs a registered command: every one but `none`, `sync`, `hop` and `home`. */
+export type NextCommandActionId = Exclude<NextActionId, 'none' | 'sync' | 'hop' | 'home'>;
 
 /** The command one action runs, and the words it runs with, read off the state. */
 interface ActionCommandSpec {
@@ -173,7 +179,7 @@ export const NEXT_COMMAND_ACTIONS: readonly NextCommandActionId[] = Object.freez
   Object.keys(ACTION_COMMANDS) as NextCommandActionId[],
 );
 
-/** Whether an action id runs a registered command, which `none` and `sync` do not. */
+/** Whether an action id runs a registered command, which `none`, `sync`, `hop` and `home` do not. */
 export function runsCommand(action: NextActionId): action is NextCommandActionId {
   return (NEXT_COMMAND_ACTIONS as readonly string[]).includes(action);
 }
@@ -190,8 +196,8 @@ export interface NextInvocation {
 
 /**
  * The command a state's action runs and the words it runs with, or null
- * for the two ids that run none: `none`, which proposes nothing, and
- * `sync`, which the module note places.
+ * for the four ids that run none: `none`, which proposes nothing, and
+ * `sync`, `hop` and `home`, which the module note places.
  *
  * Throws, naming the state and the action, on a state proposing an
  * action over a field its row left null.

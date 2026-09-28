@@ -2,7 +2,8 @@
  * Where the project stands, in ONE answer: the twelve states of
  * `.rafa/specs/rafa-63-one-command-next-step.md` and the thirteenth
  * `.rafa/specs/rafa-86-merge-pull-request-reports.md` adds, read in the
- * spec's order, the first match winning.
+ * spec's order, the first match winning; under `roadmap`, the five hop
+ * rows of `.rafa/specs/rafa-247-rafa-next-roadmap.md` among them.
  *
  * Each answer carries three things and nothing else: the action id
  * `src/next/actions.ts` runs a registered command for, the one-line
@@ -110,6 +111,33 @@
  * conflicts, since a conflict is what triage repairs and a pull request
  * that conflicts is often one GitHub never scheduled a check for.
  *
+ * ## Under `roadmap`: the hop rows
+ *
+ * With {@link NextSources.roadmap} set, as `rafa next --roadmap` sets it,
+ * five more rows are read among the thirteen (`./hop-rows.ts` holds what
+ * each matches); without it the table above is the whole table, and
+ * none of the five is asked. Each is read just ahead of one row:
+ *
+ * | Hop row | Action | Read just ahead of |
+ * | --- | --- | --- |
+ * | `pr-owner-review` | none | row 7, `pr-no-checks` |
+ * | `away-ended` | `home` | row 9, `plan-unstarted` |
+ * | `hop-halt` | `home` | row 11, `issue-blocked` |
+ * | `hop-blocked` | `hop` | row 11, `issue-blocked`, after `hop-halt` |
+ * | `hop-dry` | `hop` | row 13, `nothing-left` |
+ *
+ * `pr-owner-review` is after rows 5 and 6 and ahead of 7 and 8, so it
+ * holds back exactly the pull requests those two would merge, and it
+ * reads the provider, so the provider pre-condition is read ahead of it.
+ * `away-ended` is ahead of row 9 so that a hop whose work ended goes home
+ * before any plan of the checkout is started, and ahead of row 12 so
+ * that C's spec not ready ends the hop rather than proposing `ready`.
+ * `hop-halt` and `hop-blocked` take the blocked line row 11 would
+ * propose to unblock, and `hop-dry` the dry epic row 13 would end on;
+ * a decision the walk read as `stay`, or no next `now` epic, falls
+ * through to those rows as before. {@link NEXT_ROADMAP_STATES} holds the
+ * order.
+ *
  * ## What it reads, and what it never spends
  *
  * `./readings.ts` holds the readings and the order they are asked in:
@@ -119,6 +147,7 @@
  * failed is carried out as {@link NextState.problems} rather than
  * thrown, and the caller prints those beside the answer.
  */
+import type { NextHopStep } from './hop-rows.js';
 import type { NextSources, NextWorld, OpenPull } from './readings.js';
 
 import { blockedLineSentence, notReadySentence } from '../board/blocked-line.js';
@@ -129,6 +158,7 @@ import { plural } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 import { hasDiverged } from '../start/branch-decision.js';
 
+import { readAwayEnded, readHopBlocked, readHopDry, readHopHalt, readPrOwnerReview } from './hop-rows.js';
 import { branchLabel, onBase, openWorld } from './readings.js';
 
 /** What a defect this module raises opens with. */
@@ -153,9 +183,14 @@ export type NextActionId =
   | 'start'
   | 'plan'
   | 'unblock'
-  | 'ready';
+  | 'ready'
+  | 'hop'
+  | 'home';
 
-/** Which row of the table answered; the module note holds what each matches. */
+/**
+ * Which row of the table answered; the module note holds what each
+ * matches. The last five are the hop rows, read under `roadmap` alone.
+ */
 export type NextStateId =
   | 'loop-running'
   | 'base-behind'
@@ -169,7 +204,12 @@ export type NextStateId =
   | 'issue-ready'
   | 'issue-blocked'
   | 'issue-not-ready'
-  | 'nothing-left';
+  | 'nothing-left'
+  | 'pr-owner-review'
+  | 'away-ended'
+  | 'hop-halt'
+  | 'hop-blocked'
+  | 'hop-dry';
 
 /**
  * The two conditions reported ahead of the table, which stop it; the
@@ -215,10 +255,16 @@ export interface NextState {
   readonly planPath: string | null;
   /** One sentence per reading that failed; see `./readings.ts`. */
   readonly problems: readonly string[];
+  /**
+   * What the `hop` or `home` action writes, on the hop rows that propose
+   * one (`./hop-rows.ts`). The key is LEFT OUT, not set to undefined, on
+   * every other answer.
+   */
+  readonly hop?: NextHopStep;
 }
 
 /** What a row or a pre-condition answers with; the nulls and the problems are filled in around it. */
-interface RowAnswer {
+export interface RowAnswer {
   readonly id: NextAnswerId;
   readonly action: NextActionId;
   readonly reading: string;
@@ -227,6 +273,7 @@ interface RowAnswer {
   readonly issue?: number;
   readonly planStub?: string | null;
   readonly planPath?: string;
+  readonly hop?: NextHopStep;
 }
 
 /** The changed files a pre-condition names, capped and quoted. */
@@ -559,6 +606,23 @@ const ROWS: readonly NextRow[] = Object.freeze([
  */
 export const NEXT_STATES: readonly NextStateId[] = Object.freeze(ROWS.map((row) => row.id));
 
+/** The hop rows, each read just ahead of the row it is keyed by; see the module note. */
+const HOP_ROWS_AHEAD_OF: Readonly<Partial<Record<NextStateId, readonly NextRow[]>>> = Object.freeze({
+  'pr-no-checks': [{ id: 'pr-owner-review', read: readPrOwnerReview, pulls: true }],
+  'plan-unstarted': [{ id: 'away-ended', read: readAwayEnded }],
+  'issue-blocked': [{ id: 'hop-halt', read: readHopHalt }, { id: 'hop-blocked', read: readHopBlocked }],
+  'nothing-left': [{ id: 'hop-dry', read: readHopDry }],
+});
+
+/** The table `rafa next --roadmap` reads: the thirteen rows with the hop rows among them. */
+const ROADMAP_ROWS: readonly NextRow[] = Object.freeze(ROWS.flatMap((row) => [...HOP_ROWS_AHEAD_OF[row.id] ?? [], row]));
+
+/**
+ * The eighteen states `rafa next --roadmap` reads, in the order they are
+ * read, taken off that table as {@link NEXT_STATES} is off the plain one.
+ */
+export const NEXT_ROADMAP_STATES: readonly NextStateId[] = Object.freeze(ROADMAP_ROWS.map((row) => row.id));
+
 /** A row's answer, with the nulls filled in and the problems carried. */
 function answer(row: RowAnswer, problems: readonly string[]): NextState {
   return Object.freeze({
@@ -571,16 +635,20 @@ function answer(row: RowAnswer, problems: readonly string[]): NextState {
     planStub: row.planStub ?? null,
     planPath: row.planPath ?? null,
     problems: Object.freeze([...problems]),
+    ...row.hop === undefined
+      ? {}
+      : { hop: row.hop },
   });
 }
 
 /**
  * The ONE state the project is in: the thirteen rows read in order, the
  * first that answers winning, with every reading that failed carried
- * beside it.
+ * beside it. With {@link NextSources.roadmap} set, the five hop rows are
+ * read among them, in {@link NEXT_ROADMAP_STATES}' order.
  *
  * The two pre-conditions come first: the working tree ahead of every
- * row, the provider ahead of the four rows that read it. Either one
+ * row, the provider ahead of the rows that read it. Either one
  * answers in the table's place, carrying `none` to run.
  *
  * A row asks only the readings it needs and each of them at most once,
@@ -590,11 +658,14 @@ function answer(row: RowAnswer, problems: readonly string[]): NextState {
  */
 export async function readNextState(sources: NextSources): Promise<NextState> {
   const world = openWorld(sources);
+  const rows = sources.roadmap === undefined
+    ? ROWS
+    : ROADMAP_ROWS;
 
   const modified = readTreeModified(world);
   if (modified !== null) return answer(modified, world.problems());
 
-  for (const row of ROWS) {
+  for (const row of rows) {
     if (row.pulls === true) {
       const unusable = await readPullsUnusable(world);
       if (unusable !== null) return answer(unusable, world.problems());

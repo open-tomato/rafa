@@ -67,6 +67,7 @@ import type { PlanListing } from '../commands/plan/list.js';
 import type { PlansDir } from '../commands/plan/plan-files.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { Position } from '../project/position.js';
 import type { BaseStanding } from '../start/branch-decision.js';
 
@@ -197,6 +198,22 @@ export interface NextSources {
   readonly board: NextBoard;
   /** The remote the base is fetched from and the branches are scanned on; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * What `rafa next --roadmap` reads beside the rest. Set, the table reads
+   * its hop rows as well (`./hop-rows.ts`); left out, it reads the
+   * thirteen rows alone, and nothing it names is asked.
+   */
+  readonly roadmap?: NextRoadmapSources;
+}
+
+/** What {@link NextSources.roadmap} holds. */
+export interface NextRoadmapSources {
+  /**
+   * The owner gate for one pull request against the home board
+   * (`readOwnerApproval`, `src/pr/owner-approval.ts`). A rejection is
+   * read as `unknown` by the row that asks, never as approved.
+   */
+  readonly ownerApproval: (pullRequest: number) => Promise<OwnerApproval>;
 }
 
 /** The open pull request of the branch, with the readings the rows split on. */

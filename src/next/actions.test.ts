@@ -271,6 +271,16 @@ describe('the command each action runs', () => {
     expect([actionInvocation(none), actionInvocation(sync)]).toEqual([null, null]);
   });
 
+  it('answers no invocation for hop and home, which run no registered command either', () => {
+    const hop = stateOf({ id: 'hop-blocked', action: 'hop' });
+    const home = stateOf({ id: 'hop-halt', action: 'home' });
+
+    expect([runsCommand('hop'), runsCommand('home')]).toEqual([false, false]);
+    expect([actionInvocation(hop), actionInvocation(home)]).toEqual([null, null]);
+    expect(NEXT_COMMAND_ACTIONS).not.toContain('hop');
+    expect(NEXT_COMMAND_ACTIONS).not.toContain('home');
+  });
+
   it('throws over a state whose row proposed an action and left its field null', () => {
     const noPull = stateOf({ id: 'pr-pending', action: 'wait' });
     const noIssue = stateOf({ id: 'issue-blocked', action: 'unblock' });

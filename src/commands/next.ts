@@ -8,7 +8,7 @@
  * proposes and the two sentences it is said in, `readings.ts` is what
  * that table is read over and `sources.ts` composes those readings for
  * a real project, `actions.ts` maps an action id onto the registered
- * command that does it, `sync.ts` holds the one action that runs none,
+ * command that does it, `sync.ts` holds `sync`, an action that runs none,
  * `ceiling.ts` reads `--yes` as how far a run may go by itself, and
  * `hint.ts` words the question and the command line, which the six
  * commands that end by naming what follows say the same way, and

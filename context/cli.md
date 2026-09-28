@@ -110,7 +110,8 @@ New; it replaces no earlier text. What a row or an action added to
   `rows\? [0-9]` and renumbering each hit.
 - **A new `NextActionId` fails `check-types`** until `ACTION_COMMANDS`
   (`actions.ts`, a `Record` over `NextCommandActionId`) maps it to a
-  command.
+  command, or `NextCommandActionId` excludes it as an action that runs
+  none, as it excludes `sync`, `hop` and `home`.
 - **A mapped action can be listed under `--yes` straight away.**
   `YES_ACTIONS` is `NEXT_COMMAND_ACTIONS` minus `ALWAYS_ASKED`, so an
   action that must never run from a list goes into `ALWAYS_ASKED` and

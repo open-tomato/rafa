@@ -19,9 +19,10 @@
  *
  * ## The eight ids
  *
- * {@link YES_ACTIONS}: `sync`, the one action that runs no registered
- * command (`./sync.ts`), and the seven of {@link NEXT_COMMAND_ACTIONS}
- * that {@link ALWAYS_ASKED} does not hold. They are taken off that table
+ * {@link YES_ACTIONS}: `sync`, an action that runs no registered command
+ * (`./sync.ts`), and the seven of {@link NEXT_COMMAND_ACTIONS} that
+ * {@link ALWAYS_ASKED} does not hold. `hop` and `home`, the two other
+ * actions that run none (`./hop-rows.ts`), are not among them. They are taken off that table
  * rather than spelled again, so an id the table gains is accepted here
  * the same day and the list `--yes` names cannot drift from the list
  * the chain can run. `none` is not among them: it is the state that
