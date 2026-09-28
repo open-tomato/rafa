@@ -93,6 +93,18 @@ pre-log release in or keep it out, and `legacyGate` picks one from what
 a store holds. The open path does not read the names, the lock or the
 gate yet: `migrateSchema` still counts by position.
 
+**`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
+decision, and nothing calls it yet.** It takes what a store holds (its
+`schema_migrations` rows, or none, and `user_version`), this build's
+catalogue with checksums (`sqliteCatalogue`), `read` or `write`, and
+whether `rafa effort migrate` asks. It answers "use", with the legacy
+entries to adopt, the entries to apply and the gate value, or "refuse"
+with one of the seven `REFUSAL_REASONS` and a message ending in
+`Next safe step: <command>`. It imports nothing from `bun:sqlite` or
+`sqlite.ts`. An open with something to apply counts as a write, so a
+store holding an unknown migration that breaks writers refuses a read
+that would apply one.
+
 ### Tables outside the port
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,

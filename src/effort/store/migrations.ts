@@ -60,8 +60,9 @@
  * `sqlite.ts` applies these entries by array position and writes the
  * array's length, {@link SQLITE_SCHEMA_VERSION}, to `user_version`, as
  * the pre-log releases do. It also refuses a store past that length.
- * No module outside this one and its test reads `id`, `breaks`, the
- * lock or the gate yet.
+ * `planSchema` in `schema-plan.ts` reads `id`, `breaks` and the gate
+ * to decide whether a store can be used, but nothing calls it yet, and
+ * no module outside this one and its test reads the lock.
  */
 import { createHash } from 'node:crypto';
 
