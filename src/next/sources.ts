@@ -259,6 +259,7 @@ import { readPositionFile } from '../project/position.js';
 import { readEpicEndRelease } from './epic-end.js';
 import { decideHop, takenBy } from './hop-chain.js';
 import { readHopRecord, staleAgainst } from './hop-record.js';
+import { nextOwnerGate } from './owner-gate.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */
 const PREFIX = 'rafa next';
@@ -687,16 +688,12 @@ function nextConfig(project: ProjectFound, warn: (message: string) => void): Nex
   }
 }
 
-/**
- * The sources one answer is read over, composed for the project the
- * dispatcher resolved. Warnings the config raises are written through
- * the command's output.
- *
- * Throws `CommandExit(2, PR_NEEDS_GH)` where `pr.provider` is not `gh`,
- * and `CommandExit(1, ...)` for a config that cannot be used. Nothing is
- * read off git, the board or the provider here: every reading is a
- * function the table calls only where a row asks for it.
- */
+/** How {@link openNextSources} opens the sources beside the seams. */
+export interface NextSourcesOptions {
+  /** Open them for `rafa next --roadmap`; see {@link openNextSources}. False when left out. */
+  readonly roadmap?: boolean;
+}
+
 /**
  * What {@link openNextSources} answers: the sources, and {@link
  * OpenedNextSources.answer} for the next one. Only `rafa next` holds
@@ -722,9 +719,26 @@ export interface OpenedNextSources extends NextSources {
   readonly release: () => EpicEndRelease;
 }
 
+/**
+ * The sources one answer is read over, composed for the project the
+ * dispatcher resolved. Warnings the config raises are written through
+ * the command's output.
+ *
+ * With {@link NextSourcesOptions.roadmap}, as `rafa next --roadmap` opens
+ * them, each board is built with {@link NextBoardOptions.roadmap} and the
+ * sources carry {@link NextSources.roadmap}, the owner gate composed by
+ * `./owner-gate.ts`; without it neither key is there and nothing more is
+ * read.
+ *
+ * Throws `CommandExit(2, PR_NEEDS_GH)` where `pr.provider` is not `gh`,
+ * and `CommandExit(1, ...)` for a config that cannot be used. Nothing is
+ * read off git, the board or the provider here: every reading is a
+ * function the table calls only where a row asks for it.
+ */
 export function openNextSources(
   context: RafaContext,
   seams: NextSourceSeams = DEFAULT_NEXT_SOURCE_SEAMS,
+  options: NextSourcesOptions = {},
 ): OpenedNextSources {
   const project = nextProject(context);
   const config = nextConfig(project, (message: string) => {
@@ -740,13 +754,27 @@ export function openNextSources(
   const gh = (seams.openGh ?? ((root: string): GhRunner => createGhRunner({ cwd: root })))(project.root);
   const loop = resolveLoopSeams({ isAlive: seams.isAlive });
 
-  const board = (): NextBoard => ghNextBoard({ gh, git, configured: config.roadmapIssue, root: project.root, noticeCancelled: true });
+  const roadmap = options.roadmap === true;
+  const board = (): NextBoard => ghNextBoard({
+    gh,
+    git,
+    configured: config.roadmapIssue,
+    root: project.root,
+    noticeCancelled: true,
+    ...roadmap
+      ? { roadmap }
+      : {},
+  });
+  const pulls = (seams.pullRequests ?? ghPullRequestsIn)(project.root);
   const held = {
     base: config.prBase ?? DEFAULT_BASE_BRANCH,
     plans: plansDirAt(project.root, config.planDir),
     runs: (): readonly SessionRecord[] => readRecords(project.root, loop),
     git,
-    pulls: (seams.pullRequests ?? ghPullRequestsIn)(project.root),
+    pulls,
+    ...roadmap
+      ? { roadmap: Object.freeze({ ownerApproval: nextOwnerGate({ gh, root: project.root, pulls, configured: config.roadmapIssue }) }) }
+      : {},
   };
 
   return Object.freeze({

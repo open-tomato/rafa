@@ -11,12 +11,14 @@
  * Nothing here reads a source or prints.
  *
  * The lists of action ids the stop lines print leave out `hop` and
- * `home` (`ROADMAP_ACTIONS`, `./ceiling.ts`). No run proposes either
- * without `NextSources.roadmap`, which no line of `rafa next` sets yet,
- * so bare `--yes` allowing `home` changes nothing a plain run does, and
- * leaving the two out keeps what it prints byte for byte what it printed
- * before they were ids. The step a chain stopped at is named whatever
- * it is.
+ * `home` (`ROADMAP_ACTIONS`, `./ceiling.ts`) unless the run was typed
+ * with `--roadmap`. No run proposes either without `NextSources.roadmap`,
+ * which only `--roadmap` sets, so bare `--yes` allowing `home` changes
+ * nothing a plain run does, and leaving the two out keeps what a plain
+ * run prints byte for byte what it printed before they were ids. Under
+ * `--roadmap` they are named like any other id, so the list a stop line
+ * tells the person to type allows the hop it would otherwise stop at
+ * again. The step a chain stopped at is named whatever it is.
  */
 
 import type { NextInvocation } from './actions.js';
@@ -30,10 +32,13 @@ import { ALWAYS_ASKED, BARE_YES_ACTIONS, ROADMAP_ACTIONS, YES_FLAG } from './cei
 import { commandWords } from './hint.js';
 
 /** The usage line every refusal here names. */
-export const NEXT_USAGE = 'rafa next [--dry-run] [--yes[=<action ids>]]';
+export const NEXT_USAGE = 'rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]';
 
 /** The flag that prints the two lines and stops. */
 export const DRY_RUN_FLAG = 'dry-run';
+
+/** The flag that reads the hop rows and follows one blocker into another epic or board. */
+export const ROADMAP_FLAG = 'roadmap';
 
 /** The mark the state line opens with. */
 const STATE_MARK = '📍';
@@ -77,39 +82,51 @@ export function proposalLine(state: NextState, invocation: NextInvocation | null
   return `${PROPOSAL_MARK} ${state.proposal}${runs}`;
 }
 
-/** The ids a stop line lists, `hop` and `home` left out; see the module note. */
-function shownIds(ids: readonly NextActionId[]): readonly NextActionId[] {
-  return ids.filter((action) => !ROADMAP_ACTIONS.has(action));
+/** The ids a stop line lists: `hop` and `home` left out of a run without `--roadmap`; see the module note. */
+function shownIds(ids: readonly NextActionId[], roadmap: boolean): readonly NextActionId[] {
+  return roadmap
+    ? ids
+    : ids.filter((action) => !ROADMAP_ACTIONS.has(action));
 }
 
 /** The ids a ceiling names, as a sentence lists them. */
-function namedIds(ceiling: readonly NextActionId[]): string {
-  const shown = shownIds(ceiling);
+function namedIds(ceiling: readonly NextActionId[], roadmap: boolean): string {
+  const shown = shownIds(ceiling, roadmap);
   return shown.length === 0
     ? 'no action'
     : shown.join(', ');
 }
 
 /** Why a run that ran nothing ran nothing: the flag, or the terminal it has not got. */
-function dryRunLine(dryRun: NextDryRun | null): string {
+function dryRunLine(dryRun: NextDryRun | null, roadmap: boolean): string {
   if (dryRun === 'no-terminal') {
     return `${STOP_MARK} There is no terminal to answer on, so nothing ran; run rafa next where you can answer,`
-      + ` or type --${YES_FLAG}=${shownIds(BARE_YES_ACTIONS).join(',')} to allow those steps unasked.`;
+      + ` or type --${YES_FLAG}=${shownIds(BARE_YES_ACTIONS, roadmap).join(',')} to allow those steps unasked.`;
   }
   return `${STOP_MARK} --${DRY_RUN_FLAG}: nothing ran.`;
 }
 
-/** Why the chain stopped, or null for an ending the two lines have already said. */
-export function stopLine(stop: NextStop, state: NextState, ceiling: NextCeiling, dryRun: NextDryRun | null): string | null {
-  if (stop === 'dry-run') return dryRunLine(dryRun);
+/**
+ * Why the chain stopped, or null for an ending the two lines have
+ * already said. `roadmap` is whether the run was typed with
+ * `--roadmap`, which decides whether the lists name `hop` and `home`.
+ */
+export function stopLine(
+  stop: NextStop,
+  state: NextState,
+  ceiling: NextCeiling,
+  dryRun: NextDryRun | null,
+  roadmap = false,
+): string | null {
+  if (stop === 'dry-run') return dryRunLine(dryRun, roadmap);
   if (stop === 'declined') return `${STOP_MARK} Nothing ran.`;
   if (stop === 'unasked') {
-    const allows = `${STOP_MARK} --${YES_FLAG} allows ${namedIds(ceiling ?? [])}, and this step is ${state.action},`
+    const allows = `${STOP_MARK} --${YES_FLAG} allows ${namedIds(ceiling ?? [], roadmap)}, and this step is ${state.action},`
       + ' so nothing ran;';
     if (ALWAYS_ASKED.has(state.action)) {
       return `${allows} no --${YES_FLAG} list allows it, so drop --${YES_FLAG} to be asked.`;
     }
-    return `${allows} type --${YES_FLAG}=${[...shownIds(ceiling ?? []), state.action].join(',')} to allow it,`
+    return `${allows} type --${YES_FLAG}=${[...shownIds(ceiling ?? [], roadmap), state.action].join(',')} to allow it,`
       + ` or drop --${YES_FLAG} to be asked.`;
   }
   if (stop === 'loop-started') {
@@ -136,11 +153,25 @@ function lineRefusal(problem: string): CommandExit {
  * otherwise read `sync` as the flag's value and say nothing about it.
  */
 export function readDryRun(flags: RafaContext['flags']): boolean {
-  const value = flags[DRY_RUN_FLAG];
+  return readBareFlag(flags, DRY_RUN_FLAG);
+}
+
+/**
+ * True under `--roadmap`, false without it, a value refused as
+ * {@link readDryRun} refuses one: `rafa next --roadmap sync` would
+ * otherwise read `sync` as the flag's value.
+ */
+export function readRoadmap(flags: RafaContext['flags']): boolean {
+  return readBareFlag(flags, ROADMAP_FLAG);
+}
+
+/** A flag that takes no value, read off `flags`; see {@link readDryRun}. */
+function readBareFlag(flags: RafaContext['flags'], name: string): boolean {
+  const value = flags[name];
   if (value === undefined) return false;
   if (typeof value === 'boolean') return value;
   if (value === 'true' || value === 'false') return value === 'true';
-  throw lineRefusal(`--${DRY_RUN_FLAG} takes no value, and read "${value}" as one`);
+  throw lineRefusal(`--${name} takes no value, and read "${value}" as one`);
 }
 
 /**

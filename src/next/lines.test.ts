@@ -20,6 +20,8 @@ import {
   NEXT_USAGE,
   proposalLine,
   readDryRun,
+  readRoadmap,
+  ROADMAP_FLAG,
   stateLine,
   stopLine,
 } from './lines.js';
@@ -124,6 +126,19 @@ describe('the stop line', () => {
       + ` type --${YES_FLAG}=merge to allow it, or drop --${YES_FLAG} to be asked.`);
   });
 
+  it('lists hop and home under --roadmap, in the ceiling and in the bare list a run with no terminal names', () => {
+    const bare = stopLine('unasked', GREEN, BARE_YES_ACTIONS, null, true);
+    const roadmapOnly = stopLine('unasked', GREEN, ['hop', 'home'], null, true);
+    const noTerminal = stopLine('dry-run', GREEN, null, 'no-terminal', true);
+
+    expect(bare).toBe(`⏹ --${YES_FLAG} allows sync, wait, unblock, plan, home, and this step is merge, so nothing ran;`
+      + ` type --${YES_FLAG}=sync,wait,unblock,plan,home,merge to allow it, or drop --${YES_FLAG} to be asked.`);
+    expect(roadmapOnly).toBe(`⏹ --${YES_FLAG} allows hop, home, and this step is merge, so nothing ran;`
+      + ` type --${YES_FLAG}=hop,home,merge to allow it, or drop --${YES_FLAG} to be asked.`);
+    expect(noTerminal).toBe('⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
+      + ` or type --${YES_FLAG}=sync,wait,unblock,plan,home to allow those steps unasked.`);
+  });
+
   it('names a hop or home step it stopped at, which only the ceiling lists leave out', () => {
     expect(stopLine('unasked', stateOf({ action: 'home' }), ['plan'], null))
       .toBe(`⏹ --${YES_FLAG} allows plan, and this step is home, so nothing ran;`
@@ -150,6 +165,28 @@ describe('the line', () => {
       .map((flags) => readDryRun(flags));
 
     expect(read).toEqual([false, true, false, true, false]);
+  });
+
+  it('reads --roadmap bare, negated, written out and left out', () => {
+    const read = [{}, { [ROADMAP_FLAG]: true }, { [ROADMAP_FLAG]: false }, { [ROADMAP_FLAG]: 'true' }, { [ROADMAP_FLAG]: 'false' }]
+      .map((flags) => readRoadmap(flags));
+
+    expect(read).toEqual([false, true, false, true, false]);
+  });
+
+  it('refuses a value --roadmap swallowed with exit 1, naming the usage that spells the flag', () => {
+    const refused = ((): unknown => {
+      try {
+        return readRoadmap({ [ROADMAP_FLAG]: 'sync' });
+      } catch (error) {
+        return error;
+      }
+    })();
+
+    expect(refused).toBeInstanceOf(CommandExit);
+    expect((refused as CommandExit).exitCode).toBe(1);
+    expect((refused as CommandExit).message).toBe(`❌ --${ROADMAP_FLAG} takes no value, and read "sync" as one\nUsage: ${NEXT_USAGE}`);
+    expect(NEXT_USAGE).toBe('rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]');
   });
 
   it('refuses a value --dry-run swallowed, naming the usage', () => {

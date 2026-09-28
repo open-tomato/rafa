@@ -158,7 +158,7 @@ import { plural } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 import { hasDiverged } from '../start/branch-decision.js';
 
-import { readAwayEnded, readHopBlocked, readHopDry, readHopHalt, readPrOwnerReview } from './hop-rows.js';
+import { homeAfterLoop, readAwayEnded, readHopBlocked, readHopDry, readHopHalt, readPrOwnerReview } from './hop-rows.js';
 import { branchLabel, onBase, openWorld } from './readings.js';
 
 /** What a defect this module raises opens with. */
@@ -678,4 +678,21 @@ export async function readNextState(sources: NextSources): Promise<NextState> {
   // Unreachable: row 13 answers for every reading. A table edited to end
   // on a row that can answer null is the defect this catches.
   throw new Error(`${PREFIX}: no row of the table answered, and the last row answers for every reading`);
+}
+
+/**
+ * The `home` step `rafa next --roadmap` runs once a loop action has run
+ * while a hop is away (`homeAfterLoop`, `./hop-rows.ts`), as a state
+ * whose problems are the walk's; null without {@link NextSources.roadmap}
+ * and while no hop is away. The board is walked whatever the branch, since
+ * the loop leaves the checkout on the target's. Whatever the walk throws
+ * travels out.
+ */
+export async function readHomeAfterLoop(sources: NextSources): Promise<NextState | null> {
+  if (sources.roadmap === undefined) return null;
+  const reading = await sources.board.next();
+  const found = homeAfterLoop(reading);
+  return found === null
+    ? null
+    : answer(found, reading.problems);
 }

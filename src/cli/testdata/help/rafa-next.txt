@@ -2,7 +2,7 @@ rafa next — say where the project stands, propose the one next step, and run i
   on a yes
 
 Usage:
-  rafa next [--dry-run] [--yes=<string>]
+  rafa next [--dry-run] [--roadmap] [--yes=<string>]
 
 Description:
   Reads the project once — the running loops, the branch and its base, the plans
@@ -17,8 +17,11 @@ Description:
   --skip-checks`, which asks its own question after the warning it prints, so
   rafa next asks none before it. `--dry-run` prints the two lines and stops, and
   so does a run with no terminal to answer on and no `--yes`, since there is
-  nobody to put the question to. With `--output=json` the steps and why the
-  chain stopped are the data of the terminal result event.
+  nobody to put the question to. With `--roadmap` it follows one blocker into
+  another epic or board, works it up to its pull request and comes home, halting
+  where that blocker is blocked in turn. With `--output=json` the steps and why
+  the chain stopped are the data of the terminal result event, and under
+  `--roadmap` the hops that ran as well.
 
 Spends:
   🪙 when the step it runs is one of the above
@@ -28,6 +31,13 @@ Flags:
       Print where the project stands and what to do about it, and stop without
       asking or running it. A run with no terminal to answer on and no --yes
       does this whether or not the flag is typed.
+  --roadmap   boolean
+      Follow one blocker into another epic or board and come home: where the
+      walk stops at an issue blocked by one in another epic, or at an epic with
+      no line left, propose the hop there, pass --roadmap to plan create and
+      loop start, and go home once the loop has run. A blocker that is itself
+      blocked halts with the chain instead, and a pull request whose owner has
+      not approved is not merged.
   --yes       string
       Run the actions named without asking, as a comma list of action ids, and
       stop at the first action the list leaves out. Bare it names sync, wait,
@@ -43,6 +53,9 @@ Examples:
   rafa next --yes=sync,plan
       Fast-forwards the base and creates the next plan unasked, stopping at any
       other step.
+  rafa next --roadmap --yes=hop,plan,start,home
+      Hops to the epic holding the blocker, plans and runs it, and comes home
+      unasked.
 
 Outputs:
   text, json

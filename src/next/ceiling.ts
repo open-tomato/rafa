@@ -45,7 +45,8 @@
  *
  * {@link ROADMAP_ACTIONS} names the two ids no run proposes without
  * `--roadmap`: `src/next/lines.ts` leaves them out of the lists it
- * prints, so a plain `rafa next` says what it said before they were ids.
+ * prints in a run without that flag, so a plain `rafa next` says what it
+ * said before they were ids, and names them under it.
  *
  * ## The two refusals, both exit 2
  *

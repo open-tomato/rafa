@@ -64,6 +64,18 @@
  *    to offer the plan's branch; rows 3 and 4 are read on that branch
  *    already.
  *
+ * ## Under `--roadmap`
+ *
+ * `rafa next --roadmap` hands {@link NextActionOptions.roadmap} to both
+ * functions here, and the three actions of {@link ROADMAP_PASSED_ACTIONS}
+ * — `plan`, `start` and `resume` — carry `--roadmap` last among their
+ * words: `plan create --next --roadmap` picks the away hop's target
+ * rather than the epic's first line, and `loop start --roadmap` stamps
+ * the hop on the run's session record. The word is in the invocation, so
+ * the proposal line prints it and the step records it, as it does every
+ * other word that runs. Without the option no word is added, and every
+ * line is what it was before the flag existed.
+ *
  * ## The actions with no command
  *
  * `sync`, row 2, is not here. Fast-forwarding the base is not a
@@ -162,6 +174,18 @@ interface ActionCommandSpec extends CommandName {
 /** The command `hop` moves the position through: `rafa switch`. */
 const SWITCH_COMMAND: CommandName = Object.freeze({ subject: 'switch', action: 'switch' });
 
+/** The flag `rafa next --roadmap` passes on to the actions of {@link ROADMAP_PASSED_ACTIONS}. */
+export const ROADMAP_WORD = '--roadmap';
+
+/** The actions whose words carry {@link ROADMAP_WORD} under `--roadmap`; see the module note. */
+export const ROADMAP_PASSED_ACTIONS: ReadonlySet<NextCommandActionId> = new Set<NextCommandActionId>(['plan', 'start', 'resume']);
+
+/** How the two functions here read a state beside the state itself. */
+export interface NextActionOptions {
+  /** Whether the run was typed with `--roadmap`; see the module note. False when left out. */
+  readonly roadmap?: boolean;
+}
+
 /** The value a row filled in, or the defect of a row that proposed an action over none. */
 function needed(state: NextState, value: number | string | null, what: string): string {
   if (value === null) {
@@ -223,21 +247,25 @@ export interface NextInvocation {
 }
 
 /**
- * The command a state's action runs and the words it runs with, or null
+ * The command a state's action runs and the words it runs with,
+ * `--roadmap` added under {@link NextActionOptions.roadmap}, or null
  * for the four ids that run none: `none`, which proposes nothing, and
  * `sync`, `hop` and `home`, which the module note places.
  *
  * Throws, naming the state and the action, on a state proposing an
  * action over a field its row left null.
  */
-export function actionInvocation(state: NextState): NextInvocation | null {
+export function actionInvocation(state: NextState, options: NextActionOptions = {}): NextInvocation | null {
   if (!runsCommand(state.action)) return null;
 
   const spec = ACTION_COMMANDS[state.action];
+  const passes = options.roadmap === true && ROADMAP_PASSED_ACTIONS.has(state.action);
   return Object.freeze({
     action: state.action,
     command: commandSpelling(spec),
-    argv: Object.freeze(spec.argv(state)),
+    argv: Object.freeze(passes
+      ? [...spec.argv(state), ROADMAP_WORD]
+      : spec.argv(state)),
   });
 }
 
@@ -311,13 +339,13 @@ async function runHopStep(caller: RafaContext, state: NextState): Promise<void> 
  * caller's registry holds no such command, and throws on a state whose
  * action runs none, `sync` among them.
  */
-export async function runAction(caller: RafaContext, state: NextState): Promise<void> {
+export async function runAction(caller: RafaContext, state: NextState, options: NextActionOptions = {}): Promise<void> {
   if (state.action === 'hop' || state.action === 'home') {
     await runHopStep(caller, state);
     return;
   }
 
-  const invocation = actionInvocation(state);
+  const invocation = actionInvocation(state, options);
   if (invocation === null) {
     throw new Error(`${PREFIX}: the action "${state.action}" of state "${state.id}" runs no registered command`);
   }

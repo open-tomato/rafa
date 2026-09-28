@@ -149,7 +149,7 @@ import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines } from '../next/epic-end.js';
 import { nextQuestion } from '../next/hint.js';
-import { DRY_RUN_FLAG, MAX_ACTIONS, NEXT_USAGE } from '../next/lines.js';
+import { DRY_RUN_FLAG, MAX_ACTIONS, NEXT_USAGE, ROADMAP_FLAG } from '../next/lines.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -1050,12 +1050,12 @@ describe('the output an action writes through', () => {
 });
 
 describe('what the command declares', () => {
-  it('is top-level, needs a project, and declares the two flags with its examples and outputs', () => {
+  it('is top-level, needs a project, and declares the three flags with its examples and outputs', () => {
     const command = createNextCommand();
 
     expect([command.name, command.subject, command.action]).toEqual(['next', 'next', 'next']);
     expect(command.needsProject).toBeUndefined();
-    expect(command.flags.map((flag) => [flag.name, flag.type])).toEqual([[DRY_RUN_FLAG, 'boolean'], [YES_FLAG, 'string']]);
+    expect(command.flags.map((flag) => [flag.name, flag.type])).toEqual([[DRY_RUN_FLAG, 'boolean'], [ROADMAP_FLAG, 'boolean'], [YES_FLAG, 'string']]);
     expect(command.outputs).toEqual(['text', 'json']);
     expect(command.examples.every((example) => example.cmd.startsWith('rafa next'))).toBe(true);
     expect(command.description.length).toBeGreaterThan(command.summary.length);

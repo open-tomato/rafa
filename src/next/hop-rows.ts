@@ -67,6 +67,19 @@
  * home the position's own while it stands away, else the dry epic
  * itself, as `./sources.ts` reads H's place.
  *
+ * ## After a loop: {@link homeAfterLoop}
+ *
+ * A loop action (`start`, `resume`) run while a hop is away leaves the
+ * checkout on C's branch, where no board row is read, so `away-ended`
+ * cannot answer there. `rafa next` asks {@link homeAfterLoop} instead,
+ * over the board's walk read afresh once the loop has run, and runs the
+ * `home` step it proposes before the chain stops. It answers for every
+ * followed record in state `away`, closing a blocker hop as `away-ended`
+ * does — `merged` for C closed, `waiting` with C's open pull request —
+ * and `halted` where the loop left C open with no pull request, and a
+ * dry hop as `halted`, the one closing a record with no target is ever
+ * given. No record away, and it answers null.
+ *
  * The record a hop opens is homed at the position's `home`, so the next
  * turn's staleness check (`staleAgainst`, `./hop-record.ts`) follows it;
  * with no position file, at the walked board with no epic chosen, the
@@ -374,4 +387,33 @@ export async function readHopDry(world: NextWorld): Promise<RowAnswer | null> {
     proposal: `hop to ${placeText(to)}, keeping home`,
     hop: Object.freeze({ action: 'hop', opening: Object.freeze(opening) }),
   };
+}
+
+/** Why the hop the loop ran under ends, as {@link homeAfterLoop} reads it. */
+function loopEnding(record: HopRecord, target: NextHopReading['target']): { readonly reading: string; readonly step: HopHome } {
+  const home = (closing: HopClosing, pullRequest: number | null): HopHome => ({ action: 'home', home: record.home, closing, pullRequest });
+  const epic = ref(record.targetEpic);
+  if (record.kind === 'dry' || record.target === null) {
+    return { reading: `the loop has run in epic ${epic}, where the dry hop went`, step: home('halted', null) };
+  }
+  const where = `${ref(record.target)}, the hop's target in epic ${epic},`;
+  if (target?.closed === true) return { reading: `${where} is closed`, step: home('merged', null) };
+  if (target !== null && target.pullRequest !== null) {
+    return { reading: `${where} has pull request ${ref(target.pullRequest)} open`, step: home('waiting', target.pullRequest) };
+  }
+  return { reading: `${where} has no pull request open after the loop`, step: home('halted', null) };
+}
+
+/**
+ * The `home` step a loop run while a hop is away ends on, read off the
+ * walk after the loop, or null when no followed record is away; see the
+ * module note's "After a loop".
+ */
+export function homeAfterLoop(reading: NextRoadmapReading): RowAnswer | null {
+  const record = reading.hop === undefined
+    ? null
+    : awayRecord(reading.hop);
+  if (record === null) return null;
+  const ending = loopEnding(record, reading.hop?.target ?? null);
+  return homeAnswer('away-ended', ending.reading, ending.step, record.target);
 }
