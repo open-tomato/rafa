@@ -54,17 +54,17 @@
  * throw inside that transaction rolls the field back together with the
  * tables.
  *
- * ## What still counts by position
+ * ## Who reads the names
  *
- * The open path does not use the names yet. `migrateSchema` in
- * `sqlite.ts` applies these entries by array position and writes the
- * array's length, {@link SQLITE_SCHEMA_VERSION}, to `user_version`, as
- * the pre-log releases do. It also refuses a store past that length.
- * `planSchema` in `schema-plan.ts` reads `id`, `breaks` and the gate
- * to decide whether a store can be used, and `bringForward` in
- * `bring-forward.ts` applies that decision and keeps the migration log,
- * but the open path calls neither yet. No module outside this one and
- * its test reads the lock.
+ * Every open of the store reads them. `withSqliteStore` in `sqlite.ts`
+ * hands each store to `bringForward` in `bring-forward.ts`, which asks
+ * `planSchema` in `schema-plan.ts` whether the store can be used,
+ * from `id`, `breaks` and the gate, and keeps the migration log.
+ * `migrateSchema` in `sqlite.ts` still applies these entries by array
+ * position and writes the array's length, {@link SQLITE_SCHEMA_VERSION},
+ * to `user_version`, as the pre-log releases do; only `fix-schema.ts`
+ * builds with it, and no open goes through it. No module outside this
+ * one and its test reads the lock.
  */
 import { createHash } from 'node:crypto';
 
@@ -114,8 +114,8 @@ export const LEGACY_GATE_CLOSED = 1000;
 
 /**
  * The schema's history, by name. This module's note says why an entry
- * is frozen, what its `breaks` declares, and why the first thirteen are
- * still read by position.
+ * is frozen, what its `breaks` declares, and who still reads the first
+ * thirteen by position.
  */
 export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   // Version 1: one table per kind, keyed as its NDJSON rows are.
@@ -412,9 +412,9 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
 ];
 
 /**
- * The length of the history. `migrateSchema` in `sqlite.ts` brings a
- * store to this `user_version` and refuses one past it, as the pre-log
- * releases do.
+ * The length of the history. `migrateSchema` in `sqlite.ts`, which
+ * `fix-schema.ts` builds its rebuild with, brings a store to this
+ * `user_version` and refuses one past it, as the pre-log releases do.
  */
 export const SQLITE_SCHEMA_VERSION = SQLITE_MIGRATIONS.length;
 

@@ -128,9 +128,9 @@
  * {@link CHANGE_LEVELS}.
  *
  * It opens and creates nothing when the store file does not exist, and
- * answers none. A store that exists is opened through `withSqliteStore`,
- * as `readTaskFinishes` opens it, so a store past this rafa's version is
- * refused as it is for a write.
+ * answers none. A store that exists is opened through `withSqliteStore`
+ * for a read, as `readTaskFinishes` opens it, so it is brought forward,
+ * or refused, as `sqlite.ts` says a read's is.
  *
  * ## Writing nothing writes nothing, and still checks the schema
  *
@@ -382,6 +382,7 @@ export function readPlanChanges(repoRoot: string, planStub: string | null): Plan
 
   const rows = withSqliteStore(
     path,
+    'read',
     false,
     (db) => db.query<PlanChangeRow, [string | null]>(SELECT_PLAN_CHANGES).all(planStub),
   );

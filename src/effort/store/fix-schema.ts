@@ -5,13 +5,15 @@
  *
  * ## Why a store gets ahead of the rafa reading it
  *
- * {@link migrateSchema} refuses a store past the last version its
- * history holds, and every read and write goes through it. A store gets
- * there when newer code opens it: a branch's own code run from its
- * working tree against the project's store, while the loop driving that
- * branch is an installed runtime that predates it. From then on the
- * runtime refuses the store, and a task report the loop collects is not
- * stored.
+ * A pre-log release refuses a store past the last version its history
+ * holds, and every read and write it makes goes through that check. A
+ * store gets there when newer code opens it: a branch's own code run
+ * from its working tree against the project's store, while the loop
+ * driving that branch is an installed runtime that predates it. From
+ * then on the runtime refuses the store, and a task report the loop
+ * collects is not stored. This rafa's own opens go through
+ * `bringForward` (`bring-forward.ts`) instead, which refuses such a
+ * store with no migration log and names this repair as the way out.
  *
  * ## The rebuild
  *

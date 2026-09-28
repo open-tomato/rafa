@@ -79,9 +79,9 @@
  * tally per plan stub, status and outcome, counting the rows that share
  * all three, ordered by those three with NULL first in each. It opens
  * and creates nothing when the store file does not exist, and answers
- * none. A store that exists is opened through `withSqliteStore`, as
- * `readProgressFindings` opens it (`utils/progress.ts`), so its schema
- * is brought forward, or refused, as it is for a write.
+ * none. A store that exists is opened through `withSqliteStore` for a
+ * read, as `readProgressFindings` opens it (`utils/progress.ts`), so its
+ * schema is brought forward, or refused, as `sqlite.ts` says a read's is.
  *
  * ## What is refused
  *
@@ -266,7 +266,7 @@ export function readTaskReportTallies(repoRoot: string): TaskReportTally[] {
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return [];
 
-  const rows = withSqliteStore(path, false, (db) => db.query<TallyRow, []>(SELECT_TALLIES).all());
+  const rows = withSqliteStore(path, 'read', false, (db) => db.query<TallyRow, []>(SELECT_TALLIES).all());
   return rows.map((row) => ({
     planStub: row.plan_stub,
     status: row.status,
@@ -331,6 +331,7 @@ export function readReportedSkills(repoRoot: string): ReportedSkills[] {
 
   const rows = withSqliteStore(
     path,
+    'read',
     false,
     (db) => db.query<ReportedSkillsRow, []>(SELECT_REPORTED_SKILLS).all(),
   );

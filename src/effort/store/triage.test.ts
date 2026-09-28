@@ -275,7 +275,7 @@ describe('the triage migration', () => {
         .toEqual([...COLUMNS[table]]);
     }
     expect(rawQuery<{ name: string }>(root, tables, 'table').map(({ name }) => name))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
   });
@@ -887,7 +887,7 @@ describe('whole-write refusals', () => {
     const before = readRaw(root);
 
     expect(() => writeTriage(root, writeOf({ outOfScopeBugs: [bug()] }), seams('newer-2')))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 
@@ -905,8 +905,7 @@ describe('whole-write refusals', () => {
     db.run(`PRAGMA user_version = ${newer}`);
     db.close();
     const before = readRaw(root);
-    const refusal = `is at schema version ${newer}, past the`
-      + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+    const refusal = `has a migration log and schema version ${newer};`;
     const allRefused = writeOf({
       blockers: [blocker({ what: null })],
       outOfScopeBugs: [bug({ security: 'maybe' as never })],

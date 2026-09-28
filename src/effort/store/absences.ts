@@ -187,6 +187,7 @@ export function writeReportAbsence(
 
   const appended = withSqliteStore(
     path,
+    'write',
     !existsSync(path),
     (db) => db.query<unknown, Bound[]>(INSERT_ABSENCE).run(...values).changes,
   );

@@ -259,6 +259,8 @@ describe('writeTrackerRef', () => {
     const other = new Database(storeFile(root), { readwrite: true, create: false });
     try {
       other.run('BEGIN IMMEDIATE');
+      // The store's open waits out its busy timeout for the lock before
+      // it throws, so this case takes that long.
       expect(() => writeTrackerRef(root, writeOf())).toThrow(/database is locked/);
       other.run('ROLLBACK');
     } finally {
@@ -266,7 +268,7 @@ describe('writeTrackerRef', () => {
     }
 
     expect(writeTrackerRef(root, writeOf()).action).toBe('held');
-  });
+  }, 15_000);
 
   it('keys the row by the session and the artifact byte for byte', () => {
     const root = freshRoot('keys');
@@ -384,8 +386,8 @@ describe('writeTrackerRef', () => {
     rawRun(root, `PRAGMA user_version = ${SQLITE_SCHEMA_VERSION + 1}`);
     const bytes = readRaw(root);
 
-    expect(() => writeTrackerRef(root, writeOf())).toThrow(/past the/);
-    expect(() => readTrackerRef(root, ARTIFACT)).toThrow(/past the/);
+    expect(() => writeTrackerRef(root, writeOf())).toThrow(/has a migration log and schema version/);
+    expect(() => readTrackerRef(root, ARTIFACT)).toThrow(/has a migration log and schema version/);
     expect(readRaw(root)).toEqual(bytes);
   });
 

@@ -51,6 +51,7 @@ const TABLES = [
   'plan_ci',
   'preflight',
   'report_absences',
+  'schema_migrations',
   'sessions',
   'skill_invocations',
   'task_reports',
@@ -138,7 +139,7 @@ describe('the skill_invocations table', () => {
     // The control: the first ten entries make every earlier table and no
     // skill_invocations table, so the table this write fills came from a
     // later entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'skill_invocations' && table !== 'plan_ci'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'skill_invocations' && table !== 'plan_ci'));
 
     writeSkillInvocations(root, [COUNTED]);
 
@@ -292,7 +293,7 @@ describe('readSkillInvocations', () => {
   it('brings a version-10 store forward and answers none, the table just made', () => {
     const root = freshRoot('read-from-v10');
     plantAtVersion(root, 10);
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'skill_invocations' && table !== 'plan_ci'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'skill_invocations' && table !== 'plan_ci'));
 
     expect(readSkillInvocations(root)).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);

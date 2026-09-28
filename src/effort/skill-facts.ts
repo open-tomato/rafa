@@ -76,10 +76,10 @@
  *
  * The reader answers none, opening and creating nothing, when the store
  * file does not exist. A store that exists is opened through the store's
- * own readers and `withSqliteStore`, so its schema is brought forward, or
- * refused, as it is for a write. It throws when the store cannot be read,
- * and when a list column holds anything but a list of strings, which no
- * writer stores.
+ * own readers and `withSqliteStore`, each for a read, so its schema is
+ * brought forward, or refused, as `sqlite.ts` says a read's is. It
+ * throws when the store cannot be read, and when a list column holds
+ * anything but a list of strings, which no writer stores.
  */
 import type { SkillResolverName } from '../config-sections.js';
 import type { PlanCiRow } from './store/plan-ci.js';
@@ -244,7 +244,7 @@ function findingOf(row: StoredFinding): SkillFactFinding {
 
 /** The dispatches, findings, blockers and bugs of every session, in one open. */
 function readSessionRows(path: string): SessionRows {
-  return withSqliteStore(path, false, (db) => {
+  return withSqliteStore(path, 'read', false, (db) => {
     const offers = db.query<StoredOffer, []>(SELECT_OFFERS).all();
     return {
       offers: new Map(offers.map((row) => [row.session_id, {

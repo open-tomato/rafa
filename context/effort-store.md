@@ -46,8 +46,8 @@ is copied there as well.
 ### A store past this rafa
 
 **A plan that adds a migration can lock its own loop out of the store.**
-`migrateSchema` refuses a store past the version `SQLITE_MIGRATIONS` holds,
-and every read and write goes through it. A task that runs the branch's
+A pre-log release refuses a store past the version its `SQLITE_MIGRATIONS`
+holds, and every read and write it makes goes through that check. A task that runs the branch's
 own code from its working tree against `.rafa/effort/effort.sqlite`
 migrates the project's store, while the loop driving the plan is the older
 installed runtime. From then on that runtime refuses the store, and the
@@ -90,8 +90,10 @@ lock line, or when an entry has no lock line. So a new entry adds its
 lock line in the same commit. `LEGACY_GATE_OPEN` (13) and
 `LEGACY_GATE_CLOSED` (1000) are the `user_version` values that let a
 pre-log release in or keep it out, and `legacyGate` picks one from what
-a store holds. The open path does not read the names, the lock or the
-gate yet: `migrateSchema` still counts by position.
+a store holds. The open path reads the names and the gate through
+`bringForward`, and nothing outside `migrations.test.ts` reads the lock.
+`migrateSchema` still counts by position; only `fix-schema` builds with
+it, and the next open adopts what it built.
 
 **`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
 decision, and `bringForward` is its one caller.** It takes what a store holds (its
@@ -106,7 +108,7 @@ store holding an unknown migration that breaks writers refuses a read
 that would apply one.
 
 **`bringForward` (`src/effort/store/bring-forward.ts`) acts on that
-decision, and the open path does not call it yet.** It reads a store's
+decision, and every open calls it.** It reads a store's
 `schema_migrations` and `user_version`, plans, and throws a refusal as
 `SchemaRefusedError` (`reason`, `nextStep`) with nothing written. With
 nothing to adopt or apply it returns without taking a lock. Otherwise it
@@ -116,6 +118,23 @@ unrun with this build's checksums, runs and logs each pending entry, and
 sets `user_version` to the gate. A throw rolls all of it back. A test
 passes a synthetic tail as its `migrations` option; `applied_by` is this
 build's package version unless the caller names another.
+
+**`withSqliteStore(path, access, create, use)` is the open, and every
+caller states `access`.** `keys`, `read` and every reader outside the
+port pass `'read'`; every writer passes `'write'`, and so does
+`writeSqliteStore` for an empty write. The open sets `PRAGMA
+busy_timeout` to 5000 ms, fixed in `sqlite.ts` until the
+`effort.busyTimeoutMs` key exists, then calls `bringForward(db, path,
+access, 'open')` before `use`. A read of a current store writes nothing;
+a read of a pre-log store adopts it, since adoption counts as a write; a
+store logging an unknown migration that breaks only writers is read and
+refused a write. Without the busy timeout, an open that found migrations
+pending while another process held the lock threw `SQLITE_BUSY` at
+once; with it, `sqlite.test.ts` has two processes open one fresh store
+while a third holds the lock, and one applies every migration while the
+other finds nothing pending. A test that expects an open to throw on a
+held lock now waits out those five seconds, as the lock case of
+`tracker-refs.test.ts` does.
 
 ### Tables outside the port
 
@@ -150,7 +169,9 @@ and the filter the version-5 case of `preflight.test.ts` takes the later
 tables out with, beside the version-6 filter of `dispatches.test.ts`, the
 two version-7 filters of `changes.test.ts`, the two version-10 filters of
 `skill-invocations.test.ts`, and the two version-12 filters of
-`plan-ci.test.ts`.
+`plan-ci.test.ts`. Those lists hold `schema_migrations`, which the first
+open through the module creates, and each filter over a store planted
+by raw SQL takes it out as well, since no open has made it there yet.
 
 ### The fact rows
 

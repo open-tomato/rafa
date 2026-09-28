@@ -73,8 +73,7 @@ const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 /** One version past this rafa's own, and the wording it refuses with. */
 const NEWER_VERSION = SQLITE_SCHEMA_VERSION + 1;
-const VERSION_REFUSAL = `is at schema version ${NEWER_VERSION}, past the`
-  + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+const VERSION_REFUSAL = `has a migration log and schema version ${NEWER_VERSION};`;
 
 /** Temporary directories removed after every case. */
 const scratch: string[] = [];
