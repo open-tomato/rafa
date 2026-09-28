@@ -127,8 +127,12 @@ function issuesMatchKind(kind: HopKind, blocked: number | null, target: number |
     : blocked === null && target === null;
 }
 
-/** `value` as a hop record, or null when it is not one. */
-function asHopRecord(value: unknown): HopRecord | null {
+/**
+ * `value` as a hop record, or null when it is not one: the check
+ * {@link readHopRecord} makes on the parsed file, which the session record
+ * makes on its `hop` field (`src/loop/sessions.ts`).
+ */
+export function asHopRecord(value: unknown): HopRecord | null {
   if (!isRecord(value)) return null;
   const { kind, blocked, target, targetEpic, targetBoard, state, pullRequest, startedAt } = value;
   const home = asPlace(value.home);

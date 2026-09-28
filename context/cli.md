@@ -247,6 +247,16 @@ New; it replaces no earlier text. What a row or an action added to
   handed into `start`, which resolves the plan from `.rafa/plans/` unless
   `plan.dir` in the config names another directory, then uses that plan's
   stub to name the new branch.
+- **`loop start --roadmap` stamps the away hop on the session record**
+  (`start/session.ts`): `rafa next --roadmap` passes the flag to the loop
+  it starts, and the run's `.rafa/runs/<session-id>.json` then carries the
+  hop record (`.rafa/hop.json`) as its `hop` when that record is `away`,
+  of either kind, and its home is still the position's. A record back
+  home, a stale one, none, and no position file stamp nothing; a file
+  that is no hop record is warned about in one line and stamps nothing.
+  Without the flag neither file is read and the record carries no `hop`
+  key; `parseSessionRecord` (`loop/sessions.ts`) refuses a `hop` key
+  holding anything but a hop record, and every later write keeps it.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`

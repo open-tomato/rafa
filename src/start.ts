@@ -65,7 +65,8 @@
  * checked, the run opens its session (`start/session.ts`): it
  * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
  * stub and path, the branch, this process's pid, the start time, the state
- * `running` and no task (`loop/sessions.ts`). A record of the plan refuses
+ * `running` and no task (`loop/sessions.ts`), and under `--roadmap` the
+ * `rafa next --roadmap` hop that is away, when one is. A record of the plan refuses
  * the run when it names another branch, whatever its state, or names this
  * branch and still reads `running` or `paused`; a record whose pid is gone
  * reads `stopped`. The record names each task before its dispatch and no
@@ -139,6 +140,9 @@
  *               (`start/branch.ts`). Read nowhere else.
  * --any-branch  run where the loop stands, whatever branch that is: no
  *               offer is made and the guard below checks nothing.
+ * --roadmap     stamp the hop record, when a hop is away, on the run's
+ *               session record as its `hop` (`start/session.ts`). What
+ *               `rafa next --roadmap` passes to the loop it starts.
  * --no-ci-wait  finish at the push instead of waiting for CI.
  * --ci-timeout  minutes to wait for checks to settle (default 20).
  * --ci-attempts repair sessions to spend on a red or conflicting PR
@@ -264,6 +268,9 @@ const ANY_BRANCH_FLAG = '--any-branch';
 
 /** The flag that answers the branch question yes before it is asked. */
 const CREATE_BRANCH_FLAG = '--create-branch';
+
+/** The flag `rafa next --roadmap` passes on, stamping the away hop on the session record (`start/session.ts`). */
+const ROADMAP_FLAG = '--roadmap';
 
 /** What the refusal calls a plan whose file names no stub. */
 const UNNAMED_PLAN = 'this-plan';
@@ -484,8 +491,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   setActivePlanStub(planStub);
 
   // Refuses a second run of the plan before anything else is printed or
-  // checked; every way out of the `try` writes the run's end.
-  const session = openRunSession({ repoRoot, planPath, planStub, branch });
+  // checked; every way out of the `try` writes the run's end. Under
+  // `--roadmap` the record carries the away hop, when there is one.
+  const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap: args.includes(ROADMAP_FLAG) });
   try {
     const planContent = fs.readFileSync(planPath, 'utf8');
     const promptContent = fs.readFileSync(promptPath, 'utf8');
