@@ -1,7 +1,9 @@
 /**
  * The words `rafa status` shows for where this checkout stands: the
- * place line, and the away line while the current place is not home
- * (`.rafa/specs/rafa-245-boards-several-roadmaps-per.md`). It reads
+ * place line, the away line while the current place is not home
+ * (`.rafa/specs/rafa-245-boards-several-roadmaps-per.md`), and the
+ * waiting line while a hop's pull request waits on its owner's review
+ * (`.rafa/specs/rafa-247-rafa-next-roadmap.md`). It reads
  * nothing and prints nothing: the caller hands in a {@link PlaceView}
  * built from the place `resolvePlace` (`src/board/place.ts`) answered
  * and the board listing it already read, and writes the lines itself.
@@ -29,6 +31,15 @@
  * alone says which it is. Two places on one board at different epics
  * name their epics; a place at an epic and one on the same board with no
  * epic name the epic and the board.
+ *
+ * ## The waiting line
+ *
+ * {@link waitingLine} answers `waiting on #C (owner review)`, printed
+ * under the away line. Which hop record earns it — one in state
+ * `waiting` whose pull request is still open and whose owner gate lets
+ * no merge through — is `readPlace`'s (`./sections.ts`) to decide; this
+ * module only spells the line for the issue it is handed, which is C,
+ * or the pull request's own number on a record naming no C.
  */
 import type { Horizon } from '../board/roadmap-epic-rows.js';
 import type { Place } from '../project/position.js';
@@ -92,4 +103,12 @@ export function placeNumber(place: Place): number {
 export function awayLine(current: Place, home: Place): string | null {
   if (samePlace(current, home)) return null;
   return `${AWAY_PREFIX}: working ${id(placeNumber(current))} for ${id(placeNumber(home))}`;
+}
+
+/** What the waiting line says its issue waits on. */
+export const WAITING_ON = 'owner review';
+
+/** `waiting on #C (owner review)`; see the module note. */
+export function waitingLine(issue: number): string {
+  return `waiting on ${id(issue)} (${WAITING_ON})`;
 }
