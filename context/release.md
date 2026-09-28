@@ -109,17 +109,33 @@ refused, restored, and reported.
 
 Exits 0. Never writes.
 
-**`rafa release tag`** — Puts `v<version>` on the release branch's HEAD when
-the version file says so and the tag is absent. The release branch is
-`pr.base`, falling back to `DEFAULT_RELEASE_BRANCH` (`main`) when the project
-declares none — there is no `release.branch` setting, because `pr.base`
-already carries that fact. Refuses when the tag exists, when the tree is not
-on that branch, or when the version file's version is not the one the
-changelog's newest section names. Prints the push and publish lines but runs
-neither. There is no `release.registry` setting either: the registry comes
-from the version file's own `publishConfig.registry`, defaulting to
+**`rafa release tag`** — Puts `v<version>` on the commit of the release
+branch that SET that version, when the version file says so and the tag is
+absent. The release branch is `pr.base`, falling back to
+`DEFAULT_RELEASE_BRANCH` (`main`) when the project declares none — there is
+no `release.branch` setting, because `pr.base` already carries that fact.
+Refuses when the tag exists, when the tree is not on that branch, when the
+version file's version is not the one the changelog's newest section names,
+and when no commit holds that version yet. Prints the push and publish lines
+but runs neither. There is no `release.registry` setting either: the registry
+comes from the version file's own `publishConfig.registry`, defaulting to
 `https://registry.npmjs.org`, and the manager from `packageManager`. Exits 0
-on success, 2 on refusal.
+on success, 1 on refusal.
+
+**The tag names the commit that set the version, which need not be HEAD.**
+Merges can land on the base between the release and the tag: on 2026-09-28
+0.24.0 was published from 7db04a2, three merges followed, and a tag on HEAD
+named ffe501a, a tree the package is not.
+`src/commands/release/release-commit.ts` walks
+`git log --first-parent -- <versionFile>` newest first while the file still
+declares the version; the oldest commit of that run set it, a merge
+commit counting as the commit that brought the bump. When HEAD is past it the
+run tags it anyway, warns how many first-parent commits HEAD is past, and
+spells the publish line as `git switch --detach <tag> && <manager> publish &&
+git switch <branch>`, because a publish from HEAD would ship the later commits
+under the older version. The registry's `gitHead` is not read: that is a
+network call, and it can name a branch commit the base never holds (0.22.0's
+is d53c168, squash-merged as df0f61a).
 
 **Reading a version back out of a heading is a semver scan, not a template
 match.** `release.heading` is free text whose `{version}`, `{date}` and

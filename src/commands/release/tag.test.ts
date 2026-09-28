@@ -25,9 +25,12 @@
  *     working would name 9.9.9 as the newest release and redden;
  *   - the private-package case is paired with the same manifest
  *     without `"private": true`, which DOES get a publish line;
- *   - two cases run against a real git repository through the default
- *     seams, so `git tag <tag> HEAD` is known to write a tag git then
- *     lists, and the second of them refuses on the tag the first wrote.
+ *   - cases run against a real git repository through the default
+ *     seams, so `git tag <tag> <commit>` is known to write a tag git
+ *     then lists, a second run refuses on the tag the first wrote, and
+ *     a history with commits past the release is known to put the tag
+ *     on the commit that set the version rather than on HEAD — the
+ *     0.24.0 shape `./release-commit.ts` measures.
  */
 import type { ReleaseSeams, ReleaseTag } from './status.js';
 import type {
@@ -36,6 +39,7 @@ import type {
   ReleaseTagResult,
   TagDecision,
   TagInputs,
+  TagReady,
   TagRefused,
 } from './tag.js';
 import type { RafaCommand } from '../../cli/command.js';
@@ -65,6 +69,7 @@ import {
   readVersion,
   RELEASE_REMOTE,
   RELEASE_TAG_USAGE,
+  pastReleaseWarning,
   renderTagged,
 } from './tag.js';
 
@@ -94,6 +99,12 @@ const VERSION = '0.5.0';
 
 /** The tag that names it. */
 const TAG = `v${VERSION}`;
+
+/** The commit a planted history says set {@link VERSION}, which is HEAD unless a case says otherwise. */
+const SET_COMMIT = '7db04a24932a061f36518918f1e776a67cd601f8';
+
+/** The decision a run that tags {@link SET_COMMIT}, with HEAD on it, makes. */
+const READY: TagReady = Object.freeze({ kind: 'ready', version: VERSION, tag: TAG, commit: SET_COMMIT, ahead: 0 });
 
 /** A manifest shaped like this repository's own. */
 const MANIFEST = JSON.stringify({
@@ -163,6 +174,7 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
     version: { path: 'package.json', text: MANIFEST, version: VERSION, problem: null },
     changelog: { path: 'CHANGELOG.md', version: VERSION, problem: null },
     tags: { tags: [tag('v0.4.0')], latest: tag('v0.4.0'), problem: null },
+    release: { commit: SET_COMMIT, ahead: 0, problem: null },
     ...over,
   };
 }
@@ -201,16 +213,24 @@ function recorded(table: GitTable): RecordedSeams {
   };
 }
 
-/** The git table a run that tags answers from: a branch, a tag list, and the write. */
+/**
+ * The git table a run that tags answers from: a branch, a tag list, a
+ * history in which {@link SET_COMMIT} set the version and HEAD is
+ * `ahead` commits past it, and the write.
+ */
 function gitTable(
   branch = DEFAULT_RELEASE_BRANCH,
   tags = 'v0.4.0\n',
   write: GitResult = said(''),
+  ahead = 0,
 ): GitTable {
   return {
     'rev-parse --abbrev-ref HEAD': said(`${branch}\n`),
     'tag --list': said(tags),
-    [`tag ${TAG} HEAD`]: write,
+    'log --first-parent --format=%H HEAD -- ./package.json': said(`${SET_COMMIT}\n`),
+    [`show ${SET_COMMIT}:./package.json`]: said(MANIFEST),
+    [`rev-list --count --first-parent ${SET_COMMIT}..HEAD`]: said(`${String(ahead)}\n`),
+    [`tag ${TAG} ${SET_COMMIT}`]: write,
   };
 }
 
@@ -389,7 +409,7 @@ describe('the decision one run makes', () => {
   }
 
   it('tags the version both files agree on when no tag names it yet', () => {
-    expect(decideTag(inputs())).toEqual({ kind: 'ready', version: VERSION, tag: TAG });
+    expect(decideTag(inputs())).toEqual(READY);
   });
 
   it('refuses when another branch is checked out, naming both branches', () => {
@@ -413,7 +433,7 @@ describe('the decision one run makes', () => {
   it('tags on the branch the caller names, which need not be main', () => {
     const decision = decideTag(inputs({ releaseBranch: 'master', branch: { branch: 'master', problem: null } }));
 
-    expect(decision).toEqual({ kind: 'ready', version: VERSION, tag: TAG });
+    expect(decision).toEqual(READY);
   });
 
   it('refuses when the version file declares no version, and says why it could not be read', () => {
@@ -476,6 +496,39 @@ describe('the decision one run makes', () => {
     expect(refusal.message).toBe('the changelog could not be read at /x');
   });
 
+  it('tags the commit that set the version, carrying how far HEAD is past it', () => {
+    const decision = decideTag(inputs({ release: { commit: SET_COMMIT, ahead: 3, problem: null } }));
+
+    expect(decision).toEqual({ ...READY, ahead: 3 });
+  });
+
+  it('refuses with the version reason when no commit holds the version yet', () => {
+    const message = 'package.json says 0.5.0, and the last commit on this branch that changed it says 0.4.0;'
+      + ' commit the version before tagging it';
+    const refusal = refusalOf(decideTag(inputs({
+      release: { commit: null, ahead: 0, problem: { reason: 'version', message } },
+    })));
+
+    expect(refusal).toEqual({ kind: 'refused', reason: 'version', message });
+  });
+
+  it('refuses with the git reason when the history could not be walked', () => {
+    const refusal = refusalOf(decideTag(inputs({
+      release: { commit: null, ahead: 0, problem: { reason: 'git', message: 'the history could not be read' } },
+    })));
+
+    expect(refusal.reason).toBe('git');
+  });
+
+  it('refuses for the changelog before the release commit, which is only about where the tag goes', () => {
+    const refusal = refusalOf(decideTag(inputs({
+      changelog: { path: 'CHANGELOG.md', version: '0.4.0', problem: null },
+      release: { commit: null, ahead: 0, problem: { reason: 'git', message: 'the history could not be read' } },
+    })));
+
+    expect(refusal.reason).toBe('changelog');
+  });
+
   it('refuses for the branch first when every reading is wrong, which is the order it checks in', () => {
     const refusal = refusalOf(decideTag(inputs({
       branch: { branch: 'feat/rafa-21', problem: null },
@@ -500,7 +553,7 @@ describe('the decision one run makes', () => {
 describe('the lines a run that tagged prints', () => {
   it('names the tag, the branch, and every follow-up under one heading', () => {
     const lines = renderTagged(
-      { kind: 'ready', version: VERSION, tag: TAG },
+      READY,
       'main',
       followUpsFor(TAG, VERSION, target()),
     );
@@ -514,8 +567,37 @@ describe('the lines a run that tagged prints', () => {
   });
 });
 
+describe('a tag written behind HEAD', () => {
+  const behind: TagReady = { ...READY, ahead: 3 };
+
+  it('warns how far HEAD is past the tagged commit, and says nothing when HEAD is the tagged commit', () => {
+    expect(pastReleaseWarning(READY, 'main')).toBeNull();
+    expect(pastReleaseWarning(behind, 'main'))
+      .toBe(`HEAD of main is 3 commits past 7db04a2, where ${VERSION} was set; they are not in ${TAG}.`);
+    expect(pastReleaseWarning({ ...READY, ahead: 1 }, 'main'))
+      .toBe(`HEAD of main is 1 commit past 7db04a2, where ${VERSION} was set; they are not in ${TAG}.`);
+  });
+
+  it('spells the publish line to publish the tagged tree and switch back to the branch', () => {
+    expect(followUpsFor(TAG, VERSION, target(), { ahead: 3, branch: 'main' })).toEqual([
+      { command: `git push ${RELEASE_REMOTE} ${TAG}`, why: `the tag is local until ${RELEASE_REMOTE} has it` },
+      {
+        command: `git switch --detach ${TAG} && bun publish && git switch main`,
+        why: `publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY} from the tagged commit, not HEAD;`
+          + ` skip it if ${DEFAULT_REGISTRY} has that version already`,
+      },
+    ]);
+  });
+
+  it('names the commit it tagged in place of the HEAD of the branch', () => {
+    const lines = renderTagged(behind, 'main', followUpsFor(TAG, VERSION, target(), { ahead: 3, branch: 'main' }));
+
+    expect(lines[0]).toBe(`✅ Tagged ${TAG} at 7db04a2, the commit of main that set ${VERSION}.`);
+  });
+});
+
 describe('the dispatched action', () => {
-  it('writes the tag on HEAD and prints the push and the publish line', async () => {
+  it('writes the tag on the commit that set the version, HEAD here, and prints the push and the publish line', async () => {
     const seams = recorded(gitTable());
 
     const run = await ran(seams.seams, releaseProject());
@@ -524,7 +606,19 @@ describe('the dispatched action', () => {
     expect(run.stdout).toContain(`✅ Tagged ${TAG} at the HEAD of ${DEFAULT_RELEASE_BRANCH}.`);
     expect(run.stdout).toContain(`git push ${RELEASE_REMOTE} ${TAG}`);
     expect(run.stdout).toContain(`bun publish — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`);
-    expect(seams.calls).toContain(`tag ${TAG} HEAD`);
+    expect(seams.calls).toContain(`tag ${TAG} ${SET_COMMIT}`);
+  });
+
+  it('tags the commit that set the version when HEAD is past it, warning and publishing from the tag', async () => {
+    const seams = recorded(gitTable(DEFAULT_RELEASE_BRANCH, 'v0.4.0\n', said(''), 3));
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.calls).toContain(`tag ${TAG} ${SET_COMMIT}`);
+    expect(run.stdout).toContain(`HEAD of main is 3 commits past 7db04a2, where ${VERSION} was set`);
+    expect(run.stdout).toContain(`✅ Tagged ${TAG} at 7db04a2, the commit of main that set ${VERSION}.`);
+    expect(run.stdout).toContain(`git switch --detach ${TAG} && bun publish && git switch main`);
   });
 
   it('makes its git runner for the project the dispatcher resolved', async () => {
@@ -584,7 +678,7 @@ describe('the dispatched action', () => {
     const data = dataOf(run.events) as ReleaseTagResult;
 
     expect(run.exitCode).toBe(0);
-    expect(data.written).toEqual({ kind: 'ready', version: VERSION, tag: TAG });
+    expect(data.written).toEqual(READY);
     expect(data.inputs.branch.branch).toBe(DEFAULT_RELEASE_BRANCH);
     expect(data.inputs.changelog.version).toBe(VERSION);
     expect(data.followUps.map((followUp) => followUp.command))
@@ -601,7 +695,7 @@ describe('the dispatched action', () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain('at the HEAD of master.');
-    expect(seams.calls).toContain(`tag ${TAG} HEAD`);
+    expect(seams.calls).toContain(`tag ${TAG} ${SET_COMMIT}`);
   });
 
   it('refuses a stray word with exit code 1, and makes no git runner', async () => {
@@ -675,6 +769,50 @@ describe('what the default seams reach', () => {
     expect(second.exitCode).toBe(1);
     expect(second.stderr).toContain(`${TAG} already names ${VERSION}`);
     expect(gitIn(repo.repo, repo.home, ['tag', '--list']).trim()).toBe(TAG);
+  });
+
+  it('tags the commit that set the version, not HEAD, when commits landed after it in a real repository', async () => {
+    // Arrange: the version is set, then three more commits land on main — the 0.24.0 shape.
+    const repo = plantScratchRepo(scratch());
+    gitIn(repo.repo, repo.home, ['checkout', '-q', '-B', DEFAULT_RELEASE_BRANCH]);
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST.replace(VERSION, '0.4.0'), 'utf8');
+    gitIn(repo.repo, repo.home, ['add', '-A']);
+    gitIn(repo.repo, repo.home, ['commit', '-q', '-m', 'chore: release 0.4.0']);
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST, 'utf8');
+    writeFileSync(join(repo.repo, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    gitIn(repo.repo, repo.home, ['add', '-A']);
+    gitIn(repo.repo, repo.home, ['commit', '-q', '-m', 'chore: release 0.5.0']);
+    const set = gitIn(repo.repo, repo.home, ['rev-parse', 'HEAD']).trim();
+    for (const name of ['a', 'b', 'c']) {
+      writeFileSync(join(repo.repo, `${name}.txt`), `${name}\n`, 'utf8');
+      gitIn(repo.repo, repo.home, ['add', '-A']);
+      gitIn(repo.repo, repo.home, ['commit', '-q', '-m', `feat: ${name}`]);
+    }
+    const head = gitIn(repo.repo, repo.home, ['rev-parse', 'HEAD']).trim();
+
+    const run = await ran({}, { root: repo.repo, home: repo.home });
+
+    expect(run.exitCode).toBe(0);
+    expect(gitIn(repo.repo, repo.home, ['rev-list', '-n', '1', TAG]).trim()).toBe(set);
+    expect(set).not.toBe(head);
+    expect(run.stdout).toContain(`HEAD of main is 3 commits past ${set.slice(0, 7)}`);
+  });
+
+  it('refuses a version no commit holds yet, and writes no tag, in a real repository', async () => {
+    const repo = plantScratchRepo(scratch());
+    gitIn(repo.repo, repo.home, ['checkout', '-q', '-B', DEFAULT_RELEASE_BRANCH]);
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST.replace(VERSION, '0.4.0'), 'utf8');
+    writeFileSync(join(repo.repo, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    gitIn(repo.repo, repo.home, ['add', '-A']);
+    gitIn(repo.repo, repo.home, ['commit', '-q', '-m', 'chore: release 0.4.0']);
+    // The bump is in the working tree only.
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST, 'utf8');
+
+    const run = await ran({}, { root: repo.repo, home: repo.home });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('commit the version before tagging it');
+    expect(gitIn(repo.repo, repo.home, ['tag', '--list']).trim()).toBe('');
   });
 
   it('refuses on a branch that is not the release branch, in a real repository', async () => {
