@@ -8,10 +8,15 @@
  * `plan.dir` or `specs.dir` on purpose, and each one that does says so
  * in a sentence on the case or the file. `src/project/pre-init-dirs.ts`
  * carries the same kind of exemption for a production file: naming the
- * two old directories verbatim is its entire job, not a regression. This
- * suite is what holds every OTHER tracked file to the sweep instead, so
- * a doc comment or a runbook line that regresses to the old path is
- * caught before it can spread.
+ * two old directories verbatim is its entire job, not a regression.
+ * `CHANGELOG.md` is exempt for the same kind of reason: it records what
+ * each release changed, so an entry about the move off `.plans` names
+ * the old directory truthfully, and the release step writes its entries
+ * from the plans' change notes, where rewording one by hand would
+ * falsify a released version's history. This suite is what holds every
+ * OTHER tracked file to the sweep instead, so a doc comment or a
+ * runbook line that regresses to the old path is caught before it can
+ * spread.
  *
  * ## Joined prose, not a line-anchored grep
  *
@@ -30,10 +35,11 @@
  * ## The exemption is a path rule, not a content rule
  *
  * `isScannedPath` excludes a path two ways: it ends in `.test.ts`, or it
- * sits under `src/tests/`. Both hold regardless of what the file says,
- * which is what lets `src/tests/loop-session-fixtures.ts` — a fixture
- * module, not itself a `*.test.ts` file — keep planting non-default
- * directories without becoming an offender.
+ * sits under `src/tests/`; it also excludes the two files named above.
+ * Every one of these holds regardless of what the file says, which is
+ * what lets `src/tests/loop-session-fixtures.ts` — a fixture module,
+ * not itself a `*.test.ts` file — keep planting non-default directories
+ * without becoming an offender.
  *
  * ## The controls
  *
@@ -78,16 +84,24 @@ export interface ScanOffender {
 const PRE_INIT_DIRS_PATH = 'src/project/pre-init-dirs.ts';
 
 /**
+ * The release history, exempt because its entries name what a release
+ * changed, the move off the two old directories included. See the
+ * module note.
+ */
+const CHANGELOG_PATH = 'CHANGELOG.md';
+
+/**
  * Whether a tracked path is in scope for the sweep.
  *
  * Tests keep their fixtures: a `*.test.ts` case anywhere, or any file
- * under `src/tests/` regardless of its own extension, is exempt. So is
- * {@link PRE_INIT_DIRS_PATH}.
+ * under `src/tests/` regardless of its own extension, is exempt. So are
+ * {@link PRE_INIT_DIRS_PATH} and {@link CHANGELOG_PATH}.
  */
 export function isScannedPath(path: string): boolean {
   if (path.endsWith('.test.ts')) return false;
   if (path.startsWith('src/tests/')) return false;
   if (path === PRE_INIT_DIRS_PATH) return false;
+  if (path === CHANGELOG_PATH) return false;
   return true;
 }
 
@@ -158,11 +172,13 @@ describe('no tracked file outside the test suite still names .plans/ or .specs/'
     expect(SCANNED.length).toBeLessThan(TRACKED.length);
   });
 
-  it('excludes *.test.ts files, everything under src/tests/, and pre-init-dirs.ts, nothing else', () => {
+  it('excludes *.test.ts files, everything under src/tests/, pre-init-dirs.ts and CHANGELOG.md, nothing else', () => {
     expect(isScannedPath('src/tests/default-plan-dirs.test.ts')).toBe(false);
     expect(isScannedPath('src/tests/loop-session-fixtures.ts')).toBe(false);
     expect(isScannedPath('src/board/gate.test.ts')).toBe(false);
     expect(isScannedPath('src/project/pre-init-dirs.ts')).toBe(false);
+    expect(isScannedPath('CHANGELOG.md')).toBe(false);
+    expect(isScannedPath('docs/CHANGELOG.md')).toBe(true);
     expect(isScannedPath('AGENTS.md')).toBe(true);
     expect(isScannedPath('src/board/gate.ts')).toBe(true);
   });
