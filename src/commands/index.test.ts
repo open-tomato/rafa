@@ -1,10 +1,10 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the sixty-four commands it registers: what the registry
+ * declarations of the sixty-five commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
- * `cleanup`, `describe`, `doctor`, `epic show`, `epic new`, `epic defer`, `epic promote`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
+ * `cleanup`, `describe`, `doctor`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`,
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
@@ -155,6 +155,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'epic new': ['text', 'json'],
   'epic defer': ['text', 'json'],
   'epic promote': ['text', 'json'],
+  'epic move': ['text', 'json'],
   'switch': ['text', 'json'],
   'init': ['text', 'json'],
   'doctor': ['text', 'json'],
@@ -221,6 +222,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'epic new': [['title'], ['slug', 'horizon']],
   'epic defer': [['n'], ['to', 'reason']],
   'epic promote': [['n'], ['to', 'reason']],
+  'epic move': [['issue'], ['to', 'reason']],
   'switch': [['target'], ['rehome']],
   'init': [[], ['root', 'yes', 'board', 'epic-guard', 'release']],
   'doctor': [[], ['plan', 'deep']],
@@ -322,6 +324,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['epic new Auth --slug=auth', 'epic new', ['Auth', '--slug=auth'], ''],
   ['epic defer 40 --to=later', 'epic defer', ['40', '--to=later'], ''],
   ['epic promote 40 --to=now', 'epic promote', ['40', '--to=now'], ''],
+  ['epic move 12 --to=40', 'epic move', ['12', '--to=40'], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -425,7 +428,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the two release actions, board list, epic show, epic new, epic defer, epic promote, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the two release actions, board list, epic show, epic new, epic defer, epic promote, epic move, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -481,6 +484,7 @@ describe('the core roster', () => {
       'epic new',
       'epic defer',
       'epic promote',
+      'epic move',
       'status',
       'next',
       'roadmap',

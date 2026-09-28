@@ -30,7 +30,7 @@ module's note is the long form.
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
-| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; and `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel` |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -204,7 +204,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
-  `epic` for good; `epic new`, `epic defer`, `epic promote`, `roadmap`, `switch`, `next`, `init`,
+  `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board` and `epic`: a
@@ -1376,6 +1376,38 @@ New; it replaces no earlier text. What a row or an action added to
   line, the others still close, and the run exits 1 naming those left
   open. Json mode's result is `EpicHorizonResult`. Neither declares
   `spends`.
+- **`rafa epic move <issue> --to=<epic> [--reason="<why>"]` moves an
+  issue to another epic without recreating it** (`src/commands/epic/move.ts`).
+  The line is one issue number and a required `--to`, the target epic's
+  number, each a whole number from 1, refused with exit 1. The board
+  listing is read once (`createGhBoardListing`); `readEpicMove` reads the
+  move off it and refuses with exit 2 (`EPIC_MOVE_REFUSAL_EXIT`), before
+  any question or write: an issue not on the listing, an epic, one with
+  no `epic:` label or with several, a target that is not an open
+  `type:epic` issue or carries no `epic:` label, a target whose slug the
+  issue carries already (its own epic), and a slug no epic or several
+  own (an epic's slug is its first `epic:` label, as `readEpics` reads
+  it; the owner may be closed). A listing that cannot be read also exits
+  2. For an OPEN issue it names the open work: branches `branchClaims`
+  reads as the issue's (`scanClaimBranches`, named by `branchNameOf`)
+  and open pull requests closing it or from such a branch; a failed
+  reading is a `warn` line. The reason is `--reason`, else
+  `reasonQuestion` asked once where `isTerminal` (a seam) says stdin is
+  a terminal; no terminal and no reason prints `unaskedReasonMessage`,
+  a blank one warns `blankReasonMessage`, both writing nothing and
+  exiting 0. `applyEpicMove` then writes, in order: one
+  `IssueBoard.swapLabels` swapping the `epic:` labels (a failure exits 1
+  and sends nothing else); the line appended to the new epic's body,
+  then removed from the old one's, each through `editChecklist`
+  (`src/board/epic-checklist.ts`), carrying the old line's why and tick
+  (or the title, and ticked for a closed issue, when the old body lists
+  none); then the trail's `renderMoveComment` on the issue, naming the
+  open work, posted once the label moved. No issue is created or closed
+  and no `git` write is made. A body edit ending `failed` or a comment
+  that could not be posted is a `warn` line, and the run exits 1 naming
+  what to finish by hand. Json mode's result is `EpicMoveResult`.
+  `readEpicMove` and `applyEpicMove` are exported for `epic cancel`,
+  whose move of a dependent is the same move. It declares no `spends`.
 - **`rafa switch <n | -> [--no-rehome]` moves this checkout's place**
   (`src/commands/switch.ts`) and writes it to `.rafa/position.json`
   through `writePositionFile` (`src/project/position.ts`). It reads the
