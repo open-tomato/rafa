@@ -178,6 +178,8 @@ function recordingBoard(refuseWith?: string): { board: IssueBoard; swapped: () =
     comment: unreached,
     editComment: unreached,
     removeLabel: unreached,
+    closeIssue: unreached,
+    createLabel: unreached,
     swapLabels: (issue: number, removed: string, added: string): Promise<void> => {
       if (refuseWith !== undefined) return Promise.reject(new Error(refuseWith));
       swapped.push(`#${String(issue)} -${removed} +${added}`);

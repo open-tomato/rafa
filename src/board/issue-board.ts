@@ -1,7 +1,8 @@
 /**
- * The four writes and one read made on an issue: the comments of an
- * issue, a comment posted, a comment edited, one label swapped for
- * another, and one label taken off.
+ * The writes and one read made on an issue: the comments of an issue,
+ * a comment posted, a comment edited, one label swapped for another,
+ * one label taken off, an issue closed with a reason and a comment, and
+ * a label created in the repository.
  *
  * The readiness gate's not-ready branch posts the planner's gaps as one
  * comment, edits that comment on a rerun, and swaps `spec:ready` for
@@ -26,6 +27,13 @@
  * runner of its own and none of them reaches GitHub or reads the
  * configuration `gh` keeps under the home.
  *
+ * {@link IssueBoard.closeIssue} and {@link IssueBoard.createLabel} are
+ * for the epic lifecycle (`.rafa/plans/rafa-246-epic-lifecycle`): an
+ * epic closes or is cancelled through one `gh issue close` carrying its
+ * reason and its trail comment together, so the issue never closes
+ * without the comment saying why, and `rafa epic new` creates the
+ * `epic:<slug>` label its epic will carry.
+ *
  * ## Why not the Tracker port
  *
  * `Tracker` (`src/ports/index.ts`) carries `comment`, and nothing else
@@ -45,6 +53,18 @@
  * | `editComment` | `gh api repos/{owner}/{repo}/issues/comments/<id> -X PATCH -f body=<body>` |
  * | `swapLabels` | `gh issue edit <n> --remove-label <removed> --add-label <added>` |
  * | `removeLabel` | `gh issue edit <n> --remove-label <label>` |
+ * | `closeIssue` | `gh issue close <n> --reason=<reason> --comment=<comment>` |
+ * | `createLabel` | `gh label create <name> --description=<description>` |
+ *
+ * The close reason is one of {@link CLOSE_REASONS}, the two `gh issue
+ * close --reason` accepts, and the comment must be non-empty, since
+ * every change leaves a comment. The comment, the reason and the label
+ * description are sent in the `--flag=value` form, so free text opening
+ * with `-` is the flag's value and never read as a flag of its own; a
+ * label name is a positional and goes through the hyphen check below.
+ * What `gh label create` does with a name the repository already has
+ * was not measured here: it is sent without `--force`, so an existing
+ * label is never overwritten, and a failure is rejected to the caller.
  *
  * The comment paths are the REST ones the pull request provider reads
  * and writes, for the reason it records: a pull request IS an issue to
@@ -98,6 +118,12 @@ const REPO_PATH = '{owner}/{repo}';
 /** A comment id as the REST resource carries it: a whole number. */
 const COMMENT_ID = /^[1-9]\d*$/;
 
+/** The reasons `gh issue close --reason` accepts. */
+export const CLOSE_REASONS = Object.freeze(['completed', 'not planned'] as const);
+
+/** One of {@link CLOSE_REASONS}. */
+export type CloseReason = (typeof CLOSE_REASONS)[number];
+
 /** One comment on an issue: what the gate needs of it, and nothing more. */
 export interface BoardComment {
   /** The REST id, as a string: what the edit path takes. */
@@ -124,6 +150,10 @@ export interface IssueBoard {
   readonly swapLabels: (issue: number, removed: string, added: string) => Promise<void>;
   /** Takes `label` off the issue and puts nothing on it. */
   readonly removeLabel: (issue: number, label: string) => Promise<void>;
+  /** Closes the issue with `reason`, posting `comment` in the same command. */
+  readonly closeIssue: (issue: number, reason: CloseReason, comment: string) => Promise<void>;
+  /** Creates the label `name` in the repository, described by `description`. */
+  readonly createLabel: (name: string, description: string) => Promise<void>;
 }
 
 /** What {@link createGhIssueBoard} is made with. */
@@ -170,6 +200,24 @@ function commentId(value: string): string {
 function commentBody(value: string, member: string): string {
   if (typeof value !== 'string') {
     throw new TypeError(`${PREFIX}: ${member} refused a body ${describeValue(value)}, expected a string`);
+  }
+  return value;
+}
+
+/** The close reason `closeIssue` was handed. */
+function closeReason(value: CloseReason): CloseReason {
+  if (!(CLOSE_REASONS as readonly unknown[]).includes(value)) {
+    throw new TypeError(
+      `${PREFIX}: closeIssue refused reason ${describeValue(value)}, expected one of ${CLOSE_REASONS.join(', ')}`,
+    );
+  }
+  return value;
+}
+
+/** The close comment, which every close carries: a non-empty string. */
+function closeComment(value: string): string {
+  if (commentBody(value, 'closeIssue').trim() === '') {
+    throw new TypeError(`${PREFIX}: closeIssue refused an empty comment, every close leaves one`);
   }
   return value;
 }
@@ -281,6 +329,25 @@ export function createGhIssueBoard(options: GhIssueBoardOptions): IssueBoard {
       await succeed(
         ['issue', 'edit', number, '--remove-label', off],
         `gh issue edit ${number} --remove-label ${off}`,
+      );
+    },
+
+    closeIssue: async (issue: number, reason: CloseReason, comment: string): Promise<void> => {
+      const number = issueNumber(issue, 'closeIssue');
+      const why = closeReason(reason);
+      const text = closeComment(comment);
+      await succeed(
+        ['issue', 'close', number, `--reason=${why}`, `--comment=${text}`],
+        `gh issue close ${number} --reason=${why}`,
+      );
+    },
+
+    createLabel: async (name: string, description: string): Promise<void> => {
+      const label = labelName(name, 'createLabel', 'the label');
+      const text = commentBody(description, 'createLabel');
+      await succeed(
+        ['label', 'create', label, `--description=${text}`],
+        `gh label create ${label}`,
       );
     },
   };

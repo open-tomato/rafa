@@ -308,6 +308,14 @@ function fakeBoard(marker: boolean, faults: BoardFaults = {}): { board: IssueBoa
       calls.push(['removeLabel', issue, label]);
       return Promise.resolve();
     },
+    closeIssue: (issue, reason, comment) => {
+      calls.push(['closeIssue', issue, reason, comment]);
+      return Promise.resolve();
+    },
+    createLabel: (name, description) => {
+      calls.push(['createLabel', name, description]);
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }

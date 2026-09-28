@@ -106,6 +106,14 @@ function fakeBoard(held: readonly BoardComment[] = []): { board: IssueBoard; cal
       calls.push({ member: 'removeLabel', args: [issue, label] });
       return Promise.resolve();
     },
+    closeIssue: (issue, reason, comment) => {
+      calls.push({ member: 'closeIssue', args: [issue, reason, comment] });
+      return Promise.resolve();
+    },
+    createLabel: (name, description) => {
+      calls.push({ member: 'createLabel', args: [name, description] });
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }
