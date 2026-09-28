@@ -599,6 +599,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/pr/merge.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/roadmap-tick.js', ['tickSentence']],
+    ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../../effort/store/plan-ci.js', ['recordPlanCi']],
@@ -617,7 +618,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
     ['../../start/runtime.js', ['RUNTIME_SUBDIR']],
     ['./merge-followups.js', ['readFollowUps', 'readPackageFacts', 'versionTag']],
-    ['./merge-tick.js', ['tickRoadmapAfterMerge']],
+    ['./merge-tick.js', ['noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
     ['./merge-unchecked.js', ['confirmUncheckedMerge', 'postUncheckedComment', 'readUncheckedMerge']],
     ['./pr-context.js', [

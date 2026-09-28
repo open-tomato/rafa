@@ -752,7 +752,7 @@ describe('the tick pr merge writes, read back by the very walk plan create --nex
       warn: (message) => warnings.push(message),
     });
     expect(warnings).toEqual([]);
-    expect(result).toMatchObject({ status: 'ticked', ticked: [issue] });
+    expect(result).toEqual([expect.objectContaining({ status: 'ticked', ticked: [issue] })]);
   }
 
   /** Walks `--next` over `board`'s roadmap, in a scratch root of its own, removed after. */

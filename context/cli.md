@@ -52,7 +52,7 @@ module's note is the long form.
 | `src/commands/pr/triage-trust.ts` | board trust as `pr triage` asks it, over `src/board/trust.ts`: the newest `rafa:pr-triage` marker comment whose author holds write access or is listed in `board.trustedAuthors`, with every newer one passed over and reported rather than read, and the exit-2 refusal `--resolve` makes over a pull request whose own author is neither trusted nor a known dependency-bump bot |
 | `src/commands/pr/resolve-loop.ts` | one `--resolve` attempt's loop: the filled plan written under `~/.rafa/resolve/pr-<n>/attempt-<k>`, outside the worktree so the loop's own commit cannot push it, and `rafa loop start --plan=<file> --no-ci-wait` spawned in the worktree with its stdout forwarded a line at a time |
 | `src/commands/pr/triage-report.ts` | the one pure renderer of a triage: the head line, the re-run sentence, the class with its evidence or the stored triage, what was written, and the follow-up prompt whole |
-| `src/commands/pr/merge-tick.ts` | what `pr merge` decides about the roadmap tick: the issues the merged pull request closes, the roadmap issue `roadmap.issue` names or the search finds, and every failure on the way turned into a warning |
+| `src/commands/pr/merge-tick.ts` | what `pr merge` decides about the roadmap tick: the issues the merged pull request closes, every open `type:roadmap` board whose checklist lists one (with a `roadmap.issue` the listing does not hold), or while none is labelled the roadmap issue `roadmap.issue` names or the search finds, and every failure on the way turned into a warning |
 | `src/commands/pr/merge-unblock.ts` | the unblock reading `pr merge` ends with: the open `spec:blocked` issues whose `Blocked by:` line names an issue the merged pull request closes, run through `runUnblock`, with every failure turned into a warning naming the reading |
 | `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa release tag` while the version on the base carries no `v<version>` tag, and `rafa self-update` while the project's `package.json` names rafa's own package and the version is not installed under the home |
 | `src/commands/pr/pr-context.ts` | what the seven `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
@@ -415,10 +415,17 @@ New; it replaces no earlier text. What a row or an action added to
 - **`pr merge` ticks the roadmap after it merges**
   (`src/commands/pr/merge-tick.ts`, `src/board/roadmap-tick.ts`). GitHub
   closes an issue a merged pull request says `Closes #<n>` for and ticks
-  no `- [ ] #<n>` box, so the command reads the roadmap issue
-  `roadmap.issue` names, else the lowest-numbered open `type:roadmap`
-  board, else the issue titled `Roadmap`, and writes the
-  box through `gh api repos/{owner}/{repo}/issues/<n>`, GET then PATCH.
+  no `- [ ] #<n>` box, so the command lists the open `type:roadmap`
+  boards once and ticks EVERY one whose checklist, as the listing
+  answered it, lists a closed issue, plus a `roadmap.issue` the listing
+  does not hold, that one first; a board listing none of them is not
+  read, and when labelled boards exist but none lists one the command
+  prints `no open type:roadmap board lists #<n>, so nothing was ticked.`
+  While no issue carries the label it reads the roadmap issue
+  `roadmap.issue` names, else the issue titled `Roadmap`, as before.
+  Each board's box is written through
+  `gh api repos/{owner}/{repo}/issues/<n>`, GET then PATCH, one line
+  printed per board, and a board that fails does not stop the next.
   Every unticked line naming a closed issue is ticked, a line inside a
   fenced block is none, and the line breaks are kept as the body spelled
   them. A write that failed, and a write whose answer is not the body
@@ -429,8 +436,10 @@ New; it replaces no earlier text. What a row or an action added to
   straight after the provider merged and before the clean-up, and
   nothing it comes to changes the exit code: a roadmap that cannot be
   resolved, a board that will not take the edit and a pull request
-  closing no issue are a warning or a silence. `--output=json` carries it
-  as `roadmapTick`, null when the pull request closes nothing.
+  closing no issue are a warning or a silence. `--output=json` carries
+  every board's as `roadmapTicks`, null when the pull request closes
+  nothing, and the first of them as `roadmapTick`, null when no board was
+  ticked.
 - **`pr merge` ends with the unblock reading**
   (`src/commands/pr/merge-unblock.ts`), over every open issue labelled
   `spec:blocked` whose `Blocked by:` line names an issue the merged pull

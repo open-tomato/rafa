@@ -544,8 +544,10 @@ but `dangerous.acceptStaleRefs`, passes check 4.
 
 Both routes are mutually exclusive with `--spec` and with each other.
 
-Ticking: `pr merge` ticks the PR's `Closes #<n>` line in the roadmap issue
-after the merge (GitHub closes the issue; it does not tick a task-list box).
+Ticking: `pr merge` ticks the PR's `Closes #<n>` line on every open
+`type:roadmap` board whose checklist lists it, or in the roadmap issue while
+no issue carries the label, after the merge (GitHub closes the issue; it does
+not tick a task-list box).
 An edit conflict re-reads and retries once — and the only conflict signal
 there is, is the body the PATCH answers with. The issues REST API takes no
 `If-Match` and `gh` sends no conditional request, so a lost update comes

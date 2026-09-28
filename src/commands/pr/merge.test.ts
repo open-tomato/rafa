@@ -61,6 +61,7 @@ import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
+import { noBoardListsLine } from './merge-tick.js';
 import { createPrMergeCommand, summaryLine } from './merge.js';
 import { PR_USAGE } from './pr-context.js';
 
@@ -195,6 +196,20 @@ interface BoardIssues {
   readonly blocked?: Readonly<Record<string, string>>;
   /** Every issue the board holds with its state, each number to it. */
   readonly states?: Readonly<Record<string, 'OPEN' | 'CLOSED'>>;
+  /** The open `type:roadmap` boards, each number to its body; none when left out. */
+  readonly labelled?: Readonly<Record<string, string>>;
+}
+
+/** The `type:roadmap` listing's rows for `labelled`, as `gh` writes them. */
+function labelledRows(labelled: Readonly<Record<string, string>>): string {
+  return JSON.stringify(Object.entries(labelled).map(([number, body]) => ({
+    number: Number(number),
+    title: `Board ${number}`,
+    body,
+    state: 'OPEN',
+    stateReason: null,
+    labels: [{ name: 'type:roadmap' }],
+  })));
 }
 
 /** A `gh` runner over one planted roadmap issue, and the log of every command it was handed. */
@@ -215,15 +230,18 @@ interface FakeGh {
 function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
   const ran: string[] = [];
   const removed: string[] = [];
-  let stored = ROADMAP_BODY;
+  const stored = new Map<number, string>([
+    [ROADMAP_ISSUE, ROADMAP_BODY],
+    ...Object.entries(board.labelled ?? {}).map(([number, body]): [number, string] => [Number(number), body]),
+  ]);
   const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
 
   const gh: GhRunner = (args) => {
     ran.push(args.join(' '));
-    // No issue carries type:roadmap, so its listing answers empty, broken
-    // board or not, and roadmap.issue decides, as before; the other
-    // --label listing is the unblock reading's.
-    if (args.includes('--label') && args.includes('type:roadmap')) return ok('[]');
+    // Unless a case plants labelled boards no issue carries type:roadmap,
+    // so its listing answers empty, broken board or not, and roadmap.issue
+    // decides, as before; the other --label listing is the unblock reading's.
+    if (args.includes('--label') && args.includes('type:roadmap')) return ok(labelledRows(board.labelled ?? {}));
     if (broken) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
     if (args.slice(0, 2).join(' ') === 'issue edit') {
       removed.push(`#${args[2] ?? ''} ${args[4] ?? ''}`);
@@ -237,9 +255,10 @@ function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
       const rows = Object.entries(board.states ?? {}).map(([number, state]) => ({ number: Number(number), state }));
       return ok(JSON.stringify(rows));
     }
+    const issue = Number(/issues\/(\d+)$/u.exec(args[1] ?? '')?.[1] ?? ROADMAP_ISSUE);
     const sent = args.find((arg) => arg.startsWith('body='));
-    if (sent !== undefined) stored = sent.slice('body='.length);
-    return ok(JSON.stringify({ number: ROADMAP_ISSUE, body: stored }));
+    if (sent !== undefined) stored.set(issue, sent.slice('body='.length));
+    return ok(JSON.stringify({ number: issue, body: stored.get(issue) ?? '' }));
   };
   return { gh: () => gh, ran: () => [...ran], removed: () => [...removed] };
 }
@@ -726,6 +745,38 @@ describe('the roadmap tick', () => {
     expect(lines).toContain(`Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`);
   });
 
+  it('ticks every labelled board whose checklist lists the closed issue, and no other, one line each', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      board: { labelled: { 44: '- [ ] #20 plans\n', 40: '- [ ] #20 plans\n', 42: '- [ ] #33 setup\n' } },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      BOARDS_LISTING,
+      'api repos/{owner}/{repo}/issues/40',
+      'api repos/{owner}/{repo}/issues/40 -X PATCH -f body=- [x] #20 plans\n',
+      'api repos/{owner}/{repo}/issues/44',
+      'api repos/{owner}/{repo}/issues/44 -X PATCH -f body=- [x] #20 plans\n',
+      BLOCKED_LISTING,
+    ]);
+    expect(lines).toContain('Ticked #20 on the roadmap, issue #40.');
+    expect(lines).toContain('Ticked #20 on the roadmap, issue #44.');
+  });
+
+  it('says no board lists the closed issue when labelled boards exist and none does, reading none of them', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, { board: { labelled: { 42: '- [ ] #33 setup\n' } } });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([BOARDS_LISTING, BLOCKED_LISTING]);
+    expect(lines).toContain(noBoardListsLine([20]));
+  });
+
   it('ticks before the clean-up, so a clean-up that fails cannot drop the tick', async () => {
     const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
     const project = freshProject(ROADMAP_CONFIG);
@@ -876,7 +927,7 @@ describe('json mode', () => {
       'prune-remotes',
     ]);
     expect((data['followUps'] as { id: string }[]).map((followUp) => followUp.id)).toEqual(['release-tag']);
-    expect([data['roadmapTick'], data['unblocked']]).toEqual([null, null]);
+    expect([data['roadmapTick'], data['roadmapTicks'], data['unblocked']]).toEqual([null, null, null]);
   });
 
   it('carries what the unblock reading came to for a pull request that closes an issue', async () => {
@@ -897,12 +948,14 @@ describe('json mode', () => {
     const seams = caseSeams(stub.pulls, project);
     const { events } = await ran(seams.seams, project, ['41', '--yes', '--output=json']);
 
-    expect(dataOf(events)['roadmapTick']).toMatchObject({
+    const data = dataOf(events);
+    expect(data['roadmapTick']).toMatchObject({
       roadmap: ROADMAP_ISSUE,
       status: 'ticked',
       ticked: [20],
       attempts: 1,
     });
+    expect(data['roadmapTicks']).toEqual([data['roadmapTick']]);
   });
 
   it('gives a declined merge as a result carrying no step at all', async () => {
