@@ -812,6 +812,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/version.js', ['readManifestVersion']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['../pr/merge-followups.js', ['versionTag']],
+    ['./release-commit.js', ['readReleaseCommit']],
     ['./status.js', ['changelogVersions', 'DEFAULT_RELEASE_SEAMS', 'readTags']],
   ]],
   ['./commands/board/list.js', [

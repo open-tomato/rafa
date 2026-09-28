@@ -1,8 +1,9 @@
 /**
  * `rafa release tag`: the one WRITE of the `release` subject. It puts
- * `v<version>` on the HEAD of the release branch when every reading
- * agrees that version is the one to tag, and then prints the publish
- * line rather than publishing.
+ * `v<version>` on the commit of the release branch that SET that
+ * version, which is HEAD unless merges landed after it, when every
+ * reading agrees that version is the one to tag, and then prints the
+ * publish line rather than publishing.
  *
  * The loop writes a version and a changelog entry with every pull
  * request and stops there (`src/start/release-stage.ts`): the merge
@@ -11,8 +12,8 @@
  * `rafa pr merge` already names it as a follow-up
  * (`src/commands/pr/merge-followups.ts`).
  *
- * One git command here writes — `git tag <tag> HEAD` — and it is the
- * last thing the run does. Everything before it is a read, and every
+ * One git command here writes — `git tag <tag> <commit>` — and it is
+ * the last thing the run does. Everything before it is a read, and every
  * refusal happens before it, so a refused run leaves the repository
  * exactly as it found it.
  *
@@ -56,6 +57,27 @@
  * is checked out", and both refuse: neither can be told apart from
  * standing on the release branch, and the whole point of the check is
  * that the tag lands on the right commit.
+ *
+ * ## Which commit: the one that set the version
+ *
+ * The tag names the commit of the release branch that set the version,
+ * read by `./release-commit.ts`, whose module note measures why HEAD is
+ * the wrong answer once merges land after the release, and why the
+ * registry's `gitHead` is not the right one either. When HEAD set it the
+ * run reads exactly as it did when it always tagged HEAD. When HEAD is
+ * past it the run still tags, says how far past in a warning, and
+ * spells the publish line so it publishes the TAGGED tree:
+ * `git switch --detach <tag> && <manager> publish && git switch
+ * <branch>`, because a publish from HEAD would ship the later commits
+ * under the older version. Whether the registry has that version
+ * already is not read (no network here), so the line says to skip it
+ * when it does.
+ *
+ * A version the working tree declares and no commit holds is refused
+ * with the `version` reason, and a history git could not walk with the
+ * `git` reason: both are readings the tag cannot be placed without.
+ * They are checked last, after the changelog, since each is about WHERE
+ * the tag goes once every other reading agrees it should be written.
  *
  * ## The publish line is text
  *
@@ -102,6 +124,7 @@
  * `expectNoArgument` comes from `../plan/plan-files.ts`, the refusal
  * eight other commands reading no argument already share.
  */
+import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams, TagReading } from './status.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { GitRunner } from '../../pr/index.js';
@@ -118,6 +141,7 @@ import { readManifestVersion } from '../../release/version.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 import { versionTag } from '../pr/merge-followups.js';
 
+import { readReleaseCommit } from './release-commit.js';
 import { changelogVersions, DEFAULT_RELEASE_SEAMS, readTags } from './status.js';
 
 /** The usage line this action's refusals name. */
@@ -134,6 +158,9 @@ export const RELEASE_REMOTE = 'origin';
 
 /** What every line under a heading is indented by, as `pr merge` indents its follow-ups. */
 const INDENT = '  ';
+
+/** How many characters of a commit hash a line names it by. */
+const SHORT_COMMIT = 7;
 
 /** What branch the repository has checked out, or why it has none. */
 export interface BranchReading {
@@ -219,12 +246,16 @@ export interface TagReady {
   readonly version: string;
   /** The tag that names it. */
   readonly tag: string;
+  /** The full hash of the commit the tag is written on: the one that set the version. */
+  readonly commit: string;
+  /** First-parent commits HEAD is past {@link commit}; 0 when HEAD set the version. */
+  readonly ahead: number;
 }
 
 /** What one call to {@link decideTag} answered. */
 export type TagDecision = TagReady | TagRefused;
 
-/** The four readings a decision is made from. */
+/** The five readings a decision is made from. */
 export interface TagInputs {
   /** The branch a release is tagged on. */
   readonly releaseBranch: string;
@@ -236,6 +267,8 @@ export interface TagInputs {
   readonly changelog: ChangelogReading;
   /** The repository's release tags, as `release status` reads them. */
   readonly tags: TagReading;
+  /** The commit that set the version, or null when there was no version to look for. */
+  readonly release: ReleaseCommitReading | null;
 }
 
 /**
@@ -355,22 +388,40 @@ export function readPublishTarget(text: string | null): PublishTarget {
   };
 }
 
+/** Where the tag went relative to the checkout: how far HEAD is past it, on which branch. */
+export interface TagPlace {
+  /** First-parent commits HEAD is past the tagged commit. */
+  readonly ahead: number;
+  /** The branch checked out, which the publish line switches back to. */
+  readonly branch: string;
+}
+
+/** The place of a tag written on HEAD itself. */
+const ON_HEAD: TagPlace = Object.freeze({ ahead: 0, branch: DEFAULT_RELEASE_BRANCH });
+
 /**
  * What the operator does next once `tag` is written: push it, and
- * publish `version` when there is something to publish. Pure and
- * total.
+ * publish `version` when there is something to publish — from the tag
+ * when HEAD is past it; see the module note. Pure and total.
  */
-export function followUpsFor(tag: string, version: string, target: PublishTarget): readonly ReleaseFollowUp[] {
+export function followUpsFor(
+  tag: string,
+  version: string,
+  target: PublishTarget,
+  place: TagPlace = ON_HEAD,
+): readonly ReleaseFollowUp[] {
   const push: ReleaseFollowUp = {
     command: `git push ${RELEASE_REMOTE} ${tag}`,
     why: `the tag is local until ${RELEASE_REMOTE} has it`,
   };
   if (target.name === null || target.isPrivate) return [push];
+  const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
+  if (place.ahead === 0) return [push, { command: `${target.manager} publish`, why: publishes }];
   return [
     push,
     {
-      command: `${target.manager} publish`,
-      why: `publishes ${target.name}@${version} to ${target.registry}`,
+      command: `git switch --detach ${tag} && ${target.manager} publish && git switch ${place.branch}`,
+      why: `${publishes} from the tagged commit, not HEAD; skip it if ${target.registry} has that version already`,
     },
   ];
 }
@@ -429,7 +480,12 @@ export function decideTag(inputs: TagInputs): TagDecision {
   const disagrees = changelogRefusal(inputs, version);
   if (disagrees !== null) return disagrees;
 
-  return { kind: 'ready', version, tag: versionTag(version) };
+  const release = inputs.release;
+  if (release === null) return refuse('version', `${inputs.version.path} was not looked up in the history`);
+  if (release.problem !== null) return refuse(release.problem.reason, release.problem.message);
+  if (release.commit === null) return refuse('git', `no commit could be named for ${version}`);
+
+  return { kind: 'ready', version, tag: versionTag(version), commit: release.commit, ahead: release.ahead };
 }
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
@@ -466,32 +522,56 @@ function tagConfig(project: ProjectFound, warn: (message: string) => void): TagS
   }
 }
 
-/** The four readings one run decides from, every one of them a read. */
+/**
+ * The readings one run decides from, every one of them a read. The
+ * release commit is looked up only once there is a version to look up
+ * and the release branch is the one checked out, since the history it
+ * walks is HEAD's.
+ */
 export function readTagInputs(root: string, git: GitRunner, config: TagSettings): TagInputs {
+  const branch = readBranch(git);
+  const version = readVersion(root, config.versionFile);
+  const walkable = version.version !== null && branch.branch === config.releaseBranch;
   return {
     releaseBranch: config.releaseBranch,
-    branch: readBranch(git),
-    version: readVersion(root, config.versionFile),
+    branch,
+    version,
     changelog: readNewestRelease(root, config.changelog),
     tags: readTags(git),
+    release: walkable && version.version !== null
+      ? readReleaseCommit(git, config.versionFile, version.version)
+      : null,
   };
 }
 
-/** The one write: `v<version>` on the HEAD of the branch the checks agreed on. */
-function writeTag(git: GitRunner, tag: string): void {
-  const result = git(['tag', tag, 'HEAD']);
+/** The one write: `v<version>` on the commit that set it. */
+function writeTag(git: GitRunner, tag: string, commit: string): void {
+  const result = git(['tag', tag, commit]);
   if (result.ok) return;
   throw new CommandExit(1, `❌ ${tag} could not be written: ${gitSaid(result)}`);
 }
 
-/** The lines text mode writes for a run that tagged `branch`'s HEAD. */
+/** The warning a run prints when HEAD is past the tagged commit, or null when HEAD is the tagged commit. */
+export function pastReleaseWarning(written: TagReady, branch: string): string | null {
+  if (written.ahead === 0) return null;
+  const commits = written.ahead === 1
+    ? '1 commit'
+    : `${String(written.ahead)} commits`;
+  return `HEAD of ${branch} is ${commits} past ${written.commit.slice(0, SHORT_COMMIT)}, where ${written.version}`
+    + ` was set; they are not in ${written.tag}.`;
+}
+
+/** The lines text mode writes for a run that tagged the commit of `branch` that set the version. */
 export function renderTagged(
   written: TagReady,
   branch: string,
   followUps: readonly ReleaseFollowUp[],
 ): readonly string[] {
+  const where = written.ahead === 0
+    ? `the HEAD of ${branch}`
+    : `${written.commit.slice(0, SHORT_COMMIT)}, the commit of ${branch} that set ${written.version}`;
   return [
-    `✅ Tagged ${written.tag} at the HEAD of ${branch}.`,
+    `✅ Tagged ${written.tag} at ${where}.`,
     'Next:',
     ...followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`),
   ];
@@ -512,8 +592,9 @@ export function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEA
     throw new CommandExit(1, `❌ ${decision.message}\nUsage: ${RELEASE_TAG_USAGE}`);
   }
 
-  writeTag(git, decision.tag);
-  const followUps = followUpsFor(decision.tag, decision.version, readPublishTarget(inputs.version.text));
+  writeTag(git, decision.tag, decision.commit);
+  const place: TagPlace = { ahead: decision.ahead, branch: config.releaseBranch };
+  const followUps = followUpsFor(decision.tag, decision.version, readPublishTarget(inputs.version.text), place);
   return { inputs, written: decision, followUps };
 }
 
@@ -523,13 +604,16 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
     name: 'release tag',
     subject: 'release',
     action: 'tag',
-    summary: 'tag the release branch\'s HEAD with the version both release files agree on',
-    description: 'Writes `v<version>` on the HEAD of the release branch — `pr.base`, or `main` — when the'
+    summary: 'tag the commit that set the version both release files agree on',
+    description: 'Writes `v<version>` on the release branch — `pr.base`, or `main` — when the'
       + ' version `release.versionFile` declares is the one the newest section of `release.changelog` names.'
+      + ' The tag goes on the commit that set that version: HEAD, or, where later commits landed on the branch,'
+      + ' the earlier commit, with a warning naming how many commits HEAD is past it.'
       + ' It refuses, and writes nothing, when another branch is checked out, when a tag already names that'
-      + ' version, when the two files disagree, and when either the version file or the tag list could not'
-      + ' be read. After the tag it prints what to run next: the push that puts the tag on the remote, and'
-      + ' the publish line for the registry the version file configures, which it does not run. With'
+      + ' version, when the two files disagree, when no commit holds the version yet, and when the version'
+      + ' file, the tag list or the history could not be read. After the tag it prints what to run next: the'
+      + ' push that puts the tag on the remote, and the publish line for the registry the version file'
+      + ' configures, spelled to publish from the tag when HEAD is past it, which it does not run. With'
       + ' `--output=json` the readings, the decision and the follow-ups are the data of the terminal result'
       + ' event.',
     args: [],
@@ -547,6 +631,8 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
     outputs: ['text', 'json'],
     run: async (context) => {
       const result = runTag(context, seams);
+      const past = pastReleaseWarning(result.written, result.inputs.releaseBranch);
+      if (past !== null) context.output.warn(past);
       if (context.outputMode === 'json') {
         context.output.result(result);
         return;
