@@ -78,7 +78,11 @@
  * `rafa status` does, for the current place (`src/status/sections.ts`). An epic whose every line is done or taken has run dry and the
  * walk answers no line, so row 13 reads it without naming a second
  * epic's issue; `passed` counts the lines passed on the roadmap and
- * inside the epic together.
+ * inside the epic together. The dry epic's number and title are
+ * carried out as {@link NextRoadmapReading.dryEpic}, the `dry` that
+ * `pickDescendedLine` answers; the key is left out of a reading where no
+ * epic ran dry, so a roadmap with no epic line answers the same four
+ * keys it did before.
  *
  * ## Where the walk starts
  *
@@ -100,7 +104,8 @@
  *   order `epicLines` (`src/board/epic-walk.ts`) gives them, WHATEVER
  *   its horizon, since a switch chose it; no board body is read, and
  *   `passed` counts the epic's lines passed. Every line done or taken
- *   answers no line, as a dry epic does on the roadmap walk.
+ *   answers no line, as a dry epic does on the roadmap walk, and names
+ *   the epic as {@link NextRoadmapReading.dryEpic} the same way.
  *
  * Every notice the place reading gives, but the absent-file one, is
  * carried out as a problem ahead of the branch scan's, which
@@ -139,7 +144,7 @@
  * reaches both spends two `git for-each-ref` calls — both local, both
  * free of the network, and each memoised where it is taken.
  */
-import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
+import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { EpicDescentSeams } from '../board/epic-walk.js';
@@ -252,10 +257,11 @@ async function cancelledNotices(listing: BoardListing): Promise<readonly string[
   }
 }
 
-/** What one walk answers: the line it picked, and how many lines it passed. */
+/** What one walk answers: the line it picked, how many lines it passed, and the epic it ran dry in. */
 interface WalkAnswer {
   readonly line: RoadmapLine | null;
   readonly passed: number;
+  readonly dry: DryEpic | null;
 }
 
 /**
@@ -272,7 +278,13 @@ async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapRe
     throw new Error(`${PREFIX}: epic #${String(epic)}, the current place, is not on the board listing, so its members cannot be read`);
   }
   const pick = await pickNextRoadmapLine(epicLines(read, row).lines, readings);
-  return { line: pick.line, passed: pick.skipped.length };
+  return {
+    line: pick.line,
+    passed: pick.skipped.length,
+    dry: pick.line === null
+      ? { number: read.number, title: read.title }
+      : null,
+  };
 }
 
 /**
@@ -320,6 +332,9 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
         line: walk.line,
         passed: walk.passed,
         problems: [...current?.notices ?? [], ...cancelled, ...branches.problems],
+        ...walk.dry === null
+          ? {}
+          : { dryEpic: walk.dry },
       };
     },
 
@@ -335,8 +350,14 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
 /** The walk down `roadmap`'s checklist, descending into its first open `now` epic. */
 async function walkBoard(roadmap: number, seams: EpicDescentSeams): Promise<WalkAnswer> {
   const read = await seams.issues(roadmap);
-  const { descent, pick } = await pickDescendedLine(parseRoadmapBody(read.body), seams);
-  return { line: pick.line, passed: descent.passed.length + pick.skipped.length };
+  const { descent, pick, dry } = await pickDescendedLine(parseRoadmapBody(read.body), seams);
+  return {
+    line: pick.line,
+    passed: descent.passed.length + pick.skipped.length,
+    dry: dry && descent.epic !== null
+      ? { number: descent.epic.number, title: descent.epic.title }
+      : null,
+  };
 }
 
 /** The project the dispatcher resolved, which it resolves for every command declaring it needs one. */

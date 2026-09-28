@@ -79,6 +79,19 @@
  * and must: its answer and its commands are compared with a board handed
  * no root, which is the control that a project with no position reads
  * exactly as before.
+ *
+ * The dry epic's key is read with `Object.keys` because `toEqual` passes
+ * a `dryEpic: undefined` the reading should not hold. Three mutations
+ * were driven on 2026-09-28 over this file alone, restored the same way,
+ * against 26 pass and 0 fail:
+ *
+ *  - `dryEpic` always set, to undefined where no epic ran dry: 22 pass
+ *    and 4 fail, the four cases that read the keys. The equality cases
+ *    beside them pass, which is why the keys are read.
+ *  - the place's epic never carried as dry: 25 pass and 1 fail, the dry
+ *    place case.
+ *  - the walked-into epic never carried as dry: 25 pass and 1 fail, the
+ *    dry epic on the roadmap walk.
  */
 import type { NextSources } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -390,6 +403,8 @@ describe('the board the roadmap rows are read through', () => {
     const reading = await board.next();
 
     expect([reading.roadmap, reading.line?.issue, reading.passed]).toEqual([ROADMAP, ISSUE, 1]);
+    // A board with no epic answers the four keys it always did: no dryEpic key, not even undefined.
+    expect(Object.keys(reading)).toEqual(['roadmap', 'line', 'passed', 'problems']);
     expect(gh.calls()).toEqual([
       BOARDS_CALL,
       'issue list --state',
@@ -525,6 +540,7 @@ describe('the board walking into an epic', () => {
     const reading = await board.next();
 
     expect([reading.line?.issue, reading.passed]).toEqual([82, 1]);
+    expect(Object.keys(reading)).not.toContain('dryEpic');
     expect(gh.calls().filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
     expect(gh.calls()).not.toContain('issue view 99');
   });
@@ -581,6 +597,7 @@ describe('the board walking into an epic', () => {
     const reading = await board.next();
 
     expect([reading.line, reading.passed]).toEqual([null, 2]);
+    expect(reading.dryEpic).toEqual({ number: EPIC, title: `Issue ${String(EPIC)}` });
     expect(gh.calls()).not.toContain(`issue view ${SECOND_EPIC}`);
     expect(gh.calls()).not.toContain('issue view 91');
   });
@@ -598,6 +615,7 @@ describe('the board walking into an epic', () => {
     const reading = await board.next();
 
     expect([reading.line?.issue, reading.passed]).toEqual([99, 1]);
+    expect(Object.keys(reading)).not.toContain('dryEpic');
     expect(gh.calls()).not.toContain(LISTING_CALL);
   });
 });
@@ -669,9 +687,24 @@ describe('the board starting from the current place', () => {
     const { reading, calls } = await walkFrom(rootAt({ board: BOARD, epic: EPIC }));
 
     expect([reading.roadmap, reading.line?.issue, reading.passed, reading.problems]).toEqual([BOARD, 82, 1, []]);
+    expect(Object.keys(reading)).not.toContain('dryEpic');
     expect(calls).not.toContain(`issue view ${BOARD}`);
     expect(calls).not.toContain(`issue view ${ROADMAP}`);
     expect(calls.filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
+  });
+
+  it('names the epic the place names as dry when its every line is done or taken', async () => {
+    const gh = fakeGh({ issues: ISSUES, listing: LISTING });
+    // #82, the epic's one open line, is taken by a branch.
+    const git: GitRunner = (args) => said(args[0] === 'for-each-ref'
+      ? 'refs/heads/feat/rafa-82-taken\n'
+      : '');
+    const board = ghNextBoard({ gh: gh.gh, git, configured: ROADMAP, root: rootAt({ board: BOARD, epic: EPIC }) });
+
+    const reading = await board.next();
+
+    expect([reading.line, reading.passed]).toEqual([null, 2]);
+    expect(reading.dryEpic).toEqual({ number: EPIC, title: `Issue ${String(EPIC)}` });
   });
 
   it('falls back to the default board from a place that no longer stands, carrying the notice as a problem', async () => {
