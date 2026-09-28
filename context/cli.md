@@ -1202,15 +1202,19 @@ New; it replaces no earlier text. What a row or an action added to
   or `label: none, gate: ready` — and is read for every row whatever its
   type, not only `type:spec`. It prints as a symbol and, under
   `--texts` (`-t`), in words written for a reader who has never met the
-  readiness gate: `✅` ready to plan, `🟡` all sections filled, not marked
-  ready, `🟠` marked ready, sections missing, `🚧` sections missing,
-  `📝` outline only — a section being a heading of the spec template and
-  "marked ready" the `spec:ready` label; `--texts` names the missing
-  sections after `sections missing:`. `blocked by` groups the
-  blockers by state, what still blocks first — `🔴 #20 ❔ o/r#3 🟢 #21`,
-  or `open #20 · unknown o/r#3 · closed #21` under `--texts` — `unknown`
-  for one not on the board listing or on another repository. The legend
-  under the table has one line per column that printed a symbol, headed
+  readiness gate, naming the stages a spec moves through: `📝` outline
+  only, `🚧` needs refinement, `👀` refined, waiting for approval, `🚀`
+  ready to dev, and `🟠` approved, needs refinement where label and body
+  disagree — "refined" being a body the gate finds nothing missing in and
+  "approved" the `spec:ready` label, and the legend printing them in that
+  order. A green check is left out because it reads as done. `--texts`
+  names the sections that need work after `needs refinement:`; #318
+  specifies reading unchecked boxes and taking the words from config.
+  `blocked by` groups the blockers by state, what still blocks first —
+  `🔴 #20 ❔ o/r#3 🟢 #21`, or `open #20 · unknown o/r#3 · closed #21`
+  under `--texts` — `unknown` for one not on the board listing or on
+  another repository. The legend under the table has one line per
+  column that printed a symbol, headed
   `spec:` or `blocked by:`, naming each symbol printed (`🔴` still open,
   `🟢` closed, `❔` state unknown for blockers), and none under
   `--texts`. Width is counted in terminal cells (`Bun.stringWidth`), so

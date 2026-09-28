@@ -168,8 +168,8 @@ describe('rafa issue list --roadmap, spawned', () => {
     expect(run.stdout).toContain('Roadmap: #1');
     expect(numbersOf(run.stdout)).toEqual(ORDER);
     const [third, first, second, fourth] = cellsOf(run.stdout);
-    expect(third).toEqual(['#13', 'open', 'bug', '🟡', '-', '-', '-', 'Third thing']);
-    expect(first).toEqual(['#11', 'open', 'bug', '✅', '-', 'plan', '-', 'First thing']);
+    expect(third).toEqual(['#13', 'open', 'bug', '👀', '-', '-', '-', 'Third thing']);
+    expect(first).toEqual(['#11', 'open', 'bug', '🚀', '-', 'plan', '-', 'First thing']);
     expect(second?.slice(0, 6)).toEqual(['#12', 'open', 'code', '📝', '🔴 #11', 'branch']);
     expect(fourth?.slice(0, 6)).toEqual(['#14', 'open', 'bug', '📝', '-', 'pr #40']);
   });

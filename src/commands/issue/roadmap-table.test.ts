@@ -112,7 +112,7 @@ describe('the columns', () => {
 
   it('fills the spec and blocked by cells in words under --texts', () => {
     const cells = roadmapCells(boardRow(123, 'A title'), TEXTS);
-    expect([cells[3], cells[4]]).toEqual(['ready to plan', 'open #24']);
+    expect([cells[3], cells[4]]).toEqual(['ready to dev', 'open #24']);
   });
 
   it('keeps the rows in the order given, one line each, then the legend', () => {
@@ -173,14 +173,14 @@ describe('the labels row', () => {
 describe('the legend', () => {
   it('names each symbol the table printed, and only those, one line per column headed by its name', () => {
     expect(legendLines([boardRow(9, 'nine')], DEFAULT_STYLE)).toEqual([
-      `spec:        ${SPEC_SYMBOLS.ready} ready to plan`,
+      `spec:        ${SPEC_SYMBOLS.ready} ready to dev`,
       `blocked by:  ${BLOCKER_SYMBOLS.open} still open`,
     ]);
   });
 
   it('prints no line for a column that printed no symbol', () => {
     const unblocked: RoadmapRow = { ...boardRow(9, 'nine'), blockers: [] };
-    expect(legendLines([unblocked], DEFAULT_STYLE)).toEqual([`spec:        ${SPEC_SYMBOLS.ready} ready to plan`]);
+    expect(legendLines([unblocked], DEFAULT_STYLE)).toEqual([`spec:        ${SPEC_SYMBOLS.ready} ready to dev`]);
   });
 
   it('is left out under --texts and when no symbol was printed', () => {
@@ -194,10 +194,10 @@ describe('the spec cell in words', () => {
   it('says what each reading means with no rafa term in it, naming the missing sections', () => {
     const complete = completeSpecBody('Complete');
     const missing = complete.replace(/## Design[\s\S]*?(?=## )/u, '');
-    expect(specWords(readSpecColumn([SPEC_READY_LABEL], complete))).toBe('ready to plan');
-    expect(specWords(readSpecColumn([], complete))).toBe('all sections filled, not marked ready');
-    expect(specWords(readSpecColumn([], missing))).toBe('sections missing: Design');
-    expect(specWords(readSpecColumn([SPEC_READY_LABEL], missing))).toBe('marked ready, sections missing: Design');
+    expect(specWords(readSpecColumn([SPEC_READY_LABEL], complete))).toBe('ready to dev');
+    expect(specWords(readSpecColumn([], complete))).toBe('refined, waiting for approval');
+    expect(specWords(readSpecColumn([], missing))).toBe('needs refinement: Design');
+    expect(specWords(readSpecColumn([SPEC_READY_LABEL], missing))).toBe('approved, needs refinement: Design');
     expect(specWords(readSpecColumn([], '## What you get\n\nonly this'))).toBe('outline only');
   });
 });

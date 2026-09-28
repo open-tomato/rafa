@@ -387,7 +387,7 @@ function roadmapCommand(plant: GhPlant, calls: string[][], width?: number): Rafa
 
 /** The legend under a table printing every readiness and blocker symbol the Roadmap's rows hold: one line per column. */
 const LEGEND = [
-  'spec:        ✅ ready to plan  🟡 all sections filled, not marked ready  📝 outline only',
+  'spec:        📝 outline only  👀 refined, waiting for approval  🚀 ready to dev',
   'blocked by:  🔴 still open  🟢 closed',
 ];
 
@@ -395,8 +395,8 @@ const LEGEND = [
 const UNTICKED_TABLE = [
   'Roadmap: #1',
   '  #  state  type  spec  blocked by     has           refs  title',
-  '#13  open   bug   🟡    🔴 #20 🟢 #21  pr #40        -     Blocked bug',
-  '#11  open   code  ✅    -              -             -     Ready spec',
+  '#13  open   bug   👀    🔴 #20 🟢 #21  pr #40        -     Blocked bug',
+  '#11  open   code  🚀    -              -             -     Ready spec',
   '#14  open   bug   📝    -              plan, branch  -     Planned bug',
   ...LEGEND,
 ];
@@ -405,9 +405,9 @@ const UNTICKED_TABLE = [
 const ALL_TABLE = [
   'Roadmap: #1',
   '  #  state   type   spec  blocked by     has           refs  title',
-  '#13  open    bug    🟡    🔴 #20 🟢 #21  pr #40        -     Blocked bug',
+  '#13  open    bug    👀    🔴 #20 🟢 #21  pr #40        -     Blocked bug',
   '#12  closed  chore  📝    -              -             -     Shipped chore',
-  '#11  open    code   ✅    -              -             -     Ready spec',
+  '#11  open    code   🚀    -              -             -     Ready spec',
   '#14  open    bug    📝    -              plan, branch  -     Planned bug',
   ...LEGEND,
 ];
@@ -655,8 +655,8 @@ describe('rafa issue list --roadmap', () => {
     const narrow = await run(['issue', 'list', '--roadmap', '--labels'], project, roadmapCommand({}, [], 20));
 
     expect(plain.stdout).not.toContain('module:board');
-    expect(labelled.stdout).toContain('#13  open   bug   🟡    🔴 #20 🟢 #21  pr #40        -     Blocked bug\n     └→ type:bug, module:board\n');
-    expect(labelled.stdout).toContain('#11  open   code  ✅    -              -             -     Ready spec\n     └→ spec:ready, module:cli\n');
+    expect(labelled.stdout).toContain('#13  open   bug   👀    🔴 #20 🟢 #21  pr #40        -     Blocked bug\n     └→ type:bug, module:board\n');
+    expect(labelled.stdout).toContain('#11  open   code  🚀    -              -             -     Ready spec\n     └→ spec:ready, module:cli\n');
     expect(narrow.stdout.split('\n').find((line) => line.includes('└→ type:bug'))).toBe('     └→ type:bug, m…');
   });
 
@@ -668,10 +668,10 @@ describe('rafa issue list --roadmap', () => {
 
     expect(texts.stdout).toBe(stdoutOf([
       'Roadmap: #1',
-      '  #  state  type  spec                                   blocked by             has           refs  title',
-      '#13  open   bug   all sections filled, not marked ready  open #20 · closed #21  pr #40        -     Blocked bug',
-      '#11  open   code  ready to plan                          -                      -             -     Ready spec',
-      '#14  open   bug   outline only                           -                      plan, branch  -     Planned bug',
+      '  #  state  type  spec                           blocked by             has           refs  title',
+      '#13  open   bug   refined, waiting for approval  open #20 · closed #21  pr #40        -     Blocked bug',
+      '#11  open   code  ready to dev                   -                      -             -     Ready spec',
+      '#14  open   bug   outline only                   -                      plan, branch  -     Planned bug',
     ]));
     expect(short).toEqual(texts);
   });
@@ -725,8 +725,8 @@ describe('rafa issue list --roadmap', () => {
     expect(text.stdout).toBe(`${[
       'Roadmap: #1',
       '  #  state  type  spec  blocked by     has           refs  title',
-      '#13  open   bug   🟡    🔴 #20 🟢 #21  pr #40        1     Blocked bug',
-      '#11  open   code  ✅    -              -             0     Ready spec',
+      '#13  open   bug   👀    🔴 #20 🟢 #21  pr #40        1     Blocked bug',
+      '#11  open   code  🚀    -              -             0     Ready spec',
       '#14  open   bug   📝    -              plan, branch  -     Planned bug',
       ...LEGEND,
     ].join('\n')}\n`);
@@ -816,9 +816,9 @@ const LOOSE_LINE = 'Roadmap #1 · 2 lines name no epic: #13 #14; --full lists th
 const LOOSE_GROUP = [
   'Roadmap #1 · no epic',
   '  #  state  type  spec  blocked by     has           refs  title',
-  '#13  open   bug   🟡    🔴 #20 🟢 #21  pr #40        -     Blocked bug',
+  '#13  open   bug   👀    🔴 #20 🟢 #21  pr #40        -     Blocked bug',
   '#14  open   bug   📝    -              plan, branch  -     Planned bug',
-  'spec:        🟡 all sections filled, not marked ready  📝 outline only',
+  'spec:        📝 outline only  👀 refined, waiting for approval',
   'blocked by:  🔴 still open  🟢 closed',
 ];
 

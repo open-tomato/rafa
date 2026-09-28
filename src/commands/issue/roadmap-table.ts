@@ -14,7 +14,7 @@
  *  - `spec` — whether the issue can be planned: every section of the spec
  *    template filled, and the `spec:ready` label on it. A symbol
  *    ({@link SPEC_SYMBOLS}), or under {@link TableStyle.texts} the words
- *    {@link specWords} spells, naming the sections missing.
+ *    {@link specWords} spells, naming the sections that need work.
  *  - `blocked by` — the blockers grouped by state, each group led by its
  *    symbol ({@link BLOCKER_SYMBOLS}): `🔴 #118 #119 🟢 #26`; in words,
  *    `open #118 #119 · closed #26`.
@@ -43,14 +43,19 @@
  * reader never meets one unexplained. `--texts` (`-t`) spells both
  * columns in words instead and prints no legend.
  *
- * The words are written for someone who has never read rafa's source:
- * `ready to plan`, `all sections filled, not marked ready`, `marked
- * ready, sections missing`, `sections missing`, `outline only`. A
- * section is a heading of the spec template (`TEMPLATE_HEADINGS`,
- * `src/board/readiness.ts`), and "marked ready" is the `spec:ready`
- * label, which `rafa issue ready <n>` adds. The readiness gate's own
- * words (`label: none, gate: ready`) stay in the row reading's
- * `specText` for code that wants them, and are not printed here.
+ * The words are written for someone who has never read rafa's source,
+ * and name the stages a spec moves through: `outline only`, `needs
+ * refinement`, `refined, waiting for approval`, `ready to dev`, and
+ * `approved, needs refinement` where the label and the body disagree.
+ * "Refined" is a body the readiness gate finds nothing missing in: every
+ * heading of the spec template (`TEMPLATE_HEADINGS`,
+ * `src/board/readiness.ts`) present and filled, and no placeholder left.
+ * "Approved" is the `spec:ready` label, which a person adds through
+ * `rafa issue ready <n>`. A green check was left out on purpose, because
+ * it reads as done. Unchecked boxes are not read yet, and the words are
+ * not yet config: #318 specifies both. The readiness gate's own words
+ * (`label: none, gate: ready`) stay in the row reading's `specText` for
+ * code that wants them, and are not printed here.
  *
  * ## An empty cell
  *
@@ -133,22 +138,25 @@ export interface TableStyle {
 /** The style with neither switch: symbols, and no label rows. */
 export const DEFAULT_STYLE: TableStyle = Object.freeze({ labels: false, texts: false });
 
-/** Each readiness reading's symbol. */
+/**
+ * Each readiness reading's symbol, in the order the legend prints them:
+ * the path a spec takes, then the label and body that disagree.
+ */
 export const SPEC_SYMBOLS: Readonly<Record<SpecReadingKind, string>> = Object.freeze({
-  'ready': '✅',
-  'unlabelled': '🟡',
-  'stale-label': '🟠',
-  'gaps': '🚧',
   'outline': '📝',
+  'gaps': '🚧',
+  'unlabelled': '👀',
+  'ready': '🚀',
+  'stale-label': '🟠',
 });
 
 /** What each readiness symbol means, as the legend and `--texts` say it; see the module note. */
 export const SPEC_MEANINGS: Readonly<Record<SpecReadingKind, string>> = Object.freeze({
-  'ready': 'ready to plan',
-  'unlabelled': 'all sections filled, not marked ready',
-  'stale-label': 'marked ready, sections missing',
-  'gaps': 'sections missing',
   'outline': 'outline only',
+  'gaps': 'needs refinement',
+  'unlabelled': 'refined, waiting for approval',
+  'ready': 'ready to dev',
+  'stale-label': 'approved, needs refinement',
 });
 
 /** Each blocker state's symbol. */
@@ -200,9 +208,9 @@ function titleOf(row: RoadmapRow): string {
 }
 
 /**
- * The `spec` cell in words: the legend's meaning, with the missing
- * sections named where some are missing, as `sections missing: Design,
- * Tasks the plan must carry`.
+ * The `spec` cell in words: the legend's meaning, with the sections
+ * that need work named where there are some, as `needs refinement:
+ * Design, Tasks the plan must carry`.
  */
 export function specWords(reading: SpecReading): string {
   const missing = [...new Set(reading.gaps.map((gap) => gap.heading))];
