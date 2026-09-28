@@ -181,6 +181,15 @@ function leftText(place: Place): string {
     : `epic #${String(place.epic)}`;
 }
 
+/**
+ * The hop log line: `hop from epic #252: #210 blocked by #118, in epic
+ * #<n>`. The decision is read with it, and the `hop` action
+ * (`./hop-action.ts`) prints it off the record it opens.
+ */
+export function hopMoveSentence(move: Pick<HopMove, 'from' | 'blocked' | 'blocker' | 'epic'>): string {
+  return `hop from ${leftText(move.from)}: #${String(move.blocked)} blocked by #${String(move.blocker)}, in epic #${String(move.epic)}`;
+}
+
 /** The sentence a halt is printed with. */
 function haltSentence(halt: HopHalt): string {
   const chain = `halt: ${chainText(halt.chain)}`;
@@ -202,9 +211,7 @@ export function takenText(taken: TakenBy): string {
 
 /** The sentence a decision is printed with; a hop's is the spec's log line. */
 export function hopDecisionSentence(decision: HopDecision): string {
-  if (decision.kind === 'hop') {
-    return `hop from ${leftText(decision.from)}: #${String(decision.blocked)} blocked by #${String(decision.blocker)}, in epic #${String(decision.epic)}`;
-  }
+  if (decision.kind === 'hop') return hopMoveSentence(decision);
   if (decision.kind === 'wait') {
     return `#${String(decision.blocked)} waits on #${String(decision.blocker)}, taken: ${takenText(decision.taken)}`;
   }

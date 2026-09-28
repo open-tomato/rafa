@@ -43,7 +43,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { noNowEpicLine } from '../commands/epic/show.js';
-import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
+import { YES_FLAG } from '../next/ceiling.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
@@ -238,7 +238,7 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
       `📍 the roadmap, issue #${String(ROADMAP)}, has no line left that is not done or taken (1 line passed).`,
       '👉 open the next spec issue and add it to the roadmap',
       '⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
-        + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`,
+        + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
     ].join('\n') + '\n';
 
     expect(run.exitCode).toBe(0);

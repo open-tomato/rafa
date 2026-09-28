@@ -111,7 +111,7 @@
  * would allow the step, except for a step no list may name — `ready`
  * and `merge-unchecked` — where it says to drop `--yes` and be asked.
  *
- * Which ids a list may name — the eight, the four bare `--yes` allows,
+ * Which ids a list may name — the ten, the five bare `--yes` allows,
  * and the two lists refused with exit code 2, one naming `ready` or
  * `merge-unchecked` and one naming a word that is no action id — is
  * `src/next/ceiling.ts`, read here through {@link readYesCeiling}
@@ -150,10 +150,13 @@
  * question is spelled `[y/N]`.
  *
  * Nothing here spawns a shell line. Every action is a registered command
- * called as its own function, `sync` alone excepted — fast-forwarding
- * the base is no command, and it runs through the git seam
- * (`src/next/sync.ts`). So each action keeps its own refusals, and
- * {@link NextCommandSeams} is the whole of what a test replaces.
+ * called as its own function, the three in-process actions excepted:
+ * fast-forwarding the base is no command, and `sync` runs through the
+ * git seam (`src/next/sync.ts`), while `hop` and `home`, which only the
+ * hop rows propose, write the hop record and the position in-process
+ * and move through the registered `switch` (`src/next/hop-action.ts`).
+ * So each action keeps its own refusals, and {@link NextCommandSeams} is
+ * the whole of what a test replaces.
  *
  * An action writes through {@link actionOutput} (`src/next/ending.ts`),
  * which is the caller's output with its `result` taken: an invocation
@@ -357,9 +360,10 @@ export interface NextCommandSeams extends NextSourceSeams {
 export const DEFAULT_NEXT_SEAMS: NextCommandSeams = Object.freeze({});
 
 /**
- * Runs one state's action: the registered command it names, or, for
- * `sync`, the fast-forward through the git seam, whose refusal is this
- * command's own exit 1 and whose words git wrote are printed as they are.
+ * Runs one state's action: the registered command it names, `hop` and
+ * `home` in-process through `runAction` as well, or, for `sync`, the
+ * fast-forward through the git seam, whose refusal is this command's own
+ * exit 1 and whose words git wrote are printed as they are.
  */
 async function runStateAction(context: RafaContext, sources: NextSources, state: NextState): Promise<void> {
   if (state.action !== 'sync') {

@@ -94,7 +94,7 @@ describe('the stop line', () => {
     expect(lines).toEqual([
       `⏹ --${DRY_RUN_FLAG}: nothing ran.`,
       '⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
-        + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`,
+        + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
       '⏹ Nothing ran.',
       '⏹ The loop has run; rafa next reads where it left the project.',
       '⏹ That last step left the project where it was, so the chain stops rather than repeating it.',
@@ -111,6 +111,23 @@ describe('the stop line', () => {
       + ` type --${YES_FLAG}=sync,merge to allow it, or drop --${YES_FLAG} to be asked.`);
     expect(neverAllowed).toBe(`⏹ --${YES_FLAG} allows no action, and this step is ready, so nothing ran;`
       + ` no --${YES_FLAG} list allows it, so drop --${YES_FLAG} to be asked.`);
+  });
+
+  it('lists a ceiling holding hop and home as it listed one before they were ids, the bare one included', () => {
+    const bare = stopLine('unasked', GREEN, BARE_YES_ACTIONS, null);
+    const roadmapOnly = stopLine('unasked', GREEN, ['hop', 'home'], null);
+
+    expect(BARE_YES_ACTIONS).toContain('home');
+    expect(bare).toBe(`⏹ --${YES_FLAG} allows sync, wait, unblock, plan, and this step is merge, so nothing ran;`
+      + ` type --${YES_FLAG}=sync,wait,unblock,plan,merge to allow it, or drop --${YES_FLAG} to be asked.`);
+    expect(roadmapOnly).toBe(`⏹ --${YES_FLAG} allows no action, and this step is merge, so nothing ran;`
+      + ` type --${YES_FLAG}=merge to allow it, or drop --${YES_FLAG} to be asked.`);
+  });
+
+  it('names a hop or home step it stopped at, which only the ceiling lists leave out', () => {
+    expect(stopLine('unasked', stateOf({ action: 'home' }), ['plan'], null))
+      .toBe(`⏹ --${YES_FLAG} allows plan, and this step is home, so nothing ran;`
+        + ` type --${YES_FLAG}=plan,home to allow it, or drop --${YES_FLAG} to be asked.`);
   });
 });
 

@@ -75,7 +75,7 @@ import prWait from '../commands/pr/wait.js';
 import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { actionInvocation, NEXT_COMMAND_ACTIONS, runAction, runsCommand } from './actions.js';
+import { actionInvocation, NEXT_COMMAND_ACTIONS, NEXT_IN_PROCESS_ACTIONS, runAction, runsCommand, runsInProcess } from './actions.js';
 import { HINT_FLAG } from './hint.js';
 
 /** The project root the caller's context carries. */
@@ -279,6 +279,13 @@ describe('the command each action runs', () => {
     expect([actionInvocation(hop), actionInvocation(home)]).toEqual([null, null]);
     expect(NEXT_COMMAND_ACTIONS).not.toContain('hop');
     expect(NEXT_COMMAND_ACTIONS).not.toContain('home');
+  });
+
+  it('holds sync, hop and home as the actions that run in-process, and no id of the table among them', () => {
+    expect(NEXT_IN_PROCESS_ACTIONS).toEqual(['sync', 'hop', 'home']);
+    expect(NEXT_IN_PROCESS_ACTIONS.map((action) => runsInProcess(action))).toEqual([true, true, true]);
+    expect(NEXT_COMMAND_ACTIONS.filter((action) => runsInProcess(action))).toEqual([]);
+    expect(runsInProcess('none')).toBe(false);
   });
 
   it('throws over a state whose row proposed an action and left its field null', () => {

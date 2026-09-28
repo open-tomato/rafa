@@ -81,7 +81,7 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { planStub } from '../board/naming.js';
-import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
+import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { DRY_RUN_FLAG } from '../next/lines.js';
 
 import { plantProjectConfig } from './cli-capture.js';
@@ -390,7 +390,7 @@ describe('rafa next --yes, over the same repository, at each ceiling this suite 
     expect(record.events.includes('loop start')).toBe(false);
 
     expect(stdout).toContain(`👉 merge #${PR_NUMBER} into \`${BASE}\``);
-    expect(stdout).toContain(`--${YES_FLAG} allows ${BARE_YES_ACTIONS.join(', ')}, and this step is merge, so nothing ran`);
+    expect(stdout).toContain(`--${YES_FLAG} allows sync, wait, unblock, plan, and this step is merge, so nothing ran`);
 
     expect(snapshotOf(scratch)).toEqual(before);
   }, 30_000);

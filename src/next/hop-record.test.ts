@@ -112,7 +112,7 @@ describe('readHopRecord', () => {
     expect(readHopRecord(root)).toEqual({ set: true, record: DRY_HOP });
   });
 
-  it.each(['away', 'waiting', 'halted'])('reads the %s state as set', (state) => {
+  it.each(['away', 'waiting', 'merged', 'halted'])('reads the %s state as set', (state) => {
     const root = freshRoot();
     plant(root, withKey('state', state));
     const reading = readHopRecord(root);
@@ -136,7 +136,7 @@ describe('readHopRecord', () => {
     ['an array', '[]'],
     ['a number', '3'],
     ['an unknown kind', withKey('kind', 'sideways')],
-    ['an unknown state', withKey('state', 'merged')],
+    ['an unknown state', withKey('state', 'closed')],
     ['no home', withoutKey('home')],
     ['a malformed from', withKey('from', { board: 0, epic: null })],
     ['a string blocked', withKey('blocked', '210')],

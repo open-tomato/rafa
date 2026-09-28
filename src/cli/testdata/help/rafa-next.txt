@@ -31,9 +31,9 @@ Flags:
   --yes       string
       Run the actions named without asking, as a comma list of action ids, and
       stop at the first action the list leaves out. Bare it names sync, wait,
-      unblock, plan. The ids are sync, resume, wait, triage, merge, start, plan,
-      unblock; a list naming ready or merge-unchecked, which are always asked,
-      or a word that is no id at all is refused.
+      unblock, plan, home. The ids are sync, resume, wait, triage, merge, start,
+      plan, unblock, hop, home; a list naming ready or merge-unchecked, which
+      are always asked, or a word that is no id at all is refused.
 
 Examples:
   rafa next

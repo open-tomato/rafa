@@ -17,8 +17,9 @@
  *   read as a wrong shape.
  * - `targetEpic` and `targetBoard`: the epic and board the hop goes to.
  * - `state`: `away` while the hop works its target, `waiting` once it came
- *   home with the target's pull request open, `halted` once it came home
- *   from a halt.
+ *   home with the target's pull request open, `merged` once it came home
+ *   with the target closed, `halted` once it came home from a halt. The
+ *   `home` action (`./hop-action.ts`) writes the last three.
  * - `pullRequest`: the target's pull request number, or null before one.
  * - `startedAt`: when the hop began, an ISO 8601 timestamp.
  *
@@ -62,8 +63,8 @@ export const HOP_FILE = 'hop.json';
 /** Why the hop went: H's blocker, or a home epic that ran dry. */
 export type HopKind = 'blocker' | 'dry';
 
-/** Where the hop stands: working its target, back home waiting on it, or back home from a halt. */
-export type HopState = 'away' | 'waiting' | 'halted';
+/** Where the hop stands: working its target, back home waiting on it or with it merged, or back home from a halt. */
+export type HopState = 'away' | 'waiting' | 'merged' | 'halted';
 
 /** The record the file holds; see the module note. */
 export interface HopRecord {
@@ -92,7 +93,7 @@ export type HopReading =
   | { readonly set: false; readonly reason: HopUnsetReason; readonly detail: string };
 
 const HOP_KINDS: readonly string[] = ['blocker', 'dry'] satisfies readonly HopKind[];
-const HOP_STATES: readonly string[] = ['away', 'waiting', 'halted'] satisfies readonly HopState[];
+const HOP_STATES: readonly string[] = ['away', 'waiting', 'merged', 'halted'] satisfies readonly HopState[];
 
 /** `<root>/.rafa/hop.json`. */
 export function hopFilePath(root: string): string {

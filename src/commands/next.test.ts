@@ -145,7 +145,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
-import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
+import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines } from '../next/epic-end.js';
 import { nextQuestion } from '../next/hint.js';
@@ -416,7 +416,7 @@ describe('the chain', () => {
     expect(driven.report.stop).toBe('dry-run');
     expect(driven.lines.at(-2)).toBe(`\u{1F449} merge #${PR} into \`${BASE}\` — rafa pr merge ${PR} --${YES_FLAG}`);
     expect(driven.lines.at(-1)).toBe('⏹ There is no terminal to answer on, so nothing ran; run rafa next where'
-      + ` you can answer, or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`);
+      + ` you can answer, or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`);
   });
 
   it('runs an action the ceiling names with no question put', async () => {
@@ -728,7 +728,7 @@ describe('the command, dispatched', () => {
       `\u{1F4CD} \`${BASE}\` is 2 commits behind \`origin/${BASE}\`.`,
       `\u{1F449} fast-forward \`${BASE}\` to \`origin/${BASE}\``,
       '⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
-        + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`,
+        + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
       '',
     ].join('\n'));
     expect(run.exitCode).toBe(0);

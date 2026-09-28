@@ -74,10 +74,18 @@
  * caller's mistake.
  *
  * `hop` and `home`, the actions the hop rows of `rafa next --roadmap`
- * propose (`./hop-rows.ts`), are not here either: they move the position
- * and write the hop record rather than run a command of their own.
- * {@link actionInvocation} answers null for both, and {@link runAction}
- * refuses them the same way.
+ * propose (`./hop-rows.ts`), run no command of their own name either:
+ * they write the hop record and move the position (`./hop-action.ts`).
+ * {@link actionInvocation} answers null for both, as for `sync`, and the
+ * three are {@link NEXT_IN_PROCESS_ACTIONS}, the actions that run
+ * in-process. Unlike `sync`, {@link runAction} runs these two itself,
+ * off the `NextState.hop` step their row carries, since all they need
+ * is the caller's context: the project root the two files sit under,
+ * the output their log line goes to, and the registry `hop` finds
+ * `rafa switch` in, which it runs as `switch <epic> --no-rehome` the
+ * way every command here is run, over a context built the same way. A
+ * `hop` or `home` state carrying no step of its own action is a defect
+ * of the row and throws, naming the state.
  *
  * ## The context an action runs with
  *
@@ -110,6 +118,7 @@
  * owns that, and this module hands the result through as the command
  * gave it.
  */
+import type { HopActionWorld } from './hop-action.js';
 import type { NextActionId, NextState } from './state.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 
@@ -117,6 +126,7 @@ import { CommandExit, commandSpelling } from '../cli/command.js';
 import { parseArgs } from '../cli/core/parseArgs.js';
 
 import { HINT_FLAG } from './hint.js';
+import { runHome, runHop } from './hop-action.js';
 
 /** What a defect and a refusal this module raises open with. */
 const PREFIX = 'rafa next';
@@ -124,15 +134,33 @@ const PREFIX = 'rafa next';
 /** An action id that runs a registered command: every one but `none`, `sync`, `hop` and `home`. */
 export type NextCommandActionId = Exclude<NextActionId, 'none' | 'sync' | 'hop' | 'home'>;
 
-/** The command one action runs, and the words it runs with, read off the state. */
-interface ActionCommandSpec {
+/** An action id that runs in-process, as no registered command of its own name: `sync`, `hop` and `home`. */
+export type NextInProcessActionId = Extract<NextActionId, 'sync' | 'hop' | 'home'>;
+
+/** The three action ids that run in-process; see the module note. */
+export const NEXT_IN_PROCESS_ACTIONS: readonly NextInProcessActionId[] = Object.freeze(['sync', 'hop', 'home'] as const);
+
+/** Whether an action id runs in-process: `sync`, `hop` and `home`. */
+export function runsInProcess(action: NextActionId): action is NextInProcessActionId {
+  return (NEXT_IN_PROCESS_ACTIONS as readonly string[]).includes(action);
+}
+
+/** A registered command, by its two routing words. */
+interface CommandName {
   /** The first routing word: `pr` in `rafa pr merge`. */
   readonly subject: string;
   /** The second: `merge`. */
   readonly action: string;
+}
+
+/** The command one action runs, and the words it runs with, read off the state. */
+interface ActionCommandSpec extends CommandName {
   /** The words after them, as a person would type them. */
   readonly argv: (state: NextState) => readonly string[];
 }
+
+/** The command `hop` moves the position through: `rafa switch`. */
+const SWITCH_COMMAND: CommandName = Object.freeze({ subject: 'switch', action: 'switch' });
 
 /** The value a row filled in, or the defect of a row that proposed an action over none. */
 function needed(state: NextState, value: number | string | null, what: string): string {
@@ -225,27 +253,74 @@ function actionContext(caller: RafaContext, command: RafaCommand, argv: readonly
 }
 
 /**
+ * Runs `name` from the caller's registry over `argv`, as the `step`
+ * action runs it; a refusal with exit code 1 when nothing registers it.
+ */
+async function runRegistered(caller: RafaContext, name: CommandName, argv: readonly string[], step: NextActionId): Promise<void> {
+  const command = caller.registry.find(name.subject, name.action);
+  if (command === undefined) {
+    throw new CommandExit(1, `❌ ${PREFIX}: the "${step}" step runs "rafa ${commandSpelling(name)}", which is registered by nothing`);
+  }
+
+  await command.run(actionContext(caller, command, argv));
+}
+
+/** What `hop` and `home` write and print through, off the caller's context; see the module note. */
+function hopWorld(caller: RafaContext, state: NextState): HopActionWorld {
+  if (caller.project === null) {
+    throw new Error(`${PREFIX}: the action "${state.action}" of state "${state.id}" runs inside a project, and was handed none`);
+  }
+  return {
+    root: caller.project.root,
+    switchTo: (argv) => runRegistered(caller, SWITCH_COMMAND, argv, state.action),
+    info: (line) => {
+      caller.output.info(line);
+    },
+    warn: (line) => {
+      caller.output.warn(line);
+    },
+    now: () => new Date(),
+  };
+}
+
+/** The defect of a row that proposed `hop` or `home` and carried no step of that action. */
+function noStep(state: NextState): Error {
+  return new Error(`${PREFIX}: state "${state.id}" proposes "${state.action}" and carries no ${state.action} step`);
+}
+
+/** Runs `hop` or `home` off the step the state carries; see the module note. */
+async function runHopStep(caller: RafaContext, state: NextState): Promise<void> {
+  const step = state.hop;
+  if (step?.action !== state.action) throw noStep(state);
+  if (step.action === 'hop') {
+    await runHop(hopWorld(caller, state), step);
+    return;
+  }
+  runHome(hopWorld(caller, state), step);
+}
+
+/**
  * Runs the state's action: the registered command it names, called as
- * that command's own function over a context built off `caller`. See
+ * that command's own function over a context built off `caller`, or,
+ * for `hop` and `home`, the in-process step of `./hop-action.ts`. See
  * the module note for the table, the context and what an action's words
  * carry.
  *
  * Whatever the command throws is thrown on, a `CommandExit` with its own
  * exit code and message included. Refuses with exit code 1 when the
  * caller's registry holds no such command, and throws on a state whose
- * action runs none.
+ * action runs none, `sync` among them.
  */
 export async function runAction(caller: RafaContext, state: NextState): Promise<void> {
+  if (state.action === 'hop' || state.action === 'home') {
+    await runHopStep(caller, state);
+    return;
+  }
+
   const invocation = actionInvocation(state);
   if (invocation === null) {
     throw new Error(`${PREFIX}: the action "${state.action}" of state "${state.id}" runs no registered command`);
   }
 
-  const spec = ACTION_COMMANDS[invocation.action];
-  const command = caller.registry.find(spec.subject, spec.action);
-  if (command === undefined) {
-    throw new CommandExit(1, `❌ ${PREFIX}: the "${invocation.action}" step runs "rafa ${invocation.command}", which is registered by nothing`);
-  }
-
-  await command.run(actionContext(caller, command, invocation.argv));
+  await runRegistered(caller, ACTION_COMMANDS[invocation.action], invocation.argv, invocation.action);
 }

@@ -9,6 +9,14 @@
  * and holds the module note on each ending; this module only words
  * them, so the command's own file keeps room for the steps it runs.
  * Nothing here reads a source or prints.
+ *
+ * The lists of action ids the stop lines print leave out `hop` and
+ * `home` (`ROADMAP_ACTIONS`, `./ceiling.ts`). No run proposes either
+ * without `NextSources.roadmap`, which no line of `rafa next` sets yet,
+ * so bare `--yes` allowing `home` changes nothing a plain run does, and
+ * leaving the two out keeps what it prints byte for byte what it printed
+ * before they were ids. The step a chain stopped at is named whatever
+ * it is.
  */
 
 import type { NextInvocation } from './actions.js';
@@ -18,7 +26,7 @@ import type { RafaContext } from '../cli/command.js';
 
 import { CommandExit } from '../cli/command.js';
 
-import { ALWAYS_ASKED, BARE_YES_ACTIONS, YES_FLAG } from './ceiling.js';
+import { ALWAYS_ASKED, BARE_YES_ACTIONS, ROADMAP_ACTIONS, YES_FLAG } from './ceiling.js';
 import { commandWords } from './hint.js';
 
 /** The usage line every refusal here names. */
@@ -69,18 +77,24 @@ export function proposalLine(state: NextState, invocation: NextInvocation | null
   return `${PROPOSAL_MARK} ${state.proposal}${runs}`;
 }
 
+/** The ids a stop line lists, `hop` and `home` left out; see the module note. */
+function shownIds(ids: readonly NextActionId[]): readonly NextActionId[] {
+  return ids.filter((action) => !ROADMAP_ACTIONS.has(action));
+}
+
 /** The ids a ceiling names, as a sentence lists them. */
 function namedIds(ceiling: readonly NextActionId[]): string {
-  return ceiling.length === 0
+  const shown = shownIds(ceiling);
+  return shown.length === 0
     ? 'no action'
-    : ceiling.join(', ');
+    : shown.join(', ');
 }
 
 /** Why a run that ran nothing ran nothing: the flag, or the terminal it has not got. */
 function dryRunLine(dryRun: NextDryRun | null): string {
   if (dryRun === 'no-terminal') {
     return `${STOP_MARK} There is no terminal to answer on, so nothing ran; run rafa next where you can answer,`
-      + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`;
+      + ` or type --${YES_FLAG}=${shownIds(BARE_YES_ACTIONS).join(',')} to allow those steps unasked.`;
   }
   return `${STOP_MARK} --${DRY_RUN_FLAG}: nothing ran.`;
 }
@@ -95,7 +109,7 @@ export function stopLine(stop: NextStop, state: NextState, ceiling: NextCeiling,
     if (ALWAYS_ASKED.has(state.action)) {
       return `${allows} no --${YES_FLAG} list allows it, so drop --${YES_FLAG} to be asked.`;
     }
-    return `${allows} type --${YES_FLAG}=${[...ceiling ?? [], state.action].join(',')} to allow it,`
+    return `${allows} type --${YES_FLAG}=${[...shownIds(ceiling ?? []), state.action].join(',')} to allow it,`
       + ` or drop --${YES_FLAG} to be asked.`;
   }
   if (stop === 'loop-started') {
