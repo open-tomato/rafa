@@ -178,6 +178,13 @@
  *     1 to 13 with no `schema_migrations`, is adopted on its first open,
  *     a read included, since adoption counts as a write. A fresh or
  *     zero-byte file is given every migration.
+ *   - A development build (`bun src/rafa.ts`, a checkout's
+ *     `dist/cli.js`, `bun test`) adopts or applies only over a store
+ *     under the temporary directory or `RAFA_EFFORT_DIR`. Over any
+ *     other it throws `DevelopmentBuildRefusedError`
+ *     (`development-build.ts`) before any write, naming a live loop
+ *     recorded on the store, while a store with nothing pending is used
+ *     as it is.
  *   - Whatever is pending is applied under `BEGIN IMMEDIATE`, after a
  *     second plan under that lock. Measured in `sqlite.test.ts`: two
  *     processes that open one fresh store at once both wait for the

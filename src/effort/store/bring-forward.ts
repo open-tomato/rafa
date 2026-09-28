@@ -41,6 +41,18 @@
  * holds, even when its log would give another gate: only a transaction
  * that records a migration moves the gate.
  *
+ * ## A development build never migrates the live store
+ *
+ * Between the first plan and the lock, an open with something to write
+ * asks `refuseUnownedDevelopmentWrite` (`development-build.ts`), which
+ * throws a `DevelopmentBuildRefusedError` when this rafa is a
+ * development build and the store lies outside the temporary directory
+ * and `RAFA_EFFORT_DIR`. The refusal comes before the lock and before
+ * any write, adoption included, so the store keeps its bytes. With
+ * nothing to write the open returns before that question is asked, so
+ * a development build uses a current store as any rafa does. That
+ * module's note says which stores it owns and what the text names.
+ *
  * ## What this module does not decide
  *
  * `planSchema` owns every refusal and its text. Which rafa counts as the
@@ -48,6 +60,7 @@
  * {@link BringForwardOptions.appliedBy}; with none given it is this
  * build's package version.
  */
+import type { DevelopmentProbe } from './development-build.js';
 import type { SqliteMigration } from './migrations.js';
 import type {
   CatalogueEntry,
@@ -63,6 +76,7 @@ import type { Database } from 'bun:sqlite';
 
 import { RAFA_VERSION } from '../../cli/version.js';
 
+import { ADOPTION_NAME, refuseUnownedDevelopmentWrite } from './development-build.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 import { planSchema, sqliteCatalogue } from './schema-plan.js';
 
@@ -96,8 +110,12 @@ export class SchemaRefusedError extends Error {
   }
 }
 
-/** What an open may vary; each field has the running build's default. */
-export interface BringForwardOptions {
+/**
+ * What an open may vary; each field has the running build's default.
+ * The {@link DevelopmentProbe} fields say which build runs and which
+ * stores it owns (`development-build.ts`).
+ */
+export interface BringForwardOptions extends DevelopmentProbe {
   /** The catalogue to bring the store to; a test passes a synthetic tail here. */
   readonly migrations?: readonly SqliteMigration[];
   /** The `applied_by` of every row this open logs; this build's version by default. */
@@ -133,6 +151,7 @@ export function bringForward(
   const catalogue = sqliteCatalogue(migrations);
   const first = usablePlan(readStoreSchema(db, path), catalogue, access, caller);
   if (!hasWork(first)) return nothingWritten(db);
+  refuseUnownedDevelopmentWrite(path, writeNames(first), options);
 
   const apply = db.transaction((): BroughtForward => {
     const store = readStoreSchema(db, path);
@@ -182,6 +201,14 @@ function usablePlan(
 /** Whether a plan leaves anything to adopt or apply. */
 function hasWork(plan: SchemaUse): boolean {
   return plan.adopted.length > 0 || plan.pending.length > 0;
+}
+
+/** What a plan's write would record: the log first when it adopts, then each pending id. */
+function writeNames(plan: SchemaUse): readonly string[] {
+  const adoption = plan.adopted.length > 0
+    ? [ADOPTION_NAME]
+    : [];
+  return [...adoption, ...plan.pending.map(({ id }) => id)];
 }
 
 /** The answer of an open that wrote nothing. */

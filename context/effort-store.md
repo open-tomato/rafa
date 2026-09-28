@@ -129,13 +129,39 @@ sets `user_version` to the gate. A throw rolls all of it back. A test
 passes a synthetic tail as its `migrations` option; `applied_by` is this
 build's package version unless the caller names another.
 
+**A development build never adopts or migrates a store it does not
+own.** Between the first plan and the lock, an open with anything to
+adopt or apply asks `refuseUnownedDevelopmentWrite`
+(`src/effort/store/development-build.ts`). `readRuntimeIdentity`
+(`src/runtime/identity.ts`) walks up from `Bun.main`, through its real
+path, to the nearest `package.json` named `@open-tomato/rafa`; the build
+is a development build when that directory also holds `src/rafa.ts`, so
+`bun src/rafa.ts`, a checkout's `dist/cli.js` and every `bun test`
+process are, and a runtime copy (no `package.json`) or an npm install
+(no `src/`) is not. A development build owns a store under `tmpdir()`,
+and one under `RAFA_EFFORT_DIR` unless it sits in a project's own
+`<root>/.rafa/effort/`. Over any other it throws
+`DevelopmentBuildRefusedError` (`nextStep` `rafa effort copy`) with the
+spec's text, naming `schema_migrations` for an adoption ahead of the
+pending ids, and adds ` Loop <sessionId> (pid <pid>, plan <stub>) is
+running on this store.` for each record under `<root>/.rafa/runs/` that
+reads `running` or `paused` with its pid alive. Nothing is written, so
+the store keeps its bytes. With nothing pending a development build
+reads and writes the live store as any rafa does. So until the
+installed runtime has adopted this project's live store (0.24.1 left it
+at `user_version` 13 with no log), every `bun src/rafa.ts` command that
+opens it is refused; run it with `RAFA_EFFORT_DIR` over a copy.
+`development-build.test.ts` hands the refusal another `tempDir` to make
+a store under the real one unowned, as a spawned child's `TMPDIR` would.
+
 **`withSqliteStore(path, access, create, use)` is the open, and every
 caller states `access`.** `keys`, `read` and every reader outside the
 port pass `'read'`; every writer passes `'write'`, and so does
 `writeSqliteStore` for an empty write. The open sets `PRAGMA
 busy_timeout` to `effort.busyTimeoutMs`, then calls `bringForward(db,
 path, access, 'open')` before `use`. A read of a current store writes nothing;
-a read of a pre-log store adopts it, since adoption counts as a write; a
+a read of a pre-log store adopts it, since adoption counts as a write,
+unless a development build is refused it as above; a
 store logging an unknown migration that breaks only writers is read and
 refused a write. Without the busy timeout, an open that found migrations
 pending while another process held the lock threw `SQLITE_BUSY` at
