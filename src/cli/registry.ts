@@ -17,7 +17,8 @@
  *   - Core commands, each a `RafaCommand` under a declared subject, or
  *     top-level when its action is its subject.
  *   - Aliases: each whole other spelling a core command declares, read
- *     as the words it splits into on whitespace.
+ *     as the words it splits into on whitespace, and whether it is one
+ *     of the command's `lastingAliases`, typed with no deprecation line.
  *   - Mounts, each a {@link ModuleMount}: the commands one module's
  *     entry exports, keyed under `module/<name>` ({@link mountKey}) and
  *     reached only through an `exec` action. A mounted command's own
@@ -36,11 +37,14 @@
  * of one spelling; a top-level command spelled as a subject or its
  * plural; an alias that is not words, one claimed twice, one spelled as
  * a top-level command, and one spelled as a subject and one of its
- * actions, each of which the command itself would win.
+ * actions, each of which the command itself would win; and a lasting
+ * alias the command does not also list in `aliases`.
  *
  * An alias spelled as a subject alone is accepted, as `plan` for
  * `plan create` is. It answers for every line under that subject whose
- * next word is no action of it, the bare subject included.
+ * next word is no action of it, the bare subject included, typed by the
+ * subject's name or by its plural (`src/cli/route.ts`): `rafa epics 252`
+ * runs `epic show`, whose alias is `epic`.
  *
  * A mount is refused when its name is not a word, it is mounted twice,
  * or one of its commands fails `commandProblem`, declares `exec`, or
@@ -85,10 +89,12 @@ export interface ModuleMount {
   readonly commands: readonly RafaCommand[];
 }
 
-/** One alias: the words it is typed as, and the command it routes to. */
+/** One alias: the words it is typed as, the command it routes to, and whether it is kept for good. */
 export interface CommandAlias {
   readonly words: readonly string[];
   readonly command: RafaCommand;
+  /** True for one of the command's `lastingAliases`, which prints no deprecation line. */
+  readonly lasting: boolean;
 }
 
 /** Whether a roster keeps hidden commands. */
@@ -234,6 +240,14 @@ function shadowOf(
   return find(subject.name, second);
 }
 
+/** An alias as its words joined by one space, however it was spaced when declared. */
+function typedAlias(alias: string): string {
+  return alias
+    .trim()
+    .split(/\s+/)
+    .join(' ');
+}
+
 /** Every alias, longest first, refusing one the module note refuses. */
 function indexAliases(
   commands: readonly RafaCommand[],
@@ -244,9 +258,15 @@ function indexAliases(
   const aliases: CommandAlias[] = [];
   for (const command of commands) {
     const spelling = commandSpelling(command);
+    const lasting = new Set((command.lastingAliases ?? []).map(typedAlias));
+    for (const kept of lasting) {
+      if (!(command.aliases ?? []).map(typedAlias).includes(kept)) {
+        throw new Error(`${REFUSAL}: command "${spelling}" has lasting alias "${kept}", which is not one of its aliases`);
+      }
+    }
     for (const alias of command.aliases ?? []) {
-      const words = Object.freeze(alias.trim().split(/\s+/));
-      const typed = words.join(' ');
+      const typed = typedAlias(alias);
+      const words = Object.freeze(typed.split(' '));
       if (!words.every(isRoutingWord)) {
         throw new Error(
           `${REFUSAL}: command "${spelling}" has alias ${describeValue(alias)},`
@@ -263,7 +283,7 @@ function indexAliases(
         throw new Error(`${REFUSAL}: alias "${typed}" of "${spelling}" is spelled as command "${commandSpelling(shadow)}"`);
       }
       claimed.set(typed, command);
-      aliases.push(Object.freeze({ words, command }));
+      aliases.push(Object.freeze({ words, command, lasting: lasting.has(typed) }));
     }
   }
   return Object.freeze(aliases.sort((a, b) => b.words.length - a.words.length));

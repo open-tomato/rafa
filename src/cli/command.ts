@@ -145,10 +145,17 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
   readonly examples: readonly CommandExample[];
   /**
    * Whole other spellings of the command, each printing one deprecation
-   * line when typed: `start` for `loop start`. Routed for a core command
-   * only; a module's command is reached through an `exec` action alone.
+   * line when typed, `start` for `loop start`, unless it is also one of
+   * {@link RafaCommand.lastingAliases}. Routed for a core command only; a
+   * module's command is reached through an `exec` action alone.
    */
   readonly aliases?: readonly string[];
+  /**
+   * The aliases, each also listed in `aliases`, kept for good rather than
+   * for one release: typed, they print no deprecation line. `epic` for
+   * `epic show`, which `rafa epics` reaches through the subject's plural.
+   */
+  readonly lastingAliases?: readonly string[];
   /** What the action can render. */
   readonly outputs: readonly CommandOutput[];
   /** Set when the command itself is deprecated; typing it prints one deprecation line. */
@@ -254,6 +261,11 @@ function fieldProblem(fields: CommandFields): string | null {
     [
       'aliases',
       fields.aliases === undefined || isListOf(fields.aliases, (item) => typeof item === 'string'),
+      'absent or a list of strings',
+    ],
+    [
+      'lastingAliases',
+      fields.lastingAliases === undefined || isListOf(fields.lastingAliases, (item) => typeof item === 'string'),
       'absent or a list of strings',
     ],
     [

@@ -224,6 +224,11 @@ describe('the shape check', () => {
       'command "loop start": aliases is a list, expected absent or a list of strings',
     ],
     [
+      'a lasting alias that is not a string',
+      { lastingAliases: 'start' },
+      'command "loop start": lastingAliases is "start", expected absent or a list of strings',
+    ],
+    [
       'a deprecation with no use',
       { deprecated: { since: '0.2.0' } },
       'command "loop start": deprecated is a mapping, expected absent or a mapping of since and use',

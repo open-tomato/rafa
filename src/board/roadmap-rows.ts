@@ -78,7 +78,7 @@
  * reads the Roadmap and hands its lines to {@link readLineRows}, which
  * makes every reading below over whatever lines it is handed, the same
  * selection applied; `rafa epics` hands it one epic's lines, its
- * checklist then its label-only members (`src/commands/epics.ts`). Only
+ * checklist then its label-only members (`src/commands/epic/show.ts`). Only
  * the Roadmap read is `readRoadmapRows`' own, so only it can reject.
  *
  * ## The spec column
@@ -549,7 +549,7 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
  * `lines` as rows, in their order: the unticked ones, or every one with
  * `all`. Never rejects: each failed reading is carried as a warning, as
  * the module note holds. {@link readRoadmapRows} hands in the Roadmap's
- * lines, and `rafa epics` an epic's (`src/commands/epics.ts`).
+ * lines, and `rafa epics` an epic's (`src/commands/epic/show.ts`).
  */
 export async function readLineRows(lines: readonly RoadmapLine[], options: LineRowsOptions): Promise<LineRows> {
   const selected = lines.filter((line) => options.all === true || !line.ticked);

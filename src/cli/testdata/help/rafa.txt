@@ -17,10 +17,10 @@ Quick start:
   rafa instinct check .rafa/instincts
   rafa release status
   rafa board list
+  rafa epic show
   rafa status
   rafa next
   rafa roadmap
-  rafa epics
   rafa switch 252
   rafa init
   rafa doctor
@@ -49,10 +49,11 @@ Subjects:
              HEAD
   board      list the boards with their owner, epic count, and which is current
              and home
+  epic       show one epic's issues as the Roadmap table
 
 Commands:
-  status, next 🪙, roadmap, epics, switch, init, doctor, cleanup, self-update,
-  usage, describe
+  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,
+  describe
 
 Global flags:
   --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)

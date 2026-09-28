@@ -1,0 +1,15 @@
+{
+  "recordedAt": "b32ebb4",
+  "captures": {
+    "epics": {
+      "exitCode": 0,
+      "stdout": "Epic #50 · Alpha epic · in-progress, 1/2 done\n  #  state   type  spec     blocked by  has  refs  labels      title\n#51  open    code  outline  -           -    -     epic:alpha  Alpha open member\n#52  closed  code  outline  -           -    -     epic:alpha  Alpha closed member\n",
+      "stderr": ""
+    },
+    "epics 60": {
+      "exitCode": 0,
+      "stdout": "Epic #60 · Beta epic · done, 2/2 done\n  done, but epic #60 is still open\n  #  state   type  spec     blocked by  has  refs  labels     title\n#61  closed  code  outline  -           -    -     epic:beta  Beta member one\n#62  closed  code  outline  -           -    -     epic:beta  Beta member two\n",
+      "stderr": ""
+    }
+  }
+}

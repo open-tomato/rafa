@@ -31,7 +31,7 @@
  *
  * - A board moves to that board and its first `now` epic that is not
  *   done: its checklist read with `parseRoadmapBody` and asked through
- *   `firstNowEpic` (`./epics.ts`), the pick `rafa epics` makes with no
+ *   `firstNowEpic` (`./epic/show.ts`), the pick `rafa epics` makes with no
  *   number, the epic null when it names none.
  * - An epic moves to that epic and to the board whose checklist lists
  *   it, ticked or not: the current board first, then the default board,
@@ -95,7 +95,7 @@ import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
-import { firstNowEpic } from './epics.js';
+import { firstNowEpic } from './epic/show.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
 
 /** The usage line a refusal names. */

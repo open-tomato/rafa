@@ -27,8 +27,7 @@
  * `unblock` read and label issues on the GitHub board and `check` reads
  * the references of a spec's saved copy, all eight sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
- * run with `--roadmap` set, nor `epics`, which reads one epic's lines
- * into the same rows through `src/board/roadmap-rows.ts`, nor `switch`,
+ * run with `--roadmap` set, nor `switch`,
  * which moves the checkout's place through `src/board/place.ts` and
  * `src/project/position.ts`, nor `board list`, which lists the open
  * boards off the same listing through `src/board/board-body.ts` and
@@ -62,7 +61,9 @@
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
  * `src/cleanup/` and removes the ticked ones through its steps, nor
- * `status`, which reads the five sections through `src/status/`.
+ * `status`, which reads the five sections through `src/status/`, nor
+ * `epic show`, which reads one epic's lines into the same rows as
+ * `roadmap` through `src/board/roadmap-rows.ts`.
  *
  * ## What is registered
  *
@@ -181,8 +182,12 @@
  *     [--module=<name>] [--search=<text>] [--limit=<n>]`, top-level: the Roadmap issue's
  *     lines in its order as a table, `issue list --roadmap` under a word
  *     of its own. Not an alias, since an alias prints a deprecation line.
- *   - `epics [<n>]`, top-level: one epic's lines as the same table, the
- *     epic numbered or the first `now` epic on the Roadmap not done.
+ *   - `epic show [<n>]`, aliased `epic` for good: one epic's lines as the
+ *     same table, the epic numbered or the first `now` epic on the Roadmap
+ *     not done. The alias is typed by the subject's plural too, so
+ *     `rafa epics` and `rafa epics <n>`, its top-level spelling until the
+ *     `epic` subject was declared, still run it, and print no deprecation
+ *     line, since it is one of the command's `lastingAliases`.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -206,9 +211,10 @@
  *     was routed through.
  *
  * Typing an alias prints one deprecation line on stderr before the
- * command runs (`src/cli/dispatch.ts`).
+ * command runs (`src/cli/dispatch.ts`), unless the command declares it
+ * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the eleven with an action registered: a subject with
+ * The subjects are the twelve with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -229,7 +235,7 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
-import epics from './epics.js';
+import epicShow from './epic/show.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
@@ -293,6 +299,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
+  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table' },
 ]);
 
 /** The core commands, in roster order. */
@@ -347,10 +354,10 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseStatus,
   releaseTag,
   boardList,
+  epicShow,
   status,
   next,
   roadmap,
-  epics,
   switchCommand,
   init,
   doctor,

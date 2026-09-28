@@ -87,7 +87,7 @@
  * lines is distinct that way.
  *
  * {@link epicLines} answers that order for an epic already read, and is
- * the one spelling of it: `rafa epics` (`src/commands/epics.ts`) prints
+ * the one spelling of it: `rafa epics` (`src/commands/epic/show.ts`) prints
  * the same lines as its table's rows, so the view and the walk cannot
  * order one epic two ways.
  *

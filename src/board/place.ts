@@ -32,7 +32,7 @@
  * The FALLBACK is the default board and its first `now` epic that is not
  * done: the board's checklist, read off its listing row with
  * `parseRoadmapBody`, asked through `firstNowEpic`
- * (`src/commands/epics.ts`), the pick `rafa epics` makes with no number.
+ * (`src/commands/epic/show.ts`), the pick `rafa epics` makes with no number.
  * The epics are read with `readEpics` and no claims: a claim only tells
  * `in-progress` from `backlog`, never `done` from the rest, so the pick
  * is the same. A default board the listing does not hold has no
@@ -64,7 +64,7 @@
 import type { BoardIssue } from './roadmap-board.js';
 import type { Place, Position, PositionUnsetReason } from '../project/position.js';
 
-import { firstNowEpic } from '../commands/epics.js';
+import { firstNowEpic } from '../commands/epic/show.js';
 import { readPositionFile } from '../project/position.js';
 
 import { readEpics } from './epics.js';

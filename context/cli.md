@@ -30,6 +30,7 @@ module's note is the long form.
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -173,7 +174,10 @@ New; it replaces no earlier text. What a row or an action added to
   and in `src/tests/spends-cli-surface.test.ts`, hold the wrap (measured
   on 2026-09-27); registering `switch` moved `usage` onto that second
   line beside `describe`, and both literals moved with it (measured on
-  2026-09-28). An action
+  2026-09-28); moving `epics` under the `epic` subject as `epic show`
+  took it off that line, which moved `usage` back onto the first and
+  left `describe` alone on the second, and both literals moved again
+  (measured on 2026-09-28). An action
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
@@ -199,11 +203,12 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `roadmap`, `epics`, `switch`, `next`, `init`,
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
+  `epic` for good; `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
-  `module`, `agent`, `skill`, `instinct`, `release` and `board`: a subject is
-  declared with its first action, never ahead of it.
+  `module`, `agent`, `skill`, `instinct`, `release`, `board` and `epic`: a
+  subject is declared with its first action, never ahead of it.
   `skill index` is in the command tree and is registered by none of it
   yet, so no roster names it.
   The module note of `src/commands/index.ts` says so in the words
@@ -1259,8 +1264,19 @@ New; it replaces no earlier text. What a row or an action added to
   the terminal error's message in json mode, where the dispatcher
   drops the result's data on a non-zero exit; a check that passes
   changes nothing.
-- **`rafa epics [n]` prints one epic's lines as the Roadmap table**
-  (`src/commands/epics.ts`). The epic is the `type:epic` issue numbered
+- **`rafa epic show [n]` prints one epic's lines as the Roadmap table**
+  (`src/commands/epic/show.ts`). It was the top-level `rafa epics` until
+  the `epic` subject was declared, and the registry refuses a top-level
+  command spelled as a subject's plural; its lasting alias `epic`, typed
+  by the subject or its plural, keeps `rafa epics` and `rafa epics <n>`
+  printing what they printed before, byte for byte in text mode
+  (`src/tests/epic-show-cli.test.ts` compares both against captures the
+  top-level command wrote at `b32ebb4`, kept in
+  `src/tests/fixtures/epics-pre-move.json`; never re-record them, since
+  that command is gone). Its refusals still name `rafa epics [<n>]`. In
+  json mode the start event names `epic show`, as it names every
+  command by its canonical spelling, and `rafa epics --help` is now the
+  `epic` subject's roster. The epic is the `type:epic` issue numbered
   `n`, whatever its horizon and whether the Roadmap names it, or with no
   number the current place's epic (`readCurrentPlace`, as `rafa
   roadmap` reads its board), whatever its horizon and state, reading no
@@ -1562,7 +1578,14 @@ New; it replaces no earlier text. What a row or an action added to
   wins, then the top-level command.
 - **An alias spelled as a subject**, as `plan` is for `plan create`,
   catches every line under that subject whose next word is no action of
-  it, the bare subject included.
+  it, the bare subject included, typed by the subject's name or by its
+  plural: `rafa plans --spec=<file>` runs `plan create`, and
+  `rafa epics 252` runs `epic show` through `epic`. An alias declared as
+  the plural itself wins over that plural reading of another.
+- **A lasting alias**, one a command lists in `lastingAliases` as well
+  as in `aliases`, routes as any alias does but leaves the route's
+  `alias` null, so it writes no deprecation line: `epic` for
+  `epic show` is the one. The others are kept for one release.
 - **Help**: no routing word, a first word `help`, or `--help` or `-h`
   before a `--`. A subject alone asks for its roster before an alias
   spelled as that subject is tried.
@@ -1588,7 +1611,8 @@ subject "release"`). It refuses `help` as a subject, as a top-level command and 
 first word. It also refuses a subject, command or alias declared twice,
 a subject spelled as another's plural, and a top-level command spelled
 as a subject. So is an alias spelled as a top-level command or as a
-subject and one of its actions. `mount` answers a new registry and
+subject and one of its actions, and a lasting alias a command does not
+also list in `aliases`. `mount` answers a new registry and
 leaves the old one unchanged. Help and `describe` read this registry,
 never a second one: `describe` through `RafaContext.registry`, which
 holds the invocation's mounts.
@@ -1689,8 +1713,8 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   (`src/adapters/output/active.ts`), set in the invocation's output mode,
   which `activeOutputMode()` answers. The output and the mode active
   before are put back afterwards, when the command throws too.
-- **An alias, or a command declaring `deprecated`, writes one line to
-  stderr** before it runs, in either mode:
+- **An alias but a lasting one, or a command declaring `deprecated`,
+  writes one line to stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help
   request writes none, nor does a command refused outside a project.
 - **A flag declaring `deprecated` is read as its `use`** when typed bare

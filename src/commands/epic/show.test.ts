@@ -1,8 +1,11 @@
 /**
- * Tests for `rafa epics` (`epics.ts`): the pure pieces — the argument,
- * the choice of the first `now` epic, the problems kept for one epic and
- * the lines written — and the command dispatched over one planted `gh`
- * and `git` holding four epics.
+ * Tests for `rafa epic show` (`show.ts`), typed here mostly as
+ * `rafa epics`, the spelling it kept through its lasting alias: the pure
+ * pieces — the argument, the choice of the first `now` epic, the problems
+ * kept for one epic and the lines written — and the command dispatched
+ * over one planted `gh` and `git` holding four epics, under a registry
+ * declaring the `epic` subject, so every `epics` line below is routed
+ * through the subject's plural to the alias.
  *
  * The board: epic #80 is `next`, epic #70 is `now` with its one member
  * closed (so `done`, and still open: a disagreement), epic #50 (`alpha`)
@@ -21,14 +24,14 @@
  * `rafa epics` on it lands on #60 where the default board lands on #50;
  * the bare case with no position file is the control for each.
  */
-import type { EpicsResult } from './epics.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { EpicProblem } from '../board/epic-problems.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
-import type { RoadmapLine } from '../board/roadmap.js';
-import type { GitRunner } from '../pr/git.js';
-import type { Place } from '../project/position.js';
-import type { PlantedProject } from '../tests/cli-capture.js';
+import type { EpicsResult } from './show.js';
+import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
+import type { EpicProblem } from '../../board/epic-problems.js';
+import type { BoardIssue } from '../../board/roadmap-board.js';
+import type { RoadmapLine } from '../../board/roadmap.js';
+import type { GitRunner } from '../../pr/git.js';
+import type { Place } from '../../project/position.js';
+import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,25 +39,25 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { typeOfLabels } from '../adapters/tracker/github.js';
-import { BOARDS_LIST_ARGS } from '../board/boards.js';
-import { readEpics } from '../board/epics.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { unweighedPositionNotice } from '../board/roadmap-rows.js';
-import { ROADMAP_REFUSAL_EXIT } from '../board/roadmap.js';
-import { positionAt, writePositionFile } from '../project/position.js';
-import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
-import { completeSpecBody } from '../tests/spec-bodies.js';
+import { typeOfLabels } from '../../adapters/tracker/github.js';
+import { BOARDS_LIST_ARGS } from '../../board/boards.js';
+import { readEpics } from '../../board/epics.js';
+import { SPEC_READY_LABEL } from '../../board/readiness.js';
+import { unweighedPositionNotice } from '../../board/roadmap-rows.js';
+import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
+import { positionAt, writePositionFile } from '../../project/position.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { completeSpecBody } from '../../tests/spec-bodies.js';
 
 import {
-  createEpicsCommand,
+  createEpicShowCommand,
   epicHead,
   firstNowEpic,
   isProblemOf,
   noNowEpicLine,
   readEpicArgument,
   renderEpics,
-} from './epics.js';
+} from './show.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epics-')));
@@ -147,6 +150,9 @@ function plantedGh(calls: string[][], planted: Planted): GhRunner {
   };
 }
 
+/** The subject the command is declared under. */
+const EPIC_SUBJECT = { name: 'epic', summary: 'the epics' };
+
 /** A `git` holding no branch, locally or on the remote. */
 const plantedGit: GitRunner = () => ({ ok: true, stdout: '', stderr: '' });
 
@@ -161,7 +167,7 @@ async function run(words: readonly string[], planted: Planted = {}) {
   const seams = { gh: plantedGh(calls, planted), git: plantedGit, planNames: () => () => [], terminalWidth: () => undefined };
   const project = plantCase();
   if (planted.position !== undefined) writePositionFile(project.root, positionAt(planted.position));
-  const outcome = await dispatchInProject(words, [], [createEpicsCommand(seams)], project);
+  const outcome = await dispatchInProject(words, [EPIC_SUBJECT], [createEpicShowCommand(seams)], project);
   return { ...outcome, calls };
 }
 
@@ -264,6 +270,18 @@ describe('renderEpics', () => {
 });
 
 describe('rafa epics, dispatched', () => {
+  it('runs as rafa epic show, rafa epic and rafa epics alike, printing no deprecation line for any', async () => {
+    const plural = await run(['epics', '60']);
+    const canonical = await run(['epic', 'show', '60']);
+    const subject = await run(['epic', '60']);
+
+    expect(plural.exitCode).toBe(0);
+    expect(plural.stdout.split('\n')[0]).toBe('Epic #60 · Epic beta · backlog, 0/2 done');
+    expect(plural.stderr).toBe('');
+    expect(canonical).toEqual(plural);
+    expect(subject).toEqual(plural);
+  });
+
   it('prints the first now epic not done, its unticked checklist then its label-only member, from one listing', async () => {
     const outcome = await run(['epics']);
     const [warning, ...lines] = outcome.stdout.split('\n');
@@ -406,10 +424,11 @@ describe('rafa epics, dispatched', () => {
     expect(events.some((event) => event.type === 'log' && event.level === 'warn')).toBe(true);
   });
 
-  it('is a top-level command declaring no spends, one optional argument and no flag', () => {
-    const command = createEpicsCommand();
+  it('is epic show, aliased epic for good, declaring no spends, one optional argument and no flag', () => {
+    const command = createEpicShowCommand();
 
-    expect([command.subject, command.action, command.spends, command.flags]).toEqual(['epics', 'epics', undefined, []]);
+    expect([command.subject, command.action, command.spends, command.flags]).toEqual(['epic', 'show', undefined, []]);
+    expect([command.aliases, command.lastingAliases]).toEqual([['epic'], ['epic']]);
     expect(command.args.map((arg) => [arg.name, arg.required])).toEqual([['n', false]]);
   });
 });
