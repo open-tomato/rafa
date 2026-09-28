@@ -9,6 +9,13 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.24.1 — 2026-09-28, Merge and release-tag fixes
+
+- Pull requests: `rafa pr merge` reports the local branch delete as skipped, `no local branch <name>; nothing to delete`, when the checkout holds no local branch of that name (a branch pushed from another worktree under another local name), and still deletes the remote branch and prunes, exiting 0.
+- Release: `rafa release tag` tags the commit that set the version instead of HEAD; when merges landed after it, it warns how many commits HEAD is past it and spells the publish line to publish from the tag, and it refuses a version no commit holds yet.
+- Scripts: `scripts/device/diagnose.sh` reports, read-only, what a machine holds before a rafa setup: platform, the tools a loop needs and who installed them, logins, `~/.claude` counts, network reach and sshd, as text or one JSON row per check. It is not part of the published package.
+- Tests: the cleanup scratch repository dates its worktree files at its own fixed clock, so three cases no longer go red once the calendar passes that date, and `CHANGELOG.md` is exempt from the old plan and spec directory sweep.
+
 ## 0.24.0 — 2026-09-28, Epic lifecycle — every change to an epic is a command with a trail
 
 - Epics: every change to an epic is a command that leaves a comment on the issue it changed, and none recreates an issue; `rafa epic new "<title>" --slug <slug> [--horizon now|next|later]` creates the `epic:<slug>` label, the issue from the epic template (`later` by default) and its line on the current board; `rafa epic defer <n> --to next|later` and `rafa epic promote <n> --to now|next` swap the horizon label and comment the reason from `--reason` or one question, and deferring an in-progress epic names its open branches and pull requests and asks whether to keep them (a no closes each pull request with a comment and deletes no branch); `rafa epic move <issue> --to <epic>` swaps the `epic:` label, moves the checklist line between the two bodies byte for byte, and comments on the issue naming its open branches and pull requests.
