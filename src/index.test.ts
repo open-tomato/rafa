@@ -943,6 +943,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../next/actions.js', ['actionInvocation', 'runAction']],
     ['../next/ceiling.js', ['ALWAYS_ASKED', 'allowedUnasked', 'BARE_YES_ACTIONS', 'readYesCeiling', 'YES_ACTIONS', 'YES_FLAG']],
     ['../next/ending.js', ['actionOutput']],
+    ['../next/epic-end.js', ['epicEndLines', 'watchDryEpic']],
     ['../next/hint.js', ['commandWords', 'nextQuestion']],
     ['../next/sources.js', ['openNextSources']],
     ['../next/state.js', ['readNextState']],

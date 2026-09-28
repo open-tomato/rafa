@@ -158,6 +158,21 @@
  * which is the caller's output with its `result` taken: an invocation
  * gives ONE result, and the chain's is the report.
  *
+ * ## The end of an epic
+ *
+ * A chain that ends at `nothing-left` because the walk ran dry inside an
+ * epic — every line done or taken, the epic not done — ends with the
+ * lines `src/next/epic-end.ts` renders, after its own and after any stop
+ * line: `rafa epic close <n>` as the next step, `rafa roadmap` to list
+ * the board's epics, and `rafa release tag` where a version the
+ * changelog calls released carries no tag. Each is printed, never run.
+ * The dry epic is the one the LAST turn's walk answered, remembered by
+ * a watch over that turn's board rather than walked again, so the
+ * listing is read once; and the changelog and the tags are read only
+ * once an epic ran dry, so a project with no epic sends no command more
+ * and prints the same bytes. A release reading that failed is written
+ * as a warning and leaves its line out.
+ *
  * ## The exit code
  *
  * 0 for every ending above, a pre-condition included: `rafa next` is a
@@ -171,8 +186,8 @@ import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
-import type { NextSources } from '../next/readings.js';
-import type { NextSourceSeams } from '../next/sources.js';
+import type { DryEpic, NextSources } from '../next/readings.js';
+import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 
 import { CommandExit } from '../cli/command.js';
@@ -180,6 +195,7 @@ import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
+import { epicEndLines, watchDryEpic } from '../next/epic-end.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
 import { openNextSources } from '../next/sources.js';
 import { readNextState } from '../next/state.js';
@@ -483,6 +499,19 @@ async function runStateAction(context: RafaContext, sources: NextSources, state:
 }
 
 /**
+ * The end-of-epic lines, written after a chain that ended at
+ * `nothing-left` whose last walk ran dry inside `epic`; nothing, and no
+ * reading, otherwise. See the module note.
+ */
+function endOfEpic(context: RafaContext, sources: OpenedNextSources, report: NextChainReport, epic: DryEpic | null): void {
+  if (epic === null || report.steps.at(-1)?.state !== 'nothing-left') return;
+
+  const release = sources.release();
+  if (release.problem !== null) context.output.warn(`the release line is left out: ${release.problem}`);
+  for (const line of epicEndLines(epic, release)) context.output.info(line);
+}
+
+/**
  * Reads the line, composes the sources and runs the chain over them,
  * asking through a prompter opened on the first question. See the module
  * note for the endings and the exit codes.
@@ -496,12 +525,13 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   const sources = openNextSources(context, seams);
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
   const prompter = lazyPrompter(openPrompter);
+  const dry = watchDryEpic();
 
   try {
-    return await runNextChain({
+    const report = await runNextChain({
       // A new answer per turn: its board reads the issue again, so the
       // chain sees what the step it just ran changed (`next/sources.ts`).
-      read: () => readNextState(sources.answer()),
+      read: () => readNextState(dry.watch(sources.answer())),
       run: (state: NextState) => runStateAction(context, sources, state),
       ask: prompter.ask,
       handOver: prompter.close,
@@ -514,6 +544,8 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
         context.output.warn(line);
       },
     });
+    endOfEpic(context, sources, report, dry.last());
+    return report;
   } finally {
     prompter.close();
   }

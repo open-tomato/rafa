@@ -14,7 +14,7 @@
  * ## What the config answers
  *
  * One `loadConfig` for the whole composition, which is what keeps the
- * four settings it reads on one reading of the file:
+ * five settings it reads on one reading of the file:
  *
  * | Setting | Field | What it answers |
  * | --- | --- | --- |
@@ -22,6 +22,7 @@
  * | `pr.base` | `prBase` | the base rows 2 and 9 to 13 are read against |
  * | `pr.provider` | `prProvider` | whether this repository has a provider at all |
  * | `roadmap.issue` | `roadmapIssue` | the roadmap issue, when a layer named one |
+ * | `release.changelog` | `releaseChangelog` | the changelog the end of an epic reads for an untagged version (`./epic-end.ts`) |
  *
  * `pr.base` unset is {@link DEFAULT_BASE_BRANCH}: `main`, which is what
  * `release tag` resolves the same setting to and the first of the two
@@ -144,6 +145,7 @@
  * reaches both spends two `git for-each-ref` calls — both local, both
  * free of the network, and each memoised where it is taken.
  */
+import type { EpicEndRelease } from './epic-end.js';
 import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
@@ -181,6 +183,8 @@ import { plansDirAt } from '../commands/plan/plan-files.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
+
+import { readEpicEndRelease } from './epic-end.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */
 const PREFIX = 'rafa next';
@@ -227,7 +231,7 @@ export interface NextBoardOptions {
 }
 
 /** The settings the composition reads off the config. */
-type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'roadmapIssue'>;
+type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue'>;
 
 /** `read`, called at most once per issue; the module note holds how long the memo lives. */
 function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
@@ -366,7 +370,7 @@ function nextProject(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The four settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
+/** The five settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
 function nextConfig(project: ProjectFound, warn: (message: string) => void): NextConfig {
   try {
     return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
@@ -406,6 +410,12 @@ export interface OpenedNextSources extends NextSources {
    * chain takes a new answer per turn.
    */
   readonly answer: () => NextSources;
+  /**
+   * The released versions `release.changelog` names that carry no tag,
+   * read afresh each call and only when called: `rafa next` asks it once
+   * an epic ran dry, and nothing else does (`./epic-end.ts`).
+   */
+  readonly release: () => EpicEndRelease;
 }
 
 export function openNextSources(
@@ -439,5 +449,6 @@ export function openNextSources(
     ...held,
     board: board(),
     answer: () => Object.freeze({ ...held, board: board() }),
+    release: () => readEpicEndRelease(git, project.root, config.releaseChangelog),
   });
 }

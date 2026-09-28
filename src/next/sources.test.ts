@@ -1,5 +1,5 @@
 /**
- * Tests for the composition (`./sources.ts`): the four settings it reads
+ * Tests for the composition (`./sources.ts`): the five settings it reads
  * off one config, the seams every reading arrives through, the refusal a
  * repository without a `gh` provider gets, and the three board readings
  * over one `gh` runner, including the walk into an epic a roadmap line
@@ -295,6 +295,38 @@ describe('the sources one answer is read over', () => {
     expect(named.plans.label).toBe('docs/plans');
     expect(named.plans.path.endsWith(join('docs', 'plans'))).toBe(true);
     expect(silent.plans.label).toBe(join('.rafa', 'plans'));
+  });
+
+  it('reads the release line off release.changelog, and CHANGELOG.md where the config names none, listing tags only when asked', () => {
+    const { root, home } = plantProject('release:\n  changelog: docs/CHANGES.md\n');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'CHANGES.md'), '# Changes\n\n## 0.2.0\n\n## 0.1.0\n', 'utf8');
+    const calls: string[] = [];
+    const git: GitRunner = (args) => {
+      calls.push(args.join(' '));
+      return said(args.join(' ') === 'tag --list'
+        ? 'v0.1.0\n'
+        : '');
+    };
+    const opened = openNextSources(contextFor(root, home), {
+      readRemote: () => GITHUB_REMOTE,
+      openGit: () => git,
+      openGh: () => (): Promise<GhResult> => wrote('[]'),
+    });
+    const beforeAsking = [...calls];
+
+    const named = opened.release();
+    const bare = plantProject('pr:\n  base: main\n');
+    const silent = openNextSources(contextFor(bare.root, bare.home), {
+      readRemote: () => GITHUB_REMOTE,
+      openGit: () => git,
+      openGh: () => (): Promise<GhResult> => wrote('[]'),
+    }).release();
+
+    expect(beforeAsking).toEqual([]);
+    expect(named).toEqual({ changelog: 'docs/CHANGES.md', versions: ['0.2.0'], problem: null });
+    expect(silent.changelog).toBe('CHANGELOG.md');
+    expect(silent.problem).toContain('the changelog could not be read');
   });
 
   it('reads the session records under the project root, with the pid probe it is handed', () => {
