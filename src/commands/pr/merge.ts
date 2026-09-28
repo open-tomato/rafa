@@ -141,6 +141,26 @@
  * fail at `git pull` anyway, since every reason the probe cannot reach
  * the remote stops the pull first.
  *
+ * ## The local branch, and a checkout that never had it
+ *
+ * Whether this checkout holds the head branch is read the same way,
+ * after the merge, by `git show-ref --verify --quiet refs/heads/<name>`.
+ * A branch pushed from another clone, or from a worktree under a
+ * different local name (`git push -u origin HEAD:<name>`), has none
+ * here, and `git branch -D` would fail with `branch '<name>' not found`
+ * and stop the remote delete and the prune behind it. So an absent
+ * branch makes the local delete a SKIPPED step, reported in its place,
+ * and the rest run. Measured on git 2.50.1 (2026-09-28): `show-ref
+ * --quiet` exits 1 and writes nothing for a branch that is not there,
+ * and exits 128 with `fatal: not a git repository` outside a
+ * repository. So the probe reads "failed and said nothing" as absent,
+ * and "failed and said something" as a probe that failed: that is
+ * warned about and read as PRESENT, so the delete runs and reports its
+ * own failure the way it did before the probe existed. The refusal for
+ * a head branch checked out in another worktree is untouched: a branch
+ * git holds elsewhere is present, and `readMergeRefusal` refuses it
+ * before anything is merged.
+ *
  * {@link REMOTE} is the one spelling of the remote here: the probe and
  * the delete step are handed the same word, where letting
  * `cleanUpSteps` fall back to its own default would leave the probe
@@ -246,8 +266,10 @@ export interface MergeStepReport {
   readonly label: string;
   /** The whole command it ran, ready to paste. */
   readonly command: string;
-  /** True when git exited 0. */
+  /** True when git exited 0, and for a skipped step, which spawned nothing. */
   readonly ok: boolean;
+  /** True when the step was reported as skipped rather than run. */
+  readonly skipped: boolean;
 }
 
 /** What `--skip-checks` read and posted, as the result carries it; see the module note. */
@@ -278,7 +300,7 @@ export interface PrMergeResult {
   readonly declined: boolean;
   /** What the provider said about the merge, empty when it said nothing. */
   readonly detail: string;
-  /** Each clean-up step that ran, in order; empty for a declined merge. */
+  /** Each clean-up step that ran or was skipped, in order; empty for a declined merge. */
   readonly steps: readonly MergeStepReport[];
   /** The follow-ups that apply, empty when neither does. */
   readonly followUps: readonly FollowUp[];
@@ -391,6 +413,16 @@ function remoteHoldsBranch(git: GitRunner, branch: string, warn: (message: strin
   return false;
 }
 
+/** Whether this checkout holds the branch; a probe that failed is warned about and read as present. See the module note. */
+function localHoldsBranch(git: GitRunner, branch: string, warn: (message: string) => void): boolean {
+  const probe = git(['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]);
+  if (probe.ok) return true;
+  const said = gitSaid(probe);
+  if (said === '') return false;
+  warn(`could not read whether this checkout holds a local branch ${branch}, so its delete runs: ${said}`);
+  return true;
+}
+
 /** The text of a file, or the empty string when it cannot be read. */
 function textOf(path: string): string {
   try {
@@ -497,12 +529,23 @@ async function reportTick(
   return tick;
 }
 
-/** The line saying what is ready, which the remote delete having run changes. */
-function readyLine(base: string, branch: string, remoteBranchPresent: boolean): string {
-  const remote = remoteBranchPresent
-    ? `and ${branch} is gone locally and on ${REMOTE}.`
-    : `and ${branch} is gone locally; ${REMOTE} had already deleted it.`;
-  return `${base} is checked out and pulled, ${remote}`;
+/** Which of the two branches the clean-up found to delete. */
+interface BranchesPresent {
+  readonly local: boolean;
+  readonly remote: boolean;
+}
+
+/** The line saying what is ready, which each delete having run changes. */
+function readyLine(base: string, branch: string, present: BranchesPresent): string {
+  const pulled = `${base} is checked out and pulled`;
+  if (present.local) {
+    return present.remote
+      ? `${pulled}, and ${branch} is gone locally and on ${REMOTE}.`
+      : `${pulled}, and ${branch} is gone locally; ${REMOTE} had already deleted it.`;
+  }
+  return present.remote
+    ? `${pulled}, and ${branch} is gone on ${REMOTE}; there was no local branch to delete.`
+    : `${pulled}; ${branch} had no local branch, and ${REMOTE} had already deleted it.`;
 }
 
 /** What git said, each line indented, and nothing at all when it said nothing. */
@@ -517,18 +560,24 @@ function runCleanUp(
   context: RafaContext,
   git: GitRunner,
   detail: PullRequestDetail,
-  remoteBranchPresent: boolean,
+  present: BranchesPresent,
 ): readonly MergeStepReport[] {
   const steps = cleanUpSteps({
     branch: detail.headRefName,
     base: detail.baseRefName,
     remote: REMOTE,
-    remoteBranchPresent,
+    localBranchPresent: present.local,
+    remoteBranchPresent: present.remote,
   });
   const reports: MergeStepReport[] = [];
   for (const step of steps) {
+    if (step.skip !== undefined) {
+      reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: true, skipped: true });
+      context.output.info(`${step.label}: skipped — ${step.skip}`);
+      continue;
+    }
     const result = git(step.argv.slice(1));
-    reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: result.ok });
+    reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: result.ok, skipped: false });
     if (result.ok) {
       context.output.info(`${step.label}: done`);
       continue;
@@ -659,11 +708,15 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   const commentUrl = await commentIfUnchecked(context, pr, detail.number, answer.unchecked);
   const roadmapTicks = await reportTick(context, pr, seams, detail);
 
-  const remoteBranchPresent = remoteHoldsBranch(git, detail.headRefName, (message) => {
+  const warn = (message: string): void => {
     context.output.warn(message);
-  });
-  const steps = runCleanUp(context, git, detail, remoteBranchPresent);
-  context.output.info(readyLine(detail.baseRefName, detail.headRefName, remoteBranchPresent));
+  };
+  const present: BranchesPresent = {
+    remote: remoteHoldsBranch(git, detail.headRefName, warn),
+    local: localHoldsBranch(git, detail.headRefName, warn),
+  };
+  const steps = runCleanUp(context, git, detail, present);
+  context.output.info(readyLine(detail.baseRefName, detail.headRefName, present));
 
   const followUps = followUpsFor(pr, git);
   if (followUps.length > 0) {
@@ -695,7 +748,8 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
     summary: 'merge a pull request and clean up both branches',
     description: 'Merges one pull request through the GitHub CLI and then, in code, switches to the base branch,'
       + ' pulls it fast-forward only, deletes the head branch locally and on the remote where it is still there,'
-      + ' and prunes, reporting each step. Refuses before it asks anything on a dirty working tree, on a pull'
+      + ' and prunes, reporting each step; a head branch this checkout has no local branch for is reported as a'
+      + ' skipped local delete, and the rest still run. Refuses before it asks anything on a dirty working tree, on a pull'
       + ' request that is not green or does not merge, and on a head branch checked out in another worktree. It'
       + ' shows the pull request, its branches and the method and asks `Merge? [y/N]`; `--yes` skips the question,'
       + ' and without a terminal and without `--yes` it refuses. A pull request that reports no checks at all is'

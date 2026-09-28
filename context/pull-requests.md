@@ -125,7 +125,13 @@ sentence replaces nothing.
 3. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
    the base branch, `git pull --ff-only`, delete the local branch (`-D`: a
    squash leaves it unmerged in git's eyes), delete the remote branch when
-   it still exists, `git fetch --prune`.
+   it still exists, `git fetch --prune`. A head branch this checkout has no
+   local branch for — pushed from another clone, or from a worktree under
+   another local name — is read by `git show-ref --verify --quiet` and
+   reported as `delete the local branch <name>: skipped — no local branch
+   <name>; nothing to delete`; the remote delete and the prune still run,
+   and the exit code stays 0. A branch checked out in another worktree is
+   present, so step 1 still refuses it.
 4. Tick the roadmap, print what is ready and the two follow-ups when they
    apply: `rafa release tag` and `rafa self-update`.
 5. Run the unblock reading over every open issue labelled

@@ -410,7 +410,7 @@ describe('readMergeRefusal with skipChecks', () => {
 });
 
 describe('cleanUpSteps', () => {
-  const plan = { branch: 'feat/ci-gate', base: 'main', remoteBranchPresent: true };
+  const plan = { branch: 'feat/ci-gate', base: 'main', localBranchPresent: true, remoteBranchPresent: true };
 
   it('orders the five steps the way the merge runs them', () => {
     expect(cleanUpSteps(plan).map((step) => step.id)).toEqual([
@@ -447,6 +447,23 @@ describe('cleanUpSteps', () => {
     ]);
   });
 
+  it('keeps the local delete in its place as a skipped step when there is no local branch', () => {
+    const steps = cleanUpSteps({ ...plan, localBranchPresent: false });
+    expect(steps.map((step) => step.id)).toEqual([
+      'switch-base',
+      'pull-base',
+      'delete-local',
+      'delete-remote',
+      'prune-remotes',
+    ]);
+    expect(steps.find((s) => s.id === 'delete-local')?.skip)
+      .toBe('no local branch feat/ci-gate; nothing to delete');
+  });
+
+  it('skips no step while both branches are there', () => {
+    expect(cleanUpSteps(plan).filter((step) => step.skip !== undefined)).toEqual([]);
+  });
+
   it('pushes the delete to the remote it is given, not always origin', () => {
     const steps = cleanUpSteps({ ...plan, remote: 'upstream' });
     const step = steps.find((s) => s.id === 'delete-remote');
@@ -473,7 +490,7 @@ describe('cleanUpSteps', () => {
 });
 
 describe('commandLine', () => {
-  const plan = { branch: 'feat/ci gate', base: 'main', remoteBranchPresent: true };
+  const plan = { branch: 'feat/ci gate', base: 'main', localBranchPresent: true, remoteBranchPresent: true };
 
   it('renders a step as one pasteable line', () => {
     const steps = cleanUpSteps({ ...plan, branch: 'feat/ci-gate' });
@@ -498,6 +515,7 @@ describe('remainingFrom', () => {
   const steps = cleanUpSteps({
     branch: 'feat/ci-gate',
     base: 'main',
+    localBranchPresent: true,
     remoteBranchPresent: true,
   });
 
@@ -522,9 +540,24 @@ describe('remainingFrom', () => {
     const withoutRemote = cleanUpSteps({
       branch: 'feat/ci-gate',
       base: 'main',
+      localBranchPresent: true,
       remoteBranchPresent: false,
     });
     expect(remainingFrom(withoutRemote, 'delete-remote')).toEqual([]);
+  });
+
+  it('leaves a skipped step out of the commands to paste', () => {
+    const withoutLocal = cleanUpSteps({
+      branch: 'feat/ci-gate',
+      base: 'main',
+      localBranchPresent: false,
+      remoteBranchPresent: true,
+    });
+    expect(remainingFrom(withoutLocal, 'pull-base').map((step) => commandLine(step))).toEqual([
+      'git pull --ff-only',
+      'git push origin --delete feat/ci-gate',
+      'git fetch --prune',
+    ]);
   });
 
   it('answers commands the operator can paste', () => {
