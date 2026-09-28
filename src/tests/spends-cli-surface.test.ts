@@ -69,7 +69,8 @@ describe('rafa --help, spawned', () => {
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain(
       '  epic       show one epic\'s issues as the Roadmap table; create an epic; defer\n'
-      + '             or promote it; move an issue to it; close it through the gate 🪙\n',
+      + '             or promote it; move an issue to it; close it through the gate or\n'
+      + '             cancel it 🪙\n',
     );
   }, RUN_TIMEOUT);
 

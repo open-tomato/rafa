@@ -2,6 +2,7 @@ import type { HorizonChange, MembershipChange, ReasonAsk } from './epic-trail.js
 
 import { describe, expect, test } from 'bun:test';
 
+import { readBlockedBy } from './blocked.js';
 import {
   blankReasonMessage,
   cancelMoveReason,
@@ -15,6 +16,7 @@ import {
   renderHorizonComment,
   renderMoveComment,
   renderParkedPullRequestComment,
+  renderUnblockNote,
   unaskedReasonMessage,
 } from './epic-trail.js';
 
@@ -165,6 +167,29 @@ describe('dependent comments', () => {
     expect(renderMoveComment({ kind: 'move', issue: 14, from: 50, to: 40 }, cancelMoveReason(30))).toBe(
       'Moved from epic #50 to #40: epic #30, which it was blocked by, was cancelled',
     );
+  });
+});
+
+describe('renderUnblockNote', () => {
+  test('names the day, the epic, the one member dropped and that nothing else blocks it', () => {
+    expect(renderUnblockNote('2026-09-28', 30, [21], [])).toBe(
+      '**Updated 2026-09-28, epic #30 cancelled:** #21 no longer blocks this issue; nothing else blocks it.',
+    );
+  });
+
+  test('lists several members dropped and what the line still names, foreign tokens as written', () => {
+    expect(renderUnblockNote('2026-09-28', 30, [21, 22], ['#26', 'open-tomato/rafa#3'])).toBe(
+      '**Updated 2026-09-28, epic #30 cancelled:** #21 and #22 no longer block this issue;'
+        + ' it is still blocked by #26 and open-tomato/rafa#3.',
+    );
+  });
+
+  test('is one line, never read as a Blocked by: field line', () => {
+    const note = renderUnblockNote('2026-09-28', 30, [21], ['#26']);
+    expect(note.split('\n')).toHaveLength(1);
+    expect(readBlockedBy(57, note).kind).toBe('no-line');
+    // The control: the same words opening a line are read as the field.
+    expect(readBlockedBy(57, 'Blocked by: #26').kind).toBe('blocked');
   });
 });
 

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-six registered so far wrap a
+ * of each is its command. Five of the sixty-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -72,7 +72,10 @@
  * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
  * `epic close`, which plans and runs its verification through
  * `src/epic/verify-plan.ts` and `src/epic/verify-run.ts` and closes the
- * epic through `src/board/issue-board.ts`.
+ * epic through `src/board/issue-board.ts`, nor `epic cancel`, which asks
+ * about the epic's dependents (`src/board/epic-dependents.ts`), applies
+ * each answer through `./epic/move.ts`, `src/board/epic-checklist.ts`
+ * and `src/board/issue-board.ts`, and closes the epic through the last.
  *
  * ## What is registered
  *
@@ -224,6 +227,15 @@
  *     failed check filed as a bug and refused, and otherwise the epic
  *     closed as completed with a comment and its cost printed beside its
  *     estimate. It is the one `epic` action that declares `spends`.
+ *   - `epic cancel <n> [--reason="<why>"]`: every open issue outside the
+ *     epic that its open members block, listed and asked about in turn
+ *     where there is a terminal — moved to another epic, unblocked with
+ *     an "Updated" note and `spec:blocked` taken off, or closed as not
+ *     planned — then the epic closed as not planned with a comment, the
+ *     close skipped for an epic closed so already; with no terminal and
+ *     an issue to ask about, the list printed and nothing changed; an
+ *     issue that is no epic and an epic closed as completed refused
+ *     with exit code 2.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -271,6 +283,7 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
+import epicCancel from './epic/cancel.js';
 import epicClose from './epic/close.js';
 import epicDefer from './epic/defer.js';
 import epicMove from './epic/move.js';
@@ -340,7 +353,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
-  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate' },
+  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
 ]);
 
 /** The core commands, in roster order. */
@@ -401,6 +414,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   epicPromote,
   epicMove,
   epicClose,
+  epicCancel,
   status,
   next,
   roadmap,

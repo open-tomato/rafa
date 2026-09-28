@@ -27,6 +27,13 @@
  * {@link cancelMoveReason} as its reason, so a move reads the same
  * whichever command made it.
  *
+ * One piece of the trail is not a comment: a dependent the person chose
+ * to UNBLOCK also gets {@link renderUnblockNote} appended below its body,
+ * `**Updated <date>, epic #E cancelled:**` and the members it no longer
+ * waits on, since a body is changed only by a note below the original.
+ * The note never opens a line with `Blocked by:`, so it is not read as
+ * the field.
+ *
  * The first line of each comment is the sentence the spec names; what
  * follows it, after a blank line, is detail. The move comment names the
  * issue's open branches and pull requests when it has any, because the
@@ -73,11 +80,15 @@ function ref(issue: number): string {
   return `#${String(issue)}`;
 }
 
+/** `a, b and c`, the way a comment lists words. */
+function wordList(words: readonly string[]): string {
+  if (words.length < 2) return words.join('');
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1] ?? ''}`;
+}
+
 /** `#12, #13 and #14`, the way a comment lists issues. */
 function refList(issues: readonly number[]): string {
-  const refs = issues.map(ref);
-  if (refs.length < 2) return refs.join('');
-  return `${refs.slice(0, -1).join(', ')} and ${refs[refs.length - 1] ?? ''}`;
+  return wordList(issues.map(ref));
 }
 
 /**
@@ -280,6 +291,23 @@ export function renderDependentComment(action: DependentAction, epic: number, wa
   return action === 'unblocked'
     ? `Unblocked: ${why} no longer ${verb} this issue.`
     : `Closed as not planned: ${why}, which this issue waited on, will not land.`;
+}
+
+/**
+ * The note `cancel` appends below the body of a dependent it unblocked:
+ * `**Updated <day>, epic #E cancelled:**`, the members of the epic it no
+ * longer waits on, then what its `Blocked by:` line still names, each as
+ * the line wrote it (`#26`, `owner/repo#3`), or that nothing else blocks
+ * it. `day` is the local calendar day, `YYYY-MM-DD`.
+ */
+export function renderUnblockNote(day: string, epic: number, dropped: readonly number[], still: readonly string[]): string {
+  const verb = dropped.length === 1
+    ? 'blocks'
+    : 'block';
+  const rest = still.length === 0
+    ? 'nothing else blocks it.'
+    : `it is still blocked by ${wordList(still)}.`;
+  return `**Updated ${day}, epic ${ref(epic)} cancelled:** ${refList(dropped)} no longer ${verb} this issue; ${rest}`;
 }
 
 /** The question asked for a change's reason when `--reason` was not passed. */

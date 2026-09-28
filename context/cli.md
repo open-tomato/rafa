@@ -30,7 +30,7 @@ module's note is the long form.
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
-| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -184,7 +184,11 @@ New; it replaces no earlier text. What a row or an action added to
   `rafa.txt`. The exception is an action declaring `spends` under a
   subject none of whose actions did: its subject's line gains the `🪙`
   mark, which moves `rafa.txt` (measured again on 2026-09-28,
-  registering `epic close`, whose subject summary moved with it). A new spender also reddens the spender
+  registering `epic close`, whose subject summary moved with it). A
+  summary rewritten under a subject moves it too: adding `or cancel it`
+  for `epic cancel` wrapped the `epic` line onto a third row (measured on
+  2026-09-28), and `src/tests/spends-cli-surface.test.ts` spells that
+  line, so it moves with the snapshot. A new spender also reddens the spender
   rosters, `src/cli/spends-roster.test.ts`, the spawned `describe` case
   of `src/tests/spends-cli-surface.test.ts` and the README table
   `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
@@ -205,7 +209,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
-  `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `roadmap`, `switch`, `next`, `init`,
+  `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board` and `epic`: a
@@ -1450,6 +1454,44 @@ New; it replaces no earlier text. What a row or an action added to
   through the output in both modes; json mode's result on a close is
   `EpicCloseResult`. Git, `gh`, the spawner, the store and the tracker
   chain are `EpicCloseSeams`.
+- **`rafa epic cancel <n> [--reason="<why>"]` cancels an epic, asking
+  about each issue its open members block** (`src/commands/epic/cancel.ts`).
+  The line is one epic number, a whole number from 1, and an optional
+  `--reason` for the epic's comment; anything else is exit 1. The board
+  listing is read once; `readEpicToCancel` refuses with exit 2
+  (`EPIC_CANCEL_REFUSAL_EXIT`) an issue not on it, one not `type:epic`
+  and an epic closed as completed, as it does a listing that cannot be
+  read. An epic closed as NOT PLANNED already is not refused: its close
+  is skipped and its dependents are asked about. The dependents are
+  `readEpicDependents`'s (`src/board/epic-dependents.ts`), listed one a
+  line with the members each waits on; an unreadable line naming a
+  member is a `warn` line and is not asked about. Where `isTerminal` (a
+  seam) says stdin is a terminal, each is asked `dependentQuestion` in
+  turn on a line prompter: `m`/`move`, `u`/`unblock` or `c`/`cancel`,
+  anything else told `CHOICE_HINT` and asked again. A move asks
+  `targetQuestion` and reads the move with `readEpicMove`, saying a
+  refusal, or the epic being cancelled, and asking again. Every answer
+  is taken before any write, so an input that ends early writes nothing
+  (`endedCancelMessage`, exit 0). With no terminal and a dependent, the
+  list and `unaskedCancelMessage` are printed and nothing is written,
+  exit 0; with no dependent there is nothing to ask and the cancel goes
+  ahead. The writes, dependent by dependent, then the epic: a move is
+  `applyEpicMove` with `cancelMoveReason`; an unblock appends
+  `renderUnblockNote` below the body through `editChecklist` and
+  `appendNote` (every other byte kept, the body's own line break), takes
+  `spec:blocked` off when the dependent carries it and nothing its line
+  still names is open or on another repository, and comments
+  `renderDependentComment('unblocked')`; a cancel is one `closeIssue`
+  as `not planned` with `renderDependentComment('cancelled')`. The epic
+  is then closed as `not planned` with `renderCancelComment`, listing
+  each dependent whose own write landed; one closed so already gets that
+  comment only when a dependent was answered. A failed write is a
+  `warn` line, the run goes on, and it exits 1 naming what to finish by
+  hand. The epic's members are not touched. An answered dependent's
+  `Blocked by:` line still names the member, and `readBlockedBy` reads
+  that first line and not the note, so `readEpicDependents` keeps
+  listing a moved or unblocked dependent. Json mode's result is
+  `EpicCancelResult`. It declares no `spends`.
 - **`rafa switch <n | -> [--no-rehome]` moves this checkout's place**
   (`src/commands/switch.ts`) and writes it to `.rafa/position.json`
   through `writePositionFile` (`src/project/position.ts`). It reads the

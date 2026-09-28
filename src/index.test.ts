@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -912,6 +912,24 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../plan/plan-files.js', ['readSwitch']],
   ]],
+  ['./commands/epic/cancel.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/blocked.js', ['readBlockedBy', 'SPEC_BLOCKED_LABEL']],
+    ['../../board/epic-checklist.js', ['editChecklist']],
+    ['../../board/epic-dependents.js', ['readEpicDependents']],
+    ['../../board/epic-trail.js', ['cancelMoveReason', 'REASON_FLAG', 'renderCancelComment', 'renderDependentComment', 'renderUnblockNote']],
+    ['../../board/epics.js', ['isNotPlanned', 'localDay']],
+    ['../../board/issue-board.js', ['createGhIssueBoard']],
+    ['../../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
+    ['../../board/roadmap.js', ['createGhOpenPullRequests']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../pr/git.js', ['createGitRunner']],
+    ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
+    ['./move.js', ['applyEpicMove', 'readEpicMove']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../status/render.js', ['renderStatus', 'statusData']],
@@ -1225,6 +1243,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/epic/promote.js',
       './commands/epic/move.js',
       './commands/epic/close.js',
+      './commands/epic/cancel.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

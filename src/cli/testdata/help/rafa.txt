@@ -50,7 +50,8 @@ Subjects:
   board      list the boards with their owner, epic count, and which is current
              and home
   epic       show one epic's issues as the Roadmap table; create an epic; defer
-             or promote it; move an issue to it; close it through the gate 🪙
+             or promote it; move an issue to it; close it through the gate or
+             cancel it 🪙
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,
