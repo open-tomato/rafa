@@ -263,6 +263,10 @@ function fakeBoard(): { board: IssueBoard; calls: BoardCall[] } {
       calls.push(['createIssue', title, body, [...labels]]);
       return Promise.resolve({ number: 1, url: 'https://github.com/o/r/issues/1' });
     },
+    closePullRequest: (pullRequest, comment) => {
+      calls.push(['closePullRequest', pullRequest, comment]);
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }

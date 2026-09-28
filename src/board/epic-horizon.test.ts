@@ -342,6 +342,7 @@ describe('applyHorizonChange', () => {
       closeIssue: unused,
       createLabel: unused,
       createIssue: unused,
+      closePullRequest: unused,
       swapLabels: async (issue, removed, added) => {
         if (failSwap) throw new Error('board issue: gh issue edit 40 failed: HTTP 403');
         writes.push(`swap ${String(issue)} ${removed} ${added}`);

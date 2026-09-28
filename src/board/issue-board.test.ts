@@ -1,5 +1,5 @@
 /**
- * Tests for the issue board (`src/board/issue-board.ts`): the eight
+ * Tests for the issue board (`src/board/issue-board.ts`): the nine
  * commands it sends, the comment shape it reads back, and the arguments
  * it refuses before any command leaves.
  *
@@ -359,5 +359,41 @@ describe('createIssue', () => {
     expect(stub.calls()).toEqual([]);
     // The control: an ordinary title and labels send the command.
     await expect(board.createIssue('X', '', ['type:epic'])).resolves.toEqual({ number: 41, url });
+  });
+});
+
+describe('closePullRequest', () => {
+  it('closes the pull request with the comment in one gh pr close, with no --delete-branch', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).closePullRequest(7, 'Closed: epic #40 was deferred');
+
+    expect(stub.calls()).toEqual([['pr', 'close', '7', '--comment=Closed: epic #40 was deferred']]);
+  });
+
+  it('keeps a comment opening with a hyphen as the flag value', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).closePullRequest(7, '--delete-branch');
+
+    expect(stub.calls()).toEqual([['pr', 'close', '7', '--comment=--delete-branch']]);
+  });
+
+  it('rejects a failed close, naming the command', async () => {
+    const stub = stubGh(failed('no pull requests found for 7'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).closePullRequest(7, 'Closed'))
+      .rejects.toThrow('board issue: gh pr close 7 failed: no pull requests found for 7');
+  });
+
+  it('refuses an empty comment and a number that is no number, and sends no command', async () => {
+    const stub = stubGh(wrote(''));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.closePullRequest(7, '  ')).rejects.toThrow('closePullRequest refused an empty comment');
+    await expect(board.closePullRequest(0, 'x')).rejects.toThrow(TypeError);
+    expect(stub.calls()).toEqual([]);
+    // The control: a number with a comment sends the command.
+    await expect(board.closePullRequest(7, 'x')).resolves.toBeUndefined();
   });
 });

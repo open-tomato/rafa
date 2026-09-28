@@ -2,7 +2,8 @@
  * The writes and one read made on an issue: the comments of an issue,
  * a comment posted, a comment edited, one label swapped for another,
  * one label taken off, an issue closed with a reason and a comment, a
- * label created in the repository, and an issue created with its labels.
+ * label created in the repository, an issue created with its labels, and
+ * a pull request closed with a comment.
  *
  * The readiness gate's not-ready branch posts the planner's gaps as one
  * comment, edits that comment on a rerun, and swaps `spec:ready` for
@@ -35,6 +36,10 @@
  * `epic:<slug>` label its epic will carry. {@link IssueBoard.createIssue}
  * is `rafa epic new`'s too: the epic issue, created with its labels in the
  * same command, so it never stands on the board unlabelled.
+ * {@link IssueBoard.closePullRequest} is `rafa epic defer`'s: a no to
+ * keeping a deferred epic's open work closes each of its pull requests
+ * with a comment naming the deferral, in one `gh pr close`. It never
+ * sends `--delete-branch`, so the branch outlives the pull request.
  *
  * ## Why not the Tracker port
  *
@@ -58,10 +63,12 @@
  * | `closeIssue` | `gh issue close <n> --reason=<reason> --comment=<comment>` |
  * | `createLabel` | `gh label create <name> --description=<description>` |
  * | `createIssue` | `gh issue create --title=<title> --body=<body> --label=<label>…` |
+ * | `closePullRequest` | `gh pr close <n> --comment=<comment>` |
  *
  * The close reason is one of {@link CLOSE_REASONS}, the two `gh issue
  * close --reason` accepts, and the comment must be non-empty, since
- * every change leaves a comment. The comment, the reason and the label
+ * every change leaves a comment; a pull request close is held to the
+ * same non-empty comment. The comment, the reason and the label
  * description are sent in the `--flag=value` form, so free text opening
  * with `-` is the flag's value and never read as a flag of its own; a
  * label name is a positional and goes through the hyphen check below.
@@ -174,6 +181,8 @@ export interface IssueBoard {
   readonly createLabel: (name: string, description: string) => Promise<void>;
   /** Creates an issue titled `title` with `body`, carrying every one of `labels`, and answers it. */
   readonly createIssue: (title: string, body: string, labels: readonly string[]) => Promise<CreatedIssue>;
+  /** Closes the pull request, posting `comment` in the same command and deleting no branch. */
+  readonly closePullRequest: (pullRequest: number, comment: string) => Promise<void>;
 }
 
 /** What {@link createGhIssueBoard} is made with. */
@@ -235,9 +244,9 @@ function closeReason(value: CloseReason): CloseReason {
 }
 
 /** The close comment, which every close carries: a non-empty string. */
-function closeComment(value: string): string {
-  if (commentBody(value, 'closeIssue').trim() === '') {
-    throw new TypeError(`${PREFIX}: closeIssue refused an empty comment, every close leaves one`);
+function closeComment(value: string, member = 'closeIssue'): string {
+  if (commentBody(value, member).trim() === '') {
+    throw new TypeError(`${PREFIX}: ${member} refused an empty comment, every close leaves one`);
   }
   return value;
 }
@@ -405,6 +414,12 @@ export function createGhIssueBoard(options: GhIssueBoardOptions): IssueBoard {
         'gh issue create',
       );
       return createdIssue(stdout);
+    },
+
+    closePullRequest: async (pullRequest: number, comment: string): Promise<void> => {
+      const number = issueNumber(pullRequest, 'closePullRequest');
+      const text = closeComment(comment, 'closePullRequest');
+      await succeed(['pr', 'close', number, `--comment=${text}`], `gh pr close ${number}`);
     },
   };
   return Object.freeze(board);

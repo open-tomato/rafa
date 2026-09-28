@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-two registered so far wrap a
+ * of each is its command. Five of the sixty-four registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -65,7 +65,9 @@
  * `epic show`, which reads one epic's lines into the same rows as
  * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
  * creates an epic's label, issue and board line through
- * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`.
+ * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `epic defer` and `epic promote`, which move an epic between horizons
+ * over `src/board/epic-horizon.ts` through `./epic/horizon-change.ts`.
  *
  * ## What is registered
  *
@@ -195,6 +197,14 @@
  *     `type:epic`, `epic:<slug>` and its horizon (`later` by default), and
  *     its line on the current board; a slug that is no kebab word or that
  *     an issue already carries refused with exit code 2.
+ *   - `epic defer <n> --to=next|later` and `epic promote <n>
+ *     --to=now|next`, each with `[--reason="<why>"]`: the epic's
+ *     `horizon:` label swapped and the reason commented, asked once
+ *     where `--reason` is left out; a defer of an in-progress epic names
+ *     its open branches and pull requests and asks whether to keep them,
+ *     a no closing each pull request with a comment and deleting no
+ *     branch; a target that is not an open epic's, its own horizon or
+ *     the other way refused with exit code 2.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -242,7 +252,9 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
+import epicDefer from './epic/defer.js';
 import epicNew from './epic/new.js';
+import epicPromote from './epic/promote.js';
 import epicShow from './epic/show.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
@@ -307,7 +319,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
-  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic' },
+  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it' },
 ]);
 
 /** The core commands, in roster order. */
@@ -364,6 +376,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   boardList,
   epicShow,
   epicNew,
+  epicDefer,
+  epicPromote,
   status,
   next,
   roadmap,

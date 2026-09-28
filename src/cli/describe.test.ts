@@ -237,7 +237,7 @@ describe('the document over the core registry', () => {
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
     expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
-    expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new']);
+    expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote']);
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -255,6 +255,10 @@ describe('the document over the core registry', () => {
     expect(actionOf(document, 'epic', 'show')?.aliases).toEqual(['epic']);
     expect(spendsOf('epic', 'new')).toBeNull();
     expect(actionOf(document, 'epic', 'new')?.aliases).toEqual([]);
+    expect(spendsOf('epic', 'defer')).toBeNull();
+    expect(spendsOf('epic', 'promote')).toBeNull();
+    expect(actionOf(document, 'epic', 'defer')?.aliases).toEqual([]);
+    expect(actionOf(document, 'epic', 'promote')?.aliases).toEqual([]);
     expect(command('switch')?.spends).toBeNull();
     expect(spendsOf('board', 'list')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();

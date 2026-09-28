@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -864,6 +864,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
   ]],
+  ['./commands/epic/defer.js', [
+    ['../../board/epic-trail.js', ['REASON_FLAG']],
+    ['./horizon-change.js', ['DEFER_ACTION', 'runEpicHorizon', 'TO_FLAG']],
+  ]],
+  ['./commands/epic/promote.js', [
+    ['../../board/epic-trail.js', ['REASON_FLAG']],
+    ['./horizon-change.js', ['PROMOTE_ACTION', 'runEpicHorizon', 'TO_FLAG']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../status/render.js', ['renderStatus', 'statusData']],
@@ -1173,6 +1181,8 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/board/list.js',
       './commands/epic/show.js',
       './commands/epic/new.js',
+      './commands/epic/defer.js',
+      './commands/epic/promote.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

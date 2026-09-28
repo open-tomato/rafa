@@ -17,6 +17,7 @@
  * | Renderer | Posted on | Opens with |
  * |---|---|---|
  * | {@link renderHorizonComment} | the epic, by `defer` and `promote` | `Moved now → later: <reason>` |
+ * | {@link renderParkedPullRequestComment} | a pull request of a deferred epic, closed by `defer` on a no | `Closed: epic #A was deferred now → later: <reason>` |
  * | {@link renderMoveComment} | the moved issue, by `move` | `Moved from epic #A to #B: <reason>` |
  * | {@link renderCloseComment} | the epic, by `close` | `Closed through the closing gate:` |
  * | {@link renderCancelComment} | the epic, by `cancel` | `Cancelled:` |
@@ -132,6 +133,17 @@ export interface OpenWork {
 /** The comment `defer` and `promote` post on the epic: `Moved now → later: <reason>`. */
 export function renderHorizonComment(change: HorizonChange, reason: string): string {
   return `Moved ${change.from} → ${change.to}: ${normaliseReason(reason)}`;
+}
+
+/**
+ * The comment `defer` closes an open pull request of the deferred epic's
+ * members with, when the answer to keeping that work was no. It names the
+ * epic and the move, and says the branch is kept, since the close deletes
+ * no branch and reopening the pull request takes up the work again.
+ */
+export function renderParkedPullRequestComment(change: HorizonChange, reason: string): string {
+  return `Closed: epic ${ref(change.epic)} was deferred ${change.from} → ${change.to}: ${normaliseReason(reason)}`
+    + '\n\nThe branch is kept; reopen this pull request to take the work up again.';
 }
 
 /** `branch \`a\`, pull request #7`, the open work a move comment names; empty when there is none. */

@@ -14,6 +14,7 @@ import {
   renderDependentComment,
   renderHorizonComment,
   renderMoveComment,
+  renderParkedPullRequestComment,
   unaskedReasonMessage,
 } from './epic-trail.js';
 
@@ -54,6 +55,15 @@ describe('renderHorizonComment', () => {
 
   test('keeps a multi-line reason on one line', () => {
     expect(renderHorizonComment({ ...DEFER, from: 'later', to: 'next' }, 'customer\nasked')).toBe('Moved later → next: customer asked');
+  });
+});
+
+describe('renderParkedPullRequestComment', () => {
+  test('names the epic and the move, the reason on one line, and says the branch is kept', () => {
+    expect(renderParkedPullRequestComment(DEFER, 'waiting\non #118')).toBe(
+      'Closed: epic #40 was deferred now → later: waiting on #118\n\n'
+        + 'The branch is kept; reopen this pull request to take the work up again.',
+    );
   });
 });
 

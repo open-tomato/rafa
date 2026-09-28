@@ -118,6 +118,10 @@ function fakeBoard(held: readonly BoardComment[] = []): { board: IssueBoard; cal
       calls.push({ member: 'createIssue', args: [title, body, [...labels]] });
       return Promise.resolve({ number: 1, url: 'https://github.com/o/r/issues/1' });
     },
+    closePullRequest: (pullRequest, comment) => {
+      calls.push({ member: 'closePullRequest', args: [pullRequest, comment] });
+      return Promise.resolve();
+    },
   };
   return { board, calls };
 }
