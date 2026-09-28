@@ -153,6 +153,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { version } from '../../package.json';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
+import { unlabelledRoadmapMessage } from '../board/boards.js';
 import { BOARD_LIST_FIELDS } from '../board/roadmap-board.js';
 import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
 import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
@@ -171,12 +172,14 @@ import {
   ghOnPathItem,
 } from '../pr/preflight-items.js';
 import { readBinPath } from '../project/bin-path.js';
+import { writePositionFile } from '../project/position.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { ABSENT, PRESENT } from '../refs/stamp.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
+import { BOARDS_HEADING, unresolvedOwnerMessage } from './doctor-boards.js';
 import { PLAN_NEEDS_SECTION_TITLE, STACK_TOOLS_SECTION_TITLE } from './doctor-deep-needs.js';
 import { PROVIDERS_SECTION_TITLE } from './doctor-deep-providers.js';
 import { SETTINGS_SECTION_TITLE } from './doctor-deep-settings.js';
@@ -376,15 +379,29 @@ interface FakeRepo {
   readonly blocked?: readonly { number: number; body: string }[];
   /** Every issue number the board holds, open and closed. */
   readonly known?: readonly number[];
-  /** Every issue the board listing answers, with its labels; the epic labels row reads these. */
-  readonly listed?: readonly { number: number; labels: readonly string[] }[];
+  /**
+   * Every issue the board listing answers, with its labels; the epic
+   * labels row and the boards row read these. `title`, `body` and
+   * `state` default to an open issue named `issue <n>` with no body,
+   * as the epic labels row's fixtures need nothing more.
+   */
+  readonly listed?: readonly {
+    readonly number: number;
+    readonly labels: readonly string[];
+    readonly title?: string;
+    readonly body?: string;
+    readonly state?: 'OPEN' | 'CLOSED';
+  }[];
+  /** `gh api` paths, for an owner lookup, answered 404. */
+  readonly missing?: readonly string[];
 }
 
 /** The route the board listing is recorded under, apart from the numbers listing that is also `--state all`. */
 const LISTING_CALL = 'issue list --board';
 
-/** Which reading a command is, since four of them are `gh issue list`. */
+/** Which reading a command is, since four of them are `gh issue list`, and an owner lookup is `gh api`. */
 function routeOf(args: readonly string[]): string {
+  if (args[0] === 'api') return `api ${args[1] ?? ''}`;
   const route = args.slice(0, 2).join(' ');
   if (route !== 'issue list') return route;
   if (args.includes(BOARD_LIST_FIELDS)) return LISTING_CALL;
@@ -393,20 +410,26 @@ function routeOf(args: readonly string[]): string {
   return 'issue list --search';
 }
 
-/** One issue of the board listing, as `gh` answers it: an open issue with no body, carrying `labels`. */
-function listedRow(issue: { number: number; labels: readonly string[] }): Record<string, unknown> {
+/** One issue of the board listing, as `gh` answers it: an open issue with no body, carrying `labels`, unless the case names its own. */
+function listedRow(issue: {
+  readonly number: number;
+  readonly labels: readonly string[];
+  readonly title?: string;
+  readonly body?: string;
+  readonly state?: 'OPEN' | 'CLOSED';
+}): Record<string, unknown> {
   return {
     number: issue.number,
-    title: `issue ${String(issue.number)}`,
-    body: '',
-    state: 'OPEN',
+    title: issue.title ?? `issue ${String(issue.number)}`,
+    body: issue.body ?? '',
+    state: issue.state ?? 'OPEN',
     stateReason: null,
     labels: issue.labels.map((name) => ({ name })),
   };
 }
 
 /**
- * A `gh` runner over `repo`, answering the five commands the board
+ * A `gh` runner over `repo`, answering the six commands the board
  * readings send and failing every other, and the readings
  * it was asked for. So no case of this file spawns `gh`.
  */
@@ -422,6 +445,11 @@ function fakeGh(repo: FakeRepo = {}): { run: GhRunner; calls: () => readonly str
     if (route === LISTING_CALL) return ok(JSON.stringify((repo.listed ?? []).map(listedRow)));
     if (route === 'issue list --state all') {
       return ok(JSON.stringify((repo.known ?? []).map((number) => ({ number }))));
+    }
+    if (route.startsWith('api ')) {
+      return repo.missing?.includes(route.slice(4)) === true
+        ? Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' })
+        : ok('{}');
     }
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${route}` });
   };
@@ -1516,6 +1544,41 @@ describe('the epic labels', () => {
     expect(dataOf(run.stdout)?.epics?.labelled).toBe(4);
     expect(control.exitCode).toBe(0);
     expect(dataOf(control.stdout)?.epics).toBe(null);
+  });
+});
+
+describe('the boards', () => {
+  /** A labelled board whose owner resolves to nobody, a second labelled board, an unlabelled "Roadmap" beside them, and a closed board. */
+  const LISTED = [
+    { number: 30, labels: ['type:roadmap'], title: 'Board 30', body: 'Owner: @ghost\n' },
+    { number: 31, labels: ['type:roadmap'], title: 'Board 31' },
+    { number: 32, labels: [], title: 'Roadmap' },
+    { number: 33, labels: ['type:roadmap'], title: 'Board 33', state: 'CLOSED' as const },
+  ];
+
+  it('names the unresolved owner, the unlabelled Roadmap and the lost position once each, where a project with none of them prints no row', async () => {
+    const world = plantWorld();
+    const controlWorld = plantWorld();
+    writePositionFile(world.root, { current: { board: 33, epic: null }, previous: null, home: { board: 33, epic: null } });
+    const faulted = fakeGh({ listed: LISTED, missing: ['users/ghost'], issues: [{ number: 32, title: 'Roadmap' }] });
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => faulted.run) });
+    const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN) });
+
+    expect(run.exitCode).toBe(0);
+    const runLines = lines(run.stdout);
+    expect(runLines.filter((line) => line === BOARDS_HEADING)).toHaveLength(1);
+    const unresolved = `  ${unresolvedOwnerMessage(30, '@ghost')}`;
+    const unlabelled = `  ${unlabelledRoadmapMessage([32])}`;
+    const lostPosition = '  The current place and home lost board #33, which is closed;'
+      + ' falling back to the default board #30, with no epic: it names no now epic that is not done';
+    expect(runLines.filter((line) => line === unresolved)).toHaveLength(1);
+    expect(runLines.filter((line) => line === unlabelled)).toHaveLength(1);
+    expect(runLines.filter((line) => line === lostPosition)).toHaveLength(1);
+    expect(runLines.slice(runLines.indexOf(BOARDS_HEADING) + 1)).toEqual([unresolved, unlabelled, lostPosition, aheadLine(world)]);
+
+    expect(control.exitCode).toBe(0);
+    expect(lines(control.stdout)).not.toContain(BOARDS_HEADING);
   });
 });
 
