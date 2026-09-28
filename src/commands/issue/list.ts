@@ -45,8 +45,25 @@
  * the reading behind `rafa doctor`'s references row, narrowed to the
  * selected lines' issues and folded by `roadmapRefsCells`: the saved
  * copies under `specs.dir`, resolved against the project root, each
- * issue a copy names read once for the run through the same `gh`
- * runner. It writes nothing.
+ * issue a copy names answered from the board listing when it holds it
+ * and read once for the run through the same `gh` runner when it does
+ * not. It writes nothing. In text mode it is read with `refsWhen:
+ * 'plain'`: a Roadmap naming an epic prints no `refs` column anywhere,
+ * so its copies are not read at all. `--full` prints the lines naming no
+ * epic as the issue table, `refs` column included, so it reads them
+ * always, as json mode does: a `-` there would claim no saved copy where
+ * the truth is that none was read.
+ *
+ * ## One board read
+ *
+ * The board listing is {@link roadmapBoard}'s: asked once for the
+ * command and handed to the rows, the epics and the refs column alike.
+ * It is kept under `.rafa/cache/board.json` and read incrementally
+ * (`../../board/board-cache.ts`) — a first read lists the whole board,
+ * every later one asks GitHub only for the issues changed since — and
+ * `--refresh` reads the whole board again. A case planting `gh` reads
+ * uncached unless its seams set `boardCache`, so the commands it planted
+ * are the commands sent.
  *
  * The Roadmap and the board are GitHub's, so `--roadmap` resolves no
  * tracker, runs no preflight and reads the board whatever
@@ -107,8 +124,10 @@
  * the table is the one `renderEpicTable` (`./roadmap-epic-table.ts`)
  * spells: one group per shown horizon headed `Roadmap #<n> · <horizon>`,
  * the `unknown` line with the listing's reason, the line counting the
- * epics a horizon hides, and the spec rows under `Specs` as today's
- * table. Each group names the Roadmap, so the `Roadmap: #<n>` head is
+ * epics a horizon hides, and one line counting the lines that name no
+ * epic — listed as the issue table under `--full`, and as the table
+ * under `Specs` when the listing failed and no line could be told an
+ * epic. Each group names the Roadmap, so the `Roadmap: #<n>` head is
  * not written. Every label problem on the board is a warning, written
  * as the other warnings are; the reading adds none when the Roadmap
  * names no epic. Whenever the listing was read, the cancelled-epic
@@ -133,7 +152,9 @@
  * Under `--roadmap`, text mode writes `Roadmap: #<n>`, then the table
  * `renderRoadmapTable` (`./roadmap-table.ts`) spells, fitted to the
  * terminal's width and uncut with no terminal, or `No issues.` when no
- * row is left. Each reading `readRoadmapRows` could not make — the board
+ * row is left: `spec` and `blocked by` as symbols with a legend under
+ * the table, or in words under `--texts` (`-t`), and each issue's labels
+ * on a row under it only with `--labels`. Each reading `readRoadmapRows` could not make — the board
  * unreachable, a branch scan or a pull request list failing — is written
  * as a `warn` line, a `warn` `log` event in json mode, and the rows
  * still print: an unreachable board leaves every row in the Roadmap's
@@ -158,8 +179,11 @@
  * failed, ends with `EPIC_CHECK_EXIT`, 1.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
+import type { TableStyle } from './roadmap-table.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicProblem } from '../../board/epic-problems.js';
 import type { Epics } from '../../board/epics.js';
+import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
@@ -167,9 +191,10 @@ import type { Issue, IssueQuery, TrackerKind } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
+import { createCachedBoardListing } from '../../board/board-cache.js';
 import { createGhBoardLister } from '../../board/boards.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
-import { createGhBoardListing } from '../../board/roadmap-board.js';
+import { createGhBoardListing, keepListing } from '../../board/roadmap-board.js';
 import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
@@ -183,6 +208,7 @@ import {
   DEFAULT_ISSUE_SEAMS,
   issueProject,
   issueSubjectConfig,
+  keepsBoard,
   lineRefusal,
   onTracker,
   readChoiceFlag,
@@ -195,7 +221,8 @@ import { renderEpicTable } from './roadmap-epic-table.js';
 import { renderRoadmapTable } from './roadmap-table.js';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue list [--roadmap [--all] [--full] [--check]] [--state=<state>] [--type=<type>] [--module=<name>]'
+const USAGE = 'rafa issue list [--roadmap [--all] [--full] [--check] [--labels] [--texts] [--refresh]] [--state=<state>]'
+  + ' [--type=<type>] [--module=<name>]'
   + ' [--search=<text>] [--limit=<n>]';
 
 /** What a switch typed with a value is told. */
@@ -249,6 +276,8 @@ export interface RoadmapListing {
   readonly result: RoadmapListResult;
   /** Every `type:epic` issue on the listing, read, or why the listing failed. */
   readonly epics: Epics;
+  /** Each issue's state on the listing, for the blockers `--full` prints under a member; empty when it failed. */
+  readonly states: ReadonlyMap<number, BoardIssueState>;
 }
 
 /**
@@ -260,6 +289,12 @@ export interface IssueListLine {
   readonly all: boolean;
   readonly full: boolean;
   readonly check: boolean;
+  /** `--labels`: each issue's labels on a row of their own under it. */
+  readonly labels: boolean;
+  /** `--texts` (`-t`): the spec and blocked by columns in words. */
+  readonly texts: boolean;
+  /** `--refresh`: read the whole board rather than what changed since the kept listing. */
+  readonly refresh: boolean;
 }
 
 /** The `--limit` a line gives, or undefined when it gives none; a refusal for any value but a positive whole number. */
@@ -299,6 +334,9 @@ export function readIssueListLine(flags: LineFlags): IssueListLine {
   const all = readSwitch('all', flags['all'], SWITCH_HINT);
   const full = readSwitch('full', flags['full'], SWITCH_HINT);
   const check = readSwitch('check', flags['check'], SWITCH_HINT);
+  const labels = readSwitch('labels', flags['labels'], SWITCH_HINT);
+  const texts = readSwitch('texts', flags['texts'], SWITCH_HINT);
+  const refresh = readSwitch('refresh', flags['refresh'], SWITCH_HINT);
   if (roadmap && flags['state'] !== undefined) {
     throw lineRefusal(
       '--state cannot narrow --roadmap: the Roadmap is read off the GitHub board, which holds an issue open or'
@@ -309,7 +347,10 @@ export function readIssueListLine(flags: LineFlags): IssueListLine {
   if (all && !roadmap) throw lineRefusal('--all keeps the ticked Roadmap lines, so it needs --roadmap', USAGE);
   if (full && !roadmap) throw lineRefusal('--full prints the issues of each Roadmap epic, so it needs --roadmap', USAGE);
   if (check && !roadmap) throw lineRefusal('--check weighs the epics the board read finds, so it needs --roadmap', USAGE);
-  return { roadmap, all, full, check };
+  if (labels && !roadmap) throw lineRefusal('--labels prints a row under each Roadmap line, so it needs --roadmap', USAGE);
+  if (texts && !roadmap) throw lineRefusal('--texts spells the Roadmap table\'s columns in words, so it needs --roadmap', USAGE);
+  if (refresh && !roadmap) throw lineRefusal('--refresh reads the whole board the Roadmap is listed from, so it needs --roadmap', USAGE);
+  return { roadmap, all, full, check, labels, texts, refresh };
 }
 
 /** The lines text mode writes for a list; see the module note. */
@@ -359,13 +400,35 @@ export function renderRoadmapList(
   listed: Pick<RoadmapListResult, 'roadmap' | 'rows' | 'epics'>,
   width?: number,
   full = false,
+  style?: TableStyle,
+  states?: ReadonlyMap<number, BoardIssueState>,
 ): string[] {
   if (listed.epics !== undefined) {
-    return renderEpicTable({ ...listed.epics, roadmap: listed.roadmap, specs: listed.rows }, width, full);
+    return renderEpicTable({ ...listed.epics, roadmap: listed.roadmap, specs: listed.rows, states }, width, full, style);
   }
   const head = `Roadmap: #${String(listed.roadmap)}`;
   if (listed.rows.length === 0) return [head, 'No issues.'];
-  return [head, ...renderRoadmapTable(listed.rows, width)];
+  return [head, ...renderRoadmapTable(listed.rows, width, style)];
+}
+
+/**
+ * The board listing a roadmap reading reads through, asked once for the
+ * command: kept under `.rafa/cache/` and read incrementally when `seams`
+ * keeps the board (`keepsBoard`), else one full `gh issue list`. See the
+ * module note's "One board read".
+ */
+export function roadmapBoard(seams: IssueSeams, gh: GhRunner, root: string, refresh: boolean): BoardListing {
+  return keepListing(keepsBoard(seams)
+    ? createCachedBoardListing({ gh, root, refresh })
+    : createGhBoardListing({ gh }));
+}
+
+/** What a roadmap listing is read with beyond its filter: `--all`, `--refresh`, and whether the refs column is printed. */
+export interface RoadmapReadOptions {
+  readonly all: boolean;
+  readonly refresh?: boolean;
+  /** When the refs column is read; `always` for json mode, `plain` for text. See `RoadmapRowsOptions.refsWhen`. */
+  readonly refsWhen?: 'always' | 'plain';
 }
 
 /**
@@ -377,9 +440,10 @@ export function renderRoadmapList(
 export async function listRoadmap(
   context: RafaContext,
   seams: IssueSeams,
-  all: boolean,
+  how: RoadmapReadOptions,
   filter: RoadmapFilter,
 ): Promise<RoadmapListing> {
+  const { all } = how;
   const project = issueProject(context);
   const warn = (message: string): void => {
     context.output.warn(message);
@@ -388,8 +452,9 @@ export async function listRoadmap(
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const plans = plansDirAt(project.root, config.planDir);
   const planNames = (seams.planNames ?? createPlanDirNames)(plans.path);
+  const board = roadmapBoard(seams, gh, project.root, how.refresh === true);
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
-    { root: project.root, specsDir: config.specsDir, gh, env: context.env, issues },
+    { root: project.root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
   ));
 
@@ -400,11 +465,12 @@ export async function listRoadmap(
       listBoards: createGhBoardLister({ gh }),
       search: createGhRoadmapSearch({ gh }),
       issues: createGhSpecIssueReader({ gh }),
-      board: createGhBoardListing({ gh }),
+      board,
       git: seams.git ?? createGitRunner(project.root),
       pullRequests: createGhOpenPullRequests({ gh }),
       planNames,
       refs,
+      refsWhen: how.refsWhen,
       all,
       root: project.root,
     });
@@ -423,10 +489,12 @@ export async function listRoadmap(
     rows: narrowRoadmapRows(read.specs, filter),
     warnings: read.warnings,
   };
-  if (!hasEpicLines(read) && read.unknown === null) return Object.freeze({ result: Object.freeze(listed), epics: read.epics });
+  if (!hasEpicLines(read) && read.unknown === null) {
+    return Object.freeze({ result: Object.freeze(listed), epics: read.epics, states: read.states });
+  }
   const { groups, hidden, unknown, problems } = read;
   const result = Object.freeze({ ...listed, epics: Object.freeze({ groups, hidden, unknown, problems }) });
-  return Object.freeze({ result, epics: read.epics });
+  return Object.freeze({ result, epics: read.epics, states: read.states });
 }
 
 /** Lists the issues a line asks for; see the module note. */
@@ -454,7 +522,13 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
 
   expectNoArgument(context.args, USAGE);
   const filter: RoadmapFilter = readIssueQuery(context.flags);
-  const { result, epics } = await listRoadmap(context, seams, line.all, filter);
+  const { result, epics, states } = await listRoadmap(context, seams, {
+    all: line.all,
+    refresh: line.refresh,
+    refsWhen: context.outputMode === 'json' || line.full
+      ? 'always'
+      : 'plain',
+  }, filter);
   const failure = line.check
     ? epicCheckFailure(epics)
     : null;
@@ -465,7 +539,8 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
     return;
   }
   const width = (seams.terminalWidth ?? ((): number | undefined => process.stdout.columns))();
-  for (const text of renderRoadmapList(result, width, line.full)) context.output.info(text);
+  const style: TableStyle = { labels: line.labels, texts: line.texts };
+  for (const text of renderRoadmapList(result, width, line.full, style, states)) context.output.info(text);
   if (failure !== null) throw new CommandExit(EPIC_CHECK_EXIT, failure);
 }
 
@@ -494,6 +569,25 @@ export const ISSUE_LIST_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
     name: 'check',
     description: 'With --roadmap, exit 1 when any type:epic issue on the board is open with its work done, or'
       + ' closed with it not done, or when the board could not be read, naming each. Refused without --roadmap.',
+    type: 'boolean',
+  },
+  {
+    name: 'labels',
+    description: 'With --roadmap, print each issue\'s labels on a row of their own under it, and under each --full'
+      + ' member; they are no column. Refused without --roadmap.',
+    type: 'boolean',
+  },
+  {
+    name: 'texts',
+    description: 'With --roadmap, spell the spec and blocked by columns in words instead of symbols, with no legend.'
+      + ' Refused without --roadmap.',
+    type: 'boolean',
+    aliases: ['t'],
+  },
+  {
+    name: 'refresh',
+    description: 'With --roadmap, read the whole board again instead of only what changed since the listing kept'
+      + ' under .rafa/cache/. Refused without --roadmap.',
     type: 'boolean',
   },
   {
@@ -539,14 +633,18 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       + ' it refuses `--state`, and lists 30 issues unless `--limit` says otherwise. With `--roadmap` it lists'
       + ' the unticked lines of the Roadmap issue (`roadmap.issue`, else the lowest-numbered open type:roadmap'
       + ' board, else the open issue titled Roadmap) in its'
-      + ' order instead, read off the GitHub board, as a table adding four columns: spec, whether the body'
-      + ' passes the readiness gate; blocked by, each blocker and whether it is open; has, a plan, a branch'
-      + ' or a pull request already made for it; and refs, how many references of the issue\'s saved copy under'
-      + ' `specs.dir` read suspect or dangling, `-` with no copy. A line naming an epic prints as an epic row'
-      + ' instead, grouped by horizon under a `Roadmap #<n> · <horizon>` heading with the columns #, state,'
-      + ' done/total, blocked, title and date, the now horizon only unless `--all`, and the spec rows follow'
-      + ' under Specs; `--full` prints each epic\'s issues under its row, on two rows each: number, state and'
-      + ' title, then labels and blockers; `--check` exits 1 when any type:epic issue\'s stored state'
+      + ' order instead, read off the GitHub board, as a table adding four columns: spec, whether the issue'
+      + ' can be planned (every section of the spec template filled, and the spec:ready label on it), as a'
+      + ' symbol; blocked by, the blockers grouped by whether they are still open;'
+      + ' has, a plan, a branch or a pull request already made for it; and refs, how many references of the'
+      + ' issue\'s saved copy under `specs.dir` read suspect or dangling, `-` with no copy. A legend names each'
+      + ' symbol, `--texts` (`-t`) spells them in words, and `--labels` prints the labels on a row under each'
+      + ' issue. A Roadmap naming epics prints them alone, grouped by horizon under a `Roadmap #<n> · <horizon>`'
+      + ' heading with the columns #, state, done/total, blocked, date and title, the now horizon only unless'
+      + ' `--all`, with one line counting the lines naming no epic; `--full` prints each epic\'s issues under'
+      + ' its row, and the lines naming no epic as the table. The board listing is kept under .rafa/cache/ and'
+      + ' read for what changed since; `--refresh` reads the whole board again. `--check` exits 1 when any'
+      + ' type:epic issue\'s stored state'
       + ' disagrees with its computed one. `--type`, `--module`, `--search` and `--limit` then narrow the spec rows, keeping their'
       + ' order, and an unreachable board is warned about with the rows still printed. With `--output=json`'
       + ' the tracker, the query and every issue, or under `--roadmap` the roadmap, the rows, the epics and the'

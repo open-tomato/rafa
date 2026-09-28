@@ -109,6 +109,18 @@ export interface IssueSeams {
   readonly refsVerifier?: DoctorRefsSeams['refsVerifier'];
   /** The terminal's width in columns, or undefined for none. `process.stdout.columns` when left out. */
   readonly terminalWidth?: () => number | undefined;
+  /**
+   * Keep the board listing under `.rafa/cache/` between commands and read
+   * only what changed since (`src/board/board-cache.ts`). Left out, it is
+   * kept when no `gh` is planted, so a registered command reads through the
+   * cache and a case planting `gh` sees exactly the commands it planted.
+   */
+  readonly boardCache?: boolean;
+}
+
+/** True when a roadmap reading over `seams` keeps its board listing; see {@link IssueSeams.boardCache}. */
+export function keepsBoard(seams: IssueSeams): boolean {
+  return seams.boardCache ?? seams.gh === undefined;
 }
 
 /** The seams the registered commands run with: the chain's own, every one. */

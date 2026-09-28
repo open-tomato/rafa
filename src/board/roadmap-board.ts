@@ -194,6 +194,20 @@ export function parseBoardListing(stdout: string, command: string): readonly Boa
 }
 
 /**
+ * `listing`, asked on the first call only: every later call answers or
+ * rejects as the first did. A command that hands one listing to several
+ * readers — the rows, the epics, the refs column's issue reads — reads
+ * the board once.
+ */
+export function keepListing(listing: BoardListing): BoardListing {
+  let kept: Promise<readonly BoardIssue[]> | null = null;
+  return () => {
+    kept ??= listing();
+    return kept;
+  };
+}
+
+/**
  * The listing over `options.gh`: one
  * `gh issue list --state all --limit <n> --json number,title,body,state,stateReason,labels`
  * per call, answered as checked issues. Throws a `TypeError`, sending

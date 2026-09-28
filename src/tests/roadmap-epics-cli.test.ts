@@ -171,9 +171,9 @@ describe('rafa roadmap and rafa epics over a fixture board with two epics, spawn
 
     const rows = epicCellsOf(run.stdout);
     expect(rows.find((cells) => cells[0] === `#${String(EPIC_ALPHA)}`))
-      .toEqual([`#${String(EPIC_ALPHA)}`, 'in-progress', '1/2', '-', 'Alpha epic', '-']);
+      .toEqual([`#${String(EPIC_ALPHA)}`, 'in-progress', '1/2', '-', '-', 'Alpha epic']);
     expect(rows.find((cells) => cells[0] === `#${String(EPIC_BETA)}`))
-      .toEqual([`#${String(EPIC_BETA)}`, 'done', '2/2', '-', 'Beta epic', '-']);
+      .toEqual([`#${String(EPIC_BETA)}`, 'done', '2/2', '-', '-', 'Beta epic']);
     expect(run.stdout).toContain(`done, but epic #${String(EPIC_BETA)} is still open`);
 
     // Neither epic's own members are named without --full.

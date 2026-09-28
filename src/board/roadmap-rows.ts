@@ -132,6 +132,13 @@
  * reference a copy keeps no stamp for is compared as `rafa issue check`
  * compares it, and is not stamped here.
  *
+ * With {@link RoadmapRowsOptions.refsWhen} `plain`, the column is read
+ * only when no selected line names an epic: a roadmap of epics prints no
+ * `refs` column anywhere (`src/commands/issue/roadmap-epic-table.ts`), and
+ * the reading is the slowest thing the roadmap does, since each saved
+ * copy's symbols are confirmed by `ts-symbols`. Left out, or `always`, it
+ * is read for every selected line, as json mode and `rafa epics` need.
+ *
  * ## When something cannot be read
  *
  * A Roadmap that cannot be found or read REJECTS: there is no order to
@@ -297,6 +304,8 @@ export interface RoadmapRowsOptions {
   readonly planNames: PlanNames;
   /** The saved copies' references, asked once for every selected line. */
   readonly refs: RoadmapRefs;
+  /** When the refs column is read: `always` (left out), or `plain`, only for lines naming no epic; see the module note. */
+  readonly refsWhen?: 'always' | 'plain';
   /** Keep the ticked lines too; `--all`. */
   readonly all?: boolean;
   /** The project root whose position file names the current place; left out, the default board is read. */
@@ -559,14 +568,17 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
     ? { value: [], warning: null }
     : await readOrWarn(options.pullRequests, [], 'the open pull requests could not be listed, so no pr is shown');
   const plans = await readOrWarn(options.planNames, [], 'the plan dir could not be read, so no plan is shown');
-  const issues = [...new Set(selected.map((line) => line.issue))];
-  const refs = await readOrWarn(
-    () => options.refs(issues),
-    new Map<number, RefsCell>(),
-    'the saved copies could not be read, so the refs column is empty',
-  );
-
   const board = viewOf(listed.issues);
+  const issues = [...new Set(selected.map((line) => line.issue))];
+  const namesEpic = board !== null && issues.some((issue) => board.byNumber.get(issue)?.type === 'epic');
+  const refs = options.refsWhen === 'plain' && namesEpic
+    ? { value: new Map<number, RefsCell>(), warning: null }
+    : await readOrWarn(
+      () => options.refs(issues),
+      new Map<number, RefsCell>(),
+      'the saved copies could not be read, so the refs column is empty',
+    );
+
   const sources: HasSources = { planNames: plans.value, refs: scan.refs, pulls: pulls.value };
   const rows = selected.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
 

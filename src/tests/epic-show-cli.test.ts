@@ -19,6 +19,17 @@
  * and `epic:beta` (#60) is done by its members while its issue is still
  * open, so `rafa epics 60` prints its disagreement line under the head.
  *
+ * ## What is compared
+ *
+ * The move changed no byte, and the captures proved it until the table
+ * itself changed: the labels column left the table for `--labels`, and
+ * the spec and blocked by columns became symbols (`../commands/issue/roadmap-table.ts`).
+ * So a capture is compared as the move promised it: the exit code and
+ * stderr byte for byte, every line above the table byte for byte — the
+ * epic's head and its disagreement line — and the table's rows by issue
+ * number and title, in order ({@link sameView}). The table's own spelling
+ * is the table's tests' to pin, not this suite's.
+ *
  * ## The control
  *
  * `rafa epics 50` must NOT equal the capture of `rafa epics 60`: a
@@ -129,6 +140,26 @@ function plant(): ScratchRepo {
   return scratch;
 }
 
+/** A capture as the move promised to keep it; see the module note. */
+interface View {
+  readonly exitCode: number;
+  readonly stderr: string;
+  /** Every stdout line above the table's header. */
+  readonly head: readonly string[];
+  /** Each table row's issue number and title, in order. */
+  readonly rows: readonly (readonly [string, string])[];
+}
+
+/** `captured` reduced to what the move promised to keep. */
+function sameView(captured: Capture): View {
+  const lines = captured.stdout.split('\n');
+  const header = lines.findIndex((line) => line.trimStart().startsWith('#  state'));
+  const rows = lines.slice(header + 1)
+    .filter((line) => line.startsWith('#'))
+    .map((line): readonly [string, string] => [line.split(' ')[0] ?? '', line.split(/\s{2,}/).at(-1) ?? '']);
+  return { exitCode: captured.exitCode, stderr: captured.stderr, head: lines.slice(0, header), rows };
+}
+
 /** The capture of one spawned line, reduced to what the fixture file holds. */
 function capture(scratch: ScratchRepo, words: readonly string[]): Capture {
   const { exitCode, stdout, stderr } = runRafa(scratch, scratch.repo, words);
@@ -153,16 +184,16 @@ describe('rafa epics after the move under the epic subject, spawned over one fix
     expect(beta?.stdout).toContain(`Epic #${String(EPIC_BETA)} · Beta epic · done, 2/2 done`);
   });
 
-  it('rafa epics prints a capture byte-identical to the pre-move command', () => {
-    expect(capture(scratch, ['epics'])).toEqual(preMove.captures.epics as Capture);
+  it('rafa epics prints the pre-move command\'s head, and its rows by issue and title', () => {
+    expect(sameView(capture(scratch, ['epics']))).toEqual(sameView(preMove.captures.epics as Capture));
   });
 
-  it('rafa epics <n> prints a capture byte-identical to the pre-move command', () => {
-    expect(capture(scratch, ['epics', String(EPIC_BETA)])).toEqual(preMove.captures['epics 60'] as Capture);
+  it('rafa epics <n> prints the pre-move command\'s head, and its rows by issue and title', () => {
+    expect(sameView(capture(scratch, ['epics', String(EPIC_BETA)]))).toEqual(sameView(preMove.captures['epics 60'] as Capture));
   });
 
   it('rafa epic <n> and rafa epic show <n> print the same capture as rafa epics <n>', () => {
-    const expected = preMove.captures['epics 60'] as Capture;
+    const expected = capture(scratch, ['epics', String(EPIC_BETA)]);
     expect(capture(scratch, ['epic', String(EPIC_BETA)])).toEqual(expected);
     expect(capture(scratch, ['epic', 'show', String(EPIC_BETA)])).toEqual(expected);
   });
@@ -170,6 +201,6 @@ describe('rafa epics after the move under the epic subject, spawned over one fix
   it('control: another epic\'s capture differs from the pre-move capture of rafa epics 60', () => {
     const other = capture(scratch, ['epics', String(EPIC_ALPHA)]);
     expect(other.exitCode).toBe(0);
-    expect(other).not.toEqual(preMove.captures['epics 60'] as Capture);
+    expect(sameView(other)).not.toEqual(sameView(preMove.captures['epics 60'] as Capture));
   });
 });
