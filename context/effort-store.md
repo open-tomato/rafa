@@ -76,6 +76,23 @@ runs beside a live loop; the swap refuses while a loop session is running
 or paused. A newer schema that dropped a table or column this rafa writes
 is not additive, and the repair refuses it rather than copy around it.
 
+**`rafa effort copy [--to=<dir>]` is how branch code gets real data**
+(`src/commands/effort/copy.ts` over `copyEffortStore`,
+`src/effort/store/copy.ts`). It copies `<root>/.rafa/effort/` into
+`--to`, read from the project root when relative, or into
+`<root>/.rafa/scratch/effort-<stamp>/`, and prints the directory and the
+`RAFA_EFFORT_DIR=<dir>` line to put in front of each command on the same
+line. The SQLite file goes through `VACUUM INTO` on a read-only
+connection with the store's busy timeout, the NDJSON files by file copy.
+It never calls `bringForward`, so a development build may copy the live
+store: `copy.test.ts` copies a pre-log store and finds the live file's
+bytes unchanged and no `schema_migrations` in the copy, and a copy taken
+while another connection holds a read transaction keeps `user_version`,
+the log and every row. Exit 1, with nothing made, when `RAFA_EFFORT_DIR`
+is set, when the directory holds no store file, or when the target is a
+file or a non-empty directory; exit 2 on a read or write failure, with
+every file it wrote and every directory it made removed.
+
 ### The schema history
 
 **SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and

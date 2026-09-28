@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-seven registered so far wrap a
+ * of each is its command. Five of the sixty-eight registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -121,7 +121,9 @@
  *     refuses with exit code 2 where `pr.provider` is not `gh`.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's,
  *     and `effort fix-schema [--dry-run]`, a store a newer rafa migrated
- *     rebuilt at the version this one knows, the original kept whole.
+ *     rebuilt at the version this one knows, the original kept whole, and
+ *     `effort copy [--to=<dir>]`, the store copied into a scratch
+ *     directory for `RAFA_EFFORT_DIR` to point a command at.
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
@@ -281,6 +283,7 @@ import cleanup from './cleanup.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
+import effortCopy from './effort/copy.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
 import epicCancel from './epic/cancel.js';
@@ -388,6 +391,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortCollect,
   effortReport,
   effortFixSchema,
+  effortCopy,
   moduleList,
   moduleExec,
   agentVendor,

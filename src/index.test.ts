@@ -666,6 +666,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../loop/sessions.js', ['readSessions']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
   ]],
+  ['./commands/effort/copy.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../effort/store/copy.js', ['copyEffortStore', 'EffortCopyFailure', 'EffortCopyRefusal']],
+    ['../../effort/store/location.js', ['EFFORT_DIR_VARIABLE']],
+    ['../../effort/store.js', ['EFFORT_STORE_DIR']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'requireProject']],
+    ['./fix-schema.js', ['fileStamp']],
+  ]],
   ['./commands/module/list.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
@@ -1222,6 +1230,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/merge.js',
       './commands/pr/triage.js',
       './commands/effort/fix-schema.js',
+      './commands/effort/copy.js',
       './commands/module/list.js',
       './commands/module/exec.js',
       './commands/agent/vendor.js',
