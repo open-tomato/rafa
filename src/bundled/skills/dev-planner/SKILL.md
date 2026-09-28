@@ -503,6 +503,17 @@ The report rules in this skill restate `src/report/parse.ts`, which is the autho
 
 ---
 
+## Plans that change the effort store
+
+When the spec adds or changes anything in `.rafa/effort/`:
+
+- Give each migration its own task, naming its id and whether it is additive or which side it breaks. Never write a schema version number or an array position.
+- A task that runs the branch's store code over real data first runs `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort`, and runs each command with `RAFA_EFFORT_DIR=<absolute path of that dir>` on the same line. The close-out task removes the copy.
+- Work that must land in the live store goes under "Operator steps after the plan merges [human]": `rafa self-update`, then the command.
+- PREREQUISITES carries `- [ ] The installed rafa can read and write the live store: \`rafa effort schema --check\`` under an `[auto]` heading.
+
+---
+
 ## Command-development rule: Claude session declaration
 
 When planning work on rafa commands: every command that can start a Claude

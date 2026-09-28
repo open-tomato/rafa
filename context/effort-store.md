@@ -33,7 +33,7 @@ looks for the store's file names there, and warns while `.rafa/effort/`
 holds none of them (`store/legacy.ts`). A test that plants or
 opens a store file by path spells `.rafa/effort`; the `.ralph/effort` the
 parity suites name is the sibling's own store, read through
-`readStoreRows` and never written.
+`readStoreRows` and never written. `effort.busyTimeoutMs` in the config sets how long a store open waits for another process's lock, from 1 to 60000 milliseconds, defaulting to 5000.
 
 ### Imports
 
@@ -324,6 +324,18 @@ sets it sets `null` after. `settings.test.ts` has an open wait on a lock
 a child process holds and get in once it is let go, and an open past a
 100 ms timeout throw `SQLITE_BUSY`. The two `fix-schema` opens set no
 busy timeout.
+
+### Migrations
+
+**A migration is an entry in `src/effort/store/migrations.ts` with an id, its SQL and what it breaks.** The id is kebab-case and never reused. The array's order is only the apply order for a fresh store: a store records applied migrations by id and sha256 in `schema_migrations`, and `migrations.lock.json` freezes each entry's sha256. Never edit a shipped entry; write a new one.
+
+**Additive is the default, and the guard checks it.** A new table, a nullable column, a non-unique index, or a partial unique index over columns the same migration adds breaks nothing. Anything else declares `breaks` and a `contract`, ships as the second of two specs, and runs only through `rafa effort migrate`. Migrations hold DDL only; a backfill is a command. No code reads by `SELECT *` or inserts without a column list. A reader treats NULL as "written by a runtime that did not know this column".
+
+**`user_version` is the legacy gate, not the schema version.** It holds 13 while every applied migration is additive, so pre-log runtimes keep working, and 1000 once a breaking migration runs, which shuts them out.
+
+**A development build never migrates the live store.** To run branch code over real data, copy the store first with `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort`, then put `RAFA_EFFORT_DIR=<absolute path of that dir>` in front of each command on the same line, because a session's shell may not keep an `export`. A test opens stores under `tmpdir()` only, and the store module throws otherwise.
+
+**A store a runtime refuses** is read with `rafa effort schema`, which names the next safe step: a newer rafa, `rafa effort migrate --dry-run`, or `rafa effort fix-schema --dry-run`.
 
 ### Tables outside the port
 

@@ -37,8 +37,8 @@ Subjects:
              one ready, unblock it and check its references
   pr         the pull request of a branch: one line, in full or in the browser;
              list, wait on, merge and triage them 🪙
-  effort     collect session and commit rows; report per plan; repair a store a
-             newer rafa migrated
+  effort     collect session and commit rows; report per plan; read and repair the
+             store: its schema, a copy for testing, migrations, and fixes
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
              🪙

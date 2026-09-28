@@ -357,7 +357,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
-  { name: 'effort', summary: 'collect session and commit rows; report per plan; repair a store a newer rafa migrated' },
+  { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
