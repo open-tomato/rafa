@@ -64,8 +64,12 @@
  * own done and taken
  * readings. Nothing is composed here a second time.
  *
- * The walk is `pickDescendedLine` (`src/board/epic-walk.ts`), the one
- * `plan create --next` takes, over the same memoised reader: a roadmap
+ * The walk is `pickDescendedLine`'s (`src/board/epic-walk.ts`), the one
+ * `plan create --next` takes, spelled as its two halves,
+ * `descendRoadmap` and then the pick, so that the pick can pass waiting
+ * lines under `roadmap` (see "The hop"); without it the pick is
+ * `pickNextRoadmapLine`, exactly as that function makes it. It runs over
+ * the same memoised reader: a roadmap
  * line whose issue carries `type:epic` is replaced by that epic's
  * checklist and then its labelled members, so the line `rafa next`
  * proposes is the epic's first open spec. The board is listed with one
@@ -81,7 +85,7 @@
  * epic's issue; `passed` counts the lines passed on the roadmap and
  * inside the epic together. The dry epic's number and title are
  * carried out as {@link NextRoadmapReading.dryEpic}, the `dry` that
- * `pickDescendedLine` answers; the key is left out of a reading where no
+ * `pickDescendedLine` would answer; the key is left out of a reading where no
  * epic ran dry, so a roadmap with no epic line answers the same four
  * keys it did before.
  *
@@ -122,6 +126,58 @@
  * no `gh` command of its own, and a roadmap walked with no epic line and
  * no position file prints no notice. A failed listing adds none.
  *
+ * ## The hop, under `roadmap`
+ *
+ * With {@link NextBoardOptions.roadmap} set, as `rafa next --roadmap`
+ * sets it, the answer carries {@link NextRoadmapReading.hop}; without
+ * it, the key is LEFT OUT and nothing below is read, so the board sends
+ * the `gh` and git commands it always did. Everything is read afresh on
+ * each answer, the record and the position included; nothing is kept
+ * from one turn to the next.
+ *
+ * - **The record.** `.rafa/hop.json` (`./hop-record.ts`) and
+ *   `.rafa/position.json` are read under {@link NextBoardOptions.root}.
+ *   The record is followed only when the position reads and its `home`
+ *   is the record's (`staleAgainst`): a person who switched by hand
+ *   re-homed, so the record is carried as `stale`, not followed, and the
+ *   walk starts from the new position. With no position file the record
+ *   has nothing to be weighed against and is stale the same way. The
+ *   board never deletes or rewrites the file: it reads, and a
+ *   `--dry-run` writes nothing. A file that does not read is one
+ *   problem naming it; an absent one is none.
+ * - **The away target.** While the followed record is a `blocker` hop in
+ *   state `away`, the walk answers C, the record's `target`, rather than
+ *   walking the epic the position stands in, whose first line is not
+ *   the one the hop went for. C is asked whether it is closed and, when
+ *   open, whether an open pull request closes it; either makes the line
+ *   null and is carried as {@link NextHopReading.target}, for the row
+ *   that goes home. A branch claiming C is NOT asked: while away it is
+ *   the hop's own. C's line is the record's, read off no body, so its
+ *   `why` is empty and its `lineNumber` 0.
+ * - **Waiting lines.** At home, and on a dry hop, the pick passes a line
+ *   whose `Blocked by:` reading (`readBlockedLine`, as `blocking`
+ *   answers it) holds open or unread blockers every one of which a
+ *   branch or an open pull request has taken, and names it in
+ *   {@link NextHopReading.waiting}; `passed` counts it. A line with one
+ *   free blocker, or with a fault, stops the walk as it always did. An
+ *   epic whose lines are all done, taken or waiting has run dry.
+ * - **The decision.** For the line the walk answered, when it is
+ *   blocked: at home, `decideHop` (`./hop-chain.ts`) over its open and
+ *   unread blockers in line order, the first answer that is not a
+ *   `wait` winning, read at the place H was read (the board and the
+ *   epic walked, which a board-only position does not name) with home
+ *   the position's own while it stands away, else that same place;
+ *   while away, the record's own hop read again from the record's
+ *   `from` and `home`, C's branch not taking it, so C blocked in turn
+ *   answers the halt with the chain `#H ← #C ← #B`.
+ * - **The next `now` epic.** For an epic that ran dry, `nextNowEpic`
+ *   (`src/board/epic-walk.ts`) after it on the walked board.
+ *
+ * The decision and the next epic are read over the ONE listing the
+ * walk shares, with the default board already resolved, and a reading
+ * of the two that fails is one problem and no proposal: a hop is never
+ * proposed on a board nobody could read.
+ *
  * The memo lives for the length of one board, which is one `rafa next`
  * answer: the walk reads the picked line's issue to ask whether it is
  * closed, and `blocking` and `isReady` then read the LABELS and the
@@ -146,9 +202,21 @@
  * free of the network, and each memoised where it is taken.
  */
 import type { EpicEndRelease } from './epic-end.js';
-import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
+import type { HopDecision, TakenReadings } from './hop-chain.js';
+import type { HopRecord } from './hop-record.js';
+import type {
+  DryEpic,
+  HopTarget,
+  NextBoard,
+  NextHopReading,
+  NextRoadmapReading,
+  NextSources,
+  TakenBlocker,
+  WaitingLine,
+} from './readings.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
+import type { BoardView } from '../board/epic-board.js';
 import type { EpicDescentSeams } from '../board/epic-walk.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
@@ -157,15 +225,17 @@ import type { RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
+import type { Place, Position } from '../project/position.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
 import { cancelledEpicNoticeLines } from '../board/epic-cancel-notice.js';
-import { epicLines, pickDescendedLine } from '../board/epic-walk.js';
+import { descendRoadmap, epicLines, nextNowEpic } from '../board/epic-walk.js';
 import { readEpics } from '../board/epics.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
+import { samePlace } from '../board/place.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { readCurrentPlace } from '../board/roadmap-rows.js';
@@ -181,10 +251,14 @@ import { CommandExit } from '../cli/command.js';
 import { readRecords, resolveLoopSeams } from '../commands/loop/loop-sessions.js';
 import { plansDirAt } from '../commands/plan/plan-files.js';
 import { loadConfig } from '../config-load.js';
+import { messageOf } from '../config-sections.js';
 import { ConfigError } from '../config.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
+import { readPositionFile } from '../project/position.js';
 
 import { readEpicEndRelease } from './epic-end.js';
+import { decideHop, takenBy } from './hop-chain.js';
+import { readHopRecord, staleAgainst } from './hop-record.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */
 const PREFIX = 'rafa next';
@@ -228,6 +302,13 @@ export interface NextBoardOptions {
    * the listing; `rafa next` sets it, and `rafa status` leaves it out.
    */
   readonly noticeCancelled?: boolean;
+  /**
+   * Read the hop for `rafa next --roadmap`: the answer carries
+   * {@link NextRoadmapReading.hop}, and the walk passes waiting lines and
+   * answers an away hop's target. Left out, no key and no call is added;
+   * see the module note's "The hop, under `roadmap`".
+   */
+  readonly roadmap?: boolean;
 }
 
 /** The settings the composition reads off the config. */
@@ -266,6 +347,54 @@ interface WalkAnswer {
   readonly line: RoadmapLine | null;
   readonly passed: number;
   readonly dry: DryEpic | null;
+  /** The epic the line was read in: the place's, or the one walked into; null when none. */
+  readonly epic: number | null;
+  /** The lines passed as waiting; always empty without `roadmap`. */
+  readonly waiting: readonly WaitingLine[];
+}
+
+/** What a pick over one list of lines answers. */
+interface LinePick {
+  readonly line: RoadmapLine | null;
+  readonly passed: number;
+  readonly waiting: readonly WaitingLine[];
+}
+
+/** How the walk picks among lines: `pickNextRoadmapLine` alone, or passing waiting lines too. */
+type LinePicker = (lines: readonly RoadmapLine[], readings: RoadmapReadings) => Promise<LinePick>;
+
+/** `pickNextRoadmapLine`, as every walk without `roadmap` picks. */
+const plainPick: LinePicker = async (lines, readings) => {
+  const pick = await pickNextRoadmapLine(lines, readings);
+  return { line: pick.line, passed: pick.skipped.length, waiting: [] };
+};
+
+/** The blockers `blocked` waits on, each with what took it, when every open or unread one is taken; else null. */
+async function everyBlockerTaken(blocked: BlockedLine | null, readings: RoadmapReadings): Promise<readonly TakenBlocker[] | null> {
+  if (blocked === null || blocked.fault !== null) return null;
+  const held = blocked.blockers.filter((id) => blocked.open.includes(id) || blocked.unread.includes(id));
+  if (held.length === 0) return null;
+  let taken: readonly TakenBlocker[] = [];
+  for (const issue of held) {
+    const by = await takenBy(issue, readings);
+    if (by === null) return null;
+    taken = [...taken, Object.freeze({ issue, taken: Object.freeze(by) })];
+  }
+  return Object.freeze(taken);
+}
+
+/** A picker passing, as waiting, every line whose open blockers are all taken; see the module note. */
+function waitingPick(blocking: NextBoard['blocking']): LinePicker {
+  const pick = async (lines: readonly RoadmapLine[], readings: RoadmapReadings, before: LinePick): Promise<LinePick> => {
+    const next = await pickNextRoadmapLine(lines, readings);
+    const passed = before.passed + next.skipped.length;
+    if (next.line === null) return { line: null, passed, waiting: before.waiting };
+    const blockers = await everyBlockerTaken(await blocking(next.line.issue), readings);
+    if (blockers === null) return { line: next.line, passed, waiting: before.waiting };
+    const waiting = [...before.waiting, Object.freeze({ line: next.line, blockers })];
+    return pick(lines.slice(lines.indexOf(next.line) + 1), readings, { line: null, passed: passed + 1, waiting });
+  };
+  return (lines, readings) => pick(lines, readings, { line: null, passed: 0, waiting: [] });
 }
 
 /**
@@ -273,7 +402,7 @@ interface WalkAnswer {
  * `epicLines` orders them, picked with the roadmap's own readings. See
  * the module note's "Where the walk starts".
  */
-async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapReadings): Promise<WalkAnswer> {
+async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapReadings, picker: LinePicker): Promise<WalkAnswer> {
   const rows = await listing();
   const read = readEpics({ issues: rows, claims: new Set(), today: new Date(0) }).epics
     .find((candidate) => candidate.number === epic);
@@ -281,14 +410,151 @@ async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapRe
   if (read === undefined || row === undefined) {
     throw new Error(`${PREFIX}: epic #${String(epic)}, the current place, is not on the board listing, so its members cannot be read`);
   }
-  const pick = await pickNextRoadmapLine(epicLines(read, row).lines, readings);
+  const pick = await picker(epicLines(read, row).lines, readings);
   return {
     line: pick.line,
-    passed: pick.skipped.length,
+    passed: pick.passed,
     dry: pick.line === null
       ? { number: read.number, title: read.title }
       : null,
+    epic,
+    waiting: pick.waiting,
   };
+}
+
+/** The hop record as one turn follows it; see the module note's "The hop, under `roadmap`". */
+interface FollowedHop {
+  readonly record: HopRecord | null;
+  readonly stale: HopRecord | null;
+  readonly position: Position | null;
+  readonly problems: readonly string[];
+}
+
+/** The position and the hop record under `root`, the record kept only when the position's home is its home. */
+function followHopRecord(root: string | undefined): FollowedHop {
+  if (root === undefined) return { record: null, stale: null, position: null, problems: [] };
+  const placed = readPositionFile(root);
+  const position = placed.set
+    ? placed.position
+    : null;
+  const hop = readHopRecord(root);
+  if (!hop.set) {
+    const problems = hop.reason === 'absent'
+      ? []
+      : [`${hop.detail}, so no hop is followed`];
+    return { record: null, stale: null, position, problems };
+  }
+  return position === null || staleAgainst(hop.record, position)
+    ? { record: null, stale: hop.record, position, problems: [] }
+    : { record: hop.record, stale: null, position, problems: [] };
+}
+
+/** C, when `record` is a blocker hop still away; else null. */
+function awayTargetOf(record: HopRecord | null): number | null {
+  if (record?.state !== 'away' || record.kind !== 'blocker') return null;
+  return record.target;
+}
+
+/** The walk while a blocker hop is away: C alone, answered while it is open with no pull request. */
+async function walkTarget(record: HopRecord, target: number, readings: RoadmapReadings): Promise<{ walk: WalkAnswer; target: HopTarget }> {
+  const closed = await readings.isClosed(target);
+  const pullRequest = closed
+    ? null
+    : await readings.pullRequestFor(target);
+  const line: RoadmapLine | null = closed || pullRequest !== null
+    ? null
+    : Object.freeze({ issue: target, ticked: false, why: '', lineNumber: 0 });
+  return {
+    walk: { line, passed: 0, dry: null, epic: record.targetEpic, waiting: [] },
+    target: Object.freeze({ issue: target, closed, pullRequest }),
+  };
+}
+
+/** Taken readings answering nothing taken: C is the away hop's own work, its branch included. */
+const NOTHING_TAKEN: TakenReadings = Object.freeze({
+  branchFor: () => null,
+  pullRequestFor: () => Promise.resolve(null),
+});
+
+/** What the hop's decision and next epic are read over. */
+interface HopSeams {
+  readonly blocking: NextBoard['blocking'];
+  readonly readings: RoadmapReadings;
+  readonly listing: BoardListing;
+  readonly fallback: number;
+  readonly roadmap: number;
+}
+
+/** The turn's one listing as a {@link BoardView}, the default board already resolved. */
+async function boardView(seams: HopSeams): Promise<BoardView> {
+  const listing = await seams.listing();
+  return {
+    listing,
+    rows: new Map(listing.map((row) => [row.number, row])),
+    defaultBoard: () => Promise.resolve(seams.fallback),
+  };
+}
+
+/** The decision for H read at `places.current`: the first of its open or unread blockers that is not a wait. */
+async function decideAtHome(line: RoadmapLine, places: Pick<Position, 'current' | 'home'>, seams: HopSeams): Promise<HopDecision | null> {
+  const blocked = await seams.blocking(line.issue);
+  if (blocked === null || blocked.fault !== null) return null;
+  const held = blocked.blockers.filter((id) => blocked.open.includes(id) || blocked.unread.includes(id));
+  const view = await boardView(seams);
+  let last: HopDecision | null = null;
+  for (const blocker of held) {
+    last = await decideHop({ blocked: line.issue, blocker, position: places, view, taken: seams.readings });
+    if (last.kind !== 'wait') return last;
+  }
+  return last;
+}
+
+/** The decision for the away target C when it is blocked: the record's own hop, read again from home. */
+async function decideAway(record: HopRecord, target: number, seams: HopSeams): Promise<HopDecision | null> {
+  if (record.blocked === null || await seams.blocking(target) === null) return null;
+  return decideHop({
+    blocked: record.blocked,
+    blocker: target,
+    position: { current: record.from, home: record.home },
+    view: await boardView(seams),
+    taken: NOTHING_TAKEN,
+  });
+}
+
+/** Where H was read, and home: the position's home while it stands away, else that same place. */
+function placesOf(walk: WalkAnswer, roadmap: number, position: Position | null): Pick<Position, 'current' | 'home'> {
+  const current: Place = { board: roadmap, epic: walk.epic };
+  const away = position !== null && !samePlace(position.current, position.home);
+  return {
+    current,
+    home: away
+      ? position.home
+      : current,
+  };
+}
+
+/** What one turn's hop reading holds but the record and position already read. */
+type HopAnswer = Pick<NextHopReading, 'decision' | 'nextEpic'> & { readonly problems: readonly string[] };
+
+/** The decision for the line the walk answered: C's own while away, H's at home, none without a line. */
+async function decisionFor(walk: WalkAnswer, followed: FollowedHop, seams: HopSeams): Promise<HopDecision | null> {
+  if (walk.line === null) return null;
+  const target = awayTargetOf(followed.record);
+  if (followed.record !== null && target !== null) return decideAway(followed.record, target, seams);
+  return decideAtHome(walk.line, placesOf(walk, seams.roadmap, followed.position), seams);
+}
+
+/** The decision for the line the walk answered and the next `now` epic after a dry one; a failed reading a problem. */
+async function readHopAnswer(walk: WalkAnswer, followed: FollowedHop, seams: HopSeams): Promise<HopAnswer> {
+  try {
+    const decision = await decisionFor(walk, followed, seams);
+    const nextEpic = walk.dry === null
+      ? null
+      : await nextNowEpic({ after: walk.dry.number, board: seams.roadmap, listing: await seams.listing(), readings: seams.readings });
+    return { decision, nextEpic, problems: [] };
+  } catch (error) {
+    return { decision: null, nextEpic: null, problems: [`the hop could not be read, so none is proposed: ${messageOf(error)}`] };
+  }
 }
 
 /**
@@ -306,6 +572,14 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
     return listed();
   });
   const issues = memoiseIssues(createGhSpecIssueReader({ gh }));
+
+  const board: Pick<NextBoard, 'blocking' | 'isReady'> = {
+    blocking: async (issue: number): Promise<BlockedLine | null> => readBlockedLine(
+      await issues(issue),
+      blockerStatesOf(issues),
+    ),
+    isReady: async (issue: number): Promise<boolean> => hasSpecReadyLabel((await issues(issue)).labels),
+  };
 
   return Object.freeze({
     next: async (): Promise<NextRoadmapReading> => {
@@ -325,9 +599,23 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
         branches,
         pullRequests: createGhOpenPullRequests({ gh }),
       });
-      const walk = epic === null
-        ? await walkBoard(roadmap, { issues, readings, listing })
-        : await walkEpic(epic, listing, readings);
+      const followed = options.roadmap === true
+        ? followHopRecord(root)
+        : null;
+      const picker = followed === null
+        ? plainPick
+        : waitingPick(board.blocking);
+      const record = followed?.record ?? null;
+      const target = awayTargetOf(record);
+      const away = record !== null && target !== null
+        ? await walkTarget(record, target, readings)
+        : null;
+      const walk = away?.walk ?? (epic === null
+        ? await walkBoard(roadmap, { issues, readings, listing }, picker)
+        : await walkEpic(epic, listing, readings, picker));
+      const answer = followed === null
+        ? null
+        : await readHopAnswer(walk, followed, { blocking: board.blocking, readings, listing, fallback, roadmap });
       const cancelled = options.noticeCancelled === true && asked
         ? await cancelledNotices(listing)
         : [];
@@ -335,32 +623,48 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
         roadmap,
         line: walk.line,
         passed: walk.passed,
-        problems: [...current?.notices ?? [], ...cancelled, ...branches.problems],
+        problems: [...current?.notices ?? [], ...cancelled, ...branches.problems, ...followed?.problems ?? [], ...answer?.problems ?? []],
         ...walk.dry === null
           ? {}
           : { dryEpic: walk.dry },
+        ...followed === null || answer === null
+          ? {}
+          : {
+            hop: Object.freeze({
+              record: followed.record,
+              stale: followed.stale,
+              position: followed.position,
+              target: away?.target ?? null,
+              waiting: walk.waiting,
+              decision: answer.decision,
+              nextEpic: answer.nextEpic,
+            }),
+          },
       };
     },
 
-    blocking: async (issue: number): Promise<BlockedLine | null> => readBlockedLine(
-      await issues(issue),
-      blockerStatesOf(issues),
-    ),
-
-    isReady: async (issue: number): Promise<boolean> => hasSpecReadyLabel((await issues(issue)).labels),
+    blocking: board.blocking,
+    isReady: board.isReady,
   });
 }
 
-/** The walk down `roadmap`'s checklist, descending into its first open `now` epic. */
-async function walkBoard(roadmap: number, seams: EpicDescentSeams): Promise<WalkAnswer> {
+/**
+ * The walk down `roadmap`'s checklist, descending into its first open
+ * `now` epic: `pickDescendedLine`'s descent and pick, the pick made by
+ * `picker`.
+ */
+async function walkBoard(roadmap: number, seams: EpicDescentSeams, picker: LinePicker): Promise<WalkAnswer> {
   const read = await seams.issues(roadmap);
-  const { descent, pick, dry } = await pickDescendedLine(parseRoadmapBody(read.body), seams);
+  const descent = await descendRoadmap(parseRoadmapBody(read.body), seams);
+  const pick = await picker(descent.lines, seams.readings);
   return {
     line: pick.line,
-    passed: descent.passed.length + pick.skipped.length,
-    dry: dry && descent.epic !== null
+    passed: descent.passed.length + pick.passed,
+    dry: descent.epic !== null && pick.line === null
       ? { number: descent.epic.number, title: descent.epic.title }
       : null,
+    epic: descent.epic?.number ?? null,
+    waiting: pick.waiting,
   };
 }
 

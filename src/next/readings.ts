@@ -58,12 +58,16 @@
  * repository has no pull request, and it is left to the caller
  * unchanged.
  */
+import type { HopDecision, TakenBy } from './hop-chain.js';
+import type { HopRecord } from './hop-record.js';
 import type { BlockedLine } from '../board/blocked-line.js';
+import type { NextNowEpic } from '../board/epic-walk.js';
 import type { RoadmapLine } from '../board/roadmap.js';
 import type { PlanListing } from '../commands/plan/list.js';
 import type { PlansDir } from '../commands/plan/plan-files.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { Position } from '../project/position.js';
 import type { BaseStanding } from '../start/branch-decision.js';
 
 import { scanClaimBranches } from '../board/roadmap.js';
@@ -97,6 +101,58 @@ export interface NextRoadmapReading {
    * with the four keys it always had.
    */
   readonly dryEpic?: DryEpic;
+  /**
+   * What the walk read for `rafa next --roadmap`: the hop record, the
+   * away target, the lines passed as waiting, the one-hop decision and
+   * the next `now` epic. The key is LEFT OUT, not set to undefined, on a
+   * board built without `roadmap` (`./sources.ts`), so a walk without
+   * the flag answers the keys it always did.
+   */
+  readonly hop?: NextHopReading;
+}
+
+/** One blocker of a waiting line, and what took it. */
+export interface TakenBlocker {
+  /** The blocker's issue number. */
+  readonly issue: number;
+  /** The branch or the open pull request that took it. */
+  readonly taken: TakenBy;
+}
+
+/** A line the walk passed because every open blocker it waits on is taken. */
+export interface WaitingLine {
+  /** The line passed: H. */
+  readonly line: RoadmapLine;
+  /** Each open or unread blocker of H, in line order, with what took it. */
+  readonly blockers: readonly TakenBlocker[];
+}
+
+/** The away hop's target C, as this turn read it. */
+export interface HopTarget {
+  /** C, the record's `target`. */
+  readonly issue: number;
+  /** True when C is closed. */
+  readonly closed: boolean;
+  /** The open pull request closing C, or null; not read once C is closed. */
+  readonly pullRequest: number | null;
+}
+
+/** What {@link NextRoadmapReading.hop} holds; `./sources.ts` holds how each is read. */
+export interface NextHopReading {
+  /** The hop record this turn follows, or null: none, unset, or dropped as stale. */
+  readonly record: HopRecord | null;
+  /** A record read and dropped because the position's home is not its home, else null. */
+  readonly stale: HopRecord | null;
+  /** The position file as read, or null when it reads unset. */
+  readonly position: Position | null;
+  /** C and its state while a blocker hop is away, else null. */
+  readonly target: HopTarget | null;
+  /** The lines passed as waiting, in walk order. */
+  readonly waiting: readonly WaitingLine[];
+  /** The one-hop decision for the line the walk answered when it is blocked, else null. */
+  readonly decision: HopDecision | null;
+  /** The next `now` epic after the epic that ran dry, else null. */
+  readonly nextEpic: NextNowEpic | null;
 }
 
 /** An epic whose every line is done or taken, as {@link NextRoadmapReading.dryEpic} names it. */

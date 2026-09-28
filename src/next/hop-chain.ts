@@ -193,23 +193,27 @@ function haltSentence(halt: HopHalt): string {
     : `${chain}: #${String(halt.chain.blocker)} is blocked in turn`;
 }
 
+/** `branch feat/118-x exists`, or `PR #7 open`: what took a blocker, as a sentence names it. */
+export function takenText(taken: TakenBy): string {
+  return taken.by === 'branch'
+    ? `branch ${taken.branch} exists`
+    : `PR #${String(taken.pullRequest)} open`;
+}
+
 /** The sentence a decision is printed with; a hop's is the spec's log line. */
 export function hopDecisionSentence(decision: HopDecision): string {
   if (decision.kind === 'hop') {
     return `hop from ${leftText(decision.from)}: #${String(decision.blocked)} blocked by #${String(decision.blocker)}, in epic #${String(decision.epic)}`;
   }
   if (decision.kind === 'wait') {
-    const taken = decision.taken.by === 'branch'
-      ? `branch ${decision.taken.branch} exists`
-      : `PR #${String(decision.taken.pullRequest)} open`;
-    return `#${String(decision.blocked)} waits on #${String(decision.blocker)}, taken: ${taken}`;
+    return `#${String(decision.blocked)} waits on #${String(decision.blocker)}, taken: ${takenText(decision.taken)}`;
   }
   if (decision.kind === 'halt') return haltSentence(decision);
   return `#${String(decision.blocked)} stays: ${noHopSentence(decision.located)}`;
 }
 
 /** What took `blocker`, or null: the branch first, then the pull request. */
-async function takenBy(blocker: number, taken: TakenReadings): Promise<TakenBy | null> {
+export async function takenBy(blocker: number, taken: TakenReadings): Promise<TakenBy | null> {
   const branch = taken.branchFor(blocker);
   if (branch !== null) return { by: 'branch', branch };
   const pullRequest = await taken.pullRequestFor(blocker);
