@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-five registered so far wrap a
+ * of each is its command. Five of the sixty-six registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -69,7 +69,10 @@
  * `epic defer` and `epic promote`, which move an epic between horizons
  * over `src/board/epic-horizon.ts` through `./epic/horizon-change.ts`,
  * nor `epic move`, which moves an issue between epics through
- * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`.
+ * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `epic close`, which plans and runs its verification through
+ * `src/epic/verify-plan.ts` and `src/epic/verify-run.ts` and closes the
+ * epic through `src/board/issue-board.ts`.
  *
  * ## What is registered
  *
@@ -213,6 +216,14 @@
  *     commented on the issue naming its open branches and pull
  *     requests; an issue with no epic label, a target that is not an
  *     open epic and a move to its own epic refused with exit code 2.
+ *   - `epic close <n> [--accept-unchecked]`: the closing gate, refused
+ *     with exit code 2 naming the open members while any is open, then
+ *     one planning session turning each acceptance criterion into a
+ *     check, each check run as its own session against `origin/main`,
+ *     an uncheckable criterion refused unless `--accept-unchecked`, each
+ *     failed check filed as a bug and refused, and otherwise the epic
+ *     closed as completed with a comment and its cost printed beside its
+ *     estimate. It is the one `epic` action that declares `spends`.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -260,6 +271,7 @@ import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortReport from './effort/report.js';
+import epicClose from './epic/close.js';
 import epicDefer from './epic/defer.js';
 import epicMove from './epic/move.js';
 import epicNew from './epic/new.js';
@@ -328,7 +340,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; tag the release branch\'s HEAD' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
-  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it' },
+  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate' },
 ]);
 
 /** The core commands, in roster order. */
@@ -388,6 +400,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   epicDefer,
   epicPromote,
   epicMove,
+  epicClose,
   status,
   next,
   roadmap,

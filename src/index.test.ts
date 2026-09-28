@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -889,6 +889,29 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
   ]],
+  ['./commands/epic/close.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../adapters/tracker/resolve.js', ['resolveTracker']],
+    ['../../board/epic-body.js', ['readEpicBody']],
+    ['../../board/epic-template.js', ['PLACEHOLDER_REASON']],
+    ['../../board/epic-trail.js', ['renderCloseComment']],
+    ['../../board/epics.js', ['EPIC_LABEL_PREFIX', 'epicSlugsOf', 'groupByEpicLabel']],
+    ['../../board/issue-board.js', ['createGhIssueBoard']],
+    ['../../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../effort/epic-cost.js', ['readEpicCost', 'renderEpicCost']],
+    ['../../effort/store/index.js', ['selectEffortStore']],
+    ['../../epic/verify-plan.js', ['buildVerifyPrompt', 'criteriaToAsk', 'parseVerifyPlan', 'readVerifyPrompt', 'splitCriteria']],
+    ['../../epic/verify-run.js', ['runVerification']],
+    ['../../pr/git.js', ['createGitRunner']],
+    ['../../start/dispatch.js', ['SESSION_ID_FLAG']],
+    ['../../start/triage.js', ['unresolvedTracker']],
+    ['../../triage/triage.js', ['namedSecrets', 'triageReport']],
+    ['../../utils/claude.js', ['claudeArgs', 'spawnClaudeCaptured']],
+    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
+    ['../plan/plan-files.js', ['readSwitch']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../status/render.js', ['renderStatus', 'statusData']],
@@ -1201,6 +1224,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/epic/defer.js',
       './commands/epic/promote.js',
       './commands/epic/move.js',
+      './commands/epic/close.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

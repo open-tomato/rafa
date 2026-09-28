@@ -57,6 +57,7 @@ your accounts.
   | `rafa skill search` | 🪙 one `haiku` session reading the twelve best-ranked files, one per kind with `--all`; with `--no-model`, nothing |
   | `rafa agent search` | 🪙 the same as `rafa skill search`, over agent definitions |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
+  | `rafa epic close` | 🪙 one verification planning session and one session per check; nothing while a member is open |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
 

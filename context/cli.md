@@ -30,7 +30,7 @@ module's note is the long form.
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag and the change notes pending for the current plan, writing nothing; and `release tag`, the one write of the subject, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
-| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel` |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -183,7 +183,8 @@ New; it replaces no earlier text. What a row or an action added to
   2026-09-23); the `plan` summary rewritten beside it is what moved
   `rafa.txt`. The exception is an action declaring `spends` under a
   subject none of whose actions did: its subject's line gains the `🪙`
-  mark, which moves `rafa.txt`. A new spender also reddens the spender
+  mark, which moves `rafa.txt` (measured again on 2026-09-28,
+  registering `epic close`, whose subject summary moved with it). A new spender also reddens the spender
   rosters, `src/cli/spends-roster.test.ts`, the spawned `describe` case
   of `src/tests/spends-cli-surface.test.ts` and the README table
   `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
@@ -204,7 +205,7 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
-  `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `roadmap`, `switch`, `next`, `init`,
+  `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update`, `usage` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board` and `epic`: a
@@ -1408,6 +1409,47 @@ New; it replaces no earlier text. What a row or an action added to
   what to finish by hand. Json mode's result is `EpicMoveResult`.
   `readEpicMove` and `applyEpicMove` are exported for `epic cancel`,
   whose move of a dependent is the same move. It declares no `spends`.
+- **`rafa epic close <n> [--accept-unchecked]` is the closing gate**
+  (`src/commands/epic/close.ts`), and the one `epic` action declaring
+  `spends`: `{ when: 'always', what: 'one verification planning session
+  and one session per check' }`. The line is one epic number, a whole
+  number from 1, and the flag, which takes no value; anything else is
+  exit 1. Every refusal of the gate is exit 2
+  (`EPIC_CLOSE_REFUSAL_EXIT`) and leaves the epic open. The board
+  listing is read once; `readEpicToClose` refuses an issue not on it,
+  one not `type:epic`, a closed epic, one with no `epic:` label, one
+  with no member, and one with an OPEN member, naming each open member
+  by number and title, before any session starts. Membership is the
+  `epic:<slug>` label (`groupByEpicLabel`). An epic whose body has no
+  acceptance criteria is refused with no session. Then ONE captured
+  planning session, in the project root with `--tools Read,Grep,Glob`,
+  answers a check or an uncheckable reason per criterion
+  (`src/epic/verify-plan.ts`); when every criterion is still the
+  template's placeholder no session starts and each is uncheckable. A
+  planning session that exits non-zero or ends with no readable
+  `rafa:verify` block is refused, running no check. Each uncheckable
+  criterion is a `warn` line with its reason, and any refuses the close
+  BEFORE a check runs unless `--accept-unchecked`. The checks then run
+  through `runVerification` (`src/epic/verify-run.ts`): a detached
+  worktree of `origin/main` under `<home>/.rafa/worktrees/epic-<n>`, one
+  session per check, the worktree removed after; a git step it refuses
+  is exit 1, and a removal it refuses a `warn` line. Each check that
+  answered `fail` is filed through `triageReport` as one report holding
+  one `security: false` bug and no blocker, its artifact the epic and the
+  criterion on one line (`failedCheckArtifact`) and its key's file half
+  `epic-<n>-close` (`closeTriageFile`, a name only: nothing is written
+  there), so a second failing close comments on the first issue; the
+  public tracker is resolved once, and only when a check failed. A failed
+  check, and a check whose session answered nothing, which files
+  nothing, each refuse the close. Otherwise one `IssueBoard.closeIssue`
+  closes the epic as `completed` with `renderCloseComment`
+  (`src/board/epic-trail.ts`), a refusal from `gh` being exit 1, and
+  `renderEpicCost` prints the members' cost beside the body's estimate
+  with the membership line (`src/effort/epic-cost.ts`); a store that
+  cannot be read is a `warn` line after the close. Every line goes
+  through the output in both modes; json mode's result on a close is
+  `EpicCloseResult`. Git, `gh`, the spawner, the store and the tracker
+  chain are `EpicCloseSeams`.
 - **`rafa switch <n | -> [--no-rehome]` moves this checkout's place**
   (`src/commands/switch.ts`) and writes it to `.rafa/position.json`
   through `writePositionFile` (`src/project/position.ts`). It reads the
@@ -1842,7 +1884,7 @@ each named by `when` and carrying `what`, a short phrase describing what the
 session does:
 
 - `always`: the command may start a session on any run (`plan create`,
-  `loop start`).
+  `loop start`, `epic close`).
 - `with`: the command may start a session only when a specific `flag` is
   typed on the run (`pr triage --resolve`). `flag` is written as typed,
   with its two leading dashes. `pr triage` itself never spawns: its
