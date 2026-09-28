@@ -36,11 +36,18 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
- *   - `src/PROMPT.md` and `src/plan-prompt.md` are copied into `dist/`.
- *     `start.ts` and `plan.ts` find them beside themselves through
- *     `import.meta.url`, and a bundle inlining either module answers its
- *     OWN directory. The two built files reading `import.meta.url` are
- *     `cli.js` and `index.js`, both directly in `dist/`.
+ *   - `src/PROMPT.md`, `src/plan-prompt.md` and `src/epic-verify-prompt.md`
+ *     are copied into `dist/`. `start.ts` and `plan.ts` find the first two
+ *     beside themselves through `import.meta.url`, and a bundle inlining
+ *     either module answers its OWN directory. The two built files reading
+ *     `import.meta.url` are `cli.js` and `index.js`, both directly in
+ *     `dist/`. `epic/verify-plan.ts` sits one directory below its prompt
+ *     in a checkout, so it looks beside itself first and in its parent
+ *     second, and a case resolves the prompt through `readVerifyPrompt`
+ *     pointed at `dist/`. Dropping it from the `cp` was driven on
+ *     2026-09-28, one run of this file, 57 pass before and 55 pass and 2
+ *     fail under it (its copy case and that reader case), the manifest
+ *     restored byte-identical (sha256).
  *   - `src/bundled/` is copied whole to `dist/bundled/`: the rafa tier,
  *     its skills and agents, which sits beside the entry in both a
  *     checkout and a build (`src/schema/tiers.ts`). The dev-planner skill
@@ -313,6 +320,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import { loadConfig } from '../config-load.js';
 import * as storeSource from '../effort/store/index.js';
+import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
 import * as rootSource from '../index.js';
 import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
@@ -460,6 +468,7 @@ const ROOT_SEAM_NAMES = [
 const TEMPLATES: [string, string][] = [
   ['src/PROMPT.md', 'PROMPT.md'],
   ['src/plan-prompt.md', 'plan-prompt.md'],
+  ['src/epic-verify-prompt.md', 'epic-verify-prompt.md'],
 ];
 
 /**
@@ -947,6 +956,12 @@ describe('the prompt templates in the build', () => {
 
     expect(readers.length).toBeGreaterThan(0);
     expect(readers.filter((file) => file.includes('/'))).toEqual([]);
+  });
+
+  it('lands the epic verification prompt where readVerifyPrompt looks for it from a bundle in dist', () => {
+    const source = readFileSync(join(PACKAGE_DIR, 'src', VERIFY_PROMPT_FILE), 'utf8');
+
+    expect(readVerifyPrompt(DIST)).toBe(source);
   });
 
   it('hands rafa plan the template beside dist/cli.js', () => {
