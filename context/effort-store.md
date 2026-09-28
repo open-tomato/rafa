@@ -94,7 +94,7 @@ a store holds. The open path does not read the names, the lock or the
 gate yet: `migrateSchema` still counts by position.
 
 **`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
-decision, and nothing calls it yet.** It takes what a store holds (its
+decision, and `bringForward` is its one caller.** It takes what a store holds (its
 `schema_migrations` rows, or none, and `user_version`), this build's
 catalogue with checksums (`sqliteCatalogue`), `read` or `write`, and
 whether `rafa effort migrate` asks. It answers "use", with the legacy
@@ -104,6 +104,18 @@ with one of the seven `REFUSAL_REASONS` and a message ending in
 `sqlite.ts`. An open with something to apply counts as a write, so a
 store holding an unknown migration that breaks writers refuses a read
 that would apply one.
+
+**`bringForward` (`src/effort/store/bring-forward.ts`) acts on that
+decision, and the open path does not call it yet.** It reads a store's
+`schema_migrations` and `user_version`, plans, and throws a refusal as
+`SchemaRefusedError` (`reason`, `nextStep`) with nothing written. With
+nothing to adopt or apply it returns without taking a lock. Otherwise it
+takes `BEGIN IMMEDIATE`, reads and plans again, and in that one
+transaction creates `schema_migrations`, logs the adopted legacy entries
+unrun with this build's checksums, runs and logs each pending entry, and
+sets `user_version` to the gate. A throw rolls all of it back. A test
+passes a synthetic tail as its `migrations` option; `applied_by` is this
+build's package version unless the caller names another.
 
 ### Tables outside the port
 
