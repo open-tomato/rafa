@@ -90,8 +90,8 @@ function isIssueNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-/** `value` as a place, or null when it is not one. */
-function asPlace(value: unknown): Place | null {
+/** `value` as a place, or null when it is not one; the hop record reads its places through it. */
+export function asPlace(value: unknown): Place | null {
   if (!isRecord(value) || !isIssueNumber(value.board)) return null;
   if (value.epic !== null && !isIssueNumber(value.epic)) return null;
   return { board: value.board, epic: value.epic };
