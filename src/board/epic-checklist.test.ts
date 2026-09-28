@@ -411,4 +411,28 @@ describe('editChecklists over the gh fake', () => {
     expect(result).toMatchObject({ status: 'edited', attempts: 2 });
     expect(fake.issue('1')?.body).toBe(removeLine(theirs, 12));
   });
+
+  it('answers failed with no comment posted when the write can never be confirmed', async () => {
+    const original = epic();
+    const fake = await plant(original);
+    const board = createGhRoadmapBody({
+      gh: async (args) => {
+        const result = await fake.run(args);
+        // Somebody reverts the body to its original text after every
+        // write, so the re-read always still needs the edit and the
+        // write is never confirmed.
+        if (args.includes('PATCH')) {
+          await fake.run(['api', 'repos/{owner}/{repo}/issues/1', '-X', 'PATCH', '-f', `body=${original}`]);
+        }
+        return result;
+      },
+    });
+
+    const result = await editChecklist({ issue: 1, edit: removing(12), board });
+
+    expect(result).toMatchObject({ issue: 1, status: 'failed', attempts: TICK_ATTEMPTS });
+    expect(fake.issue('1')?.body).toBe(original);
+    expect(fake.issue('1')?.comments).toEqual([]);
+    expect(fake.calls().some((call) => call[0] === 'issue' && call[1] === 'comment')).toBe(false);
+  });
 });
