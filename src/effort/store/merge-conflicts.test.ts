@@ -15,8 +15,8 @@ import type { SQLQueryBindings } from 'bun:sqlite';
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { SET_ONCE_FILLS, settleMatches } from './merge-conflicts.js';
-import { MERGE_RULES, SET_ONCE } from './merge-rules.js';
+import { RECOMPUTED_COMPARISONS, SET_ONCE_FILLS, settleMatches } from './merge-conflicts.js';
+import { MERGE_RULES, RECOMPUTED, SET_ONCE } from './merge-rules.js';
 import { unionStores } from './merge-union.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 
@@ -258,6 +258,57 @@ describe('one identity holding different content', () => {
   });
 });
 
+describe('a recomputed field: one commit collected by two devices', () => {
+  /** A commit's `row_json` holding `gap` and `branch`, as `JSON.stringify` of a `CommitStats` spells it. */
+  function commitJson(gap: number | null, branch: string | null = 'main'): string {
+    return JSON.stringify({
+      sha: 'sha-1', timestamp: '2026-09-29T10:00:00+02:00', subject: 'feat: one', author: 'A', branch,
+      filesChanged: 1, insertions: 2, deletions: 0, parentCount: 1, minutesSincePrevious: gap,
+    });
+  }
+
+  /** Plants the commit `sha-1` into `db` under `origin` with `rowJson`. */
+  function plantCommit(db: Database, origin: string, rowJson: string): void {
+    db.query<unknown, [string, string]>('INSERT INTO commits (seq, origin_store, origin_seq, sha, row_json) VALUES (1, ?, 1, \'sha-1\', ?)')
+      .run(origin, rowJson);
+  }
+
+  /** The `row_json` of every commit in `db`, in `seq` order. */
+  function commitJsonOf(db: Database): string[] {
+    return db
+      .query<{ row_json: string }, []>('SELECT row_json FROM commits ORDER BY seq')
+      .all()
+      .map(({ row_json: json }) => json);
+  }
+
+  it('skips a pair that differs only in minutesSincePrevious, keeping the gap here', () => {
+    const local = memoryStore();
+    const other = memoryStore();
+    plantCommit(local, 'store-a', commitJson(12.5));
+    plantCommit(other, 'store-b', commitJson(null));
+
+    const result = merge(local, other);
+
+    expect(entryFor(result, 'commits')).toEqual({ table: 'commits', skipped: [1], filled: [], conflicts: [] });
+    expect(commitJsonOf(local)).toEqual([commitJson(12.5)]);
+    expect(conflictsOf(local)).toEqual([]);
+  });
+
+  it('records a pair that differs outside the gap, field NULL, both rows kept (control)', () => {
+    const local = memoryStore();
+    const other = memoryStore();
+    plantCommit(local, 'store-a', commitJson(12.5));
+    plantCommit(other, 'store-b', commitJson(null, 'feat/other'));
+
+    const result = merge(local, other);
+
+    expect(entryFor(result, 'commits').conflicts).toEqual([{ localSeq: 1, incomingSeq: 1, field: null }]);
+    expect(commitJsonOf(local)).toEqual([commitJson(12.5)]);
+    expect(conflictsOf(local).map(({ table_name: table, field, incoming }) => [table, field, incoming.row_json]))
+      .toEqual([['commits', null, commitJson(null, 'feat/other')]]);
+  });
+});
+
 describe('what the settling refuses', () => {
   it('rolls back every fill and conflict when a matched row is missing from the other store', () => {
     const local = memoryStore();
@@ -285,5 +336,16 @@ describe('what the settling refuses', () => {
       const [table, field] = key.split('.');
       expect(SET_ONCE_FILLS[key]).toStartWith(`UPDATE ${table} SET ${field} = ?`);
     }
+  });
+
+  it('has a comparison for every recomputed field in MERGE_RULES', () => {
+    const recomputed = Object.entries(MERGE_RULES).flatMap(([table, rule]) => rule.scope === 'merged'
+      ? Object.entries(rule.edited)
+        .filter(([, edit]) => edit === RECOMPUTED)
+        .map(([field]) => `${table}.${field}`)
+      : []);
+
+    expect(recomputed).toEqual(['commits.row_json']);
+    expect(Object.keys(RECOMPUTED_COMPARISONS).sort()).toEqual(recomputed.sort());
   });
 });

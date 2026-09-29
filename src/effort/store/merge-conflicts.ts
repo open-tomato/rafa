@@ -18,7 +18,13 @@
  *   and a value here is kept against NULL there; the pair is then
  *   skipped. Two different filled values mean one finding was filed
  *   twice: the value here is kept, and the incoming row is recorded with
- *   `field` naming the column.
+ *   `field` naming the column. Under {@link RECOMPUTED} the two values
+ *   are compared without the part the merge recomputes, through the
+ *   field's entry in {@link RECOMPUTED_COMPARISONS}: `commits.row_json`
+ *   without its `minutesSincePrevious` (`merge-commit-gaps.ts`). Equal
+ *   so, the pair is skipped and the row here kept; the gap of a commit
+ *   brought in is the merge's to rewrite, not a matched one's. Unequal,
+ *   the rows differ outside every edited field, below.
  * - **Any other difference**: the incoming row is recorded with `field`
  *   NULL, and the row here is left as it is, edited fields included. The
  *   same `(origin_store, origin_seq)` holding different content can only
@@ -45,7 +51,8 @@
 import type { TableUnion, UnionMatch } from './merge-union.js';
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
 
-import { MERGE_RULES, SET_ONCE } from './merge-rules.js';
+import { withoutGap } from './merge-commit-gaps.js';
+import { MERGE_RULES, RECOMPUTED, SET_ONCE } from './merge-rules.js';
 import { carriedColumns } from './merge-union.js';
 import { quoted } from './rebuild-aside.js';
 
@@ -84,6 +91,11 @@ export interface TableSettlement {
 /** The statement filling one set-once field of a row left NULL, by `<table>.<column>`. */
 export const SET_ONCE_FILLS: Readonly<Record<string, string>> = {
   'findings.tracker_ref': 'UPDATE findings SET tracker_ref = ? WHERE seq = ? AND tracker_ref IS NULL',
+};
+
+/** The comparable form of one recomputed field's value, by `<table>.<column>`. */
+export const RECOMPUTED_COMPARISONS: Readonly<Record<string, (value: string) => string>> = {
+  'commits.row_json': withoutGap,
 };
 
 /** Columns a pair's content is compared without. */
@@ -135,6 +147,21 @@ function settleSetOnce(local: Database, table: string, field: string, here: Stor
   return { skipped: true, filled: [field], conflictFields: [] };
 }
 
+/** Settles one recomputed field the two rows disagree on: nothing, or a conflict outside every edited field. */
+function settleRecomputed(table: string, field: string, here: StoredRow, there: StoredRow): PairOutcome {
+  const comparable = RECOMPUTED_COMPARISONS[`${table}.${field}`];
+  if (comparable === undefined) {
+    throw new Error(`${table}.${field} is recomputed in MERGE_RULES and has no entry in RECOMPUTED_COMPARISONS`);
+  }
+  const hereValue = here[field];
+  const thereValue = there[field];
+  const same = typeof hereValue === 'string' && typeof thereValue === 'string'
+    && comparable(hereValue) === comparable(thereValue);
+  return same
+    ? { skipped: true, filled: [], conflictFields: [] }
+    : { skipped: false, filled: [], conflictFields: [null] };
+}
+
 /** Compares one matched pair and settles it as the module note says. */
 function settlePair(
   local: Database,
@@ -147,8 +174,9 @@ function settlePair(
   if (differing.length === 0) return { skipped: true, filled: [], conflictFields: [] };
   if (differing.some((column) => !Object.hasOwn(edited, column))) return { skipped: false, filled: [], conflictFields: [null] };
   const outcomes = differing.map((field) => {
-    if (edited[field] !== SET_ONCE) throw new Error(`${table}.${field} has the rule ${edited[field]}, which the merge does not apply`);
-    return settleSetOnce(local, table, field, here, there);
+    if (edited[field] === SET_ONCE) return settleSetOnce(local, table, field, here, there);
+    if (edited[field] === RECOMPUTED) return settleRecomputed(table, field, here, there);
+    throw new Error(`${table}.${field} has the rule ${edited[field]}, which the merge does not apply`);
   });
   return {
     skipped: outcomes.every((outcome) => outcome.skipped),

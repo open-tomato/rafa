@@ -355,8 +355,9 @@ describe('MERGE_RULES against every production edit under src/', () => {
     expect(files).toContain('rafa.ts');
   });
 
-  it('finds the edits production modules make, a filing and the set-once fill of a merge, and each has a rule', () => {
+  it('finds the edits production modules make, a filing and the two edits of a merge, and each has a rule', () => {
     expect(scanned.edits).toEqual([
+      { file: 'effort/store/merge-commit-gaps.ts', table: 'commits', column: 'row_json' },
       { file: 'effort/store/merge-conflicts.ts', table: 'findings', column: 'tracker_ref' },
       { file: 'effort/store/tracker-refs.ts', table: 'findings', column: 'tracker_ref' },
     ]);

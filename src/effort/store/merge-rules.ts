@@ -27,11 +27,15 @@
  *
  * The store is almost append-only. A column a production statement
  * changes after the insert is an edited field, and the merge has to know
- * which of two stores' values to keep. The one edited field today is
+ * which of two stores' values to keep. There are two today.
  * `findings.tracker_ref`, written by `writeTrackerRef`
- * (`tracker-refs.ts`) once a bug is filed: it is {@link SET_ONCE}, so a
+ * (`tracker-refs.ts`) once a bug is filed, is {@link SET_ONCE}: a
  * filled value beats NULL, and two different filled values mean one
  * finding was filed twice, which the merge keeps in `merge_conflicts`.
+ * `commits.row_json` is {@link RECOMPUTED}: its `minutesSincePrevious`
+ * is rewritten by the merge itself (`merge-commit-gaps.ts`) for each
+ * commit brought in and the commit after it in time, so two rows of one
+ * commit that differ only in that key are the same row.
  *
  * ## What holds the registry to the schema
  *
@@ -52,8 +56,15 @@ export type MergeScope = 'merged' | 'local';
  */
 export const SET_ONCE = 'set-once';
 
+/**
+ * The merge recomputes the field from the rows it holds, so two stores'
+ * values of it are never compared: for `commits.row_json`, its
+ * `minutesSincePrevious` key.
+ */
+export const RECOMPUTED = 'recomputed';
+
 /** How a merge settles an edited field whose two stores disagree. */
-export type EditRule = typeof SET_ONCE;
+export type EditRule = typeof SET_ONCE | typeof RECOMPUTED;
 
 /** A table a merge unions. */
 export interface MergedTableRule {
@@ -83,7 +94,7 @@ function appendOnly(...identity: readonly string[]): MergedTableRule {
 /** Every table of the SQLite store, by name, and what a merge does with it. */
 export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   sessions: appendOnly('session_id'),
-  commits: appendOnly('sha'),
+  commits: { scope: 'merged', identity: ['sha'], edited: { row_json: RECOMPUTED } },
   findings: { scope: 'merged', identity: ['id'], edited: { tracker_ref: SET_ONCE } },
   blockers: appendOnly('id'),
   out_of_scope_bugs: appendOnly('id'),

@@ -372,7 +372,14 @@ against NULL there, and records the incoming row as JSON, both rows
 kept, when two filled values differ (`field` names the column) or the
 rows differ outside every edited field (`field` NULL). Each set-once
 field has its literal `UPDATE` in `SET_ONCE_FILLS`, so
-`merge-rules.test.ts` can read it.
+`merge-rules.test.ts` can read it. `commits.row_json` is edited under
+the rule `recomputed`: two rows of one commit that differ only in its
+`minutesSincePrevious` are skipped, the gap here kept, through the
+field's entry in `RECOMPUTED_COMPARISONS`. `recomputeCommitGaps`
+(`store/merge-commit-gaps.ts`) rewrites that gap, with no git call,
+for each commit the union inserted and the commit right after it in
+time, ordered by `Date.parse` of the stored timestamp and by sha within
+an instant, so at most two rows are written per commit brought in.
 `src/effort/store/store-identity.ts` decides, on a write, whether to
 mint, and `store-meta.ts` reads and writes the row: `withSqliteStore`
 calls `settleStoreIdentity` after `bringForward`, so a `write` open
