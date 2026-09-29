@@ -275,6 +275,18 @@ export function restoreLine(input: RestoreInput): string | null {
   return switchBack(expected, found, branchTip);
 }
 
+/** What a halt's headline says was withheld, unless its caller names another thing. */
+export const NOTHING_COMMITTED = 'Nothing was committed.';
+
+/**
+ * The halt's headline: {@link CHECKOUT_MOVED} in `checkout`, and what the
+ * halt withheld, {@link NOTHING_COMMITTED} unless the caller names
+ * another thing. Pure.
+ */
+export function haltHeadline(checkout: string, withheld: string = NOTHING_COMMITTED): string {
+  return `⛔ Run halted: ${CHECKOUT_MOVED} in ${checkout}. ${withheld}`;
+}
+
 /**
  * The halt's lines: the headline naming {@link CHECKOUT_MOVED}, the
  * expected branch and commit, what was found, the restore line or the
@@ -284,7 +296,7 @@ export function checkoutMovedLines(input: RestoreInput): readonly string[] {
   const { expected, reading } = input;
   const restore = restoreLine(input);
   return Object.freeze([
-    `⛔ Run halted: ${CHECKOUT_MOVED} in ${expected.checkout}. Nothing was committed.`,
+    haltHeadline(expected.checkout),
     `${INDENT}Expected: ${expected.branch} at ${shortCommit(expected.head)}`,
     `${INDENT}Found:    ${foundText(reading, expected.checkout)}`,
     restore === null

@@ -1,7 +1,8 @@
 /**
  * The loop guard at work in a run: the commit the run starts its
- * checkout at, the guard run before each task is dispatched, and the
- * expected HEAD moved on by the loop's own task commits.
+ * checkout at, the guard run before each task is dispatched and before
+ * each task commit, the guard run around the wrap-up, and the expected
+ * HEAD moved on by the loop's own task commits.
  *
  * `./checkout-guard.ts` reads a checkout and compares it with a
  * {@link CheckoutExpectation}; this module holds that expectation across
@@ -22,7 +23,7 @@
  *
  * {@link advanceExpectation} moves the expected HEAD to the commit a
  * finished task's attempt made, so the loop's own commits never trip the
- * guard before the next dispatch. An attempt that made no commit leaves
+ * guard before the next dispatch or the next commit. An attempt that made no commit leaves
  * it where it was. A `committed` attempt whose sha git did not answer
  * (`utils/commit.ts` keeps that shape) cannot be told from a commit made
  * outside the loop, so it leaves the expectation where it was too, and
@@ -48,6 +49,34 @@
  * in a worktree checkout, so marking it touches nothing the guard found
  * moved.
  *
+ * ## The halt before a task commit
+ *
+ * The same halt runs once a task's session has returned 0 and before the
+ * loop commits its work (`before: 'commit'`). A session is told never to
+ * commit, so a HEAD it moved reads as a commit made outside the loop and
+ * halts like one. The task is marked as above; the session did run, so
+ * `start()` stores its report as `blocked` the way it stores any blocked
+ * task, and the session's work stays uncommitted in the checkout for the
+ * task's next dispatch to find.
+ *
+ * ## The wrap-up
+ *
+ * The wrap-up has no tracker line, so {@link haltIfWrapUpMoved} marks
+ * nothing: it prints the halt and answers true, and the next run, whose
+ * tracker still holds no open task, runs the wrap-up again. It runs at
+ * two points. Before the wrap-up session is dispatched (`before:
+ * 'dispatch'`) it holds the checkout to the last task commit, as every
+ * dispatch does. Before the loop's own `chore: release` commit
+ * (`before: 'release'`, `./release-stage.ts`) HEAD has moved by design:
+ * the wrap-up session commits, and syncs the branch with main, itself.
+ * So that guard runs against {@link expectWrapUpCommits}, the
+ * expectation re-based on the HEAD the session left while the checkout
+ * still holds the run's branch, and it halts only on a branch that
+ * moved or a checkout that is gone. Its headline says the release was
+ * not committed, since the session's own commits stand; the release
+ * commit, its push and the CI wait are what the halt withholds. The
+ * release commit is the run's last loop commit, and no guard follows it.
+ *
  * Nothing here switches, stashes, resets or recreates the checkout; the
  * restore line is printed for the operator to run.
  */
@@ -59,7 +88,7 @@ import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 
-import { CHECKOUT_MOVED, guardCheckout, readCheckout } from './checkout-guard.js';
+import { CHECKOUT_MOVED, guardCheckout, haltHeadline, readCheckout } from './checkout-guard.js';
 
 /** What the run's expectation is opened from: its directories and branch. */
 export type CheckoutOpening = Omit<CheckoutExpectation, 'head'>;
@@ -103,14 +132,30 @@ export interface CheckoutHaltOptions {
   readonly expected: CheckoutExpectation;
   /** The tracker holding the task's line. */
   readonly trackerPath: string;
-  /** The task about to be dispatched, as `findNextTask` answered it. */
+  /** The task about to be dispatched or committed, as `findNextTask` answered it. */
   readonly taskInfo: Pick<TaskInfo, 'lineNum'>;
+  /** Which step the guard runs ahead of: the task's dispatch (the default) or its commit. */
+  readonly before?: 'dispatch' | 'commit';
+}
+
+/** The line after a task's halt, by the step the guard ran ahead of. */
+const TASK_HALT_TAIL: Readonly<Record<'dispatch' | 'commit', string>> = Object.freeze({
+  dispatch: `   Task marked as blocked on ${CHECKOUT_MOVED}; nothing was dispatched. Restore the checkout, then run again.`,
+  commit: `   Task marked as blocked on ${CHECKOUT_MOVED}; its session's work was left uncommitted. Restore the checkout, then run again to retry the task.`,
+});
+
+/** Prints a halt's lines through the active output's `error`, a blank line above the headline. */
+function printHalt(lines: readonly string[]): void {
+  const [headline, ...rest] = lines;
+  activeOutput().error(`\n${headline ?? ''}`);
+  for (const line of rest) activeOutput().error(line);
 }
 
 /**
- * Runs the guard before a dispatch. False when the checkout held; true
- * once a moved or missing checkout has marked the task `[BLOCKED]` with
- * {@link CHECKOUT_MOVED} and printed the halt. See the module note.
+ * Runs the guard before a task's dispatch or its commit. False when the
+ * checkout held; true once a moved or missing checkout has marked the
+ * task `[BLOCKED]` with {@link CHECKOUT_MOVED} and printed the halt. See
+ * the module note.
  */
 export function haltIfCheckoutMoved(options: CheckoutHaltOptions, seams: CheckoutGuardSeams = {}): boolean {
   const verdict = guardCheckout(options.expected, seams);
@@ -120,9 +165,48 @@ export function haltIfCheckoutMoved(options: CheckoutHaltOptions, seams: Checkou
   if (!writeTrackerBlocker(trackerPath, taskInfo.lineNum, CHECKOUT_MOVED)) {
     updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
   }
-  const [headline, ...rest] = verdict.lines;
-  activeOutput().error(`\n${headline ?? ''}`);
-  for (const line of rest) activeOutput().error(line);
-  activeOutput().error(`   Task marked as blocked on ${CHECKOUT_MOVED}; nothing was dispatched. Restore the checkout, then run again.`);
+  printHalt(verdict.lines);
+  activeOutput().error(TASK_HALT_TAIL[options.before ?? 'dispatch']);
+  return true;
+}
+
+/**
+ * The expectation the release commit is guarded against: re-based on the
+ * HEAD the wrap-up session left, while the checkout still holds the run's
+ * branch at a commit; `expected` as it was otherwise, so the guard after
+ * it halts on the move. Reads the checkout; never changes it.
+ */
+export function expectWrapUpCommits(expected: CheckoutExpectation, seams: CheckoutGuardSeams = {}): CheckoutExpectation {
+  const reading = readCheckout(expected.checkout, seams);
+  if (reading.kind !== 'read' || reading.branch !== expected.branch || reading.head === null) return expected;
+  if (reading.head === expected.head) return expected;
+  return Object.freeze({ ...expected, head: reading.head });
+}
+
+/** What {@link haltIfWrapUpMoved} needs: the expectation and the step it runs ahead of. */
+export interface WrapUpHaltOptions {
+  /** The pair the run holds its checkout to; {@link expectWrapUpCommits} ahead of the release. */
+  readonly expected: CheckoutExpectation;
+  /** The wrap-up session's dispatch, or the loop's release commit after it. */
+  readonly before: 'dispatch' | 'release';
+}
+
+/**
+ * Runs the guard before the wrap-up session or the release commit. False
+ * when the checkout held; true once the halt is printed. Marks nothing:
+ * the wrap-up has no tracker line. See the module note.
+ */
+export function haltIfWrapUpMoved(options: WrapUpHaltOptions, seams: CheckoutGuardSeams = {}): boolean {
+  const verdict = guardCheckout(options.expected, seams);
+  if (verdict.held) return false;
+
+  if (options.before === 'dispatch') {
+    printHalt(verdict.lines);
+    activeOutput().error('   The wrap-up was not started. Restore the checkout, then run again to retry the wrap-up.');
+    return true;
+  }
+  const [, ...rest] = verdict.lines;
+  printHalt([haltHeadline(options.expected.checkout, 'The release was not committed.'), ...rest]);
+  activeOutput().error('   The wrap-up session\'s own commits stand; the release commit, its push and the CI wait were skipped. Restore the checkout, then run again to retry the wrap-up.');
   return true;
 }

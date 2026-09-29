@@ -28,7 +28,7 @@ import { commitTaskWork } from '../utils/commit.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
-import { advanceExpectation, haltIfCheckoutMoved, openCheckoutExpectation } from './checkout-watch.js';
+import { advanceExpectation, expectWrapUpCommits, haltIfCheckoutMoved, haltIfWrapUpMoved, openCheckoutExpectation } from './checkout-watch.js';
 
 /** The branch every case's run holds. */
 const BRANCH = 'feat/rafa-370';
@@ -264,5 +264,174 @@ describe('haltIfCheckoutMoved', () => {
 
     expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK })).toBe(true);
     expect(readFileSync(trackerPath, 'utf8').split('\n')[1]).toBe(`- [BLOCKED] Run the guard before each dispatch  <!-- blocked: ${CHECKOUT_MOVED} -->`);
+  });
+});
+
+describe('haltIfCheckoutMoved before a task commit', () => {
+  let errors: string[] = [];
+
+  beforeEach(() => {
+    errors = [];
+    setActiveOutput(sinkOutput({ error: (line) => errors.push(line) }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** A tracker beside the repository, as `.rafa/plans` holds it under the project root. */
+  const trackerIn = (name: string): string => {
+    const path = join(scratch, `${name}-TRACKER.md`);
+    writeFileSync(path, TRACKER);
+    return path;
+  };
+
+  it('lets the commit go on while the checkout holds, and halts on the same work once a commit is made outside the loop', () => {
+    const root = repository('commit-held');
+    const trackerPath = trackerIn('commit-held');
+    const expected = openIn(root);
+    writeFileSync(join(root, 'f.txt'), 'the session\'s work\n');
+
+    expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK, before: 'commit' })).toBe(false);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    expect(errors).toEqual([]);
+
+    writeFileSync(join(root, 'other.txt'), 'by hand\n');
+    git(root, ['add', 'other.txt']);
+    git(root, ['commit', '-q', '-m', 'made in another terminal']);
+    const outside = git(root, ['rev-parse', 'HEAD']);
+
+    expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK, before: 'commit' })).toBe(true);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(CHECKOUT_MOVED);
+    expect(errors).toEqual([
+      `\n⛔ Run halted: ${CHECKOUT_MOVED} in ${root}. Nothing was committed.`,
+      `   Expected: ${BRANCH} at ${expected.head.slice(0, 12)}`,
+      `   Found:    ${BRANCH} at ${outside.slice(0, 12)}`,
+      `   Restore:  git reset --soft ${expected.head}`,
+      '   Uncommitted work was left where it is; the checkout was not switched back.',
+      `   Task marked as blocked on ${CHECKOUT_MOVED}; its session's work was left uncommitted. Restore the checkout, then run again to retry the task.`,
+    ]);
+    expect(readFileSync(join(root, 'f.txt'), 'utf8')).toBe('the session\'s work\n');
+    expect(git(root, ['status', '--porcelain'])).toBe('M f.txt');
+    expect(git(root, ['rev-parse', 'HEAD'])).toBe(outside);
+  });
+
+  it('holds across two task commits the loop made, advanced from each attempt, and halts on a branch switched after the second', () => {
+    const root = repository('two-commits');
+    const trackerPath = trackerIn('two-commits');
+    let expected = openIn(root);
+
+    for (const text of ['first', 'second']) {
+      writeFileSync(join(root, 'f.txt'), `${text}\n`);
+      expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK, before: 'commit' })).toBe(false);
+      expected = advanceExpectation(expected, commitTaskWork({ taskText: `Write the ${text} line`, cwd: root }));
+      expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK })).toBe(false);
+    }
+    expect(expected.head).toBe(git(root, ['rev-parse', 'HEAD']));
+    expect(git(root, ['rev-list', '--count', 'HEAD'])).toBe('3');
+
+    writeFileSync(join(root, 'f.txt'), 'the third task\'s work\n');
+    git(root, ['switch', '-q', '-c', 'elsewhere']);
+    expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK, before: 'commit' })).toBe(true);
+    expect(errors[2]).toBe(`   Found:    elsewhere at ${expected.head.slice(0, 12)}`);
+    expect(errors[3]).toBe(`   Restore:  git switch ${BRANCH}`);
+    expect(git(root, ['rev-list', '--count', 'elsewhere'])).toBe('3');
+  });
+
+  it('halts on a commit the task\'s own session made, which the loop never advanced to', () => {
+    const root = repository('session-commit');
+    const trackerPath = trackerIn('session-commit');
+    const expected = openIn(root);
+    writeFileSync(join(root, 'f.txt'), 'committed by the session\n');
+    git(root, ['commit', '-q', '-am', 'the session committed']);
+
+    expect(haltIfCheckoutMoved({ expected, trackerPath, taskInfo: NEXT_TASK, before: 'commit' })).toBe(true);
+    expect(errors.at(-1)).toContain('its session\'s work was left uncommitted');
+  });
+});
+
+describe('the guard around the wrap-up', () => {
+  let errors: string[] = [];
+
+  beforeEach(() => {
+    errors = [];
+    setActiveOutput(sinkOutput({ error: (line) => errors.push(line) }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('dispatches the wrap-up while the checkout holds, and halts it on a switched branch, writing no tracker', () => {
+    const root = repository('wrap-up-dispatch');
+    const expected = openIn(root);
+    expect(haltIfWrapUpMoved({ expected, before: 'dispatch' })).toBe(false);
+    expect(errors).toEqual([]);
+
+    git(root, ['switch', '-q', 'main']);
+    expect(haltIfWrapUpMoved({ expected, before: 'dispatch' })).toBe(true);
+    expect(errors[0]).toBe(`\n⛔ Run halted: ${CHECKOUT_MOVED} in ${root}. Nothing was committed.`);
+    expect(errors[3]).toBe(`   Restore:  git switch ${BRANCH}`);
+    expect(errors.at(-1)).toBe('   The wrap-up was not started. Restore the checkout, then run again to retry the wrap-up.');
+    expect(git(root, ['symbolic-ref', '--short', 'HEAD'])).toBe('main');
+  });
+
+  it('halts the wrap-up on a commit made outside the loop since its last task commit', () => {
+    const root = repository('wrap-up-outside');
+    const expected = openIn(root);
+    git(root, ['commit', '-q', '--allow-empty', '-m', 'by hand']);
+    expect(haltIfWrapUpMoved({ expected, before: 'dispatch' })).toBe(true);
+    expect(errors[3]).toBe(`   Restore:  git reset --soft ${expected.head}`);
+  });
+
+  it('re-bases the release commit\'s expectation on the commits the wrap-up session left on the run\'s branch', () => {
+    const root = repository('wrap-up-commits');
+    const expected = openIn(root);
+    expect(expectWrapUpCommits(expected)).toBe(expected);
+
+    writeFileSync(join(root, 'f.txt'), 'promoted\n');
+    git(root, ['commit', '-q', '-am', 'docs: promote the findings']);
+    git(root, ['commit', '-q', '--allow-empty', '-m', 'Merge main']);
+    const rebased = expectWrapUpCommits(expected);
+
+    expect(rebased).toEqual({ ...expected, head: git(root, ['rev-parse', 'HEAD']) });
+    expect(Object.isFrozen(rebased)).toBe(true);
+    expect(expected.head).not.toBe(rebased.head);
+    expect(haltIfWrapUpMoved({ expected: rebased, before: 'release' })).toBe(false);
+    expect(haltIfWrapUpMoved({ expected, before: 'release' })).toBe(true);
+    expect(errors).not.toEqual([]);
+  });
+
+  it('keeps the expectation on a switched branch, so the release commit halts, headlined as the release not committed', () => {
+    const root = repository('wrap-up-switched');
+    const expected = openIn(root);
+    git(root, ['commit', '-q', '--allow-empty', '-m', 'the session\'s commit']);
+    git(root, ['switch', '-q', 'main']);
+
+    const kept = expectWrapUpCommits(expected);
+    expect(kept).toBe(expected);
+    expect(haltIfWrapUpMoved({ expected: kept, before: 'release' })).toBe(true);
+    expect(errors[0]).toBe(`\n⛔ Run halted: ${CHECKOUT_MOVED} in ${root}. The release was not committed.`);
+    expect(errors[1]).toBe(`   Expected: ${BRANCH} at ${expected.head.slice(0, 12)}`);
+    expect(errors[2]).toBe(`   Found:    main at ${expected.head.slice(0, 12)}`);
+    expect(errors[3]).toMatch(/^ {3}Restore: {2}git stash push -u -m .+ && git switch feat\/rafa-370$/);
+    expect(errors.at(-1)).toBe('   The wrap-up session\'s own commits stand; the release commit, its push and the CI wait were skipped. Restore the checkout, then run again to retry the wrap-up.');
+    expect(git(root, ['symbolic-ref', '--short', 'HEAD'])).toBe('main');
+  });
+
+  it('halts the release commit on a worktree removed under its loop, and recreates nothing', () => {
+    const root = repository('wrap-up-root');
+    git(root, ['switch', '-q', 'main']);
+    const checkout = join(scratch, 'wrap-up-worktree');
+    git(root, ['worktree', 'add', '-q', checkout, BRANCH]);
+    const expected = openCheckoutExpectation({ projectRoot: root, checkout, branch: BRANCH });
+    expect(haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })).toBe(false);
+
+    rmSync(checkout, { recursive: true, force: true });
+    const kept = expectWrapUpCommits(expected);
+    expect(kept).toBe(expected);
+    expect(haltIfWrapUpMoved({ expected: kept, before: 'release' })).toBe(true);
+    expect(existsSync(checkout)).toBe(false);
+    expect(errors[2]).toBe(`   Found:    no checkout: ${checkout} does not exist`);
   });
 });

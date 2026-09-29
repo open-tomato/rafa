@@ -108,12 +108,16 @@
  * HEAD it started from, moved on by each commit a task's attempt makes
  * (`start/checkout-watch.ts`). Before each task is dispatched, and
  * before `progress.txt` is written into the checkout, the loop guard
- * reads the checkout (`start/checkout-guard.ts`). A checkout on another
- * branch, at another commit, or gone marks the task `[BLOCKED]` with
- * `checkout moved` as its blocker text and stops the run: no session is
- * spawned, nothing is committed, the checkout is not switched back, and
- * the output names the branch expected, what was found and the one
- * command that restores it.
+ * reads the checkout (`start/checkout-guard.ts`), and again before each
+ * task commit. A checkout on another branch, at another commit, or gone
+ * marks the task `[BLOCKED]` with `checkout moved` as its blocker text
+ * and stops the run: no further session is spawned, nothing is
+ * committed, the checkout is not switched back, and the output names the
+ * branch expected, what was found and the one command that restores it.
+ * A halt before the commit stores the session's report as `blocked`. The guard
+ * also runs before the wrap-up session, marking nothing since the
+ * wrap-up has no tracker line, and before the loop's release commit,
+ * where it holds only the branch: the wrap-up session commits itself.
  *
  * Before the tracker is created and before any session is spawned, the
  * wrap-up's included, the run's preflight checks the configured
@@ -266,7 +270,13 @@ import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
-import { advanceExpectation, haltIfCheckoutMoved, openCheckoutExpectation } from './start/checkout-watch.js';
+import {
+  advanceExpectation,
+  expectWrapUpCommits,
+  haltIfCheckoutMoved,
+  haltIfWrapUpMoved,
+  openCheckoutExpectation,
+} from './start/checkout-watch.js';
 import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit } from './start/commit.js';
 import {
@@ -484,8 +494,12 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const taskInfo = findNextTask(trackerContent);
 
       // The loop guard, before anything is written into the checkout: a
-      // moved or missing one marks the task `[BLOCKED]` and stops the run.
-      if (taskInfo && haltIfCheckoutMoved({ expected, trackerPath, taskInfo })) return;
+      // moved or missing one marks the task `[BLOCKED]`, or before the
+      // wrap-up marks nothing, and stops the run.
+      const moved = taskInfo
+        ? haltIfCheckoutMoved({ expected, trackerPath, taskInfo })
+        : haltIfWrapUpMoved({ expected, before: 'dispatch' });
+      if (moved) return;
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
@@ -508,6 +522,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           planContent,
         });
         await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
+        // The loop guard before the loop's own release commit, against the
+        // HEAD the wrap-up session's commits left on the run's branch: a
+        // moved branch or a gone checkout skips the commit, push and wait.
+        if (haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })) return;
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
         // refusal, the `chore: release` commit and its push. A release
@@ -595,6 +613,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
         activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
         await storeReport('failed');
+        return;
+      }
+
+      // The loop guard before the task commit: a moved or missing checkout
+      // commits nothing and stores the task blocked on `checkout moved`.
+      if (haltIfCheckoutMoved({ expected, trackerPath, taskInfo, before: 'commit' })) {
+        await storeReport('blocked');
         return;
       }
 
