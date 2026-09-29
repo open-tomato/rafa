@@ -337,6 +337,22 @@ New; it replaces no earlier text. What a row or an action added to
   Without the flag neither file is read and the record carries no `hop`
   key; `parseSessionRecord` (`loop/sessions.ts`) refuses a `hop` key
   holding anything but a hop record, and every later write keeps it.
+- **`loop start --as-worktree` creates a new git worktree for the loop to run
+  in, alongside the main checkout** (`start/run-config.ts`, `start/session.ts`):
+  the worktree is created under `.rafa/worktrees/` by default, or in the
+  directory `loop.worktreeDir` names when configured. The project root and
+  checkout stay separate: the root owns `.rafa/`, the config and the store,
+  while the checkout (the worktree) is where the loop creates the branch and
+  runs; you stay on `main` in the original checkout and can work there while
+  the loop runs beside you. The worktree carries its own checked-out branch
+  (the feature branch the loop creates), and `loop list` names it in the
+  `worktree` column, one per run. Worktrees on merged branches are left idle
+  for `rafa cleanup` to find and remove. The loop guard compares the checkout's
+  branch and HEAD against what the run was given when it started, and halts
+  with the work kept if either changes externally; the guard fires on every
+  loop, with or without `--as-worktree`, and never interferes with the loop's
+  own commits. Without `--as-worktree` the checkout is the project root itself,
+  and you run the loop where you already are.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
@@ -898,9 +914,12 @@ New; it replaces no earlier text. What a row or an action added to
   `installRuntime` (`src/runtime/install.ts`), the script from the
   checkout and the command from the bundle. The command alone first reads
   the session records under the project root's `.rafa/runs/` and refuses
-  with 1 while one reads `running` or `paused` with its pid alive, naming
-  each loop's branch, pid and session, unless `dangerous.selfUpdateDuringLoop`
-  is true; `--force` does not override that wait. In the project root it reads
+  with exit code 1 when a live loop is found reading `running` or `paused`
+  with its pid alive, naming each loop's branch, pid and session id so you
+  know what is running. The wait can be bypassed with `dangerous.selfUpdateDuringLoop:
+  true` in the config, allowing the binary to be swapped even during a loop run,
+  or deferred until the loops complete; `--force` does not override the guard.
+  In the project root it reads
   `package.json`, refusing one not named `@open-tomato/rafa`, then
   `plan.dir` as `loop start` resolves the config, then each
   `PLAN_TRACKER*.md` directly in `plan.dir`, refusing while one holds an
@@ -1766,9 +1785,10 @@ New; it replaces no earlier text. What a row or an action added to
   from its tracker and gives a live session a rough ETA from the store's
   `done` finishes since the session started
   (`effort/store/task-finishes.ts`). `list` lists every live record and
-  reads no branch; a row ends with the record's `worktree`, the path a
-  run whose checkout is a linked worktree records (`start/session.ts`),
-  or `in the main checkout` for a record carrying none. In json mode each gives its reading as the result's
+  reads no branch; a row names each session's branch and end with the
+  `worktree` column (`src/commands/loop/loop-sessions.ts`): the path to the
+  worktree if the run was started with `--as-worktree` (`start/session.ts`),
+  or `in the main checkout` if the checkout is the project root. In json mode each gives its reading as the result's
   `data`; text mode writes lines.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
