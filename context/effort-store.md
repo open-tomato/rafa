@@ -314,7 +314,8 @@ caller states `access`.** `keys`, `read` and every reader outside the
 port pass `'read'`; every writer passes `'write'`, and so does
 `writeSqliteStore` for an empty write. The open sets `PRAGMA
 busy_timeout` to `effort.busyTimeoutMs`, then calls `bringForward(db,
-path, access, 'open')` before `use`. A read of a current store writes nothing;
+path, access, 'open')` and `settleStoreIdentity` (`store-meta.ts`,
+which mints only on a write) before `use`. A read of a current store writes nothing;
 a read of a pre-log store adopts it, since adoption counts as a write,
 unless a development build is refused it as above; a
 store logging an unknown migration that breaks only writers is read and
@@ -363,9 +364,24 @@ own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and
 `merge_conflicts` each incoming row one could not settle. No writer
-fills them yet.
-`src/effort/store/store-identity.ts` reads what `store_meta` records and
-decides, on a write, whether to mint; nothing calls it yet. The host id
+fills `merges` or `merge_conflicts` yet.
+`src/effort/store/store-identity.ts` decides, on a write, whether to
+mint, and `store-meta.ts` reads and writes the row: `withSqliteStore`
+calls `settleStoreIdentity` after `bringForward`, so a `write` open
+mints when the row is absent or a fact moved, under `BEGIN IMMEDIATE`
+with a second decision, and a `read` open never reads or writes it,
+which is why `rafa effort schema` leaves an unminted store's bytes
+unchanged. A write that keeps the origin asks git nothing. A mint
+records the project git reads in the store file's directory, or the
+one the row already names when git finds no root commit there; with
+neither, as for a store under `tmpdir()` outside a repository with
+commits, the column is `NOT NULL` and nothing is written, so such a
+store stays unminted and each writing open asks git again. A test
+passes `withSqliteStore` its fifth argument to inject the host and the
+project. SQLite's INTEGER is signed and bun binds a bigint past 2^63
+by wrapping it without a word, so the device and inode are written as
+their two's complement and read back through `CAST(… AS TEXT)` as
+unsigned. The host id
 is an HMAC of `/etc/machine-id`, the macOS platform UUID or the
 hostname, never the raw value, since `machine-id(5)` asks for a keyed
 hash and a store travels. The path is the real path, so a symlinked

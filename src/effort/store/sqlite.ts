@@ -194,6 +194,10 @@
  *     message ends with the one command to run next, and no byte is
  *     written. A store logging a migration this rafa does not know,
  *     which breaks only older writers, is read and refused a write.
+ *   - Once the store is brought forward, a write open mints its origin
+ *     into `store_meta` when it holds none or is a copy
+ *     (`store-meta.ts`). A read open never touches that row, so a read
+ *     of a current store still writes nothing, minted or not.
  *
  * {@link migrateSchema} counts the history by position and keeps no
  * log. No open and no command goes through it; `fix-schema.ts` builds
@@ -202,6 +206,7 @@
  */
 import type { SqliteMigration } from './migrations.js';
 import type { StoreAccess } from './schema-plan.js';
+import type { StoreIdentitySeams } from './store-meta.js';
 import type {
   AppendResult,
   EffortRow,
@@ -218,6 +223,7 @@ import { bringForward } from './bring-forward.js';
 import { effortStoreDir, guardTestProcess } from './location.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 import { activeStoreSettings } from './settings.js';
+import { settleStoreIdentity } from './store-meta.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
 export { SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './migrations.js';
@@ -399,7 +405,8 @@ export function migrateSchema(
  * directory before anything is made (`guardTestProcess`, `location.ts`),
  * then opens the store at `path`, sets its busy timeout to the active
  * `effort.busyTimeoutMs` (`settings.ts`), brings its schema
- * forward through `bringForward` for an open with `access`, hands it to
+ * forward through `bringForward` for an open with `access`, settles its
+ * identity through `settleStoreIdentity` (`store-meta.ts`), hands it to
  * `use`, and closes it whatever `use` did. A refused store throws
  * `SchemaRefusedError` before `use` runs. Only a caller with a row to
  * add passes `create`, and only then is the directory made.
@@ -407,7 +414,11 @@ export function migrateSchema(
  * `access` is `write` for every caller that may write, whether or not
  * it ends up writing, and `read` for one that only reads. A read can
  * still write the store, when it adopts one or applies what is pending;
- * the module note says when.
+ * the module note says when. Only a write mints: it records a new
+ * origin in `store_meta` when the store holds none or is a copy, and a
+ * read never reads or writes that row. `identity` is what the mint
+ * reads the host, the project and the clock through; every caller but
+ * a test leaves it out.
  *
  * Exported so the tables outside the port are opened, brought forward
  * and closed exactly as every kind's is. A write that can be left with
@@ -418,6 +429,7 @@ export function withSqliteStore<T>(
   access: StoreAccess,
   create: boolean,
   use: (db: Database) => T,
+  identity: StoreIdentitySeams = {},
 ): T {
   guardTestProcess(path);
   if (create) mkdirSync(dirname(path), { recursive: true });
@@ -426,6 +438,7 @@ export function withSqliteStore<T>(
   try {
     db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
     bringForward(db, path, access, 'open');
+    settleStoreIdentity(db, path, access, identity);
     return use(db);
   } finally {
     db.close();

@@ -10,6 +10,7 @@ import type { SqliteMigration } from '../../effort/store/migrations.js';
 import type { SchemaReport } from '../../effort/store/schema-report.js';
 import type { CapturedRun, ScratchRepo } from '../../tests/cli-capture.js';
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,7 +20,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { bringForward } from '../../effort/store/bring-forward.js';
 import { REFUSAL_REASONS } from '../../effort/store/schema-plan.js';
-import { migrateSchema, SQLITE_MIGRATIONS } from '../../effort/store/sqlite.js';
+import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
+import { readStoreMeta } from '../../effort/store/store-meta.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createSchemaCommand } from './schema.js';
@@ -98,6 +100,25 @@ function tamper(path: string, statements: readonly string[]): void {
 function unknownRow(id: string, breaks: readonly string[]): string {
   return 'INSERT INTO schema_migrations (id, sha256, breaks, applied_at, applied_by)'
     + ` VALUES ('${id}', '${'a'.repeat(64)}', '${JSON.stringify(breaks)}', '2026-10-01T09:00:00.000Z', '0.30.0')`;
+}
+
+/** Gives the scratch repository a root commit, so a mint of a store in it can name its project. */
+function commitRoot(scratch: ScratchRepo): void {
+  execFileSync('git', ['-c', 'user.name=rafa-test', '-c', 'user.email=rafa-test@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'root'], {
+    cwd: scratch.repo,
+    stdio: 'pipe',
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+  });
+}
+
+/** Every `store_meta` row of the store at `path`, read on a read-only connection. */
+function storeMetaRows(path: string): unknown[] {
+  const db = new Database(path, { readonly: true });
+  try {
+    return db.query('SELECT store_id FROM store_meta').all();
+  } finally {
+    db.close();
+  }
 }
 
 /** One planted store per refusal a spawned run can meet, with the next step each names. */
@@ -257,6 +278,26 @@ describe('rafa effort schema over a store this rafa uses', () => {
     }
     expect(Buffer.compare(readFileSync(path), before)).not.toBe(0);
   });
+
+  it('leaves an unminted store in a project with a root commit byte-identical, while a write open over it, the control, mints', () => {
+    const scratch = plantScratchRepo(tempBase);
+    commitRoot(scratch);
+    const path = plantCurrent(scratch.repo);
+    const before = readFileSync(path);
+
+    const run = schema(scratch, ['--check']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('✅ Current:');
+    expect(Buffer.compare(readFileSync(path), before)).toBe(0);
+    expect(storeMetaRows(path)).toEqual([]);
+    // Control: a write open of the same file mints from the project's own git, so the report could have written the row.
+    const meta = withSqliteStore(path, 'write', false, (db) => readStoreMeta(db), { readHostId: () => 'host-control' });
+    expect(meta?.hostId).toBe('host-control');
+    expect(meta?.projectRootCommit).toMatch(/^[0-9a-f]{40}$/);
+    expect(storeMetaRows(path)).toHaveLength(1);
+    expect(Buffer.compare(readFileSync(path), before)).not.toBe(0);
+  }, SPAWN_TIMEOUT);
 
   it('reports no store as absent with next step none, creating nothing', () => {
     const scratch = plantScratchRepo(tempBase);
