@@ -171,6 +171,52 @@ describe('the sync-fixture module under testdata', () => {
   });
 });
 
+describe('a module\'s sync adapter', () => {
+  it('is refused as a core kind when the registry it registers against already holds sync/local', async () => {
+    // Core registers no `sync` adapter yet (that lands with the local and
+    // file adapters stage), so this seeds the registry the module loads
+    // against with a `local` sync adapter through the `adapters` seam,
+    // standing in for the core kind it will collide with.
+    const seeded = CORE_ADAPTER_REGISTRY.register({
+      port: 'sync',
+      kind: 'local',
+      portVersion: PORT_VERSIONS.sync,
+      create: () => ({
+        kind: 'local',
+        push: async () => ({ status: 'nothing-to-sync' }),
+        pull: async () => ({ status: 'nothing-to-sync' }),
+      }),
+    });
+    const dir = demoModule('demo', {
+      types: ['sync'],
+      provides: { sync: { kind: 'local', entry: './tracker.ts' } },
+      requires: { rafa: '>=0.1', ports: { sync: 1 } },
+    });
+
+    const settings: ModuleSettings = { modules: [pathSource(dir)], allowList: ['demo'], base: tempBase };
+    const loaded = await loadModules(settings, { manifest: MANIFEST_SEAMS, adapters: seeded });
+
+    expect(loaded.warnings).toEqual(['module "demo": adapter registry: sync/local is already registered']);
+    expect(loaded.modules[0]?.state).toBe('refused');
+    expect(loaded.adapters).toBe(seeded);
+  });
+
+  it('names both port numbers when core does not serve the sync version its manifest states', async () => {
+    const dir = demoModule('demo', {
+      types: ['sync'],
+      provides: { sync: { kind: 'demo-sync', entry: './tracker.ts' } },
+      requires: { rafa: '>=0.1', ports: { sync: 2 } },
+    });
+
+    const loaded = await load([pathSource(dir)], ['demo']);
+
+    expect(loaded.warnings).toEqual([`module "demo": ${join(dir, 'package.json')}: rafa.requires.ports.sync is 2, but core serves sync port version 1`]);
+    expect(loaded.modules[0]?.state).toBe('refused');
+    expect(loaded.adapters.find('sync', 'demo-sync')).toBeUndefined();
+    expect(loaded.commands).toEqual([]);
+  });
+});
+
 describe('a module allowList does not name', () => {
   it('is read and validated, and loads nothing and warns about nothing', async () => {
     const dir = demoModule();
