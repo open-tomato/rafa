@@ -175,11 +175,12 @@ the next one, so you rarely have to remember it.
 ### Tracking effort and learning from skills
 
 Each run records what it cost in time, tokens and work, and which skills
-were offered, invoked and worked. Two commands read that record:
+were offered, invoked and worked. Key commands for the effort record:
 
 ```bash
 rafa effort collect        # gather and store session logs
 rafa effort report         # per-plan summary: sessions, tasks, costs
+rafa effort merge <file>   # join another device's store into this one
 ```
 
 `rafa effort report` shows the per-plan tables (sessions by status and
@@ -209,6 +210,26 @@ by ranking, or `none`):
 The report opens with a fixed line explaining that it shows co-occurrence,
 not causation: a skill can be invoked and its failure recur for reasons the
 skill does not cover.
+
+### Starting a second device
+
+To run rafa on a second device for the same project, bring the effort
+store over consistently:
+
+1. On the new device, check for an existing `.rafa/effort/` store and set
+   it aside (rename or back up).
+2. From the primary device, make a consistent copy:
+   ```bash
+   rafa effort copy --to=<path>
+   ```
+   Or use `sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, but never
+   a plain file copy during a write.
+3. Transfer the copied store and `.rafa/config.yaml` to the new device's
+   `.rafa/` directory.
+4. After both devices have recorded effort, bring them back together with:
+   ```bash
+   rafa effort merge <copied-store-file>
+   ```
 
 ### Which agents and skills are involved
 
