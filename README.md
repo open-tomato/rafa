@@ -180,7 +180,7 @@ were offered, invoked and worked. Key commands for the effort record:
 ```bash
 rafa effort collect        # gather and store session logs
 rafa effort report         # per-plan summary: sessions, tasks, costs
-rafa effort merge <file>   # join another device's store into this one
+rafa effort import <file>  # merge another device's store into this one
 ```
 
 `rafa effort report` shows the per-plan tables (sessions by status and
@@ -245,10 +245,41 @@ counts the time between tasks too, so it is the one to compare against
 the clock. Then come the trend, the loops, each plan's skills M1 and M2,
 and the totals of every stored session.
 
+### Choosing how the effort store travels
+
+An effort store can travel between a project's devices in different ways, each
+suited to different setups. Set `effort.sync` in `.rafa/config.yaml`:
+
+| Setup | Strategy | Why |
+|---|---|---|
+| One laptop | `local` | Nothing to sync |
+| Two personal devices, occasional | `file` | No server, no account; copy a file |
+| Personal projects, frequent | `git` | History and access from git, works offline |
+| A company or several teams | `service` | One hub, live status, shared rules |
+| Advanced, exploratory | `p2p` | Devices talk directly (spike) |
+
+Configuration examples:
+
+```yaml
+# Default: no sync, each device keeps its own store
+# (nothing set, or effort: {sync: local})
+
+# File exchange with no server
+effort:
+  sync: file
+
+# Hub-based sync (requires module and service URL)
+effort:
+  sync: service
+  syncUrl: https://hub.example.com
+```
+
+Only `local` and `file` ship with rafa; `git`, `service` and `p2p` need a module.
+
 ### Starting a second device
 
-To run rafa on a second device for the same project, bring the effort
-store over consistently:
+To run rafa on a second device for the same project, bring the effort store over
+consistently using `rafa effort copy` and `rafa effort import`:
 
 1. On the new device, check for an existing `.rafa/effort/` store and set
    it aside (rename or back up).
@@ -259,10 +290,11 @@ store over consistently:
    Or use `sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, but never
    a plain file copy during a write.
 3. Transfer the copied store and `.rafa/config.yaml` to the new device's
-   `.rafa/` directory.
+   `.rafa/` directory. **The exported file holds private text — task
+   descriptions, findings, and notes — meant only for your own devices.**
 4. After both devices have recorded effort, bring them back together with:
    ```bash
-   rafa effort merge <copied-store-file>
+   rafa effort import <copied-store-file>
    ```
 
 ### Which agents and skills are involved
