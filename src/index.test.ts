@@ -662,6 +662,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
+  ['./commands/effort/dashboard.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config.js', ['ConfigError']],
+    ['../../effort/dashboard-format.js', ['formatDashboard']],
+    ['../../effort/dashboard.js', ['readDashboard']],
+    ['../../effort/report-args.js', ['parseReportArgs']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'requireProject']],
+  ]],
   ['./commands/effort/fix-schema.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../effort/store/fix-schema.js', ['fixStoreSchema', 'SchemaFixRefusal']],
@@ -1288,6 +1296,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/wait.js',
       './commands/pr/merge.js',
       './commands/pr/triage.js',
+      './commands/effort/dashboard.js',
       './commands/effort/fix-schema.js',
       './commands/effort/copy.js',
       './commands/effort/schema.js',

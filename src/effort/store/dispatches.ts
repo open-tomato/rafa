@@ -351,3 +351,39 @@ export function readSessionBudgets(repoRoot: string): SessionBudget[] {
     budgetUsd: row.budget_usd,
   }));
 }
+
+/** One dispatched session's agent. */
+export interface SessionAgent {
+  /** The session's id, which its session row is keyed by. */
+  readonly sessionId: string;
+  /** The agent its task declared. */
+  readonly agent: string;
+}
+
+/** Every row naming an agent, in append order. */
+const SELECT_AGENTS = `
+  SELECT session_id, agent
+  FROM dispatches
+  WHERE agent IS NOT NULL
+  ORDER BY seq
+`;
+
+/**
+ * The sessions dispatched with an agent, in the order they were stored.
+ *
+ * Answers none, opening and creating nothing, when the store file does
+ * not exist. Throws when it exists and cannot be read. See the module
+ * note.
+ */
+export function readSessionAgents(repoRoot: string): SessionAgent[] {
+  const path = sqliteStorePath(repoRoot);
+  if (!existsSync(path)) return [];
+
+  const rows = withSqliteStore(
+    path,
+    'read',
+    false,
+    (db) => db.query<{ session_id: string; agent: string }, []>(SELECT_AGENTS).all(),
+  );
+  return rows.map((row) => ({ sessionId: row.session_id, agent: row.agent }));
+}

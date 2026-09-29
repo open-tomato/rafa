@@ -211,6 +211,40 @@ The report opens with a fixed line explaining that it shows co-occurrence,
 not causation: a skill can be invoked and its failure recur for reasons the
 skill does not cover.
 
+To see whether task sessions are getting more expensive over time, and
+whether that follows the plan or the calendar:
+
+```bash
+rafa effort report --trend                      # last 3 days against the 14 before, then the loops
+rafa effort report --trend --loops=10 --by=effort
+```
+
+The trend report has two parts. **Trend** compares the recent task
+sessions with a baseline: median and p90 of minutes, output tokens,
+cache-read tokens and turns per task, one row per day, and the sessions
+over the outlier line (baseline median plus three robust standard
+deviations). **Loops** lists one row per plan's loop, newest first: its
+wall-clock and summed task time, number of tasks, minutes per task (min,
+max, average, median), and average tokens and turns per task. Under the
+rows, a drift reading tests each per-task figure across the loops in the
+order they ran (the Mann-Kendall trend test). `no steady trend` means the
+cost moves with the plan; `rising` means it grows whatever the plan.
+
+To see everything at once, the loops running now included:
+
+```bash
+rafa effort collect && rafa effort dashboard
+rafa effort dashboard --output=json             # one key per widget, for a dashboard
+```
+
+The dashboard prints the running loops with their tasks done over total
+and three estimates of the time left: **by task** (the plan's average task
+session), **by progress** (the time since the plan first started, per task
+done), and **this session** (what `rafa loop status` prints). By progress
+counts the time between tasks too, so it is the one to compare against
+the clock. Then come the trend, the loops, each plan's skills M1 and M2,
+and the totals of every stored session.
+
 ### Starting a second device
 
 To run rafa on a second device for the same project, bring the effort
