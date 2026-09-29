@@ -718,6 +718,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['./fix-schema.js', ['fileStamp']],
   ]],
+  ['./commands/effort/import.js', [
+    ['../../effort/sync/file.js', ['createFileSync']],
+    ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
+    ['./merge.js', ['mergeRefusalExit', 'mergeTargetPath', 'renderMerge']],
+  ]],
   ['./commands/effort/move.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
@@ -1305,6 +1310,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/effort/schema.js',
       './commands/effort/migrate.js',
       './commands/effort/merge.js',
+      './commands/effort/import.js',
       './commands/effort/move.js',
       './commands/module/list.js',
       './commands/module/exec.js',

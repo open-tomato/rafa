@@ -243,6 +243,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.find((action) => action.name === 'dashboard')?.spends).toBeNull();
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('migrate');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('merge');
+    expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('import');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('move');
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
   });
@@ -282,6 +283,7 @@ describe('the document over the core registry', () => {
     expect(spendsOf('effort', 'schema')).toBeNull();
     expect(spendsOf('effort', 'migrate')).toBeNull();
     expect(spendsOf('effort', 'merge')).toBeNull();
+    expect(spendsOf('effort', 'import')).toBeNull();
     expect(spendsOf('effort', 'move')).toBeNull();
   });
 });
