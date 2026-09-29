@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the seventy registered so far wrap a
+ * of each is its command. Five of the seventy-one registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -290,6 +290,7 @@ import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortCopy from './effort/copy.js';
+import effortDashboard from './effort/dashboard.js';
 import effortFixSchema from './effort/fix-schema.js';
 import effortMigrate from './effort/migrate.js';
 import effortReport from './effort/report.js';
@@ -398,6 +399,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   prTriage,
   effortCollect,
   effortReport,
+  effortDashboard,
   effortFixSchema,
   effortCopy,
   effortSchema,

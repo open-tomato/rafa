@@ -239,6 +239,8 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('copy');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('schema');
+    expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('dashboard');
+    expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.find((action) => action.name === 'dashboard')?.spends).toBeNull();
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('migrate');
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
   });

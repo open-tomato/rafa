@@ -289,7 +289,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue ready`, `issue unblock` and `issue check`;
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
-  `effort collect`, `effort report`, `effort copy`, `effort schema`, `effort migrate`, `module list`, `module exec`,
+  `effort collect`, `effort report`, `effort dashboard`, `effort copy`, `effort schema`, `effort migrate`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
@@ -394,8 +394,11 @@ New; it replaces no earlier text. What a row or an action added to
   report as the terminal result's `data`, the document phase 0's `--json`
   printed with the task report tallies, the preflight halts and the
   budgeted sessions added, or under `--skills` the `SkillsReport`
-  (`src/effort/report-skills.ts`), and
-  writes no table line. `plan create`, `effort collect` and
+  (`src/effort/report-skills.ts`), or under `--trend` the `TrendReport`
+  (`src/effort/report-trend.ts`), and
+  writes no table line. `effort dashboard` gives the `Dashboard`
+  (`src/effort/dashboard.ts`), one key per widget: `status`, `trend`,
+  `loops`, `skills` and `totals`, beside `generatedAt`. `plan create`, `effort collect` and
   `usage` write each line as a `log` event of its level and give no
   result.
 - **The plan readers start no session, and read the configured
