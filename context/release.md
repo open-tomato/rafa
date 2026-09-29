@@ -138,7 +138,7 @@ A planted edit outside the fragment — to the version file, the changelog
 or another fragment — is caught by step 3's check and refused, the
 fragment restored, and reported.
 
-### Two release actions
+### Three release actions
 
 **`rafa release status`** — Read-only. Prints four lines:
 - The version `release.versionFile` declares now
@@ -149,6 +149,12 @@ fragment restored, and reported.
   would render into the next changelog)
 
 Exits 0. Never writes.
+
+**`rafa release settle [--dry-run]`** — Folds the fragments waiting on the
+base branch into one version and one changelog section in a scratch
+worktree of `origin/<pr.base>`, commits `chore: release <version>` and
+delivers it by `release.settle`; `--dry-run` prints the same reading and
+writes nothing. What it prints and its exit codes are in `context/cli.md`.
 
 **`rafa release tag`** — Puts `v<version>` on the commit of the release
 branch that SET that version, when the version file says so and the tag is

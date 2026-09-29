@@ -1,5 +1,6 @@
 /**
- * `rafa release tag`: the one WRITE of the `release` subject. It puts
+ * `rafa release tag`: the TAG write of the `release` subject, whose
+ * other write, the release commit, is `./settle.ts`'s. It puts
  * `v<version>` on the commit of the release branch that SET that
  * version, which is HEAD unless merges landed after it, when every
  * reading agrees that version is the one to tag, and then prints the
