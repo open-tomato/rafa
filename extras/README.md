@@ -11,6 +11,32 @@ themes, terminal apps and, later, IDEs. Nothing here is part of rafa.
 - **Not planned work.** These are experiments to revisit per terminal,
   shell and IDE. An entry that proves itself can become a spec later.
 
+## Where to keep it
+
+Link or source these files from a checkout that stays on `main`, never
+from the checkout you work in. A working checkout moves between
+branches, and one branched before an entry existed has no such file, so
+a link into it breaks and the shell falls back or errors at start.
+
+A plain clone does it:
+
+```bash
+git clone https://github.com/open-tomato/rafa.git ~/rafa-extras
+```
+
+or, next to a clone you already have, a detached worktree that shares
+its objects and never holds the `main` branch itself:
+
+```bash
+git -C <your-rafa-clone> fetch origin
+git -C <your-rafa-clone> worktree add --detach ~/rafa-extras origin/main
+```
+
+Update it with `git -C ~/rafa-extras pull` for the clone, or
+`git -C ~/rafa-extras fetch origin && git -C ~/rafa-extras checkout
+--detach origin/main` for the worktree. The examples in each entry use
+`~/rafa-extras`.
+
 ## Entries
 
 | Entry | What it gives | Tested with |

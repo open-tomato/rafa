@@ -73,16 +73,28 @@ than zsh counts it.
 
 ## Adding it
 
-The theme sources the rafa-prompt plugin from beside it, so link the
-theme file itself and leave the directories where they are.
+Keep the files in a checkout that stays on `main` (see
+[Where to keep it](../../README.md#where-to-keep-it)); the examples use
+`~/rafa-extras`. The theme sources the rafa-prompt plugin from beside
+it, so link the theme file itself and leave the directories where they
+are.
 
 ### oh-my-zsh
 
 1. Link the theme into your custom themes:
    ```bash
-   ln -s ~/projects/open-tomato/rafa/extras/zsh/tomato/tomato.zsh-theme ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/tomato.zsh-theme
+   ln -sfn ~/rafa-extras/extras/zsh/tomato/tomato.zsh-theme ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/tomato.zsh-theme
    ```
-2. Set `ZSH_THEME="tomato"` in `~/.zshrc`.
+2. In `~/.zshrc`, in place of your `ZSH_THEME=` line, pick tomato only
+   while its file is there, so a missing checkout falls back instead of
+   failing:
+   ```zsh
+   if [[ -r ${ZSH_CUSTOM:-$ZSH/custom}/themes/tomato.zsh-theme ]]; then
+     ZSH_THEME="tomato"
+   else
+     ZSH_THEME="robbyrussell"
+   fi
+   ```
 3. Open a new terminal.
 
 You don't need the rafa-prompt plugin in `plugins=(…)`, and no
@@ -91,7 +103,8 @@ You don't need the rafa-prompt plugin in `plugins=(…)`, and no
 ### zsh without oh-my-zsh
 
 ```zsh
-source ~/projects/open-tomato/rafa/extras/zsh/tomato/tomato.zsh-theme
+[[ -r ~/rafa-extras/extras/zsh/tomato/tomato.zsh-theme ]] &&
+  source ~/rafa-extras/extras/zsh/tomato/tomato.zsh-theme
 ```
 
 `jq` is needed for the board parts; without it they are left out and

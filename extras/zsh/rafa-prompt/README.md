@@ -42,11 +42,15 @@ It never starts rafa and never reaches the network. One call took about
 
 ## Adding it
 
+Keep the files in a checkout that stays on `main` (see
+[Where to keep it](../../README.md#where-to-keep-it)); the examples use
+`~/rafa-extras`.
+
 ### oh-my-zsh
 
 1. Link the plugin into your custom plugins:
    ```bash
-   ln -s ~/projects/open-tomato/rafa/extras/zsh/rafa-prompt ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/rafa-prompt
+   ln -sfn ~/rafa-extras/extras/zsh/rafa-prompt ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/rafa-prompt
    ```
 2. Add `rafa-prompt` to `plugins=(…)` in `~/.zshrc`.
 3. Below `source $ZSH/oh-my-zsh.sh`, put the segment on the right side:
@@ -61,7 +65,7 @@ instead, for example `RPROMPT='$(rafa_prompt_info) '"$RPROMPT"`.
 ### zsh without oh-my-zsh
 
 ```zsh
-source ~/projects/open-tomato/rafa/extras/zsh/rafa-prompt/rafa-prompt.plugin.zsh
+source ~/rafa-extras/extras/zsh/rafa-prompt/rafa-prompt.plugin.zsh
 setopt prompt_subst
 RPROMPT='$(rafa_prompt_info)'
 ```
