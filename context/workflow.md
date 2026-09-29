@@ -184,6 +184,15 @@ by hyphens.
 
 ### Branch creation with loop start
 
+**Branch creation happens in the CHECKOUT, not the project root.** A single
+`rafa` project has one PROJECT ROOT (the main checkout, first entry of
+`git worktree list`) and one or more CHECKOUTS where loops run. The
+project root owns `.rafa/` and the config; the checkout is where
+`loop start` creates the feature branch and runs. Under
+`--as-worktree`, the checkout is a new worktree beside the main checkout
+(or in a directory you configure); without it, the checkout IS the project
+root, and you run the loop where you already are.
+
 **`loop start --create-branch` creates the feature branch automatically**
 when run on `main` or `master`, instead of printing a checkout instruction.
 The branch is created as `feat/<stub>` from the latest `origin/<base>`,
@@ -192,6 +201,15 @@ requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
+
+**The loop guard halts the loop if the checkout's branch changes.** Every
+loop watches the checkout's branch and HEAD. If you switch branches in
+another terminal (or pull changes that move `main`), the guard compares
+what it finds against what the run was given when it started, and halts
+with the work kept and nothing committed. The guard never interferes with
+the loop's own commits; it fires only on external changes. This replaces
+the old behavior of carrying a task's edits onto a different branch
+without warning.
 
 **A resumed `loop start` takes its tasks from `PLAN_TRACKER-<stub>.md`,
 not the plan.** Once the tracker exists, a task line appended to the plan
