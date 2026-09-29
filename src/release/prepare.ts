@@ -1,166 +1,171 @@
 /**
  * Step 1 of the release, whole: the loop's own write, run before the
- * wrap-up session is spawned, answering either the record of what it
+ * wrap-up session is spawned. It writes the plan's change fragment
+ * under `release.fragments` and answers either the record of what it
  * wrote or the one sentence saying why it wrote nothing.
  *
- * The four modules beside this one are each one reading
- * (`.rafa/specs/rafa-21-changelog-and-release.md`, step 3's first item):
- * `./enabled.ts` says whether the release runs here, `./level.ts` what
- * bump the plan is worth, `./version.ts` what `origin/main` holds and
- * what the level makes of it, and `./changelog.ts` what the entry says
- * and where it goes. This module is the order they run in, the two
- * writes at the end of it, and the record step 3 verifies against.
+ * A branch never owns a version number: this module does NOT read the
+ * base version, bump it, or touch `release.versionFile` or
+ * `release.changelog`. Versions and changelog sections are written on
+ * the base branch alone, by `rafa release settle`, folding the
+ * fragments this module leaves (`.rafa/specs/rafa-367-releases-settle-base-branch.md`).
  *
  * ```text
- * prepareRelease({ repoRoot, settings, git, declared, notes, title, now })
- *   → { kind: 'prepared', version, entry, changelog, versionFile, ... }
+ * prepareRelease({ repoRoot, settings, git, plan, declared, notes, title })
+ *   → { kind: 'prepared', plan, fragment, file, base, fetched, ... }
  *   → { kind: 'skipped', reason, sentence, ... }
  * ```
  *
- * ## Why the pure readings come first and the writes come last
+ * ## What the fragment holds
  *
- * Every reading that can refuse the release — the config, the level,
- * both files' presence, the base version, the changelog's text — is
- * taken BEFORE either file is opened for writing. A preparation that
- * cannot finish then leaves the worktree exactly as it found it, which
- * is what lets the wrap-up carry on with a sentence instead of a
- * half-written release.
+ * The file is `./fragment.ts`'s format, written by
+ * {@link serializeFragment}, so nothing written here is a file that
+ * module would refuse to read:
  *
- * Two writes remain, and they cannot be one: the version file's is
- * {@link writeManifestVersion}'s and the changelog's is this module's.
- * The version goes first, because a failure there has touched nothing.
- * A changelog write that fails after it RESTORES the version file's
- * previous bytes before answering, and says in its sentence whether
- * that restore succeeded — the one case in which this module can leave
- * a file changed, and it says so.
+ *   - `plan` is the plan id the caller passes, which is the plan stub.
+ *   - `title` is the plan's title, its whitespace collapsed to one line;
+ *     the plan id stands in when the title is empty.
+ *   - `level` is `./level.ts`'s reading: the plan's declaration, else
+ *     the highest stored note, else `none`. A `none` level is WRITTEN,
+ *     not skipped, so a missing fragment and "no release" stay two
+ *     different readings downstream.
+ *   - the notes are the plan's raw change notes as `- <area>: <summary>`
+ *     lines, grouped by area through `groupChangeNotes` and
+ *     `renderNoteLines` (`./changelog.ts`) — the grouping the fold
+ *     renders a section with — for the wrap-up session to rewrite into
+ *     one line per area in step 2.
  *
- * ## What stops a release, and what only gets reported
+ * A level other than `none` whose notes all came out empty (no note
+ * stored, or every one skipped) cannot be written bare: the format
+ * refuses a `patch`, `minor` or `major` with no body. The plan's title
+ * then becomes the one note, and {@link ReleasePrepared.problems} says
+ * so, rather than the plan's declared release being dropped.
  *
- * A FAILED FETCH does not stop it. `./version.ts` leaves that choice to
- * its caller, and this is the caller: a wrap-up that refused to prepare
- * a release because the network was down would cost the pull request
- * its entry for a reason unrelated to the diff, while a base read off
- * the ref this clone already holds is wrong only when `main` moved
- * since the last fetch — and step 3's verification and the merge the
- * wrap-up session performs both run after it. The sentence
- * `readBaseVersion` wrote lands in {@link ReleasePrepared.problems},
- * and {@link ReleasePrepared.fetched} is false, so whoever writes the
- * pull request body can say the base may be stale.
+ * ## The name, and why the base branch is read for it
  *
- * A BASE THAT CANNOT BE READ AT ALL does stop it. There is then no
- * number to bump from, and bumping from the working tree's manifest
- * instead would ship the version of whatever branch this is — which on
- * a branch whose wrap-up already ran once is the version that wrap-up
- * wrote, bumped a second time.
+ * The file is named by `allocateFragmentName`: `<plan id>.md`, or
+ * `-2`, `-3` and on when that name is taken by a fragment still
+ * waiting unsettled. "Waiting" is read off the BASE branch's tree
+ * (`./fragment-tree.ts`), after a `git fetch` of it, and not off the
+ * working tree, for two reasons:
  *
- * A MISSING CHANGELOG stops it too, version file or not. The entry is
- * the half of a release a person reads; a bump with no entry is the
- * shape this plan exists to retire, so the release writes both files or
- * neither.
+ *   - The wrap-up merges the base only after this step, so a fragment
+ *     an earlier run of the same plan left waiting on the base is not
+ *     in the working tree yet. Allocating off the working tree would
+ *     pick the same name and turn that merge into an add/add conflict.
+ *   - A fragment THIS branch wrote on an earlier wrap-up is in the
+ *     working tree and not on the base. Allocating off the base names
+ *     that same file again, so a second wrap-up rewrites it rather than
+ *     adding a second fragment of one plan to one branch.
  *
- * A MISSING VERSION FILE does not stop it, and is not a failure: the
- * spec's config section ends "a project with no version file gets the
- * changelog entry under a date heading and no bump". So the entry is
- * rendered with an empty `{version}` — `./changelog.ts` takes the
- * dangling separator with it — {@link ReleasePrepared.version} is null,
- * and no fetch runs at all, since nothing would be read from it.
+ * A FAILED FETCH does not stop the step: the tree read is then the ref
+ * this clone already holds, {@link ReleasePrepared.fetched} is false,
+ * and the sentence lands in {@link ReleasePrepared.problems}. A base
+ * tree that cannot be READ at all does stop it, since no free name can
+ * be chosen without it.
  *
  * ## The record is what step 3 works from
  *
- * Each file this module wrote is a {@link ReleaseFileEdit} carrying
- * BOTH texts: `before`, the bytes as they were, and `after`, the bytes
- * step 1 wrote. Step 3 needs both and for different readings — `after`
- * is the text it restores when it refuses the session's edit, and
- * `before` is what it compares the session's file against to see that
- * no other section of the changelog changed. Keeping them here means
- * step 3 re-reads neither file from disk to know what it should hold.
+ * {@link ReleasePrepared.file} carries the fragment file's text BEFORE
+ * this step (null when the file was not there) and AFTER it, so step 3
+ * can restore the loop's text without re-reading the file. The base
+ * reading the name was allocated against rides along in
+ * {@link ReleasePrepared.base}, so the forecast need not read it twice.
  *
  * ## The skip carries a sentence, not a code to translate
  *
  * A skipped preparation answers {@link ReleaseSkipped.sentence}: one
- * line, worded for the pull request body the spec asks it to appear in
- * ("Level `none` skips all three steps and says so in the PR body").
- * {@link ReleaseSkipped.reason} is beside it for a caller that wants to
- * branch rather than print. The level reading is on both records, so a
- * skip can still say what the plan declared and what its notes claimed.
+ * line, worded for the pull request body. {@link ReleaseSkipped.reason}
+ * is beside it for a caller that wants to branch rather than print.
+ * Every reading that can refuse is taken before the one write, so a
+ * skip leaves the working tree as it found it. The level reading is on
+ * both records, so a skip can still say what the plan declared and what
+ * its notes claimed.
  */
-import type { ChangelogEntry, ChangelogInsertPoint, ChangelogNote } from './changelog.js';
-import type { ReleaseEnabledReading, ReleaseEnabledSource, ReleaseFileReading, ReleaseFileSettings } from './enabled.js';
+import type { ChangelogNote } from './changelog.js';
+import type { ReleaseEnabledSource, ReleaseFileReading, ReleaseFileSettings } from './enabled.js';
+import type { TreeFragment } from './fragment-tree.js';
+import type { Fragment } from './fragment.js';
 import type { ReleaseLevelReading, ReleaseLevelSource } from './level.js';
 import type { BaseVersionOptions } from './version.js';
 import type { PlanReleaseLevel } from '../plan/parse.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, posix } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
+import { gitSaid } from '../pr/index.js';
 
-import { changelogDate, insertChangelogEntry, renderChangelogEntry } from './changelog.js';
+import { groupChangeNotes, renderNoteLines } from './changelog.js';
 import { resolveReleaseEnabled } from './enabled.js';
+import { readFragmentTree } from './fragment-tree.js';
+import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from './fragment.js';
 import { resolveReleaseLevel } from './level.js';
-import { nextVersion, readBaseVersion, writeManifestVersion } from './version.js';
-
-/** The three levels that actually move a version number. */
-export type ReleaseBumpLevel = Exclude<PlanReleaseLevel, 'none'>;
+import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from './version.js';
 
 /**
- * The four `release` settings a preparation reads, named as
- * `ResolvedConfig` names them, so a resolved config is one and no
- * caller has to take the fields apart first.
+ * The `release` settings a preparation reads, named as `ResolvedConfig`
+ * names them, so a resolved config is one and no caller has to take the
+ * fields apart first.
  */
 export interface ReleaseSettings extends ReleaseFileSettings {
-  /** The template one entry's heading is rendered from. `release.heading`. */
-  readonly releaseHeading: string;
+  /** The directory fragments are written into. `release.fragments`. */
+  readonly releaseFragments: string;
 }
 
 /** What one preparation is made from. */
 export interface ReleasePreparationInput {
-  /** The repository the two configured paths are relative to. */
+  /** The repository the configured paths are relative to. */
   readonly repoRoot: string;
   /** The `release` settings, as the config resolved them. */
   readonly settings: ReleaseSettings;
-  /** The git to read the base version through; see `./version.ts`. */
+  /** The git the base branch's fragments are read through. */
   readonly git: GitRunner;
+  /** The plan id the fragment is named and marked by: the plan stub. */
+  readonly plan: string;
   /** The plan's own `release` field, null when it declares none. */
   readonly declared: PlanReleaseLevel | null;
   /** The plan's stored change notes, in append order. */
   readonly notes: readonly ChangelogNote[];
-  /** The plan's title, as the heading names it. */
+  /** The plan's title, as the fragment's `title` names it. */
   readonly title: string;
-  /** When the release is being made; the entry's date comes from it. */
-  readonly now: Date;
-  /** Which remote branch the base version is read from. */
+  /** Which remote branch the waiting fragments are read from. */
   readonly base?: BaseVersionOptions;
 }
 
-/** One file step 1 rewrote, in both its states. */
+/** The one file step 1 wrote, in both its states. */
 export interface ReleaseFileEdit {
-  /** The path as the config spells it, relative to the repository root. */
+  /** The path relative to the repository root, `/`-separated. */
   readonly path: string;
   /** The same path resolved against the repository root. */
   readonly resolved: string;
-  /** Its bytes before step 1 wrote; what step 3 compares against. */
-  readonly before: string;
-  /** Its bytes after step 1 wrote; what step 3 restores. */
+  /** Its text before step 1 wrote, or null when it was not there. */
+  readonly before: string | null;
+  /** Its text after step 1 wrote; what step 3 restores. */
   readonly after: string;
+}
+
+/** The base branch's fragments the name was allocated against. */
+export interface ReleaseBaseReading {
+  /** The ref read, e.g. `origin/main`. */
+  readonly ref: string;
+  /** The full hash of the commit that ref named when it was read. */
+  readonly commit: string;
+  /** The fragments waiting on it, in add order. */
+  readonly waiting: readonly TreeFragment[];
 }
 
 /** Why a preparation wrote nothing. */
 export type ReleaseSkipReason =
   /** `release.enabled` is off, or `auto` found a file missing. */
   | 'disabled'
-  /** The level resolved to `none`; the spec skips all three steps. */
-  | 'level-none'
-  /** No regular file sits at `release.changelog`. */
-  | 'changelog-missing'
-  /** The changelog is there and could not be read. */
-  | 'changelog-unreadable'
-  /** No version could be read off the base branch's manifest. */
+  /** The plan id cannot name a fragment file. */
+  | 'plan-unusable'
+  /** The base branch's fragments could not be read to choose a name. */
   | 'base-unreadable'
-  /** The version file could not be read, or its version not replaced. */
-  | 'version-unwritable'
-  /** The changelog could not be written; see the module note's restore. */
-  | 'changelog-unwritable';
+  /** The fragment file, or its directory, could not be written. */
+  | 'fragment-unwritable';
 
 /** What every preparation carries, whether it wrote or skipped. */
 interface ReleaseLevelFields {
@@ -172,28 +177,20 @@ interface ReleaseLevelFields {
   readonly notesLevel: PlanReleaseLevel | null;
 }
 
-/** A preparation that wrote both files it was asked to write. */
+/** A preparation that wrote the plan's fragment. */
 export interface ReleasePrepared extends ReleaseLevelFields {
   /** Tells this apart from {@link ReleaseSkipped}. */
   readonly kind: 'prepared';
-  /** The bump: never `none`, which is a skip. */
-  readonly level: ReleaseBumpLevel;
-  /** The version this release ships, or null with no version file. */
-  readonly version: string | null;
-  /** The version the base branch held, or null with no version file. */
-  readonly baseVersion: string | null;
+  /** The plan id the fragment carries. */
+  readonly plan: string;
+  /** The fragment as written, `none` level included. */
+  readonly fragment: Fragment;
+  /** The fragment file, before and after. */
+  readonly file: ReleaseFileEdit;
+  /** The base branch's waiting fragments the name was chosen against. */
+  readonly base: ReleaseBaseReading;
   /** False when the fetch failed and the base may be stale. */
   readonly fetched: boolean;
-  /** The entry as `./changelog.ts` rendered it. */
-  readonly entry: ChangelogEntry;
-  /** Which of the three places in the changelog the entry went. */
-  readonly insertPoint: ChangelogInsertPoint;
-  /** The 1-based line the entry's heading now sits on. */
-  readonly insertLine: number;
-  /** The changelog, before and after. */
-  readonly changelog: ReleaseFileEdit;
-  /** The version file, before and after, or null when there is none. */
-  readonly versionFile: ReleaseFileEdit | null;
   /** A sentence per reading that did not come out as asked. */
   readonly problems: readonly string[];
 }
@@ -212,6 +209,12 @@ export interface ReleaseSkipped extends ReleaseLevelFields {
 
 /** What one call to {@link prepareRelease} answered. */
 export type ReleasePreparation = ReleasePrepared | ReleaseSkipped;
+
+/** The head every skip sentence opens with. */
+const NO_FRAGMENT = 'no release fragment';
+
+/** Any whitespace run, collapsed to one space in a title. */
+const WHITESPACE = /\s+/g;
 
 /** The level fields both records share, off one reading. */
 function levelFields(reading: ReleaseLevelReading): ReleaseLevelFields {
@@ -234,7 +237,7 @@ function disabledSentence(
   changelog: ReleaseFileReading,
   source: ReleaseEnabledSource,
 ): string {
-  const head = 'no version bump and no changelog entry: release.enabled is';
+  const head = `${NO_FRAGMENT}: release.enabled is`;
   if (source === 'config') return `${head} false in this project`;
   const missing = [versionFile, changelog].filter((file) => !file.present).map((file) => file.path);
   const verb = missing.length === 1
@@ -243,78 +246,78 @@ function disabledSentence(
   return `${head} auto and ${missing.join(' and ')} ${verb} not there`;
 }
 
-/** Why a `none` level came out, as a sentence; the three sources word differently. */
-function noneSentence(reading: ReleaseLevelReading): string {
-  const tail = 'so this pull request ships no version bump and no changelog entry';
-  if (reading.source === 'plan') return `the plan declares release: none, ${tail}`;
-  if (reading.source === 'notes') {
-    return `every change note this plan stored is at level none, ${tail}`;
-  }
-  return `this plan stored no change note and declares no release level, ${tail}`;
+/** The plan's title as one trimmed line, the plan id when it is empty. */
+function fragmentTitle(title: string, plan: string): string {
+  const line = title.replace(WHITESPACE, ' ').trim();
+  return line === ''
+    ? plan
+    : line;
 }
 
-/** What the version half worked out, or the refusal that stopped it. */
-type VersionOutcome =
-  | {
-    readonly refused: false;
-    /** The version to write, or null when there is no version file. */
-    readonly version: string | null;
-    /** The version the base held, or null when there is no version file. */
-    readonly baseVersion: string | null;
-    /** False when the fetch failed; the reading went on regardless. */
-    readonly fetched: boolean;
-    /** Sentences worth carrying into the record. */
-    readonly problems: readonly string[];
-  }
-  | {
-    readonly refused: true;
-    readonly reason: ReleaseSkipReason;
-    readonly sentence: string;
-    readonly problems: readonly string[];
-  };
+/** Why the notes rendered no line, for the problem the title note answers. */
+function emptyNotesProblem(level: PlanReleaseLevel, notes: number, title: string): string {
+  const why = notes === 0
+    ? 'the plan stored no change note'
+    : `all ${notes} of the plan's change notes were skipped`;
+  return `the fragment's one note is the plan title, ${JSON.stringify(title)}: ${why}, and a ${level} fragment cannot be written with none`;
+}
 
 /**
- * The version this release ships: null when there is no version file,
- * else the base on `origin/main` bumped by `level`.
- *
- * The fetch and the show are `readBaseVersion`'s; the module note holds
- * why a failed fetch is carried and a failed read is not.
+ * The fragment's note lines: the raw notes grouped by area, or the
+ * title as the one note when a shipping level would otherwise carry
+ * none. See the module note.
  */
-function planVersion(
+function fragmentNotes(
   input: ReleasePreparationInput,
-  versionFile: ReleaseFileReading,
-  level: ReleaseBumpLevel,
-): VersionOutcome {
-  if (!versionFile.present) {
-    return {
-      refused: false,
-      version: null,
-      baseVersion: null,
-      fetched: false,
-      problems: [`${versionFile.path} is not there, so the entry is dated and carries no version`],
-    };
+  level: PlanReleaseLevel,
+  title: string,
+): { readonly notes: readonly string[]; readonly problem: string | null } {
+  const notes = renderNoteLines(groupChangeNotes(input.notes));
+  if (notes.length > 0 || level === 'none') return { notes, problem: null };
+  const fallback = renderNoteLines(groupChangeNotes([{ level, area: null, summary: title }]));
+  return { notes: fallback, problem: emptyNotesProblem(level, input.notes.length, title) };
+}
+
+/** What reading the base branch answered, or the refusal it produced. */
+type BaseOutcome =
+  | {
+    readonly ok: true;
+    readonly base: ReleaseBaseReading;
+    readonly fetched: boolean;
+    readonly problems: readonly string[];
+  }
+  | { readonly ok: false; readonly sentence: string; readonly problems: readonly string[] };
+
+/**
+ * The fragments waiting on the base branch, after fetching it. The
+ * module note holds why a failed fetch is carried and a failed read is
+ * not.
+ */
+function readBase(input: ReleasePreparationInput): BaseOutcome {
+  const remote = input.base?.remote ?? RELEASE_REMOTE;
+  const branch = input.base?.branch ?? RELEASE_BASE_BRANCH;
+  const ref = `${remote}/${branch}`;
+  const problems: string[] = [];
+
+  const fetched = input.git(['fetch', remote, branch]);
+  if (!fetched.ok) {
+    problems.push(`${branch} could not be fetched from ${remote}, so the fragments waiting on it are whatever this clone already holds for ${ref}: ${gitSaid(fetched)}`);
   }
 
-  const base = readBaseVersion(input.git, input.settings.releaseVersionFile, input.base ?? {});
-  if (base.version === null) {
+  const tree = readFragmentTree(input.git, ref, input.settings.releaseFragments);
+  if (!tree.ok) {
     return {
-      refused: true,
-      reason: 'base-unreadable',
-      sentence: `no version bump and no changelog entry: the base version could not be read from ${base.ref}:${base.path}`,
-      problems: base.problems,
+      ok: false,
+      sentence: `${NO_FRAGMENT}: ${tree.problem}, so no free fragment name for ${input.plan} could be chosen`,
+      problems,
     };
   }
-
-  const version = nextVersion(base.version, level);
-  if (version === null) {
-    return {
-      refused: true,
-      reason: 'base-unreadable',
-      sentence: `no version bump and no changelog entry: ${base.ref}:${base.path} declares ${base.version}, which is no version to bump`,
-      problems: base.problems,
-    };
-  }
-  return { refused: false, version, baseVersion: base.version, fetched: base.fetched, problems: base.problems };
+  return {
+    ok: true,
+    base: { ref, commit: tree.commit, waiting: tree.fragments },
+    fetched: fetched.ok,
+    problems,
+  };
 }
 
 /** `path`'s text, or null when it could not be read. */
@@ -326,91 +329,30 @@ function textOf(path: string): string | null {
   }
 }
 
-/** Writes `text` to `path`, answering the problem or null. */
-function writeText(path: string, text: string): string | null {
+/** The file name of a repository path, `/`-separated. */
+function nameOf(path: string): string {
+  return posix.basename(path);
+}
+
+/**
+ * Writes `text` to the fragment file, its directory made first when it
+ * is not there, answering the problem or null.
+ */
+function writeFragment(path: string, resolved: string, text: string): string | null {
   try {
-    writeFileSync(path, text);
+    mkdirSync(dirname(resolved), { recursive: true });
+    writeFileSync(resolved, text);
     return null;
   } catch (error) {
     return `${path} could not be written: ${messageOf(error)}`;
   }
 }
 
-/** The version file rewritten, or the sentence that stopped the write. */
-function writeVersionFile(
-  file: ReleaseFileReading,
-  version: string,
-): { readonly edit: ReleaseFileEdit | null; readonly problem: string | null } {
-  const before = textOf(file.resolved);
-  if (before === null) {
-    return { edit: null, problem: `${file.path} could not be read, so ${version} was not written to it` };
-  }
-
-  const written = writeManifestVersion(file.resolved, version);
-  if (written.problem !== null) return { edit: null, problem: written.problem };
-
-  const after = textOf(file.resolved);
-  if (after === null) {
-    return { edit: null, problem: `${file.path} could not be read back after ${version} was written to it` };
-  }
-  return { edit: { path: file.path, resolved: file.resolved, before, after }, problem: null };
-}
-
-/** Why an entry came out with no lines under its heading. */
-function emptyEntryProblem(entry: ChangelogEntry, notes: number): string {
-  const skipped = entry.noneNotes + entry.duplicateNotes + entry.blankNotes;
-  return notes === 0
-    ? `${entry.heading} has no lines under it: the plan stored no change note`
-    : `${entry.heading} has no lines under it: all ${skipped} of the plan's change notes were skipped`;
-}
-
-/** What writing the two files did, or the refusal that came out of it. */
-type WriteOutcome =
-  | { readonly ok: true; readonly versionFile: ReleaseFileEdit | null }
-  | { readonly ok: false; readonly reason: ReleaseSkipReason; readonly sentence: string };
-
 /**
- * Writes both files, or leaves both as they were: the version file
- * first, and the changelog second with the version file restored when
- * that write fails. The module note holds why that order.
- */
-function writeBoth(
-  files: ReleaseEnabledReading,
-  version: string | null,
-  changelog: string,
-): WriteOutcome {
-  const versionEdit = version === null
-    ? { edit: null, problem: null }
-    : writeVersionFile(files.versionFile, version);
-  if (versionEdit.problem !== null) {
-    return {
-      ok: false,
-      reason: 'version-unwritable',
-      sentence: `no version bump and no changelog entry: ${versionEdit.problem}`,
-    };
-  }
-
-  const failed = writeText(files.changelog.resolved, changelog);
-  if (failed === null) return { ok: true, versionFile: versionEdit.edit };
-
-  const restored = versionEdit.edit === null
-    ? null
-    : writeText(versionEdit.edit.resolved, versionEdit.edit.before);
-  return {
-    ok: false,
-    reason: 'changelog-unwritable',
-    sentence: changelogFailure(failed, versionEdit.edit, restored),
-  };
-}
-
-/**
- * Step 1 of the release: reads, writes the version file and the
- * changelog, and answers what it did or why it did nothing.
- *
- * Either both files are written or neither is, with the one documented
- * exception — a changelog write that fails after the version file's
- * succeeded restores it and says so. See the module note for what stops
- * a release and what is only reported.
+ * Step 1 of the release: reads the level and the base branch's waiting
+ * fragments, writes the plan's fragment, and answers what it wrote or
+ * why it wrote nothing. Never touches the version file or the
+ * changelog; see the module note.
  */
 export function prepareRelease(input: ReleasePreparationInput): ReleasePreparation {
   const reading = resolveReleaseLevel(input.declared, input.notes);
@@ -418,70 +360,41 @@ export function prepareRelease(input: ReleasePreparationInput): ReleasePreparati
   if (!files.enabled) {
     return skip('disabled', disabledSentence(files.versionFile, files.changelog, files.source), reading);
   }
+  if (!FRAGMENT_PLAN_ID_PATTERN.test(input.plan)) {
+    return skip(
+      'plan-unusable',
+      `${NO_FRAGMENT}: the plan id ${JSON.stringify(input.plan)} cannot name a fragment file`,
+      reading,
+    );
+  }
+
+  const read = readBase(input);
+  if (!read.ok) return skip('base-unreadable', read.sentence, reading, read.problems);
 
   const level = reading.level;
-  if (level === 'none') return skip('level-none', noneSentence(reading), reading);
+  const title = fragmentTitle(input.title, input.plan);
+  const lines = fragmentNotes(input, level, title);
+  const fragment: Fragment = { plan: input.plan, title, level, notes: lines.notes };
+  const name = allocateFragmentName(input.plan, read.base.waiting.map((waiting) => nameOf(waiting.path)));
+  const path = posix.join(input.settings.releaseFragments.replace(/\\/g, '/'), name);
+  const resolved = join(input.repoRoot, path);
+  const before = textOf(resolved);
+  const after = serializeFragment(fragment);
+  const problems = lines.problem === null
+    ? read.problems
+    : [...read.problems, lines.problem];
 
-  if (!files.changelog.present) {
-    return skip('changelog-missing', `no version bump and no changelog entry: ${files.changelog.path} is not there`, reading);
-  }
-  const changelogBefore = textOf(files.changelog.resolved);
-  if (changelogBefore === null) {
-    return skip('changelog-unreadable', `no version bump and no changelog entry: ${files.changelog.path} could not be read`, reading);
-  }
-
-  const planned = planVersion(input, files.versionFile, level);
-  if (planned.refused) return skip(planned.reason, planned.sentence, reading, planned.problems);
-
-  const entry = renderChangelogEntry({
-    template: input.settings.releaseHeading,
-    values: {
-      version: planned.version ?? '',
-      date: changelogDate(input.now),
-      title: input.title,
-    },
-    notes: input.notes,
-  });
-  const insertion = insertChangelogEntry(changelogBefore, entry.text);
-  const problems = [...planned.problems];
-  if (entry.lines.length === 0) problems.push(emptyEntryProblem(entry, input.notes.length));
-
-  const written = writeBoth(files, planned.version, insertion.text);
-  if (!written.ok) return skip(written.reason, written.sentence, reading, problems);
+  const failed = writeFragment(path, resolved, after);
+  if (failed !== null) return skip('fragment-unwritable', `${NO_FRAGMENT}: ${failed}`, reading, problems);
 
   return {
     kind: 'prepared',
     ...levelFields(reading),
-    level,
-    version: planned.version,
-    baseVersion: planned.baseVersion,
-    fetched: planned.fetched,
-    entry,
-    insertPoint: insertion.point,
-    insertLine: insertion.line,
-    changelog: {
-      path: files.changelog.path,
-      resolved: files.changelog.resolved,
-      before: changelogBefore,
-      after: insertion.text,
-    },
-    versionFile: written.versionFile,
+    plan: input.plan,
+    fragment,
+    file: { path, resolved, before, after },
+    base: read.base,
+    fetched: read.fetched,
     problems,
   };
-}
-
-/**
- * The sentence a failed changelog write answers, naming what became of
- * the version file the write before it had already changed.
- */
-function changelogFailure(
-  failed: string,
-  versionEdit: ReleaseFileEdit | null,
-  restored: string | null,
-): string {
-  const head = `no changelog entry: ${failed}`;
-  if (versionEdit === null) return head;
-  return restored === null
-    ? `${head}, and ${versionEdit.path} was restored to the version it held`
-    : `${head}, and ${versionEdit.path} could not be restored to the version it held: ${restored}`;
 }

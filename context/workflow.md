@@ -293,11 +293,11 @@ deleted.
 
 **Versioning and changelog are automated at wrap-up and owned by the loop,
 not by a task.** No plan carries a version-bump or changelog task; the
-loop computes the next version from the plan's declared `release` level or
-its highest change-note level, and rewrites `package.json` and the
-changelog — in loop code, before the wrap-up session is spawned, off a base
-version read with `git show origin/main:<versionFile>` rather than from the
-working tree. The wrap-up agent then polishes the raw notes into one line
+loop reads the release level from the plan's declared `release` level or
+its highest change-note level, and writes the plan's change fragment under
+`release.fragments` — in loop code, before the wrap-up session is spawned,
+never touching `package.json` or the changelog, which are written on the
+base branch and never by a branch's wrap-up. The wrap-up agent then polishes the raw notes into one line
 per area and leaves both files unstaged. Loop code verifies that edit,
 restores its own text on any failure, commits `chore: release <version>`
 over those two files alone, pushes, and attaches the entry — or the failure

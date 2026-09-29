@@ -49,18 +49,31 @@ report both.
 
 ### Three wrap-up steps with restore
 
-Order inside the wrap-up, after merging with `origin/main` so the base
-version is the one on `main` at that moment:
+Order inside the wrap-up, step 1 running before the wrap-up session is
+spawned:
 
-**Step 1** (Loop, code): Read the base version from `release.versionFile`
-on `origin/main`, compute the next version by the release level
-(semver bump), write the new version to the version file **byte-safely**
-(critical: `package.json` ends without a newline, `src/release/version.ts`),
-and insert a changelog heading `release.heading` (default `## {version} — {date}, {title}`)
-at the top of `release.changelog`, with the plan's raw change notes grouped by area beneath it.
-Implemented in `src/release/prepare.ts`, `prepareRelease`, over the four
-readings beside it (`enabled.ts`, `level.ts`, `version.ts`, `changelog.ts`).
-The heading goes to one of three places, which `ChangelogInsertPoint` names:
+**Step 1** (Loop, code): Write the plan's change fragment under
+`release.fragments` (default `.changes/`) and never touch
+`release.versionFile` or `release.changelog`: no branch owns a version
+number, and versions and changelog sections are written on the base
+branch, never by a branch's wrap-up. The fragment is `src/release/fragment.ts`'s format: `plan` is
+the plan id (the plan stub), `title` the plan's title on one line, `level`
+the release level below, and the notes are the plan's raw change notes as
+`- <area>: <summary>` lines grouped by area. A `none` level is written, not
+skipped, so a missing fragment and "no release" stay two readings. A
+shipping level whose notes all came out empty carries the plan title as its
+one note, reported as a problem, since the format refuses a bare `patch`,
+`minor` or `major`. The file name is `<plan id>.md`, or `-2`, `-3` when a
+fragment of that name still waits on `origin/main`, read after a
+`git fetch` of it (`src/release/fragment-tree.ts`), so a second wrap-up of
+one branch rewrites its own fragment. A failed fetch is reported and the
+step goes on; a base tree that cannot be read at all writes nothing.
+Implemented in `src/release/prepare.ts`, `prepareRelease`, over
+`enabled.ts`, `level.ts`, `fragment.ts` and `fragment-tree.ts`.
+
+`src/release/changelog.ts` still renders `release.heading` and finds where
+a section goes; step 1 no longer calls either. The heading goes to one of
+three places, which `ChangelogInsertPoint` names:
 `before-next-heading` (the usual one — after the file's first heading and
 its preamble), `file-end` when that first heading was the file's only one,
 and `file-top` when the file held no ATX heading at all.
@@ -90,9 +103,11 @@ write to, so the stage builds no provider, spawns no `gh`, and prints one
 line naming the sentence that went unwritten and the reading that kept it
 off the board.
 
-Level `none` skips all three steps and reports it in the PR body — or on
-the terminal alone, by the line above, when the provider resolves to
-`none`.
+Level `none` no longer skips: step 1 writes a `none` fragment. Step 1
+skips when the release is off, the plan id cannot name a file, the base
+branch's fragments cannot be read or the fragment cannot be written, and
+reports that in the PR body — or on the terminal alone, by the line above,
+when the provider resolves to `none`.
 
 A planted edit outside the new section is caught by step 3's check and
 refused, restored, and reported.
