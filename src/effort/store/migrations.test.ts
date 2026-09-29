@@ -398,6 +398,7 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
     { length: ORIGIN_TABLE_COUNT },
     () => ['add-column', 'add-column', 'create-unique-index-on-new-column'],
   ).flat(),
+  'store-meta': ['create-table', 'create-table', 'create-table'],
 };
 
 describe('classifyMigration over the catalogue', () => {

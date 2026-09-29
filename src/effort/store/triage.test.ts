@@ -282,7 +282,7 @@ describe('the triage migration', () => {
         .toEqual([...COLUMNS[table]]);
     }
     expect(rawQuery<{ name: string }>(root, tables, 'table').map(({ name }) => name))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'store_meta', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });

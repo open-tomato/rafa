@@ -307,7 +307,7 @@ describe('openSqliteStore layout', () => {
     const columns = 'SELECT name FROM pragma_table_info(?) ORDER BY cid';
 
     expect(tablesOf(root))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'store_meta', 'task_reports']);
     for (const [kind, keyColumn] of Object.entries(KEY_COLUMNS)) {
       expect(rawQuery<{ name: string }>(root, columns, kind))
         .toEqual([{ name: 'seq' }, { name: keyColumn }, { name: 'row_json' }, { name: 'origin_store' }, { name: 'origin_seq' }]);
@@ -593,7 +593,7 @@ describe('schema versioning', () => {
     expect(store.keys('sessions').size).toBe(0);
     expect(versionOf(root)).toBe(LEGACY_GATE_OPEN);
     expect(tablesOf(root))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'store_meta', 'task_reports']);
     expect(store.append('sessions', [S_A]).appended).toBe(1);
   });
 

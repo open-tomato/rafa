@@ -82,6 +82,8 @@ const TABLES = [
   'commits',
   'dispatches',
   'findings',
+  'merge_conflicts',
+  'merges',
   'out_of_scope_bugs',
   'plan_ci',
   'preflight',
@@ -89,6 +91,7 @@ const TABLES = [
   'schema_migrations',
   'sessions',
   'skill_invocations',
+  'store_meta',
   'task_reports',
 ];
 
@@ -185,7 +188,7 @@ describe('the dispatches table', () => {
     // The control: the first six entries make every earlier table and no
     // dispatches table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'store_meta' && table !== 'merges' && table !== 'merge_conflicts'));
 
     writeDispatch(root, writeOf('s-1', 'Do it'), CLOCK);
 

@@ -211,7 +211,11 @@ release reads. `row-origins`, the first entry past the thirteen legacy
 ones, makes the array longer than 13, while an open through
 `bringForward` leaves `user_version` at the legacy gate; so a store's
 `user_version` no longer equals `SQLITE_SCHEMA_VERSION`, and its log,
-not `user_version`, says which entries it holds.
+not `user_version`, says which entries it holds. A test that plants a
+pre-log store `behind` therefore plants it at `LEGACY_GATE_OPEN`, never
+at the array's length less one: past 13 a pre-log store is
+`pre-log-unreleased`, and `doctor-effort-schema.test.ts`'s behind case
+failed that way once `store-meta` made the array 15.
 
 **Each entry is a named `SqliteMigration`: an `id`, what it `breaks` and
 its `sql`.** The `id` is kebab-case and is never reused. `breaks` is `[]`
@@ -352,7 +356,14 @@ busy timeout.
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
 `report_absences`, `task_reports`, `preflight`, `dispatches`,
-`skill_invocations` and `plan_ci` are SQLite-only and stay out of the port's row map.
+`skill_invocations`, `plan_ci`, `store_meta`, `merges` and
+`merge_conflicts` are SQLite-only and stay out of the port's row map.
+The last three, which migration `store-meta` creates, are the store's
+own identity and its merge trail: `store_meta` holds one row (`id = 1`)
+naming the origin the store stamps, its project and the host, path and
+file identity it was minted under; `merges` records each merge and
+`merge_conflicts` each incoming row one could not settle. No writer
+fills them yet.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with

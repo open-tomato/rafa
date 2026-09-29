@@ -494,6 +494,54 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
     WHERE origin_store IS NOT NULL;
   `,
   },
+  // The store's own identity and its merge trail, three tables that never
+  // leave this machine. `store_meta` holds one row, pinned by `id = 1`:
+  // the origin this store stamps on the rows it writes, the project it
+  // belongs to, and the host, absolute path and file identity it was
+  // minted under, which a writing open compares to detect a copy.
+  // `merges` records each merge by the other store's id, NULL when that
+  // store was never minted, with the rows it added, skipped and left in
+  // conflict. `merge_conflicts` keeps each incoming row a merge could not
+  // settle, as the JSON of its columns, beside the local row's `seq`;
+  // `field` names the edited field whose two values differ, and is NULL
+  // when the rows differ outside any edited field.
+  {
+    id: 'store-meta',
+    breaks: [],
+    sql: `
+  CREATE TABLE store_meta (
+    id                  INTEGER PRIMARY KEY CHECK (id = 1),
+    store_id            TEXT NOT NULL CHECK (store_id <> ''),
+    project_root_commit TEXT NOT NULL CHECK (project_root_commit <> ''),
+    project_remote      TEXT CHECK (project_remote <> ''),
+    host_id             TEXT NOT NULL CHECK (host_id <> ''),
+    store_path          TEXT NOT NULL CHECK (store_path <> ''),
+    file_dev            INTEGER NOT NULL CHECK (typeof(file_dev) = 'integer'),
+    file_ino            INTEGER NOT NULL CHECK (typeof(file_ino) = 'integer'),
+    minted_at           TEXT NOT NULL CHECK (minted_at <> '')
+  );
+
+  CREATE TABLE merges (
+    seq              INTEGER PRIMARY KEY,
+    id               TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    other_store      TEXT CHECK (other_store <> ''),
+    merged_at        TEXT NOT NULL CHECK (merged_at <> ''),
+    rows_added       INTEGER NOT NULL CHECK (typeof(rows_added) = 'integer' AND rows_added >= 0),
+    rows_skipped     INTEGER NOT NULL CHECK (typeof(rows_skipped) = 'integer' AND rows_skipped >= 0),
+    rows_in_conflict INTEGER NOT NULL CHECK (typeof(rows_in_conflict) = 'integer' AND rows_in_conflict >= 0)
+  );
+
+  CREATE TABLE merge_conflicts (
+    seq         INTEGER PRIMARY KEY,
+    merge_id    TEXT NOT NULL CHECK (merge_id <> ''),
+    table_name  TEXT NOT NULL CHECK (table_name <> ''),
+    local_seq   INTEGER NOT NULL CHECK (typeof(local_seq) = 'integer'),
+    field       TEXT CHECK (field <> ''),
+    incoming    TEXT NOT NULL CHECK (json_valid(incoming) AND json_type(incoming) = 'object'),
+    recorded_at TEXT NOT NULL CHECK (recorded_at <> '')
+  );
+  `,
+  },
 ];
 
 /**
