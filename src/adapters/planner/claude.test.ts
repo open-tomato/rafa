@@ -2,7 +2,8 @@
  * Tests for the `claude` Planner adapter (`src/adapters/planner/claude.ts`).
  *
  * No case spawns `claude`. Each planner is made with a recording CAPTURING
- * spawner, which keeps the argument list and the prompt it is handed, notes
+ * spawner, which keeps the argument list, the prompt and the working
+ * directory it is handed, notes
  * whether the plans directory was there when the session started, writes
  * the files a case names under the root as a session would, and answers the
  * exit code and the stdout the case names. Every root is a directory of its own under one
@@ -39,6 +40,17 @@
  * No case asserts that the planner refuses a not-ready spec, because it
  * does not: the gate is `rafa plan`'s, which is what leaves
  * `--skip-review` somewhere to act.
+ *
+ * ## The working directory (#171)
+ *
+ * Two cases pin that the session runs in the root, resolved absolute. The
+ * #171 case's session writes the plan by its relative path against the
+ * directory it was spawned in, or a worktree nested under the root when it
+ * was handed none, as a session inheriting the caller's directory did.
+ * Measured on 2026-09-29, 25 pass and 0 fail either side: the `cwd`
+ * dropped from the spawn reddened 3 cases (this pair and the first
+ * generating case, which records the call whole), and the root handed over
+ * unresolved reddened the relative-root case alone.
  *
  * Six mutations of `claude.ts` were driven on 2026-09-19 over this file,
  * `src/adapters/registry.test.ts` and `src/ports/index.test.ts`, one at
@@ -95,7 +107,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
@@ -169,6 +181,8 @@ function freshRoot(): string {
 interface SessionCall {
   readonly args: readonly string[];
   readonly prompt: string;
+  /** The working directory the session was spawned in, or undefined for the caller's. */
+  readonly cwd: string | undefined;
   /** Whether {@link PLAN_DIR} was under the root when the session started. */
   readonly plansDirExisted: boolean;
 }
@@ -187,8 +201,8 @@ function recordingSession(
   { writes = [], exitCode = 0, stdout = '' }: SessionScript = {},
 ): { spawn: CapturingSpawner; calls: SessionCall[] } {
   const calls: SessionCall[] = [];
-  const spawn: CapturingSpawner = async (args, prompt) => {
-    calls.push({ args: [...args], prompt, plansDirExisted: existsSync(join(root, PLAN_DIR)) });
+  const spawn: CapturingSpawner = async (args, prompt, options) => {
+    calls.push({ args: [...args], prompt, cwd: options?.cwd, plansDirExisted: existsSync(join(root, PLAN_DIR)) });
     for (const file of writes) writeFileSync(join(root, file), `written by the session: ${file}\n`, 'utf8');
     return { exitCode, stdout };
   };
@@ -244,7 +258,12 @@ describe('a claude planner generating a plan', () => {
     expect(root.startsWith(tempDir)).toBe(true);
     expect(generated).toEqual({ planPath: PLAN, prerequisitesPath: null, review: ABSENT_REVIEW });
     expect(session.calls).toEqual([
-      { args: [...BASE_ARGS, 'project,local'], prompt: `prompt for probe\n${SPEC}`, plansDirExisted: true },
+      {
+        args: [...BASE_ARGS, 'project,local'],
+        prompt: `prompt for probe\n${SPEC}`,
+        cwd: root,
+        plansDirExisted: true,
+      },
     ]);
     expect(readdirSync(join(root, PLAN_DIR))).toEqual(['PLAN-probe.md']);
     expect(existsSync(join(root, '.plans'))).toBe(false);
@@ -316,6 +335,40 @@ describe('a claude planner generating a plan', () => {
     expect(absolute.calls.map((call) => call.prompt)).toEqual(['prompt for probe\nthe outside spec\n']);
   });
 
+  it('spawns the session in the root, so a plan written by its relative path lands under the root (#171)', async () => {
+    const root = freshRoot();
+    const nested = join(root, '.claude', 'worktrees', 'nested');
+    mkdirSync(nested, { recursive: true });
+    const cwds: (string | undefined)[] = [];
+    // A session that writes the plan by the relative path the prompt names,
+    // against its own working directory, the caller's when none is handed.
+    const spawn: CapturingSpawner = async (_args, _prompt, options) => {
+      cwds.push(options?.cwd);
+      const sessionDir = options?.cwd ?? nested;
+      mkdirSync(join(sessionDir, PLAN_DIR), { recursive: true });
+      writeFileSync(join(sessionDir, PLAN), 'the plan\n', 'utf8');
+      return { exitCode: 0, stdout: '' };
+    };
+
+    const generated = await plannerOver(root, spawn).create(REQUEST);
+
+    expect(cwds).toEqual([root]);
+    expect(generated.planPath).toBe(PLAN);
+    expect(readFileSync(join(root, PLAN), 'utf8')).toBe('the plan\n');
+    expect(existsSync(join(nested, '.rafa'))).toBe(false);
+  });
+
+  it('spawns the session in the absolute root when it is made with a relative one', async () => {
+    const root = freshRoot();
+    const relativeRoot = relative(process.cwd(), root);
+    const session = recordingSession(root, { writes: [PLAN] });
+
+    await plannerOver(relativeRoot, session.spawn).create(REQUEST);
+
+    expect(isAbsolute(relativeRoot)).toBe(false);
+    expect(session.calls.map((call) => call.cwd)).toEqual([root]);
+  });
+
   it('is frozen', () => {
     const root = freshRoot();
 
@@ -343,7 +396,8 @@ describe('a claude planner rejecting', () => {
 
     expect(error).toBeInstanceOf(ClaudePlannerError);
     expect(error).toMatchObject({
-      message: 'The session finished but .rafa/plans/PLAN-probe.md was not created — inspect the output above.',
+      message: `The session finished but .rafa/plans/PLAN-probe.md was not created under ${root}`
+        + ' — inspect the output above.',
       exitCode: 1,
     });
   });

@@ -11,12 +11,14 @@
  * add.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
- * LOOP reads as well. It has four callers: the per-task dispatch,
+ * LOOP reads as well. It has three callers: the per-task dispatch,
  * through `runTaskSession` in `start/dispatch.ts`, the wrap-up session
- * in `start/wrap-up.ts`, the backfill proposal pass in
- * `backfill/propose.ts`, and plan generation in the `claude` planner,
- * `adapters/planner/claude.ts`, which `plan.ts` makes. Each of the four
- * parses what its session wrote: a task session ends its final message
+ * in `start/wrap-up.ts` and the backfill proposal pass in
+ * `backfill/propose.ts`. Plan generation in the `claude` planner,
+ * `adapters/planner/claude.ts`, which `plan.ts` makes, captures its
+ * session through the same spawner without that door, for the reason
+ * the search runner does below. Each of the four parses what its
+ * session wrote: a task session ends its final message
  * with a `rafa:report` block, the wrap-up with a `rafa:promoted` one
  * when it was listed lessons to promote (`start/promoted-check.ts`), a
  * plan session ends its final message with a `rafa:spec-review` one,
@@ -28,7 +30,7 @@
  * the ones its routing declaration resolved to, with the
  * `--session-id` the loop picked for that session ahead of them and
  * its served flags (`start/serving.ts`) ahead of both, and the planner
- * hands over none. The captured entry builds its argument
+ * hands over none: its argument list is `claudeArgs(settingSources)`. The captured entry builds its argument
  * list through the same {@link claudeArgs} and hands the prompt over the
  * same way; only the spawner differs, {@link spawnClaudeCaptured} piping
  * stdout, echoing it on to the operator as it arrives and keeping the
@@ -44,7 +46,9 @@
  * callers never pass, {@link CapturedSpawnOptions.cwd}, since that
  * session runs inside the scratch copy of its candidates. The epic
  * verification runner (`epic/verify-run.ts`) does the same for each
- * check session, which runs inside a worktree made for the run.
+ * check session, which runs inside a worktree made for the run, and the
+ * `claude` planner for its plan session, which runs in the project root
+ * `rafa plan` resolved rather than in the caller's directory (#171).
  *
  * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
  * rather than before, and the ordering is load-bearing rather than
@@ -446,11 +450,13 @@ export interface CapturedSession {
  */
 export interface CapturedSpawnOptions {
   /**
-   * The session's working directory, or the loop's own when absent. Two
+   * The session's working directory, or the loop's own when absent. Three
    * callers name one: the search session (`src/inventory/search/index.ts`),
-   * which runs inside the scratch copy of its candidates, and each check
+   * which runs inside the scratch copy of its candidates, each check
    * session of the epic verification run (`src/epic/verify-run.ts`), which
-   * runs inside a detached worktree of main.
+   * runs inside a detached worktree of main, and the plan session of the
+   * `claude` planner (`src/adapters/planner/claude.ts`), which runs in the
+   * project root it writes the plan under.
    */
   readonly cwd?: string;
 }
