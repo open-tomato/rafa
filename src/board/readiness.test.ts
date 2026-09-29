@@ -70,6 +70,7 @@ import { CommandExit } from '../cli/command.js';
 
 import {
   findListSectionGaps,
+  findPinnedMigrations,
   findReadinessGaps,
   hasSpecReadyLabel,
   listSectionWarning,
@@ -326,6 +327,68 @@ describe('a surviving template comment', () => {
   it('left open inside a fenced block does not hide the sections after the fence', () => {
     const fenced = 'Prose.\n\n```markdown\n<!-- a comment quoted half-way\n```';
     expect(findReadinessGaps(bodyWith({ Design: fenced }))).toEqual([]);
+  });
+});
+
+describe('a store change pinned by number', () => {
+  it('is found for each spelling the pattern names, so a spelling without a match fails here', () => {
+    const spellings = ['migration 12', 'migrations 12', 'Migration #12', 'schema version 9', 'schema versions #13'];
+    for (const spelling of spellings) {
+      expect(gapsIn(bodyWith({ Design: `it lands as ${spelling} on the store` }))).toEqual(['pinned-migration Design']);
+    }
+  });
+
+  it('names the words it matched and the line they sit on, counting from 1', () => {
+    const body = '## Design\n\nfirst\nsecond\nmigration 14 lands first\n';
+    const gap = findReadinessGaps(body).find((found) => found.kind === 'pinned-migration');
+    expect(gap?.heading).toBe('Design');
+    expect(gap?.line).toBe(5);
+    expect(gap?.what).toBe('pins a store change by number ("migration 14") on line 5');
+  });
+
+  it('is not found for a release number, where a pinned migration on the same line is', () => {
+    expect(findReadinessGaps(bodyWith({ Design: 'the pre-log runtime is rafa 0.18.0' }))).toEqual([]);
+    expect(gapsIn(bodyWith({ Design: 'rafa 0.18.0 stops at migration 9' }))).toEqual(['pinned-migration Design']);
+  });
+
+  it('is not found inside an inline code span, where the same words bare are', () => {
+    expect(findReadinessGaps(bodyWith({ Design: 'a spec saying `migration 12` is refused' }))).toEqual([]);
+    expect(gapsIn(bodyWith({ Design: 'a spec saying migration 12 is refused' }))).toEqual(['pinned-migration Design']);
+  });
+
+  it('is not found inside a fenced block, where the same line outside one is', () => {
+    expect(findReadinessGaps(bodyWith({ Design: '```text\nschema version 9\n```' }))).toEqual([]);
+    expect(gapsIn(bodyWith({ Design: 'schema version 9' }))).toEqual(['pinned-migration Design']);
+  });
+
+  it('is not found for a migration named by its id or by what it adds', () => {
+    const body = bodyWith({ Design: 'migration `dispatch-skills` adds a nullable column; the migration log records it' });
+    expect(findReadinessGaps(body)).toEqual([]);
+  });
+
+  it('is found beside a placeholder on the same line, placeholder first', () => {
+    expect(gapsIn(bodyWith({ Design: 'TODO: migration 12' }))).toEqual(['placeholder Design', 'pinned-migration Design']);
+  });
+
+  it('is left out of the two list sections read on their own', () => {
+    expect(findListSectionGaps(bodyWith({ 'Definition of done': '- migration 12 applies' }))).toEqual([]);
+  });
+
+  it('is read over a whole document by findPinnedMigrations, under the same exemptions', () => {
+    const document = [
+      '# Plan',
+      'the store gains migration 14',
+      '`migration 15` is quoted',
+      '```',
+      'schema version 16',
+      '```',
+      '<!-- migration 17 -->',
+      '- [ ] ship Schema Version #18',
+    ].join('\n');
+    expect(findPinnedMigrations(document)).toEqual([
+      { line: 2, text: 'migration 14' },
+      { line: 8, text: 'Schema Version #18' },
+    ]);
   });
 });
 

@@ -1,26 +1,34 @@
 /**
- * `rafa effort fix-schema [--dry-run]`: the project's SQLite effort store,
- * when it is past the schema version this rafa knows, rebuilt at that
- * version by `fixStoreSchema` (`src/effort/store/fix-schema.ts`, whose
- * note is the long form). Starts no Claude session and declares no
- * `spends`.
+ * `rafa effort fix-schema [--dry-run]`: the project's SQLite effort
+ * store, when this rafa refuses it for a reason a rebuild repairs,
+ * rebuilt at the migrations this rafa knows by `fixStoreSchema`
+ * (`src/effort/store/fix-schema.ts`, whose note is the long form).
+ * Starts no Claude session and declares no `spends`.
  *
- * A store gets past this rafa when newer code opens it, most often a
- * plan's own branch code run from its working tree while the loop driving
- * the plan is an older installed runtime. That runtime then refuses the
- * store, and the task reports it collects are not stored.
+ * The decision is `planSchema`'s. A store this rafa uses is left alone,
+ * `current` or `behind`, even when it logs migrations this rafa does
+ * not know that are additive. A store refused as `pre-log-unreleased`,
+ * `gate-mismatch`, `edited` or either `unknown-breaks-*` is rebuilt with
+ * a migration log whose rows name this runtime as applying them, and
+ * what only the newer schema holds, unknown migrations included, is
+ * kept in the backup alone. The other two refusals are passed on with
+ * the plan's own next step. Where a newer rafa that knows the store's
+ * migrations can be installed, that comes first.
  *
  * The swap is refused while any loop session under the project reads
  * `running` or `paused` (`readSessions`, `src/loop/sessions.ts`), since a
- * loop writing the store while it is renamed would lose those writes. A
+ * loop writing the store while it is renamed would lose those writes,
+ * and from a development build, whose migrations may be a branch's. A
  * dry run reads the store and writes only its own parallel file, which it
- * deletes, so it runs beside a live loop. Every refusal is exit code 1
- * with the live store untouched; every other outcome is exit code 0. In
- * json mode the `FixSchemaResult` is the data of the terminal result.
+ * deletes, so it runs beside a live loop and from a development build.
+ * Every refusal is exit code 1 with the live store untouched; every other
+ * outcome is exit code 0. In json mode the `FixSchemaResult` is the data
+ * of the terminal result.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { FixSchemaResult } from '../../effort/store/fix-schema.js';
 import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
+import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { fixStoreSchema, SchemaFixRefusal } from '../../effort/store/fix-schema.js';
@@ -42,6 +50,8 @@ export interface FixSchemaCommandSeams {
   readonly now?: () => Date;
   /** Whether a run record's pid is alive. */
   readonly isAlive?: PidProbe;
+  /** Which build runs; `readRuntimeIdentity()` by default. */
+  readonly identity?: RuntimeIdentity;
 }
 
 /** A clock reading as a file-name stamp: `20260926T101500Z`. */
@@ -69,21 +79,41 @@ function refuseLiveLoop(root: string, isAlive: PidProbe | undefined): void {
   );
 }
 
-/** The lines a rebuild's tables and left-behind data read as. */
+/** A list of logged migrations as a line names them. */
+function migrationNames(result: FixSchemaResult): string {
+  return result.unknown.map(({ id, appliedBy }) => `${id} (applied by ${appliedBy})`).join(', ');
+}
+
+/** The lines a rebuild's reason, tables and left-behind data read as. */
 function rebuildLines(result: FixSchemaResult): string[] {
   const rows = result.kept.reduce((sum, table) => sum + table.rows, 0);
   const kept = result.kept.map((table) => `${table.table} ${String(table.rows)}`).join(', ');
   const left = [
+    ...result.unknown.map(({ id, appliedBy }) => `migration ${id} (applied by ${appliedBy})`),
     ...result.leftTables.map((table) => `table ${table.table} (${String(table.rows)} rows)`),
     ...result.leftColumns.map((column) => `column ${column.table}.${column.column} (${String(column.values)} values)`),
   ];
+  const newer = result.unknown.length === 0
+    ? []
+    : [`A rafa that knows ${result.unknown.map(({ id }) => id).join(', ')} uses the store as it is and keeps that data`
+      + ' in it; install one instead where you can.'];
   return [
-    `${result.path} is at schema version ${String(result.storeVersion)}, past the ${String(result.knownVersion)} this rafa knows.`,
+    `Refused as ${String(result.reason)}: ${String(result.refusal)}`,
+    `Rebuilds it at the ${String(result.known.length)} migrations this rafa knows, logged as applied by ${result.appliedBy}.`,
     `Keeps ${String(result.kept.length)} tables, ${String(rows)} rows: ${kept}.`,
     left.length === 0
       ? 'Leaves nothing behind.'
       : `Leaves behind, kept only in the backup: ${left.join('; ')}.`,
+    ...newer,
   ];
+}
+
+/** The line naming the additive migrations a usable store logs that this rafa does not know, if any. */
+function unknownAdditiveLines(result: FixSchemaResult): string[] {
+  return result.unknown.length === 0
+    ? []
+    : [`It logs ${migrationNames(result)}, which this rafa does not know; each is additive, so this rafa uses the store`
+      + ' through them.'];
 }
 
 /** Every line one outcome prints. */
@@ -92,22 +122,26 @@ export function renderFixSchema(result: FixSchemaResult): string[] {
     case 'missing':
       return [`No effort store at ${result.path}: nothing to repair.`];
     case 'current':
-      return [`✅ ${result.path} is at schema version ${String(result.knownVersion)}, the one this rafa knows: nothing to repair.`];
+      return [
+        `✅ ${result.path} is current: this rafa reads and writes it as it is. Nothing to repair.`,
+        ...unknownAdditiveLines(result),
+      ];
     case 'behind':
       return [
-        `${result.path} is at schema version ${String(result.storeVersion)}, behind the ${String(result.knownVersion)} this rafa`
-          + ' knows; the next command that opens it migrates it. Nothing to repair.',
+        `${result.path} is behind this rafa's migrations; the next command that opens it records`
+          + ` ${result.pending.join(', ')}. Nothing to repair.`,
+        ...unknownAdditiveLines(result),
       ];
     case 'would-rebuild':
       return [
         ...rebuildLines(result),
-        `🔍 Dry run: the rebuild at version ${String(result.knownVersion)} was built, checked (row counts, integrity_check)`
-          + ' and deleted. Run without `--dry-run` to swap it in.',
+        '🔍 Dry run: the rebuild was built, checked (row counts, integrity_check, this rafa\'s schema plan) and'
+          + ' deleted. Run without `--dry-run` to swap it in.',
       ];
     case 'rebuilt':
       return [
         ...rebuildLines(result),
-        `✅ Rebuilt at version ${String(result.knownVersion)}. The original is kept whole at ${String(result.backupPath)};`
+        `✅ Rebuilt at this rafa's migrations. The original is kept whole at ${String(result.backupPath)};`
           + ' rename it back to undo.',
       ];
   }
@@ -120,13 +154,18 @@ export function runFixSchema(context: RafaContext, seams: FixSchemaCommandSeams)
   if (context.project === null) throw new Error(`${COMMAND_NAME} runs inside a project, and was handed none`);
   const root = context.project.root;
   if (!dryRun) refuseLiveLoop(root, seams.isAlive);
+  const now = seams.now ?? ((): Date => new Date());
 
   let result: FixSchemaResult;
   try {
     result = fixStoreSchema({
       path: sqliteStorePath(root),
       dryRun,
-      stamp: fileStamp((seams.now ?? ((): Date => new Date()))()),
+      stamp: fileStamp(now()),
+      now,
+      ...(seams.identity === undefined
+        ? {}
+        : { identity: seams.identity }),
     });
   } catch (error) {
     if (error instanceof SchemaFixRefusal) throw new CommandExit(1, `❌ ${COMMAND_NAME}: ${error.message}`);
@@ -146,23 +185,28 @@ export function createFixSchemaCommand(seams: FixSchemaCommandSeams = {}): RafaC
     name: 'effort fix-schema',
     subject: 'effort',
     action: 'fix-schema',
-    summary: 'rebuild an effort store a newer rafa migrated at the version this rafa knows, keeping the original',
-    description: 'Repairs `.rafa/effort/effort.sqlite` when it is past the schema version this rafa knows, which'
-      + ' happens when newer code opens it, such as a plan\'s own branch code run while an older installed rafa'
-      + ' drives the loop. It builds a parallel store beside it at this rafa\'s version, copies every table and'
-      + ' column this rafa knows, checks the row counts and SQLite\'s integrity_check, and lists what only the'
-      + ' newer schema holds. Then it renames the original to `effort.sqlite.v<version>-<stamp>.bak`, whole, and'
-      + ' moves the rebuild into its place. A store at or behind this version, or no store, is left alone. It'
-      + ' refuses, changing nothing, while a loop session under the project is running or paused, while a'
-      + ' journal beside the store shows a write in flight, and when the newer schema lacks a table or column'
-      + ' this rafa writes. With `--output=json` the outcome is the data of the terminal result event. Starts no'
-      + ' session.',
+    summary: 'rebuild an effort store this rafa refuses at the migrations it knows, keeping the original',
+    description: 'Repairs `.rafa/effort/effort.sqlite`, or the store under `RAFA_EFFORT_DIR`, when this rafa refuses'
+      + ' it for a reason a rebuild repairs: no migration log past the legacy entries (pre-log-unreleased), a log'
+      + ' with a schema version it does not match (gate-mismatch), a logged checksum this rafa holds otherwise'
+      + ' (edited), or a logged migration this rafa does not know that breaks older readers or writers'
+      + ' (unknown-breaks-readers, unknown-breaks-writers). Installing a rafa that knows the store\'s migrations'
+      + ' comes first where one exists. It builds a parallel store beside it at this rafa\'s migrations, with a'
+      + ' migration log naming this rafa, copies every table and column this rafa knows, checks the row counts,'
+      + ' SQLite\'s integrity_check and the schema plan, and lists what only the newer schema holds, unknown'
+      + ' migrations included. Then it renames the original to `effort.sqlite.v<user_version>-<stamp>.bak`,'
+      + ' whole, and moves the rebuild into its place. A store this rafa uses, current or behind, or no store, is'
+      + ' left alone. It refuses, changing nothing, while a loop session under the project is running or paused,'
+      + ' from a development build, while a journal beside the store shows a write in flight, when the newer'
+      + ' schema lacks a table or column this rafa writes, and on a refusal a rebuild does not repair. With'
+      + ' `--output=json` the outcome is the data of the terminal result event. Starts no session.',
     args: [],
     flags: [
       {
         name: DRY_RUN_FLAG,
         description: 'Build and check the rebuild, print what it keeps and leaves behind, then delete it. The'
-          + ' live store is only read, so this runs beside a live loop and can be repeated.',
+          + ' live store is only read, so this runs beside a live loop and from a development build, and can be'
+          + ' repeated.',
         type: 'boolean',
       },
     ],

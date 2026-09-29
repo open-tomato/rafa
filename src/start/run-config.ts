@@ -15,19 +15,42 @@
  * before anything else is read, so a refused run loads no config, waits
  * for no `--start-at` and writes no session record.
  *
+ * {@link refuseEffortDirRun} comes right after it, before a `--runtime`
+ * hands the run on: while `RAFA_EFFORT_DIR` is set (an empty value
+ * counts as unset) a command reads and writes the store it names, a
+ * copy, and a loop records to the project's own store, so it is refused
+ * rather than let a run's sessions, reports and preflight rows land in
+ * a copy that is later deleted. `start()` hands it `process.env`.
+ *
  * Every line either writes goes through the active output
  * (`adapters/output/active.ts`), at warn level.
  */
 import type { ConfigRoots } from '../config-load.js';
 import type { ConfigSource, ResolvedConfig } from '../config.js';
+import type { StoreEnvironment } from '../effort/store/location.js';
 import type { PlanIssue } from '../plan/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
+import { EFFORT_DIR_VARIABLE } from '../effort/store/location.js';
 import { parsePlan } from '../plan/index.js';
 
 import { NOTHING_DISPATCHED } from './session.js';
+
+/**
+ * Throws `CommandExit` with exit code 1 while `RAFA_EFFORT_DIR` is set
+ * in `env` to anything but the empty string, and returns otherwise. See
+ * the module note.
+ */
+export function refuseEffortDirRun(env: StoreEnvironment): void {
+  const value = env[EFFORT_DIR_VARIABLE];
+  if (value === undefined || value === '') return;
+  throw new CommandExit(1, [
+    `❌ ${EFFORT_DIR_VARIABLE} is set (${value}); a loop records to the project's own store. Unset it and run again.`,
+    NOTHING_DISPATCHED,
+  ].join('\n'));
+}
 
 /**
  * The value of the first `flag=value` argument, or undefined when no

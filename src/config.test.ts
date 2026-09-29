@@ -84,7 +84,7 @@ const PATH = '/repo/.rafa/config.yaml';
 const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
-const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
+const KNOWN = '(known keys: version, store, effort, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
   + 'roadmap, release, cleanup, dangerous, status, tiers, routing, task)';
 
@@ -92,6 +92,7 @@ const KNOWN = '(known keys: version, store, plan, specs, tracker, learning, '
 const SETTINGS: readonly ConfigSetting[] = [
   'version',
   'store',
+  'effortBusyTimeoutMs',
   'inject',
   'planDir',
   'specsDir',
@@ -137,6 +138,7 @@ const SETTINGS: readonly ConfigSetting[] = [
 const DEFAULTS: RafaConfig = {
   version: 1,
   store: 'sqlite',
+  effortBusyTimeoutMs: 5000,
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -188,6 +190,8 @@ const DEFAULTS: RafaConfig = {
 const FULL = [
   'version: 1',
   'store: ndjson',
+  'effort:',
+  '  busyTimeoutMs: 250',
   'plan:',
   '  inject: full',
   '  dir: .plans',
@@ -263,6 +267,7 @@ const FULL = [
 const FULL_VALUES: RafaConfig = {
   version: 1,
   store: 'ndjson',
+  effortBusyTimeoutMs: 250,
   inject: 'full',
   planDir: '.plans',
   specsDir: '.specs',
@@ -545,6 +550,11 @@ describe('parseConfigText', () => {
       [
         'store', 'store: postgres', 'store is "postgres", expected one of: sqlite, ndjson',
         'store: ndjson', 'store', 'ndjson',
+      ],
+      [
+        'effort.busyTimeoutMs', 'effort:\n  busyTimeoutMs: "5000"',
+        'effort.busyTimeoutMs is "5000", expected a lock wait in milliseconds, a whole number from 1 to 60000',
+        'effort:\n  busyTimeoutMs: 60000', 'effortBusyTimeoutMs', 60_000,
       ],
       [
         'plan.inject', 'plan:\n  inject: all',

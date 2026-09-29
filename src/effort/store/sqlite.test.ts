@@ -43,12 +43,21 @@
  * migration, a malformed body tolerated, and the schema accepting an
  * empty key.
  *
+ * The open path's cases were driven the same way, each mutation
+ * reddening exactly the case named: every open passed `write` (the read
+ * of a store only older writers are refused from), every open passed
+ * `read` (its write control), and two against the two-process case:
+ * `bringForward` applying its first plan without planning again under
+ * the lock, where the loser threw `table sessions already exists`, and
+ * the busy timeout dropped, where both opens threw `SQLITE_BUSY`.
+ *
  * One compile-time claim was driven red against `check-types`, with
  * mutated copies of the port and of this module planted beside them
  * and moved out after: a third kind added to the port's row map and key
  * record compiled in the port and failed in this module's table record
  * (TS2741).
  */
+import type { SqliteMigration } from './migrations.js';
 import type {
   AppendResult,
   CommitEffortRow,
@@ -297,7 +306,7 @@ describe('openSqliteStore layout', () => {
     const columns = 'SELECT name FROM pragma_table_info(?) ORDER BY cid';
 
     expect(tablesOf(root))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     for (const [kind, keyColumn] of Object.entries(KEY_COLUMNS)) {
       expect(rawQuery<{ name: string }>(root, columns, kind))
         .toEqual([{ name: 'seq' }, { name: keyColumn }, { name: 'row_json' }]);
@@ -583,13 +592,13 @@ describe('schema versioning', () => {
     expect(store.keys('sessions').size).toBe(0);
     expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
     expect(tablesOf(root))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     expect(store.append('sessions', [S_A]).appended).toBe(1);
   });
 
   const NEWER = SQLITE_SCHEMA_VERSION + 1;
-  const NEWER_REFUSAL = `is at schema version ${NEWER}, past the`
-    + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+  const NEWER_REFUSAL = `is at schema version ${NEWER} with no migration log;`
+    + ' no released rafa wrote that';
 
   it('refuses a store past the last version, touching nothing', () => {
     const root = freshRoot('newer');
@@ -638,11 +647,143 @@ describe('schema versioning', () => {
   });
 });
 
+describe('the open path', () => {
+  /** A current store, written once through the module. */
+  function plantCurrent(name: string): string {
+    const root = freshRoot(name);
+    openSqliteStore(root).append('sessions', [S_A]);
+    return root;
+  }
+
+  /** The ids the store's migration log holds, in apply order. */
+  function loggedIds(root: string): string[] {
+    return rawQuery<{ id: string }>(root, 'SELECT id FROM schema_migrations ORDER BY seq')
+      .map(({ id }) => id);
+  }
+
+  const ALL_IDS = SQLITE_MIGRATIONS.map(({ id }) => id);
+
+  it('adopts a store a pre-log release left on its first read, running nothing and keeping its rows', () => {
+    const root = freshRoot('pre-log');
+    rawExec(root, `${SQLITE_MIGRATIONS.map(({ sql }) => sql).join('\n')}
+      PRAGMA user_version = ${SQLITE_SCHEMA_VERSION};`);
+    rawInsert(root, 'sessions', 'aaaa-1111', JSON.stringify(S_A));
+    expect(tablesOf(root)).not.toContain('schema_migrations');
+
+    expect([...openSqliteStore(root).keys('sessions')]).toEqual(['aaaa-1111']);
+
+    expect(loggedIds(root)).toEqual(ALL_IDS);
+    expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
+    expect(bodiesOf(root, 'sessions')).toEqual([JSON.stringify(S_A)]);
+  });
+
+  /**
+   * What a newer rafa leaves once it applies a migration that breaks
+   * older writers: the migration logged under an id this rafa does not
+   * know, and the legacy gate closed.
+   */
+  function plantWriterBreak(root: string): void {
+    rawExec(root, `
+      INSERT INTO schema_migrations (id, sha256, breaks, applied_at, applied_by)
+        VALUES ('future-writer-break', '${'a'.repeat(64)}', '["writers"]', '2027-01-01T00:00:00.000Z', '0.99.0');
+      PRAGMA user_version = 1000;`);
+  }
+
+  const WRITER_REFUSAL = 'holds migration future-writer-break (applied by 0.99.0 on 2027-01-01),'
+    + ' which this rafa does not know and which breaks older writers; refusing to write it.';
+
+  it('reads a store only older writers are refused from, and writes no byte of it', () => {
+    const root = plantCurrent('writer-break-read');
+    plantWriterBreak(root);
+    const before = readRaw(root);
+    const store = openSqliteStore(root);
+
+    expect([...store.keys('sessions')]).toEqual(['aaaa-1111']);
+    expect(store.read('sessions')).toEqual([S_A]);
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  it('control: refuses a write to that store, with rows or with none, writing no byte', () => {
+    const root = plantCurrent('writer-break-write');
+    plantWriterBreak(root);
+    const before = readRaw(root);
+    const store = openSqliteStore(root);
+
+    expect(() => store.append('sessions', [S_B])).toThrow(WRITER_REFUSAL);
+    expect(() => store.append('commits', [])).toThrow(WRITER_REFUSAL);
+    expect(readRaw(root)).toEqual(before);
+  });
+
+  /** How long the test holds the write lock before the two opens may race for it. */
+  const HOLD_MS = 1000;
+
+  /**
+   * A child process that opens the store at `path` for a write, and
+   * prints how many rows its own connection had written once the open
+   * returned (`total_changes()`, which counts the log rows an open
+   * inserts and no DDL), when its open began and when it returned.
+   */
+  function spawnOpen(path: string): Bun.Subprocess<'ignore', 'pipe', 'pipe'> {
+    const module = join(import.meta.dir, 'sqlite.ts');
+    const script = `
+      import { withSqliteStore } from ${JSON.stringify(module)};
+      const started = Date.now();
+      const wrote = withSqliteStore(${JSON.stringify(path)}, 'write', true, (db) => db
+        .query('SELECT total_changes() AS n').get().n);
+      process.stdout.write(JSON.stringify({ wrote, started, at: Date.now() }));
+    `;
+    return Bun.spawn(['bun', '-e', script], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  }
+
+  /** A child's exit code, stdout and stderr once it exits. */
+  async function settled(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): Promise<readonly [number, string, string]> {
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    return [code, stdout, stderr];
+  }
+
+  it('lets two processes migrate one fresh store at once: one applies, the other finds nothing pending', async () => {
+    const root = freshRoot('two-processes');
+    mkdirSync(storeDir(root), { recursive: true });
+    const path = storeFile(root);
+    const holder = new Database(path, { readwrite: true, create: true });
+    holder.run('BEGIN IMMEDIATE');
+
+    // Both opens begin while the lock is held, so each first plan finds
+    // every migration pending and waits for the lock; releasing it lets
+    // them race, and the loser plans again under the lock.
+    const children = [spawnOpen(path), spawnOpen(path)];
+    await Bun.sleep(HOLD_MS);
+    const releasedAt = Date.now();
+    holder.run('ROLLBACK');
+    holder.close();
+    const outcomes = await Promise.all(children.map(settled));
+
+    expect(outcomes.map(([code, , stderr]) => [code, stderr])).toEqual([[0, ''], [0, '']]);
+    const reports = outcomes.map(([, stdout]) => JSON.parse(stdout) as { wrote: number; started: number; at: number });
+    expect(reports.map(({ wrote }) => wrote).sort((a, b) => a - b)).toEqual([0, ALL_IDS.length]);
+    for (const { started, at } of reports) {
+      expect(started).toBeLessThan(releasedAt);
+      expect(at).toBeGreaterThanOrEqual(releasedAt);
+    }
+    expect(loggedIds(root)).toEqual(ALL_IDS);
+    expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
+  }, 20_000);
+});
+
 describe('migrateSchema', () => {
+  /** A named, additive migration running `sql`. */
+  function named(id: string, sql: string): SqliteMigration {
+    return { id, breaks: [], sql };
+  }
+
   const HISTORY = [
-    'CREATE TABLE a (x)',
-    'CREATE TABLE b (x)',
-    'CREATE TABLE c (x)',
+    named('a', 'CREATE TABLE a (x)'),
+    named('b', 'CREATE TABLE b (x)'),
+    named('c', 'CREATE TABLE c (x)'),
   ];
 
   /** An in-memory database, set up by the SQL given. */
@@ -700,7 +841,11 @@ describe('migrateSchema', () => {
 
   it('rolls every pending migration back when one fails', () => {
     const db = memoryDb();
-    const broken = ['CREATE TABLE a (x)', 'CREATE TABLE b (', 'CREATE c'];
+    const broken = [
+      named('a', 'CREATE TABLE a (x)'),
+      named('b', 'CREATE TABLE b ('),
+      named('c', 'CREATE c'),
+    ];
 
     expect(() => migrateSchema(db, 'memory', broken)).toThrow();
     expect(tablesIn(db)).toEqual([]);

@@ -209,6 +209,20 @@
  *     not a {@link CommandLineSetting}, for the reason the `pr` section
  *     gives.
  *
+ * ## The `effort` section
+ *
+ * `effort.busyTimeoutMs` is how long an effort store open waits for
+ * another process's write lock before it throws `SQLITE_BUSY`. Three
+ * readings are this module's:
+ *
+ *   - It sits under `effort` because `store` is already a scalar
+ *     (`store: sqlite`) and can open no section.
+ *   - It defaults to 5000 and is never null: every open sets a busy
+ *     timeout, and one with no wait is the failure the key prevents.
+ *   - It is not a {@link CommandLineSetting}, for the reason the `pr`
+ *     section gives. `loadConfig` hands the resolved value to the store
+ *     (`effort/store/settings.ts`); nothing else reads it.
+ *
  * ## The `tiers` section
  *
  * `.rafa/specs/rafa-26-skill-tiers.md` names three keys that decide which
@@ -334,6 +348,7 @@ import {
   trackerKind,
 } from './config-readers.js';
 import {
+  busyTimeoutMs,
   CLAUDE_SETTING_SOURCES,
   confidence,
   CONFIG_VERSIONS,
@@ -382,6 +397,11 @@ export interface RafaConfig {
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
   store: StoreBackend;
+  /**
+   * How long an effort store open waits for another process's write
+   * lock, in milliseconds. `effort.busyTimeoutMs`.
+   */
+  effortBusyTimeoutMs: number;
   /** How much of the plan a task prompt receives. `plan.inject`. */
   inject: InjectMode;
   /** Where plans are written and read. `plan.dir`. */
@@ -525,6 +545,7 @@ export type CommandLineSetting = 'store' | 'inject' | 'planDir' | 'specsDir'
 export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   version: 1,
   store: 'sqlite',
+  effortBusyTimeoutMs: 5000,
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -589,6 +610,7 @@ export interface SettingSpec<K extends ConfigSetting> {
 export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   version: { key: 'version', read: oneOf(CONFIG_VERSIONS), cli: false },
   store: { key: 'store', read: oneOf(STORE_BACKENDS), cli: true },
+  effortBusyTimeoutMs: { key: 'effort.busyTimeoutMs', read: busyTimeoutMs, cli: false },
   inject: { key: 'plan.inject', read: oneOf(INJECT_MODES), cli: true },
   planDir: { key: 'plan.dir', read: directory, cli: true },
   specsDir: { key: 'specs.dir', read: directory, cli: true },

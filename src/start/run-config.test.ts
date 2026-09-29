@@ -16,6 +16,10 @@
  * with `-d` ends on the detached refusal instead, and neither leaves a
  * session record or calls the stand-in.
  *
+ * `refuseEffortDirRun` is read over a set `RAFA_EFFORT_DIR`, which it
+ * refuses, beside an empty one and an absent one, which it lets through;
+ * `src/tests/loop-start-effort-store.test.ts` spawns the refusal.
+ *
  * The `--skills-resolver` cases load a project with no config file under
  * a home with none, so the default answers wherever the flag is silent.
  * The flag named is `tag`, not the default `planner`, so a reading that
@@ -32,7 +36,7 @@ import { CommandExit } from '../cli/command.js';
 import { ConfigError } from '../config.js';
 import { plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
 
-import { asksDetached, loadRunConfig, refuseDetachedRun } from './run-config.js';
+import { asksDetached, loadRunConfig, refuseDetachedRun, refuseEffortDirRun } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';
 
 /** A temporary directory of this file's own. */
@@ -91,6 +95,30 @@ describe('refuseDetachedRun', () => {
 
   it('returns for a line asking for none', () => {
     expect(refuseDetachedRun(['--no-detached', '--plan=.plans/PLAN-a.md'])).toBeUndefined();
+  });
+});
+
+describe('refuseEffortDirRun', () => {
+  it('throws exit code 1 naming the directory while RAFA_EFFORT_DIR is set', () => {
+    let thrown: unknown;
+    try {
+      refuseEffortDirRun({ RAFA_EFFORT_DIR: '/tmp/a-copy' });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CommandExit);
+    const exit = thrown as CommandExit;
+    expect(exit.exitCode).toBe(1);
+    expect(exit.message).toBe([
+      '❌ RAFA_EFFORT_DIR is set (/tmp/a-copy); a loop records to the project\'s own store. Unset it and run again.',
+      NOTHING_DISPATCHED,
+    ].join('\n'));
+  });
+
+  it('returns when RAFA_EFFORT_DIR is empty or absent', () => {
+    expect(refuseEffortDirRun({ RAFA_EFFORT_DIR: '' })).toBeUndefined();
+    expect(refuseEffortDirRun({})).toBeUndefined();
   });
 });
 

@@ -99,6 +99,7 @@ const TABLES = [
   'plan_ci',
   'preflight',
   'report_absences',
+  'schema_migrations',
   'sessions',
   'skill_invocations',
   'task_reports',
@@ -282,7 +283,7 @@ describe('the changes migration', () => {
     // The control: the first seven entries make every earlier table and no
     // changes table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'));
 
     const result = writeChanges(root, writeOf({ changes: [change()] }), seams('from-v7'));
 
@@ -659,7 +660,7 @@ describe('whole-write refusals', () => {
     const before = readRaw(root);
 
     expect(() => writeChanges(root, writeOf({ changes: [change({ area: null })] }), seams('newer-2')))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 
@@ -679,8 +680,7 @@ describe('whole-write refusals', () => {
     db.run(`PRAGMA user_version = ${newer}`);
     db.close();
     const before = readRaw(root);
-    const refusal = `is at schema version ${newer}, past the`
-      + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+    const refusal = `has a migration log and schema version ${newer};`;
     const allRefused = writeOf({ changes: [change({ level: null })] });
 
     expect(() => writeChanges(root, writeOf())).toThrow(refusal);
@@ -880,7 +880,7 @@ describe('readPlanChanges', () => {
     const before = readRaw(root);
 
     expect(() => readPlanChanges(root, stub))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 
@@ -890,7 +890,7 @@ describe('readPlanChanges', () => {
     const db = new Database(storeFile(root), { create: true, readwrite: true });
     migrateSchema(db, storeFile(root), SQLITE_MIGRATIONS.slice(0, 7));
     db.close();
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'));
 
     expect(readPlanChanges(root, 'rafa-21-changelog-and-release')).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);

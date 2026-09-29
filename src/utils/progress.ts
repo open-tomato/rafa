@@ -284,7 +284,7 @@ export function readProgressFindings(
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return [];
 
-  const rows = withSqliteStore(path, false, (db) => {
+  const rows = withSqliteStore(path, 'read', false, (db) => {
     const query = db.query<FindingRow, [string | null]>(SELECT_FINDINGS);
     return query.all(planStub);
   });

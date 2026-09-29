@@ -237,6 +237,9 @@ describe('the document over the core registry', () => {
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
     expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
+    expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('copy');
+    expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('schema');
+    expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('migrate');
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
   });
 
@@ -271,6 +274,9 @@ describe('the document over the core registry', () => {
     expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();
     expect(spendsOf('loop', 'status')).toBeNull();
+    expect(spendsOf('effort', 'copy')).toBeNull();
+    expect(spendsOf('effort', 'schema')).toBeNull();
+    expect(spendsOf('effort', 'migrate')).toBeNull();
   });
 });
 

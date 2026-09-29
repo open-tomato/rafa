@@ -22,8 +22,10 @@
  * it already held, rather than at an empty one that would collect
  * everything again; that store sits under `.ralph/effort/`, which the
  * phase 1 move left behind, and no backend reads it. The directory is
- * `EFFORT_STORE_DIR`, spelled once in `effort/store.ts`, and the
- * project's `.gitignore` entry for `.rafa/` ignores it.
+ * the one `effortStoreDir` (`location.ts`) spells for both backends:
+ * `EFFORT_STORE_DIR` from `effort/store.ts`, which the project's
+ * `.gitignore` entry for `.rafa/` ignores, unless `RAFA_EFFORT_DIR`
+ * names another. Every read and append runs the test guard there first.
  *
  * The file names are the sibling's closed record too, so a kind added
  * to the port's row map compiles here only once that record names its
@@ -68,13 +70,16 @@ import type {
   EffortStore,
 } from './types.js';
 
+import { join } from 'node:path';
+
 import {
   appendRows,
   collectedKeys,
-  effortStorePath,
+  effortStoreFileName,
   readStoreRows,
 } from '../store.js';
 
+import { effortStoreDir, guardTestProcess } from './location.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
 export type { StoreReadResult } from '../store.js';
@@ -118,12 +123,31 @@ export interface NdjsonEffortStore extends EffortStore {
   ) => StoreReadResult<EffortRow<K>>;
 }
 
+/**
+ * The file one kind lives in under a repo root, in the directory
+ * `effortStoreDir` (`location.ts`) answers for both backends.
+ */
+function kindPath(repoRoot: string, kind: EffortRowKind): string {
+  return join(effortStoreDir(repoRoot), effortStoreFileName(kind));
+}
+
+/**
+ * {@link kindPath}, once the test guard (`guardTestProcess`) has let
+ * this process open it. Every read and append resolves its file here,
+ * so a refused open makes no file and no directory.
+ */
+function openedKindPath(repoRoot: string, kind: EffortRowKind): string {
+  const path = kindPath(repoRoot, kind);
+  guardTestProcess(path);
+  return path;
+}
+
 /** One kind's rows and line arithmetic, read whole. */
 function readKind<K extends EffortRowKind>(
   repoRoot: string,
   kind: K,
 ): StoreReadResult<EffortRow<K>> {
-  return readStoreRows<EffortRow<K>>(effortStorePath(repoRoot, kind));
+  return readStoreRows<EffortRow<K>>(openedKindPath(repoRoot, kind));
 }
 
 /** The keys one kind holds, by that kind's projection. */
@@ -131,7 +155,7 @@ function keysOfKind<K extends EffortRowKind>(
   repoRoot: string,
   kind: K,
 ): Set<string> {
-  const path = effortStorePath(repoRoot, kind);
+  const path = openedKindPath(repoRoot, kind);
   return collectedKeys<EffortRow<K>>(path, EFFORT_KEY_PROJECTIONS[kind]);
 }
 
@@ -141,7 +165,7 @@ function appendKind<K extends EffortRowKind>(
   kind: K,
   rows: readonly EffortRow<K>[],
 ): NdjsonAppendResult {
-  const path = effortStorePath(repoRoot, kind);
+  const path = openedKindPath(repoRoot, kind);
   return appendRows<EffortRow<K>>(path, rows, EFFORT_KEY_PROJECTIONS[kind]);
 }
 
@@ -157,7 +181,7 @@ export function openNdjsonStore(repoRoot: string): NdjsonEffortStore {
     append: (kind, rows) => appendKind(repoRoot, kind, rows),
     keys: (kind) => keysOfKind(repoRoot, kind),
     read: (kind) => readKind(repoRoot, kind).rows,
-    path: (kind) => effortStorePath(repoRoot, kind),
+    path: (kind) => kindPath(repoRoot, kind),
     readRows: (kind) => readKind(repoRoot, kind),
   };
 }

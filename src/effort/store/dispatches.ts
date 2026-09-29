@@ -76,8 +76,8 @@
  * {@link readSessionBudgets} answers each row carrying a budget, in append
  * order, for `rafa effort report`. It opens and creates nothing when the
  * store file does not exist, and answers none. A store that exists is
- * opened through `withSqliteStore`, so its schema is brought forward, or
- * refused, as it is for a write.
+ * opened through `withSqliteStore` for a read, so its schema is brought
+ * forward, or refused, as `sqlite.ts` says a read's is.
  *
  * ## What is refused
  *
@@ -340,7 +340,7 @@ export function readSessionBudgets(repoRoot: string): SessionBudget[] {
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return [];
 
-  const rows = withSqliteStore(path, false, (db) => db.query<BudgetRow, []>(SELECT_BUDGETS).all());
+  const rows = withSqliteStore(path, 'read', false, (db) => db.query<BudgetRow, []>(SELECT_BUDGETS).all());
   return rows.map((row) => ({
     sessionId: row.session_id,
     planStub: row.plan_stub,

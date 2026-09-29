@@ -459,6 +459,77 @@ describe('the PREREQUISITES file of the plan', () => {
   });
 });
 
+/** A plan carrying migration `plan-ci`, its second task spelling `collect`. */
+function storePlan(collect: string): string {
+  return [
+    '# Stage: one',
+    '',
+    '- [ ] Add migration `plan-ci`, additive: a new `plan_ci` table',
+    `- [ ] Collect over a copy: \`${collect}\``,
+    '',
+  ].join('\n');
+}
+
+/** The probe a store-changing plan's PREREQUISITES carries. */
+const SCHEMA_PROBE = 'rafa effort schema --check';
+
+/** A PREREQUISITES file carrying that probe under `[auto]`. */
+const PROBED = `## Store [auto]\n- [ ] The installed rafa can read and write the live store: \`${SCHEMA_PROBE}\`\n`;
+
+describe('the effort-store rules the preflight repeats from plan validate', () => {
+  it('refuses a migration plan running bun src/rafa.ts unprefixed before any probe, where the prefixed plan runs its probe', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    writeFileSync(planPathIn(root), storePlan('bun src/rafa.ts effort collect'), 'utf8');
+    writeFileSync(prerequisitesPathIn(root), PROBED, 'utf8');
+    writeFileSync(planPathIn(controlRoot), storePlan('RAFA_EFFORT_DIR=/tmp/copy bun src/rafa.ts effort collect'), 'utf8');
+    writeFileSync(prerequisitesPathIn(controlRoot), PROBED, 'utf8');
+
+    const run = await drive(root, settingsOf([], []), {});
+    const control = await drive(controlRoot, settingsOf([], []), { [SCHEMA_PROBE]: answered(0) });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message.split('\n')).toEqual([
+      `❌ Refusing to start: PLAN-${STUB}.md breaks 1 effort-store rule(s) that \`rafa plan validate\` checks.`,
+      `   PLAN-${STUB}.md:4: unprefixed-command: runs \`bun src/rafa.ts effort collect\` without a leading`
+        + ' RAFA_EFFORT_DIR=, in a plan that carries a migration; copy the store first with'
+        + ' `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort` and write the command as'
+        + ' RAFA_EFFORT_DIR=<absolute path of that dir> bun src/rafa.ts effort collect',
+      '   Nothing was checked and nothing was dispatched.',
+    ]);
+    expect([run.probes, run.info]).toEqual([[], []]);
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+
+    expect(control.refusal).toBeNull();
+    expect(control.probes).toEqual([`${SCHEMA_PROBE} in ${controlRoot}`]);
+  });
+
+  it('refuses a migration plan whose PREREQUISITES lacks the schema probe, and a plan pinning a number', async () => {
+    const unprobed = freshRoot();
+    const pinned = freshRoot();
+    writeFileSync(planPathIn(unprobed), storePlan('RAFA_EFFORT_DIR=/tmp/copy bun src/rafa.ts effort collect'), 'utf8');
+    writeFileSync(planPathIn(pinned), '# Stage: one\n\n- [ ] Ship the column as schema version 14\n', 'utf8');
+
+    const missing = await drive(unprobed, settingsOf([], []), {});
+    const pinnedRun = await drive(pinned, settingsOf([], []), {});
+
+    expect(missing.refusal?.message).toContain(`   PLAN-${STUB}.md:3: missing-probe: carries a migration, and PREREQUISITES-${STUB}.md`
+      + ` holds no [auto] item probing \`${SCHEMA_PROBE}\`;`);
+    expect(pinnedRun.refusal?.message).toContain(`   PLAN-${STUB}.md:3: pinned-migration: pins a store change by number`
+      + ' ("schema version 14");');
+    expect([missing.probes, pinnedRun.probes]).toEqual([[], []]);
+  });
+
+  it('lets a plan quoting the pinned pattern in a code span through', async () => {
+    const quoted = freshRoot();
+    writeFileSync(planPathIn(quoted), '# Stage: one\n\n- [ ] Refuse a spec saying `migration 14`\n', 'utf8');
+
+    const run = await drive(quoted, settingsOf([], []), {});
+
+    expect(run.refusal).toBeNull();
+  });
+});
+
 describe('an optional item that fails', () => {
   it('warns, answers its known-missing line and stores a failed row that halts nothing', async () => {
     const root = freshRoot();

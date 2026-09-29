@@ -456,6 +456,38 @@ export const dayCount: Reader<number> = (raw, at) => typeof raw === 'number'
   ? accepted(raw)
   : refused(at, raw, 'a number of days, a whole number above zero');
 
+/** The shortest lock wait `effort.busyTimeoutMs` accepts, in milliseconds. */
+export const BUSY_TIMEOUT_MIN_MS = 1;
+
+/** The longest lock wait `effort.busyTimeoutMs` accepts: one minute. */
+export const BUSY_TIMEOUT_MAX_MS = 60_000;
+
+/**
+ * True for a lock wait the effort store accepts: a whole number of
+ * milliseconds from {@link BUSY_TIMEOUT_MIN_MS} to
+ * {@link BUSY_TIMEOUT_MAX_MS}, both included.
+ */
+export function isBusyTimeoutMs(raw: unknown): raw is number {
+  return typeof raw === 'number'
+    && Number.isSafeInteger(raw)
+    && raw >= BUSY_TIMEOUT_MIN_MS
+    && raw <= BUSY_TIMEOUT_MAX_MS;
+}
+
+/**
+ * Accepts how long an effort store open waits for another process's
+ * write lock, as `effort.busyTimeoutMs` takes it.
+ *
+ * Zero is refused and not read as "no wait": SQLite reads a zero busy
+ * timeout as none, so an open would throw `SQLITE_BUSY` at once, the
+ * failure the key exists to prevent. There is no unlimited value, since
+ * a lock wait with no end can hang a loop. A fraction, a quoted number
+ * and `false` are refused as every reader here refuses them.
+ */
+export const busyTimeoutMs: Reader<number> = (raw, at) => isBusyTimeoutMs(raw)
+  ? accepted(raw)
+  : refused(at, raw, `a lock wait in milliseconds, a whole number from ${String(BUSY_TIMEOUT_MIN_MS)} to ${String(BUSY_TIMEOUT_MAX_MS)}`);
+
 /**
  * Accepts a lesson confidence as the `learning` thresholds take one: a
  * number from {@link CONFIDENCE_MIN} to {@link CONFIDENCE_MAX}, both

@@ -25,9 +25,9 @@
  *
  * Both tables sit in the SQLite store's file whatever `store` selects. It
  * opens and creates nothing when that file does not exist, and answers no
- * time. A store that exists is opened through `withSqliteStore`, as
- * `readTaskReportTallies` opens it, so a store past the last schema
- * version is refused as it is for a write.
+ * time. A store that exists is opened through `withSqliteStore` for a
+ * read, as `readTaskReportTallies` opens it, so it is brought forward,
+ * or refused, as `sqlite.ts` says a read's is.
  */
 import { existsSync } from 'node:fs';
 
@@ -69,6 +69,6 @@ export function readTaskFinishes(repoRoot: string, query: TaskFinishQuery): stri
   if (!existsSync(path)) return [];
 
   const bound: Bound[] = [query.planStub, query.since, query.planStub, query.since];
-  const rows = withSqliteStore(path, false, (db) => db.query<FinishRow, Bound[]>(SELECT_FINISHES).all(...bound));
+  const rows = withSqliteStore(path, 'read', false, (db) => db.query<FinishRow, Bound[]>(SELECT_FINISHES).all(...bound));
   return rows.map((row) => row.collected_at);
 }

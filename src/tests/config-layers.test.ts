@@ -49,16 +49,23 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '../config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
+import { setActiveStoreSettings } from '../effort/store/settings.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-layers-'));
 let planted = 0;
 
 afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
+});
+
+// `loadConfig` hands the effort store the busy timeout each file names,
+// and a later file's store would open with this file's 250 ms.
+afterEach(() => {
+  setActiveStoreSettings(null);
 });
 
 /** A fresh, empty directory under this file's temporary root. */
@@ -125,6 +132,8 @@ function sourcesWith(
 const PROJECT_TEXT = [
   'version: 1',
   'store: ndjson',
+  'effort:',
+  '  busyTimeoutMs: 250',
   'plan:',
   '  inject: full',
   '  dir: project-plans',
@@ -205,6 +214,7 @@ const PROJECT_TEXT = [
 const PROJECT_VALUES: RafaConfig = {
   version: 1,
   store: 'ndjson',
+  effortBusyTimeoutMs: 250,
   inject: 'full',
   planDir: 'project-plans',
   specsDir: 'project-specs',
@@ -268,6 +278,8 @@ const PROJECT_VALUES: RafaConfig = {
 const USER_TEXT = [
   'version: 1',
   'store: sqlite',
+  'effort:',
+  '  busyTimeoutMs: 750',
   'plan:',
   '  inject: task',
   '  dir: user-plans',
@@ -337,6 +349,7 @@ const USER_TEXT = [
 const USER_VALUES: RafaConfig = {
   version: 1,
   store: 'sqlite',
+  effortBusyTimeoutMs: 750,
   inject: 'task',
   planDir: 'user-plans',
   specsDir: 'user-specs',
@@ -481,6 +494,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
   [
     'store', 'store: postgres', 'store is "postgres", expected one of: sqlite, ndjson',
     'store: ndjson', 'store', 'ndjson',
+  ],
+  [
+    'effort.busyTimeoutMs', 'effort:\n  busyTimeoutMs: false',
+    'effort.busyTimeoutMs is false, expected a lock wait in milliseconds, a whole number from 1 to 60000',
+    'effort:\n  busyTimeoutMs: 1', 'effortBusyTimeoutMs', 1,
   ],
   [
     'plan.inject', 'plan:\n  inject: all',

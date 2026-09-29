@@ -67,6 +67,7 @@ import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 import { setActiveOutput } from './adapters/output/active.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from './config.js';
+import { activeStoreSettings, setActiveStoreSettings } from './effort/store/settings.js';
 import { sinkOutput } from './tests/output-sinks.js';
 
 /** Chmod cannot deny a read to root; see the unreadable-file case. */
@@ -209,6 +210,35 @@ describe('loadConfig', () => {
     expect([resolved.path, resolved.userPath]).toEqual([null, null]);
     expect(lines).toEqual([]);
     expect([readdirSync(roots.root), readdirSync(roots.home)]).toEqual([[], []]);
+  });
+
+  it('hands the effort store the busy timeout it resolved, the user file answering where the project file is silent', () => {
+    try {
+      loadConfig(scopes('store: ndjson\n', 'effort:\n  busyTimeoutMs: 250\n'), {}, quiet);
+      const fromUser = activeStoreSettings().busyTimeoutMs;
+      loadConfig(scopes('effort:\n  busyTimeoutMs: 60000\n', 'effort:\n  busyTimeoutMs: 250\n'), {}, quiet);
+      const fromProject = activeStoreSettings().busyTimeoutMs;
+      loadConfig(scopes(null, null), {}, quiet);
+
+      expect([fromUser, fromProject, activeStoreSettings().busyTimeoutMs]).toEqual([250, 60_000, 5000]);
+    } finally {
+      setActiveStoreSettings(null);
+    }
+  });
+
+  it('leaves the store settings as they were when it refuses a file', () => {
+    try {
+      setActiveStoreSettings({ busyTimeoutMs: 250 });
+      const roots = scopes('effort:\n  busyTimeoutMs: 0\n', null);
+
+      expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+        `${literalPath(roots.root)}: effort.busyTimeoutMs is 0, `
+          + 'expected a lock wait in milliseconds, a whole number from 1 to 60000',
+      ]);
+      expect(activeStoreSettings().busyTimeoutMs).toBe(250);
+    } finally {
+      setActiveStoreSettings(null);
+    }
   });
 
   it('reads the project file and lets the command line outrank it', () => {

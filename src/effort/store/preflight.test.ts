@@ -108,6 +108,7 @@ const TABLES = [
   'plan_ci',
   'preflight',
   'report_absences',
+  'schema_migrations',
   'sessions',
   'skill_invocations',
   'task_reports',
@@ -324,7 +325,7 @@ describe('the preflight migration', () => {
     // preflight table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
     expect(tablesOf(root)).toEqual(
-      TABLES.filter((table) => table !== 'preflight' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'),
+      TABLES.filter((table) => table !== 'schema_migrations' && table !== 'preflight' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci'),
     );
 
     const result = writePreflightChecks(root, { runId: 'run-v5', checks: [PASS_CHECK] }, CLOCK);
@@ -624,9 +625,9 @@ describe('what a preflight write refuses', () => {
     const before = readRaw(root);
 
     expect(() => writePreflightChecks(root, { runId: 'run-newer-2', checks: [PASS_CHECK] }, CLOCK))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(() => writePreflightChecks(root, { runId: 'run-newer-3', checks: [] }, CLOCK))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 });
@@ -724,7 +725,7 @@ describe('readPreflightHalts', () => {
     db.close();
     const before = readRaw(root);
 
-    expect(() => readPreflightHalts(root)).toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+    expect(() => readPreflightHalts(root)).toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 });

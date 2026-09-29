@@ -24,6 +24,7 @@ import type { Reader, ValueAt } from './config-sections.js';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  busyTimeoutMs,
   CLAUDE_SETTING_SOURCES,
   confidence,
   dayCount,
@@ -378,6 +379,33 @@ describe('dayCount', () => {
     expect(problemsOf(dayCount, parsed.b)).toEqual([
       'F: s is "30", expected a number of days, a whole number above zero',
     ]);
+  });
+});
+
+/** What {@link busyTimeoutMs} names as expected when it refuses a value. */
+const BUSY_EXPECTED = 'a lock wait in milliseconds, a whole number from 1 to 60000';
+
+describe('busyTimeoutMs', () => {
+  it('accepts both bounds and the default as themselves', () => {
+    expect([1, 5000, 60_000].map((raw) => valueOf(busyTimeoutMs, raw))).toEqual([1, 5000, 60_000]);
+  });
+
+  it.each([
+    ['zero, which SQLite would read as no wait', 0, '0'],
+    ['a negative wait', -1, '-1'],
+    ['one past the minute', 60_001, '60001'],
+    ['a fraction', 1.5, '1.5'],
+    ['a wait quoted as a string', '5000', '"5000"'],
+    ['false, which is not read as off', false, 'false'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(busyTimeoutMs, raw)).toEqual([`F: s is ${found}, expected ${BUSY_EXPECTED}`]);
+  });
+
+  it('accepts the wait a file spells unquoted, and refuses the same wait quoted', () => {
+    const parsed = Bun.YAML.parse('a: 5000\nb: "5000"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(busyTimeoutMs, parsed.a)).toBe(5000);
+    expect(problemsOf(busyTimeoutMs, parsed.b)).toEqual([`F: s is "5000", expected ${BUSY_EXPECTED}`]);
   });
 });
 

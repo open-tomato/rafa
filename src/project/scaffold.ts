@@ -85,6 +85,8 @@ export const USER_TREE = Object.freeze(['instincts'] as const);
  */
 export const CONFIG_SETTINGS_LINES = Object.freeze([
   `# store: ${CONFIG_DEFAULTS.store}                  # sqlite | ndjson`,
+  '# effort:',
+  `#   busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}          # 1..60000 ms; how long a store open waits for another process's lock`,
   '# plan:',
   `#   inject: ${CONFIG_DEFAULTS.inject}                # full | stage | task`,
   `#   dir: ${CONFIG_DEFAULTS.planDir}`,

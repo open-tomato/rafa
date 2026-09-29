@@ -279,6 +279,23 @@ project's file outranks the same one in yours. `rafa init` writes both
 with every setting commented out at its default, so uncomment a line,
 with its section line, to change it.
 
+### `effort`
+
+One setting says how long a command waits for another rafa process that
+is writing the effort store before it gives up with `SQLITE_BUSY`.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `effort.busyTimeoutMs` | `5000` | the wait in milliseconds, a whole number from 1 to 60000 |
+
+There is no unlimited wait, since a lock wait with no end can hang a
+loop; `0`, a fraction and a quoted `"5000"` are refused.
+
+```yaml
+effort:
+  busyTimeoutMs: 10000
+```
+
 ### `cleanup`
 
 Three settings shape what `rafa cleanup` lists.

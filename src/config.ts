@@ -319,6 +319,7 @@ function readLayer(
   const layer: ConfigLayer = {
     version: read('version'),
     store: read('store'),
+    effortBusyTimeoutMs: read('effortBusyTimeoutMs'),
     inject: read('inject'),
     planDir: read('planDir'),
     specsDir: read('specsDir'),

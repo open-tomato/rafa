@@ -50,6 +50,17 @@
  * where the project's names one, because the next project without one
  * would run on it.
  *
+ * ## The store's settings
+ *
+ * {@link loadConfig} is the one place a command's config is resolved
+ * from its files, so it is where the effort store learns its
+ * `effort.busyTimeoutMs`: every call sets the store's active settings
+ * to the value it resolved. The store opens far below any config, in
+ * the dozen writers and readers that call `withSqliteStore`, and a
+ * value threaded down to each would be an argument none of them uses.
+ * A command that never loads its config opens its store with the
+ * default.
+ *
  * ## Existence
  *
  * "When the file exists" is decided with `existsSync`, and the choice
@@ -67,6 +78,7 @@ import { isAbsolute } from 'node:path';
 import { activeOutput } from './adapters/output/active.js';
 import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
+import { setActiveStoreSettings } from './effort/store/settings.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */
 export interface ConfigRoots {
@@ -140,6 +152,10 @@ function printWarning(message: string): void {
  * unknown key through `warn`, the active output's `warn` when none is
  * given.
  *
+ * The resolved `effort.busyTimeoutMs` is handed to the effort store
+ * (`effort/store/settings.ts`), so every store open after this call
+ * waits that long for a lock.
+ *
  * The files are read and judged before the command line is looked at,
  * the user's first, so a run with problems in all three reports the
  * user file's alone. See the module note for the home.
@@ -153,5 +169,6 @@ export function loadConfig(
   const file = readConfigFile(roots.root);
   const resolved = resolveConfig({ cli, file, user });
   for (const warning of resolved.warnings) warn(warning);
+  setActiveStoreSettings({ busyTimeoutMs: resolved.config.effortBusyTimeoutMs });
   return resolved;
 }

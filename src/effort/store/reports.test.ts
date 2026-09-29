@@ -264,7 +264,7 @@ describe('the task reports migration', () => {
     expect(rawQuery<{ name: string }>(root, columns, 'task_reports').map(({ name }) => name))
       .toEqual(COLUMNS);
     expect(tablesOf(root))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
   });
@@ -455,7 +455,7 @@ describe('readTaskReportTallies', () => {
     db.close();
     const before = readRaw(root);
 
-    expect(() => readTaskReportTallies(root)).toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+    expect(() => readTaskReportTallies(root)).toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 });
@@ -572,7 +572,7 @@ describe('what a task report write refuses', () => {
     const before = readRaw(root);
 
     expect(() => writeTaskReport(root, writeOf({ dispatch: RETRY }), seams('newer-2')))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 });

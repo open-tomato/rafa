@@ -237,6 +237,12 @@ the reference example. This section replaces nothing.
 - `runRafa` gives the child a `PATH` of `scratch.bin` then git's directory
   and nothing else. Plant an executable (mode 755) in `scratch.bin` to make
   a program present; leave it out to make it absent.
+- `runRafa` also sets `RAFA_TEST=1` and the suite's own `TMPDIR` on the
+  child, ahead of the case's `env`, so a case naming either overrides it.
+  `RAFA_TEST=1` makes the child a test process to the effort store's test
+  guard (`src/effort/store/location.ts`), and the `TMPDIR` lets that guard
+  judge the scratch project by the directory the suite built it under.
+  This replaces nothing.
 - The same `PATH` means a stand-in `claude` script cannot rely on `cat` or
   other coreutils where git lives outside `/usr/bin`. Print a file with
   shell builtins: `while IFS= read -r l; do printf '%s\n' "$l"; done < f`.
