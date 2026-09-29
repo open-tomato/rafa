@@ -97,6 +97,9 @@
  * suspect or dangling reference naming `rafa issue check <n>` as the
  * fix. It never changes the exit code.
  *
+ * A repository whose release is on then gets the `Release:` row
+ * (`./doctor-release.ts`), a warning while fragments wait on the base.
+ *
  * ## The risk total
  *
  * A plan `--plan` names also gets the one line `loop start` prints before
@@ -189,7 +192,7 @@
  * then `renderDoctorBoard`'s lines (`./doctor-board.ts`) for a repository that has a GitHub board —
  * its rows, then any blocked issues, then any epic labels — and none for
  * one that has not; then the cleanup row, when there is anything to
- * clean; then the references row, when there is a saved copy; then the `Skill tiers` rows
+ * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then, under `--deep`,
  * `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
@@ -221,6 +224,7 @@ import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
+import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { PrProvider } from '../config-sections.js';
@@ -261,6 +265,7 @@ import { readDeep, renderDeep } from './doctor-deep.js';
 import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
+import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
 import { isFile } from './plan/plan-files.js';
@@ -272,7 +277,7 @@ import { isFile } from './plan/plan-files.js';
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
 export interface DoctorSeams
-  extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorTiersRunSeams {
+  extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -362,6 +367,8 @@ export interface DoctorResult {
   readonly cleanup: DoctorCleanupReading;
   /** The suspect, dangling and unknown references of every saved copy under `specs.dir`, or why it could not be listed. */
   readonly refs: DoctorRefsReading;
+  /** The release row (`./doctor-release.ts`): `{ enabled: false }` for a project whose release is off. */
+  readonly release: DoctorReleaseReading;
   /** The skill tier rows and the Claude Code version they were read against (`./doctor-tiers.ts`). */
   readonly tiers: DoctorTiersReading;
   /** The `effort store schema` row (`./doctor-effort-schema.ts`); a failing one gives no `data`. */
@@ -374,6 +381,7 @@ export interface DoctorResult {
 interface BoardReadings extends DoctorBoardReadings {
   readonly cleanup: DoctorCleanupReading;
   readonly refs: DoctorRefsReading;
+  readonly release: DoctorReleaseReading;
   readonly tiers: DoctorTiersReading;
   readonly effortSchema: DoctorEffortSchemaReading;
 }
@@ -612,6 +620,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     boards: readings.boards,
     cleanup: readings.cleanup,
     refs: readings.refs,
+    release: readings.release,
     tiers: readings.tiers,
     effortSchema: readings.effortSchema,
     deep,
@@ -653,14 +662,16 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const gh = boardRunner(preflight.provider, preflight.root, seams);
     const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
     const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
+    const release = readDoctorRelease({ root: project.root, config: preflight.config }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
     const effortSchema = readDoctorEffortSchema(project.root, context.env);
     const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue);
-    const readings: BoardReadings = { ...board, cleanup, refs, tiers, effortSchema };
+    const readings: BoardReadings = { ...board, cleanup, refs, release, tiers, effortSchema };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
     writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
+    writeDoctorRelease(context, release);
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
     const deep = await checkDeep(context, preflight, seams);
@@ -718,7 +729,11 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' fetching, the branches and worktrees `rafa cleanup` would list, and prints them in one row naming'
       + ' `rafa cleanup` when any group holds one. It then counts the suspect, dangling and unknown references'
       + ' of every saved copy under `specs.dir`, writing nothing, and names `rafa issue check <n>` for each'
-      + ' copy holding a suspect or dangling one. It then prints, under `Skill tiers`, a warning per'
+      + ' copy holding a suspect or dangling one. Where the release is on, it then prints one `Release:` row naming'
+      + ' the version `origin/<pr.base>` declares as last fetched, the latest release tag, the version the changelog\'s'
+      + ' top heading names and the change fragments waiting on the base, as a warning naming `rafa release settle`'
+      + ' while any wait; it fetches nothing and never changes the exit code.'
+      + ' It then prints, under `Skill tiers`, a warning per'
       + ' skill or agent name two tiers hold with different contents, per unreviewed third-party rafa or'
       + ' add-on item, and for an installed Claude Code other than the version skill serving was probed'
       + ' against, and a note per byte-identical copy that can be deleted and per user-tier item with no'

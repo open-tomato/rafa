@@ -65,7 +65,7 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`; then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the release row over `src/commands/doctor-release.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -90,6 +90,7 @@ module's note is the long form.
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
+| `src/commands/doctor-release.ts` | the release row of `rafa doctor`, read only where `resolveReleaseEnabled` says the release is on: the version `origin/<pr.base>` declares as last fetched, the waiting fragments and their forecast (`readWaiting`, `src/commands/release/status-fragments.ts`), the latest release tag (`readTags`) and the version of the changelog's top heading (`changelogVersions`), all through `rafa release status`'s readers; one `Release:` line, a warning in both modes naming `rafa release settle` while any fragment waits, `info` in text mode otherwise, and a `?` with an indented reason for a part it could not read |
 | `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues, the epic labels and the boards read over it in that order (`readDoctorBoard`, all four null with no runner), the board listing made once and handed to both the epic labels and the boards, and their lines joined in that order (`renderDoctorBoard`) |
@@ -840,7 +841,18 @@ New; it replaces no earlier text. What a row or an action added to
   suspect or dangling one naming `rafa issue check <n>`
   (`src/commands/doctor-refs.ts`); it writes no stamp, reads each issue
   once per run, reads an issue the board cannot answer as `unknown`,
-  and never changes the exit code. Every run then prints the
+  and never changes the exit code. A repository whose release is on
+  (`src/release/enabled.ts`) then gets one row naming the version
+  `origin/<pr.base>` declares as last fetched, the latest release tag,
+  the version the changelog's top heading names and the fragments
+  waiting on the base, `Release: origin/main at 0.25.0, latest tag
+  v0.25.0, CHANGELOG.md tops at 0.25.0, no fragment waits.`
+  (`src/commands/doctor-release.ts`); while any fragment waits, one
+  that does not parse included, it names them and the release settle
+  would fold them into, and goes out as a warning naming
+  `rafa release settle`, in json mode too. It fetches nothing, marks a
+  part it could not read `?` with the reason on an indented line, and
+  never changes the exit code. Every run then prints the
   `Skill tiers` rows (`src/commands/doctor-tiers.ts`), when there is
   any, as json's `tiers`; they never change the exit code. Every run then
   prints the `effort store schema` row (`src/commands/doctor-effort-schema.ts`),
@@ -873,7 +885,8 @@ New; it replaces no earlier text. What a row or an action added to
   issues, the labels and the boards null for a project with no GitHub board, the cleanup counts as its `cleanup`
   (`{ ok: false, detail }` for a repository git cannot read), the
   references counts as its `refs` (`{ ok: false, detail }` for a
-  `specs.dir` that cannot be listed), the `--deep` sections as its `deep`,
+  `specs.dir` that cannot be listed), the release row's reading as its
+  `release` (`{ enabled: false }` where the release is off), the `--deep` sections as its `deep`,
   null without the flag, and a
   halt gives the `command_exit` error and no `data`.
 - **`status` reads where the project stands in five sections**

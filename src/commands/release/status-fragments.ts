@@ -159,7 +159,7 @@ function fragmentCount(count: number): string {
 }
 
 /** What the cell says after the count: the forecast, or why there is none. */
-function forecastPhrase(reading: WaitingReading): string {
+export function forecastPhrase(reading: WaitingReading): string {
   if (reading.malformed > 0) return `${reading.malformed} does not parse, so settle would refuse`;
   if (reading.forecast === null) return 'no forecast, the base version could not be read';
   if (reading.forecast.kind === 'failed') return 'the forecast failed';
