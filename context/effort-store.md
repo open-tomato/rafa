@@ -363,8 +363,14 @@ The last three, which migration `store-meta` creates, are the store's
 own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and
-`merge_conflicts` each incoming row one could not settle. No writer
-fills `merges` yet. `settleMatches` (`store/merge-conflicts.ts`) fills
+`merge_conflicts` each incoming row one could not settle. `mergeStore`
+(`store/merge-store.ts`) writes one `merges` row per merge into the
+build it swaps in through `rebuildAside`, behind
+`effort.sqlite.before-merge-<stamp>.bak`; its refusals, the forwarded
+copy of an other store that lacks migrations, and its row-count check
+(each table's old count plus the rows the merge added, through
+`checkedCounts`' `added`) are in its module note. `settleMatches`
+(`store/merge-conflicts.ts`) fills
 `merge_conflicts`: it compares each pair the union matched on every
 column but `seq` and the origin pair, skips an equal pair, fills a
 set-once field NULL here from the other store and keeps a filled one
@@ -419,7 +425,7 @@ copy, which carries the columns over as they were, the merge's
 union (`store/merge-union.ts`), which inserts another store's unmatched
 rows under a new local `seq` with their origin pair unchanged, and the
 merge's conflict trail (`store/merge-conflicts.ts`) into the local
-`merge_conflicts`.
+`merge_conflicts`, and its `merges` row (`store/merge-store.ts`).
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
