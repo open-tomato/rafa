@@ -281,7 +281,7 @@ describe('resolveRunBranch', () => {
     args: readonly string[],
     over: BranchSeams,
   ): Promise<string> {
-    return resolveRunBranch({ repoRoot: REPO, planStub, base, args }, over);
+    return resolveRunBranch({ checkout: REPO, planStub, base, args }, over);
   }
 
   beforeEach(() => {

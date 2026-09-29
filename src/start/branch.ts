@@ -92,7 +92,7 @@ const INDENT = '   ';
 
 /** What the run knows about itself when the offer is made. */
 export interface BranchRequest {
-  /** The project root git is run in. */
+  /** The run's checkout, which git is run in (`start/checkout.ts`). */
   readonly repoRoot: string;
   /** The plan's stub, or null when the plan path gave none. */
   readonly planStub: string | null;

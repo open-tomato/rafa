@@ -202,8 +202,15 @@ export const RELEASE_STAGE_SEAMS: ReleaseStageSeams = {
 
 /** What step 1 is made from, as the run already holds it. */
 export interface ReleaseStageInput {
-  /** The repository the two configured paths are relative to. */
+  /** The project root, whose store the plan's change notes are read from. */
   readonly repoRoot: string;
+  /**
+   * The run's checkout (`start/checkout.ts`): the working tree the two
+   * configured paths are relative to and written in, and git runs in.
+   * `repoRoot` when absent, which is the checkout of every loop that does
+   * not run in a linked worktree.
+   */
+  readonly checkout?: string;
   /** The `release` settings, as the config resolved them. */
   readonly settings: ReleaseSettings;
   /** The plan stub the run's change notes are stored under. */
@@ -214,7 +221,10 @@ export interface ReleaseStageInput {
 
 /** What {@link finishRelease} is made from. */
 export interface ReleaseFinishInput {
-  /** The repository the commit and the push are made in. */
+  /**
+   * The repository the commit and the push are made in: the run's
+   * checkout, the same working tree step 1 wrote the two files in.
+   */
   readonly repoRoot: string;
   /** Step 1's record, or null when no preparation ran; see the module note. */
   readonly preparation: ReleasePreparation | null;
@@ -308,7 +318,9 @@ function announcePreparation(preparation: ReleasePreparation): void {
 /**
  * Step 1, run before the wrap-up session is spawned: the plan's change
  * notes, its declared level and its title, handed to
- * `release/prepare.ts`.
+ * `release/prepare.ts`. The notes are read from the store under the
+ * project root, and the changelog and the version file are read and
+ * written in the checkout, where git runs too.
  *
  * Answers the record the session's prompt is built from and the finish
  * works against, or null when the stage could not run — see the module
@@ -319,11 +331,12 @@ export function prepareReleaseStage(
   seams: Partial<ReleaseStageSeams> = {},
 ): ReleasePreparation | null {
   const io: ReleaseStageSeams = { ...RELEASE_STAGE_SEAMS, ...seams };
+  const checkout = input.checkout ?? input.repoRoot;
   try {
     const preparation = io.prepare({
-      repoRoot: input.repoRoot,
+      repoRoot: checkout,
       settings: input.settings,
-      git: io.git(input.repoRoot),
+      git: io.git(checkout),
       declared: parsePlan(input.planContent).header.release,
       notes: io.readNotes(input.repoRoot, input.planStub),
       title: releaseTitle(input),

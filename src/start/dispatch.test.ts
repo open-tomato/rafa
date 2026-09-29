@@ -44,7 +44,7 @@ import type { InstinctRecord } from '../learning/index.js';
 import type { Learning, SyncPayload } from '../ports/index.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -58,7 +58,7 @@ import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 
-import { buildTaskPrompt, dispatchTask, NO_TASK_SECTIONS, storeTaskReport } from './dispatch.js';
+import { buildTaskPrompt, dispatchTask, NO_TASK_SECTIONS, renderProgressForDispatch, storeTaskReport } from './dispatch.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -342,6 +342,7 @@ describe('dispatchTask, serving its session', () => {
       planContent: `- [ ] ${LINE}\n`,
       inject: 'full',
       repoRoot,
+      checkout: repoRoot,
       home: join(repoRoot, 'home'),
       settingSources: ['project', 'local'],
       serving,
@@ -472,6 +473,7 @@ describe('dispatchTask, handing its task out', () => {
       planContent: `- [ ] ${SKILLED}\n`,
       inject: 'full',
       repoRoot,
+      checkout: repoRoot,
       home: join(repoRoot, 'home'),
       settingSources: ['project', 'local'],
       serving,
@@ -609,6 +611,7 @@ describe('dispatchTask, one fixture task under each resolver', () => {
       planContent: `- [ ] ${FIXTURE}\n`,
       inject: 'full',
       repoRoot: serving.root,
+      checkout: serving.root,
       home: join(serving.root, 'home'),
       settingSources: ['project', 'local'],
       serving,
@@ -706,6 +709,7 @@ describe('dispatchTask, lessons matched by artifact path', () => {
       planContent: `- [ ] ${TASK_TEXT}\n`,
       inject: 'full',
       repoRoot: root,
+      checkout: root,
       home: join(root, 'home'),
       settingSources: ['project', 'local'],
       serving: null,
@@ -981,5 +985,72 @@ describe('buildTaskPrompt, placing the task\'s sections', () => {
 
     expect(prompt.indexOf(SKILLS)).toBeLessThan(prompt.indexOf(PLAN));
     expect(prompt.indexOf(PLAN)).toBeLessThan(prompt.indexOf('known-missing: skill foo'));
+  });
+});
+
+describe('dispatchTask and renderProgressForDispatch, in the run\'s checkout', () => {
+  /** A session output whose report holds one finding, so the render has a line to write. */
+  const FOUND = REPORTED.replace(
+    'findings: []',
+    'findings:\n  - trigger: "when the checkout is a worktree"\n    kind: gotcha\n    what: "the finding the store holds"\n    signal: loud',
+  );
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('spawns the session in the checkout, not the project root', async () => {
+    const root = freshRoot();
+    const checkout = `${root}-worktree`;
+    const cwds: string[] = [];
+    const run: TaskSessionRunner = (_prompt, _flags, _sessionId, _sources, _served, cwd) => {
+      cwds.push(cwd);
+      return Promise.resolve({ exitCode: 0, stdout: '' });
+    };
+    setActiveOutput(sinkOutput({}));
+
+    await dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      run,
+      newSessionId: () => 'session-under-test',
+    });
+
+    expect(cwds).toEqual([checkout]);
+  });
+
+  it('renders progress.txt from the project root\'s store into the checkout', async () => {
+    const root = freshRoot();
+    const checkout = `${root}-worktree`;
+    mkdirSync(checkout, { recursive: true });
+    setActiveOutput(sinkOutput({}));
+    expect(await storeTaskReport(storeOptions(root, 's-1', FOUND, 'done'))).toBe(true);
+
+    expect(renderProgressForDispatch(root, 'demo', checkout)).toBe(true);
+
+    expect(readFileSync(join(checkout, 'progress.txt'), 'utf8')).toContain('the finding the store holds');
+    expect(existsSync(join(root, 'progress.txt'))).toBe(false);
+    // The checkout holds no store: the finding was read under the root.
+    expect(existsSync(sqliteStorePath(checkout))).toBe(false);
+  });
+
+  it('renders progress.txt into the project root when handed no checkout', async () => {
+    // The control for the case above: the same store rendered with no
+    // checkout lands at the root, so the file above went where it was sent.
+    const root = freshRoot();
+    setActiveOutput(sinkOutput({}));
+    expect(await storeTaskReport(storeOptions(root, 's-1', FOUND, 'done'))).toBe(true);
+
+    expect(renderProgressForDispatch(root, 'demo')).toBe(true);
+
+    expect(readFileSync(join(root, 'progress.txt'), 'utf8')).toContain('the finding the store holds');
   });
 });

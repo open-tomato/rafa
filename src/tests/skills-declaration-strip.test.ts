@@ -195,6 +195,7 @@ async function dispatchPlanted(taskInfo: TaskInfo) {
     planContent: PLAN_CONTENT,
     inject: 'task',
     repoRoot: join(tempRoot, 'repo'),
+    checkout: join(tempRoot, 'repo'),
     home: join(tempRoot, 'home'),
     settingSources: ['project', 'local'],
     serving: null,

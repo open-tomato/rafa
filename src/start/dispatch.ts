@@ -36,6 +36,17 @@
  * rendered empty; with both absent the prompt is the one built before
  * sections existed.
  *
+ * Two directories reach a dispatch, and are never confused. The PROJECT
+ * ROOT, {@link TaskDispatchOptions.repoRoot}, holds `.rafa/`: the store
+ * the lessons are pulled from and the report is stored in, and the agent
+ * definitions a routed task's effort is read from. The CHECKOUT,
+ * {@link TaskDispatchOptions.checkout}, is the working tree the session
+ * runs in and edits, which `start/commit.ts` then commits: a linked
+ * worktree's own directory when the loop runs in one
+ * (`start/checkout.ts`), and the project root otherwise. `progress.txt`
+ * is rendered from the project root's store into the checkout, where the
+ * session reads it.
+ *
  * Before each session the dispatch serves it the rafa-tier winners
  * (`start/serving.ts`) when its caller names a
  * {@link TaskDispatchOptions.serving}, and warns once per winner left
@@ -68,7 +79,7 @@ import type { Learning } from '../ports/index.js';
 import type { TaskReportRecord } from '../report/record.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
-import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
+import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../utils/claude.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -97,9 +108,10 @@ export const SESSION_ID_FLAG = '--session-id';
 /**
  * How one task's Claude session is spawned: `prompt` on stdin, the
  * `flags` its declaration resolved to, `sessionId` as its id, settings
- * loaded from `settingSources`, and the `served` flags handing it the
- * run's served directory. It answers the exit code together with
- * everything the session wrote to stdout.
+ * loaded from `settingSources`, the `served` flags handing it the
+ * run's served directory, and `cwd`, the run's checkout, as its working
+ * directory. It answers the exit code together with everything the
+ * session wrote to stdout.
  */
 export type TaskSessionRunner = (
   prompt: string,
@@ -107,6 +119,7 @@ export type TaskSessionRunner = (
   sessionId: string,
   settingSources: readonly ClaudeSettingSource[],
   served: readonly string[],
+  cwd: string,
 ) => Promise<CapturedSession>;
 
 /**
@@ -127,6 +140,10 @@ export type TaskSessionRunner = (
  * log as `<uuid>.jsonl`, the basename `effort collect` keys a session
  * row by (`effort/session-log.ts`). So each row a task's report is
  * stored as joins the session row of the session that wrote it.
+ *
+ * `cwd` is the session's working directory, the run's checkout, handed
+ * to the spawner as {@link CapturedSpawnOptions.cwd}; left out, the
+ * session runs in the loop's own directory.
  */
 export function runTaskSession(
   prompt: string,
@@ -134,9 +151,13 @@ export function runTaskSession(
   sessionId: string,
   settingSources: readonly ClaudeSettingSource[],
   served: readonly string[] = [],
+  cwd?: string,
   spawn?: CapturingSpawner,
 ): Promise<CapturedSession> {
-  return runClaudeCaptured(prompt, settingSources, [SESSION_ID_FLAG, sessionId, ...flags], spawn, served);
+  const options: CapturedSpawnOptions = cwd === undefined
+    ? {}
+    : { cwd };
+  return runClaudeCaptured(prompt, settingSources, [SESSION_ID_FLAG, sessionId, ...flags], spawn, served, options);
 }
 
 /** What {@link dispatchTask} needs to run one task. */
@@ -157,10 +178,19 @@ export interface TaskDispatchOptions {
    */
   inject: InjectMode;
   /**
-   * The repo root. A routed agent's project definition resolves under
-   * it (`utils/agent-definition.ts`).
+   * The project root, which holds `.rafa/`. A routed agent's project
+   * definition resolves under it (`utils/agent-definition.ts`), and the
+   * handout's lessons are pulled from the store under it.
    */
   repoRoot: string;
+  /**
+   * The run's checkout (`start/checkout.ts`): the working tree the
+   * session is spawned in and edits. The project root unless the loop
+   * runs in a linked worktree. Required for the reason `inject` is: a
+   * default would let a caller that forgot it spawn the session in
+   * whatever directory the loop's process stands in.
+   */
+  checkout: string;
   /**
    * The home directory a user-level agent definition resolves under,
    * searched only when {@link TaskDispatchOptions.settingSources}
@@ -468,7 +498,7 @@ export async function dispatchTask(
 
   const served = serveForSession(options.serving, resolution);
   const sessionId = (options.newSessionId ?? randomUUID)();
-  const session = await run(prompt, flags, sessionId, options.settingSources, served);
+  const session = await run(prompt, flags, sessionId, options.settingSources, served, options.checkout);
 
   return {
     taskText,
@@ -506,7 +536,10 @@ function messageOf(error: unknown): string {
 
 /**
  * Renders `progress.txt` from the stored findings ahead of a dispatch,
- * and answers whether it could.
+ * and answers whether it could. The findings are read from the store
+ * under `repoRoot`, the project root, and the file is written into
+ * `checkout`, the working tree the session runs in and reads it from;
+ * the two are one directory unless the loop runs in a linked worktree.
  *
  * Called before EVERY session that reads the file, the wrap-up's
  * included, so each is handed what the store held once the task before
@@ -519,9 +552,13 @@ function messageOf(error: unknown): string {
  * the run before the dispatch: nothing has been spent yet, and every
  * later dispatch would meet the same store.
  */
-export function renderProgressForDispatch(repoRoot: string, planStub: string | null): boolean {
+export function renderProgressForDispatch(
+  repoRoot: string,
+  planStub: string | null,
+  checkout: string = repoRoot,
+): boolean {
   try {
-    const render = writeProgress(repoRoot, planStub);
+    const render = writeProgress(repoRoot, planStub, checkout);
     const left = render.oversized + render.omitted;
     if (left > 0) {
       activeOutput().warn(`📝 progress.txt holds ${render.rendered} finding(s); ${left} more did not fit its ${PROGRESS_CAP_BYTES} bytes.`);

@@ -428,6 +428,7 @@ async function dispatchSpec(
     planContent: PLAN_CONTENT,
     inject: 'full',
     repoRoot: overrides.roots?.repoRoot ?? join(tempRoot, 'no-definitions', 'repo'),
+    checkout: overrides.roots?.repoRoot ?? join(tempRoot, 'no-definitions', 'repo'),
     home: overrides.roots?.home ?? join(tempRoot, 'no-definitions', 'home'),
     settingSources: overrides.settingSources ?? ['project', 'local'],
     serving: null,

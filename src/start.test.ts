@@ -8,6 +8,12 @@
  * step 1 before the wrap-up session, the record handed to that session,
  * step 3 after it returns, and all three BEFORE the CI gate.
  *
+ * A second claim is where each call is pointed: at the project root,
+ * which holds `.rafa/`, or at the checkout git and the sessions run in
+ * (`start/checkout.ts`). The same reader, walked over the whole file,
+ * answers each call's arguments as written, and a planted source that
+ * hands a dispatch no checkout is its control.
+ *
  * `start()` itself is not driven, for the reason
  * `tests/plan-injection.test.ts` gives for not driving it either: it
  * spawns the real CLI with no seam, and reaching its wrap-up branch
@@ -108,6 +114,21 @@ function wrapUpCalls(source: string): readonly BranchCall[] {
   return found;
 }
 
+/** Every call `source` makes, in source order, wherever it sits. */
+function everyCall(source: string): readonly BranchCall[] {
+  const file = ts.createSourceFile('start.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const found: BranchCall[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const name = calleeName(node.expression);
+      if (name !== null) found.push({ name, args: node.arguments.map((argument) => argument.getText(file)), bound: null });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+
 /** The bindings a source imports from `module`, sorted. */
 function importedFrom(source: string, module: string): readonly string[] {
   const file = ts.createSourceFile('start.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -160,7 +181,7 @@ function plantedStart(body: readonly string[]): string {
 const PREPARE = 'const release = prepareReleaseStage({ repoRoot, settings: runConfig.config, planStub, planContent });';
 
 /** The wrap-up session, handed the record step 1 answered. */
-const SESSION = 'await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning);';
+const SESSION = 'await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);';
 
 /** Step 3, over that same record. */
 const FINISH = 'await finishRelease({ repoRoot, preparation: release });';
@@ -209,7 +230,7 @@ describe('the wrap-up branch of start.ts', () => {
 
   it('hands the session and the finish the very record the preparation answered', () => {
     expect(callTo(CALLS, 'prepareReleaseStage').bound).toBe('release');
-    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release', 'serving', 'wrapUpLearning']);
+    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release', 'serving', 'wrapUpLearning', 'checkout']);
     expect(callTo(CALLS, 'finishRelease').args[0]).toContain('preparation: release');
   });
 
@@ -237,5 +258,58 @@ describe('the wrap-up branch of start.ts', () => {
     // The control: the reader answers the module asked for and not any
     // import at all, so the list above is that module's own.
     expect(importedFrom(START, './start/wrap-up.js')).toEqual(['preserveProgress', 'WrapUpLearning']);
+  });
+});
+
+describe('the two directories start.ts points each call at', () => {
+  const EVERY = everyCall(START);
+
+  /** The first argument of the first call to `name`, as written. */
+  const firstArgument = (name: string): string => callTo(EVERY, name).args[0] ?? '';
+
+  it('resolves the checkout from the project root', () => {
+    expect(callTo(EVERY, 'resolveRunDirs').args).toEqual(['repoRoot']);
+    expect(START).toContain('const { checkout } = resolveRunDirs(repoRoot);');
+  });
+
+  it('reads, offers and commits the branch in the checkout', () => {
+    expect(callTo(EVERY, 'getCurrentBranch').args).toEqual(['checkout']);
+    expect(firstArgument('resolveRunBranch')).toContain('checkout,');
+    expect(firstArgument('finishCleanExit')).toContain('repoRoot: checkout,');
+  });
+
+  it('dispatches each task with the project root and the checkout both', () => {
+    const input = firstArgument('dispatchTask');
+
+    expect(input).toContain('repoRoot,');
+    expect(input).toContain('checkout,');
+    expect(callTo(EVERY, 'renderProgressForDispatch').args).toEqual(['repoRoot', 'planStub', 'checkout']);
+  });
+
+  it('reads a dispatch handed no checkout as handed none', () => {
+    // The control for the case above: the reader answers what is written,
+    // so a dispatch literal without the field reads without it.
+    const planted = everyCall('async function run() { await dispatchTask({ taskInfo, repoRoot, home }); }');
+
+    expect(callTo(planted, 'dispatchTask').args[0]).not.toContain('checkout');
+  });
+
+  it('runs the release, the wrap-up and the CI gate in the checkout', () => {
+    expect(callTo(CALLS, 'prepareReleaseStage').args[0]).toContain('checkout,');
+    expect(callTo(CALLS, 'preserveProgress').args.at(-1)).toBe('checkout');
+    expect(callTo(CALLS, 'finishRelease').args[0]).toContain('repoRoot: checkout');
+    expect(callTo(CALLS, 'prLifecycleSeamsIn').args).toEqual(['checkout']);
+  });
+
+  it('keeps the config, the plan, the session record, the preflight, the pause and triage at the project root', () => {
+    expect(firstArgument('loadRunConfig')).toContain('root: repoRoot');
+    expect(firstArgument('resolvePlanPath')).toBe('repoRoot');
+    expect(firstArgument('openRunSession')).toContain('repoRoot,');
+    expect(firstArgument('runStartPreflight')).toContain('repoRoot,');
+    expect(firstArgument('holdWhilePaused')).toContain('repoRoot,');
+    expect(firstArgument('createStartTriage')).toContain('repoRoot,');
+    for (const name of ['loadRunConfig', 'openRunSession', 'runStartPreflight', 'holdWhilePaused', 'createStartTriage']) {
+      expect(firstArgument(name)).not.toContain('checkout');
+    }
   });
 });

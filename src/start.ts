@@ -40,6 +40,19 @@
  * `start` with the run's other words and waited for, and its exit code is
  * this run's.
  *
+ * Two directories, never confused (`start/checkout.ts`). The PROJECT
+ * ROOT is the dispatcher's root, the one holding `.rafa/`: the config,
+ * the plan and its tracker, `PROMPT.md`, the session record, the
+ * preflight, the store, the learning adapter and triage are all read
+ * and written there. The CHECKOUT is the working tree the run was
+ * started in, when it is one of the project's own: every git command
+ * runs there — the branch read, offered and guarded, each task's
+ * commit, the release's files, commit and push, and the CI gate — and
+ * every session, task, wrap-up and CI repair alike, is spawned there,
+ * with `progress.txt` written there for it to read. From a linked
+ * worktree that is the worktree, and the run says so once; everywhere
+ * else it is the project root.
+ *
  * Ahead of the branch guard, a run started on `main` or `master` is
  * offered the plan's own branch (`resolveRunBranch` in
  * `start/run-setup.ts`, the offer itself in `start/branch.ts`): with a
@@ -170,7 +183,7 @@
  * nothing, and the wrap-up runs without a release rather than not at
  * all.
  *
- * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/runtime.ts`, `start/session.ts`,
+ * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
  * through the active output
@@ -185,7 +198,8 @@
  * read (`start/run-config.ts`), a `RAFA_EFFORT_DIR` set in the
  * environment, refused right after it (the same module), a `--runtime`
  * refused (`start/runtime.ts`),
- * an unusable config, a plan file that does not exist, a branch offer
+ * an unusable config, a plan file that does not exist, a checkout git
+ * could not read (`start/checkout.ts`), a branch offer
  * that could not be taken (`start/branch.ts`), a default branch the run
  * stayed on,
  * a session record refusing the run or session records that cannot be
@@ -223,6 +237,7 @@ import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
+import { announceRunDirs, resolveRunDirs } from './start/checkout.js';
 import { finishCleanExit } from './start/commit.js';
 import {
   dispatchTask,
@@ -231,7 +246,7 @@ import {
 } from './start/dispatch.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
-import { verifyPullRequest } from './start/pr-lifecycle.js';
+import { prLifecycleSeamsIn, verifyPullRequest } from './start/pr-lifecycle.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import { announceRiskTotal } from './start/risk-total.js';
@@ -261,8 +276,10 @@ let interrupted = false;
 /**
  * Runs the loop over the words of its line, on the project at `repoRoot`:
  * the root the dispatcher resolved from the nearest `.rafa/config.yaml`
- * at or above the working directory, handed over by
- * `src/commands/wrap.ts`.
+ * at or above the working directory, or the main checkout's from a
+ * linked worktree with none, handed over by `src/commands/wrap.ts`. The
+ * checkout git and the sessions run in is resolved here, once the plan
+ * is known to exist; see the module note.
  */
 export default async function start(args: string[], repoRoot: string): Promise<void> {
   // Before anything is read: `-d|--detached` is declared, and refused until phase 6.
@@ -303,15 +320,18 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   }
 
   const planStub = planStubFromPath(planPath);
+  // Where git runs and every session is spawned: the working tree the run
+  // was started in, when it is one of the project's (`start/checkout.ts`).
+  const { checkout } = resolveRunDirs(repoRoot);
   // Ahead of the guard: on `main` or `master` the run offers to create or
   // switch to `feat/<stub>` and take it (`start/run-setup.ts`). What it
   // answers is the branch the guard reads and the branch the session
   // record below names, so a run that moved is never guarded on, and never
   // records, the base it started from.
   const branch = await resolveRunBranch({
-    repoRoot,
+    checkout,
     planStub,
-    base: getCurrentBranch(),
+    base: getCurrentBranch(checkout),
     args,
   });
   guardRunBranch(planStub, branch, args);
@@ -342,6 +362,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     const promptContent = fs.readFileSync(promptPath, 'utf8');
 
     const injectSource = injectSourceLabel(runConfig);
+    announceRunDirs({ projectRoot: repoRoot, checkout });
     activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
     announcePlanIssues(planContent);
 
@@ -421,7 +442,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const taskInfo = findNextTask(trackerContent);
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
-      if (!renderProgressForDispatch(repoRoot, planStub)) return;
+      if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
 
       if (!taskInfo) {
         session.wrapUpStarted();
@@ -435,11 +456,12 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // at all, and the wrap-up carries on without a release.
         const release = prepareReleaseStage({
           repoRoot,
+          checkout,
           settings: runConfig.config,
           planStub,
           planContent,
         });
-        await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning);
+        await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
         // refusal, the `chore: release` commit and its push. A release
@@ -452,11 +474,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // repository resolving to `none` has no pull request to carry it
         // (`start/release-stage.ts`).
         await finishRelease(
-          { repoRoot, preparation: release },
+          { repoRoot: checkout, preparation: release },
           {
             readProvider: () => resolvePrProvider({
               configured: runConfig.config.prProvider ?? null,
-              dir: repoRoot,
+              dir: checkout,
             }),
           },
         );
@@ -470,9 +492,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
             // (`start/pr-lifecycle.ts`). The reading is made here
             // because the run's `pr.provider` lives in this config.
             {
+              ...prLifecycleSeamsIn(checkout),
               readProvider: () => resolvePrProvider({
                 configured: runConfig.config.prProvider ?? null,
-                dir: repoRoot,
+                dir: checkout,
               }),
             },
           );
@@ -488,6 +511,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         planContent,
         inject: injectMode,
         repoRoot,
+        checkout,
         home: homedir(),
         settingSources,
         knownMissing,
@@ -531,7 +555,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const finished = finishCleanExit({
         trackerPath,
         taskInfo,
-        repoRoot,
+        repoRoot: checkout,
         output: dispatch.output,
       });
       const stored = await storeReport(finished.outcome);

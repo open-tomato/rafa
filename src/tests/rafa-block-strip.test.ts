@@ -168,6 +168,7 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
       planContent: PLAN,
       inject: 'full',
       repoRoot: tempRoot,
+      checkout: tempRoot,
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
       serving: null,

@@ -48,8 +48,11 @@ const UNNAMED_PLAN = 'this-plan';
 
 /** What the run knows about its branch when the offer is made. */
 export interface RunBranchRequest {
-  /** The project root git is run in. */
-  readonly repoRoot: string;
+  /**
+   * The run's checkout, which git is run in (`start/checkout.ts`): the
+   * project root unless the loop runs in a linked worktree.
+   */
+  readonly checkout: string;
   /** The plan's stub, or null when the plan path gave none. */
   readonly planStub: string | null;
   /** The branch the run was started on. */
@@ -88,7 +91,7 @@ export async function resolveRunBranch(
   if (!DEFAULT_BRANCHES.includes(base)) return base;
 
   const outcome = await offerRunBranch({
-    repoRoot: request.repoRoot,
+    repoRoot: request.checkout,
     planStub: request.planStub,
     base,
     anyBranch: args.includes(ANY_BRANCH_FLAG),
