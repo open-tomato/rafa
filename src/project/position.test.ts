@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
+  goHome,
   hop,
   POSITION_FILE,
   positionAt,
@@ -181,11 +182,22 @@ describe('transitions', () => {
     expect(swap(positionAt(BOARD_A))).toBeNull();
   });
 
+  it('goHome stands at home and remembers the place left as previous', () => {
+    const hopped = hop(POSITION, BOARD_C);
+    expect(goHome(hopped)).toEqual({ current: BOARD_A, previous: BOARD_C, home: BOARD_A });
+    expect(swap(goHome(hopped))).toEqual({ current: BOARD_C, previous: BOARD_A, home: BOARD_A });
+  });
+
+  it('goHome at home keeps home current and previous', () => {
+    expect(goHome(positionAt(BOARD_A))).toEqual({ current: BOARD_A, previous: BOARD_A, home: BOARD_A });
+  });
+
   it('leaves the position it is given untouched', () => {
     const before = structuredClone(POSITION);
     rehome(POSITION, BOARD_C);
     hop(POSITION, BOARD_C);
     swap(POSITION);
+    goHome(POSITION);
     expect(POSITION).toEqual(before);
   });
 });

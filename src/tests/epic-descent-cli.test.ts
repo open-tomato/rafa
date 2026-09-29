@@ -44,8 +44,8 @@ import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { parseRoadmapBody } from '../board/roadmap.js';
 import { pickLine, roadmapHeaderLine } from '../board/spec-source-roadmap.js';
 import { describeIssue, dryRunLine } from '../board/spec-source.js';
-import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../commands/next.js';
 import { plural } from '../commands/plan/plan-files.js';
+import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../next/lines.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

@@ -1,6 +1,6 @@
 /**
- * Tests for `--yes` as a risk ceiling (`ceiling.ts`): the eight ids a
- * list may name, the four bare `--yes` allows, the two lists refused
+ * Tests for `--yes` as a risk ceiling (`ceiling.ts`): the ten ids a
+ * list may name, the five bare `--yes` allows, the two lists refused
  * with exit code 2 — the second read for each of the two always-asked
  * ids, `ready` and `merge-unchecked` — and which action may then run
  * with no question put.
@@ -16,18 +16,18 @@
  *
  * Four readings here would pass while wrong, and each is paired:
  *
- *  - The eight ids are read as a literal list AND as the action table
- *    with the two always-asked ids dropped, so a list spelled twice
+ *  - The ten ids are read as a literal list AND as the action table
+ *    with the two always-asked ids dropped, `sync`, `hop` and `home` beside it, so a list spelled twice
  *    cannot drift apart unnoticed: the first would pass over a
  *    hand-written copy.
- *  - The four bare `--yes` allows are read beside the four it leaves
- *    out, so a bare flag that named all eight would fail rather than
- *    satisfy a check that the four are among them.
+ *  - The five bare `--yes` allows are read beside the five it leaves
+ *    out, so a bare flag that named all ten would fail rather than
+ *    satisfy a check that the five are among them.
  *  - Each refusal is read beside a list that is NOT refused —
  *    {@link refusalOf} answers null where nothing was thrown — so a
  *    reader that refused everything could not pass.
  *  - `ready` and `merge-unchecked` are each read as refused in a list
- *    and as unaskable in a ceiling built in code, beside the seven ids
+ *    and as unaskable in a ceiling built in code, beside the ten ids
  *    that do run unasked.
  *
  * ## What passes while wrong
@@ -77,6 +77,7 @@ import {
   BARE_YES_ACTIONS,
   CEILING_REFUSAL_EXIT,
   readYesCeiling,
+  ROADMAP_ACTIONS,
   YES_ACTIONS,
   YES_FLAG,
 } from './ceiling.js';
@@ -84,8 +85,8 @@ import {
 /** The usage line the caller hands the reading, which every refusal names. */
 const USAGE = 'rafa next [--dry-run] [--yes[=<action ids>]]';
 
-/** The eight, spelled out: what a person may type, held against the table below. */
-const EIGHT: readonly NextActionId[] = ['sync', 'resume', 'wait', 'triage', 'merge', 'start', 'plan', 'unblock'];
+/** The ten, spelled out: what a person may type, held against the table below. */
+const TEN: readonly NextActionId[] = ['sync', 'resume', 'wait', 'triage', 'merge', 'start', 'plan', 'unblock', 'hop', 'home'];
 
 /** The ceiling `--yes=<value>` reads to. */
 function ceilingOf(value: boolean | string): readonly NextActionId[] | null {
@@ -109,29 +110,31 @@ describe('the ids a list may name', () => {
     expect([...ALWAYS_ASKED].every((action) => NEXT_COMMAND_ACTIONS.includes(action))).toBe(true);
   });
 
-  it('accepts eight: sync and the command actions but the two that are always asked', () => {
-    expect(YES_ACTIONS).toEqual(EIGHT);
-    expect(YES_ACTIONS).toHaveLength(8);
+  it('accepts ten: sync, the command actions but the two that are always asked, hop and home', () => {
+    expect(YES_ACTIONS).toEqual(TEN);
+    expect(YES_ACTIONS).toHaveLength(10);
     expect(YES_ACTIONS.filter((action) => ALWAYS_ASKED.has(action))).toEqual([]);
     expect(YES_ACTIONS).not.toContain('none');
   });
 
   it('takes the seven that run a command off the action table rather than spelling them again', () => {
-    expect(YES_ACTIONS.filter((action) => action !== 'sync'))
+    expect(YES_ACTIONS.filter((action) => action !== 'sync' && !ROADMAP_ACTIONS.has(action)))
       .toEqual(NEXT_COMMAND_ACTIONS.filter((action) => action !== 'ready' && action !== 'merge-unchecked'));
+    expect([...ROADMAP_ACTIONS]).toEqual(['hop', 'home']);
+    expect(NEXT_COMMAND_ACTIONS.filter((action) => ROADMAP_ACTIONS.has(action))).toEqual([]);
   });
 
-  it('reads each of the eight, one at a time, as the id it spells', () => {
+  it('reads each of the ten, one at a time, as the id it spells', () => {
     expect(YES_ACTIONS.map((action) => ceilingOf(action))).toEqual(YES_ACTIONS.map((action) => [action]));
   });
 });
 
-describe('the four bare --yes allows', () => {
-  it('names the four that neither merge, nor start a loop, nor push, and leaves the other four out', () => {
-    expect(BARE_YES_ACTIONS).toEqual(['sync', 'wait', 'unblock', 'plan']);
+describe('the five bare --yes allows', () => {
+  it('names the five that neither merge, nor start a loop, nor push, nor leave home, and leaves the other five out', () => {
+    expect(BARE_YES_ACTIONS).toEqual(['sync', 'wait', 'unblock', 'plan', 'home']);
     expect(ceilingOf(true)).toEqual(BARE_YES_ACTIONS);
     expect(YES_ACTIONS.filter((action) => !BARE_YES_ACTIONS.includes(action)))
-      .toEqual(['resume', 'triage', 'merge', 'start']);
+      .toEqual(['resume', 'triage', 'merge', 'start', 'hop']);
   });
 });
 
@@ -179,19 +182,19 @@ describe('the two refusals', () => {
     expect(refusalOf('ready,merge-unchecked')?.message).toBe(refusalOf('ready')?.message);
   });
 
-  it('refuses a list naming no id of the table with exit 2, naming the eight and the usage', () => {
+  it('refuses a list naming no id of the table with exit 2, naming the ten and the usage', () => {
     const refused = refusalOf('mrege,sync');
 
     expect(refused?.exitCode).toBe(CEILING_REFUSAL_EXIT);
     expect(refused?.message).toBe(`❌ --${YES_FLAG} names "mrege", which is no step of rafa next;`
-      + ` the ids are ${EIGHT.join(', ')}\nUsage: ${USAGE}`);
+      + ` the ids are ${TEN.join(', ')}\nUsage: ${USAGE}`);
   });
 
   it('reads an id spelled with a capital as no id at all', () => {
     expect(refusalOf('Merge')?.exitCode).toBe(CEILING_REFUSAL_EXIT);
   });
 
-  it('refuses no list the eight spell, however they are padded or ordered', () => {
+  it('refuses no list the ten spell, however they are padded or ordered', () => {
     expect(refusalOf(YES_ACTIONS.join(','))).toBeNull();
     expect(refusalOf(' start , merge ')).toBeNull();
   });
@@ -207,7 +210,7 @@ describe('whether an action may run unasked', () => {
     ]).toEqual([true, false, false, false]);
   });
 
-  it('allows each of the eight a ceiling names, and never ready, whatever the ceiling holds', () => {
+  it('allows each of the ten a ceiling names, and never ready, whatever the ceiling holds', () => {
     expect(YES_ACTIONS.map((action) => allowedUnasked(action, YES_ACTIONS))).toEqual(YES_ACTIONS.map(() => true));
     expect(allowedUnasked('ready', ['ready'])).toBe(false);
     expect(allowedUnasked('ready', [...YES_ACTIONS, 'ready'])).toBe(false);

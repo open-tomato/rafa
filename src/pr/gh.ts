@@ -85,6 +85,23 @@
  *     pull requests whose remote branch had been deleted. An open pull
  *     request answers `mergedAt` null, so a merged row carrying null is
  *     refused rather than read, like any field of the wrong type.
+ *   - **`--json files` answers at most 100 paths.** Measured on
+ *     2026-09-28 against `cli/cli`: #14354, whose `changedFiles` is 150,
+ *     answered 100 paths, and #14515 (960) answered 100 too — `gh`
+ *     sends `files(first: 100)` and pages no further. So
+ *     `changedFiles` asks for `changedFiles,files` in the one command
+ *     and THROWS when the list is shorter than the count, rather than
+ *     answering the first hundred as if they were all of them.
+ *   - **A review's author is `{login}` alone, and `gh` answers reviews
+ *     oldest first.** `gh pr view 12000 --repo cli/cli --json reviews`
+ *     wrote `author: {login}` with no `is_bot` beside it, which is why a
+ *     review answers a `login` rather than a {@link PullRequestAuthor},
+ *     and #14354's seven reviews came in `submittedAt` order. The
+ *     `reviews(first: 100)` query `GH_DEBUG=api` showed asks for
+ *     `pageInfo`; a pull request with more than 100 reviews was not
+ *     found to measure whether `gh` follows it. Both members throw on
+ *     every failure, an absent pull request included, as the port
+ *     declares.
  *
  * ## What is refused, and what is narrowed
  *
@@ -124,6 +141,7 @@ import type {
   PullRequestAuthor,
   PullRequestComment,
   PullRequestDetail,
+  PullRequestReview,
   PullRequestState,
   PullRequestSummary,
   PullRequests,
@@ -153,6 +171,12 @@ const CHECK_FIELDS = 'name,state,link';
 
 /** The fields a merged pull request is read from. */
 const MERGED_FIELDS = 'headRefName,headRefOid,mergedAt,number';
+
+/** The fields `changedFiles` reads: the paths, and the count they must add up to. */
+const FILES_FIELDS = 'changedFiles,files';
+
+/** The field `reviews` reads. */
+const REVIEW_FIELDS = 'reviews';
 
 /** The path the workflow count is read from. */
 const WORKFLOWS_PATH = `repos/${REPO_PATH}/actions/workflows`;
@@ -344,6 +368,42 @@ function readComment(value: unknown, command: string, where: string): PullReques
   };
 }
 
+/** The whole number of zero or more at `where`, or a refusal. */
+function readCount(value: unknown, command: string, where: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    refuse(command, `${where} is ${describeValue(value)}, expected a whole number of zero or more`);
+  }
+  return value;
+}
+
+/**
+ * The changed paths `gh pr view --json changedFiles,files` wrote. Refuses
+ * a list shorter or longer than the count; see the module note.
+ */
+function readChangedFiles(value: unknown, command: string): string[] {
+  const pull = readMapping(value, command, 'its output');
+  const count = readCount(pull['changedFiles'], command, 'changedFiles');
+  const paths = readList(pull['files'], command, 'files').map((file, index) => {
+    const named = readMapping(file, command, `files[${index}]`);
+    return readString(named['path'], command, `files[${index}].path`);
+  });
+  if (paths.length !== count) {
+    refuse(command, `${paths.length} paths for ${count} changed files, so the list is not the whole of it`);
+  }
+  return paths;
+}
+
+/** One review as `gh pr view --json reviews` writes it; see the module note. */
+function readReview(value: unknown, command: string, where: string): PullRequestReview {
+  const review = readMapping(value, command, where);
+  const author = readMapping(review['author'], command, `${where}.author`);
+  return {
+    login: readString(author['login'], command, `${where}.author.login`),
+    state: readString(review['state'], command, `${where}.state`),
+    submittedAt: readString(review['submittedAt'], command, `${where}.submittedAt`),
+  };
+}
+
 /**
  * The `total_count` of a workflows payload, or null when `stdout` is not
  * JSON or its count is not a whole number of zero or more.
@@ -489,6 +549,22 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       // The verdict comes off the rows, never off the exit code; see the module note.
       const rows = parseChecks(result.stdout);
       return { rows, verdict: verdictOf(rows) };
+    },
+
+    changedFiles: async (number: number): Promise<readonly string[]> => {
+      const target = pullNumber(number, 'changedFiles');
+      const command = `gh pr view ${target} --json ${FILES_FIELDS}`;
+      const stdout = await succeed(['pr', 'view', target, '--json', FILES_FIELDS], command);
+      return readChangedFiles(parseJson(stdout, command), command);
+    },
+
+    reviews: async (number: number): Promise<readonly PullRequestReview[]> => {
+      const target = pullNumber(number, 'reviews');
+      const command = `gh pr view ${target} --json ${REVIEW_FIELDS}`;
+      const stdout = await succeed(['pr', 'view', target, '--json', REVIEW_FIELDS], command);
+      const pull = readMapping(parseJson(stdout, command), command, 'its output');
+      const rows = readList(pull['reviews'], command, 'reviews');
+      return rows.map((row, index) => readReview(row, command, `reviews[${index}]`));
     },
 
     browse: async (number: number): Promise<void> => {

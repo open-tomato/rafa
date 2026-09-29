@@ -51,6 +51,30 @@
  * and the walk sharing it, as `rafa next`'s walk shares it
  * (`src/next/sources.ts`).
  *
+ * ## Under `--roadmap`: the away hop's target
+ *
+ * A request carrying {@link RoadmapPickOptions.followHop} (`plan create
+ * --next --roadmap`, which `rafa next --roadmap` sends) first reads the
+ * hop record (`.rafa/hop.json`, `src/next/hop-record.ts`) and the
+ * position file through {@link readAwayHop}. Where the record is a
+ * `blocker` hop still `away`, and its home is still the position's, the
+ * pick is the record's target C, whether `--next` or `--next=<n>` was
+ * typed: C is on the board the record names, not on the one the walk
+ * would read, so no board is resolved, no roadmap body read or
+ * inspected, no branch scanned and no listing made. C is read once
+ * through the memoised reader for its `Blocked by:` line, a C with a
+ * blocker still open stops `blocked` ({@link hopBlockedMessage}; a
+ * hop's chain never reaches a second one, so nothing is offered in its
+ * place), and otherwise its number is answered and the funnel's
+ * readiness gate runs on it as on any line picked at home.
+ *
+ * Every other reading picks as a bare `--next` does: no record, a
+ * `dry` hop (the position already stands in the epic it went to), a
+ * record no longer `away`, and a STALE record, whose home a person's
+ * `rafa switch` has since moved. A record that cannot be read, or is
+ * not one, is warned in one line first ({@link unfollowedHopNotice}).
+ * Without `followHop` neither file is read.
+ *
  * ## The one line the walk moves past, and what moves it
  *
  * A line that is not ready STOPS the walk (`./spec-source.ts`, where
@@ -136,8 +160,12 @@ import type {
   RoadmapSearch,
   RoadmapSkip,
 } from './roadmap.js';
+import type { HopRecord } from '../next/hop-record.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
+
+import { readHopRecord, staleAgainst } from '../next/hop-record.js';
+import { readPositionFile } from '../project/position.js';
 
 import {
   blockedLineSentence,
@@ -218,6 +246,66 @@ export interface RoadmapPickOptions {
   readonly issues: SpecIssueReader;
   /** Where the lines go. */
   readonly output: Output;
+  /** True under `--roadmap`: an away hop's target is the pick. Left out otherwise; see the module note. */
+  readonly followHop?: boolean;
+}
+
+/** A blocker hop still away: the record, its target C read off it. */
+export interface AwayHop {
+  readonly record: HopRecord;
+  /** C, the issue the hop works. */
+  readonly target: number;
+}
+
+/** What {@link readAwayHop} answers: the hop to follow or null, and the warnings. */
+export interface AwayHopReading {
+  readonly away: AwayHop | null;
+  readonly notices: readonly string[];
+}
+
+/** The line an away hop's pick opens with, naming C, H and where C lives. */
+export function hopHeaderLine(away: AwayHop): string {
+  const { record, target } = away;
+  return `🧭 Away on a hop: issue #${String(target)}, the blocker of #${String(record.blocked)},`
+    + ` in epic #${String(record.targetEpic)} on board #${String(record.targetBoard)}`;
+}
+
+/** The line an away hop's pick prints once C is taken. */
+export function hopPickLine(target: number): string {
+  return `▶ Next on the hop: issue #${String(target)}`;
+}
+
+/** The sentence an away hop's pick stops on when C still has an open blocker. */
+export function hopBlockedMessage(target: number): string {
+  return `issue #${String(target)} is the hop's target and still has an open blocker, so nothing is planned;`
+    + ' a hop follows one blocker, never a second, and `rafa next --roadmap` goes home from here';
+}
+
+/** The warning a hop record that cannot be read, or is not one, is followed by. */
+export function unfollowedHopNotice(detail: string): string {
+  return `${detail}, so no hop is followed and --next picks as it does without --roadmap`;
+}
+
+/**
+ * The hop `plan create --next --roadmap` follows under `root`: a
+ * `blocker` record still `away` whose home is the position's, or null.
+ * Never throws; see the module note's "Under `--roadmap`".
+ */
+export function readAwayHop(root: string): AwayHopReading {
+  const hop = readHopRecord(root);
+  if (!hop.set) {
+    return {
+      away: null,
+      notices: hop.reason === 'absent'
+        ? []
+        : [unfollowedHopNotice(hop.detail)],
+    };
+  }
+  const { record } = hop;
+  const placed = readPositionFile(root);
+  if (!placed.set || staleAgainst(record, placed.position)) return { away: null, notices: [] };
+  if (record.state !== 'away' || record.kind !== 'blocker' || record.target === null) return { away: null, notices: [] };
+  return { away: Object.freeze({ record, target: record.target }), notices: [] };
 }
 
 /** The line a `--next` walk opens with, naming the roadmap it is reading. */
@@ -346,6 +434,11 @@ async function walkPlaceEpic(number: number, listing: BoardListing, readings: Ro
  */
 export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<RoadmapOutcome> {
   const { seams, issues, output } = options;
+  if (options.followHop === true) {
+    const hop = readAwayHop(options.root);
+    hop.notices.forEach((notice) => output.warn(notice));
+    if (hop.away !== null) return await pickHopTarget(hop.away, issues, output);
+  }
   const listing = listOnce(seams.listing);
   const start = await startingPlace(options, listing);
   start.notices.forEach((notice) => output.warn(notice));
@@ -382,6 +475,22 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
 
   output.info(pickLine(pick.line));
   return settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+}
+
+/**
+ * C, the away hop's target, as the pick, or `blocked` when C still has an
+ * open blocker. See the module note's "Under `--roadmap`".
+ */
+async function pickHopTarget(away: AwayHop, issues: SpecIssueReader, output: Output): Promise<RoadmapOutcome> {
+  output.info(hopHeaderLine(away));
+  const blocked = await readBlockedLine(await issues(away.target), blockerStatesOf(issues));
+  if (blocked !== null) {
+    output.info(blockedPickLine(blocked));
+    output.info(hopBlockedMessage(away.target));
+    return { stop: 'blocked' };
+  }
+  output.info(hopPickLine(away.target));
+  return { issue: away.target };
 }
 
 /**

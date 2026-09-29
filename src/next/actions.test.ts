@@ -75,7 +75,16 @@ import prWait from '../commands/pr/wait.js';
 import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { actionInvocation, NEXT_COMMAND_ACTIONS, runAction, runsCommand } from './actions.js';
+import {
+  actionInvocation,
+  NEXT_COMMAND_ACTIONS,
+  NEXT_IN_PROCESS_ACTIONS,
+  ROADMAP_PASSED_ACTIONS,
+  ROADMAP_WORD,
+  runAction,
+  runsCommand,
+  runsInProcess,
+} from './actions.js';
 import { HINT_FLAG } from './hint.js';
 
 /** The project root the caller's context carries. */
@@ -271,6 +280,23 @@ describe('the command each action runs', () => {
     expect([actionInvocation(none), actionInvocation(sync)]).toEqual([null, null]);
   });
 
+  it('answers no invocation for hop and home, which run no registered command either', () => {
+    const hop = stateOf({ id: 'hop-blocked', action: 'hop' });
+    const home = stateOf({ id: 'hop-halt', action: 'home' });
+
+    expect([runsCommand('hop'), runsCommand('home')]).toEqual([false, false]);
+    expect([actionInvocation(hop), actionInvocation(home)]).toEqual([null, null]);
+    expect(NEXT_COMMAND_ACTIONS).not.toContain('hop');
+    expect(NEXT_COMMAND_ACTIONS).not.toContain('home');
+  });
+
+  it('holds sync, hop and home as the actions that run in-process, and no id of the table among them', () => {
+    expect(NEXT_IN_PROCESS_ACTIONS).toEqual(['sync', 'hop', 'home']);
+    expect(NEXT_IN_PROCESS_ACTIONS.map((action) => runsInProcess(action))).toEqual([true, true, true]);
+    expect(NEXT_COMMAND_ACTIONS.filter((action) => runsInProcess(action))).toEqual([]);
+    expect(runsInProcess('none')).toBe(false);
+  });
+
   it('throws over a state whose row proposed an action and left its field null', () => {
     const noPull = stateOf({ id: 'pr-pending', action: 'wait' });
     const noIssue = stateOf({ id: 'issue-blocked', action: 'unblock' });
@@ -279,6 +305,36 @@ describe('the command each action runs', () => {
     expect(() => actionInvocation(noPull)).toThrow(/state "pr-pending" proposes "wait" and names no pull request/);
     expect(() => actionInvocation(noIssue)).toThrow(/names no issue/);
     expect(() => actionInvocation(noPlan)).toThrow(/names no plan file/);
+  });
+});
+
+describe('what an action is called with under --roadmap', () => {
+  it('hands --roadmap to plan, start and resume, last among their words', async () => {
+    const { caller, seen } = harnessFor();
+
+    for (const action of ['plan', 'start', 'resume'] as const) await runAction(caller, STATES[action], { roadmap: true });
+
+    expect(seen.map((call) => [call.spelling, call.context.argv])).toEqual([
+      ['plan create', ['--next', ROADMAP_WORD]],
+      ['loop start', [`--plan=${PLAN}`, '--create-branch', ROADMAP_WORD]],
+      ['loop start', [`--plan=${PLAN}`, ROADMAP_WORD]],
+    ]);
+    expect(seen[0]?.context.flags).toEqual({ next: true, roadmap: true, hint: false });
+  });
+
+  it('adds it to no other action, and to none without the option', async () => {
+    const { caller, seen } = harnessFor();
+
+    for (const action of NEXT_COMMAND_ACTIONS) await runAction(caller, STATES[action], { roadmap: !ROADMAP_PASSED_ACTIONS.has(action) });
+    for (const action of ROADMAP_PASSED_ACTIONS) await runAction(caller, STATES[action]);
+
+    expect(seen.flatMap((call) => call.context.argv.filter((word) => word === ROADMAP_WORD))).toEqual([]);
+    expect([...ROADMAP_PASSED_ACTIONS]).toEqual(['plan', 'start', 'resume']);
+  });
+
+  it('prints the word in the invocation the proposal line is written from', () => {
+    expect(actionInvocation(STATES.plan, { roadmap: true })?.argv).toEqual(['--next', ROADMAP_WORD]);
+    expect(actionInvocation(STATES.plan)?.argv).toEqual(['--next']);
   });
 });
 

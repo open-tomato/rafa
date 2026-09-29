@@ -49,6 +49,24 @@
  * 1 for (`context/cli.md`), while a closed issue or a missing roadmap
  * is about the board's state.
  *
+ * One refusal of the words exits {@link ROADMAP_REFUSAL_EXIT}, 2:
+ * `--roadmap` on a line without `--next`
+ * ({@link roadmapWithoutNextMessage}), as the plan for
+ * `rafa next --roadmap` specifies. It is read after the several-sources
+ * refusal, so a line naming two sources is refused for that first.
+ *
+ * ## `--roadmap`, and the hop it follows
+ *
+ * `rafa next --roadmap` hands `plan create` the words `--next --roadmap`.
+ * With both, the `next` request carries `followHop: true`, and
+ * `./spec-source-roadmap.ts` answers the away hop's target C where
+ * `.rafa/hop.json` records one, and picks as a bare `--next` does where
+ * it records none. The key is LEFT OUT of a request read without
+ * `--roadmap`, so a line without the flag makes the request it always
+ * made. C then comes through every line below the pick here, the
+ * readiness gate of {@link SpecSourceOptions.inspect} included, exactly
+ * as a line the walk picked at home does.
+ *
  * ## Where the checks go
  *
  * The readiness gate's cheap checks — trust, the `spec:ready` label,
@@ -132,6 +150,7 @@ import {
   ISSUE_FLAG,
   NEXT_FLAG,
   REFRESH_FLAG,
+  ROADMAP_FLAG,
   SPEC_FLAG,
 } from './flags.js';
 import { requireSpecIssue } from './issue.js';
@@ -142,19 +161,22 @@ import { pickRoadmapIssue } from './spec-source-roadmap.js';
 const PREFIX = 'board spec source';
 
 /**
- * The four flags this module reads, re-exported: the readings and the
+ * The five flags this module reads, re-exported: the readings and the
  * refusals are this module's, and the words are `./flags.js`'s, which
  * records why they sit there. `--refresh` is read here too and stays
  * `./issue.ts`'s to re-export, since the rule it changes is that
  * module's.
  */
-export { DRY_RUN_FLAG, ISSUE_FLAG, NEXT_FLAG, SPEC_FLAG };
+export { DRY_RUN_FLAG, ISSUE_FLAG, NEXT_FLAG, ROADMAP_FLAG, SPEC_FLAG };
 
 /** The three flags, in the order a refusal names them. */
 export const SOURCE_FLAGS: readonly string[] = [SPEC_FLAG, ISSUE_FLAG, NEXT_FLAG];
 
 /** The exit code a command line naming no source, or several, ends with. */
 export const SOURCE_REFUSAL_EXIT = 1;
+
+/** The exit code a line giving `--roadmap` without `--next` ends with; see the module note. */
+export const ROADMAP_REFUSAL_EXIT = 2;
 
 /** Which of the three flags named the spec. */
 export type SpecSourceKind = 'spec' | 'issue' | 'next';
@@ -163,7 +185,12 @@ export type SpecSourceKind = 'spec' | 'issue' | 'next';
 export type SpecSourceRequest =
   | { readonly kind: 'spec'; readonly spec: string }
   | { readonly kind: 'issue'; readonly issue: number }
-  | { readonly kind: 'next'; readonly roadmap: number | null };
+  | {
+    readonly kind: 'next';
+    readonly roadmap: number | null;
+    /** Set under `--roadmap` alone, and left out otherwise: follow an away hop to its target. */
+    readonly followHop?: true;
+  };
 
 /** What the command line said about where the spec comes from. */
 export interface SpecSourceFlags {
@@ -186,6 +213,12 @@ export function noSourceMessage(specsDir: string): string {
   return `no spec was named: pass ${SPEC_FLAG}=<file>.md, read against the project root`
     + ` or under specs.dir (${specsDir}), ${ISSUE_FLAG}=<n> to plan from an issue,`
     + ` or ${NEXT_FLAG} to take the first undone line of the roadmap`;
+}
+
+/** The sentence a line giving `--roadmap` without `--next` is refused with. */
+export function roadmapWithoutNextMessage(): string {
+  return `${ROADMAP_FLAG} follows a hop to the spec ${NEXT_FLAG} would plan, and this line gives no ${NEXT_FLAG};`
+    + ` write ${NEXT_FLAG} ${ROADMAP_FLAG}, or drop ${ROADMAP_FLAG}`;
 }
 
 /** The sentence a flag given without its value is refused with. */
@@ -250,12 +283,27 @@ function requestOf(flag: string, word: FlagWord): SpecSourceRequest {
 }
 
 /**
+ * `request` with `followHop` set when `args` gives `--roadmap`, refused
+ * when it does and `request` is not `--next`'s; `request` as it was
+ * when `args` does not, the key left out. See the module note.
+ */
+function withRoadmap(args: readonly string[], request: SpecSourceRequest | null): SpecSourceRequest | null {
+  if (!readFlagWord(args, ROADMAP_FLAG).given) return request;
+  if (request?.kind !== 'next') {
+    throw new CommandExit(ROADMAP_REFUSAL_EXIT, roadmapWithoutNextMessage());
+  }
+  return { ...request, followHop: true };
+}
+
+/**
  * The source, the refresh and the dry run `args` name.
  *
  * Throws `CommandExit({@link SOURCE_REFUSAL_EXIT}, ...)` when more than
  * one of the three is given, when one of them is given without the
  * value it needs, and when `--issue` or `--next` is given something
- * that is not an issue number.
+ * that is not an issue number; and
+ * `CommandExit({@link ROADMAP_REFUSAL_EXIT}, ...)` when `--roadmap` is
+ * given without `--next`.
  *
  * A line naming NONE of them answers a null request rather than
  * throwing: what a command with no source says is that command's usage,
@@ -272,10 +320,11 @@ export function readSpecSourceFlags(args: readonly string[]): SpecSourceFlags {
   }
 
   const [only] = given;
+  const request = only === undefined
+    ? null
+    : requestOf(only.flag, only.word);
   return Object.freeze({
-    request: only === undefined
-      ? null
-      : requestOf(only.flag, only.word),
+    request: withRoadmap(args, request),
     refresh: args.includes(REFRESH_FLAG),
     dryRun: args.includes(DRY_RUN_FLAG),
   });
@@ -420,6 +469,9 @@ export async function resolveSpecSource(options: SpecSourceOptions): Promise<Spe
       root: repoRoot,
       issues,
       output,
+      ...request.followHop === true
+        ? { followHop: true }
+        : {},
     });
   if ('stop' in picked) return stopped(picked.stop);
   const number = picked.issue;

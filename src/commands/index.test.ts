@@ -221,7 +221,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'release tag': [[], []],
   'board list': [[], []],
   'status': [[], []],
-  'next': [[], ['dry-run', 'yes']],
+  'next': [[], ['dry-run', 'roadmap', 'yes']],
   'roadmap': [[], ['all', 'full', 'check', 'labels', 'texts', 'refresh', 'type', 'module', 'search', 'limit']],
   'epic show': [['n'], ['labels', 'texts', 'refresh']],
   'epic new': [['title'], ['slug', 'horizon']],

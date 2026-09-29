@@ -203,6 +203,7 @@ const RAFA_PATHS = [
   '.rafa/instincts/x.md',
   '.rafa/tracking.digest',
   '.rafa/position.json',
+  '.rafa/hop.json',
   '.rafa/cache/board.json',
 ] as const;
 
@@ -261,8 +262,8 @@ describe('trackingEntry', () => {
     ]);
   });
 
-  it('keeps the private triage directory, the digest, the position and the cache ignored under all, whatever the other flags say', () => {
-    const all = ['!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/cache/'];
+  it('keeps the private triage directory, the digest, the position, the hop record and the cache ignored under all, whatever the other flags say', () => {
+    const all = ['!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/hop.json', '.rafa/cache/'];
     expect(trackingEntry(flagsOf({ trackingAll: true }))).toEqual(all);
     expect(trackingEntry({ trackingSpecs: true, trackingPlans: true, trackingAll: true })).toEqual(all);
   });
@@ -299,18 +300,20 @@ describe('withTrackingBlock', () => {
   it('finds CRLF markers and writes the block with CRLF', () => {
     const text = `dist\r\n${BEGIN}\r\n.rafa/\r\n${END}\r\nout\r\n`;
     const next = withTrackingBlock(text, flagsOf({ trackingAll: true }));
-    const lines = [BEGIN, '!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/cache/', END];
+    const lines = [BEGIN, '!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/hop.json', '.rafa/cache/', END];
     expect(next).toBe(`dist\r\n${lines.join('\r\n')}\r\nout\r\n`);
   });
 
-  it('rewrites an all block written without the position or the cache line, as it would one without the digest line', () => {
-    const current = blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/cache/');
+  it('rewrites an all block written without the position, the hop or the cache line, as it would one without the digest line', () => {
+    const current = blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/hop.json', '.rafa/cache/');
     const noCache = `dist\n${blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json')}out\n`;
+    const noHop = `dist\n${blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/cache/')}out\n`;
     const noPosition = `dist\n${blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest')}out\n`;
     const noDigest = `dist\n${blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/position.json')}out\n`;
     const all = flagsOf({ trackingAll: true });
     expect(withTrackingBlock(noPosition, all)).toBe(`dist\n${current}out\n`);
     expect(withTrackingBlock(noDigest, all)).toBe(`dist\n${current}out\n`);
+    expect(withTrackingBlock(noHop, all)).toBe(`dist\n${current}out\n`);
     expect(withTrackingBlock(noCache, all)).toBe(`dist\n${current}out\n`);
   });
 
@@ -369,6 +372,17 @@ describe('writeTrackingGitignore', () => {
     expect(isIgnored(repo, '.rafa/tracking.digest')).toBe(true);
   });
 
+  it('updates an all block on disk that lacks the hop line, which git then ignores', () => {
+    const repo = freshRepo();
+    const file = join(repo, '.gitignore');
+    plantFile(file, blockOf('!/.rafa/', '.rafa/triage/private/', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/cache/'));
+    expect(isIgnored(repo, '.rafa/hop.json')).toBe(false);
+
+    expect(writeTrackingGitignore(repo, flagsOf({ trackingAll: true }))).toEqual({ file, change: 'updated' });
+    expect(isIgnored(repo, '.rafa/hop.json')).toBe(true);
+    expect(isIgnored(repo, '.rafa/position.json')).toBe(true);
+  });
+
   it('keeps the operator lines of an existing file', () => {
     const root = freshDir();
     plantFile(join(root, '.gitignore'), 'node_modules\n');
@@ -407,7 +421,7 @@ describe('ignore state read through git check-ignore', () => {
   });
 
   /** Each expected list is in `RAFA_PATHS` order, the order `ignoredRafaPaths` answers in. */
-  const ALL_TRACKED_BUT = ['.rafa/triage/private/i.md', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/cache/board.json'];
+  const ALL_TRACKED_BUT = ['.rafa/triage/private/i.md', '.rafa/tracking.digest', '.rafa/position.json', '.rafa/hop.json', '.rafa/cache/board.json'];
   const EVERY_RAFA_PATH: readonly string[] = RAFA_PATHS;
   const shapes: readonly [string, TrackingFlags, readonly string[]][] = [
     ['no flag', flagsOf(), EVERY_RAFA_PATH],

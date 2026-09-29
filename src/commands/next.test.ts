@@ -96,13 +96,16 @@
  *
  * Three more were driven the same way on 2026-09-22, against the 197
  * pass and 0 fail the scope answers with the no-terminal cases in it:
+ * (`dryRunOf` and the reading case it names below have since moved to
+ * `src/next/lines.ts` and `src/next/lines.test.ts`.)
  *
- *  - the `no-terminal` branch dropped from {@link dryRunOf}, so a run
+ *
+ *  - the `no-terminal` branch dropped from `dryRunOf`, so a run
  *    with no terminal asks anyway: 195 pass and 2 fail, the reading
  *    case and the dispatched no-terminal case. The chain case passes
  *    either way, because it is handed the reason rather than reading
  *    it, which is why the dispatched case is here beside it.
- *  - the ceiling ignored in {@link dryRunOf}, so `--yes` with no
+ *  - the ceiling ignored in `dryRunOf`, so `--yes` with no
  *    terminal runs nothing: 194 pass and 3 fail, the reading case, the
  *    `--yes=sync` control and the `--resolve` case, both of which run
  *    under `--yes` with no terminal.
@@ -127,10 +130,11 @@
  * refusals it makes are dispatched here, and the no-terminal run is
  * read as a chain case, a reading case and two dispatched ones.
  */
-import type { NextChainOptions, NextChainReport, NextDryRun } from './next.js';
+import type { NextChainOptions, NextChainReport } from './next.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { NextCeiling } from '../next/ceiling.js';
+import type { NextDryRun } from '../next/lines.js';
 import type { NextState } from '../next/state.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 
@@ -141,25 +145,16 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
-import { BARE_YES_ACTIONS, CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
+import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines } from '../next/epic-end.js';
 import { nextQuestion } from '../next/hint.js';
+import { DRY_RUN_FLAG, MAX_ACTIONS, NEXT_USAGE, ROADMAP_FLAG } from '../next/lines.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import {
-  createNextCommand,
-  DRY_RUN_FLAG,
-  dryRunOf,
-  MAX_ACTIONS,
-  NEXT_USAGE,
-  proposalLine,
-  readDryRun,
-  runNextChain,
-  stateLine,
-} from './next.js';
+import { createNextCommand, runNextChain } from './next.js';
 import prTriage from './pr/triage.js';
 
 /** A temporary directory of this file's own. */
@@ -311,25 +306,7 @@ async function drive(script: Script): Promise<Driven> {
   return { report, lines, warnings, asked, ran, reads };
 }
 
-describe('the two lines and the question', () => {
-  it('writes what is true, then what to do about it with the command that does it', () => {
-    const lines = [stateLine(STATES.green), proposalLine(STATES.green, {
-      action: 'merge',
-      command: 'pr merge',
-      argv: [String(PR), `--${YES_FLAG}`],
-    })];
-
-    expect(lines).toEqual([
-      `📍 #${PR} is open on \`feat/rafa-63\`, green and merges into \`${BASE}\`.`,
-      `👉 merge #${PR} into \`${BASE}\` — rafa pr merge ${PR} --${YES_FLAG}`,
-    ]);
-  });
-
-  it('writes the proposal alone for an action that runs no command', () => {
-    expect(proposalLine(STATES.behind, null))
-      .toBe(`👉 fast-forward \`${BASE}\` to \`origin/${BASE}\``);
-  });
-
+describe('the question', () => {
   it('asks the proposal itself, capitalised and spelled [y/N]', () => {
     const questions = [STATES.green, STATES.behind, STATES.notReady]
       .map((state) => nextQuestion(state));
@@ -439,7 +416,7 @@ describe('the chain', () => {
     expect(driven.report.stop).toBe('dry-run');
     expect(driven.lines.at(-2)).toBe(`\u{1F449} merge #${PR} into \`${BASE}\` — rafa pr merge ${PR} --${YES_FLAG}`);
     expect(driven.lines.at(-1)).toBe('⏹ There is no terminal to answer on, so nothing ran; run rafa next where'
-      + ` you can answer, or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`);
+      + ` you can answer, or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`);
   });
 
   it('runs an action the ceiling names with no question put', async () => {
@@ -506,43 +483,6 @@ describe('the chain', () => {
     const driven = await drive({ states: [carried], answer: false });
 
     expect(driven.warnings).toEqual(['`origin/main` could not be fetched', 'the plans could not be read']);
-  });
-});
-
-describe('the line', () => {
-  it('reads a run with no terminal and no --yes as a dry run, and one with either as a run that acts', () => {
-    const read = [
-      dryRunOf(false, null, true),
-      dryRunOf(false, null, false),
-      dryRunOf(false, ['sync'], false),
-      dryRunOf(false, [], false),
-      dryRunOf(true, null, true),
-      dryRunOf(true, ['sync'], false),
-    ];
-
-    expect(read).toEqual([null, 'no-terminal', null, null, 'flag', 'flag']);
-  });
-
-  it('reads --dry-run bare, negated, written out and left out', () => {
-    const read = [{}, { [DRY_RUN_FLAG]: true }, { [DRY_RUN_FLAG]: false }, { [DRY_RUN_FLAG]: 'true' }, { [DRY_RUN_FLAG]: 'false' }]
-      .map((flags) => readDryRun(flags));
-
-    expect(read).toEqual([false, true, false, true, false]);
-  });
-
-  it('refuses a value --dry-run swallowed, naming the usage', () => {
-    let refused: CommandExit | null = null;
-
-    try {
-      readDryRun({ [DRY_RUN_FLAG]: 'sync' });
-    } catch (error) {
-      refused = error instanceof CommandExit
-        ? error
-        : null;
-    }
-
-    expect(refused?.exitCode).toBe(1);
-    expect(refused?.message).toBe(`❌ --${DRY_RUN_FLAG} takes no value, and read "sync" as one\nUsage: ${NEXT_USAGE}`);
   });
 });
 
@@ -788,7 +728,7 @@ describe('the command, dispatched', () => {
       `\u{1F4CD} \`${BASE}\` is 2 commits behind \`origin/${BASE}\`.`,
       `\u{1F449} fast-forward \`${BASE}\` to \`origin/${BASE}\``,
       '⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
-        + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`,
+        + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
       '',
     ].join('\n'));
     expect(run.exitCode).toBe(0);
@@ -1110,12 +1050,12 @@ describe('the output an action writes through', () => {
 });
 
 describe('what the command declares', () => {
-  it('is top-level, needs a project, and declares the two flags with its examples and outputs', () => {
+  it('is top-level, needs a project, and declares the three flags with its examples and outputs', () => {
     const command = createNextCommand();
 
     expect([command.name, command.subject, command.action]).toEqual(['next', 'next', 'next']);
     expect(command.needsProject).toBeUndefined();
-    expect(command.flags.map((flag) => [flag.name, flag.type])).toEqual([[DRY_RUN_FLAG, 'boolean'], [YES_FLAG, 'string']]);
+    expect(command.flags.map((flag) => [flag.name, flag.type])).toEqual([[DRY_RUN_FLAG, 'boolean'], [ROADMAP_FLAG, 'boolean'], [YES_FLAG, 'string']]);
     expect(command.outputs).toEqual(['text', 'json']);
     expect(command.examples.every((example) => example.cmd.startsWith('rafa next'))).toBe(true);
     expect(command.description.length).toBeGreaterThan(command.summary.length);

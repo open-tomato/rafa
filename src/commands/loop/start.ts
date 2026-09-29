@@ -59,7 +59,8 @@ const wrapped = wrapPhaseZeroCommand({
     + ' `main` or `master` it offers to create the plan\'s `feat/<stub>` from the latest'
     + ' `origin/<base>` and run there, `--create-branch` answering that without asking, and refuses'
     + ' the run when the offer is not taken. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
-    + ' the plan, the branch, the pid, the start, the state and the running task. It refuses a plan whose'
+    + ' the plan, the branch, the pid, the start, the state and the running task, and under `--roadmap`'
+    + ' the hop away, when one is. It refuses a plan whose'
     + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
     + ' `resume`, `status` and `list` reach the run through that record. A run holds its terminal: until'
     + ' phase 6 it refuses `--detached`. With `--runtime` the whole run goes on in that installed rafa,'
@@ -126,6 +127,13 @@ const wrapped = wrapPhaseZeroCommand({
     {
       name: 'any-branch',
       description: 'Runs on `main` or `master`, which the loop otherwise refuses.',
+      type: 'boolean',
+    },
+    {
+      name: 'roadmap',
+      description: 'Stamps the hop `rafa next --roadmap` is away on, when one is, on the session record as'
+        + ' its `hop`: the hop record `.rafa/hop.json` holds, still `away` and its home still the'
+        + ' position\'s. What `rafa next --roadmap` passes to the loop it starts.',
       type: 'boolean',
     },
     {

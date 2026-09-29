@@ -33,7 +33,7 @@
  * labels row reads (`./doctor-epics.ts`): `./doctor-board.ts` reads it
  * once per run and hands both rows the same answer, so this row adds no
  * listing. The open boards are the listing's own open `type:roadmap` rows
- * (`openBoards`, `./switch.ts`), never a second `gh issue list --label`.
+ * (`openBoards`, `src/board/epic-board.ts`), never a second `gh issue list --label`.
  * Beyond that it spends:
  *
  * - one `gh api` per distinct owner handle;
@@ -74,13 +74,12 @@ import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 
 import { readBoardBody } from '../board/board-body.js';
 import { resolveDefaultBoard, unlabelledRoadmapMessage } from '../board/boards.js';
+import { openBoards } from '../board/epic-board.js';
 import { createOwnerResolver } from '../board/owner-resolve.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhRoadmapSearch } from '../board/roadmap.js';
 import { messageOf } from '../config-sections.js';
 import { readPositionFile } from '../project/position.js';
-
-import { openBoards } from './switch.js';
 
 /** The heading the board lines sit under, as `Epic labels:` heads its own. */
 export const BOARDS_HEADING = 'Boards:';

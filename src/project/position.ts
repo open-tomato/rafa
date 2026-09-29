@@ -37,7 +37,10 @@
  * place becomes current and home. {@link hop} is a switch that keeps home
  * (`--no-rehome`). {@link swap} goes back to the previous place, as
  * `cd -` does, keeping home, and answers null when there is no previous
- * place. {@link positionAt} is the position a first switch starts from.
+ * place. {@link goHome} is the way back from a hop: home becomes current,
+ * the place left becomes previous, and home is kept; at home already it
+ * answers a position whose previous is home too. {@link positionAt} is the
+ * position a first switch starts from.
  */
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -87,8 +90,8 @@ function isIssueNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-/** `value` as a place, or null when it is not one. */
-function asPlace(value: unknown): Place | null {
+/** `value` as a place, or null when it is not one; the hop record reads its places through it. */
+export function asPlace(value: unknown): Place | null {
   if (!isRecord(value) || !isIssueNumber(value.board)) return null;
   if (value.epic !== null && !isIssueNumber(value.epic)) return null;
   return { board: value.board, epic: value.epic };
@@ -165,4 +168,9 @@ export function hop(position: Position, place: Place): Position {
 export function swap(position: Position): Position | null {
   if (position.previous === null) return null;
   return { current: position.previous, previous: position.current, home: position.home };
+}
+
+/** Back home from wherever the position stands: home becomes current, the place left previous. */
+export function goHome(position: Position): Position {
+  return { current: position.home, previous: position.current, home: position.home };
 }

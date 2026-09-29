@@ -22,7 +22,12 @@
  *     repository. A WRITE is the other way round
  *     ({@link PullRequests.editBody}): it was handed the pull request to
  *     act on rather than discovering it, so a number nothing answers for
- *     throws there. {@link PullRequests.workflowCount} is the one read
+ *     throws there. {@link PullRequests.changedFiles} and
+ *     {@link PullRequests.reviews} throw on an absent pull request too:
+ *     their caller, the owner gate, was handed the number it reads, and
+ *     an empty list would read as "touches nothing" or "nobody has
+ *     reviewed" where the truth is "could not be read".
+ *     {@link PullRequests.workflowCount} is the one read
  *     that answers null on ANY failure rather than throwing: its null is
  *     not an empty answer but the riskier one, read by the caller the
  *     same as "workflows exist", so an outage cannot pass for "this
@@ -199,6 +204,28 @@ export interface PullRequestComment {
 }
 
 /**
+ * One review submitted on a pull request, as the owner gate reads it:
+ * who reviewed, what they said, and when.
+ *
+ * Only what telling "the latest review of this login" and whether it
+ * approves needs; the review's body, comments and commit are not
+ * answered.
+ */
+export interface PullRequestReview {
+  /** The reviewer's login. */
+  readonly login: string;
+  /**
+   * GitHub's review state verbatim — `APPROVED`, `CHANGES_REQUESTED`,
+   * `COMMENTED`, `DISMISSED` and whatever it adds next. Kept unnarrowed,
+   * as `mergeStateStatus` is, so a caller compares it with `APPROVED`
+   * and an unrecognised word is simply not an approval.
+   */
+  readonly state: string;
+  /** When the review was submitted, ISO 8601. */
+  readonly submittedAt: string;
+}
+
+/**
  * What a merge did.
  *
  * `merged` false is a merge the provider REFUSED — not green, not
@@ -242,6 +269,21 @@ export interface PullRequests {
   get: (number: number) => Promise<PullRequestDetail | null>;
   /** The PR's checks now. One poll: the waiting is the caller's. */
   checks: (number: number) => Promise<ChecksReading>;
+  /**
+   * The paths the PR changes, in the provider's order.
+   *
+   * The WHOLE list or a throw, never a part of it: a list short of the
+   * PR's own changed-file count throws, because an owner gate reading
+   * a partial list could find every path it saw at home and let through
+   * a path it never saw. An absent PR throws too; see the module note.
+   */
+  changedFiles: (number: number) => Promise<readonly string[]>;
+  /**
+   * Every review submitted on the PR, in the provider's order, oldest
+   * first on `gh`. Throws when the provider could not be asked or the PR
+   * is absent, so a failed read never passes for "no reviews".
+   */
+  reviews: (number: number) => Promise<readonly PullRequestReview[]>;
   /** Opens the PR in a browser. */
   browse: (number: number) => Promise<void>;
   /** Merges the PR, or answers why the provider would not. */

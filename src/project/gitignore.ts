@@ -24,7 +24,7 @@
  *     `!.rafa/plans/` for the flags set, in that order.
  *   - `tracking.all`, whatever the other two say: `!/.rafa/`,
  *     `.rafa/triage/private/`, `.rafa/tracking.digest`,
- *     `.rafa/position.json` and `.rafa/cache/`.
+ *     `.rafa/position.json`, `.rafa/hop.json` and `.rafa/cache/`.
  *
  * `.rafa/*` ignores every entry of `.rafa/` but not the directory
  * itself, so a `!` line after it re-includes one sub-path. The store
@@ -32,19 +32,22 @@
  * therefore stay ignored under either individual flag with no line of
  * their own, and the config file and `instincts/` with them.
  *
- * `tracking.all` keeps four paths ignored. The private triage directory
+ * `tracking.all` keeps five paths ignored. The private triage directory
  * holds security bugs, which the phase 1 plan keeps out of reach of
  * every tracking flag, and the notice does not name them. The digest
  * file is this checkout's record of the notice (below): tracked, it
  * would travel to a clone whose operator never read the notice and keep
  * it from printing there. The position file (`position.ts`) is this
  * checkout's place on the board for the same reason: tracked, one
- * operator's switch would move every clone that pulls it. The cache
+ * operator's switch would move every clone that pulls it. The hop
+ * record (`src/next/hop-record.ts`) says a hop is under way in this
+ * checkout and where its home is: tracked, one clone's hop would read
+ * as under way in every other, against a position it never wrote. The cache
  * directory holds what rafa read from GitHub and from `ts-symbols` to
  * spare the next command the reading (`src/board/board-cache.ts`,
  * `src/refs/outline-cache.ts`): tracked, every read would be a diff, and
  * a clone would start from another checkout's reading. A block
- * written before that line existed is rewritten with it on the next
+ * written before one of those lines existed is rewritten with it on the next
  * {@link writeTrackingGitignore}, as any stale block is.
  *
  * ## The re-include
@@ -127,6 +130,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { describeValue, messageOf } from '../config-sections.js';
+import { HOP_FILE } from '../next/hop-record.js';
 
 import { POSITION_FILE } from './position.js';
 import { SCOPE_DIR } from './scope.js';
@@ -210,6 +214,7 @@ export function trackingEntry(flags: TrackingFlags): readonly string[] {
       `${SCOPE_DIR}/${PRIVATE_TRIAGE}/`,
       `${SCOPE_DIR}/${DIGEST_NAME}`,
       `${SCOPE_DIR}/${POSITION_FILE}`,
+      `${SCOPE_DIR}/${HOP_FILE}`,
       `${SCOPE_DIR}/${CACHE_DIR}/`,
     ];
   }

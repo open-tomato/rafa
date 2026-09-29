@@ -13,7 +13,8 @@
  *
  *   - **Opened**: `running`, no task, this process's pid, the clock's
  *     time, the plan's stub and its path relative to the project root, and
- *     the branch the guard read.
+ *     the branch the guard read. Under `--roadmap`, the away hop as well
+ *     (below).
  *   - **Before each dispatch** ({@link RunSession.taskStarted}): the task's
  *     tracker line counted from 1, and its sentence with the routing
  *     declaration left out, as the dispatch quotes it.
@@ -29,6 +30,24 @@
  * Each change after the open reads the stored record again and changes
  * only its own field, so a `paused` another process wrote is kept by the
  * loop writing its next task (`loop/sessions.ts`).
+ *
+ * ## Under `--roadmap`: the away hop
+ *
+ * `rafa next --roadmap` passes `--roadmap` to the `loop start` it runs
+ * (`src/next/actions.ts`), and {@link RunSessionOptions.roadmap} carries
+ * it here. The open then reads the hop record (`.rafa/hop.json`,
+ * `src/next/hop-record.ts`) and the position file, and stamps the record
+ * as the new record's `hop` when it is AWAY ({@link readAwayHopStamp}):
+ * stored `away`, of either kind, and its home still the position's. A
+ * record whose home a person's `rafa switch` has since moved is stale and
+ * stamps nothing, as does one back home (`waiting`, `merged`, `halted`),
+ * none at all, and no position file to weigh it against. A record that
+ * cannot be read, or is not one, is warned about in one line and stamps
+ * nothing; the run goes on either way, since the stamp says what the run
+ * worked for and decides nothing the run does.
+ *
+ * Without the option neither file is read, and the record carries no
+ * `hop` key at all (`loop/sessions.ts`).
  *
  * ## The refusals
  *
@@ -57,7 +76,8 @@
  * store's, both written by then.
  *
  * Every line goes through the active output (`adapters/output/active.ts`).
- * A run that is let through prints nothing here.
+ * A run that is let through prints nothing here but the hop record's
+ * warning above.
  */
 import type {
   PidProbe,
@@ -65,6 +85,7 @@ import type {
   SessionConflict,
   SessionDraft,
 } from '../loop/sessions.js';
+import type { HopRecord } from '../next/hop-record.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { randomUUID } from 'node:crypto';
@@ -82,6 +103,8 @@ import {
   SessionRecordError,
   updateSession,
 } from '../loop/sessions.js';
+import { readHopRecord, staleAgainst } from '../next/hop-record.js';
+import { readPositionFile } from '../project/position.js';
 import { stripTaskDeclaration } from '../utils/declaration.js';
 
 /** The last line of every refusal the open throws. */
@@ -109,6 +132,8 @@ export interface RunSessionOptions {
   readonly planStub: string | null;
   /** The branch the run is on. */
   readonly branch: string;
+  /** Whether the run was typed with `--roadmap`, stamping the away hop; see the module note. False when left out. */
+  readonly roadmap?: boolean;
   readonly seams?: RunSessionSeams;
 }
 
@@ -216,6 +241,36 @@ function sessionHandle(repoRoot: string, sessionId: string): RunSession {
   });
 }
 
+/** The draft's `hop` key under `--roadmap` with a hop away, and no key otherwise. */
+function awayHopOf(options: RunSessionOptions): Pick<SessionDraft, 'hop'> {
+  if (options.roadmap !== true) return {};
+  const hop = readAwayHopStamp(options.repoRoot);
+  return hop === null
+    ? {}
+    : { hop };
+}
+
+/**
+ * The hop record to stamp on a `--roadmap` run's session record: the one
+ * `.rafa/hop.json` holds when it is away and not stale, or null. A record
+ * that cannot be read, or is not one, is warned about. See the module note.
+ */
+export function readAwayHopStamp(repoRoot: string): HopRecord | null {
+  const reading = readHopRecord(repoRoot);
+  if (!reading.set) {
+    if (reading.reason !== 'absent') {
+      activeOutput().warn(`⚠️  --roadmap: no hop is stamped on the session record: ${reading.detail}`);
+    }
+    return null;
+  }
+  const { record } = reading;
+  if (record.state !== 'away') return null;
+  const placed = readPositionFile(repoRoot);
+  return placed.set && !staleAgainst(record, placed.position)
+    ? record
+    : null;
+}
+
 /**
  * Opens the session of one `loop start` run: refuses it by throwing
  * `CommandExit` with exit code 1, or writes its record and answers the
@@ -231,6 +286,7 @@ export function openRunSession(options: RunSessionOptions): RunSession {
     branch: options.branch,
     pid: seams.pid ?? process.pid,
     startedAt: (seams.now ?? (() => new Date()))().toISOString(),
+    ...awayHopOf(options),
   };
 
   try {
