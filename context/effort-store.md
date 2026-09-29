@@ -364,6 +364,15 @@ naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and
 `merge_conflicts` each incoming row one could not settle. No writer
 fills them yet.
+`src/effort/store/store-identity.ts` reads what `store_meta` records and
+decides, on a write, whether to mint; nothing calls it yet. The host id
+is an HMAC of `/etc/machine-id`, the macOS platform UUID or the
+hostname, never the raw value, since `machine-id(5)` asks for a keyed
+hash and a store travels. The path is the real path, so a symlinked
+spelling does not mint; the device and inode are bigints. A `.bak`
+renamed over the store has a new inode and mints, but one restored
+with `cp` over the existing file keeps the old inode and does not
+(measured on tmpfs); the merge's collision check is what catches it.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
