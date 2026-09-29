@@ -217,7 +217,8 @@ The keys are: `release.fragments` (path, default `.changes/`), `release.strategy
 (fold strategy, default `semver-by-level`), `release.settle` (`push` or `pr`,
 default `push`), `release.tag` (`manual` or `settle`, default `manual`).
 `pr.versionCollision` controls what happens when a merge would collide
-(default `report`). Read `context/release.md` for the full design and
+(default `report`). Read `context/release.md` for the full design,
+`docs/ci-release-settle.md` for automating settle in CI, and
 `rafa release settle --help` for the settle command.
 
 ### Tracking effort and learning from skills
