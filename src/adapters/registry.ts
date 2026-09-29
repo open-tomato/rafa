@@ -66,9 +66,10 @@
  * `src/adapters/learning/`, `learning/local`, and the planner under
  * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
  * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
- * the phase 1 table names. Core registers no `sync` adapter yet: the port
- * is served at version 1, so a module's `sync` adapter registers, and
- * `kinds('sync')` answers an empty list.
+ * the phase 1 table names. The `sync` port adds `sync/local`, the default
+ * strategy of `effort.sync`, from `src/effort/sync/select.ts`, whose
+ * `selectSync` resolves `effort.sync` through a registry. `git`, `service`
+ * and `p2p` are modules' strategies, registered by a loaded module.
  *
  * ## What an adapter answers
  *
@@ -119,6 +120,7 @@ import { describeValue } from '../config-sections.js';
 import { CONFIG_DEFAULTS, STORE_BACKENDS } from '../config.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
+import { createLocalSync } from '../effort/sync/select.js';
 
 import { createLocalLearning, localInstinctsDir } from './learning/local.js';
 import { createJsonOutput } from './output/json.js';
@@ -396,7 +398,8 @@ const STORE_OPENERS: {
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
  * and `json` outputs, then the `local` and `github` trackers, then the
- * `local` learning adapter, then the `claude` planner.
+ * `local` learning adapter, then the `claude` planner, then the `local`
+ * sync strategy.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -473,6 +476,12 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
       }
       return createClaudePlanner({ repoRoot, planDir, settingSources, buildPrompt: planPrompt, spawn: claude });
     },
+  },
+  {
+    port: 'sync',
+    kind: 'local',
+    portVersion: PORT_VERSIONS.sync,
+    create: () => createLocalSync(),
   },
 ];
 

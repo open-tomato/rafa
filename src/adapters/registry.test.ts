@@ -115,6 +115,12 @@
  * `PORT_VERSIONS.sync` set to 2 failed `check-types` and reddened the
  * literal case and both sync add-on cases. The sync adapters left out
  * of the index reddened the add-on sync kind case alone.
+ *
+ * Core's `sync/local` arrived the same day (`src/effort/sync/select.ts`).
+ * Its entry removed reddened six cases here: the sync kinds case, the
+ * local strategy case, the frozen-registry case, the add-on sync kind
+ * case, the refusal of an add-on taking `local` over, and the refusal
+ * naming the kinds held.
  */
 import type { DescribedInstinctRecord } from './learning/local.js';
 import type { AdapterContext, AnyAdapter } from './registry.js';
@@ -605,9 +611,24 @@ describe('the core adapter registry', () => {
     expect(attempt).toThrow(`adapter registry: planner/claude has ${named}`);
   });
 
+  it('registers the local sync strategy alone', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local']);
+  });
+
+  it('makes the local sync strategy, whose push and pull answer that there is nothing to sync', async () => {
+    const root = freshRoot('sync');
+    const sync = CORE_ADAPTER_REGISTRY.resolve('sync', 'local').create({ repoRoot: root });
+
+    expect(sync.kind).toBe('local');
+    expect(await sync.push({ to: join(root, 'copy') })).toEqual({ status: 'nothing-to-sync' });
+    expect(await sync.pull({ from: join(root, 'effort.sqlite'), dryRun: false }))
+      .toEqual({ status: 'nothing-to-sync' });
+    expect(existsSync(root)).toBe(false);
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const port of ['store', 'output', 'tracker', 'learning', 'planner'] as const) {
+    for (const port of ['store', 'output', 'tracker', 'learning', 'planner', 'sync'] as const) {
       expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
       for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
         expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);
@@ -740,14 +761,20 @@ describe('registering an adapter', () => {
     expect(attempt).toThrow(`adapter registry: an adapter is ${quoted}, expected a mapping`);
   });
 
-  it('answers a new registry holding an add-on sync kind, where core holds none', () => {
+  it('answers a new registry holding an add-on sync kind after core\'s local', () => {
     const extended = CORE_ADAPTER_REGISTRY.register(
       addOn({ port: 'sync', kind: 'git', create: () => FIXTURE_SYNC }),
     );
 
-    expect(extended.kinds('sync')).toEqual(['git']);
+    expect(extended.kinds('sync')).toEqual(['local', 'git']);
     expect(extended.resolve('sync', 'git').create({ repoRoot: '/nonexistent' })).toBe(FIXTURE_SYNC);
-    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual([]);
+    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local']);
+  });
+
+  it('refuses a sync add-on taking core\'s local kind over', () => {
+    const local = addOn({ port: 'sync', kind: 'local', create: () => FIXTURE_SYNC });
+
+    expect(() => CORE_ADAPTER_REGISTRY.register(local)).toThrow('adapter registry: sync/local is already registered');
   });
 
   it('refuses a sync add-on at a port version core does not serve, naming both numbers', () => {
@@ -818,7 +845,7 @@ describe('looking an adapter up', () => {
       'adapter registry: no planner adapter is registered as "webhook"; registered: claude',
     );
     expect(() => CORE_ADAPTER_REGISTRY.resolve('sync', 'git')).toThrow(
-      'adapter registry: no sync adapter is registered as "git"; registered: none',
+      'adapter registry: no sync adapter is registered as "git"; registered: local',
     );
   });
 

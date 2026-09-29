@@ -172,21 +172,7 @@ describe('the sync-fixture module under testdata', () => {
 });
 
 describe('a module\'s sync adapter', () => {
-  it('is refused as a core kind when the registry it registers against already holds sync/local', async () => {
-    // Core registers no `sync` adapter yet (that lands with the local and
-    // file adapters stage), so this seeds the registry the module loads
-    // against with a `local` sync adapter through the `adapters` seam,
-    // standing in for the core kind it will collide with.
-    const seeded = CORE_ADAPTER_REGISTRY.register({
-      port: 'sync',
-      kind: 'local',
-      portVersion: PORT_VERSIONS.sync,
-      create: () => ({
-        kind: 'local',
-        push: async () => ({ status: 'nothing-to-sync' }),
-        pull: async () => ({ status: 'nothing-to-sync' }),
-      }),
-    });
+  it('is refused as a core kind when it registers sync/local, which core holds', async () => {
     const dir = demoModule('demo', {
       types: ['sync'],
       provides: { sync: { kind: 'local', entry: './tracker.ts' } },
@@ -194,11 +180,12 @@ describe('a module\'s sync adapter', () => {
     });
 
     const settings: ModuleSettings = { modules: [pathSource(dir)], allowList: ['demo'], base: tempBase };
-    const loaded = await loadModules(settings, { manifest: MANIFEST_SEAMS, adapters: seeded });
+    const loaded = await loadModules(settings, { manifest: MANIFEST_SEAMS });
 
+    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toContain('local');
     expect(loaded.warnings).toEqual(['module "demo": adapter registry: sync/local is already registered']);
     expect(loaded.modules[0]?.state).toBe('refused');
-    expect(loaded.adapters).toBe(seeded);
+    expect(loaded.adapters).toBe(CORE_ADAPTER_REGISTRY);
   });
 
   it('names both port numbers when core does not serve the sync version its manifest states', async () => {
