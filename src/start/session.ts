@@ -14,7 +14,7 @@
  *   - **Opened**: `running`, no task, this process's pid, the clock's
  *     time, the plan's stub and its path relative to the project root, and
  *     the branch the guard read. Under `--roadmap`, the away hop as well
- *     (below).
+ *     (below), and in a worktree, the worktree's path (below).
  *   - **Before each dispatch** ({@link RunSession.taskStarted}): the task's
  *     tracker line counted from 1, and its sentence with the routing
  *     declaration left out, as the dispatch quotes it.
@@ -48,6 +48,16 @@
  *
  * Without the option neither file is read, and the record carries no
  * `hop` key at all (`loop/sessions.ts`).
+ *
+ * ## In a worktree: its path
+ *
+ * `start()` hands the run's checkout over as
+ * {@link RunSessionOptions.checkout} (`./run-checkout.ts`). When that
+ * checkout is not the project root, as under `--as-worktree` or for a
+ * loop started in a linked worktree with no `.rafa/` of its own, the
+ * record carries it as `worktree`, and `rafa loop list` prints it. A run
+ * whose checkout is the project root, or that hands none, carries no
+ * `worktree` key at all (`loop/sessions.ts`).
  *
  * ## The refusals
  *
@@ -134,6 +144,8 @@ export interface RunSessionOptions {
   readonly branch: string;
   /** Whether the run was typed with `--roadmap`, stamping the away hop; see the module note. False when left out. */
   readonly roadmap?: boolean;
+  /** The directory the run's git and sessions run in; recorded as `worktree` when it is not `repoRoot`. See the module note. */
+  readonly checkout?: string;
   readonly seams?: RunSessionSeams;
 }
 
@@ -250,6 +262,14 @@ function awayHopOf(options: RunSessionOptions): Pick<SessionDraft, 'hop'> {
     : { hop };
 }
 
+/** The draft's `worktree` key for a checkout other than the project root, and no key otherwise. */
+function worktreeOf(options: RunSessionOptions): Pick<SessionDraft, 'worktree'> {
+  const { checkout, repoRoot } = options;
+  return checkout === undefined || checkout === repoRoot
+    ? {}
+    : { worktree: checkout };
+}
+
 /**
  * The hop record to stamp on a `--roadmap` run's session record: the one
  * `.rafa/hop.json` holds when it is away and not stale, or null. A record
@@ -287,6 +307,7 @@ export function openRunSession(options: RunSessionOptions): RunSession {
     pid: seams.pid ?? process.pid,
     startedAt: (seams.now ?? (() => new Date()))().toISOString(),
     ...awayHopOf(options),
+    ...worktreeOf(options),
   };
 
   try {

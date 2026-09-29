@@ -380,8 +380,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
   // Refuses a second run of the plan before anything else is printed or
   // checked; every way out of the `try` writes the run's end. Under
-  // `--roadmap` the record carries the away hop, when there is one.
-  const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap });
+  // `--roadmap` the record carries the away hop, when there is one, and
+  // a run in a worktree carries the worktree's path.
+  const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
   try {
     const planContent = fs.readFileSync(planPath, 'utf8');
     const promptContent = fs.readFileSync(promptPath, 'utf8');

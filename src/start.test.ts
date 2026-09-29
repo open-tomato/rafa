@@ -334,8 +334,12 @@ describe('the two directories start.ts points each call at', () => {
     expect(firstArgument('runStartPreflight')).toContain('repoRoot,');
     expect(firstArgument('holdWhilePaused')).toContain('repoRoot,');
     expect(firstArgument('createStartTriage')).toContain('repoRoot,');
-    for (const name of ['loadRunConfig', 'openRunSession', 'runStartPreflight', 'holdWhilePaused', 'createStartTriage']) {
+    for (const name of ['loadRunConfig', 'runStartPreflight', 'holdWhilePaused', 'createStartTriage']) {
       expect(firstArgument(name)).not.toContain('checkout');
     }
+    // The session record is written at the project root, and handed the
+    // checkout only to record it as the run's `worktree` (`start/session.ts`).
+    expect(firstArgument('openRunSession')).not.toContain('repoRoot: checkout');
+    expect(firstArgument('openRunSession')).toMatch(/\bcheckout \}$/);
   });
 });

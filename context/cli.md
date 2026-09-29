@@ -1762,7 +1762,9 @@ New; it replaces no earlier text. What a row or an action added to
   from its tracker and gives a live session a rough ETA from the store's
   `done` finishes since the session started
   (`effort/store/task-finishes.ts`). `list` lists every live record and
-  reads no branch. In json mode each gives its reading as the result's
+  reads no branch; a row ends with the record's `worktree`, the path a
+  run whose checkout is a linked worktree records (`start/session.ts`),
+  or `in the main checkout` for a record carrying none. In json mode each gives its reading as the result's
   `data`; text mode writes lines.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
