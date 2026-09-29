@@ -32,6 +32,18 @@
  * on red checks, or on none, still records what it read. A store that
  * refuses the row is warned about and never changes the exit code.
  *
+ * ## The release guard
+ *
+ * Straight after `readMergeRefusal` and before the question, one call
+ * hands the pull request to `./merge-guard.ts`, which reads the release
+ * guard where the release runs and meets its answer as
+ * `pr.versionCollision` and `dangerous.acceptVersionCollision` say:
+ * printed, warned about, asked about, or refused with exit 1 — that
+ * module's note has the table. Its question is asked before
+ * `Merge? [y/N]`, `--yes` does not answer it, and a no to it declines
+ * the merge the way a no to the merge question does. What it read is
+ * {@link PrMergeResult.guard}, null where the release does not run.
+ *
  * ## The question
  *
  * `rafa init` reads an answer only when standard input is a TTY and
@@ -141,11 +153,12 @@
  * failed; each of the refusals `readMergeRefusal` answers, `--skip-checks`
  * on a pull request that reports checks among them; no terminal to ask
  * on and no `--yes`; `--yes` beside `--skip-checks` where workflows exist
- * or their count could not be read; a provider that would not merge; and
- * a clean-up step that failed.
+ * or their count could not be read; the release guard's refusals; a
+ * provider that would not merge; and a clean-up step that failed.
  */
 import type { MergeStepReport } from './merge-cleanup.js';
 import type { FollowUp } from './merge-followups.js';
+import type { MergeGuardReport } from './merge-guard.js';
 import type { UncheckedMerge } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -175,6 +188,7 @@ import {
 } from '../../pr/index.js';
 
 import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
+import { guardBeforeMerge } from './merge-guard.js';
 import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
 import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
@@ -209,6 +223,8 @@ export interface MergeSeams extends PrSeams {
   readonly openPrompter?: () => Prompter;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
   readonly ending?: NextEndingSeams;
+  /** The clock the release guard's forecast is dated by. The system's own when left out. */
+  readonly now?: () => Date;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -254,6 +270,8 @@ export interface PrMergeResult {
   readonly unblocked: UnblockReport | null;
   /** What `--skip-checks` read and posted, or null when the flag was not given. */
   readonly unchecked: UncheckedMergeReport | null;
+  /** What the release guard answered and how the merge met it, or null where the release does not run. */
+  readonly guard: MergeGuardReport | null;
 }
 
 /** A refusal of this action with exit code 1. */
@@ -312,14 +330,18 @@ function refuseFromGit(git: GitRunner, detail: PullRequestDetail, checks: Checks
   if (found !== null) throw refusal([`❌ ${found.message}`]);
 }
 
+/** True when a question can be answered: the seam's reading, or standard input being a TTY. */
+function terminalOf(seams: MergeSeams): () => boolean {
+  return seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
+}
+
 /**
  * Refuses when there is no terminal to ask on. Read BEFORE the summary
  * line is written, so the refusal carries it once and the run that
  * cannot be answered writes nothing to stdout.
  */
 function requireTerminal(seams: MergeSeams, summary: string): void {
-  const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
-  if (isTerminal()) return;
+  if (terminalOf(seams)()) return;
   throw refusal([
     '❌ rafa pr merge asks before merging, and standard input is no terminal.',
     `${INDENT}${summary}`,
@@ -359,8 +381,7 @@ function openGh(pr: PrContext, seams: MergeSeams): GhRunner {
  * unblocks nothing opens none.
  */
 function unblockAsk(seams: MergeSeams): UnblockAsk | null {
-  const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
-  if (!isTerminal()) return null;
+  if (!terminalOf(seams)()) return null;
 
   const open = prompterOf(seams);
   return async (question: string): Promise<boolean> => {
@@ -513,9 +534,25 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     },
   });
   refuseFromGit(git, detail, checks, skipChecks);
+  const guard = await guardBeforeMerge({
+    pr,
+    git,
+    detail,
+    now: (seams.now ?? ((): Date => new Date()))(),
+    info: (message) => {
+      context.output.info(message);
+    },
+    warn: (message) => {
+      context.output.warn(message);
+    },
+    isTerminal: terminalOf(seams),
+    openPrompter: prompterOf(seams),
+  });
 
   const summary = summaryLine(detail, method);
-  const answer = await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks });
+  const answer: MergeAnswer = guard.go
+    ? await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks })
+    : { go: false, unchecked: null };
   // What the run answers if it stops here, and the base of what it answers if it does not.
   const answered: PrMergeResult = {
     number: detail.number,
@@ -533,6 +570,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     roadmapTicks: null,
     unblocked: null,
     unchecked: uncheckedReport(answer.unchecked, null),
+    guard: guard.report,
   };
   if (!answer.go) {
     context.output.info('Nothing was merged.');
@@ -588,7 +626,10 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' refused unless `--skip-checks` is given, which is refused on any pull request that does report checks;'
       + ' with it the command reads how many workflows the repository defines, prints a warning for that case, asks'
       + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow),'
-      + ' and after the merge posts one comment on the pull request saying so. A step that fails never undoes the merge: it'
+      + ' and after the merge posts one comment on the pull request saying so. Where the release runs, the release'
+      + ' guard reads the branch before the question: a `collision` is refused unless'
+      + ' `dangerous.acceptVersionCollision` is true, and `pr.versionCollision` sets whether a `missing` or'
+      + ' `stale` branch merges silently, with a warning, after its own question, or not at all. A step that fails never undoes the merge: it'
       + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
       + ' every issue the pull request closes on every open board whose checklist lists it, or on the roadmap issue while no issue carries `type:roadmap`, warning rather than failing when that write'
       + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'

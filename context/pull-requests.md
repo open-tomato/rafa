@@ -134,9 +134,17 @@ sentence replaces nothing.
    `pr triage`, and verdict `none` — no checks at all — points at
    `--skip-checks` instead, since triage has nothing to fix there), and
    when the branch is checked out in another worktree (names it).
-2. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
+2. Where the release runs (`release.enabled`), read the release guard
+   (`src/commands/pr/merge-guard.ts`) over `origin/<head>` against
+   `origin/<base>`, both fetched first: `clean` prints its lines and the
+   forecast; `missing` and `stale` follow `pr.versionCollision` (`allow`,
+   `report`, `ask`, `refuse`); `collision` refuses unless
+   `dangerous.acceptVersionCollision` is true. Its question comes before the
+   merge question, `--yes` does not answer it, and without a TTY `ask`
+   refuses.
+3. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
-3. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
+4. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
    the base branch, `git pull --ff-only`, delete the local branch (`-D`: a
    squash leaves it unmerged in git's eyes), delete the remote branch when
    it still exists, `git fetch --prune`. A head branch this checkout has no
@@ -146,16 +154,16 @@ sentence replaces nothing.
    <name>; nothing to delete`; the remote delete and the prune still run,
    and the exit code stays 0. A branch checked out in another worktree is
    present, so step 1 still refuses it.
-4. Tick the roadmap, print what is ready and the two follow-ups when they
+5. Tick the roadmap, print what is ready and the two follow-ups when they
    apply: `rafa release tag` and `rafa self-update`.
-5. Run the unblock reading over every open issue labelled
+6. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
    about each one whose blockers have all closed and removing the label on a
    yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code.
-6. Last, name the one step that follows — with the base pulled and both
+7. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
    (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
    DECLINED ends without it: nothing moved, so the hint would put the
