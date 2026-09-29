@@ -1,11 +1,12 @@
 /**
- * `rafa release status`: the five readings an operator needs before
+ * `rafa release status`: the six readings an operator needs before
  * they tag anything — the version the version file declares, the
  * latest release tag the repository holds, the versions the changelog
  * calls released that carry no tag, the change notes waiting for
- * the current plan's release, and the change fragments waiting on the
+ * the current plan's release, the change fragments waiting on the
  * base branch with the release settling them would make (read in
- * `./status-fragments.ts`).
+ * `./status-fragments.ts`), and the audit of the changelog's released
+ * history (`src/release/audit.ts`).
  *
  * The loop writes a version and a changelog entry with every pull
  * request (`src/start/release-stage.ts`), and stops there: the merge
@@ -79,14 +80,16 @@
  *
  * ## Nothing here refuses for a reading that failed
  *
- * Each of the five is read on its own and each is allowed to fail:
+ * Each of the six is read on its own and each is allowed to fail:
  * a missing version file, a git that cannot list tags, an unreadable
  * changelog, a store this rafa cannot open. A cell nothing could be
  * read for renders {@link UNREADABLE} and the reason goes on its own
  * line under the block, which is the convention `pr list` keeps for
  * its per-row probes. Refusing the whole command for one of them
- * would hide the ones that were readable, and every one of the five
- * is worth having alone.
+ * would hide the ones that were readable, and every one of the six
+ * is worth having alone. The audit is the one exception to a reason
+ * of its own: it reads the changelog the untagged reading reads, so
+ * an unreadable changelog is said once, under that reading.
  *
  * The refusals left are the line's own: a stray word, and a config
  * `loadConfig` refuses. Both exit 1.
@@ -97,6 +100,7 @@ import type { PlanChange } from '../../effort/store/changes.js';
 import type { PlanReleaseLevel } from '../../plan/parse.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { AuditReading } from '../../release/audit.js';
 import type { SemanticVersion } from '../../release/version.js';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -109,6 +113,7 @@ import { ConfigError } from '../../config.js';
 import { planStubsFromFileNames, resolvePlanStub } from '../../effort/attribution.js';
 import { readPlanChanges } from '../../effort/store/changes.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
+import { auditCell, auditLines, readAudit } from '../../release/audit.js';
 import { groupChangeNotes, renderNoteLines } from '../../release/changelog.js';
 import { highestChangeLevel } from '../../release/level.js';
 import { parseSemanticVersion, readManifestVersion } from '../../release/version.js';
@@ -229,7 +234,7 @@ export interface PendingNotesReading {
   readonly problem: string | null;
 }
 
-/** The five readings one run of this action answers. */
+/** The six readings one run of this action answers. */
 export interface ReleaseStatusReading {
   /** The version the version file declares. */
   readonly versionFile: VersionFileReading;
@@ -241,11 +246,13 @@ export interface ReleaseStatusReading {
   readonly plan: PendingNotesReading;
   /** The fragments waiting on the base branch, and their forecast. */
   readonly waiting: WaitingReading;
+  /** The audit of the changelog's released history. */
+  readonly audit: AuditReading;
 }
 
 /** What json mode gives as the terminal result's `data`. */
 export interface ReleaseStatusResult {
-  /** The five readings. */
+  /** The six readings. */
   readonly reading: ReleaseStatusReading;
   /** The block text mode writes. */
   readonly text: string;
@@ -557,13 +564,14 @@ function problemsOf(reading: ReleaseStatusReading): readonly string[] {
   ].filter((problem): problem is string => problem !== null);
 }
 
-/** The label of each of the five lines, in the order the block writes them. */
-const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting'] as const;
+/** The label of each of the six lines, in the order the block writes them. */
+const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting', 'audit'] as const;
 
 /**
  * The whole block for one reading: a line per reading, the pending
- * notes under theirs, the waiting fragments under theirs, and a line
- * for every reading that failed. Pure and total.
+ * notes under theirs, the waiting fragments under theirs, the audit's
+ * findings under its line, and a line for every reading that failed.
+ * Pure and total.
  */
 export function renderStatus(reading: ReleaseStatusReading): string {
   const width = Math.max(...LABELS.map((label) => label.length));
@@ -573,14 +581,16 @@ export function renderStatus(reading: ReleaseStatusReading): string {
     untaggedCell(reading.untagged),
     pendingCell(reading.plan),
     waitingCell(reading.waiting) ?? UNREADABLE,
+    auditCell(reading.audit) ?? UNREADABLE,
   ];
-  const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine] = LABELS
+  const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine, auditLine] = LABELS
     .map((label, index) => `${INDENT}${label.padEnd(width)}${GAP}${cells[index] ?? ''}`);
   const under = (line: string): string => `${INDENT}${' '.repeat(width)}${GAP}${line}`;
   const problems = problemsOf(reading).map((problem) => `${INDENT}${problem}`);
   const block = [
     versionLine, tagLine, untaggedLine, pendingLine, ...pendingLines(reading.plan).map(under),
     waitingLine, ...waitingLines(reading.waiting).map(under),
+    auditLine, ...auditLines(reading.audit).map(under),
   ].join('\n');
   return problems.length === 0
     ? block
@@ -640,7 +650,7 @@ function expectNoArguments(args: readonly string[]): void {
   );
 }
 
-/** The five readings for one invocation, and the block they render to. */
+/** The six readings for one invocation, and the block they render to. */
 export function readStatus(
   context: RafaContext,
   seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS,
@@ -667,6 +677,7 @@ export function readStatus(
       readNotes,
     ),
     waiting: readWaiting(git, config.waiting),
+    audit: readAudit(project.root, config.changelog, tags.tags.map((tag) => tag.version)),
   };
   return { reading, text: renderStatus(reading) };
 }
@@ -678,16 +689,18 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
     subject: 'release',
     action: 'status',
     summary: 'show the version, the latest tag, the untagged releases, the pending notes and the waiting fragments',
-    description: 'Reads five things about the release state of the project and writes nothing: the version'
+    description: 'Reads six things about the release state of the project and writes nothing: the version'
       + ' `release.versionFile` declares, the latest release tag of the repository by semantic version'
       + ' precedence, the versions `release.changelog` calls released that carry no tag, the change notes'
       + ' the current plan\'s sessions have stored for its next release, and the change fragments waiting on'
-      + ' `origin/<pr.base>` as last fetched, with the release `rafa release settle` would fold them into.'
+      + ' `origin/<pr.base>` as last fetched, with the release `rafa release settle` would fold them into,'
+      + ' and an audit of the changelog\'s released history: a version two headings name, a gap between'
+      + ' versions, dates out of order, and a heading newer than the releases made before settle with no tag.'
       + ' The current plan is the one'
       + ' `--plan=<stub>` names, and otherwise the one the checked-out branch\'s `<type>/<stub>` names,'
       + ' resolved against the plans in `plan.dir`. A reading that could not be made leaves its cell as `?`'
       + ' and says why on a line under the block rather than refusing the others. With `--output=json`'
-      + ' the five readings and the rendered block are the data of the terminal result event.',
+      + ' the six readings and the rendered block are the data of the terminal result event.',
     args: [],
     flags: [
       {

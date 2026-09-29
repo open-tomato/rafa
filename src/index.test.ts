@@ -829,6 +829,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../effort/attribution.js', ['planStubsFromFileNames', 'resolvePlanStub']],
     ['../../effort/store/changes.js', ['readPlanChanges']],
     ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
+    ['../../release/audit.js', ['auditCell', 'auditLines', 'readAudit']],
     ['../../release/changelog.js', ['groupChangeNotes', 'renderNoteLines']],
     ['../../release/level.js', ['highestChangeLevel']],
     ['../../release/version.js', ['parseSemanticVersion', 'readManifestVersion']],

@@ -140,7 +140,7 @@ fragment restored, and reported.
 
 ### Three release actions
 
-**`rafa release status`** — Read-only. Prints five lines:
+**`rafa release status`** — Read-only. Prints six lines:
 - The version `release.versionFile` declares now
 - The latest release tag by semantic version precedence
 - Untagged versions `release.changelog` marks as released (ones that carry a
@@ -153,6 +153,13 @@ fragment restored, and reported.
   `forecastSettle` (`src/release/forecast.ts`); a fragment that does not
   parse gives no forecast, since settle would refuse the batch
   (`src/commands/release/status-fragments.ts`)
+- The audit of released history in `release.changelog`, one line per
+  finding under it: a version two headings name, a gap (a version that is
+  not the next patch, minor or major of the one below it; pairs with a
+  prerelease are not judged), a heading dated before the one below it, and
+  a heading with no tag whose version is not legacy by the receipt rule —
+  so a changelog with no receipted section, this repository's included,
+  reports no untagged heading here (`src/release/audit.ts`)
 
 Exits 0. Never writes.
 

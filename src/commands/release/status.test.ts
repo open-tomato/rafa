@@ -144,6 +144,7 @@ function reading(over: Partial<ReleaseStatusReading> = {}): ReleaseStatusReading
     untagged: { path: 'CHANGELOG.md', released: ['0.5.0', '0.4.0'], versions: ['0.5.0'], problem: null },
     plan: { stub: STUB, source: 'roster', branch: BRANCH, notes: [note()], level: 'minor', problem: null },
     waiting: { ref: 'origin/main', read: true, baseVersion: '0.5.0', fragments: [], malformed: 0, forecast: null, problems: [] },
+    audit: { path: 'CHANGELOG.md', read: true, sections: 2, findings: [] },
     ...over,
   };
 }
@@ -594,7 +595,7 @@ describe('the block', () => {
     }));
 
     expect(cellOf(text, 'pending')).toBe(`${NOTHING}: no current plan`);
-    expect(linesOf(text)).toHaveLength(5);
+    expect(linesOf(text)).toHaveLength(6);
   });
 
   it('says a plan with no stored note has none pending', () => {
@@ -637,7 +638,7 @@ describe('the block', () => {
       },
     }));
 
-    const notes = linesOf(text).slice(4, -1);
+    const notes = linesOf(text).slice(4, -2);
 
     expect(notes.map((line) => line.trim()))
       .toEqual(['- release: one', '- release: three', '- two']);
