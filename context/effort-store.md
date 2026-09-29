@@ -389,6 +389,18 @@ spelling does not mint; the device and inode are bigints. A `.bak`
 renamed over the store has a new inode and mints, but one restored
 with `cp` over the existing file keeps the old inode and does not
 (measured on tmpfs); the merge's collision check is what catches it.
+Every production insert into the twelve tables a merge unions stamps
+`origin_store` from that row and `origin_seq` as the row's own `seq`,
+which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the
+two cannot differ: `STAMPED_COLUMNS` and `stampedValues`
+(`store/origins.ts`) spell both for every writer, in the insert's own
+column list, with no trigger and no `UPDATE`. A store with no row
+stamps NULL in both. A copy's new origin counts on from the `seq` it
+copied, and no reader names either column, so a row an older runtime
+inserted is read as any other. `origins.test.ts` reads every
+`INSERT INTO` under `store/` from source and fails on an unstamped one
+other than the `schema_migrations` log, `store_meta` and `fix-schema`'s
+copy, which carries the columns over as they were.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
@@ -700,7 +712,8 @@ the same items and writes no row.
 issue's reference in the row the dispatch's session holds under the text
 its caller keys the recurrence by: it sets `tracker_ref` on that
 session's row for the key, or inserts a row holding only the dispatch,
-the key and the reference, and keeps a reference already there.
+the key, the reference and the origin pair every insert stamps, and
+keeps a reference already there.
 `readTrackerRef` answers the oldest reference stored under a key, in any
 session. `triage/triage.ts` keys by the bug's artifact WITH the tracker
 file it was reported against, so its rows carry that key rather than a
@@ -715,10 +728,10 @@ bullet `- artifact: <key>`.
 where a task's substance lands; `task_reports` holds no prose, as the row
 above says. Select EVERY column rather than filtering on `kind`: a row
 `store/tracker-refs.ts` inserted for a filed issue carries only the
-dispatch, the key and the `tracker_ref`, leaving `kind`, `what` and
-`signal` NULL, so a `where kind = ...` query silently drops exactly the
-findings that were escalated. Measured over rafa-63: 210 rows under the
-stub, 12 of them null-`kind`.
+dispatch, the key, the `tracker_ref` and its origin pair, leaving
+`kind`, `what` and `signal` NULL, so a `where kind = ...` query
+silently drops exactly the findings that were escalated. Measured
+over rafa-63: 210 rows under the stub, 12 of them null-`kind`.
 
 ### Attribution
 

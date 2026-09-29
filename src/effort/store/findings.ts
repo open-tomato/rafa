@@ -18,6 +18,7 @@
  * | `outcome` | the loop: `done`, `blocked` or `failed` |
  * | `tracker_ref` | null on every row this writer writes; `tracker-refs.ts` sets it |
  * | `collected_at` | the write's time, ISO 8601, one per write |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store.
  * An entry's `extras` are not stored: the table has a column for each
@@ -125,6 +126,7 @@ import { randomUUID } from 'node:crypto';
 
 import { FINDING_KINDS, FINDING_SIGNALS } from '../../report/parse.js';
 
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { LONE_SURROGATE, sqliteStorePath, writeSqliteStore } from './sqlite.js';
 
 /**
@@ -214,9 +216,10 @@ const INSERT_FINDING = `
   INSERT INTO findings (
     id, session_id, plan_stub, task_line,
     kind, trigger, what, cause, resolution, artifact, signal,
-    outcome, tracker_ref, collected_at
+    outcome, tracker_ref, collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ${stampedValues('findings')})
   ON CONFLICT (session_id, artifact) WHERE artifact IS NOT NULL DO NOTHING
   ON CONFLICT (session_id, trigger, what) WHERE artifact IS NULL DO NOTHING
 `;

@@ -21,6 +21,7 @@
  * | `block_body` | the unread block's raw body, or NULL for `no-block` |
  * | `outcome` | the loop: `done`, `blocked` or `failed` |
  * | `collected_at` | the write's time, ISO 8601 |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store.
  * `session_id` is the id the loop spawned the session under, which is
@@ -79,6 +80,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { LONE_SURROGATE, sqliteStorePath, withSqliteStore } from './sqlite.js';
 
 /**
@@ -125,9 +127,10 @@ const INSERT_ABSENCE = `
   INSERT INTO report_absences (
     id, session_id, plan_stub, task_line,
     reason, detail, block_body,
-    outcome, collected_at
+    outcome, collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('report_absences')})
   ON CONFLICT (session_id) DO NOTHING
 `;
 

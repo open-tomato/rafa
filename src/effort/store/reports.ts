@@ -23,6 +23,7 @@
  * | `outcome` | the loop: `done`, `blocked` or `failed` |
  * | `collected_at` | the write's time, ISO 8601 |
  * | `skills_used` | the report's `skills_used`, a JSON array, or NULL when not recorded |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store.
  * `session_id` joins the row to the findings, blockers and out-of-scope
@@ -117,6 +118,7 @@ import { existsSync } from 'node:fs';
 import { REPORT_STATUSES } from '../../report/parse.js';
 
 import { checkDispatch, describeValue } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's status, the dispatch it came from, and the outcome. */
@@ -158,9 +160,10 @@ const INSERT_REPORT = `
     id, session_id, plan_stub, task_line,
     status,
     outcome, collected_at,
-    skills_used
+    skills_used,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('task_reports')})
   ON CONFLICT (session_id) DO NOTHING
 `;
 

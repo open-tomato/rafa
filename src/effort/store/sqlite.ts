@@ -13,7 +13,7 @@
  * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
- * NDJSON rows are deduplicated by. Each table has three columns:
+ * NDJSON rows are deduplicated by. Each table has five columns:
  *
  *   - `seq`, the order the row was appended in.
  *   - The kind's key, filled from {@link EFFORT_KEY_PROJECTIONS}:
@@ -21,6 +21,9 @@
  *     reference schema gives the same two keys. It is `NOT NULL` and
  *     `UNIQUE` and refuses an empty string, so no stored row lacks one.
  *   - `row_json`, the row itself.
+ *   - `origin_store` and `origin_seq`, the store's origin and the row's
+ *     own `seq`, which the append stamps as every production insert
+ *     does (`origins.ts`), NULL in both on a store with no origin.
  *
  * The row is stored whole, as the JSON text the NDJSON backend writes
  * as a line, and read back through `JSON.parse` as that backend reads
@@ -205,6 +208,7 @@
  * with it.
  */
 import type { SqliteMigration } from './migrations.js';
+import type { OriginTable } from './origins.js';
 import type { StoreAccess } from './schema-plan.js';
 import type { StoreIdentitySeams } from './store-meta.js';
 import type {
@@ -222,6 +226,7 @@ import { Database } from 'bun:sqlite';
 import { bringForward } from './bring-forward.js';
 import { effortStoreDir, guardTestProcess } from './location.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { activeStoreSettings } from './settings.js';
 import { settleStoreIdentity } from './store-meta.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
@@ -244,7 +249,7 @@ export function sqliteStorePath(repoRoot: string): string {
 /** Where one kind's rows live in the schema. */
 interface KindTable {
   /** The table, named for the kind. */
-  readonly name: string;
+  readonly name: OriginTable;
   /** The column the kind's key is stored in, and deduplicated by. */
   readonly keyColumn: string;
 }
@@ -449,7 +454,8 @@ export function withSqliteStore<T>(
  * Inserts a checked batch in one transaction and answers how many rows
  * it added. A row whose key is already held, on disk or earlier in the
  * batch, conflicts, adds nothing and is counted by the caller as
- * skipped.
+ * skipped. Each row is stamped with the store's origin and its own
+ * `seq` (`origins.ts`).
  */
 function insertBatch(
   db: Database,
@@ -457,7 +463,8 @@ function insertBatch(
   entries: readonly BatchEntry[],
 ): number {
   const insert = db.query<unknown, [string, string]>(
-    `INSERT INTO ${table.name} (${table.keyColumn}, row_json) VALUES (?, ?)`
+    `INSERT INTO ${table.name} (${table.keyColumn}, row_json, ${STAMPED_COLUMNS})`
+      + ` VALUES (?, ?, ${stampedValues(table.name)})`
       + ` ON CONFLICT (${table.keyColumn}) DO NOTHING`,
   );
   const insertAll = db.transaction(() => entries.reduce(

@@ -19,6 +19,7 @@
  * | `session_id`, `plan_stub`, `task_line` | the dispatch |
  * | `level`, `area`, `summary` | the report entry, as parsed |
  * | `collected_at` | the write's time, ISO 8601, one per write |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store.
  * An entry's `extras` are not stored: the table has a column for each
@@ -155,6 +156,7 @@ import { existsSync } from 'node:fs';
 import { CHANGE_LEVELS } from '../../report/parse.js';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's change notes and the dispatch they came from. */
@@ -221,9 +223,10 @@ const INSERT_CHANGE = `
   INSERT INTO changes (
     id, session_id, plan_stub, task_line,
     level, area, summary,
-    collected_at
+    collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('changes')})
   ON CONFLICT (session_id, level, ifnull(area, ''), summary) DO NOTHING
 `;
 
