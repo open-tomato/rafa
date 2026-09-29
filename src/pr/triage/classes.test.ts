@@ -39,6 +39,7 @@ import type { DependencyBumpReading, TriageClass } from './classes.js';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  CONVERSION_TRIAGE_CLASSES,
   DEPENDENCY_BUMP_AUTHORS,
   DEPENDENCY_BUMP_SIMPLE_CLASSES,
   DEPENDENCY_BUMP_TITLE_PREFIX,
@@ -62,8 +63,8 @@ function simpleClasses(dependencyBump: boolean): readonly TriageClass[] {
 }
 
 describe('the class list', () => {
-  it('carries eleven distinct classes and freezes the list', () => {
-    expect(TRIAGE_CLASSES).toHaveLength(11);
+  it('carries twelve distinct classes and freezes the list', () => {
+    expect(TRIAGE_CLASSES).toHaveLength(12);
     expect(new Set(TRIAGE_CLASSES).size).toBe(TRIAGE_CLASSES.length);
     expect(Object.isFrozen(TRIAGE_CLASSES)).toBe(true);
   });
@@ -80,13 +81,17 @@ describe('the class list', () => {
     expect(isTriageClass(undefined)).toBe(false);
   });
 
-  it('draws both simple sets from the class list and keeps them disjoint', () => {
+  it('draws the three simple sets from the class list and keeps them disjoint', () => {
     const declared = new Set<string>(TRIAGE_CLASSES);
     const always = new Set<string>(SIMPLE_TRIAGE_CLASSES);
+    const converted = new Set<string>(CONVERSION_TRIAGE_CLASSES);
 
     expect(SIMPLE_TRIAGE_CLASSES.every((one) => declared.has(one))).toBe(true);
     expect(DEPENDENCY_BUMP_SIMPLE_CLASSES.every((one) => declared.has(one))).toBe(true);
+    expect(CONVERSION_TRIAGE_CLASSES.every((one) => declared.has(one))).toBe(true);
     expect(DEPENDENCY_BUMP_SIMPLE_CLASSES.some((one) => always.has(one))).toBe(false);
+    expect(DEPENDENCY_BUMP_SIMPLE_CLASSES.some((one) => converted.has(one))).toBe(false);
+    expect(SIMPLE_TRIAGE_CLASSES.some((one) => converted.has(one))).toBe(false);
   });
 });
 
@@ -120,13 +125,13 @@ describe('the dependency bump reading', () => {
 });
 
 describe('the eligibility rule', () => {
-  it('calls exactly the two conflict classes simple on a pull request that is not a bump', () => {
-    expect(simpleClasses(false)).toEqual([...SIMPLE_TRIAGE_CLASSES]);
+  it('calls exactly the two conflict classes and the conversion simple on a pull request that is not a bump', () => {
+    expect(simpleClasses(false)).toEqual([...SIMPLE_TRIAGE_CLASSES, ...CONVERSION_TRIAGE_CLASSES]);
   });
 
   it('adds exactly the two CI classes on a dependency bump', () => {
     const added = simpleClasses(true).filter(
-      (one) => !SIMPLE_TRIAGE_CLASSES.includes(one),
+      (one) => !SIMPLE_TRIAGE_CLASSES.includes(one) && !CONVERSION_TRIAGE_CLASSES.includes(one),
     );
 
     expect(added).toEqual([...DEPENDENCY_BUMP_SIMPLE_CLASSES]);
@@ -147,6 +152,18 @@ describe('the eligibility rule', () => {
     expect(DEPENDENCY_BUMP_SIMPLE_CLASSES).not.toContain('no-checks');
     for (const dependencyBump of [false, true]) {
       expect(isSimpleTriageClass('no-checks', { dependencyBump })).toBe(false);
+    }
+  });
+
+  it('declares conflict-version among the conflicts, as the one conversion, simple whoever opened it', () => {
+    expect(CONVERSION_TRIAGE_CLASSES).toEqual(['conflict-version']);
+    expect(Object.isFrozen(CONVERSION_TRIAGE_CLASSES)).toBe(true);
+    expect(TRIAGE_CLASSES.indexOf('conflict-version')).toBe(TRIAGE_CLASSES.indexOf('conflict-other') + 1);
+    expect(isTriageClass('conflict-version')).toBe(true);
+    expect(isTriageClass('conflict-versions')).toBe(false);
+    expect(SIMPLE_TRIAGE_CLASSES).not.toContain('conflict-version');
+    for (const dependencyBump of [false, true]) {
+      expect(isSimpleTriageClass('conflict-version', { dependencyBump })).toBe(true);
     }
   });
 

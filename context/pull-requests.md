@@ -222,18 +222,23 @@ Assessment is CODE, not a session:
   failing job, the repository's workflow count (`gh api
   repos/<repo>/actions/workflows`) when no check reported at all, and for a
   conflict the file list from `git merge-tree --write-tree` with a liveness
-  control (the `merge-tree-mergeability-readings` skill's rule).
+  control (the `merge-tree-mergeability-readings` skill's rule), and, where
+  the release runs, the release guard over the head against the base with
+  no fetch (`src/commands/pr/triage-guard.ts`).
 - Classify into one class: `green`, `pending`, `no-checks`,
   `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
-  added or bumped entries), `conflict-other`, `ci-install`, `ci-lint`,
-  `ci-types`, `ci-test`, `ci-other`. The failing STEP name decides the `ci-*`
-  class; `no-checks` means the PR reports no checks at all (verdict `none`),
+  added or bumped entries), `conflict-other`, `conflict-version`,
+  `ci-install`, `ci-lint`, `ci-types`, `ci-test`, `ci-other`. The failing STEP
+  name decides the `ci-*` class; `conflict-version` is the guard's `stale` or
+  `collision` answer (the branch stamped a version) and outranks every other
+  class, a git conflict included; `no-checks` means the PR reports no checks at all (verdict `none`),
   whatever the workflow count; the count, or that it could not be read,
   goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,
-  `conflict-manifest`, and `ci-install` or `ci-lint` on a dependency bump
-  PR (author `dependabot[bot]` or title `chore(deps`). Everything else is
-  assessed only.
+  `conflict-manifest`, `conflict-version` (`CONVERSION_TRIAGE_CLASSES`: a
+  conversion in code with no pinned plan and no session), and `ci-install`
+  or `ci-lint` on a dependency bump PR (author `dependabot[bot]` or title
+  `chore(deps`). Everything else is assessed only.
 - Output: the class, the evidence (files, step, log excerpt capped at 40
   lines), and a ready FOLLOW-UP PROMPT for another session that carries all
   of it, so that session does not assess again.

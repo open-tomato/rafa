@@ -70,13 +70,13 @@
  * theirs says there is nothing to fix and nothing to wait for
  * respectively, and `no-checks` gets one saying there is nothing to fix
  * — a caller may build a prompt for any assessment, and a prompt that
- * quietly omitted the work for three of the eleven classes would
+ * quietly omitted the work for three of the twelve classes would
  * be a worse reading than one that says the work is none.
  *
  * The lines name the SHAPE of the work and never a plan file: the
  * pinned resolve plans (`src/pr/plans/resolve-<class>.md`) are the
  * `--resolve` path's own, they exist for four classes only, and a prompt
- * that pointed at one for the other seven would point at nothing.
+ * that pointed at one for the other eight would point at nothing.
  */
 import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
@@ -146,6 +146,10 @@ export const FOLLOW_UP_TASKS: Readonly<Record<TriageClass, string>> = Object.fre
   'conflict-other': 'Merge the base branch into the head and resolve the conflicting'
     + ' files below by hand; they are ordinary source, so the resolution needs to'
     + ' know what the pull request was for. Run the gates before pushing.',
+  'conflict-version': 'The branch stamped a version where the base expects a release'
+    + ' fragment. Run rafa pr triage --resolve on this pull request, which turns the'
+    + ' stamped changelog section into a fragment and restores the version file and'
+    + ' the changelog to the base; do not pick a new version number by hand.',
   'ci-install': 'The install step failed. Read the excerpt below, fix what it names'
     + ' — an unresolvable version, a lockfile out of step with the manifest, a'
     + ' missing platform build — then reinstall, run the gates and push.',

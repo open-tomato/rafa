@@ -67,6 +67,7 @@ import type { CheckRow } from '../checks.js';
 import type { TriageClass } from './classes.js';
 import type { ClassifiedPullRequest, ClassifyTriageInput } from './classify.js';
 import type { FailedStep } from './evidence.js';
+import type { GuardVerdict, NamedBaseEntry } from '../../release/guard.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -79,6 +80,7 @@ import {
   classifyFailedStep,
   classifyTriage,
   isLockfilePath,
+  isStampVerdict,
   isManifestPath,
   LOCKFILE_FILES,
   MANIFEST_FILES,
@@ -141,6 +143,7 @@ function input(overrides: Partial<ClassifyTriageInput> = {}): ClassifyTriageInpu
     step: undefined,
     conflictFiles: [],
     workflowCount: 0,
+    guard: null,
     ...overrides,
   };
 }
@@ -169,6 +172,36 @@ function failedIn(name: string, pr: ClassifiedPullRequest = pull()): ClassifyTri
   return input({ pr, rows: RED_ROWS, step: step(name) });
 }
 
+/** The base's entry behind a stamp: at `version`, with a section for it. */
+function baseEntry(version: string): NamedBaseEntry {
+  return {
+    version,
+    section: { heading: `## ${version}`, notes: ['- the base notes'] },
+    commit: 'a'.repeat(40),
+  };
+}
+
+/** The branch's stamp of 0.25.0, with a section of its own. */
+const STAMP = {
+  version: '0.25.0',
+  section: { heading: '## 0.25.0', notes: ['- the branch notes'] },
+} as const;
+
+/** The guard's `stale` answer over the 0.25.0 stamp, the base standing to it as `relation` says. */
+function stale(
+  relation: 'passed' | 'released' | 'not-on-base',
+  baseVersion = '0.26.0',
+): GuardVerdict {
+  return { answer: 'stale', stamp: STAMP, base: baseEntry(baseVersion), relation };
+}
+
+/** The guard's `collision` answer: 0.25.0 on both sides, with different notes. */
+const COLLISION: GuardVerdict = { answer: 'collision', stamp: STAMP, base: baseEntry('0.25.0') };
+
+/** The guard's two answers that stamp nothing. */
+const CLEAN: GuardVerdict = { answer: 'clean', fragments: ['.changes/rafa-367.md'] };
+const MISSING: GuardVerdict = { answer: 'missing', outside: ['src/cli.ts'] };
+
 /** The class one input is classified as. */
 function classOf(one: ClassifyTriageInput): TriageClass {
   return classifyTriage(one).triageClass;
@@ -185,6 +218,7 @@ const EVERY_CLASS: readonly (readonly [TriageClass, ClassifyTriageInput])[] = [
   ['conflict-lockfile', conflicting(['bun.lock'])],
   ['conflict-manifest', conflicting(['package.json'])],
   ['conflict-other', conflicting(['src/config.ts'])],
+  ['conflict-version', input({ guard: COLLISION })],
   ['ci-install', failedIn('bun install --frozen-lockfile')],
   ['ci-lint', failedIn('bunx eslint .')],
   ['ci-types', failedIn('bunx tsc --noEmit')],
@@ -208,7 +242,7 @@ describe('the class set', () => {
     for (const [expected, one] of EVERY_CLASS) {
       const read = classifyTriage(one);
 
-      const expectedFiles = expected.startsWith('conflict-')
+      const expectedFiles = expected.startsWith('conflict-') && expected !== 'conflict-version'
         ? one.conflictFiles
         : [];
 
@@ -442,5 +476,67 @@ describe('the simple flag', () => {
       expect(classifyTriage(input({ pr, rows: [] })).simple).toBe(false);
       expect(classifyTriage(failedIn('bun test', pr)).simple).toBe(false);
     }
+  });
+});
+
+describe('a stamped version', () => {
+  it('reads only the stale and collision answers as a stamp, and a guard not read as none', () => {
+    expect(isStampVerdict(stale('passed'))).toBe(true);
+    expect(isStampVerdict(COLLISION)).toBe(true);
+    expect(isStampVerdict(CLEAN)).toBe(false);
+    expect(isStampVerdict(MISSING)).toBe(false);
+    expect(isStampVerdict(null)).toBe(false);
+  });
+
+  it('classes every stale relation and a collision conflict-version, and clean, missing and unread as they were', () => {
+    for (const relation of ['passed', 'released', 'not-on-base'] as const) {
+      expect(classOf(input({ guard: stale(relation) }))).toBe('conflict-version');
+    }
+    expect(classOf(input({ guard: COLLISION }))).toBe('conflict-version');
+    expect(classOf(input({ guard: CLEAN }))).toBe('green');
+    expect(classOf(input({ guard: MISSING }))).toBe('green');
+    expect(classOf(input({ guard: null }))).toBe('green');
+  });
+
+  it('outranks a git conflict and red checks, which decide the class once the stamp is gone', () => {
+    const stamped = { ...conflicting(['CHANGELOG.md', 'package.json']), guard: COLLISION };
+    const unstamped = { ...stamped, guard: null };
+
+    expect(classOf(stamped)).toBe('conflict-version');
+    expect(classOf(unstamped)).toBe('conflict-other');
+    expect(classOf(failedIn('bun test'))).toBe('ci-test');
+    expect(classOf({ ...failedIn('bun test'), guard: stale('passed') })).toBe('conflict-version');
+  });
+
+  it('outranks checks still running and a head that reports none', () => {
+    expect(classOf(input({ rows: PENDING_ROWS, guard: COLLISION }))).toBe('conflict-version');
+    expect(classOf(input({ rows: [], guard: COLLISION }))).toBe('conflict-version');
+    expect(classOf(input({ rows: PENDING_ROWS, guard: MISSING }))).toBe('pending');
+  });
+
+  it('calls it simple whoever opened the pull request, and carries no files and no step', () => {
+    for (const pr of [pull(), bumpPull()]) {
+      const read = classifyTriage({ ...conflicting(['package.json']), pr: { ...pr, mergeable: 'conflicting' }, guard: COLLISION });
+
+      expect(read.triageClass).toBe('conflict-version');
+      expect(read.simple).toBe(true);
+      expect(read.files).toEqual([]);
+      expect(read.step).toBeUndefined();
+      expect(read.conflicting).toBe(true);
+    }
+  });
+
+  it('names the answer, the stamped version, how the base stands to it, and ends with the fix command', () => {
+    const passed = classifyTriage(input({ guard: stale('passed') })).reason;
+    const released = classifyTriage(input({ guard: stale('released', '0.25.0') })).reason;
+    const ahead = classifyTriage(input({ guard: stale('not-on-base', '0.24.0') })).reason;
+    const collided = classifyTriage(input({ guard: COLLISION })).reason;
+
+    expect(passed).toBe('the release guard reads stale: the branch stamped 0.25.0, which the base has passed at 0.26.0;'
+      + ' to turn the stamp into a fragment, run rafa pr triage 86 --resolve');
+    expect(released).toContain('stale: the branch stamped 0.25.0, which the base has already released;');
+    expect(ahead).toContain('which the base will hand out from its fragments instead;');
+    expect(collided).toContain('collision: the branch stamped 0.25.0, which the base already names with different notes;');
+    for (const reason of [passed, released, ahead, collided]) expect(reason.endsWith('rafa pr triage 86 --resolve')).toBe(true);
   });
 });

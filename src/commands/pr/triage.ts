@@ -151,6 +151,7 @@
  */
 import type { PrSeams } from './pr-context.js';
 import type { ResolveLoopRunner } from './resolve-loop.js';
+import type { TriageGuardReader } from './triage-guard.js';
 import type { TriageReading } from './triage-report.js';
 import type { ResolveResult } from './triage-resolve.js';
 import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
@@ -179,6 +180,7 @@ import {
   readBooleanFlag,
   readPullArgument,
 } from './pr-context.js';
+import { readTriageGuard } from './triage-guard.js';
 import { readConflictFiles, readFailedLogs, readWorkflowCount } from './triage-read.js';
 import { evidenceOf, renderTriages, workflowCountOf } from './triage-report.js';
 import { resolvePullRequest } from './triage-resolve.js';
@@ -227,6 +229,8 @@ export interface TriageSeams extends PrSeams {
   readonly permissions?: (root: string) => Permissions;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
   readonly ending?: NextEndingSeams;
+  /** How the release guard is read for one pull request. `readTriageGuard` when left out. */
+  readonly readGuard?: TriageGuardReader;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -264,6 +268,8 @@ interface AssessOptions {
   readonly permissions: Permissions;
   /** Where a checks reading the store refused is warned about. */
   readonly warn: (message: string) => void;
+  /** How the release guard is read, which `conflict-version` is classed from. */
+  readonly readGuard: TriageGuardReader;
 }
 
 /**
@@ -458,12 +464,22 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
   const conflict = detail.mergeable === 'mergeable'
     ? null
     : readConflictFiles(git, detail);
+  const guard = options.readGuard({
+    git,
+    settings: pr.versionGuard,
+    root: pr.project.root,
+    pr: detail,
+    now: new Date(options.at),
+  });
   const assessment = classifyTriage({
     pr: detail,
     rows: checks.rows,
     step: logs.chosen?.evidence.step,
     conflictFiles: conflict?.files ?? [],
     workflowCount: workflows?.count ?? null,
+    guard: guard?.ok === true
+      ? guard.verdict
+      : null,
   });
   const assessed: TriageReading = {
     detail,
@@ -534,6 +550,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
       warn: (message) => {
         context.output.warn(message);
       },
+      readGuard: seams.readGuard ?? readTriageGuard,
     });
     const reading = await assess();
     if (!wantsResolve) {
@@ -593,7 +610,8 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
     description: 'Assesses one pull request in code — no session is started and no model is asked. It reads the pull'
       + ' request, its checks, the failing job logs and, for a head that does not merge, the conflicting files from'
       + ' `git merge-tree`, and classifies it as one of `green`, `pending`, `conflict-lockfile`, `conflict-manifest`,'
-      + ' `conflict-other`, `ci-install`, `ci-lint`, `ci-types`, `ci-test` or `ci-other`. It prints the class, the'
+      + ' `conflict-other`, `conflict-version` (the release guard read a stamped version), `ci-install`, `ci-lint`,'
+      + ' `ci-types`, `ci-test` or `ci-other`. It prints the class, the'
       + ' evidence it was read from with the failing log capped at 40 lines, and a follow-up prompt carrying all of'
       + ' it, so a session handed that prompt assesses nothing again. It leaves one triage comment per pull request'
       + ' and edits that comment on every later assessment; a pull request whose head has not moved since it was'

@@ -1,5 +1,5 @@
 /**
- * The classifier: five readings of a pull request in, one
+ * The classifier: six readings of a pull request in, one
  * {@link TriageClass} out.
  *
  * `rafa pr triage` assesses in CODE, and this module is where the
@@ -8,10 +8,11 @@
  * answered it, the check rows through `parseChecks` (`../checks.ts`),
  * the failing step out of `gh run view <id> --log-failed`
  * (`./evidence.ts`), the conflicting paths out of
- * `git merge-tree --write-tree` (`./conflict.ts`), and the repository's
- * workflow count through `PullRequests.workflowCount` (`../types.ts`) —
- * so nothing here spawns a process, reads a file or awaits. It is a
- * pure function over those five, which is what lets one case per class
+ * `git merge-tree --write-tree` (`./conflict.ts`), the repository's
+ * workflow count through `PullRequests.workflowCount` (`../types.ts`),
+ * and the release guard's verdict through `readGuard`
+ * (`src/release/guard.ts`) — so nothing here spawns a process, reads a
+ * file or awaits. It is a pure function over those six, which is what lets one case per class
  * drive it from literals and what keeps the class set measurable from
  * both ends.
  *
@@ -23,9 +24,10 @@
  *
  * ## The precedence, and why a conflict outranks a red check
  *
- * {@link classifyTriage} asks five questions in this order: does the
- * pull request conflict, is anything pending, is anything failing, does
- * it report no checks at all, and otherwise it is green.
+ * {@link classifyTriage} asks six questions in this order: did the
+ * branch stamp a version, does the pull request conflict, is anything
+ * pending, is anything failing, does it report no checks at all, and
+ * otherwise it is green.
  *
  * The conflict goes first because a conflicting pull request's checks
  * are not evidence about its code. GitHub builds a workflow run against
@@ -36,6 +38,23 @@
  * those rows would send a resolve plan after a test failure that is an
  * artefact of the stale merge, and would leave the conflict — the thing
  * actually blocking it — unnamed.
+ *
+ * ## A stamped version outranks everything
+ *
+ * `conflict-version` is the guard's `stale` or `collision` answer: the
+ * branch stamped a version where the base expects a fragment. It is
+ * read before git's conflict because the stamp is usually what makes
+ * the head conflict — both sides edited the version file and the
+ * changelog, as #354 and #356 did over 0.25.0 — and its conversion
+ * restores both files to the base's text, which clears that conflict;
+ * a conflict on any other file is still there after the conversion's
+ * commit, and the next triage of the moved head names it. It is read
+ * before the checks because `rafa pr merge` refuses the stamp whatever
+ * they say, and the conversion starts no session, so there is nothing
+ * a running check could be spoiled by. The guard's `clean` and
+ * `missing` answers, and a guard that was not read (`null`), decide
+ * nothing here: `missing` is a fragment the author still owes, which
+ * no mechanical fix can write.
  *
  * Pending outranks failing for the reason `verdictOf` already reduces
  * that way: a partial reading of a run still in flight is not a red
@@ -126,6 +145,7 @@
  */
 import type { TriageClass } from './classes.js';
 import type { FailedStep } from './evidence.js';
+import type { GuardVerdict } from '../../release/guard.js';
 import type { CheckRow, ChecksVerdict } from '../checks.js';
 import type { PullRequestDetail } from '../types.js';
 
@@ -252,7 +272,7 @@ export type ClassifiedPullRequest = Pick<
   'author' | 'mergeable' | 'mergeStateStatus' | 'number' | 'title'
 >;
 
-/** The five captured readings {@link classifyTriage} decides on. */
+/** The six captured readings {@link classifyTriage} decides on. */
 export interface ClassifyTriageInput {
   /** The pull request as `gh pr view --json …` answered it. */
   readonly pr: ClassifiedPullRequest;
@@ -277,6 +297,12 @@ export interface ClassifyTriageInput {
    * module note.
    */
   readonly workflowCount: number | null;
+  /**
+   * The release guard's verdict over the branch, or `null` where the
+   * guard did not run or could not read. Only `stale` and `collision`
+   * decide a class; see the module note.
+   */
+  readonly guard: GuardVerdict | null;
 }
 
 /** What one classification concluded. */
@@ -295,8 +321,9 @@ export interface TriageAssessment {
   /** Whether the pull request was read as conflicting; see the module note. */
   readonly conflicting: boolean;
   /**
-   * The conflicting paths behind a `conflict-*` class, in git's order.
-   * Empty for every other class, so a caller never reports files beside
+   * The conflicting paths behind a git `conflict-*` class, in git's
+   * order. Empty for every other class — `conflict-version` among them,
+   * which the guard decided and no path list did — so a caller never reports files beside
    * a conclusion they did not decide.
    */
   readonly files: readonly string[];
@@ -442,20 +469,54 @@ export function noChecksReason(number: number, workflowCount: number | null): st
     + ` to merge it anyway, run rafa pr merge ${number} --skip-checks`;
 }
 
+/** A guard verdict that stamped a version: the two answers `conflict-version` is read from. */
+export type StampVerdict = Extract<GuardVerdict, { readonly answer: 'stale' | 'collision' }>;
+
+/** Whether the guard's verdict is a stamp; `clean`, `missing` and `null` are not. */
+export function isStampVerdict(guard: GuardVerdict | null): guard is StampVerdict {
+  return guard !== null && (guard.answer === 'stale' || guard.answer === 'collision');
+}
+
+/** How the base stands to a stamp, as the reason words it. */
+function stampRelation(guard: StampVerdict): string {
+  if (guard.answer === 'collision') return 'which the base already names with different notes';
+  if (guard.relation === 'passed') return `which the base has passed at ${guard.base.version ?? 'a later version'}`;
+  if (guard.relation === 'released') return 'which the base has already released';
+  return 'which the base will hand out from its fragments instead';
+}
+
+/**
+ * The sentence behind `conflict-version`: the guard's answer, the
+ * stamped version, how the base stands to it, and the fix command.
+ */
+export function stampReason(number: number, guard: StampVerdict): string {
+  return `the release guard reads ${guard.answer}: the branch stamped ${guard.stamp.version},`
+    + ` ${stampRelation(guard)}; to turn the stamp into a fragment, run rafa pr triage ${number} --resolve`;
+}
+
 /** What the precedence decides, before the flags are computed over it. */
 type DecidedClass = Pick<TriageAssessment, 'files' | 'reason' | 'step' | 'triageClass'>;
 
 /**
- * The precedence itself — conflict, then pending, then failing, then
- * no checks, then green — kept apart from the flags so that the order
- * is one readable list of five branches and nothing else.
+ * The precedence itself — a stamped version, then conflict, then
+ * pending, then failing, then no checks, then green — kept apart from
+ * the flags so that the order is one readable list of six branches and
+ * nothing else.
  */
 function decideClass(
   input: ClassifyTriageInput,
   verdict: ChecksVerdict,
   conflicting: boolean,
 ): DecidedClass {
-  const { conflictFiles, rows, step } = input;
+  const { conflictFiles, guard, rows, step } = input;
+  if (isStampVerdict(guard)) {
+    return {
+      triageClass: 'conflict-version',
+      files: [],
+      step: undefined,
+      reason: stampReason(input.pr.number, guard),
+    };
+  }
   if (conflicting) {
     return {
       triageClass: classifyConflictFiles(conflictFiles),
@@ -498,12 +559,13 @@ function decideClass(
 }
 
 /**
- * Classifies one pull request from its five captured readings.
+ * Classifies one pull request from its six captured readings.
  *
  * Total and pure: every input reaches exactly one class, nothing is
  * spawned, nothing is awaited and nothing is thrown. The precedence —
- * conflict, then pending, then failing, then no checks, then green — and the reason
- * each class is reached by are in the module note.
+ * a stamped version, then conflict, then pending, then failing, then no
+ * checks, then green — and the reason each class is reached by are in
+ * the module note.
  */
 export function classifyTriage(input: ClassifyTriageInput): TriageAssessment {
   const dependencyBump = isDependencyBump(input.pr);
