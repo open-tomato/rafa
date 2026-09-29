@@ -13,7 +13,7 @@
  * for those strings in what the extract writes. The search is paired
  * with its control: the same strings found in the source files' bytes.
  */
-import type { Extract, ExtractSide, ExtractValue } from './fixture-extract.js';
+import type { Extract, ExtractSide, ExtractValue, OverlapCap } from './fixture-extract.js';
 import type { OriginTable } from './origins.js';
 import type { SQLQueryBindings } from 'bun:sqlite';
 
@@ -28,6 +28,7 @@ import { bringForward } from './bring-forward.js';
 import {
   anonymiseValue,
   createPlaceholderMap,
+  DEFAULT_OVERLAP,
   EXTRACT_FILE_NAMES,
   extractStores,
   PlaceholderCollision,
@@ -231,9 +232,9 @@ function parsed(value: ExtractValue): Record<string, unknown> {
 }
 
 /** Runs the extract over a fresh scenario. */
-function extractScenario(perSide?: number): Extract {
+function extractScenario(perSide?: number, overlap?: OverlapCap): Extract {
   const { pathA, pathB } = plantScenario();
-  return extractStores(pathA, pathB, perSide);
+  return extractStores(pathA, pathB, perSide, overlap);
 }
 
 describe('extractStores over a copy then divergence', () => {
@@ -265,7 +266,7 @@ describe('extractStores over a copy then divergence', () => {
 
     for (const table of ORIGIN_TABLES) {
       const summary = extract.summary.find((entry) => entry.table === table);
-      expect(summary).toEqual({ table, rowsA: 7, rowsB: 7, overlap: 4, keptA: 7, keptB: 7 });
+      expect(summary).toEqual({ table, rowsA: 7, rowsB: 7, overlap: 4, overlapKept: 4, keptA: 7, keptB: 7 });
       for (const key of SHARED_KEYS) {
         const rowOf = (side: ExtractSide): ExtractValue[] => extract[side.side].tables[table]?.rows[seqOf(key) - 1]?.slice() ?? [];
         expect(rowOf(extract.b)).toEqual(rowOf(extract.a));
@@ -381,12 +382,54 @@ describe('extractStores over a copy then divergence', () => {
 
     for (const table of ORIGIN_TABLES) {
       expect(extract.summary.find((entry) => entry.table === table))
-        .toEqual({ table, rowsA: 7, rowsB: 7, overlap: 4, keptA: 5, keptB: 5 });
+        .toEqual({ table, rowsA: 7, rowsB: 7, overlap: 4, overlapKept: 4, keptA: 5, keptB: 5 });
       expect(columnOf(extract.a, table, 'seq')).toEqual([1, 2, 3, 4, 5]);
       expect(columnOf(extract.b, table, 'seq')).toEqual([1, 2, 3, 4, 5]);
     }
     const log = extract.summary.find((entry) => entry.table === 'schema_migrations');
     expect([log?.keptA, log?.keptB]).toEqual([SQLITE_MIGRATIONS.length, SQLITE_MIGRATIONS.length]);
+  });
+
+  it('keeps the last overlap pairs nearest the divergence on both sides, and the union matches exactly those', () => {
+    const extract = extractScenario(1, 2);
+
+    for (const table of ORIGIN_TABLES) {
+      expect(extract.summary.find((entry) => entry.table === table))
+        .toEqual({ table, rowsA: 7, rowsB: 7, overlap: 4, overlapKept: 2, keptA: 3, keptB: 3 });
+      expect(columnOf(extract.a, table, 'seq')).toEqual([3, 4, 5]);
+      expect(columnOf(extract.b, table, 'seq')).toEqual([3, 4, 5]);
+    }
+    const restoredA = join(base, 'restored-a.sqlite');
+    const restoredB = join(base, 'restored-b.sqlite');
+    restoreExtractSide(extract.a, restoredA);
+    restoreExtractSide(extract.b, restoredB);
+    for (const union of unionStores(open(restoredB), open(restoredA))) {
+      expect([union.table, union.matched.length, union.added.length, union.collided.length])
+        .toEqual([union.table, 2, 1, 0]);
+    }
+  });
+
+  it('keeps every overlapping row under the cap all, and by default while the overlap is under 200', () => {
+    const { pathA, pathB } = plantScenario();
+    const every = extractStores(pathA, pathB, 0, 'all');
+    const byDefault = extractStores(pathA, pathB, 0);
+
+    expect([every.overlap, byDefault.overlap]).toEqual(['all', DEFAULT_OVERLAP]);
+    for (const extract of [every, byDefault]) {
+      for (const table of ORIGIN_TABLES) {
+        expect(extract.summary.find((entry) => entry.table === table))
+          .toEqual({ table, rowsA: 7, rowsB: 7, overlap: 4, overlapKept: 4, keptA: 4, keptB: 4 });
+      }
+    }
+  });
+
+  it('refuses an overlap cap that is not a whole number of rows above zero', () => {
+    const { pathA, pathB } = plantScenario();
+
+    for (const cap of [0, -1, 1.5]) {
+      expect(() => extractStores(pathA, pathB, 1, cap))
+        .toThrow(`overlap cap ${String(cap)} is not a whole number of rows above zero; use all to keep every overlapping row`);
+    }
   });
 
   it('refuses a per-side sample that is not a whole number and a store that is not there', () => {

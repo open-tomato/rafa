@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { DEFAULT_PER_SIDE } from '../src/effort/store/fixture-extract.js';
+import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE } from '../src/effort/store/fixture-extract.js';
 import { SQLITE_MIGRATIONS } from '../src/effort/store/migrations.js';
 
 import { EXIT_COULD_NOT_RUN, EXIT_WRITTEN, readExtractArgs, runExtract, TAG, USAGE } from './extract-merge-fixture.js';
@@ -39,11 +39,14 @@ function plantStore(name: string): string {
 }
 
 describe('readExtractArgs', () => {
-  it('reads two stores and --out, resolved against the directory given, with the default sample', () => {
+  it('reads two stores and --out, resolved against the directory given, with the default sample and overlap cap', () => {
     expect(readExtractArgs(['a.sqlite', '/x/b.sqlite', '--out=scratch/out'], '/work')).toEqual({
       pathA: resolve('/work', 'a.sqlite'), pathB: '/x/b.sqlite', outDir: resolve('/work', 'scratch/out'), perSide: DEFAULT_PER_SIDE,
+      overlap: DEFAULT_OVERLAP,
     });
     expect(readExtractArgs(['a', 'b', '--per-side=0', '--out=/o'], '/work').perSide).toBe(0);
+    expect(readExtractArgs(['a', 'b', '--overlap=3', '--out=/o'], '/work').overlap).toBe(3);
+    expect(readExtractArgs(['a', 'b', '--overlap=all', '--out=/o'], '/work').overlap).toBe('all');
   });
 
   it('refuses a missing store, a missing --out, an unknown flag and a sample that is not a whole number', () => {
@@ -55,6 +58,9 @@ describe('readExtractArgs', () => {
       [['a', 'b', '--out=/o', '--force'], 'unknown argument(s): --force'],
       [['a', 'b', '--out=/o', '--per-side=-3'], '--per-side=-3 is not a whole number'],
       [['a', 'b', '--out=/o', '--per-side=1', '--per-side=2'], 'expected at most one --per-side=<n>'],
+      [['a', 'b', '--out=/o', '--overlap=0'], '--overlap=0 is not a whole number above zero or all'],
+      [['a', 'b', '--out=/o', '--overlap=some'], '--overlap=some is not a whole number above zero or all'],
+      [['a', 'b', '--out=/o', '--overlap=1', '--overlap=2'], 'expected at most one --overlap=<n|all>'],
     ];
     for (const [argv, message] of cases) {
       expect(() => readExtractArgs(argv, '/work')).toThrow(message);
@@ -68,10 +74,13 @@ describe('runExtract', () => {
     const lines: string[] = [];
     const outDir = join(base, 'out');
 
-    const code = runExtract({ pathA: plantStore('a.sqlite'), pathB: plantStore('b.sqlite'), outDir, perSide: 5 }, (line) => lines.push(line));
+    const code = runExtract(
+      { pathA: plantStore('a.sqlite'), pathB: plantStore('b.sqlite'), outDir, perSide: 5, overlap: DEFAULT_OVERLAP },
+      (line) => lines.push(line),
+    );
 
     expect(code).toBe(EXIT_WRITTEN);
-    expect(lines).toContain(`${TAG} sessions: rows A 1, B 1; overlap 1; kept A 1, B 1`);
+    expect(lines).toContain(`${TAG} sessions: rows A 1, B 1; overlap 1, 1 kept; kept A 1, B 1`);
     expect(lines.filter((line) => line.startsWith(`${TAG} wrote `))).toEqual(
       ['a.json', 'b.json', 'summary.json'].map((name) => `${TAG} wrote ${join(outDir, name)}`),
     );
