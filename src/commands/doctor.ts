@@ -159,17 +159,29 @@
  * included, and a project with no store yet gets none; its warnings are
  * `warn` lines, like the three below.
  *
+ * ## The effort sync row
+ *
+ * Every such run then reads the `effort sync` row
+ * (`./doctor-effort-sync.ts`, whose note says which registry each kind
+ * is selected through): `ok` naming the strategy `effort.sync` names,
+ * `local` when it names none, and `fail` when no adapter serves it,
+ * naming for `git`, `service` and `p2p` the `modules:` and `allowList:`
+ * lines that load a module providing it. Its line follows the effort
+ * store schema row on every run, a halt's included.
+ *
  * ## The exit code
  *
- * 0 when no required item failed and the effort store schema row did
- * not fail, whatever failed among the optional ones and whatever was
- * warned. 1 when a required item failed or timed out,
+ * 0 when no required item failed and neither the effort store schema
+ * row nor the effort sync row failed, whatever failed among the
+ * optional ones and whatever was warned. 1 when a required item failed or timed out,
  * which is when `loop start` would halt before any session: the refusal
  * opens with the runner's halt, which names each such item, its probe,
  * and its exit code with the first line of stderr. 1 when the effort
  * store schema row fails, the refusal naming the store, why this rafa
  * refuses it and its next safe step, after a halt's text when both
- * happen. 1 as well, each
+ * happen. 1 when the effort sync row fails, its refusal naming the
+ * strategy and why no adapter serves it, after the halt's and the
+ * schema row's text when those happen. 1 as well, each
  * ending `Nothing was checked.`, for a positional word, a `--plan` with
  * no file, a `--deep` holding a value, a plan named that is no file, a plan path that cannot be
  * checked, such as one under a file (`stat` answers `ENOTDIR`, measured
@@ -190,16 +202,18 @@
  * its rows, then any blocked issues, then any epic labels — and none for
  * one that has not; then the cleanup row, when there is anything to
  * clean; then the references row, when there is a saved copy; then the `Skill tiers` rows
- * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then, under `--deep`,
+ * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
+ * effort sync row; then, under `--deep`,
  * `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
  * absolute, for a preflight that did not halt and an effort store schema
- * row that did not fail. A halt gives no `data`, nor does a failing row:
- * the terminal event is the `command_exit` error, whose message is the
- * halt naming every failed required item, then the row's refusal with
- * its next safe step. In either mode each warning is
+ * row and an effort sync row that did not fail. A halt gives no `data`,
+ * nor does a failing row: the terminal event is the `command_exit`
+ * error, whose message is the halt naming every failed required item,
+ * then each failing row's refusal, the schema row's with its next safe
+ * step. In either mode each warning is
  * a `warn` line, a `log` event in json mode, and so is the risk total, at
  * `info`.
  *
@@ -218,6 +232,7 @@ import type { DoctorBoardReadings, DoctorBoardSeams } from './doctor-board.js';
 import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
 import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
+import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from './doctor-effort-sync.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
@@ -259,6 +274,7 @@ import { boardRunner, readDoctorBoard, renderDoctorBoard } from './doctor-board.
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
 import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
+import { effortSyncRefusal, readDoctorEffortSync, renderDoctorEffortSync } from './doctor-effort-sync.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { renderDoctor } from './doctor-render.js';
@@ -271,8 +287,8 @@ import { isFile } from './plan/plan-files.js';
  * session runs in, the runner its provider probes go through, and how
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
-export interface DoctorSeams
-  extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorTiersRunSeams {
+export interface DoctorSeams extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorEffortSyncSeams,
+  DoctorRefsSeams, DoctorTiersRunSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -366,6 +382,8 @@ export interface DoctorResult {
   readonly tiers: DoctorTiersReading;
   /** The `effort store schema` row (`./doctor-effort-schema.ts`); a failing one gives no `data`. */
   readonly effortSchema: DoctorEffortSchemaReading;
+  /** The `effort sync` row (`./doctor-effort-sync.ts`); a failing one gives no `data`. */
+  readonly effortSync: DoctorEffortSyncReading;
   /** Every `--deep` section as it was read; null without `--deep`. */
   readonly deep: DeepReading | null;
 }
@@ -376,6 +394,7 @@ interface BoardReadings extends DoctorBoardReadings {
   readonly refs: DoctorRefsReading;
   readonly tiers: DoctorTiersReading;
   readonly effortSchema: DoctorEffortSchemaReading;
+  readonly effortSync: DoctorEffortSyncReading;
 }
 
 /** The line every refusal before a check ends with. */
@@ -559,23 +578,24 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
 }
 
 /**
- * The refusal for a halt, a failing `effort store schema` row, or both:
- * the runner's own text and what `loop start` would do, then the row's
- * refusal; null for neither.
+ * The refusal for a halt, a failing `effort store schema` or
+ * `effort sync` row, or any of them together: the runner's own text and
+ * what `loop start` would do, then each failing row's refusal in that
+ * order; null for none.
  */
-function doctorRefusal(halt: string | null, schema: string | null): CommandExit | null {
-  if (halt === null) {
-    return schema === null
-      ? null
-      : new CommandExit(1, schema);
-  }
-  const lines = [
-    `rafa doctor: ${halt}`,
+function doctorRefusal(halt: string | null, rows: readonly (string | null)[]): CommandExit | null {
+  const failed = rows.filter((row): row is string => row !== null);
+  const halted = [
+    `rafa doctor: ${String(halt)}`,
     'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
   ];
-  return new CommandExit(1, [...lines, ...(schema === null
+  const lines = halt === null
     ? []
-    : [schema])].join('\n'));
+    : halted;
+  const all = [...lines, ...failed];
+  return all.length === 0
+    ? null
+    : new CommandExit(1, all.join('\n'));
 }
 
 /**
@@ -614,6 +634,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     refs: readings.refs,
     tiers: readings.tiers,
     effortSchema: readings.effortSchema,
+    effortSync: readings.effortSync,
     deep,
   };
 }
@@ -655,19 +676,21 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
     const effortSchema = readDoctorEffortSchema(project.root, context.env);
+    const effortSync = await readDoctorEffortSync({ root: project.root, home: project.home, resolved: preflight.resolved }, seams);
     const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue);
-    const readings: BoardReadings = { ...board, cleanup, refs, tiers, effortSchema };
+    const readings: BoardReadings = { ...board, cleanup, refs, tiers, effortSchema, effortSync };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
     writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
+    writeText(context, renderDoctorEffortSync(effortSync));
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
       : renderDeep(deep));
-    const refusal = doctorRefusal(preflight.report.halt, effortSchemaRefusal(effortSchema));
+    const refusal = doctorRefusal(preflight.report.halt, [effortSchemaRefusal(effortSchema), effortSyncRefusal(effortSync)]);
     if (refusal !== null) throw refusal;
     if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings, deep));
   } finally {
@@ -698,7 +721,10 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
       + ' `rafa effort schema --check` does, changing nothing, and prints its `effort store schema` row:'
       + ' it exits 1 where that check fails, naming the next safe step, and warns on a migration this rafa'
       + ' does not know that is additive and on one the project\'s own store logs as applied by a development'
-      + ' build. It exits 0 otherwise. It warns when'
+      + ' build. It prints its `effort sync` row, the strategy `effort.sync` names (`local` when unset) and'
+      + ' whether core or a loaded module serves it, and exits 1 when no adapter serves it, naming for'
+      + ' `git`, `service` and `p2p` the `modules:` and `allowList:` lines that load a module providing it.'
+      + ' It exits 0 otherwise. It warns when'
       + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
       + ' not on PATH ahead of `~/.bun/bin`, and when `previous/` under `specs.dir` holds more than fifty'
       + ' previous copies of issue specs, which are safe to delete; a warning never changes the exit code. On a repository whose'

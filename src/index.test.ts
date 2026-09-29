@@ -1099,6 +1099,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-cleanup.js', ['readDoctorCleanup', 'renderDoctorCleanup']],
     ['./doctor-deep.js', ['readDeep', 'renderDeep']],
     ['./doctor-effort-schema.js', ['effortSchemaRefusal', 'readDoctorEffortSchema', 'writeDoctorEffortSchema']],
+    ['./doctor-effort-sync.js', ['effortSyncRefusal', 'readDoctorEffortSync', 'renderDoctorEffortSync']],
     ['./doctor-install.js', ['readInstall', 'writeInstall']],
     ['./doctor-refs.js', ['readDoctorRefs', 'renderDoctorRefs']],
     ['./doctor-render.js', ['renderDoctor']],
