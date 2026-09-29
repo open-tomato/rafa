@@ -14,8 +14,10 @@
  * {@link resolveRunBranch} and {@link guardRunBranch} are the branch
  * step: on `main` or `master` the run is offered the plan's own branch
  * (`start/branch.ts`), and whichever branch that answers is the one the
- * guard reads and the session record names. `start()` calls the two in
- * that order, back to back, once the plan file is known to exist.
+ * guard reads and the session record names. Once the plan file is known
+ * to exist, `start()` reaches the first through `start/run-checkout.ts`,
+ * which makes no offer under `--as-worktree`, and calls the second right
+ * after on whichever branch that answered.
  *
  * The guard's two warnings go through the active output
  * (`adapters/output/active.ts`), and its refusal is thrown as a

@@ -10,9 +10,10 @@
  *
  * A second claim is where each call is pointed: at the project root,
  * which holds `.rafa/`, or at the checkout git and the sessions run in
- * (`start/checkout.ts`). The same reader, walked over the whole file,
- * answers each call's arguments as written, and a planted source that
- * hands a dispatch no checkout is its control.
+ * (`start/checkout.ts`, settled in `start/run-checkout.ts`), and which
+ * root every session is served from. The same reader, walked over the
+ * whole file, answers each call's arguments as written, and a planted
+ * source that hands a dispatch no checkout is its control.
  *
  * `start()` itself is not driven, for the reason
  * `tests/plan-injection.test.ts` gives for not driving it either: it
@@ -267,15 +268,40 @@ describe('the two directories start.ts points each call at', () => {
   /** The first argument of the first call to `name`, as written. */
   const firstArgument = (name: string): string => callTo(EVERY, name).args[0] ?? '';
 
-  it('resolves the checkout from the project root', () => {
-    expect(callTo(EVERY, 'resolveRunDirs').args).toEqual(['repoRoot']);
-    expect(START).toContain('const { checkout } = resolveRunDirs(repoRoot);');
+  it('settles the checkout and its branch from the project root and the configured worktree directory', () => {
+    // Which checkout, the started one or the worktree `--as-worktree`
+    // adds, is `start/run-checkout.ts`'s, and its suite drives both.
+    const input = firstArgument('settleRunCheckout');
+
+    expect(START).toContain('const { checkout, branch } = await settleRunCheckout({');
+    expect(input).toContain('projectRoot: repoRoot,');
+    expect(input).toContain('worktreeDir: runConfig.config.loopWorktreeDir,');
+    expect(input).toContain('args,');
+    expect(input).not.toContain('checkout');
   });
 
-  it('reads, offers and commits the branch in the checkout', () => {
-    expect(callTo(EVERY, 'getCurrentBranch').args).toEqual(['checkout']);
-    expect(firstArgument('resolveRunBranch')).toContain('checkout,');
+  it('reads no directory or branch of its own beside that settling', () => {
+    // A second reading here would let the guard and the record name a
+    // branch the worktree does not hold.
+    for (const name of ['resolveRunDirs', 'getCurrentBranch', 'resolveRunBranch', 'addRunWorktree']) {
+      expect(EVERY.some((call) => call.name === name)).toBe(false);
+    }
+  });
+
+  it('guards and records the branch that settling answered, and commits in the checkout', () => {
+    expect(callTo(EVERY, 'guardRunBranch').args).toEqual(['planStub', 'branch', 'args']);
+    expect(firstArgument('openRunSession')).toContain('branch,');
+    expect(callTo(EVERY, 'announceRunDirs').args).toEqual(['{ projectRoot: repoRoot, checkout }']);
     expect(firstArgument('finishCleanExit')).toContain('repoRoot: checkout,');
+  });
+
+  it('serves every session from the project root while spawning it in the checkout', () => {
+    // The served directory is `.rafa/runs/<id>/served/` under this root
+    // (`start/serving.ts`), so a worktree run's sessions are served the
+    // main checkout's `.rafa/`, and the same `serving` reaches both doors.
+    expect(START).toContain('const serving: SessionServing = { root: repoRoot, run: session.id,');
+    expect(firstArgument('dispatchTask')).toContain('serving,');
+    expect(callTo(CALLS, 'preserveProgress').args).toContain('serving');
   });
 
   it('dispatches each task with the project root and the checkout both', () => {

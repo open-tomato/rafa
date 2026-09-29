@@ -14,7 +14,9 @@
  *     sessions run in it too.
  *
  * {@link resolveRunDirs} answers both, once, before the run reads its
- * branch.
+ * branch. Under `--as-worktree` the checkout it answers is only where
+ * the base is read: `run-checkout.ts` then adds the plan's worktree and
+ * makes THAT the run's checkout, with the same project root.
  *
  * ## Which checkout
  *

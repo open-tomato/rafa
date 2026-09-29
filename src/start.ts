@@ -50,8 +50,10 @@
  * commit, the release's files, commit and push, and the CI gate — and
  * every session, task, wrap-up and CI repair alike, is spawned there,
  * with `progress.txt` written there for it to read. From a linked
- * worktree that is the worktree, and the run says so once; everywhere
- * else it is the project root.
+ * worktree that is the worktree, and under `--as-worktree` it is the
+ * worktree the run adds for the plan's branch; the run says so once
+ * either way. Everywhere else it is the project root. Both are settled
+ * in `start/run-checkout.ts`.
  *
  * Ahead of the branch guard, a run started on `main` or `master` is
  * offered the plan's own branch (`resolveRunBranch` in
@@ -67,6 +69,13 @@
  * always did. Every refusal along the way — a modified tracked file, a
  * fetch that failed, a base that has diverged — is thrown from there as
  * exit code 1, and leaves the run on its base.
+ *
+ * `--as-worktree` takes the place of that offer: no question is asked,
+ * and `feat/<plan-stub>` is cut from the latest `origin/<base>`, or taken
+ * as it stands when it exists, and added as a linked worktree at
+ * `loop.worktreeDir/<stub>` (`start/worktree.ts`), which becomes the
+ * run's checkout. The main checkout is never switched, and every session
+ * is still served from its `.rafa/` (`start/serving.ts`).
  *
  * Once the branch guard lets the run through, the run prints the plan's
  * risk total, the one line `rafa plan risk` ends its report with
@@ -152,6 +161,10 @@
  *               latest `origin/<base>` and run there without asking, or
  *               switch to that branch when it is already there
  *               (`start/branch.ts`). Read by `start/run-setup.ts` alone.
+ * --as-worktree run in a linked worktree of `feat/<plan-stub>` at
+ *               `loop.worktreeDir/<stub>`, created from the latest
+ *               `origin/<base>` when the branch is not there yet, and leave
+ *               the main checkout as it is (`start/run-checkout.ts`).
  * --any-branch  run where the loop stands, whatever branch that is: no
  *               offer is made and the guard (`start/run-setup.ts`)
  *               checks nothing.
@@ -183,7 +196,7 @@
  * nothing, and the wrap-up runs without a release rather than not at
  * all.
  *
- * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/runtime.ts`, `start/session.ts`,
+ * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
  * through the active output
@@ -203,7 +216,8 @@
  * an unusable config, `--as-worktree` while a `tracking` setting is
  * on (`start/run-setup.ts`), a plan file that does not exist, a checkout git
  * could not read (`start/checkout.ts`), a branch offer
- * that could not be taken (`start/branch.ts`), a default branch the run
+ * that could not be taken (`start/branch.ts`), a worktree git would not
+ * add (`start/worktree.ts`), a default branch the run
  * stayed on,
  * a session record refusing the run or session records that cannot be
  * read or written, and a preflight that halts (a failed required
@@ -240,7 +254,7 @@ import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
-import { announceRunDirs, resolveRunDirs } from './start/checkout.js';
+import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit } from './start/commit.js';
 import {
   dispatchTask,
@@ -253,6 +267,7 @@ import { prLifecycleSeamsIn, verifyPullRequest } from './start/pr-lifecycle.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import { announceRiskTotal } from './start/risk-total.js';
+import { settleRunCheckout } from './start/run-checkout.js';
 import {
   announcePlanIssues,
   injectSourceLabel,
@@ -265,7 +280,6 @@ import {
   readRunArgs,
   refuseWorktreeBesideCreateBranch,
   refuseWorktreeWhileTracking,
-  resolveRunBranch,
 } from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
@@ -273,7 +287,6 @@ import { setActivePlanStub } from './start/stamp.js';
 import { createStartTriage } from './start/triage.js';
 import { preserveProgress } from './start/wrap-up.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
-import { getCurrentBranch } from './utils/git.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
@@ -333,18 +346,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   }
 
   const planStub = planStubFromPath(planPath);
-  // Where git runs and every session is spawned: the working tree the run
-  // was started in, when it is one of the project's (`start/checkout.ts`).
-  const { checkout } = resolveRunDirs(repoRoot);
-  // Ahead of the guard: on `main` or `master` the run offers to create or
-  // switch to `feat/<stub>` and take it (`start/run-setup.ts`). What it
-  // answers is the branch the guard reads and the branch the session
-  // record below names, so a run that moved is never guarded on, and never
-  // records, the base it started from.
-  const branch = await resolveRunBranch({
-    checkout,
+  // Where git runs and every session is spawned, and the branch there
+  // (`start/run-checkout.ts`): the working tree the run was started in,
+  // on `main` or `master` offered `feat/<stub>` first, or under
+  // `--as-worktree` the worktree added for that branch. The branch is the
+  // one the guard reads and the session record below names, so a run
+  // that moved is never guarded on, and never records, the base it
+  // started from.
+  const { checkout, branch } = await settleRunCheckout({
+    projectRoot: repoRoot,
+    worktreeDir: runConfig.config.loopWorktreeDir,
     planStub,
-    base: getCurrentBranch(checkout),
     args,
   });
   guardRunBranch(planStub, branch, args);
