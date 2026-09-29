@@ -78,11 +78,17 @@ three places, which `ChangelogInsertPoint` names:
 its preamble), `file-end` when that first heading was the file's only one,
 and `file-top` when the file held no ATX heading at all.
 
-**Step 2** (Wrap-up session, agent): Rewrite the raw lines under that heading
-into one line per area, touching nothing else in the file. The wrap-up prompt
-receives the raw notes as bullets below the first line so the classifier key
-does not move. The bullets are built in `src/start/wrap-up.ts`,
-`buildWrapUpPrompt`, never in a prompt file.
+**Step 2** (Wrap-up session, agent): Rewrite the raw notes inside the
+plan's fragment, below its front matter, into one line per area, touching
+nothing else: not the fences, not the `plan`, `title` or `level` lines, and
+not the trailing newline. The prompt names the fragment's path, plan id and
+level, tells the session to leave the fragment unstaged for the loop's
+`chore: release fragment <plan id>` commit and to keep off the version file,
+the changelog and every other fragment, and asks for the fragment's level
+and notes in the PR body with no version number. A skipped step 1 gets one
+bullet instead, carrying its sentence verbatim. The release bullets sit below
+the first line so the classifier key does not move. They are built in
+`src/start/wrap-up.ts`, `buildWrapUpPrompt`, never in a prompt file.
 
 **Step 3** (Loop, code): Verify the fragment still parses (`parseFragment`,
 the reader settle folds with), still names the plan id and carries the

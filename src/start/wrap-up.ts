@@ -31,6 +31,8 @@ import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
 
+import { posix } from 'node:path';
+
 import { activeOutput } from '../adapters/output/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { promotable } from '../learning/index.js';
@@ -76,11 +78,11 @@ import { withStamp } from './stamp.js';
  * `release` is step 1's record, as `release/prepare.ts` answered it
  * before this session was spawned, and null when no preparation was
  * attempted at all — a wrap-up run outside the release stage, which
- * then gets no release bullet of any kind. The spec's step 2 is the
- * whole of what those bullets ask for
- * (`.rafa/specs/rafa-21-changelog-and-release.md`): "rewrite the raw lines
- * under that heading into one line per area, touching nothing else in
- * the file". {@link releaseBullets} holds why each of them is worded
+ * then gets no release bullet of any kind. Step 2 of the release is
+ * the whole of what those bullets ask for
+ * (`.rafa/specs/rafa-367-releases-settle-base-branch.md`): rewrite the
+ * raw notes inside the plan's fragment into one line per area, touching
+ * nothing else. {@link releaseBullets} holds why each of them is worded
  * the way it is.
  *
  * `lessons` is what {@link lessonsToPromote} answered before the
@@ -192,39 +194,43 @@ function pullRequestStep(branch: string, openPullRequest: number | null): string
 
 /**
  * The release bullets, as step 1's record leaves them: three when it
- * wrote the two files, one when it wrote nothing, and none at all when
- * no preparation was attempted.
+ * wrote the plan's fragment, one when it wrote nothing, and none at all
+ * when no preparation was attempted.
  *
- * The spec splits the release three ways
- * (`.rafa/specs/rafa-21-changelog-and-release.md`, its step 3 list): the
- * loop writes the version and the raw notes, the SESSION rewrites the
- * prose, and the loop then verifies, commits and pushes. Only the
- * middle third is a prompt, so only the middle third is here. Each
- * bullet exists because `release/verify.ts` refuses something:
+ * The release splits three ways
+ * (`.rafa/specs/rafa-367-releases-settle-base-branch.md`): the loop
+ * writes the fragment with the raw notes, the SESSION rewrites those
+ * notes, and the loop then verifies and commits. Only the middle third
+ * is a prompt, so only the middle third is here. A branch never owns a
+ * version number, so no bullet names a version, a changelog heading or
+ * a bump. Each bullet exists because `release/verify.ts` refuses
+ * something:
  *
- *   - The rewrite is bounded to ONE section because the verification
- *     compares every line outside the inserted span byte for byte
- *     (`changelogInsertionSpan`). A session that rewrapped the
- *     preamble is refused exactly as one that rewrote an old release,
- *     so the bullet names the preamble, the other sections, the
- *     heading and the trailing newline rather than saying "nothing
- *     else" and leaving the reader to guess how strict that is.
- *   - The two files are left UNSTAGED because step 3's commit holds
- *     them alone. A `git add -A` in this session would put them under
- *     the session's own subject, and the release commit that follows
- *     would then be empty — a release nothing verified, since the
- *     verification runs after this session and before that commit.
- *   - The entry goes into the pull request body because that is where
- *     the spec puts it ("The PR body gains the entry"), and the body
- *     is this session's to write; nothing downstream rewrites it.
+ *   - The rewrite is bounded to the notes BELOW the front matter,
+ *     because the verification parses the fragment with the reader
+ *     settle folds with and refuses one that no longer parses, that
+ *     names another plan id, or that carries another level. The bullet
+ *     names the fences, the `plan`, `title` and `level` lines and the
+ *     trailing newline rather than saying "nothing else" and leaving
+ *     the reader to guess how strict that is.
+ *   - The fragment is left UNSTAGED because step 3's commit,
+ *     `chore: release fragment <plan id>`, holds it alone. A
+ *     `git add -A` in this session would put it under the session's
+ *     own subject, and the release commit that follows would be empty —
+ *     a fragment nothing verified. The same bullet names the version
+ *     file, the changelog and the other fragments, since a change to
+ *     any of them is the verification's `other-file-changed` refusal.
+ *   - The notes go into the pull request body because the body is this
+ *     session's to write, and a reader should see what the branch ships
+ *     without opening the fragment.
  *
  * A SKIPPED preparation gets one bullet instead of the three, carrying
  * {@link ReleaseSkipped.sentence} verbatim — the same sentence the
  * release stage puts in the body when the session does not, so the two
- * cannot word it differently. It also says to leave both files alone:
- * a session told only that there is no release is a session that might
- * write the entry by hand, and a hand-written entry is one no
- * verification ever reads.
+ * cannot word it differently. It also says to write no fragment and
+ * leave the release files alone: a session told only that there is no
+ * fragment is a session that might write one by hand, and a
+ * hand-written fragment is one no verification ever reads.
  *
  * Every bullet here sits BELOW the prompt's first line, which is the
  * `wrap-up` classifier key; none of them may be moved above it.
@@ -233,53 +239,36 @@ function releaseBullets(release: ReleasePreparation | null): readonly string[] {
   if (release === null) return [];
   if (release.kind === 'skipped') return [skippedReleaseBullet(release)];
   return [
-    changelogRewriteBullet(release),
-    releaseFilesBullet(release),
-    releaseBodyBullet(release),
+    fragmentRewriteBullet(release),
+    fragmentFilesBullet(release),
+    fragmentBodyBullet(release),
   ];
 }
 
-/**
- * The paths step 1 wrote, as backticked prose: both files, or the
- * changelog alone in a project with no version file.
- */
-function releaseFilePhrase(prepared: ReleasePrepared): string {
-  const paths = prepared.versionFile === null
-    ? [prepared.changelog.path]
-    : [prepared.changelog.path, prepared.versionFile.path];
-  return paths.map((path) => `\`${path}\``).join(' and ');
+/** The directory the fragment sits in, as the repository names it. */
+function fragmentDirectory(prepared: ReleasePrepared): string {
+  return posix.dirname(prepared.file.path);
 }
 
-/** What step 1 left behind, as one clause naming the heading and the bump. */
-function releaseStateClause(prepared: ReleasePrepared): string {
-  const section = `\`${prepared.changelog.path}\` now carries a new section headed \`${prepared.entry.heading}\``;
-  const { version, versionFile } = prepared;
-  return version === null || versionFile === null
-    ? `${section}, and this project has no version file to bump`
-    : `${section}, and \`${versionFile.path}\` now declares ${version}`;
+/** Step 2 itself: the raw notes below the front matter, and nothing else. */
+function fragmentRewriteBullet(prepared: ReleasePrepared): string {
+  const { plan, level } = prepared.fragment;
+  return `* The loop has already written this pull request's release fragment: \`${prepared.file.path}\`, for plan \`${plan}\` at level \`${level}\`. Rewrite the raw \`- <area>: <summary>\` lines below its front matter into one line per area, in a changelog's voice, and change nothing else in the file: not the \`---\` fences, not the \`plan:\`, \`title:\` or \`level:\` lines, not the blank line after the front matter, and not the file's trailing newline. After this session the loop checks that the fragment still parses, still names plan \`${plan}\` and still carries level \`${level}\`, and a fragment that fails any of those costs this pull request its release fragment. If there are no lines below the front matter, leave the file as it is rather than inventing any.`;
 }
 
-/** Step 2 itself: the raw lines under that one heading, and nothing else. */
-function changelogRewriteBullet(prepared: ReleasePrepared): string {
-  return `* The loop has already prepared this pull request's release: ${releaseStateClause(prepared)}. Rewrite the raw \`- <area>: <summary>\` lines under THAT heading into one line per area, in the changelog's own voice, and change nothing else anywhere in the file: not another release's section, not the file's preamble above them all, not the heading line itself, not the blank lines around the section, and not the file's trailing newline. Every line outside that section is compared byte for byte against what the loop wrote, and one changed byte anywhere else costs this pull request its release. If the section has no lines under its heading, leave it as it is rather than inventing any.`;
+/** Why the fragment stays out of this session's commit, and what else stays untouched. */
+function fragmentFilesBullet(prepared: ReleasePrepared): string {
+  return `* Leave \`${prepared.file.path}\` UNSTAGED and UNCOMMITTED. Do not \`git add\` it, and do not sweep it up with \`git add -A\`, \`git commit -a\` or \`git commit <path>\`: after this session ends the loop checks your rewrite, and then makes its own \`chore: release fragment ${prepared.plan}\` commit holding that file and nothing else. A commit of yours that took it is a release fragment nothing ever verified. Do not edit the version file, the changelog, or any other file under \`${fragmentDirectory(prepared)}/\` either: versions and changelog sections are written on the base branch after the merge, never by this branch, and a change to any of those files costs this pull request its release fragment.`;
 }
 
-/** Why the two files stay out of this session's commit. */
-function releaseFilesBullet(prepared: ReleasePrepared): string {
-  const subject = prepared.version === null
-    ? '`chore: release`'
-    : `\`chore: release ${prepared.version}\``;
-  return `* Leave ${releaseFilePhrase(prepared)} UNSTAGED and UNCOMMITTED. Do not \`git add\` them, and do not sweep them up with \`git add -A\`, \`git commit -a\` or \`git commit <path>\`: after this session ends the loop checks your rewrite, and then makes its own ${subject} commit holding those files and nothing else. A commit of yours that took them is a release commit nothing ever verified.`;
-}
-
-/** The entry, carried from the changelog into the pull request body. */
-function releaseBodyBullet(prepared: ReleasePrepared): string {
-  return `* Carry the entry into the pull request body: the heading \`${prepared.entry.heading}\` and the lines you left under it, as a section of the description, so a reader sees what this release ships without opening \`${prepared.changelog.path}\`.`;
+/** The fragment's notes, carried into the pull request body. */
+function fragmentBodyBullet(prepared: ReleasePrepared): string {
+  return `* Carry the fragment into the pull request body: its level, \`${prepared.fragment.level}\`, and the note lines you left in it, as a section of the description, so a reader sees what this pull request ships without opening \`${prepared.file.path}\`. Name no version number: the version is chosen on the base branch when the fragments are settled, not here.`;
 }
 
 /** The one line a preparation that wrote nothing asks the session for. */
 function skippedReleaseBullet(skipped: ReleaseSkipped): string {
-  return `* This pull request ships NO release: ${skipped.sentence}. Put that line in the pull request body as it is written here, and leave the changelog and the version file exactly as you found them — do not write an entry or bump a version by hand, since a release the loop did not prepare is one nothing verifies.`;
+  return `* This pull request ships NO release fragment: ${skipped.sentence}. Put that line in the pull request body as it is written here, and leave the fragments directory, the changelog and the version file exactly as you found them — do not write a fragment, an entry or a version by hand, since a release the loop did not prepare is one nothing verifies.`;
 }
 
 /**
