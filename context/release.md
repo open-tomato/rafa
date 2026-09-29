@@ -163,7 +163,12 @@ absent. The release branch is `pr.base`, falling back to
 no `release.branch` setting, because `pr.base` already carries that fact.
 Refuses when the tag exists, when the tree is not on that branch, when the
 version file's version is not the one the changelog's newest section names,
-and when no commit holds that version yet. Prints the push and publish lines
+when that section carries no receipt (`<!-- rafa:fragments <id> -->`) and
+the version is above the adoption boundary, and when no commit holds that
+version yet. The boundary is read off the changelog alone
+(`src/release/receipt.ts`): the version of the newest section below the
+oldest receipted one; with no receipted section every version is legacy
+and accepted. Prints the push and publish lines
 but runs neither. There is no `release.registry` setting either: the registry
 comes from the version file's own `publishConfig.registry`, defaulting to
 `https://registry.npmjs.org`, and the manager from `packageManager`. Exits 0

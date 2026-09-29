@@ -851,6 +851,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-load.js', ['loadConfig']],
     ['../../config.js', ['ConfigError']],
     ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
+    ['../../release/receipt.js', ['readReceiptVerdict', 'receiptProblem']],
     ['../../release/version.js', ['readManifestVersion']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['../pr/merge-followups.js', ['versionTag']],
