@@ -88,12 +88,16 @@
  * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
  * from the working directory, {@link DispatchOptions.cwd}, to the first
  * directory holding `.rafa/config.yaml`, passing over the home,
- * {@link DispatchOptions.home}. The project found is the context's
- * `project`. With none, the invocation ends as the `no_project` refusal
+ * {@link DispatchOptions.home}. When the walk finds none, the main
+ * checkout of the repository holding the working directory is the
+ * project if it holds `.rafa/config.yaml`, so a linked worktree beside
+ * it runs in the main checkout's project. The project found is the
+ * context's `project`. With none, the invocation ends as the `no_project` refusal
  * with exit code 1 and the `rafa init` hint the walk answers as its
  * message, and the command never runs, so it prints no deprecation line.
- * A working directory or a home the walk refuses, a relative path or a
- * start that does not resolve, ends the same way with the walk's message.
+ * A working directory or a home the walk refuses, a relative path, a
+ * start that does not resolve or a git that cannot name the main
+ * checkout, ends the same way with the walk's message.
  *
  * A help request, a version request, a routing refusal, `invalid_spec`
  * and a command declaring `needsProject: false` read neither the working

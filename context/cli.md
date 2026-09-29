@@ -2073,12 +2073,17 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   command needing a project is read, `resolveScope` walks up from the
   working directory, `process.cwd()` unless the `cwd` option names
   another, to the nearest `.rafa/config.yaml`, passing over the home,
-  `homedir()` unless `home` names another. The project found is the
-  context's `project`. With none, the invocation ends as `no_project`
+  `homedir()` unless `home` names another. When the walk finds none, the
+  main checkout of the repository holding the working directory is the
+  project if it holds `.rafa/config.yaml`, so a linked worktree beside
+  it, which has no `.rafa/` of its own, runs in the main checkout's
+  project. The project found is the context's `project`. With none, the
+  invocation ends as `no_project`
   with exit code 1: `rafa: ` and the `rafa init` hint on stderr in text
   mode, the hint as the result's message in json mode. The command never
   runs, so it prints no deprecation line. A relative working directory or
-  home ends the same way with the walk's message. A help request, a
+  home, and a git that cannot name the main checkout, end the same way
+  with the walk's message. A help request, a
   routing refusal, `invalid_spec` and a command declaring
   `needsProject: false` read neither the working directory nor the home.
 

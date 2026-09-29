@@ -101,6 +101,14 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { describeValue, messageOf } from '../config-sections.js';
 
 import { DISK_FILE_SYSTEM, SCOPE_DIR, selfAndAncestors } from './scope.js';
+import { NOT_A_REPOSITORY } from './worktree-root.js';
+
+/**
+ * Re-exported from `worktree-root.ts`, which defines it so that module
+ * imports nothing from this one: `scope.ts` imports `worktree-root.ts`,
+ * and this module imports `scope.ts`.
+ */
+export { NOT_A_REPOSITORY };
 
 /** A directory refused by name, and why. */
 export interface RefusedRoot {
@@ -133,12 +141,6 @@ export const MONOREPO_MARKER_FILES = Object.freeze([
 
 /** The manifest that marks a monorepo when it has a `workspaces` key. */
 export const PACKAGE_JSON = 'package.json';
-
-/**
- * The start of the line `git rev-parse` prints when no directory at or
- * above holds a repository; see the module note.
- */
-export const NOT_A_REPOSITORY = 'fatal: not a git repository (or any ';
 
 /**
  * What a refusal is for: `system` for a directory in

@@ -49,7 +49,15 @@ import { isAbsolute } from 'node:path';
 
 import { createGitRunner, gitSaid } from '../pr/git.js';
 
-import { NOT_A_REPOSITORY } from './roots.js';
+/**
+ * The start of the line git prints when no directory at or above holds
+ * a repository, as `git rev-parse` and `git worktree list` both print
+ * it. Defined here rather than in `roots.ts`, which re-exports it, so
+ * this module imports nothing from `roots.ts`: `scope.ts` imports this
+ * module and `roots.ts` imports `scope.ts`, and the cycle through them
+ * left `SCOPE_DIR` uninitialised when `roots.ts` evaluated.
+ */
+export const NOT_A_REPOSITORY = 'fatal: not a git repository (or any ';
 
 /** The argv, after `git`, that lists the worktrees NUL-terminated. */
 export const WORKTREE_LIST_ARGS = Object.freeze(['worktree', 'list', '--porcelain', '-z'] as const);
