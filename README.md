@@ -224,11 +224,12 @@ default `push`), `release.tag` (`manual` or `settle`, default `manual`).
 ### Tracking effort and learning from skills
 
 Each run records what it cost in time, tokens and work, and which skills
-were offered, invoked and worked. Two commands read that record:
+were offered, invoked and worked. Key commands for the effort record:
 
 ```bash
 rafa effort collect        # gather and store session logs
 rafa effort report         # per-plan summary: sessions, tasks, costs
+rafa effort import <file>  # merge another device's store into this one
 ```
 
 `rafa effort report` shows the per-plan tables (sessions by status and
@@ -258,6 +259,92 @@ by ranking, or `none`):
 The report opens with a fixed line explaining that it shows co-occurrence,
 not causation: a skill can be invoked and its failure recur for reasons the
 skill does not cover.
+
+To see whether task sessions are getting more expensive over time, and
+whether that follows the plan or the calendar:
+
+```bash
+rafa effort report --trend                      # last 3 days against the 14 before, then the loops
+rafa effort report --trend --loops=10 --by=effort
+```
+
+The trend report has two parts. **Trend** compares the recent task
+sessions with a baseline: median and p90 of minutes, output tokens,
+cache-read tokens and turns per task, one row per day, and the sessions
+over the outlier line (baseline median plus three robust standard
+deviations). **Loops** lists one row per plan's loop, newest first: its
+wall-clock and summed task time, number of tasks, minutes per task (min,
+max, average, median), and average tokens and turns per task. Under the
+rows, a drift reading tests each per-task figure across the loops in the
+order they ran (the Mann-Kendall trend test). `no steady trend` means the
+cost moves with the plan; `rising` means it grows whatever the plan.
+
+To see everything at once, the loops running now included:
+
+```bash
+rafa effort collect && rafa effort dashboard
+rafa effort dashboard --output=json             # one key per widget, for a dashboard
+```
+
+The dashboard prints the running loops with their tasks done over total
+and three estimates of the time left: **by task** (the plan's average task
+session), **by progress** (the time since the plan first started, per task
+done), and **this session** (what `rafa loop status` prints). By progress
+counts the time between tasks too, so it is the one to compare against
+the clock. Then come the trend, the loops, each plan's skills M1 and M2,
+and the totals of every stored session.
+
+### Choosing how the effort store travels
+
+An effort store can travel between a project's devices in different ways, each
+suited to different setups. Set `effort.sync` in `.rafa/config.yaml`:
+
+| Setup | Strategy | Why |
+|---|---|---|
+| One laptop | `local` | Nothing to sync |
+| Two personal devices, occasional | `file` | No server, no account; copy a file |
+| Personal projects, frequent | `git` | History and access from git, works offline |
+| A company or several teams | `service` | One hub, live status, shared rules |
+| Advanced, exploratory | `p2p` | Devices talk directly (spike) |
+
+Configuration examples:
+
+```yaml
+# Default: no sync, each device keeps its own store
+# (nothing set, or effort: {sync: local})
+
+# File exchange with no server
+effort:
+  sync: file
+
+# Hub-based sync (requires module and service URL)
+effort:
+  sync: service
+  syncUrl: https://hub.example.com
+```
+
+Only `local` and `file` ship with rafa; `git`, `service` and `p2p` need a module.
+
+### Starting a second device
+
+To run rafa on a second device for the same project, bring the effort store over
+consistently using `rafa effort copy` and `rafa effort import`:
+
+1. On the new device, check for an existing `.rafa/effort/` store and set
+   it aside (rename or back up).
+2. From the primary device, make a consistent copy:
+   ```bash
+   rafa effort copy --to=<path>
+   ```
+   Or use `sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, but never
+   a plain file copy during a write.
+3. Transfer the copied store and `.rafa/config.yaml` to the new device's
+   `.rafa/` directory. **The exported file holds private text — task
+   descriptions, findings, and notes — meant only for your own devices.**
+4. After both devices have recorded effort, bring them back together with:
+   ```bash
+   rafa effort import <copied-store-file>
+   ```
 
 ### Which agents and skills are involved
 
@@ -331,11 +418,13 @@ with its section line, to change it.
 ### `effort`
 
 One setting says how long a command waits for another rafa process that
-is writing the effort store before it gives up with `SQLITE_BUSY`.
+is writing the effort store before it gives up with `SQLITE_BUSY`, and
+another names how the store travels between a project's devices.
 
 | Key | Default | What it sets |
 |---|---|---|
 | `effort.busyTimeoutMs` | `5000` | the wait in milliseconds, a whole number from 1 to 60000 |
+| `effort.sync` | `local` | how the store travels: `local`, `file`, `git`, `service` or `p2p` |
 
 There is no unlimited wait, since a lock wait with no end can hang a
 loop; `0`, a fraction and a quoted `"5000"` are refused.

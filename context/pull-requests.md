@@ -71,8 +71,8 @@ rafa-21's: the release stage writes its failure sentence into a pull
 request body the wrap-up session already wrote, when the provider that
 stage resolves is `gh`. The port is NOT in
 `PORT_VERSIONS` (`src/adapters/registry.ts` versions tracker, store,
-learning, output and planner only), so adding a method to it bumps no
-version.
+learning, output, planner and sync only), so adding a method to it bumps
+no version.
 
 `create` and `editTitle` are rafa-367's, for settle's `pr` delivery
 (`src/release/settle-pr.ts`), which opens or updates the one pending

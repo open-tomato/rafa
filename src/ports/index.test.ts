@@ -11,9 +11,10 @@
  * written to a temporary directory outside the repository and import the
  * entry by absolute path, so no gate ever reads one.
  *
- * One probe implements all five ports, its tracker under a kind an
- * add-on brings, assigns both store backends to `Store`, states every
- * port version, and compiles clean. Every other probe changes one thing
+ * One probe implements all six ports, its tracker under a kind an
+ * add-on brings, its `file` sync over `copyEffortStore` and `mergeStore`,
+ * assigns both store backends to `Store`, states every port version, and
+ * compiles clean. Every other probe changes one thing
  * against one port and is held to exactly one diagnostic: its code, and
  * message text naming what the probe changed, so a probe failing for
  * some other reason does not pass as the refusal it is there to show.
@@ -92,6 +93,19 @@
  * the library's structurally still reds. Measured that day at 28 pass:
  * `MergeRule` declared in the entry in place of its re-export reddened
  * its own name's case and the no-copy case, and nothing else.
+ *
+ * The `Sync` port arrived on 2026-09-29 with its four refusals. Six
+ * mutations of the entry were driven that day against this file,
+ * `src/adapters/registry.test.ts`, `src/tests/adapter-registry.test.ts`
+ * and `src/modules/`, each restored from a scratch copy and verified
+ * with `sha256sum -c`, and every one reddened a case. `kind` widened
+ * to `string`, `push` allowed to answer synchronously, and the pulled
+ * result's `merge` made optional each reddened its own refusal alone.
+ * `merge` typed as the learning library's `MergeResult` reddened the
+ * clean probe, the entry's own diagnostics and the refusal of a
+ * learning merge. `PortVersions` without `sync` reddened the clean
+ * probe and the registry's literal case, and `SyncPortVersion` widened
+ * to `number` the literal case alone.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -154,7 +168,13 @@ const TYPE_EXPORTS = [
   'SessionMode',
   'Store',
   'StorePortVersion',
+  'Sync',
   'SyncPayload',
+  'SyncPortVersion',
+  'SyncPullRequest',
+  'SyncPullResult',
+  'SyncPushRequest',
+  'SyncPushResult',
   'Tracker',
   'TrackerCapabilities',
   'TrackerKind',
@@ -224,6 +244,8 @@ const CONFORMING_PROBE = probeSource(
   `import { openNdjsonStore } from ${specifierOf('effort', 'store', 'ndjson.js')};`,
   `import { openSqliteStore } from ${specifierOf('effort', 'store', 'sqlite.js')};`,
   `import { parseSpecReview } from ${specifierOf('board', 'spec-review.js')};`,
+  `import { copyEffortStore } from ${specifierOf('effort', 'store', 'copy.js')};`,
+  `import { mergeStore } from ${specifierOf('effort', 'store', 'merge-store.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),
   'export const ndjson: P.Store = openNdjsonStore("/nonexistent");',
   'export const sqlite: P.Store = openSqliteStore("/nonexistent");',
@@ -258,11 +280,48 @@ const CONFORMING_PROBE = probeSource(
   '    review: parseSpecReview("nothing to read"),',
   '  }),',
   '};',
-  'export const versions: P.PortVersions = {',
-  '  tracker: 1, store: 1, learning: 1, output: 1, planner: 1,',
+  'export const localSync: P.Sync = {',
+  '  kind: "local",',
+  '  push: async () => ({ status: "nothing-to-sync" }),',
+  '  pull: async () => ({ status: "nothing-to-sync" }),',
   '};',
-  'export const port: P.PortType = "planner";',
+  'export const fileSync: P.Sync = {',
+  '  kind: "file",',
+  '  push: async (request) => {',
+  '    if (request.to === null) throw new Error("no directory");',
+  '    const copy = copyEffortStore({ source: ".rafa/effort", target: request.to });',
+  '    return { status: "pushed", path: copy.directory + "/effort.sqlite" };',
+  '  },',
+  '  pull: async (request) => {',
+  '    if (request.from === null) throw new Error("no file");',
+  '    return {',
+  '      status: "pulled",',
+  '      merge: mergeStore({',
+  '        path: ".rafa/effort/effort.sqlite", otherPath: request.from,',
+  '        backend: "sqlite", dryRun: request.dryRun, stamp: "probe",',
+  '      }),',
+  '    };',
+  '  },',
+  '};',
+  'export const versions: P.PortVersions = {',
+  '  tracker: 1, store: 1, learning: 1, output: 1, planner: 1, sync: 1,',
+  '};',
+  'export const port: P.PortType = "sync";',
 );
+
+/** A sync literal: `kind`, `push` and `pull` as given. */
+function syncLiteral(kind: string, push: string, pull: string): string[] {
+  return [
+    'export const sync: P.Sync = {',
+    `  kind: ${kind},`,
+    `  push: ${push},`,
+    `  pull: ${pull},`,
+    '};',
+  ];
+}
+
+/** A push or pull answering that there is nothing to sync, as `local` does. */
+const NOTHING_TO_SYNC = 'async () => ({ status: "nothing-to-sync" })';
 
 /** One probe changing one thing, and the one diagnostic it must draw. */
 interface Refusal {
@@ -388,11 +447,49 @@ const REFUSALS: readonly Refusal[] = [
     names: 'review',
   },
   {
+    title: 'a sync kind outside the five strategies',
+    file: 'sync-unknown-kind.ts',
+    source: probeSource(...syncLiteral('"rsync"', NOTHING_TO_SYNC, NOTHING_TO_SYNC)),
+    code: 2322,
+    names: '"rsync"',
+  },
+  {
+    title: 'a sync push that answers without a promise',
+    file: 'sync-sync-push.ts',
+    source: probeSource(
+      ...syncLiteral('"local"', '() => ({ status: "nothing-to-sync" })', NOTHING_TO_SYNC),
+    ),
+    code: 2739,
+    names: 'Promise<SyncPushResult>',
+  },
+  {
+    title: 'a sync pull that says it pulled and carries no merge',
+    file: 'sync-pulled-no-merge.ts',
+    source: probeSource(
+      ...syncLiteral('"file"', NOTHING_TO_SYNC, 'async () => ({ status: "pulled" })'),
+    ),
+    code: 2322,
+    names: 'Property \'merge\' is missing',
+  },
+  {
+    title: 'a sync pull whose merge is not the store merge\'s result',
+    file: 'sync-learning-merge.ts',
+    source: probeSource(
+      ...syncLiteral(
+        '"file"',
+        NOTHING_TO_SYNC,
+        'async () => ({ status: "pulled", merge: { decisions: [], discarded: [] } })',
+      ),
+    ),
+    code: 2322,
+    names: 'missing the following properties from type \'MergeResult\': path, otherPath',
+  },
+  {
     title: 'a port version other than the one its port declares',
     file: 'port-version-drifted.ts',
     source: probeSource(
       'export const versions: P.PortVersions = {',
-      '  tracker: 2, store: 1, learning: 1, output: 1, planner: 1,',
+      '  tracker: 2, store: 1, learning: 1, output: 1, planner: 1, sync: 1,',
       '};',
     ),
     code: 2322,

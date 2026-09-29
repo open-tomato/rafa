@@ -42,6 +42,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseReport } from '../../report/parse.js';
 
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 import { writeTriage } from './triage.js';
 
@@ -59,6 +60,8 @@ interface StoredBlocker {
   artifact: string | null;
   outcome: string;
   collected_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** An out-of-scope bugs row as the table holds it. */
@@ -79,6 +82,8 @@ const COLUMNS: Readonly<Record<TriageTableName, readonly string[]>> = {
     'artifact',
     'outcome',
     'collected_at',
+    'origin_store',
+    'origin_seq',
   ],
   out_of_scope_bugs: [
     'seq',
@@ -92,6 +97,8 @@ const COLUMNS: Readonly<Record<TriageTableName, readonly string[]>> = {
     'outcome',
     'collected_at',
     'scope',
+    'origin_store',
+    'origin_seq',
   ],
 };
 
@@ -275,9 +282,9 @@ describe('the triage migration', () => {
         .toEqual([...COLUMNS[table]]);
     }
     expect(rawQuery<{ name: string }>(root, tables, 'table').map(({ name }) => name))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'store_meta', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-2 store forward, keeping the findings it holds', () => {
@@ -297,7 +304,7 @@ describe('the triage migration', () => {
 
     expect(counts(result)).toEqual({ blockers: listOf(1, 0), outOfScopeBugs: listOf(1, 0) });
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT id FROM findings')).toEqual([{ id: 'f-1' }]);
     expect(columnOf(root, 'blockers', 'id')).toEqual(['from-v2-1']);
     expect(columnOf(root, 'out_of_scope_bugs', 'id')).toEqual(['from-v2-2']);
@@ -377,7 +384,7 @@ describe('writeTriage rows', () => {
       plan_stub: 'phase-0',
       task_line: 'Add the blockers and out-of-scope-bug tables',
     };
-    const written = { outcome: 'blocked', collected_at: '2026-09-13T10:00:00.000Z' };
+    const written = { outcome: 'blocked', collected_at: '2026-09-13T10:00:00.000Z', origin_store: null, origin_seq: null };
 
     expect(result.path).toBe(storeFile(root));
     expect(counts(result)).toEqual({ blockers: listOf(2, 0), outOfScopeBugs: listOf(3, 0) });
@@ -621,7 +628,7 @@ describe('the scope column', () => {
 
     expect(counts(result)).toEqual({ blockers: listOf(0, 0), outOfScopeBugs: listOf(1, 0) });
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(columnOf(root, 'out_of_scope_bugs', 'what'))
       .toEqual(['report writer drops the last line', 'a bug reported after the reading']);
     expect(columnOf(root, 'out_of_scope_bugs', 'scope')).toEqual([null, 'rafa']);

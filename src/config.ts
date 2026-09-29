@@ -40,9 +40,11 @@
  *     the setting specs, and the section and known-key indexes built off
  *     them. The four readings the spec leaves to the reader — open
  *     tracker kinds, empty prerequisite tiers, `version: 1` alone, and
- *     `loop.settingSources` as an ordered list — are argued there.
- *     Its `pr` and `release` sections sit in `config-schema-release.ts`,
- *     which it spreads in.
+ *     `loop.settingSources` as an ordered list — are argued there; the
+ *     readings each later section's spec leaves are argued in
+ *     `config-schema-readings.ts`, a note that exports nothing, except
+ *     the `pr` and `release` sections', which sit with their fields in
+ *     `config-schema-release.ts`, spread into `config-schema.ts`.
  *   - `config-readers.ts` holds `mapOf` and the named readers
  *     `config-schema.ts` reads its settings through. No caller reads a
  *     setting through them but the schema, so nothing here re-exports
@@ -190,6 +192,7 @@ export type {
   RouteTarget,
   SkillResolverName,
   StoreBackend,
+  SyncStrategy,
   TierPin,
   TierSwitch,
 } from './config-sections.js';
@@ -203,6 +206,7 @@ export {
   PREREQUISITE_KINDS,
   RELEASE_AUTO,
   STORE_BACKENDS,
+  SYNC_STRATEGIES,
 } from './config-sections.js';
 
 /**
@@ -323,6 +327,7 @@ function readLayer(
     version: read('version'),
     store: read('store'),
     effortBusyTimeoutMs: read('effortBusyTimeoutMs'),
+    effortSync: read('effortSync'),
     inject: read('inject'),
     planDir: read('planDir'),
     specsDir: read('specsDir'),

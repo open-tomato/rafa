@@ -1,0 +1,15 @@
+{
+  "name": "sync-fixture",
+  "version": "0.1.0",
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["sync"],
+    "provides": {
+      "sync": { "kind": "git", "entry": "./sync.ts" }
+    },
+    "requires": {
+      "rafa": ">=0.1 <1",
+      "ports": { "sync": 1 }
+    }
+  }
+}

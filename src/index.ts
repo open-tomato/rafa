@@ -137,6 +137,7 @@ export type {
   ReleaseEnabled,
   ResolvedConfig,
   StoreBackend,
+  SyncStrategy,
 } from './config.js';
 export type {
   AppendResult,
@@ -247,6 +248,7 @@ export {
   RELEASE_AUTO,
   resolveConfig,
   STORE_BACKENDS,
+  SYNC_STRATEGIES,
 } from './config.js';
 export { default as effortCollectCommand } from './effort/collect.js';
 export { default as effortReportCommand } from './effort/report.js';

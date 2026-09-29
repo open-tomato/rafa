@@ -132,6 +132,9 @@ function plantLoop(root: string, record: SessionRecord): void {
   writeFileSync(sessionFilePath(root, record.sessionId), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
 }
 
+/** The ids past the thirteen legacy entries, which adopting a pre-log store also applies. */
+const PAST_LEGACY_IDS = SQLITE_MIGRATIONS.slice(LEGACY_GATE_OPEN).map(({ id }) => id);
+
 /** The spec's refusal text for `path`, naming `needs`, before any loop sentence. */
 function refusalText(path: string, needs: string): string {
   return `effort store: ${path} needs migration ${needs} and this rafa is a development build (${CHECKOUT});`
@@ -184,7 +187,7 @@ describe('a development build with something pending, over a store it does not o
 
     const refusal = refusalOf(() => withDb(path, (db) => bringForward(db, path, 'read', 'open', UNOWNED)));
 
-    expect(refusal.message).toBe(refusalText(path, ADOPTION_NAME));
+    expect(refusal.message).toBe(refusalText(path, [ADOPTION_NAME, ...PAST_LEGACY_IDS].join(', ')));
     const after = snapshot(path, root);
     expect(after.names).toEqual(before.names);
     expect(after.bytes.equals(before.bytes)).toBe(true);
@@ -290,7 +293,8 @@ describe('a development build over a store it owns', () => {
     const result = withDb(path, (db) => bringForward(db, path, 'read', 'open', { identity: DEVELOPMENT, env: {} }));
 
     expect(result.adopted).toHaveLength(LEGACY_GATE_OPEN);
-    expect(loggedIds(path)).toHaveLength(LEGACY_GATE_OPEN);
+    expect(result.applied).toEqual(PAST_LEGACY_IDS);
+    expect(loggedIds(path)).toHaveLength(SQLITE_MIGRATIONS.length);
   });
 
   it('migrates a copy under the directory RAFA_EFFORT_DIR names', () => {

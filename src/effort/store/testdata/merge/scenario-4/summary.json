@@ -1,0 +1,124 @@
+{
+  "format": "rafa-merge-fixture/1",
+  "perSide": 200,
+  "overlap": 200,
+  "tables": [
+    {
+      "table": "sessions",
+      "rowsA": 940,
+      "rowsB": 934,
+      "overlap": 934,
+      "overlapKept": 200,
+      "keptA": 206,
+      "keptB": 200
+    },
+    {
+      "table": "commits",
+      "rowsA": 110,
+      "rowsB": 98,
+      "overlap": 98,
+      "overlapKept": 98,
+      "keptA": 110,
+      "keptB": 98
+    },
+    {
+      "table": "findings",
+      "rowsA": 2396,
+      "rowsB": 2351,
+      "overlap": 2275,
+      "overlapKept": 200,
+      "keptA": 321,
+      "keptB": 276
+    },
+    {
+      "table": "blockers",
+      "rowsA": 4,
+      "rowsB": 4,
+      "overlap": 4,
+      "overlapKept": 4,
+      "keptA": 4,
+      "keptB": 4
+    },
+    {
+      "table": "out_of_scope_bugs",
+      "rowsA": 725,
+      "rowsB": 697,
+      "overlap": 675,
+      "overlapKept": 200,
+      "keptA": 250,
+      "keptB": 222
+    },
+    {
+      "table": "report_absences",
+      "rowsA": 12,
+      "rowsB": 9,
+      "overlap": 9,
+      "overlapKept": 9,
+      "keptA": 12,
+      "keptB": 9
+    },
+    {
+      "table": "task_reports",
+      "rowsA": 751,
+      "rowsB": 751,
+      "overlap": 723,
+      "overlapKept": 200,
+      "keptA": 228,
+      "keptB": 228
+    },
+    {
+      "table": "preflight",
+      "rowsA": 128,
+      "rowsB": 106,
+      "overlap": 104,
+      "overlapKept": 104,
+      "keptA": 128,
+      "keptB": 106
+    },
+    {
+      "table": "dispatches",
+      "rowsA": 763,
+      "rowsB": 760,
+      "overlap": 732,
+      "overlapKept": 200,
+      "keptA": 231,
+      "keptB": 228
+    },
+    {
+      "table": "changes",
+      "rowsA": 615,
+      "rowsB": 611,
+      "overlap": 582,
+      "overlapKept": 200,
+      "keptA": 233,
+      "keptB": 229
+    },
+    {
+      "table": "skill_invocations",
+      "rowsA": 623,
+      "rowsB": 617,
+      "overlap": 617,
+      "overlapKept": 200,
+      "keptA": 206,
+      "keptB": 200
+    },
+    {
+      "table": "plan_ci",
+      "rowsA": 9,
+      "rowsB": 12,
+      "overlap": 7,
+      "overlapKept": 7,
+      "keptA": 9,
+      "keptB": 12
+    },
+    {
+      "table": "schema_migrations",
+      "rowsA": 13,
+      "rowsB": 0,
+      "overlap": 0,
+      "overlapKept": 0,
+      "keptA": 13,
+      "keptB": 0
+    }
+  ]
+}

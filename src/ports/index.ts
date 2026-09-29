@@ -1,5 +1,5 @@
 /**
- * The package's ports: the five interfaces core defines for an adapter
+ * The package's ports: the six interfaces core defines for an adapter
  * to implement, declared as types with no implementation behind any of
  * them.
  *
@@ -73,6 +73,17 @@
  *   - {@link Planner}: no spec gives it a signature. The phase 1 table
  *     names its core adapter as today's `plan.ts`, so the request and the
  *     answer are read off what `rafa plan` takes and leaves behind.
+ *   - {@link Sync}: issue #323, "choose how a project's effort store
+ *     travels". The spec gives its two directions, push (send the rows
+ *     this store wrote) and pull (merge the rows another device wrote),
+ *     and the five strategies `effort.sync` selects between. Every
+ *     adapter's pull runs `mergeStore` (`src/effort/store/merge-store.ts`),
+ *     so {@link SyncPullResult} carries that merge's own result type,
+ *     imported as `StoreMergeResult` because the learning library's
+ *     `MergeResult` already holds the name here. The request types are
+ *     read off what the `file` strategy needs: the directory
+ *     `rafa effort copy` writes into, and the `effort.sqlite` and
+ *     `--dry-run` that `rafa effort import` hands the merge.
  *
  * ## Property signatures
  *
@@ -97,6 +108,7 @@
  *     branch, which may widen the answer.
  */
 import type { SpecReviewReading } from '../board/spec-review.js';
+import type { MergeResult as StoreMergeResult } from '../effort/store/merge-store.js';
 import type { BlessedBundle, MergeResult, SyncPayload } from '../learning/types.js';
 
 export type {
@@ -138,6 +150,9 @@ export type OutputPortVersion = 1;
 /** The version of the {@link Planner} port this entry declares. */
 export type PlannerPortVersion = 1;
 
+/** The version of the {@link Sync} port this entry declares. */
+export type SyncPortVersion = 1;
+
 /**
  * Each port's version, under the port type the adapter registry keys its
  * adapters by. An adapter states the version of its port it implements,
@@ -149,9 +164,13 @@ export interface PortVersions {
   learning: LearningPortVersion;
   output: OutputPortVersion;
   planner: PlannerPortVersion;
+  sync: SyncPortVersion;
 }
 
-/** The five port types: `tracker`, `store`, `learning`, `output` and `planner`. */
+/**
+ * The six port types: `tracker`, `store`, `learning`, `output`,
+ * `planner` and `sync`.
+ */
 export type PortType = keyof PortVersions;
 
 // ---------------------------------------------------------------------
@@ -442,4 +461,78 @@ export interface Planner {
    * failed, or it finished without writing the plan.
    */
   create: (request: PlanRequest) => Promise<GeneratedPlan>;
+}
+
+// ---------------------------------------------------------------------
+// Sync
+// ---------------------------------------------------------------------
+
+/**
+ * Where a push leaves this store's rows.
+ *
+ * `to` is the directory the `file` strategy copies the store into, as
+ * `rafa effort copy --to=<dir>` names it, and null for a strategy that
+ * sends the rows on by itself or sends none.
+ */
+export interface SyncPushRequest {
+  readonly to: string | null;
+}
+
+/**
+ * Where a pull reads another device's rows from, and whether it swaps
+ * the merge in.
+ */
+export interface SyncPullRequest {
+  /**
+   * The other device's store file the `file` strategy merges, the
+   * `effort.sqlite` a copy carried, and null for a strategy that fetches
+   * the rows by itself or fetches none.
+   */
+  readonly from: string | null;
+  /**
+   * Build and check the merged store, then delete it rather than swap it
+   * in, as `mergeStore`'s own `dryRun` does.
+   */
+  readonly dryRun: boolean;
+}
+
+/** What a push did. */
+export type SyncPushResult =
+  /** The strategy moves no rows: `local`. */
+  | { readonly status: 'nothing-to-sync' }
+  /**
+   * The rows were sent. `path` is the file the person carries to the
+   * other device, the copy's `effort.sqlite` under `file`, and null for
+   * a strategy that delivered the rows itself.
+   */
+  | { readonly status: 'pushed'; readonly path: string | null };
+
+/** What a pull did. */
+export type SyncPullResult =
+  /** The strategy moves no rows: `local`. */
+  | { readonly status: 'nothing-to-sync' }
+  /**
+   * The rows were merged by `mergeStore`, whose result says whether the
+   * merge was swapped in or, under `dryRun`, built and deleted.
+   */
+  | { readonly status: 'pulled'; readonly merge: StoreMergeResult };
+
+/**
+ * How a project's effort store travels between devices: the strategy
+ * `effort.sync` selects. `local` and `file` are core's strategies and
+ * `git`, `service` and `p2p` modules'; the adapter registry holds core's
+ * as `sync/local` (`src/effort/sync/select.ts`) and `sync/file`
+ * (`src/effort/sync/file.ts`). Push and pull are directions,
+ * not strategies: in every strategy a device pushes the rows it wrote
+ * and pulls the rows others wrote.
+ */
+export interface Sync {
+  readonly kind: 'local' | 'file' | 'git' | 'service' | 'p2p';
+  /** Sends the rows this store wrote. */
+  push: (request: SyncPushRequest) => Promise<SyncPushResult>;
+  /**
+   * Merges the rows another device wrote into this store. Rejects with
+   * the merge's own refusal when `mergeStore` refuses.
+   */
+  pull: (request: SyncPullRequest) => Promise<SyncPullResult>;
 }

@@ -23,8 +23,9 @@
  *     `writeTriage` ever runs.
  *   - `rafa effort collect`, spawned as a development build (this
  *     repository's own `src/rafa.ts`), over a project's own store
- *     planted one migration behind this rafa: no migration log yet, and
- *     `plan-ci`, the last of `SQLITE_MIGRATIONS`, still pending. A live
+ *     planted as a pre-log release one entry short left it: no migration
+ *     log yet, and `plan-ci`, the last legacy entry, still pending with
+ *     every entry after it. A live
  *     loop record sits under the project's `.rafa/runs/`, its pid the
  *     test process's own so a real `isPidAlive` reads it alive. The
  *     child's `TMPDIR` is pointed at a directory of its own elsewhere,
@@ -79,6 +80,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { sessionLogDir } from '../effort/collect.js';
+import { LEGACY_GATE_OPEN } from '../effort/store/migrations.js';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../effort/store/sqlite.js';
 import { runsDir, sessionFilePath } from '../loop/sessions.js';
 import { recordTaskReport } from '../report/record.js';
@@ -272,17 +274,18 @@ describe('effort collect spawned as a development build, over a project store a 
   const LOOP_PLAN_STUB = 'rafa-234-effort-store-migrations-older';
 
   /**
-   * Plants the project's own store one migration behind this rafa: the
-   * legacy entries up to but not including `plan-ci` are run directly, as
-   * a pre-log release left it, so opening it with the full catalogue
-   * needs both the adoption (`schema_migrations`) and `plan-ci` itself.
+   * Plants the project's own store behind this rafa: the legacy entries
+   * up to but not including `plan-ci` are run directly, as a pre-log
+   * release left it, so opening it with the full catalogue needs the
+   * adoption (`schema_migrations`), `plan-ci` itself and every entry
+   * after it.
    */
   function plantPendingMigrationStore(root: string): string {
     const path = sqliteStorePath(root);
     mkdirSync(dirname(path), { recursive: true });
     const db = new Database(path, { create: true, readwrite: true });
     try {
-      migrateSchema(db, path, SQLITE_MIGRATIONS.slice(0, SQLITE_MIGRATIONS.length - 1));
+      migrateSchema(db, path, SQLITE_MIGRATIONS.slice(0, LEGACY_GATE_OPEN - 1));
     } finally {
       db.close();
     }
@@ -319,8 +322,10 @@ describe('effort collect spawned as a development build, over a project store a 
 
     expect(run.exitCode).not.toBe(0);
     expect(run.stdout).toBe('');
-    expect(run.stderr).toContain(`effort store: ${path} needs migration schema_migrations, plan-ci and this rafa is a`
-      + ' development build (');
+    const pending = SQLITE_MIGRATIONS.slice(LEGACY_GATE_OPEN - 1).map(({ id }) => id);
+    expect(pending[0]).toBe('plan-ci');
+    expect(run.stderr).toContain(`effort store: ${path} needs migration ${['schema_migrations', ...pending].join(', ')}`
+      + ' and this rafa is a development build (');
     expect(run.stderr).toContain('a development build migrates only a store under the temp directory or RAFA_EFFORT_DIR.'
       + ' Copy it with \'rafa effort copy\' and run this command with RAFA_EFFORT_DIR=<the copy>.');
     expect(run.stderr).toContain(`Loop ${LOOP_SESSION_ID} (pid ${String(process.pid)}, plan ${LOOP_PLAN_STUB})`

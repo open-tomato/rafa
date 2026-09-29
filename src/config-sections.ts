@@ -265,6 +265,17 @@ export const STORE_BACKENDS = ['sqlite', 'ndjson'] as const;
 /** One of the two effort-store backends. */
 export type StoreBackend = (typeof STORE_BACKENDS)[number];
 
+/**
+ * How a project's effort store travels between devices, as
+ * `effort.sync` names it. Closed: `git`, `service` and `p2p` are named
+ * here though modules bring their adapters, so a value outside the five
+ * is refused at load rather than when a sync is attempted.
+ */
+export const SYNC_STRATEGIES = ['local', 'file', 'git', 'service', 'p2p'] as const;
+
+/** One of the five effort-store sync strategies. */
+export type SyncStrategy = (typeof SYNC_STRATEGIES)[number];
+
 /** How much of the plan a task session is handed, widest first. */
 export const INJECT_MODES = ['full', 'stage', 'task'] as const;
 

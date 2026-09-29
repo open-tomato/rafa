@@ -162,17 +162,29 @@
  * included, and a project with no store yet gets none; its warnings are
  * `warn` lines, like the three below.
  *
+ * ## The effort sync row
+ *
+ * Every such run then reads the `effort sync` row
+ * (`./doctor-effort-sync.ts`, whose note says which registry each kind
+ * is selected through): `ok` naming the strategy `effort.sync` names,
+ * `local` when it names none, and `fail` when no adapter serves it,
+ * naming for `git`, `service` and `p2p` the `modules:` and `allowList:`
+ * lines that load a module providing it. Its line follows the effort
+ * store schema row on every run, a halt's included.
+ *
  * ## The exit code
  *
- * 0 when no required item failed and the effort store schema row did
- * not fail, whatever failed among the optional ones and whatever was
- * warned. 1 when a required item failed or timed out,
+ * 0 when no required item failed and neither the effort store schema
+ * row nor the effort sync row failed, whatever failed among the
+ * optional ones and whatever was warned. 1 when a required item failed or timed out,
  * which is when `loop start` would halt before any session: the refusal
  * opens with the runner's halt, which names each such item, its probe,
  * and its exit code with the first line of stderr. 1 when the effort
  * store schema row fails, the refusal naming the store, why this rafa
  * refuses it and its next safe step, after a halt's text when both
- * happen. 1 as well, each
+ * happen. 1 when the effort sync row fails, its refusal naming the
+ * strategy and why no adapter serves it, after the halt's and the
+ * schema row's text when those happen. 1 as well, each
  * ending `Nothing was checked.`, for a positional word, a `--plan` with
  * no file, a `--deep` holding a value, a plan named that is no file, a plan path that cannot be
  * checked, such as one under a file (`stat` answers `ENOTDIR`, measured
@@ -193,16 +205,18 @@
  * its rows, then any blocked issues, then any epic labels — and none for
  * one that has not; then the cleanup row, when there is anything to
  * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the `Skill tiers` rows
- * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then, under `--deep`,
+ * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
+ * effort sync row; then, under `--deep`,
  * `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a {@link DoctorResult}, every path
  * absolute, for a preflight that did not halt and an effort store schema
- * row that did not fail. A halt gives no `data`, nor does a failing row:
- * the terminal event is the `command_exit` error, whose message is the
- * halt naming every failed required item, then the row's refusal with
- * its next safe step. In either mode each warning is
+ * row and an effort sync row that did not fail. A halt gives no `data`,
+ * nor does a failing row: the terminal event is the `command_exit`
+ * error, whose message is the halt naming every failed required item,
+ * then each failing row's refusal, the schema row's with its next safe
+ * step. In either mode each warning is
  * a `warn` line, a `log` event in json mode, and so is the risk total, at
  * `info`.
  *
@@ -221,6 +235,7 @@ import type { DoctorBoardReadings, DoctorBoardSeams } from './doctor-board.js';
 import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
 import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
+import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from './doctor-effort-sync.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
@@ -254,7 +269,7 @@ import {
   mergePlanPrerequisites,
   prerequisitesPathForPlan,
 } from '../preflight/prerequisites-md.js';
-import { PROBE_TIMEOUT_MS, runPreflight } from '../preflight/run.js';
+import { runPreflight } from '../preflight/run.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { announceRiskTotal } from '../start/risk-total.js';
 import { trackerPathFor } from '../utils/tracker.js';
@@ -262,7 +277,9 @@ import { trackerPathFor } from '../utils/tracker.js';
 import { boardRunner, readDoctorBoard, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
+import { DOCTOR_DESCRIPTION } from './doctor-description.js';
 import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
+import { effortSyncRefusal, readDoctorEffortSync, renderDoctorEffortSync } from './doctor-effort-sync.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
@@ -276,8 +293,8 @@ import { isFile } from './plan/plan-files.js';
  * session runs in, the runner its provider probes go through, and how
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
-export interface DoctorSeams
-  extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams {
+export interface DoctorSeams extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorEffortSyncSeams,
+  DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -373,6 +390,8 @@ export interface DoctorResult {
   readonly tiers: DoctorTiersReading;
   /** The `effort store schema` row (`./doctor-effort-schema.ts`); a failing one gives no `data`. */
   readonly effortSchema: DoctorEffortSchemaReading;
+  /** The `effort sync` row (`./doctor-effort-sync.ts`); a failing one gives no `data`. */
+  readonly effortSync: DoctorEffortSyncReading;
   /** Every `--deep` section as it was read; null without `--deep`. */
   readonly deep: DeepReading | null;
 }
@@ -384,6 +403,7 @@ interface BoardReadings extends DoctorBoardReadings {
   readonly release: DoctorReleaseReading;
   readonly tiers: DoctorTiersReading;
   readonly effortSchema: DoctorEffortSchemaReading;
+  readonly effortSync: DoctorEffortSyncReading;
 }
 
 /** The line every refusal before a check ends with. */
@@ -567,23 +587,24 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
 }
 
 /**
- * The refusal for a halt, a failing `effort store schema` row, or both:
- * the runner's own text and what `loop start` would do, then the row's
- * refusal; null for neither.
+ * The refusal for a halt, a failing `effort store schema` or
+ * `effort sync` row, or any of them together: the runner's own text and
+ * what `loop start` would do, then each failing row's refusal in that
+ * order; null for none.
  */
-function doctorRefusal(halt: string | null, schema: string | null): CommandExit | null {
-  if (halt === null) {
-    return schema === null
-      ? null
-      : new CommandExit(1, schema);
-  }
-  const lines = [
-    `rafa doctor: ${halt}`,
+function doctorRefusal(halt: string | null, rows: readonly (string | null)[]): CommandExit | null {
+  const failed = rows.filter((row): row is string => row !== null);
+  const halted = [
+    `rafa doctor: ${String(halt)}`,
     'rafa loop start would halt here, before any session. No run was started and nothing was stored.',
   ];
-  return new CommandExit(1, [...lines, ...(schema === null
+  const lines = halt === null
     ? []
-    : [schema])].join('\n'));
+    : halted;
+  const all = [...lines, ...failed];
+  return all.length === 0
+    ? null
+    : new CommandExit(1, all.join('\n'));
 }
 
 /**
@@ -623,6 +644,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     release: readings.release,
     tiers: readings.tiers,
     effortSchema: readings.effortSchema,
+    effortSync: readings.effortSync,
     deep,
   };
 }
@@ -665,8 +687,9 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const release = readDoctorRelease({ root: project.root, config: preflight.config }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
     const effortSchema = readDoctorEffortSchema(project.root, context.env);
+    const effortSync = await readDoctorEffortSync({ root: project.root, home: project.home, resolved: preflight.resolved }, seams);
     const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue);
-    const readings: BoardReadings = { ...board, cleanup, refs, release, tiers, effortSchema };
+    const readings: BoardReadings = { ...board, cleanup, refs, release, tiers, effortSchema, effortSync };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
     const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
@@ -674,11 +697,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     writeDoctorRelease(context, release);
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
+    writeText(context, renderDoctorEffortSync(effortSync));
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
       : renderDeep(deep));
-    const refusal = doctorRefusal(preflight.report.halt, effortSchemaRefusal(effortSchema));
+    const refusal = doctorRefusal(preflight.report.halt, [effortSchemaRefusal(effortSchema), effortSyncRefusal(effortSync)]);
     if (refusal !== null) throw refusal;
     if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings, deep));
   } finally {
@@ -693,60 +717,7 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
     subject: 'doctor',
     action: 'doctor',
     summary: 'check the prerequisites rafa loop start checks, and the install, starting no run',
-    description: 'Checks the prerequisites `rafa loop start` checks before its first session and prints each'
-      + ' check, starting no run and storing nothing: the required and optional items of'
-      + ' `.rafa/config.yaml`, with the `PREREQUISITES-<stub>.md` beside the plan merged in, and, when the'
-      + ' repository resolves to `pr.provider: gh`, the two required items that provider adds ahead of them:'
-      + ' `gh` on PATH and `gh auth status` for the remote\'s host. A plan\'s `[start]` items are checked'
-      + ' after those and ahead of the configured tiers, on a first dispatch alone: a'
-      + ' `PLAN_TRACKER-<stub>.md` beside the plan already holding a ticked task makes the next run a'
-      + ' resume, which checks none of them and says in one line how many it passed over.'
-      + ' The plan is the'
-      + ' one `--plan=<file>` names, relative to the project root, or the default plan `rafa loop start`'
-      + ` runs. Each probe runs in the project root with stdin closed and a ${String(PROBE_TIMEOUT_MS / 1000)}-second`
-      + ' timeout. It exits 1 when a required item fails, naming the item, its probe and its exit code or'
-      + ' first line of stderr, where `rafa loop start` would halt. It reads the effort store as'
-      + ' `rafa effort schema --check` does, changing nothing, and prints its `effort store schema` row:'
-      + ' it exits 1 where that check fails, naming the next safe step, and warns on a migration this rafa'
-      + ' does not know that is additive and on one the project\'s own store logs as applied by a development'
-      + ' build. It exits 0 otherwise. It warns when'
-      + ' `.ralph/effort/` holds an effort store and `.rafa/effort/` holds none, and when `~/.rafa/bin` is'
-      + ' not on PATH ahead of `~/.bun/bin`, and when `previous/` under `specs.dir` holds more than fifty'
-      + ' previous copies of issue specs, which are safe to delete; a warning never changes the exit code. On a repository whose'
-      + ' provider is `gh` it also reads the GitHub board `rafa init --board` sets up and prints one row per'
-      + ' part — the seven labels, the spec issue template, the Roadmap issue and `roadmap.issue` — as present,'
-      + ' missing, or unknown for a reading that failed, naming `rafa init --board` as the fix; it writes'
-      + ' nothing to the board and a row never changes the exit code. It then names, under `Blocked'
-      + ' issues:`, every open issue labelled `spec:blocked` whose `Blocked by:` line is missing, names no'
-      + ' issue, names itself, or names an id the board has no issue for, with what an author does about'
-      + ' it; that reading writes nothing and never changes the exit code either. It then names, under'
-      + ' `Epic labels:`, every issue carrying two `epic:` labels and every `epic:` label no `type:epic` issue'
-      + ' carries, read off one board listing, writing nothing and never changing the exit code. It then names, under'
-      + ' `Boards:`, every type:roadmap board whose Owner: handle resolves to nobody GitHub shows, every open issue titled'
-      + ' "Roadmap" without type:roadmap while labelled boards exist, and every slot of this checkout\'s position on a'
-      + ' board or epic that is closed, unlabelled or gone, read off that same listing and printing nothing when there is'
-      + ' none; it writes nothing and never changes the exit code. It then counts, without'
-      + ' fetching, the branches and worktrees `rafa cleanup` would list, and prints them in one row naming'
-      + ' `rafa cleanup` when any group holds one. It then counts the suspect, dangling and unknown references'
-      + ' of every saved copy under `specs.dir`, writing nothing, and names `rafa issue check <n>` for each'
-      + ' copy holding a suspect or dangling one. Where the release is on, it then prints one `Release:` row naming'
-      + ' the version `origin/<pr.base>` declares as last fetched, the latest release tag, the version the changelog\'s'
-      + ' top heading names and the change fragments waiting on the base, as a warning naming `rafa release settle`'
-      + ' while any wait; it fetches nothing and never changes the exit code.'
-      + ' It then prints, under `Skill tiers`, a warning per'
-      + ' skill or agent name two tiers hold with different contents, per unreviewed third-party rafa or'
-      + ' add-on item, and for an installed Claude Code other than the version skill serving was probed'
-      + ' against, and a note per byte-identical copy that can be deleted and per user-tier item with no'
-      + ' `provenance`; none changes the exit code. With `--output=json` the'
-      + ' checks, both readings, those rows, those issues, those labels and those boards are the data of the terminal result event,'
-      + ' unless a required item failed. A plan `--plan` names also gets the one-line risk total'
-      + ' `rafa loop start` prints before its notices, which never changes the exit code. With `--deep` it'
-      + ' also prints the machine as a loop session sees it, starting no session: the session\'s'
-      + ' Environment and working directory against the shell\'s, the Settings each agent, skill and MCP'
-      + ' server is read from and whether a session sees it, the Providers `gh` answers under the session\'s'
-      + ' environment, and the Stack tools the project\'s stack needs, with Plan needs for a plan `--plan`'
-      + ' names; each row is ok, warn or note with its fix, printed after the blocked issues and before a'
-      + ' refusal, and none changes the exit code. With `--output=json` they are the `deep` of the data.',
+    description: DOCTOR_DESCRIPTION,
     args: [],
     flags: [
       {

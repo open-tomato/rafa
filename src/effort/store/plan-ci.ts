@@ -20,6 +20,7 @@
  * | `verdict` | `green`, `red` or `none`, as `verdictOf` reads the rows |
  * | `failing` | the failing checks' names, a JSON array, `[]` unless red |
  * | `read_at` | when the checks were read, ISO 8601 |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store. A
  * CHECK keeps `failing` non-empty exactly when the verdict is `red`. The
@@ -84,6 +85,7 @@ import { failingRows, verdictOf } from '../../pr/checks.js';
 import { attributeBranch, planStubsFromFileNames, resolvePlanStub } from '../attribution.js';
 
 import { describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** A settled verdict: what the table stores, `pending` left out. */
@@ -164,8 +166,8 @@ interface StoredPlanCi {
 
 /** The insert; the same reading of the same head is absorbed as held. */
 const INSERT_PLAN_CI = `
-  INSERT INTO plan_ci (plan_stub, pr, head_sha, verdict, failing, read_at)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT INTO plan_ci (plan_stub, pr, head_sha, verdict, failing, read_at, ${STAMPED_COLUMNS})
+  VALUES (?, ?, ?, ?, ?, ?, ${stampedValues('plan_ci')})
   ON CONFLICT (pr, head_sha, read_at) DO NOTHING
 `;
 

@@ -25,6 +25,7 @@
  * | `skills_offered` | the bare names of the skills its prompt offered, a JSON array, or NULL when not recorded |
  * | `lessons_offered` | the ids of the lessons its prompt offered, a JSON array, or NULL when not recorded |
  * | `collected_at` | the write's time, ISO 8601 |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store. The
  * five value columns follow `DECLARATION_KEYS`, whose sixth key, `skills`,
@@ -106,6 +107,7 @@ import { existsSync } from 'node:fs';
 import { SKILL_RESOLVERS } from '../../config-sections.js';
 
 import { describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { LONE_SURROGATE, sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** The part of the parser's record a row stores. */
@@ -164,9 +166,10 @@ const INSERT_DISPATCH = `
   INSERT INTO dispatches (
     session_id, plan_stub, task_line,
     declaration, agent, model, effort, budget_usd, tools,
-    flags, resolver, skills_offered, lessons_offered, collected_at
+    flags, resolver, skills_offered, lessons_offered, collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('dispatches')})
   ON CONFLICT (session_id) DO NOTHING
 `;
 
@@ -347,4 +350,40 @@ export function readSessionBudgets(repoRoot: string): SessionBudget[] {
     taskLine: row.task_line,
     budgetUsd: row.budget_usd,
   }));
+}
+
+/** One dispatched session's agent. */
+export interface SessionAgent {
+  /** The session's id, which its session row is keyed by. */
+  readonly sessionId: string;
+  /** The agent its task declared. */
+  readonly agent: string;
+}
+
+/** Every row naming an agent, in append order. */
+const SELECT_AGENTS = `
+  SELECT session_id, agent
+  FROM dispatches
+  WHERE agent IS NOT NULL
+  ORDER BY seq
+`;
+
+/**
+ * The sessions dispatched with an agent, in the order they were stored.
+ *
+ * Answers none, opening and creating nothing, when the store file does
+ * not exist. Throws when it exists and cannot be read. See the module
+ * note.
+ */
+export function readSessionAgents(repoRoot: string): SessionAgent[] {
+  const path = sqliteStorePath(repoRoot);
+  if (!existsSync(path)) return [];
+
+  const rows = withSqliteStore(
+    path,
+    'read',
+    false,
+    (db) => db.query<{ session_id: string; agent: string }, []>(SELECT_AGENTS).all(),
+  );
+  return rows.map((row) => ({ sessionId: row.session_id, agent: row.agent }));
 }

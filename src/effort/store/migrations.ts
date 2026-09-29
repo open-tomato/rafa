@@ -408,7 +408,140 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   );
   `,
   },
+  // The first entry past the legacy history: which store wrote each row
+  // of the twelve tables a merge unions, and the row's own `seq` there.
+  // Both columns are nullable with no DEFAULT, because a pre-log runtime
+  // keeps inserting through this entry without naming them, and a row
+  // it writes, like every row held before this entry ran, reads NULL in
+  // both. Each unique index covers only rows carrying an origin, so
+  // those NULL rows never collide. No trigger fills them, since a
+  // trigger breaks `writers`: a writer that stamps an origin names both
+  // columns in its own insert.
+  {
+    id: 'row-origins',
+    breaks: [],
+    sql: `
+  ALTER TABLE sessions ADD COLUMN origin_store TEXT;
+  ALTER TABLE sessions ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX sessions_by_origin
+    ON sessions (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
 
+  ALTER TABLE commits ADD COLUMN origin_store TEXT;
+  ALTER TABLE commits ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX commits_by_origin
+    ON commits (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE findings ADD COLUMN origin_store TEXT;
+  ALTER TABLE findings ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX findings_by_origin
+    ON findings (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE blockers ADD COLUMN origin_store TEXT;
+  ALTER TABLE blockers ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX blockers_by_origin
+    ON blockers (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE out_of_scope_bugs ADD COLUMN origin_store TEXT;
+  ALTER TABLE out_of_scope_bugs ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX out_of_scope_bugs_by_origin
+    ON out_of_scope_bugs (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE report_absences ADD COLUMN origin_store TEXT;
+  ALTER TABLE report_absences ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX report_absences_by_origin
+    ON report_absences (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE task_reports ADD COLUMN origin_store TEXT;
+  ALTER TABLE task_reports ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX task_reports_by_origin
+    ON task_reports (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE preflight ADD COLUMN origin_store TEXT;
+  ALTER TABLE preflight ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX preflight_by_origin
+    ON preflight (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE dispatches ADD COLUMN origin_store TEXT;
+  ALTER TABLE dispatches ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX dispatches_by_origin
+    ON dispatches (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE changes ADD COLUMN origin_store TEXT;
+  ALTER TABLE changes ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX changes_by_origin
+    ON changes (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE skill_invocations ADD COLUMN origin_store TEXT;
+  ALTER TABLE skill_invocations ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX skill_invocations_by_origin
+    ON skill_invocations (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE plan_ci ADD COLUMN origin_store TEXT;
+  ALTER TABLE plan_ci ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX plan_ci_by_origin
+    ON plan_ci (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+  `,
+  },
+  // The store's own identity and its merge trail, three tables that never
+  // leave this machine. `store_meta` holds one row, pinned by `id = 1`:
+  // the origin this store stamps on the rows it writes, the project it
+  // belongs to, and the host, absolute path and file identity it was
+  // minted under, which a writing open compares to detect a copy.
+  // `merges` records each merge by the other store's id, NULL when that
+  // store was never minted, with the rows it added, skipped and left in
+  // conflict. `merge_conflicts` keeps each incoming row a merge could not
+  // settle, as the JSON of its columns, beside the local row's `seq`;
+  // `field` names the edited field whose two values differ, and is NULL
+  // when the rows differ outside any edited field.
+  {
+    id: 'store-meta',
+    breaks: [],
+    sql: `
+  CREATE TABLE store_meta (
+    id                  INTEGER PRIMARY KEY CHECK (id = 1),
+    store_id            TEXT NOT NULL CHECK (store_id <> ''),
+    project_root_commit TEXT NOT NULL CHECK (project_root_commit <> ''),
+    project_remote      TEXT CHECK (project_remote <> ''),
+    host_id             TEXT NOT NULL CHECK (host_id <> ''),
+    store_path          TEXT NOT NULL CHECK (store_path <> ''),
+    file_dev            INTEGER NOT NULL CHECK (typeof(file_dev) = 'integer'),
+    file_ino            INTEGER NOT NULL CHECK (typeof(file_ino) = 'integer'),
+    minted_at           TEXT NOT NULL CHECK (minted_at <> '')
+  );
+
+  CREATE TABLE merges (
+    seq              INTEGER PRIMARY KEY,
+    id               TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    other_store      TEXT CHECK (other_store <> ''),
+    merged_at        TEXT NOT NULL CHECK (merged_at <> ''),
+    rows_added       INTEGER NOT NULL CHECK (typeof(rows_added) = 'integer' AND rows_added >= 0),
+    rows_skipped     INTEGER NOT NULL CHECK (typeof(rows_skipped) = 'integer' AND rows_skipped >= 0),
+    rows_in_conflict INTEGER NOT NULL CHECK (typeof(rows_in_conflict) = 'integer' AND rows_in_conflict >= 0)
+  );
+
+  CREATE TABLE merge_conflicts (
+    seq         INTEGER PRIMARY KEY,
+    merge_id    TEXT NOT NULL CHECK (merge_id <> ''),
+    table_name  TEXT NOT NULL CHECK (table_name <> ''),
+    local_seq   INTEGER NOT NULL CHECK (typeof(local_seq) = 'integer'),
+    field       TEXT CHECK (field <> ''),
+    incoming    TEXT NOT NULL CHECK (json_valid(incoming) AND json_type(incoming) = 'object'),
+    recorded_at TEXT NOT NULL CHECK (recorded_at <> '')
+  );
+  `,
+  },
 ];
 
 /**

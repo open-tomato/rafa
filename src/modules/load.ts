@@ -33,10 +33,10 @@
  * so `rafa module list` can say why a disabled module would not load.
  * Only an enabled module goes further, and only with no problem so far:
  *
- *   1. Each `tracker`, `store`, `planner` and `output` entry is resolved
- *      against the module directory and imported. Its default export is
- *      the adapter's `create`, called with an `AdapterContext` and
- *      answering the port. It is registered under its port type and the
+ *   1. Each `tracker`, `store`, `planner`, `output` and `sync` entry is
+ *      resolved against the module directory and imported. Its default
+ *      export is the adapter's `create`, called with an `AdapterContext`
+ *      and answering the port. It is registered under its port type and the
  *      `kind` the manifest names, at the port version `requires.ports`
  *      states, so the registry's own refusals apply: a kind core or an
  *      earlier module holds, and a port version core does not serve,
@@ -168,7 +168,7 @@ export interface InvocationPlace {
 }
 
 /** The port types a manifest can provide an adapter for, in the order they are registered. */
-const ADAPTER_TYPES = ['tracker', 'store', 'planner', 'output'] as const;
+const ADAPTER_TYPES = ['tracker', 'store', 'planner', 'output', 'sync'] as const;
 
 /** Why a source kind phase 1 does not read is refused. */
 const PHASE_7 = 'phase 1 loads path sources alone, and installing a package or a repository is phase 7\'s';
