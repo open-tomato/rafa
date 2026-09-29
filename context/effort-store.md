@@ -167,6 +167,21 @@ rebuild over non-null rows migrates, names the backup, refuses beside a
 planted live loop, and spawns `bun src/rafa.ts`: refused over a project's
 store, migrating a copy under `RAFA_EFFORT_DIR`.
 
+**`rafa effort merge <file> [--dry-run]` joins another device's store**
+(`src/commands/effort/merge.ts` over `mergeStore`,
+`src/effort/store/merge-store.ts`, whose note holds the rules and the
+refusals). This store is the one `effortStoreDir` answers; `<file>` is
+read against the directory the command runs from and is only read. It
+prints, per merged table, the rows added, skipped and in conflict (and
+the set-once fields filled and the rows another UNIQUE key refused,
+when any), the totals with the commit gaps recomputed, and
+`effort.sqlite.before-merge-<stamp>.bak`, or under `--dry-run` that the
+build was checked and deleted. Another project's store and a
+`store: ndjson` project, the latter naming `rafa effort move
+--to=sqlite`, are exit code 2; every other refusal, a live loop and a
+development build over a store it does not own among them, is exit
+code 1, and each leaves both files byte-identical (`merge.test.ts`).
+
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
 empty string, right after the detached refusal and before `--runtime`

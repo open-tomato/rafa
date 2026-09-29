@@ -134,6 +134,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'effort copy': ['text', 'json'],
   'effort schema': ['text', 'json'],
   'effort migrate': ['text', 'json'],
+  'effort merge': ['text', 'json'],
   'module list': ['text', 'json'],
   'module exec': ['text', 'json'],
   'agent vendor': ['text', 'json'],
@@ -238,6 +239,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'effort copy': [[], ['to']],
   'effort schema': [[], ['check']],
   'effort migrate': [[], ['dry-run']],
+  'effort merge': [['file'], ['dry-run']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
@@ -475,6 +477,7 @@ describe('the core roster', () => {
       'effort copy',
       'effort schema',
       'effort migrate',
+      'effort merge',
       'module list',
       'module exec',
       'agent vendor',
@@ -633,7 +636,7 @@ describe('how the command tree routes', () => {
     const issue = await dispatchRecorded('issue');
     const unknown = await dispatchRecorded('stop');
 
-    expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report, fix-schema, copy, schema, migrate\n');
+    expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report, fix-schema, copy, schema, migrate, merge\n');
     expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move, ready, unblock, check\n');
     expect(unknown.stderr).toBe('rafa: unknown subject or command "stop"\n');
     expect([bare.outcome.exitCode, issue.outcome.exitCode, unknown.outcome.exitCode]).toEqual([1, 1, 1]);
