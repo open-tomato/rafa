@@ -281,6 +281,58 @@ describe('rafa plan list, dispatched', () => {
     const refused = await dispatchInProject(['plan', 'list'], SUBJECTS, [planListCommand], project);
     expect([refused.exitCode, refused.stderr.split('\n')[0]]).toEqual([1, '❌ rafa plan list: the config cannot be used:']);
   });
+
+  it('refuses a value typed onto --open with exit code 1', async () => {
+    const project = freshProject();
+    plantPlans(project.root, DEFAULT_DIR);
+    const run = await dispatchInProject(['plan', 'list', '--open=maybe'], SUBJECTS, [planListCommand], project);
+
+    expect(run).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: '❌ --open takes no value, and read "maybe" as one. Type it bare: rafa plan list --open\n',
+    });
+  });
+
+  it('lists only alpha for its open task and b for its issues under --open, hiding neither', async () => {
+    const project = freshProject();
+    plantPlans(project.root, DEFAULT_DIR);
+    const run = await dispatchInProject(['plan', 'list', '--open'], SUBJECTS, [planListCommand], project);
+
+    expect(run).toEqual({
+      exitCode: 0,
+      stdout: `${[
+        `Plans in ${DEFAULT_DIR}/:`,
+        '  alpha   1/3 done, 1 blocked, 1 open',
+        '  b       1/1 done, 0 blocked, 0 open; no tracker; 2 issues',
+      ].join('\n')}\n`,
+      stderr: '',
+    });
+  });
+
+  it('prints the no-open-tasks line and exits 0 where every plan is done or all-blocked with no issues', async () => {
+    const project = freshProject();
+    const dir = DEFAULT_DIR;
+    plantFiles(project.root, {
+      [`${dir}/PLAN-alpha.md`]: ALPHA_PLAN,
+      [`${dir}/PLAN_TRACKER-alpha.md`]: ALPHA_TRACKER.replace('- [ ] third', '- [BLOCKED] third'),
+    });
+    const run = await dispatchInProject(['plan', 'list', '--open'], SUBJECTS, [planListCommand], project);
+
+    expect(run).toEqual({ exitCode: 0, stdout: `No plan in ${dir}/ has open tasks.\n`, stderr: '' });
+  });
+
+  it('holds only the kept plans in the result data of json mode', async () => {
+    const project = freshProject(CONFIGURED_CONFIG);
+    plantPlans(project.root, CONFIGURED_DIR);
+    const run = await dispatchInProject(['plan', 'list', '--open', '--output=json'], SUBJECTS, [planListCommand], project);
+    const events = eventsOf(run.stdout);
+    const kept = openPlans(listPlans(plansDirAt(project.root, CONFIGURED_DIR)));
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    expect(events[1]).toMatchObject({ type: 'result', ok: true, data: JSON.parse(JSON.stringify(kept)) as unknown });
+  });
 });
 
 describe('rafa plan list, spawned', () => {
