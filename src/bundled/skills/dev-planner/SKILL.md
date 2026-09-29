@@ -155,7 +155,7 @@ Recognized fields:
 - `stub` — The plan identifier (string, following the `rafa-<n>-<slug>` format). Used to organize findings and dedupe rows across runs.
 - `issue` — Optional GitHub issue number (integer, e.g., `123`). Links the work back to the `open-tomato/rafa` board.
 - `spec` — Optional path to the specification document that guided the plan.
-- `release` — Optional release level for the version bump this plan's pull request ships: `patch`, `minor`, `major` or `none`. Anything else is reported as `unusable-field` and read as if unset. Left out, the level is the highest among the change notes the plan's tasks stored, and `none` when they stored none.
+- `release` — Optional release level for the version bump this plan's pull request ships: `patch`, `minor`, `major` or `none`. Anything else is reported as `unusable-field` and read as if unset. When absent, the level is the highest severity among the plan's collected change notes. The wrap-up writes this level to a release fragment file (under `release.fragments`, default `.changes/`) that `rafa release settle` will process to compute the version bump after the branch merges.
 
 Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
 
@@ -270,7 +270,7 @@ Report fields:
 | `skills_used` | list of strings | Names of skills referenced or applied |
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
 | `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
-| `changes` | list of objects | The changelog for this task's own diff, one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none` |
+| `changes` | list of objects | Release notes for this task's own diff (contributing to the release fragment), one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none`. The wrap-up collects these from all tasks and writes them to the fragment that `rafa release settle` processes after the branch merges. |
 
 Finding entry fields:
 
@@ -414,13 +414,13 @@ The second example above has no `skills=` and is still a valid task declaration.
   invariant sweeps), live-seam runs, migrations, and close-out — these
   preserve resumability where a halt is most likely.
 * The RUNNER owns the push, the pull request, the merge with the base,
-  the wait for CI, and the version bump and changelog entry. After the last
+  the wait for CI, and the release fragment creation. After the last
   task it runs a wrap-up session that promotes findings, compacts
   `progress.txt`, merges `origin/main`, commits, pushes and opens (or
   updates) the PR — and then polls that PR's checks, spending repair sessions
   on a red or conflicting result. So a plan must NOT carry a task that opens
   a PR, resolves a merge conflict, waits on CI, compacts `progress.txt`,
-  or writes a version bump or changelog entry. Two openers race: measured,
+  or writes a release fragment. Two openers race: measured,
   one run cut a second branch and opened a second PR for a single plan. A
   close-out task SHOULD still take the mergeability reading (`git merge-tree
   --write-tree origin/main HEAD`) and assemble the body material — the gate
