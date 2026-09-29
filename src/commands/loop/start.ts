@@ -4,22 +4,29 @@
  *
  * The command is aliased `start`, so the phase 0 spelling
  * `rafa start --plan=<file>` still runs it, after one deprecation line on
- * stderr. `src/start.ts` and `src/start/run-config.ts` read its flags,
- * and the ones declared here are those they read. The CI defaults are
- * the loop's own constants, so the help cannot drift from them.
+ * stderr. `src/start.ts`, `src/start/run-config.ts` and
+ * `src/start/run-setup.ts` read its flags, and the ones declared here
+ * are those they read. The CI defaults are the loop's own constants, so
+ * the help cannot drift from them.
  *
  * `-d|--detached` is declared so the help does not change when detached
  * runs arrive in phase 6, and `start/run-config.ts` refuses it until
  * then, before anything else is read.
  *
- * `--create-branch` is read by `src/start.ts` ahead of its branch guard,
- * and only on `main` or `master`: it answers yes to the question the run
+ * `--create-branch` is read by `src/start/run-setup.ts` ahead of its
+ * branch guard, and only on `main` or `master`: it answers yes to the question the run
  * would otherwise ask a terminal (`start/branch.ts`). It is declared
  * beside `--any-branch` because the two are the pair an operator on the
  * base chooses between — leave the base, or stay on it deliberately —
  * and `--any-branch` outranks it.
  *
- * `--hint` is read by neither, and by nothing before the run: it is
+ * `--as-worktree` is declared beside them for the same reason: it is
+ * the third answer to that question, the plan's branch in a worktree
+ * of its own (`start/worktree.ts`), and `start/run-setup.ts` refuses it
+ * beside `--create-branch` before anything else is read but
+ * `-d|--detached`.
+ *
+ * `--hint` is read by none of them, and by nothing before the run: it is
  * this tree's own ({@link HINT_FLAG_SPEC}), and `endingWith` reads it
  * once `start` has returned, to end a finished run by naming the one
  * step that follows — with the pull request pushed, the wait on its
@@ -58,7 +65,9 @@ const wrapped = wrapPhaseZeroCommand({
     + ' store. Started on'
     + ' `main` or `master` it offers to create the plan\'s `feat/<stub>` from the latest'
     + ' `origin/<base>` and run there, `--create-branch` answering that without asking, and refuses'
-    + ' the run when the offer is not taken. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
+    + ' the run when the offer is not taken. `--as-worktree` runs the plan in a worktree of its own on'
+    + ' that branch instead, leaving the main checkout as it is, and is refused beside'
+    + ' `--create-branch`. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
     + ' the plan, the branch, the pid, the start, the state and the running task, and under `--roadmap`'
     + ' the hop away, when one is. It refuses a plan whose'
     + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
@@ -122,6 +131,14 @@ const wrapped = wrapPhaseZeroCommand({
         + ' and runs the plan there without asking, or switches to that branch when it already'
         + ' exists. Refuses rather than move when a tracked file is modified, the fetch fails or the'
         + ' base has diverged from its remote.',
+      type: 'boolean',
+    },
+    {
+      name: 'as-worktree',
+      description: 'Runs the plan in a linked worktree of its own: `feat/<plan-stub>` from the latest'
+        + ' `origin/<base>`, added at `<loop.worktreeDir>/<plan-stub>`, `.rafa/worktrees` unless the'
+        + ' config names another. The main checkout keeps its branch and working tree. Refused beside'
+        + ' `--create-branch`, which makes the same branch by switching the main checkout.',
       type: 'boolean',
     },
     {

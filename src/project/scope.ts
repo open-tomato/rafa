@@ -48,6 +48,35 @@
  * home spelled in another case: measured on bun 1.3.14 on macOS,
  * `realpathSync('/users')` answers `/Users`.
  *
+ * ## A linked worktree
+ *
+ * `.rafa/` is gitignored, so a linked worktree of a project's
+ * repository holds none of its own, and a walk from a worktree beside
+ * the main checkout reaches no project. So when the walk finds nothing,
+ * the resolution asks for the MAIN CHECKOUT of the repository holding
+ * the start, `mainCheckoutOf` in `worktree-root.ts`, and answers it as
+ * the root when it holds `.rafa/config.yaml`. A worktree under the main
+ * checkout, at `.rafa/worktrees/<name>` say, needs no fallback: the
+ * walk climbs into the main checkout and finds it there.
+ *
+ * The fallback runs only once the walk has found nothing, so a start
+ * inside a project never runs git, and a worktree whose own `.rafa/`
+ * holds the file still resolves to itself. It checks the main checkout
+ * alone and does not climb above it: a project above the repository is
+ * one the walk already reached, had there been one. The main checkout
+ * is not probed again when the walk already passed it, which it did
+ * from the main checkout and from any directory under it, and it is
+ * not taken when it is the home, for the reason the home is passed
+ * over. When the main checkout it probed holds no file either, the hint
+ * names it.
+ *
+ * Git answers the main checkout as a real path, measured in
+ * `worktree-root.ts`, so it compares with the real paths the walk
+ * climbs. A git that cannot answer, a `WorktreeRootError`, is refused
+ * as a {@link ScopeError} carrying it as its cause, so the dispatcher
+ * prints it as it prints the walk's other refusals rather than
+ * answering "no project" for a start it could not read.
+ *
  * ## Seams
  *
  * The home is an argument with no default, as it is for `loadConfig`,
@@ -56,7 +85,10 @@
  * throws a `TypeError`. The filesystem is a {@link ScopeFileSystem},
  * the two calls the walk makes, and defaults to the disk. A test hands
  * in one of its own to walk to `/` without its answer depending on what
- * the machine's directories above its temporary root hold.
+ * the machine's directories above its temporary root hold. The main
+ * checkout is read through `mainCheckout`, `mainCheckoutOf` when left
+ * out, so a test over an in-memory tree hands in its own rather than
+ * running git in directories that are not on disk.
  *
  * The start and the home are refused with a {@link ScopeError} unless
  * each is an absolute path, because resolving a relative one would read
@@ -72,6 +104,8 @@ import { dirname, isAbsolute, join } from 'node:path';
 
 import { describeValue, messageOf } from '../config-sections.js';
 import { CONFIG_FILE, configFilePath } from '../config.js';
+
+import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
 
 /**
  * The directory a scope keeps its files in, relative to the project
@@ -109,6 +143,11 @@ export interface ScopeSeams {
   readonly home: string;
   /** The filesystem the walk reads. {@link DISK_FILE_SYSTEM} when absent. */
   readonly fs?: ScopeFileSystem;
+  /**
+   * The main checkout of the repository holding a directory, a real
+   * path, or null outside any repository. `mainCheckoutOf` when absent.
+   */
+  readonly mainCheckout?: (dir: string) => string | null;
 }
 
 /** One scope's paths: its `.rafa` directory and the config file in it. */
@@ -172,14 +211,24 @@ export function scopeAt(base: string): Scope {
  * The hint printed outside a project: the directory the walk started
  * from, the file no directory at or above it holds, and `rafa init`.
  * When the walk passed over a home holding the user scope's file, that
- * file is named as marking no project; see the module note.
+ * file is named as marking no project; and when the fallback probed a
+ * main checkout holding no file either, that checkout is named. See
+ * the module note.
  */
-export function initHint(start: string, passedUserConfig: string | null = null): string {
+export function initHint(
+  start: string,
+  passedUserConfig: string | null = null,
+  probedMainCheckout: string | null = null,
+): string {
   const passed = passedUserConfig === null
     ? []
     : [`${passedUserConfig} is the user scope's config and marks no project`];
+  const main = probedMainCheckout === null
+    ? []
+    : [`nor in ${probedMainCheckout}, the main checkout of the repository holding it`];
   return [
     `not inside a rafa project: no ${CONFIG_FILE} in ${start} or any directory above it`,
+    ...main,
     ...passed,
     `run \`${INIT_COMMAND}\` to set one up`,
   ].join('\n');
@@ -240,29 +289,74 @@ function walkUp(realStart: string, realHome: string | null, fs: ScopeFileSystem)
   return { root: null, passedUserConfig };
 }
 
+/** The main checkout of the repository holding `realStart`, a refusal wrapped as a {@link ScopeError}. */
+function mainCheckoutAt(realStart: string, mainCheckout: (dir: string) => string | null): string | null {
+  try {
+    return mainCheckout(realStart);
+  } catch (error) {
+    if (!(error instanceof WorktreeRootError)) throw error;
+    throw new ScopeError(`cannot read the main checkout of ${realStart} (${error.message})`, { cause: error });
+  }
+}
+
+/** What the fallback found: the main checkout as the root, or the one it probed in vain. */
+interface Fallback {
+  readonly root: string | null;
+  readonly probed: string | null;
+}
+
+/**
+ * The main checkout as the root when the walk from `realStart` found
+ * none and the checkout holds the file; see the module note. Probes
+ * nothing when the checkout is null, the home, or a directory the walk
+ * already passed.
+ */
+function fallBack(
+  realStart: string,
+  realHome: string | null,
+  fs: ScopeFileSystem,
+  mainCheckout: (dir: string) => string | null,
+): Fallback {
+  const main = mainCheckoutAt(realStart, mainCheckout);
+  if (main === null || main === realHome || selfAndAncestors(realStart).includes(main)) {
+    return { root: null, probed: null };
+  }
+  return fs.exists(configFilePath(main))
+    ? { root: main, probed: main }
+    : { root: null, probed: main };
+}
+
 /**
  * Resolves the scopes a command run in `start` stands in: the project
  * whose root is the nearest directory at or above `start` holding
  * `.rafa/config.yaml`, the home passed over, and the user scope under
- * `seams.home`. Answers {@link NoProject}, carrying the `rafa init`
- * hint, when no directory up to the filesystem root holds the file.
+ * `seams.home`. When no directory up to the filesystem root holds the
+ * file, the main checkout of the repository holding `start` is the
+ * root if it holds the file. Answers {@link NoProject}, carrying the
+ * `rafa init` hint, when it does not either.
  *
- * Throws a {@link ScopeError} for a relative start or home and for a
- * start that does not resolve. See the module note for the walk and
+ * Throws a {@link ScopeError} for a relative start or home, for a
+ * start that does not resolve, and for a git that cannot say which
+ * main checkout holds the start. See the module note for the walk and
  * the seams.
  */
 export function resolveScope(start: string, seams: ScopeSeams): ScopeResolution {
-  const { home, fs = DISK_FILE_SYSTEM } = seams;
+  const { home, fs = DISK_FILE_SYSTEM, mainCheckout = mainCheckoutOf } = seams;
   requireAbsolute('start directory', start);
   requireAbsolute('home directory', home);
 
   const user = scopeAt(home);
-  const walk = walkUp(realStartOf(start, fs), realHomeOf(home, fs), fs);
-  if (walk.root === null) {
+  const realStart = realStartOf(start, fs);
+  const realHome = realHomeOf(home, fs);
+  const walk = walkUp(realStart, realHome, fs);
+  const fallback = walk.root === null
+    ? fallBack(realStart, realHome, fs, mainCheckout)
+    : { root: walk.root, probed: null };
+  if (fallback.root === null) {
     const passed = walk.passedUserConfig
       ? user.configFile
       : null;
-    return { found: false, start, home, user, hint: initHint(start, passed) };
+    return { found: false, start, home, user, hint: initHint(start, passed, fallback.probed) };
   }
-  return { found: true, root: walk.root, home, project: scopeAt(walk.root), user };
+  return { found: true, root: fallback.root, home, project: scopeAt(fallback.root), user };
 }

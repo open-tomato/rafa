@@ -344,6 +344,7 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
     planContent: PLAN,
     inject: mode,
     repoRoot: tempRoot,
+    checkout: tempRoot,
     home: join(tempRoot, 'home'),
     settingSources: ['project', 'local'],
     serving: null,
@@ -483,7 +484,7 @@ describe('the wrap-up session', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
     const wrapUp = readFileSync(new URL('../start/wrap-up.ts', import.meta.url), 'utf8');
 
-    expect(start).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning);');
+    expect(start).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);');
     expect(wrapUp).toContain('buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons)');
     expect(start).toContain('inject: injectMode,');
     expect(start).not.toContain('await preserveProgress(injection');

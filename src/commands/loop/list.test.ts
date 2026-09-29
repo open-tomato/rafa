@@ -10,6 +10,8 @@
  * The listed records sit beside the records passed over: one reading
  * `done`, and one stored `running` whose pid is gone. A record of another
  * branch is listed, and one whose plan is gone is listed with no counts.
+ * A record carrying a `worktree` is listed with that path as its last
+ * column, beside records carrying none, listed `in the main checkout`.
  */
 import type { SessionRecord } from '../../loop/sessions.js';
 
@@ -80,12 +82,50 @@ describe('rafa loop list', () => {
 
     expect(run.stdout).toBe([
       'Running sessions:',
-      '  session-0600: plan `demo` on `feat/other`, paused, pid 7171, started 2026-09-15T11:00:00.000Z; 1/4 done, 1 blocked, 2 open',
-      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done, 1 blocked, 2 open',
-      '  session-0800: plan `gone` on `feat/gone`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count',
+      '  session-0600: plan `demo` on `feat/other`, paused, pid 7171, started 2026-09-15T11:00:00.000Z; 1/4 done, 1 blocked, 2 open; in the main checkout',
+      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done, 1 blocked, 2 open; in the main checkout',
+      '  session-0800: plan `gone` on `feat/gone`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count; in the main checkout',
       '',
     ].join('\n'));
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
+  });
+
+  it('prints a worktree under the project root relative to it, and one outside it absolute', async () => {
+    const project = plantDemoProject(tempBase);
+    const inside = join(project.root, '.rafa', 'worktrees', 'demo');
+    const outside = join(tempBase, 'elsewhere', 'wt-demo');
+    plantSession(project.root, sessionRecord({ worktree: inside }));
+    plantSession(project.root, sessionRecord({
+      sessionId: 'session-0900',
+      planStub: 'gone',
+      plan: '.plans/PLAN-gone.md',
+      branch: 'feat/gone',
+      startedAt: '2026-09-15T13:00:00.000Z',
+      worktree: outside,
+    }));
+
+    const run = await list(project);
+
+    expect(run.stdout).toBe([
+      'Running sessions:',
+      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done, 1 blocked, 2 open; in worktree `.rafa/worktrees/demo`',
+      `  session-0900: plan \`gone\` on \`feat/gone\`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count; in worktree \`${outside}\``,
+      '',
+    ].join('\n'));
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+  });
+
+  it('gives the record\'s absolute worktree in json mode, and no key for a record in the main checkout', async () => {
+    const project = plantDemoProject(tempBase);
+    const inside = join(project.root, '.rafa', 'worktrees', 'demo');
+    plantSession(project.root, sessionRecord({ worktree: inside }));
+    plantSession(project.root, MIXED[4] ?? sessionRecord());
+
+    const run = await list(project, ['--output=json']);
+    const sessions = (resultEvent(run.stdout) as { data: { sessions: Array<{ session: object }> } }).data.sessions;
+
+    expect(sessions.map(({ session }) => Object.hasOwn(session, 'worktree'))).toEqual([true, false]);
+    expect(sessions[0]?.session).toMatchObject({ worktree: inside });
   });
 
   it('says there is none when no record is live, and when there is no record at all', async () => {

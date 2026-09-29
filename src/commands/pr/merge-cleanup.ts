@@ -72,6 +72,7 @@
  * settle.
  */
 import type { FollowUp, SettleWaiting } from './merge-followups.js';
+import type { PidProbe } from '../../loop/sessions.js';
 import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
 
@@ -83,6 +84,7 @@ import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/inde
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 import { readSettle } from '../../release/settle.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
+import { liveLoopsOf } from '../self-update.js';
 
 import { readFollowUps, readPackageFacts } from './merge-followups.js';
 
@@ -127,6 +129,8 @@ export interface FollowUpPlace {
   readonly base: string;
   /** The release settings the settle dry run reads, `release.enabled` among them. */
   readonly release: MergeGuardSettings;
+  /** Whether a loop record's pid is alive, for the update follow-up. `isPidAlive` when left out. */
+  readonly isAlive?: PidProbe;
 }
 
 /** Whether the remote still holds the branch; a probe that failed is warned about. See the module note. */
@@ -233,6 +237,15 @@ function textOf(path: string): string {
   }
 }
 
+/** The live loops' branches under `root`, or null when a record cannot be read; see `merge-followups.ts`. */
+function liveLoopBranchesOf(root: string, isAlive?: PidProbe): readonly string[] | null {
+  try {
+    return liveLoopsOf(root, isAlive).map((loop) => loop.branch);
+  } catch {
+    return null;
+  }
+}
+
 /** What the settle dry run folded on `origin/<base>`, or null where the release is off or nothing folds. */
 export function settleWaitingOn(place: FollowUpPlace, git: GitRunner): SettleWaiting | null {
   if (!resolveReleaseEnabled(place.release, place.root).enabled) return null;
@@ -249,6 +262,7 @@ export function followUpsFor(place: FollowUpPlace, git: GitRunner): readonly Fol
     rafaCheckout: facts.rafaCheckout,
     runtimeInstalled: facts.version !== null && existsSync(join(place.home, RUNTIME_SUBDIR, facts.version)),
     settle: settleWaitingOn(place, git),
+    liveLoopBranches: liveLoopBranchesOf(place.root, place.isAlive),
   });
 }
 

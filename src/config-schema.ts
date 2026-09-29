@@ -56,6 +56,9 @@
  *   - `loop.settingSources` is the key finding 3 of the spec names. It
  *     resolves to a list in the order written, because the list is what
  *     a caller asks (does it include `user`?) and rebuilds the flag from.
+ *   - `loop.worktreeDir` defaults to `.rafa/worktrees` and is never null:
+ *     a relative value is read from the project root, not the checkout
+ *     (`start/worktree-dir.ts`). It is no {@link CommandLineSetting}.
  *
  * ## The closed set
  *
@@ -221,6 +224,11 @@ export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleas
   /** What each spawned session loads settings from. `loop.settingSources`. */
   settingSources: readonly ClaudeSettingSource[];
   /**
+   * The directory a loop adds its worktrees under, read from the
+   * project root. `loop.worktreeDir`.
+   */
+  loopWorktreeDir: string;
+  /**
    * The logins trusted with board text besides the repository's own
    * write-holders. `board.trustedAuthors`.
    */
@@ -248,6 +256,12 @@ export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleas
    * on one. `dangerous.acceptStaleRefs`.
    */
   dangerousAcceptStaleRefs: boolean;
+  /**
+   * Whether `rafa self-update` replaces the install while a loop of the
+   * project is live, where it otherwise waits for that loop to finish.
+   * `dangerous.selfUpdateDuringLoop`.
+   */
+  dangerousSelfUpdateDuringLoop: boolean;
   /**
    * Whether a command that runs inside a project prints the one-line
    * since-last-command notice on stderr. `status.notice`.
@@ -313,6 +327,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   modules: Object.freeze([]),
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
+  loopWorktreeDir: join('.rafa', 'worktrees'),
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   roadmapIssue: null,
@@ -322,6 +337,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
   ...DANGEROUS_RELEASE_DEFAULTS,
+  dangerousSelfUpdateDuringLoop: false,
   statusNotice: true,
   tiersRafa: 'on',
   tiersSkills: new Map<string, TierPin>(),
@@ -405,6 +421,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: subsetOf(CLAUDE_SETTING_SOURCES),
     cli: true,
   },
+  loopWorktreeDir: { key: 'loop.worktreeDir', read: directory, cli: false },
   ...PR_SETTINGS,
   boardTrustedAuthors: {
     key: 'board.trustedAuthors',
@@ -430,6 +447,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: false,
   },
   ...DANGEROUS_RELEASE_SETTINGS,
+  dangerousSelfUpdateDuringLoop: {
+    key: 'dangerous.selfUpdateDuringLoop',
+    read: flag,
+    cli: false,
+  },
   statusNotice: { key: 'status.notice', read: flag, cli: false },
   tiersRafa: { key: 'tiers.rafa', read: tierSwitch, cli: false },
   tiersSkills: { key: 'tiers.skills', read: tierPins, cli: false },

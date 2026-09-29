@@ -119,7 +119,7 @@ export function mapOf<T>(
   };
 }
 
-/** The reader both directory settings, `plan.dir` and `specs.dir`, share. */
+/** The reader every directory setting, `plan.dir`, `specs.dir` and `loop.worktreeDir`, shares. */
 export const directory: Reader<string> = text('a directory path');
 
 /** The reader every tracker kind goes through, alone or in a list. */

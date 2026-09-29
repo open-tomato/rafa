@@ -39,7 +39,11 @@ export interface FinishedTaskOptions {
   trackerPath: string;
   /** The task whose session just returned 0. */
   taskInfo: TaskInfo;
-  /** Directory git stages and commits in — the repo root. */
+  /**
+   * Directory git stages and commits in: the run's checkout
+   * (`start/checkout.ts`), the working tree the task session edited.
+   * The project root unless the loop runs in a linked worktree.
+   */
   repoRoot: string;
   /** Commit seam. Defaults to the real helper. */
   commit?: TaskCommitRunner;

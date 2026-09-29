@@ -469,6 +469,56 @@ status:
   notice: false
 ```
 
+### `loop` and the guard
+
+A loop guards itself: every turn, it watches the checkout's branch and HEAD
+and halts if either changes externally (a branch switch in another terminal,
+a pull that moved the base). The work stays committed and nothing is lost;
+without the guard the edits would move with the checkout. The guard runs on
+every loop and never interferes with the loop's own commits.
+
+**Worktree use cases.** `loop start --as-worktree` runs the loop in a new
+git worktree alongside your main checkout, so you stay on `main` in your
+terminal and can keep working — reviewing, pulling or merging other PRs —
+while the loop runs beside you. This is a git worktree, the second desk on
+the same repository, with its own branch and its own working directory. Both
+share one `.rafa/` and one effort store. The worktree is created under
+`.rafa/worktrees/` by default, or in the directory `loop.worktreeDir` names
+when configured. A loop without `--as-worktree` runs in the current checkout,
+which is unchanged. The guard stops a loop if you switch away from it; with
+a worktree, you are free to switch the main checkout to anything, and the
+loop stays on its branch. Two loops run in two worktrees, each with its own
+branch, both under the same `.rafa/`, allowing parallel work on two epics at
+once. Merging a PR while a loop runs no longer offers `rafa self-update` right
+away; `pr merge` names the running loop and asks you to update after it stops,
+since the binary is what the loop spawns its sessions from, and swapping it
+mid-run changes the engine while driving.
+
+**Edge case: the 2026-09-29 incident.** A loop switched the main checkout to
+its branch; 48 seconds later, `git checkout main` and `git pull` in another
+terminal moved it back, and the edits followed. Both branches were at the
+same commit, so `git switch <loop-branch>` recovered it. With the guard the
+loop halts instead, keeping the work and the branch where it is while you
+sort out what happened.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `loop.worktreeDir` | `.rafa/worktrees` | the directory where `--as-worktree` creates worktrees, absolute or relative to the project root |
+| `dangerous.selfUpdateDuringLoop` | `false` | whether `rafa self-update` runs while a loop of this project is live |
+
+Both take a string and a boolean as written; quoted values are refused.
+
+```yaml
+# empty: loops run in the current checkout, guarded
+# --as-worktree puts them in .rafa/worktrees (the default)
+
+loop:
+  worktreeDir: ../rafa-loops   # worktrees beside the repository
+
+dangerous:
+  selfUpdateDuringLoop: true   # update the binary even while a loop runs
+```
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want
@@ -576,10 +626,13 @@ of `~/.bun/bin`; both warn when it is not, and `rafa doctor` checks it.
 Both exit 1 before building anything while a plan tracker in `plan.dir`
 (`.rafa/plans` unless `.rafa/config.yaml` names another) still holds an
 open or blocked task, and name every such tracker. `rafa self-update`
-runs only inside a project, so `rafa init` the checkout first. They exit
+runs only inside a project, so `rafa init` the checkout first, and it
+also exits 1 while a loop of the project is live, naming each loop's
+branch and pid, unless `dangerous.selfUpdateDuringLoop` is true in the
+config; `--force` does not override that wait. They exit
 2 when they could not run: a `package.json` that is not rafa's or cannot
-be read, a config or tracker they could not read, or a build, copy or
-link that failed.
+be read, a config or tracker they could not read, a loop record
+`rafa self-update` could not read, or a build, copy or link that failed.
 
 A version is installed once. Both also exit 1, before building, when
 `~/.rafa/runtime/<version>/` is already there, naming that directory and

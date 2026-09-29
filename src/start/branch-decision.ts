@@ -26,7 +26,7 @@
  * ## When there is no offer at all
  *
  * {@link readBranchOffer} answers `stand-aside` three ways, and each of
- * them leaves the branch guard in `src/start.ts` to have the last word:
+ * them leaves the branch guard in `src/start/run-setup.ts` to have the last word:
  *
  *  - `--any-branch`: an operator who asked to run on `main` is not then
  *    asked whether to leave it. It outranks `--create-branch` too, since
@@ -212,7 +212,7 @@ export function questionFor(route: BranchRoute, plan: BranchPlan): string {
 /**
  * What to do about the branch: ask a question, take the branch without
  * asking because `--create-branch` said so, or stand aside and leave the
- * guard in `src/start.ts` to have the last word. See the module note for
+ * guard in `src/start/run-setup.ts` to have the last word. See the module note for
  * the order these are read in.
  */
 export function readBranchOffer(situation: BranchSituation): BranchOffer {

@@ -115,6 +115,12 @@
  * `dangerous.acceptVersionCollision` is read the same three ways, and
  * its field, default and spec sit in `config-schema-release.ts` beside
  * the `pr.versionCollision` it overrides, spread in right after this one.
+ * `dangerous.selfUpdateDuringLoop` has `rafa self-update` replace the
+ * install while a loop of the project is live, where it otherwise
+ * refuses and names each loop. The three readings above hold for it
+ * as written: `false` by default, read through `flag`, and not a
+ * `CommandLineSetting`; `self-update --force` keeps its own
+ * meaning and is not a layer over this key.
  *
  * ## The `status` section
  *

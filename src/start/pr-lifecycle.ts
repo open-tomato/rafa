@@ -17,6 +17,10 @@
  * The port is what the gate reads a PR through, so nothing here names
  * `gh`, a command or a JSON field: the provider answers records, and the
  * default seams hold the `gh` adapter over the process's own directory.
+ * `start()` hands {@link prLifecycleSeamsIn} its checkout instead
+ * (`start/checkout.ts`), so the branch, the push, the `gh` readings and
+ * every repair session are made in the working tree the loop committed
+ * in, a linked worktree's own directory when the loop runs in one.
  * The one thing still spelled `gh` is {@link PrLifecycleSeams.isGhUsable},
  * the reading that decides whether to skip the gate at all, and the
  * repair prompt, which tells a session which commands to read logs with.
@@ -66,6 +70,7 @@ import type {
   WaitOptions,
   WaitResult,
 } from '../pr/index.js';
+import type { ClaudeSpawner } from '../utils/claude.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../config-sections.js';
@@ -79,7 +84,7 @@ import {
   resolvePrProvider,
   waitForChecks,
 } from '../pr/index.js';
-import { runClaude } from '../utils/claude.js';
+import { runClaude, spawnClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 
 import { withStamp } from './stamp.js';
@@ -129,16 +134,34 @@ export interface PrLifecycleSeams {
   readonly sleep?: WaitOptions['sleep'];
 }
 
-/** The real helpers, which {@link verifyPullRequest} runs on by default. */
+/**
+ * The real helpers, each made in `dir`: the branch read there, the push
+ * and every `gh` reading made there, and each repair session spawned
+ * there through `spawn`, {@link spawnClaude} unless a test names a
+ * recording one. `start()` names its checkout; see the module note.
+ */
+export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClaude): PrLifecycleSeams {
+  return {
+    currentBranch: () => getCurrentBranch(dir),
+    // `configured: null` leaves the answer to `origin`. `start()` passes a
+    // reader carrying the run's own `pr.provider`; this default is what a
+    // caller that names no seam gets.
+    readProvider: () => resolvePrProvider({ configured: null, dir }),
+    pushBranch: (branch) => Promise.resolve(pushBranch(dir, branch)),
+    isGhUsable: () => ghAuthOkIn(dir),
+    pulls: ghPullRequestsIn(dir),
+    runClaude: (prompt, settingSources) => runClaude(prompt, settingSources, [], spawn, [], { cwd: dir }),
+  };
+}
+
+/**
+ * The real helpers, which {@link verifyPullRequest} runs on by default:
+ * the branch, the provider and `gh` over the process's own directory,
+ * and repair sessions spawned in the loop's own directory.
+ */
 export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
+  ...prLifecycleSeamsIn(process.cwd()),
   currentBranch: getCurrentBranch,
-  // `configured: null` leaves the answer to `origin`. `start()` passes a
-  // reader carrying the run's own `pr.provider`; this default is what a
-  // caller that names no seam gets.
-  readProvider: () => resolvePrProvider({ configured: null, dir: process.cwd() }),
-  pushBranch: (branch) => Promise.resolve(pushBranch(process.cwd(), branch)),
-  isGhUsable: () => ghAuthOkIn(process.cwd()),
-  pulls: ghPullRequestsIn(process.cwd()),
   runClaude,
 };
 

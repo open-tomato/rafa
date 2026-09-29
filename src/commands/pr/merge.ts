@@ -171,6 +171,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { ChecksReading, GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
 import type { UncheckedCase } from '../../pr/unchecked.js';
@@ -231,6 +232,8 @@ export interface MergeSeams extends PrSeams {
   readonly ending?: NextEndingSeams;
   /** The clock the release guard's forecast is dated by. The system's own when left out. */
   readonly now?: () => Date;
+  /** Whether a loop record's pid is alive, for the update follow-up. `isPidAlive` when left out. */
+  readonly isAlive?: PidProbe;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -600,7 +603,13 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   const steps = cleanUpAfterMerge(git, detail, { info, warn });
   const unblocked = await reportUnblock(context, pr, seams, detail);
   const followUps = reportFollowUps(
-    { root: pr.project.root, home: pr.project.home, base: detail.baseRefName, release: pr.versionGuard },
+    {
+      root: pr.project.root,
+      home: pr.project.home,
+      base: detail.baseRefName,
+      release: pr.versionGuard,
+      isAlive: seams.isAlive,
+    },
     git,
     info,
   );

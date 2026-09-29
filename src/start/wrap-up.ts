@@ -20,6 +20,13 @@
  * `promoted_to` on each lesson whose named path changed, and puts one
  * line naming every lesson left unanswered or unchanged in the PR body.
  *
+ * The session runs in the run's checkout (`start/checkout.ts`), and so
+ * does every git and `gh` reading made around it: the branch, its open
+ * PR, the HEAD the promotion check compares against and the PR body that
+ * check writes to. The lessons are read from the learning adapter over
+ * the project root, which holds the store; the two are one directory
+ * unless the loop runs in a linked worktree.
+ *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
@@ -272,8 +279,8 @@ function skippedReleaseBullet(skipped: ReleaseSkipped): string {
 }
 
 /**
- * The branch's open PR number as the loop reads it before the session,
- * or null when it has none.
+ * The branch's open PR number as the loop reads it in `checkout` before
+ * the session, or null when it has none.
  *
  * A provider that could not be ASKED — `gh` absent, unauthenticated or
  * offline — throws, and that is read as null here rather than stopping
@@ -281,9 +288,9 @@ function skippedReleaseBullet(skipped: ReleaseSkipped): string {
  * push, and the create bullet already carries the reading of a refusal
  * that must not turn into a second PR.
  */
-async function openPullRequestNumber(branch: string): Promise<number | null> {
+async function openPullRequestNumber(checkout: string, branch: string): Promise<number | null> {
   try {
-    const found = await ghPullRequestsIn(process.cwd()).findOpen(branch);
+    const found = await ghPullRequestsIn(checkout).findOpen(branch);
     return found?.number ?? null;
   } catch {
     return null;
@@ -296,7 +303,7 @@ async function openPullRequestNumber(branch: string): Promise<number | null> {
  * is made over, and the run's two `learning.promote.*` keys.
  */
 export interface WrapUpLearning extends TaskLearning {
-  /** The repo root the adapter holds its lessons under. */
+  /** The project root the adapter holds its lessons under. */
   readonly repoRoot: string;
   /** The run's `learning.promote.after`. */
   readonly promoteAfter: number;
@@ -390,6 +397,11 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * session that FAILED is not checked. Its commit, push and PR may never
  * have happened, and the rerun this module then asks for lists the same
  * lessons again, which a `promoted_to` set now would take off that list.
+ *
+ * `checkout` is the run's checkout, where the session is spawned and
+ * every git and `gh` reading above is made; see the module note. It is
+ * required, as `release` is: a default would spawn the session wherever
+ * the loop's process stands.
  */
 export async function preserveProgress(
   planContent: string,
@@ -397,9 +409,10 @@ export async function preserveProgress(
   release: ReleasePreparation | null,
   serving: SessionServing | null,
   learning: WrapUpLearning | null,
+  checkout: string,
 ): Promise<void> {
-  const branch = getCurrentBranch();
-  const openPullRequest = await openPullRequestNumber(branch);
+  const branch = getCurrentBranch(checkout);
+  const openPullRequest = await openPullRequestNumber(checkout, branch);
   const lessons = await lessonsToPromote(learning);
   const prompt = buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons);
   const served = serving === null
@@ -408,11 +421,18 @@ export async function preserveProgress(
   for (const skipped of served?.skipped ?? []) activeOutput().warn(`   ${skipped.message}`);
   const git = learning === null || lessons.length === 0
     ? null
-    : createGitRunner(learning.repoRoot);
+    : createGitRunner(checkout);
   const head = git === null
     ? null
     : readHead(git);
-  const session = await runClaudeCaptured(withStamp(prompt), settingSources, [], undefined, served?.flags ?? []);
+  const session = await runClaudeCaptured(
+    withStamp(prompt),
+    settingSources,
+    [],
+    undefined,
+    served?.flags ?? [],
+    { cwd: checkout },
+  );
   if (session.exitCode !== 0) {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${session.exitCode}). Please try again.`);
     return;
@@ -423,10 +443,10 @@ export async function preserveProgress(
     lessons,
     output: session.stdout,
     head,
-    repoRoot: learning.repoRoot,
+    repoRoot: checkout,
     branch,
     git,
-    pulls: ghPullRequestsIn(process.cwd()),
+    pulls: ghPullRequestsIn(checkout),
     learning: () => wrapUpAdapter(learning),
   });
 }

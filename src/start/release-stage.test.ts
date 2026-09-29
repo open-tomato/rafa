@@ -157,6 +157,45 @@ describe('prepareReleaseStage', () => {
     expect(input?.base).toEqual({ branch: 'main' });
   });
 
+  it('reads the notes under the project root and prepares the files in the checkout, where git runs', () => {
+    setActiveOutput(sinkOutput({}));
+    const capture = capturing();
+    const gitMadeIn: string[] = [];
+    const checkout = `${REPO}-worktree`;
+
+    prepareReleaseStage({ ...STAGE_INPUT, checkout }, {
+      ...capture.seams,
+      git: (dir) => {
+        gitMadeIn.push(dir);
+        return () => OK;
+      },
+    });
+
+    expect(capture.notes).toEqual([`${REPO} rafa-21-changelog-and-release`]);
+    expect(capture.inputs[0]?.repoRoot).toBe(checkout);
+    expect(gitMadeIn).toEqual([checkout]);
+  });
+
+  it('prepares the files and runs git under the project root when handed no checkout', () => {
+    // The control for the case above: the same stage with no checkout
+    // makes its git in the root, so the directory above came from the
+    // checkout it was handed.
+    setActiveOutput(sinkOutput({}));
+    const capture = capturing();
+    const gitMadeIn: string[] = [];
+
+    prepareReleaseStage(STAGE_INPUT, {
+      ...capture.seams,
+      git: (dir) => {
+        gitMadeIn.push(dir);
+        return () => OK;
+      },
+    });
+
+    expect(capture.inputs[0]?.repoRoot).toBe(REPO);
+    expect(gitMadeIn).toEqual([REPO]);
+  });
+
   it('falls back to the plan stub when the plan carries no heading', () => {
     setActiveOutput(sinkOutput({}));
     const capture = capturing();

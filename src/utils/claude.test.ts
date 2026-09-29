@@ -1029,6 +1029,73 @@ describe('the environment both doors spawn with, against a stand-in claude on PA
   });
 });
 
+describe('the working directory both doors spawn in, against a stand-in claude on PATH', () => {
+  let sessionDir = '';
+
+  beforeEach(() => {
+    binDir = mkdtempSync(join(tmpdir(), 'rafa-claude-stand-in-'));
+    sessionDir = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claude-session-dir-')));
+    savedEnv = {
+      PATH: process.env['PATH'],
+      CLAUDE_CODE_ENTRYPOINT: process.env['CLAUDE_CODE_ENTRYPOINT'],
+    };
+  });
+
+  afterEach(() => {
+    restoreEnv('PATH', savedEnv.PATH);
+    restoreEnv('CLAUDE_CODE_ENTRYPOINT', savedEnv.CLAUDE_CODE_ENTRYPOINT);
+    rmSync(binDir, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  });
+
+  /** Installs a bun script as the only `claude` on PATH, writing its working directory, and answers where. */
+  function cwdWritingClaude(): string {
+    const dump = join(binDir, 'cwd.txt');
+    const path = join(binDir, 'claude');
+    writeFileSync(path, [
+      `#!${process.execPath}`,
+      `require('node:fs').writeFileSync(${JSON.stringify(dump)}, process.cwd());`,
+      '',
+    ].join('\n'));
+    chmodSync(path, 0o755);
+    process.env['PATH'] = binDir;
+    return dump;
+  }
+
+  it('spawns the inherited door in the directory it is handed', async () => {
+    const dump = cwdWritingClaude();
+
+    expect(await runClaude('where am I', DEFAULT_SOURCES, [], spawnClaude, [], { cwd: sessionDir })).toBe(0);
+
+    expect(realpathSync(readFileSync(dump, 'utf8'))).toBe(sessionDir);
+  });
+
+  it('spawns the captured door in the directory it is handed', async () => {
+    const dump = cwdWritingClaude();
+
+    const session = await runClaudeCaptured('where am I', DEFAULT_SOURCES, [], spawnClaudeCaptured, [], { cwd: sessionDir });
+
+    expect(session.exitCode).toBe(0);
+    expect(realpathSync(readFileSync(dump, 'utf8'))).toBe(sessionDir);
+  });
+
+  it('spawns both doors in the process\'s own directory when handed none', async () => {
+    // The control for the two cases above: with no directory named the
+    // stand-in reports the suite's own, which is not the session
+    // directory, so their reading is of the option.
+    const dump = cwdWritingClaude();
+
+    await runClaude('where am I', DEFAULT_SOURCES);
+    const inherited = realpathSync(readFileSync(dump, 'utf8'));
+    await runClaudeCaptured('where am I', DEFAULT_SOURCES);
+    const captured = realpathSync(readFileSync(dump, 'utf8'));
+
+    expect(inherited).toBe(realpathSync(process.cwd()));
+    expect(captured).toBe(realpathSync(process.cwd()));
+    expect(inherited).not.toBe(sessionDir);
+  });
+});
+
 describe('both doors in json mode, against a stand-in claude on PATH', () => {
   beforeEach(() => {
     binDir = mkdtempSync(join(tmpdir(), 'rafa-claude-stand-in-'));

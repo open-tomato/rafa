@@ -37,7 +37,9 @@
  *     takes.
  *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
  *     which walks up from a directory to the nearest one holding
- *     `.rafa/config.yaml` and answers the project root with both scopes,
+ *     `.rafa/config.yaml`, or else to the main checkout of the
+ *     repository holding it when that checkout holds one, and answers
+ *     the project root with both scopes,
  *     the `ConfigRoots` {@link loadConfig} reads, or the `rafa init` hint
  *     when no directory holds one, with {@link ScopeError},
  *     {@link scopeAt}, {@link initHint} and the filesystem seam the walk

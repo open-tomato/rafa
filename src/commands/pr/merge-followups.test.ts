@@ -23,7 +23,7 @@ import { describe, expect, it } from 'bun:test';
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { createReleaseSettleCommand } from '../release/settle.js';
 
-import { readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND, versionTag } from './merge-followups.js';
+import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND, versionTag } from './merge-followups.js';
 
 /** Two fragments waiting on main that fold into 0.5.0. */
 const WAITING: SettleWaiting = { base: 'main', fragments: 2, version: '0.5.0' };
@@ -35,6 +35,7 @@ function reading(over: Partial<FollowUpReading> = {}): FollowUpReading {
     rafaCheckout: true,
     runtimeInstalled: false,
     settle: WAITING,
+    liveLoopBranches: [],
     ...over,
   };
 }
@@ -118,6 +119,62 @@ describe('which follow-ups apply', () => {
 describe('the settle command', () => {
   it('is the name the settle command registers under', () => {
     expect(RELEASE_SETTLE_COMMAND).toBe(`rafa ${createReleaseSettleCommand().name}`);
+  });
+});
+
+describe('the update beside a live loop', () => {
+  /** The reason the update follow-up of `given` carries. */
+  function updateWhy(given: FollowUpReading): string | undefined {
+    return readFollowUps(given).find((followUp) => followUp.id === 'self-update')?.why;
+  }
+
+  it('says to run it after the loop on that branch finishes while one loop is live', () => {
+    expect(updateWhy(reading({ liveLoopBranches: ['feature/a'] })))
+      .toBe('0.4.0 is not installed as this machine\'s rafa runtime; run it after the loop on feature/a finishes');
+  });
+
+  it('says nothing of a loop while none is live, the control the phrase is measured against', () => {
+    expect(updateWhy(reading())).toBe('0.4.0 is not installed as this machine\'s rafa runtime');
+  });
+
+  it('keeps the command itself bare, so the line still names what an operator types', () => {
+    const update = readFollowUps(reading({ liveLoopBranches: ['feature/a'] })).find((followUp) => followUp.id === 'self-update');
+
+    expect(update?.command).toBe('rafa self-update');
+  });
+
+  it('names every live loop\'s branch in the order given, each once', () => {
+    expect(updateWhy(reading({ liveLoopBranches: ['feature/a', 'feature/b', 'feature/a', 'feature/c'] })))
+      .toEndWith('; run it after the loops on feature/a, feature/b and feature/c finish');
+  });
+
+  it('says a loop record cannot be read, rather than naming the update bare, when the branches are unknown', () => {
+    expect(updateWhy(reading({ liveLoopBranches: null })))
+      .toEndWith('; a loop record under .rafa/runs cannot be read, and rafa self-update refuses until it can');
+  });
+
+  it('leaves the settle follow-up alone, since settle does not wait for a loop', () => {
+    /** The reason the settle follow-up of `given` carries. */
+    function settleWhy(given: FollowUpReading): string | undefined {
+      return readFollowUps(given).find((followUp) => followUp.id === 'release-settle')?.why;
+    }
+
+    expect(settleWhy(reading({ liveLoopBranches: ['feature/a'] }))).toBe(settleWhy(reading()));
+  });
+
+  it('names no update at all for an installed version, a live loop or not', () => {
+    expect(idsOf(reading({ runtimeInstalled: true, liveLoopBranches: ['feature/a'] }))).toEqual(['release-settle']);
+  });
+});
+
+describe('afterLoopsPhrase', () => {
+  it('reads one branch in the singular and two in the plural', () => {
+    expect(afterLoopsPhrase(['feature/a'])).toBe('after the loop on feature/a finishes');
+    expect(afterLoopsPhrase(['feature/a', 'feature/b'])).toBe('after the loops on feature/a and feature/b finish');
+  });
+
+  it('reads one branch named twice as one loop', () => {
+    expect(afterLoopsPhrase(['feature/a', 'feature/a'])).toBe('after the loop on feature/a finishes');
   });
 });
 

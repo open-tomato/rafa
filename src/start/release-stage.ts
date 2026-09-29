@@ -238,11 +238,18 @@ export interface ReleaseStageSettings extends ReleaseSettings, BranchForecastSet
 
 /** What step 1 is made from, as the run already holds it. */
 export interface ReleaseStageInput {
-  /** The repository the configured paths are relative to. */
+  /** The project root, whose store the plan's change notes are read from. */
   readonly repoRoot: string;
+  /**
+   * The run's checkout (`start/checkout.ts`): the working tree the
+   * fragment is written in, and git runs in. `repoRoot` when absent,
+   * which is the checkout of every loop that does not run in a linked
+   * worktree.
+   */
+  readonly checkout?: string;
   /** The release settings, as the config resolved them. */
   readonly settings: ReleaseStageSettings;
-  /** The plan stub: the plan id the fragment is named and marked by. */
+  /** The plan stub: the plan id the fragment is named and marked by, and the change notes are stored under. */
   readonly planStub: string | null;
   /** The plan document, whole: its `release` field and its title. */
   readonly planContent: string;
@@ -250,7 +257,10 @@ export interface ReleaseStageInput {
 
 /** What {@link finishRelease} is made from. */
 export interface ReleaseFinishInput {
-  /** The repository the commit and the push are made in. */
+  /**
+   * The repository the commit and the push are made in: the run's
+   * checkout, the same working tree step 1 wrote the two files in.
+   */
   readonly repoRoot: string;
   /** The release settings step 1 ran under; step 3 and the forecast read them too. */
   readonly settings: ReleaseStageSettings;
@@ -352,7 +362,9 @@ function announcePreparation(preparation: ReleasePreparation): void {
  * Step 1, run before the wrap-up session is spawned: the plan's change
  * notes, its declared level, its title and its stub, handed to
  * `release/prepare.ts` with `pr.base` as the branch the fragment's name
- * is allocated against.
+ * is allocated against. The notes are read from the store under the
+ * project root, and the fragment is written in the checkout, where git
+ * runs too.
  *
  * Answers the record the session's prompt is built from and the finish
  * works against, or null when the stage could not run — see the module
@@ -363,11 +375,12 @@ export function prepareReleaseStage(
   seams: Partial<ReleaseStageSeams> = {},
 ): ReleasePreparation | null {
   const io: ReleaseStageSeams = { ...RELEASE_STAGE_SEAMS, ...seams };
+  const checkout = input.checkout ?? input.repoRoot;
   try {
     const preparation = io.prepare({
-      repoRoot: input.repoRoot,
+      repoRoot: checkout,
       settings: input.settings,
-      git: io.git(input.repoRoot),
+      git: io.git(checkout),
       plan: input.planStub ?? '',
       declared: parsePlan(input.planContent).header.release,
       notes: io.readNotes(input.repoRoot, input.planStub),

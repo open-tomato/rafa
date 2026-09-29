@@ -305,6 +305,12 @@ export function readProgressFindings(
  * Renders `progress.txt` for a dispatch of this plan, and answers the
  * render.
  *
+ * The findings are read from the store under `repoRoot`, the project
+ * root, and the file is written into `dir`, the directory the session
+ * reading it runs in: the loop's checkout (`start/checkout.ts`), which
+ * is `repoRoot` itself unless the loop runs in a linked worktree, and
+ * `repoRoot` when left out.
+ *
  * The store is read before the file is written, so a store that cannot be
  * read throws with the file as it was. Otherwise the file is replaced
  * whole, and is empty for a plan nothing has been reported under.
@@ -312,9 +318,10 @@ export function readProgressFindings(
 export function writeProgress(
   repoRoot: string,
   planStub: string | null,
+  dir: string = repoRoot,
 ): ProgressWrite {
   const render = renderProgressText(readProgressFindings(repoRoot, planStub));
-  const path = progressFilePath(repoRoot);
+  const path = progressFilePath(dir);
   writeFileSync(path, render.text, 'utf8');
   return { ...render, path, storePath: sqliteStorePath(repoRoot) };
 }

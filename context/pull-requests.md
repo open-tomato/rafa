@@ -170,9 +170,11 @@ sentence replaces nothing.
 7. Print the two follow-ups when they apply, under `Follow-ups:`:
    `rafa self-update`, then `rafa release settle` while the fragments
    waiting on `origin/<base>` fold into a version, so settle is the
-   merge's last line (`src/commands/pr/merge-followups.ts`). It is only
-   printed: `pr merge` never runs settle, and `rafa release tag` is no
-   longer named here, since settle tags or names the tag itself.
+   merge's last line (`src/commands/pr/merge-followups.ts`). While a loop
+   of the project is live, the update's line ends `run it after the loop
+   on <branch> finishes`, since `rafa self-update` refuses until then.
+   Both are only printed: `pr merge` never runs settle, and `rafa release
+   tag` is no longer named here, since settle tags or names the tag itself.
 8. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
    (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was

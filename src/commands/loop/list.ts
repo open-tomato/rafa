@@ -19,6 +19,13 @@
  * nor its tracker is there. Text mode writes `Running sessions:` and one
  * row per session, or `No running sessions.` alone.
  *
+ * A row's last column is where the session runs: `in worktree <path>`
+ * for a record carrying a `worktree` (`loop/sessions.ts`), the path
+ * relative to the project root when the worktree sits under it, as the
+ * default `loop.worktreeDir` of `.rafa/worktrees` does, and absolute
+ * otherwise; `in the main checkout` for a record carrying none. In json
+ * mode the record's own `worktree` key, absolute, is the column.
+ *
  * ## Refusals
  *
  * Exit code 1 for an argument, and for records that cannot be read. The
@@ -28,6 +35,8 @@ import type { LoopSessionSeams, ResolvedLoopSeams } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { SessionRecord } from '../../loop/sessions.js';
 import type { TaskCounts } from '../plan/plan-files.js';
+
+import { isAbsolute, relative } from 'node:path';
 
 import { countTasks, expectNoArgument, formatCounts } from '../plan/plan-files.js';
 
@@ -54,14 +63,32 @@ export interface SessionList {
   readonly sessions: readonly SessionListing[];
 }
 
-/** The lines text mode writes for a list. */
-export function renderSessionList(list: SessionList): string[] {
+/** A worktree's path as a row names it: relative to `root` when under it, absolute otherwise. */
+function worktreeLabel(root: string, worktree: string): string {
+  const under = relative(root, worktree);
+  return under === '' || under.startsWith('..') || isAbsolute(under)
+    ? worktree
+    : under;
+}
+
+/** Where a session runs, as a row's last column. See the module note. */
+export function checkoutColumn(root: string, session: SessionRecord): string {
+  return session.worktree === undefined
+    ? 'in the main checkout'
+    : `in worktree \`${worktreeLabel(root, session.worktree)}\``;
+}
+
+/** The lines text mode writes for the list of the project at `root`. */
+export function renderSessionList(root: string, list: SessionList): string[] {
   if (list.sessions.length === 0) return ['No running sessions.'];
   return [
     'Running sessions:',
-    ...list.sessions.map(({ session, tasks }) => `  ${sessionLine(session)}; ${tasks === null
-      ? 'no plan or tracker to count'
-      : formatCounts(tasks)}`),
+    ...list.sessions.map(({ session, tasks }) => {
+      const counts = tasks === null
+        ? 'no plan or tracker to count'
+        : formatCounts(tasks);
+      return `  ${sessionLine(session)}; ${counts}; ${checkoutColumn(root, session)}`;
+    }),
   ];
 }
 
@@ -86,7 +113,7 @@ async function runList(context: RafaContext, seams: ResolvedLoopSeams): Promise<
     context.output.result(list);
     return;
   }
-  for (const line of renderSessionList(list)) context.output.info(line);
+  for (const line of renderSessionList(root, list)) context.output.info(line);
 }
 
 /** The command, reaching the system through `seams`. See the module note. */
@@ -98,8 +125,8 @@ export function createLoopListCommand(seams: LoopSessionSeams = {}): RafaCommand
     action: 'list',
     summary: 'list the running sessions, with the tasks done in each plan',
     description: 'Lists every session record under `.rafa/runs/` that reads `running` or `paused`, oldest'
-      + ' first: its id, plan, branch, state, pid and start, and the tasks of its plan done, blocked and'
-      + ' open. A record whose pid is gone reads `stopped` and is not listed. Until phase 6 a plan runs in'
+      + ' first: its id, plan, branch, state, pid and start, the tasks of its plan done, blocked and'
+      + ' open, and the worktree it runs in, or the main checkout. A record whose pid is gone reads `stopped` and is not listed. Until phase 6 a plan runs in'
       + ' one session at a time, so each row is a plan running. With `--output=json` the sessions are the'
       + ' data of the terminal result event.',
     args: [],
@@ -107,7 +134,7 @@ export function createLoopListCommand(seams: LoopSessionSeams = {}): RafaCommand
     examples: [
       {
         cmd: 'rafa loop list',
-        note: 'Prints one row per running session: its id, plan, branch, state and tasks done.',
+        note: 'Prints one row per running session: its id, plan, branch, state, tasks done and worktree.',
       },
       {
         cmd: 'rafa loop list --output=json',
