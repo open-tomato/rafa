@@ -544,7 +544,7 @@ describe('the production inserts, read from source', () => {
     .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'));
   const found = modules.flatMap((name) => insertsIn(name, readFileSync(join(import.meta.dir, name), 'utf8')));
 
-  it('stamps every insert into a merged table, and leaves the three bookkeeping ones alone', () => {
+  it('stamps every insert into a merged table, and leaves the three bookkeeping ones and the merge union alone', () => {
     const unstamped = found.filter(({ stamped }) => !stamped).map(({ file, table }) => `${file}: ${table}`);
 
     const stamped = found.filter((insert) => insert.stamped).map(({ file }) => file);
@@ -556,6 +556,7 @@ describe('the production inserts, read from source', () => {
     expect(unstamped.sort()).toEqual([
       ['bring-forward.ts: ', '${', 'MIGRATION_LOG_TABLE}'].join(''),
       ['fix-schema.ts: main.', '${', 'quoted(table)}'].join(''),
+      ['merge-union.ts: ', '${', 'quoted(table)}'].join(''),
       'store-meta.ts: store_meta',
     ]);
   });

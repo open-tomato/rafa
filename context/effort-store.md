@@ -399,8 +399,10 @@ stamps NULL in both. A copy's new origin counts on from the `seq` it
 copied, and no reader names either column, so a row an older runtime
 inserted is read as any other. `origins.test.ts` reads every
 `INSERT INTO` under `store/` from source and fails on an unstamped one
-other than the `schema_migrations` log, `store_meta` and `fix-schema`'s
-copy, which carries the columns over as they were.
+other than the `schema_migrations` log, `store_meta`, `fix-schema`'s
+copy, which carries the columns over as they were, and the merge's
+union (`store/merge-union.ts`), which inserts another store's unmatched
+rows under a new local `seq` with their origin pair unchanged.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
