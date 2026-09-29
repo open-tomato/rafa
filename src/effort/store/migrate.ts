@@ -157,8 +157,17 @@ function asidePaths(path: string, first: string, stamp: string): { parallelPath:
   return { parallelPath: `${path}.migrate-${stamp}`, backupPath: `${path}.before-${first}-${stamp}.bak` };
 }
 
-/** The first loop record under the store's project root that reads `running` or `paused`, if any. */
-function liveLoop(path: string, options: DevelopmentProbe): SessionRecord | undefined {
+/**
+ * The first loop record under the store's project root that reads
+ * `running` or `paused`, if any. Records that cannot be read refuse, the
+ * text ending with `nothingDone`, the caller's sentence for what it left
+ * undone; the merge (`merge-store.ts`) asks this too.
+ */
+export function liveLoop(
+  path: string,
+  options: DevelopmentProbe,
+  nothingDone = 'Nothing was migrated.',
+): SessionRecord | undefined {
   const root = storeProjectRoot(path);
   if (root === null) return undefined;
   let records: readonly SessionRecord[];
@@ -166,7 +175,7 @@ function liveLoop(path: string, options: DevelopmentProbe): SessionRecord | unde
     records = readSessions(root, { isAlive: options.isAlive ?? isPidAlive });
   } catch (error) {
     throw new RebuildRefusal(`the loop's run records cannot be read, so a live loop on ${path} cannot be ruled out`
-      + ` (${messageOf(error)}). Nothing was migrated.`);
+      + ` (${messageOf(error)}). ${nothingDone}`);
   }
   return records.find((record) => record.state === 'running' || record.state === 'paused');
 }

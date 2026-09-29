@@ -87,8 +87,14 @@ repeated and runs beside a live loop and from a development build; the
 swap refuses while a loop session is running or paused, and from a
 development build before anything is built. A newer schema that dropped
 a table or column this rafa writes is not additive, and the repair
-refuses it rather than copy around it. `fix-schema.test.ts` (store and
-command) rebuilds a pre-log store at 15 with a log, reports a logged
+refuses it rather than copy around it. It refuses a store that never
+held one as well: since `row-origins` added `origin_store` and
+`origin_seq`, a pre-log store past this rafa holds legacy tables
+without them, and the rebuild answers `the store holds no column
+blockers.origin_store, blockers.origin_seq, which this rafa writes;
+its newer schema is not additive`. So `fix-schema.test.ts` (store and
+command) plants its pre-log store two entries past the whole
+catalogue, rebuilds it with a log, reports a logged
 store with an unknown additive migration `current`, and spawns
 `bun src/rafa.ts` over a store outside the child's temp directory:
 the swap is refused, the dry run runs. The steps around the build, from
@@ -161,6 +167,11 @@ rebuild over non-null rows migrates, names the backup, refuses beside a
 planted live loop, and spawns `bun src/rafa.ts`: refused over a project's
 store, migrating a copy under `RAFA_EFFORT_DIR`.
 
+**`rafa effort merge <file> [--dry-run]` joins another device's store,
+and `rafa effort move --to=sqlite` migrates from NDJSON to SQLite.**
+See `context/effort-merge.md` for the merge rules, the command details,
+and the merge trail (`merges` and `merge_conflicts` tables).
+
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
 empty string, right after the detached refusal and before `--runtime`
@@ -188,6 +199,121 @@ at a failing required item, so no session is spawned.
 `doctor-effort-schema.test.ts` spawns `doctor` and `effort schema
 --check` over the same stores and holds their exit codes together.
 
+### Row origins
+
+**A store's origin is its store id, not the machine id.** A row's
+**origin pair** is `(origin_store, origin_seq)`, where `origin_store`
+is a UUID minted when the store first writes after a migration, and
+`origin_seq` is the row's own local `seq` at the moment of insert. The
+origin pair stays with a row through copies and merges, so rows from
+the first device keep their A identity even after being copied to device
+B. If device B then keeps its own store id and the copied rows under A's
+origin, both devices can write new rows with their own store ids
+without collision: B's new rows are `finding:B:1`, while the copied
+rows keep `finding:A:1`, etc. This is why the origin is the store and
+not the machine — a single machine might hold multiple copies of a
+store.
+
+**Minting a new origin is always safe; missing a copy is not.** The
+principle guides every copy-detection rule. A new origin should be
+minted when a copy is detected, even if the detection is uncertain —
+false positives create duplicates that merge removes, while false
+negatives create collisions that merge cannot undo. A store mints a new
+origin on a write open after the first migration (when the origin pair
+columns were added) and on a write open that detects a copy, never on a
+read open.
+
+**The nine scenarios describe every way two stores can meet.** Numbered
+by who comes second (the store being brought in): 1) no store anywhere
+(the first device creates it); 2) one device has a store (the other
+takes a copy before opening); 3) two clean starts (every row new,
+only commits overlap); 4) copied then diverged (the shared part
+collapses, diverged parts are added); 5) a restored older `.bak`
+(nothing new, just the old store restored); 6) different rafa versions
+(both brought to the union of named migrations); 7) wrong project
+(refused); 8) a loop is writing the store (refused); 9) three devices or
+the same merge twice (same result in any order, any number of times). In
+scenario 4, the recommended pattern for starting a second device: first
+set aside any existing store on the new device. On 2026-09-28, an `scp`
+of the seed store overwrote the second device's own small store before
+rename; then take a consistent copy with `rafa effort copy` (or
+`sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, never a plain
+file copy during a write), move it and `.rafa/config.yaml` into the new
+device's `.rafa/`, and merge back later with `rafa effort merge`.
+
+**Why UUIDs alone are not trusted.** A v4 UUID almost never collides by
+chance; collisions come from copies (a restored backup, a cloned VM
+starting with the same random state). A project that minimized UUID
+collisions still saw a handful a year. The composite id guards against
+exactly that: two columns, one fixed per store, one per row within that
+store, cost just as much as the UUID column they replace and catch every
+copy by detecting when the machine's filesystem reports a fact that did
+not come from that store. The storage choice is "expand first" from
+expand-and-contract (parallel change); #234 already uses "contract" for
+a breaking migration, and expand-first lets migration name everything,
+today and in the future.
+
+### Store metadata
+
+**`store_meta` is a single-row table (`id = 1`) that identifies the
+store.** The row holds the origin the store stamps (`origin_store`, a
+UUID), the project git reads in the store's directory (or the one the
+row already names when git finds no root commit there), and the host,
+path and file identity the store was minted under. It is written on a
+write open, at most once per store, behind the first migration named
+`store-meta`; a write open that keeps the existing origin asks git
+nothing. The row is unminted if it has no value in `origin_store` (the
+column is `NOT NULL` for every runtime, but minting is skipped when git
+finds no project or repository). A read open never reads or writes the
+`store_meta` row, which is why `rafa effort schema` leaves an unminted
+store's bytes unchanged.
+
+**The host id is an HMAC-SHA256 of `/etc/machine-id`, the macOS
+platform UUID, or the hostname, never the raw value, since `machine-id(5)`
+asks for a keyed hash and a store travels between machines.** The path is
+the real path, so a symlinked spelling does not trigger a copy-detection
+mint. The device and inode are bigints: when a `.bak` file is renamed
+over the store, it has a new inode and triggers a copy-detection mint,
+but one restored with `cp` over the existing file keeps the old inode
+and does not (measured on tmpfs). The merge's collision check is what
+catches a missed `.bak` restore. SQLite's INTEGER is signed and bun binds
+a bigint past 2^63 by wrapping without warning, so the device and inode
+are written as their two's complement and read back through `CAST(… AS TEXT)`
+as unsigned.
+
+**A test passes its fifth argument to `withSqliteStore` to inject the
+host and project, so test stores can be minted independently.** The store
+module reads these values from `settleStoreIdentity`
+(`src/effort/store/store-identity.ts`) on a write, and `store-meta.ts`
+reads and writes the row. `withSqliteStore` calls `settleStoreIdentity`
+after `bringForward`, so a write open mints when the row is absent or a
+fact moved (the filesystem identity changed), under `BEGIN IMMEDIATE`
+with a second decision.
+
+### Copy detection
+
+**The collision check in the merge (`store/merge-store.ts`) catches
+every copy by examining the origin pair of each incoming row.** When a
+store is copied — backed up and restored, cloned to a new VM, or moved
+to another device — the merged store will hold two rows with the same
+origin pair: one from the local store (inserted before the copy) and one
+from the incoming store (the same insert, copied). The first detection
+marks the incoming store's origin as a copy: its `store_meta` row's
+filesystem identity (device, inode, path) is found in the local store's
+`merges` table (a log of every completed merge) or it collides on
+`origin_store`. When a copy is detected and merged, the merge refusal
+entry names the copy's origin and what copied it.
+
+**A development build mints on the first write after copy detection.**
+Between the first plan and the lock in `bringForward`, an open with
+anything to adopt or apply asks `refuseUnownedDevelopmentWrite` for a
+store it does not own. After the lock is taken (in the same transaction),
+if the merge detects a copy, `settleStoreIdentity` is called a second
+time with the detection flag, and it mints a new origin for this store.
+This is why a development build can write copies: it owns stores under
+`tmpdir()` and under `RAFA_EFFORT_DIR` unless one sits in the project's
+own `<root>/.rafa/effort/`.
+
 ### The schema history
 
 **SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and
@@ -200,7 +326,16 @@ transaction as the migrations it records, so a run killed between the two
 rolls the field back with the tables; and the last version is the array's
 length rather than a constant beside it, so an appended entry cannot be
 forgotten. Measured, a throw inside the transaction rolls `user_version`
-back as well.
+back as well. That count is what `migrateSchema` writes and a pre-log
+release reads. `row-origins`, the first entry past the thirteen legacy
+ones, makes the array longer than 13, while an open through
+`bringForward` leaves `user_version` at the legacy gate; so a store's
+`user_version` no longer equals `SQLITE_SCHEMA_VERSION`, and its log,
+not `user_version`, says which entries it holds. A test that plants a
+pre-log store `behind` therefore plants it at `LEGACY_GATE_OPEN`, never
+at the array's length less one: past 13 a pre-log store is
+`pre-log-unreleased`, and `doctor-effort-schema.test.ts`'s behind case
+failed that way once `store-meta` made the array 15.
 
 **Each entry is a named `SqliteMigration`: an `id`, what it `breaks` and
 its `sql`.** The `id` is kebab-case and is never reused. `breaks` is `[]`
@@ -299,7 +434,8 @@ caller states `access`.** `keys`, `read` and every reader outside the
 port pass `'read'`; every writer passes `'write'`, and so does
 `writeSqliteStore` for an empty write. The open sets `PRAGMA
 busy_timeout` to `effort.busyTimeoutMs`, then calls `bringForward(db,
-path, access, 'open')` before `use`. A read of a current store writes nothing;
+path, access, 'open')` and `settleStoreIdentity` (`store-meta.ts`,
+which mints only on a write) before `use`. A read of a current store writes nothing;
 a read of a pre-log store adopts it, since adoption counts as a write,
 unless a development build is refused it as above; a
 store logging an unknown migration that breaks only writers is read and
@@ -341,7 +477,79 @@ busy timeout.
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
 `report_absences`, `task_reports`, `preflight`, `dispatches`,
-`skill_invocations` and `plan_ci` are SQLite-only and stay out of the port's row map.
+`skill_invocations`, `plan_ci`, `store_meta`, `merges` and
+`merge_conflicts` are SQLite-only and stay out of the port's row map.
+The last three, which migration `store-meta` creates, are the store's
+own identity and its merge trail: `store_meta` holds one row (`id = 1`)
+naming the origin the store stamps, its project and the host, path and
+file identity it was minted under; `merges` records each merge and
+`merge_conflicts` each incoming row one could not settle. `mergeStore`
+(`store/merge-store.ts`) writes one `merges` row per merge into the
+build it swaps in through `rebuildAside`, behind
+`effort.sqlite.before-merge-<stamp>.bak`; its refusals, the forwarded
+copy of an other store that lacks migrations, and its row-count check
+(each table's old count plus the rows the merge added, through
+`checkedCounts`' `added`) are in its module note. `settleMatches`
+(`store/merge-conflicts.ts`) fills
+`merge_conflicts`: it compares each pair the union matched on every
+column but `seq` and the origin pair, skips an equal pair, fills a
+set-once field NULL here from the other store and keeps a filled one
+against NULL there, and records the incoming row as JSON, both rows
+kept, when two filled values differ (`field` names the column) or the
+rows differ outside every edited field (`field` NULL). Each set-once
+field has its literal `UPDATE` in `SET_ONCE_FILLS`, so
+`merge-rules.test.ts` can read it. `commits.row_json` is edited under
+the rule `recomputed`: two rows of one commit that differ only in its
+`minutesSincePrevious` are skipped, the gap here kept, through the
+field's entry in `RECOMPUTED_COMPARISONS`. `recomputeCommitGaps`
+(`store/merge-commit-gaps.ts`) rewrites that gap, with no git call,
+for each commit the union inserted and the commit right after it in
+time, ordered by `Date.parse` of the stored timestamp and by sha within
+an instant, so at most two rows are written per commit brought in.
+`src/effort/store/store-identity.ts` decides, on a write, whether to
+mint, and `store-meta.ts` reads and writes the row: `withSqliteStore`
+calls `settleStoreIdentity` after `bringForward`, so a `write` open
+mints when the row is absent or a fact moved, under `BEGIN IMMEDIATE`
+with a second decision, and a `read` open never reads or writes it,
+which is why `rafa effort schema` leaves an unminted store's bytes
+unchanged. A write that keeps the origin asks git nothing. A mint
+records the project git reads in the store file's directory, or the
+one the row already names when git finds no root commit there; with
+neither, as for a store under `tmpdir()` outside a repository with
+commits, the column is `NOT NULL` and nothing is written, so such a
+store stays unminted and each writing open asks git again. A test
+passes `withSqliteStore` its fifth argument to inject the host and the
+project. SQLite's INTEGER is signed and bun binds a bigint past 2^63
+by wrapping it without a word, so the device and inode are written as
+their two's complement and read back through `CAST(… AS TEXT)` as
+unsigned. The host id
+is an HMAC of `/etc/machine-id`, the macOS platform UUID or the
+hostname, never the raw value, since `machine-id(5)` asks for a keyed
+hash and a store travels. The path is the real path, so a symlinked
+spelling does not mint; the device and inode are bigints. A `.bak`
+renamed over the store has a new inode and mints, but one restored
+with `cp` over the existing file keeps the old inode and does not
+(measured on tmpfs); the merge's collision check is what catches it.
+Every production insert into the twelve tables a merge unions stamps
+`origin_store` from that row and `origin_seq` as the row's own `seq`,
+which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the
+two cannot differ: `STAMPED_COLUMNS` and `stampedValues`
+(`store/origins.ts`) spell both for every writer, in the insert's own
+column list, with no trigger and no `UPDATE`. A store with no row
+stamps NULL in both. A copy's new origin counts on from the `seq` it
+copied, and no reader names either column, so a row an older runtime
+inserted is read as any other. `origins.test.ts` reads every
+`INSERT INTO` in the modules directly under `store/` from source, not
+the scenario builders in `store/testdata/merge-scenarios.ts`, which
+plant a `plan-ci` store's rows with no origin columns, and fails on an
+unstamped one other than the `schema_migrations` log, `store_meta`, `fix-schema`'s
+copy, which carries the columns over as they were, the merge's
+union (`store/merge-union.ts`), which inserts another store's unmatched
+rows under a new local `seq` with their origin pair unchanged, and the
+merge's conflict trail (`store/merge-conflicts.ts`) into the local
+`merge_conflicts`, its `merges` row (`store/merge-store.ts`), and the
+merge fixtures' restore (`store/fixture-extract.ts`), which builds a
+store from an anonymised extract with every row as the extract holds it.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
@@ -360,8 +568,32 @@ and `readSessionBudgets` the `dispatches` rows carrying a budget.
 `readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
 `task_reports` and `report_absences` back the same way, for the rough ETA
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
-`changes` row under one plan stub, in append order, for a release step to
-render.
+`changes` row under one plan stub, in `ACROSS_STORES_ORDER`
+(`store/origins.ts`: `collected_at`, the origin pair, then `seq`), for a
+release step to render. A reader that answers rows in order over a table
+with `collected_at` sorts by that constant rather than `seq`, since a
+merge gives the other store's rows new local `seq` values after its own.
+
+**A new table has a checklist, and each item lands in the table's own
+commit:**
+
+- its `SQLITE_MIGRATIONS` entry and its `migrations.lock.json` line;
+- **declare its merge rule** in `MERGE_RULES`
+  (`store/merge-rules.ts`): its scope, `merged` for a table whose rows
+  travel between stores or `local` for one that never leaves its
+  machine; for a merged table, the identity columns that match its
+  rows with a NULL origin and every column a production statement
+  changes after the insert, each with its rule; a merged table also
+  carries `origin_store` and `origin_seq` with its partial unique index
+  `<table>_by_origin`, and joins `ORIGIN_TABLES` (`store/origins.ts`)
+  with its inserts stamped. `merge-rules.test.ts` builds a store
+  through every migration and fails on a table with no entry, an entry
+  with no table, a merged table without both origin columns and that
+  index, and an `UPDATE <table> SET <column>` in a production module
+  under `src/` whose column has no rule; a new edit of an existing
+  table's column needs its rule the same way;
+- the table-list expectations below.
+
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
 `reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts`,
@@ -384,7 +616,8 @@ expectations do not move. Each `SkillFact` holds what `task_reports` says
 (plan, task line, outcome, claimed skills), what `dispatches` holds about
 its resolver and offers, what `skill_invocations` shows it invoked (or
 `'unknown'` when its log could not be read), its `findings`, `blockers`
-and `out_of_scope_bugs` rows in append order, and every `plan_ci` reading
+and `out_of_scope_bugs` rows in `ACROSS_STORES_ORDER`, the facts of one
+plan in that order over `task_reports`, and every `plan_ci` reading
 of its plan (empty for no plan or a plan with no reading). Names are
 mapped through `bareSkillName`, so a served skill reads as its bare name
 and a plugin's `plugin:name` is kept. A session with no report (a
@@ -631,8 +864,8 @@ NULL or an array and nothing else. `writeTaskReport` stores it from the
 `recordTaskReport`. NULL is "not recorded" and never an empty list: a
 row a version-11 store held reads NULL, and so does a write that leaves
 the list out, while a report that listed no skill stores `[]`.
-`readReportedSkills` (`store/reports.ts`) answers the list per row in
-append order, NULL as null. A `SkillFact` reads it as `skillsUsed` after
+`readReportedSkills` (`store/reports.ts`) answers the list per row, the
+rows in `ACROSS_STORES_ORDER`, NULL as null. A `SkillFact` reads it as `skillsUsed` after
 mapping each name through `bareSkillName`, keeping each once in first-
 seen order. It is the session's claim; comparing it with `skill_invocations`
 (what the log shows) is the reader's job, not the writer's. Never called
@@ -653,7 +886,8 @@ the same items and writes no row.
 issue's reference in the row the dispatch's session holds under the text
 its caller keys the recurrence by: it sets `tracker_ref` on that
 session's row for the key, or inserts a row holding only the dispatch,
-the key and the reference, and keeps a reference already there.
+the key, the reference and the origin pair every insert stamps, and
+keeps a reference already there.
 `readTrackerRef` answers the oldest reference stored under a key, in any
 session. `triage/triage.ts` keys by the bug's artifact WITH the tracker
 file it was reported against, so its rows carry that key rather than a
@@ -668,10 +902,10 @@ bullet `- artifact: <key>`.
 where a task's substance lands; `task_reports` holds no prose, as the row
 above says. Select EVERY column rather than filtering on `kind`: a row
 `store/tracker-refs.ts` inserted for a filed issue carries only the
-dispatch, the key and the `tracker_ref`, leaving `kind`, `what` and
-`signal` NULL, so a `where kind = ...` query silently drops exactly the
-findings that were escalated. Measured over rafa-63: 210 rows under the
-stub, 12 of them null-`kind`.
+dispatch, the key, the `tracker_ref` and its origin pair, leaving
+`kind`, `what` and `signal` NULL, so a `where kind = ...` query
+silently drops exactly the findings that were escalated. Measured
+over rafa-63: 210 rows under the stub, 12 of them null-`kind`.
 
 ### Attribution
 

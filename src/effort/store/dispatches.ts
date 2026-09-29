@@ -25,6 +25,7 @@
  * | `skills_offered` | the bare names of the skills its prompt offered, a JSON array, or NULL when not recorded |
  * | `lessons_offered` | the ids of the lessons its prompt offered, a JSON array, or NULL when not recorded |
  * | `collected_at` | the write's time, ISO 8601 |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store. The
  * five value columns follow `DECLARATION_KEYS`, whose sixth key, `skills`,
@@ -106,6 +107,7 @@ import { existsSync } from 'node:fs';
 import { SKILL_RESOLVERS } from '../../config-sections.js';
 
 import { describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { LONE_SURROGATE, sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** The part of the parser's record a row stores. */
@@ -164,9 +166,10 @@ const INSERT_DISPATCH = `
   INSERT INTO dispatches (
     session_id, plan_stub, task_line,
     declaration, agent, model, effort, budget_usd, tools,
-    flags, resolver, skills_offered, lessons_offered, collected_at
+    flags, resolver, skills_offered, lessons_offered, collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('dispatches')})
   ON CONFLICT (session_id) DO NOTHING
 `;
 

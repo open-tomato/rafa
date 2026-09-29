@@ -14,9 +14,11 @@
  *    repair (`fix-schema.ts`) brings a fresh file to this rafa's
  *    migrations through the log-aware apply and copies the known tables
  *    into it, and the forward move (`migrate.ts`) writes the store out
- *    with `VACUUM INTO` and applies its pending migrations there. The
- *    caller checks it with {@link checkedCounts},
- *    every table's row count against the store's, and
+ *    with `VACUUM INTO` and applies its pending migrations there, and
+ *    the merge (`merge-store.ts`) writes the store out the same way and
+ *    unions another store's rows into it. The caller checks it with
+ *    {@link checkedCounts}, every table's row count against the
+ *    store's plus the rows the caller says it added, and
  *    {@link refuseCorrupt}, SQLite's `integrity_check`.
  * 4. Any failure while building removes the parallel file and its
  *    journal, and leaves the store untouched.
@@ -73,14 +75,25 @@ export function refuseInFlight(path: string): void {
 
 /**
  * Every table in `tables` with its rows in `main`, refusing one whose
- * count differs from the same table in the attached `original` schema.
+ * count differs from the same table in the attached `original` schema
+ * plus the rows `added` names for it, none for a table it does not name.
+ * A repair or a migration adds none; a merge names what it inserted.
  */
-export function checkedCounts(db: Database, tables: readonly string[], original: string): TableRows[] {
+export function checkedCounts(
+  db: Database,
+  tables: readonly string[],
+  original: string,
+  added: Readonly<Record<string, number>> = {},
+): TableRows[] {
   return tables.map((table) => {
     const rows = count(db, `SELECT count(*) AS n FROM main.${quoted(table)}`);
     const originalRows = count(db, `SELECT count(*) AS n FROM ${original}.${quoted(table)}`);
-    if (rows !== originalRows) {
-      throw new RebuildRefusal(`the rebuilt ${table} holds ${String(rows)} rows, the store ${String(originalRows)}`);
+    const addedRows = added[table] ?? 0;
+    if (rows !== originalRows + addedRows) {
+      const plus = addedRows === 0
+        ? ''
+        : ` plus ${String(addedRows)} added`;
+      throw new RebuildRefusal(`the rebuilt ${table} holds ${String(rows)} rows, the store ${String(originalRows)}${plus}`);
     }
     return { table, rows };
   });

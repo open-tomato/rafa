@@ -41,6 +41,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { FINDING_KINDS, FINDING_SIGNALS, parseReport } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES, writeFindings } from './findings.js';
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import {
   migrateSchema,
   openSqliteStore,
@@ -65,6 +66,8 @@ interface StoredFinding {
   outcome: string;
   tracker_ref: string | null;
   collected_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The spec's columns, in its order, after the append order. */
@@ -84,6 +87,8 @@ const COLUMNS = [
   'outcome',
   'tracker_ref',
   'collected_at',
+  'origin_store',
+  'origin_seq',
 ];
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-findings-'));
@@ -245,7 +250,7 @@ describe('the findings migration', () => {
     expect(rawQuery<{ name: string }>(root, columns, 'findings').map(({ name }) => name))
       .toEqual(COLUMNS);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-1 store forward, keeping the rows it holds', () => {
@@ -263,7 +268,7 @@ describe('the findings migration', () => {
 
     expect(result.appended).toBe(1);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(openSqliteStore(root).read('sessions')).toEqual([
       { sessionId: 's-1' } as never,
     ]);
@@ -350,6 +355,8 @@ describe('writeFindings rows', () => {
         outcome: 'blocked',
         tracker_ref: null,
         collected_at: '2026-09-13T10:00:00.000Z',
+        origin_store: null,
+        origin_seq: null,
       },
       {
         seq: 2,
@@ -367,6 +374,8 @@ describe('writeFindings rows', () => {
         outcome: 'blocked',
         tracker_ref: null,
         collected_at: '2026-09-13T10:00:00.000Z',
+        origin_store: null,
+        origin_seq: null,
       },
     ]);
   });

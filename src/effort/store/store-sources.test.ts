@@ -16,7 +16,9 @@
  *     `plan-ci.ts`, `skill-invocations.ts`, `tracker-refs.ts`,
  *     `sqlite.ts`'s row store, `bring-forward.ts`'s log insert).
  *   - No `new Database(` outside `sqlite.ts`, `fix-schema.ts`,
- *     `copy.ts`, `schema-report.ts` and `migrate.ts`. Every other opener of a SQLite
+ *     `copy.ts`, `schema-report.ts`, `migrate.ts`, `merge-store.ts`,
+ *     `fixture-extract.ts` and `testdata/merge-scenarios.ts`.
+ *     Every other opener of a SQLite
  *     handle is expected to go through `withSqliteStore` (`sqlite.ts`)
  *     so every open runs the test guard, the busy timeout and
  *     `bringForward` alike; `fix-schema.ts` opens the store itself on
@@ -29,6 +31,19 @@
  *     file it built beside the store, and must bring that file forward
  *     as the `migrate` caller, the one a breaking migration is applied
  *     for, rather than as the ordinary open `withSqliteStore` makes.
+ *     `merge-store.ts` opens the other store `{ readonly: true }`,
+ *     which no open through `withSqliteStore` is, and brings forward
+ *     only files it built itself, with `builtAside`.
+ *     `fixture-extract.ts` opens the two stores it extracts
+ *     `{ readonly: true }` too, and builds a fixture store from an
+ *     extract at the migrations the extract holds, which an open
+ *     through `withSqliteStore` would bring forward; it runs the
+ *     guard itself before either.
+ *     `testdata/merge-scenarios.ts` builds the merge scenarios' stores
+ *     under `tmpdir()`: one left at the `plan-ci` schema, which an open
+ *     through `withSqliteStore` would bring forward, and every other
+ *     with a `store_meta` row it plants, where a writing open would
+ *     mint one from the real host id; it runs the guard itself first.
  *
  * A fourth guard reads `schema-plan.ts` alone: it imports neither
  * `bun:sqlite` nor `sqlite.ts`, which is `schema-plan.ts`'s own module
@@ -97,6 +112,9 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'src/effort/store/copy.ts',
   'src/effort/store/schema-report.ts',
   'src/effort/store/migrate.ts',
+  'src/effort/store/merge-store.ts',
+  'src/effort/store/fixture-extract.ts',
+  'src/effort/store/testdata/merge-scenarios.ts',
 ]);
 
 /** An `import … from 'bun:sqlite'` or from a `sqlite.{js,ts}` module. */

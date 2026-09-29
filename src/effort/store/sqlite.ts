@@ -13,7 +13,7 @@
  * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
- * NDJSON rows are deduplicated by. Each table has three columns:
+ * NDJSON rows are deduplicated by. Each table has five columns:
  *
  *   - `seq`, the order the row was appended in.
  *   - The kind's key, filled from {@link EFFORT_KEY_PROJECTIONS}:
@@ -21,6 +21,9 @@
  *     reference schema gives the same two keys. It is `NOT NULL` and
  *     `UNIQUE` and refuses an empty string, so no stored row lacks one.
  *   - `row_json`, the row itself.
+ *   - `origin_store` and `origin_seq`, the store's origin and the row's
+ *     own `seq`, which the append stamps as every production insert
+ *     does (`origins.ts`), NULL in both on a store with no origin.
  *
  * The row is stored whole, as the JSON text the NDJSON backend writes
  * as a line, and read back through `JSON.parse` as that backend reads
@@ -194,6 +197,10 @@
  *     message ends with the one command to run next, and no byte is
  *     written. A store logging a migration this rafa does not know,
  *     which breaks only older writers, is read and refused a write.
+ *   - Once the store is brought forward, a write open mints its origin
+ *     into `store_meta` when it holds none or is a copy
+ *     (`store-meta.ts`). A read open never touches that row, so a read
+ *     of a current store still writes nothing, minted or not.
  *
  * {@link migrateSchema} counts the history by position and keeps no
  * log. No open and no command goes through it; `fix-schema.ts` builds
@@ -201,7 +208,9 @@
  * with it.
  */
 import type { SqliteMigration } from './migrations.js';
+import type { OriginTable } from './origins.js';
 import type { StoreAccess } from './schema-plan.js';
+import type { StoreIdentitySeams } from './store-meta.js';
 import type {
   AppendResult,
   EffortRow,
@@ -217,7 +226,9 @@ import { Database } from 'bun:sqlite';
 import { bringForward } from './bring-forward.js';
 import { effortStoreDir, guardTestProcess } from './location.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { activeStoreSettings } from './settings.js';
+import { settleStoreIdentity } from './store-meta.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
 export { SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './migrations.js';
@@ -238,7 +249,7 @@ export function sqliteStorePath(repoRoot: string): string {
 /** Where one kind's rows live in the schema. */
 interface KindTable {
   /** The table, named for the kind. */
-  readonly name: string;
+  readonly name: OriginTable;
   /** The column the kind's key is stored in, and deduplicated by. */
   readonly keyColumn: string;
 }
@@ -399,7 +410,8 @@ export function migrateSchema(
  * directory before anything is made (`guardTestProcess`, `location.ts`),
  * then opens the store at `path`, sets its busy timeout to the active
  * `effort.busyTimeoutMs` (`settings.ts`), brings its schema
- * forward through `bringForward` for an open with `access`, hands it to
+ * forward through `bringForward` for an open with `access`, settles its
+ * identity through `settleStoreIdentity` (`store-meta.ts`), hands it to
  * `use`, and closes it whatever `use` did. A refused store throws
  * `SchemaRefusedError` before `use` runs. Only a caller with a row to
  * add passes `create`, and only then is the directory made.
@@ -407,7 +419,11 @@ export function migrateSchema(
  * `access` is `write` for every caller that may write, whether or not
  * it ends up writing, and `read` for one that only reads. A read can
  * still write the store, when it adopts one or applies what is pending;
- * the module note says when.
+ * the module note says when. Only a write mints: it records a new
+ * origin in `store_meta` when the store holds none or is a copy, and a
+ * read never reads or writes that row. `identity` is what the mint
+ * reads the host, the project and the clock through; every caller but
+ * a test leaves it out.
  *
  * Exported so the tables outside the port are opened, brought forward
  * and closed exactly as every kind's is. A write that can be left with
@@ -418,6 +434,7 @@ export function withSqliteStore<T>(
   access: StoreAccess,
   create: boolean,
   use: (db: Database) => T,
+  identity: StoreIdentitySeams = {},
 ): T {
   guardTestProcess(path);
   if (create) mkdirSync(dirname(path), { recursive: true });
@@ -426,6 +443,7 @@ export function withSqliteStore<T>(
   try {
     db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
     bringForward(db, path, access, 'open');
+    settleStoreIdentity(db, path, access, identity);
     return use(db);
   } finally {
     db.close();
@@ -436,7 +454,8 @@ export function withSqliteStore<T>(
  * Inserts a checked batch in one transaction and answers how many rows
  * it added. A row whose key is already held, on disk or earlier in the
  * batch, conflicts, adds nothing and is counted by the caller as
- * skipped.
+ * skipped. Each row is stamped with the store's origin and its own
+ * `seq` (`origins.ts`).
  */
 function insertBatch(
   db: Database,
@@ -444,7 +463,8 @@ function insertBatch(
   entries: readonly BatchEntry[],
 ): number {
   const insert = db.query<unknown, [string, string]>(
-    `INSERT INTO ${table.name} (${table.keyColumn}, row_json) VALUES (?, ?)`
+    `INSERT INTO ${table.name} (${table.keyColumn}, row_json, ${STAMPED_COLUMNS})`
+      + ` VALUES (?, ?, ${stampedValues(table.name)})`
       + ` ON CONFLICT (${table.keyColumn}) DO NOTHING`,
   );
   const insertAll = db.transaction(() => entries.reduce(

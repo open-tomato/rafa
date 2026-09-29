@@ -48,6 +48,9 @@ const OPTIONS = { appliedBy: '0.25.0', now: () => NOW };
 
 const LEGACY_IDS = SQLITE_MIGRATIONS.slice(0, LEGACY_GATE_OPEN).map(({ id }) => id);
 
+/** The ids past the legacy entries, which adopting a pre-log store also applies. */
+const PAST_LEGACY_IDS = SQLITE_MIGRATIONS.slice(LEGACY_GATE_OPEN).map(({ id }) => id);
+
 /** Runs `use` over a connection to `path`, closing it whatever `use` did. */
 function withDb<T>(path: string, use: (db: Database) => T): T {
   const db = new Database(path, { readwrite: true, create: true });
@@ -196,7 +199,7 @@ describe('adopting a store with no log', () => {
       // so reaching here is what shows the held ones were not run.
       expect(result).toEqual({
         adopted: LEGACY_IDS.slice(0, count),
-        applied: LEGACY_IDS.slice(count),
+        applied: [...LEGACY_IDS.slice(count), ...PAST_LEGACY_IDS],
         userVersion: LEGACY_GATE_OPEN,
       });
       expect(logOf(path)?.map(({ id, sha256 }) => ({ id, sha256 }))).toEqual(SQLITE_MIGRATIONS.map((migration) => ({
@@ -213,8 +216,8 @@ describe('adopting a store with no log', () => {
 
     const result = withDb(path, (db) => bringForward(db, path, 'read', 'open', OPTIONS));
 
-    expect(result).toEqual({ adopted: LEGACY_IDS, applied: [], userVersion: LEGACY_GATE_OPEN });
-    expect(logOf(path)).toHaveLength(LEGACY_GATE_OPEN);
+    expect(result).toEqual({ adopted: LEGACY_IDS, applied: PAST_LEGACY_IDS, userVersion: LEGACY_GATE_OPEN });
+    expect(logOf(path)).toHaveLength(SQLITE_MIGRATIONS.length);
   });
 
   it('refuses a store at 14 with no log, naming its way out, and leaves it byte-identical', () => {
@@ -325,7 +328,7 @@ describe('a synthetic tail', () => {
 
     const result = withDb(path, (db) => bringForward(db, path, 'write', 'open', { ...OPTIONS, migrations }));
 
-    expect(result).toEqual({ adopted: LEGACY_IDS, applied: ['fixture-notes'], userVersion: LEGACY_GATE_OPEN });
+    expect(result).toEqual({ adopted: LEGACY_IDS, applied: [...PAST_LEGACY_IDS, 'fixture-notes'], userVersion: LEGACY_GATE_OPEN });
   });
 
   it('applies an additive migration late, after one that follows it in the catalogue', () => {

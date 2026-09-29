@@ -215,6 +215,26 @@ describe('checkedCounts', () => {
       db.close();
     }
   });
+
+  it('answers a table holding the original count plus the rows the caller added', () => {
+    const db = attached(5, 3);
+    try {
+      expect(checkedCounts(db, ['notes'], 'original', { notes: 2 })).toEqual([{ table: 'notes', rows: 5 }]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('refuses a table short of the original count plus the rows the caller added, and one holding them uncounted', () => {
+    const db = attached(4, 3);
+    try {
+      expect(() => checkedCounts(db, ['notes'], 'original', { notes: 2 }))
+        .toThrow('the rebuilt notes holds 4 rows, the store 3 plus 2 added');
+      expect(() => checkedCounts(db, ['notes'], 'original', { other: 1 })).toThrow('the rebuilt notes holds 4 rows, the store 3');
+    } finally {
+      db.close();
+    }
+  });
 });
 
 describe('refuseCorrupt', () => {
