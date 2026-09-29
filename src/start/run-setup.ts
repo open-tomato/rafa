@@ -27,6 +27,7 @@
  * switching the main checkout, so a line naming both asks for two
  * contradictory things and is refused before anything is read.
  */
+import type { RafaConfig } from '../config-schema.js';
 import type { BranchSeams } from './branch.js';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -76,6 +77,45 @@ export function refuseWorktreeBesideCreateBranch(args: readonly string[]): void 
     '   of its own and the other by switching the main checkout to it.',
     `   Pass ${AS_WORKTREE_FLAG} alone to run under \`loop.worktreeDir\` and leave the main checkout as it is,`,
     `   or ${CREATE_BRANCH_FLAG} alone to switch the main checkout to the branch and run there.`,
+    NOTHING_DISPATCHED,
+  ].join('\n'));
+}
+
+/** The tracking settings that refuse `--as-worktree`, each with its config key. */
+const TRACKING_SETTINGS: readonly (readonly [keyof RafaConfig & `tracking${string}`, string])[] = [
+  ['trackingSpecs', 'tracking.specs'],
+  ['trackingPlans', 'tracking.plans'],
+  ['trackingAll', 'tracking.all'],
+];
+
+/**
+ * Throws `CommandExit` with exit code 1 when the words carry
+ * `--as-worktree` and any of `tracking.specs`, `tracking.plans` or
+ * `tracking.all` is on, naming every one that is on, and returns
+ * otherwise.
+ *
+ * Tracked `.rafa/` content would be checked out into the worktree as a
+ * second copy beside the main checkout's, which a worktree loop serves
+ * its sessions from; the two would drift apart.
+ */
+export function refuseWorktreeWhileTracking(
+  args: readonly string[],
+  config: Pick<RafaConfig, 'trackingSpecs' | 'trackingPlans' | 'trackingAll'>,
+): void {
+  if (!args.includes(AS_WORKTREE_FLAG)) return;
+  const on = TRACKING_SETTINGS.filter(([field]) => config[field]).map(([, key]) => `\`${key}\``);
+  if (on.length === 0) return;
+  const single = on.length === 1;
+  const verb = single
+    ? 'is'
+    : 'are';
+  const pronoun = single
+    ? 'it'
+    : 'them';
+  throw new CommandExit(1, [
+    `❌ Refusing ${AS_WORKTREE_FLAG} while ${on.join(', ')} ${verb} on: a worktree checks out`,
+    '   what git tracks, so it would hold a second copy of the `.rafa/` content the main checkout owns.',
+    `   Turn ${pronoun} off in \`.rafa/config.yaml\`, or run without ${AS_WORKTREE_FLAG}.`,
     NOTHING_DISPATCHED,
   ].join('\n'));
 }

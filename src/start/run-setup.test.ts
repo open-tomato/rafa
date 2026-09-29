@@ -22,6 +22,11 @@
  * paired with the same line less one flag, which returns, so the
  * refusal is shown to be keyed on the pair and not on either flag.
  *
+ * `refuseWorktreeWhileTracking` reads the words and three config
+ * flags; every refusing case is paired with a returning one (all
+ * settings off, or the flag absent with the settings on), so the
+ * refusal is shown to be keyed on both.
+ *
  * The guard and wiring cases moved here from `tests/plan-stamp.test.ts`
  * with the two functions, unchanged.
  */
@@ -40,6 +45,7 @@ import {
   guardRunBranch,
   readRunArgs,
   refuseWorktreeBesideCreateBranch,
+  refuseWorktreeWhileTracking,
   resolveRunBranch,
 } from './run-setup.js';
 import { NOTHING_DISPATCHED } from './session.js';
@@ -146,6 +152,53 @@ describe('refuseWorktreeBesideCreateBranch', () => {
     // `resolveRunBranch` acts on the bare `--create-branch` only, so a
     // valued spelling makes no branch and there is no pair to refuse.
     expect(worktreeRefusalOf(['--as-worktree', '--create-branch=false'])).toBeUndefined();
+  });
+});
+
+const TRACKING_OFF = { trackingSpecs: false, trackingPlans: false, trackingAll: false };
+
+/** Runs the tracking refusal and answers what it threw, or undefined. */
+function trackingRefusalOf(args: readonly string[], on: Partial<typeof TRACKING_OFF>): unknown {
+  try {
+    refuseWorktreeWhileTracking(args, { ...TRACKING_OFF, ...on });
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
+describe('refuseWorktreeWhileTracking', () => {
+  it.each([
+    ['trackingSpecs', 'tracking.specs'],
+    ['trackingPlans', 'tracking.plans'],
+    ['trackingAll', 'tracking.all'],
+  ])('throws exit code 1 naming %s as `%s` when it alone is on', (field, key) => {
+    const thrown = trackingRefusalOf(['--as-worktree'], { [field]: true });
+
+    expect(thrown).toBeInstanceOf(CommandExit);
+    const exit = thrown as CommandExit;
+    expect(exit.exitCode).toBe(1);
+    expect(exit.message.startsWith(`❌ Refusing --as-worktree while \`${key}\` is on:`)).toBe(true);
+    for (const other of ['tracking.specs', 'tracking.plans', 'tracking.all'].filter((name) => name !== key)) {
+      expect(exit.message).not.toContain(`\`${other}\``);
+    }
+    expect(exit.message.endsWith(NOTHING_DISPATCHED)).toBe(true);
+  });
+
+  it('names every setting that is on', () => {
+    const thrown = trackingRefusalOf(['--as-worktree'], { trackingSpecs: true, trackingAll: true });
+
+    expect((thrown as CommandExit).message).toContain('`tracking.specs`, `tracking.all` are on:');
+  });
+
+  it('returns under --as-worktree when every tracking setting is off', () => {
+    expect(trackingRefusalOf(['--as-worktree'], {})).toBeUndefined();
+  });
+
+  it('returns without --as-worktree even with every tracking setting on', () => {
+    const allOn = { trackingSpecs: true, trackingPlans: true, trackingAll: true };
+
+    expect(trackingRefusalOf(['--plan=.rafa/plans/PLAN-x.md'], allOn)).toBeUndefined();
   });
 });
 

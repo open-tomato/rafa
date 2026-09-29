@@ -200,7 +200,8 @@
  * `RAFA_EFFORT_DIR` set in the environment, refused next
  * (`start/run-config.ts`), a `--runtime`
  * refused (`start/runtime.ts`),
- * an unusable config, a plan file that does not exist, a checkout git
+ * an unusable config, `--as-worktree` while a `tracking` setting is
+ * on (`start/run-setup.ts`), a plan file that does not exist, a checkout git
  * could not read (`start/checkout.ts`), a branch offer
  * that could not be taken (`start/branch.ts`), a default branch the run
  * stayed on,
@@ -263,6 +264,7 @@ import {
   guardRunBranch,
   readRunArgs,
   refuseWorktreeBesideCreateBranch,
+  refuseWorktreeWhileTracking,
   resolveRunBranch,
 } from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
@@ -308,6 +310,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     const problems = error.problems.map((problem) => `   ${problem}`);
     throw new CommandExit(1, ['❌ Refusing to start on this configuration:', ...problems].join('\n'));
   }
+  // A worktree beside tracked `.rafa/` content would carry a second copy of it.
+  refuseWorktreeWhileTracking(args, runConfig.config);
   const { inject: injectMode, settingSources } = runConfig.config;
 
   // Every flag `start()` reads itself, read once (`start/run-setup.ts`).
