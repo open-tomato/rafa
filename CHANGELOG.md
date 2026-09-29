@@ -9,7 +9,7 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
-## 0.29.0 — 2026-09-29, Run a loop in its own worktree
+## 0.30.0 — 2026-09-29, Run a loop in its own worktree
 
 - Loop: new `rafa loop start --as-worktree` creates `feat/<stub>` from the latest `origin/<base>` and adds it as a worktree under `loop.worktreeDir`, never switching the main checkout; git commands, task sessions, commits and pushes run in the worktree while config, plans, runs, the effort store and served skills stay in the main checkout's `.rafa/`; it is refused beside `--create-branch`, on a branch checked out in another worktree (naming its path) and while `tracking.specs`, `tracking.plans` or `tracking.all` is on (naming the setting); a worktree loop records its path on its session record and `rafa loop list` shows it as a column.
 - Loop guard: every loop now checks its checkout's branch and HEAD before each task, before each task commit and around the wrap-up, against the branch it holds and the commit it last made; a switched, moved or removed checkout halts the run with `checkout moved`, commits nothing, keeps the work, marks the task blocked and prints the expected branch, the found branch and the command that restores it; `rafa loop start` refuses a detached HEAD or a branch with no commit, since the guard cannot hold them.
@@ -20,6 +20,17 @@ version is tagged `v<version>` (`v0.1.0` was never tagged;
 - Config: new `loop.worktreeDir` (default `.rafa/worktrees`, resolved against the project root) and `dangerous.selfUpdateDuringLoop` (default `false`), each with its commented line in the config `rafa init` writes.
 - Tests: new integration tests cover project resolution and planning from worktrees, each `--as-worktree` refusal, a worktree loop leaving the main checkout untouched, the guard halting on an outside commit, on the 2026-09-29 incident replayed and on a removed worktree while ignoring branch switches in the main checkout, `rafa self-update` beside a live loop, and two worktree loops writing one shared effort store.
 - Docs: `context/workflow.md`, `context/cli.md` and the README's loop section cover `--as-worktree`, the project root versus checkout split, the loop guard, the `loop list` worktree column, `self-update` waiting for live loops, and the config examples.
+
+## 0.29.0 — 2026-09-29, Choose how a project's effort store travels between devices
+
+- Config: new `effort.sync` (default `local`; one of `local`, `file`, `git`, `service` or `p2p`) names how a project's effort store travels between devices, and a value set in `~/.rafa/config.yaml` applies to every project that leaves it out; `rafa init` writes it commented out, and `effort.sync` and `prerequisites.required` are declared the settings every device of a team must share.
+- Ports: a new `Sync` port (version 1) pushes the rows this store wrote and pulls the rows another device wrote, always merging through `rafa effort merge`'s rules; core serves `local`, which has nothing to sync, and `file`, whose push is a `rafa effort copy` snapshot and whose pull is a merge.
+- Modules: a module can provide a sync strategy, listing `sync` in its manifest and registering its adapter as `sync/<kind>`; a module claiming `local` or `file`, or serving a port version core does not, is refused, naming both numbers.
+- Effort: new `rafa effort import <file> [--dry-run]` merges the `effort.sqlite` another device carried over, with `rafa effort merge`'s output and exit codes, including exit 2 for another project's store and for a `store: ndjson` project; importing the same file again adds nothing.
+- Doctor: `rafa doctor` gains an `effort sync` row naming the strategy in use (`local` when unset), and exits 1 when no adapter serves it, naming the `modules:` and `allowList:` lines that load a module providing `git`, `service` or `p2p`.
+- Loop: `rafa loop start` refuses a run whose `effort.sync` names a strategy no adapter serves, before any session, naming the same `modules:` and `allowList:` lines.
+- Tests: new tests hold the user and project precedence of `effort.sync` through `loadConfig`, the refused module adapters, a two-way `file` exchange converging on identical merged-table rows with a repeated pull adding nothing, and spawned `rafa effort import`, `rafa doctor` and `rafa loop start` runs over a missing module and over a project with no `effort.sync`, whose merge, copy and preflight outcomes are unchanged.
+- Docs: `context/effort-store.md` gains a Sync section (its pointer in `AGENTS.md` widened), and the README gains the `rafa effort import` line, the strategies from one laptop to a company with their config examples, and a warning that the carried file holds private text.
 
 ## 0.28.0 — 2026-09-29, Merge two devices' effort stores with nothing lost
 

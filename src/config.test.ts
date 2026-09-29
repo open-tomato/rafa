@@ -93,6 +93,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'version',
   'store',
   'effortBusyTimeoutMs',
+  'effortSync',
   'inject',
   'planDir',
   'specsDir',
@@ -141,6 +142,7 @@ const DEFAULTS: RafaConfig = {
   version: 1,
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
+  effortSync: 'local',
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -196,6 +198,7 @@ const FULL = [
   'store: ndjson',
   'effort:',
   '  busyTimeoutMs: 250',
+  '  sync: file',
   'plan:',
   '  inject: full',
   '  dir: .plans',
@@ -274,6 +277,7 @@ const FULL_VALUES: RafaConfig = {
   version: 1,
   store: 'ndjson',
   effortBusyTimeoutMs: 250,
+  effortSync: 'file',
   inject: 'full',
   planDir: '.plans',
   specsDir: '.specs',
@@ -563,6 +567,11 @@ describe('parseConfigText', () => {
         'effort.busyTimeoutMs', 'effort:\n  busyTimeoutMs: "5000"',
         'effort.busyTimeoutMs is "5000", expected a lock wait in milliseconds, a whole number from 1 to 60000',
         'effort:\n  busyTimeoutMs: 60000', 'effortBusyTimeoutMs', 60_000,
+      ],
+      [
+        'effort.sync', 'effort:\n  sync: rsync',
+        'effort.sync is "rsync", expected one of: local, file, git, service, p2p',
+        'effort:\n  sync: p2p', 'effortSync', 'p2p',
       ],
       [
         'plan.inject', 'plan:\n  inject: all',
@@ -1078,5 +1087,42 @@ describe('resolveConfig', () => {
     expect(() => fromDefaults.push('x')).toThrow(TypeError);
     expect(() => fromFile.push('x')).toThrow(TypeError);
     expect(CONFIG_DEFAULTS.trackerFallback).toEqual(['local']);
+  });
+});
+
+describe('effort.sync', () => {
+  it('refuses a strategy outside the five, naming each it accepts', () => {
+    const accepted = ['local', 'file', 'git', 'service', 'p2p'].map(
+      (strategy) => fileOf(`effort:\n  sync: ${strategy}\n`).values.effortSync,
+    );
+
+    expect(accepted).toEqual(['local', 'file', 'git', 'service', 'p2p']);
+    expect(refusal(() => fileOf('effort:\n  sync: s3\n')).problems).toEqual([
+      `${PATH}: effort.sync is "s3", expected one of: local, file, git, service, p2p`,
+    ]);
+  });
+
+  it('is not a setting the command line can name', () => {
+    const cli = { effortSync: 'file' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect([resolved.config.effortSync, resolved.sources.effortSync]).toEqual(['local', 'default']);
+  });
+
+  it('answers local when no layer names it, and a file naming it answers from the file', () => {
+    const unnamed = resolveConfig({ file: fileOf('effort:\n  busyTimeoutMs: 250\n') });
+    const named = resolveConfig({ file: fileOf('effort:\n  sync: file\n') });
+
+    expect([unnamed.config.effortSync, unnamed.sources.effortSync]).toEqual(['local', 'default']);
+    expect([named.config.effortSync, named.sources.effortSync]).toEqual(['file', 'file']);
+  });
+
+  it('uses the user scope value when the project file leaves the key out of its effort section', () => {
+    const user = fileOf('effort:\n  sync: file\n', USER_PATH);
+    const omitting = resolveConfig({ file: fileOf('effort:\n  busyTimeoutMs: 250\n'), user });
+    const naming = resolveConfig({ file: fileOf('effort:\n  sync: local\n'), user });
+
+    expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
+    expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
   });
 });

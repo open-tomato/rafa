@@ -35,6 +35,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['version', 'version'],
   ['store', 'store'],
   ['effortBusyTimeoutMs', 'effort.busyTimeoutMs'],
+  ['effortSync', 'effort.sync'],
   ['inject', 'plan.inject'],
   ['planDir', 'plan.dir'],
   ['specsDir', 'specs.dir'],

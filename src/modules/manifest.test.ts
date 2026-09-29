@@ -62,10 +62,10 @@ import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
 const SEAMS: ManifestSeams = { rafaVersion: '0.2.0', portVersions: PORT_VERSIONS };
 
 /** The feature types, as a refusal lists them. */
-const TYPES = 'output, tracker, store, planner, learning, skills, agents, mcp, commands';
+const TYPES = 'output, tracker, store, planner, learning, skills, agents, mcp, commands, sync';
 
 /** The port types, as a refusal lists them. */
-const PORTS = 'tracker, store, learning, output, planner';
+const PORTS = 'tracker, store, learning, output, planner, sync';
 
 /** The sentence every refusal of `learning` ends with. */
 const CLOSED = 'which core closes to third parties: a module never provides a learning source';
@@ -85,7 +85,7 @@ function manifestOf(raw: unknown, seams: ManifestSeams = SEAMS): ModuleManifest 
 }
 
 /** The port feature types, which state a port version. */
-const PORTED: readonly string[] = ['tracker', 'store', 'planner', 'output'];
+const PORTED: readonly string[] = ['tracker', 'store', 'planner', 'output', 'sync'];
 
 /** A manifest listing `type` alone and providing `value` for it. */
 function providing(type: string, value: unknown): Record<string, unknown> {
@@ -538,6 +538,49 @@ describe('validateManifest on requires.ports', () => {
       `rafa.requires.ports carries "issues", which is none of: ${PORTS}`,
     ]);
     expect(problemsOf(commandsModule({ requires: { rafa: '>=0.1', ports: [1] } }))).toEqual(['rafa.requires.ports is a list, expected a mapping']);
+  });
+});
+
+describe('validateManifest on sync', () => {
+  /** The manifest of the `sync-fixture` module under `testdata/`, read off the disk. */
+  function syncFixture(): Record<string, unknown> {
+    const text = readFileSync(join(import.meta.dir, 'testdata', 'sync-fixture', 'package.json'), 'utf8');
+    return (JSON.parse(text) as { rafa: Record<string, unknown> }).rafa;
+  }
+
+  it('accepts the fixture module providing a git strategy at the sync port version core serves', () => {
+    expect(manifestOf(syncFixture())).toEqual({
+      manifestVersion: 1,
+      types: ['sync'],
+      provides: { sync: { kind: 'git', entry: './sync.ts' } },
+      requires: { rafa: '>=0.1 <1', ports: { sync: 1 } },
+      prerequisites: { required: [], optional: [] },
+      source: null,
+    });
+  });
+
+  it('refuses a sync entry by the adapter shape, naming no kind or carrying a key it does not read', () => {
+    expect(problemsOf(providing('sync', { entry: './sync.ts' }))).toEqual(['rafa.provides.sync.kind is missing']);
+    expect(problemsOf(providing('sync', { kind: 'git', entry: './sync.ts', channels: ['socket'] }))).toEqual([
+      'rafa.provides.sync carries "channels", which is none of: kind, entry',
+    ]);
+  });
+
+  it('refuses sync listed with no sync port version, which the fixture states', () => {
+    const raw = syncFixture();
+    raw['requires'] = { rafa: '>=0.1 <1' };
+    expect(problemsOf(raw)).toEqual(['rafa.requires.ports.sync is missing: rafa.types lists sync, a port core versions']);
+  });
+
+  it('refuses a sync entry and a sync port version when types does not list sync', () => {
+    const raw = commandsModule({
+      provides: { commands: { entry: './src/commands.ts' }, sync: { kind: 'git', entry: './sync.ts' } },
+      requires: { rafa: '>=0.1', ports: { sync: 1 } },
+    });
+    expect(problemsOf(raw)).toEqual([
+      'rafa.provides.sync is given, but rafa.types does not list sync',
+      'rafa.requires.ports.sync is given, but rafa.types does not list sync',
+    ]);
   });
 });
 

@@ -59,6 +59,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { resolveConfig } from '../config.js';
 import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';
@@ -378,6 +379,9 @@ function requiredOnly(probe: string): PrerequisiteSettings {
   return { prerequisitesRequired: [requiredItem(probe)], prerequisitesOptional: [] };
 }
 
+/** The config default, `effort.sync: local`, read against a home under this file's scratch. */
+const DEFAULT_SYNC = { resolved: resolveConfig(), home: join(libRoot, 'home') };
+
 /** Enough PATH for the probe's `sleep` to resolve; nothing carried over from this process. */
 const PROBE_ENV = { PATH: ['/usr/bin', '/bin'].join(delimiter) };
 
@@ -408,6 +412,7 @@ describe('a required probe waiting on stdin', () => {
           planPath: libPlanPath(failingRoot),
           settings: requiredOnly(WAITING_PROBE),
           checks: { timeoutMs: SHORT_TIMEOUT_MS, env: PROBE_ENV },
+          sync: DEFAULT_SYNC,
         });
       } catch (error) {
         if (!(error instanceof CommandExit)) throw error;
@@ -421,6 +426,7 @@ describe('a required probe waiting on stdin', () => {
         planPath: libPlanPath(passingRoot),
         settings: requiredOnly('exit 0'),
         checks: { timeoutMs: SHORT_TIMEOUT_MS, env: PROBE_ENV },
+        sync: DEFAULT_SYNC,
       });
       const passElapsed = Date.now() - passStarted;
       setActiveOutput(null);

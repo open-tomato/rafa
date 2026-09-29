@@ -226,6 +226,23 @@ describe('loadConfig', () => {
     }
   });
 
+  it('resolves effort.sync from the user file where the project file leaves it out, '
+    + 'and lets a project value outrank a user one', () => {
+    const omitting = loadConfig(
+      scopes('effort:\n  busyTimeoutMs: 250\n', 'effort:\n  sync: file\n'),
+      {},
+      quiet,
+    );
+    const naming = loadConfig(
+      scopes('effort:\n  sync: local\n', 'effort:\n  sync: file\n'),
+      {},
+      quiet,
+    );
+
+    expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
+    expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
+  });
+
   it('leaves the store settings as they were when it refuses a file', () => {
     try {
       setActiveStoreSettings({ busyTimeoutMs: 250 });

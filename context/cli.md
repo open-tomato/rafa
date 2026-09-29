@@ -61,7 +61,7 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`; then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, the `effort sync` row over `src/commands/doctor-effort-sync.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -87,6 +87,7 @@ module's note is the long form.
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
 | `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
+| `src/commands/doctor-effort-sync.ts` | the `effort sync` row of `rafa doctor`: the strategy `effort.sync` names, selected through `selectSync` (`src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind core holds and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the refusal `doctor` exits 1 with otherwise, `SyncModuleMissing`'s `modules:` and `allowList:` lines included for `git`, `service` and `p2p` |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues, the epic labels and the boards read over it in that order (`readDoctorBoard`, all four null with no runner), the board listing made once and handed to both the epic labels and the boards, and their lines joined in that order (`renderDoctorBoard`) |
 | `src/commands/doctor-epics.ts` | the epic labels row of `rafa doctor`: one board listing over `src/board/roadmap-board.ts`, the `several-epic-labels` and `orphan-label` problems of `readEpicProblems` (`src/board/epic-problems.ts`) kept and worded by `epicProblemMessage`, no orphan reported when the listing came back full, and the `Epic labels:` lines, none for a board carrying no `epic:` label |
@@ -289,7 +290,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue ready`, `issue unblock` and `issue check`;
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
-  `effort collect`, `effort report`, `effort dashboard`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort move`, `module list`, `module exec`,
+  `effort collect`, `effort report`, `effort dashboard`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
@@ -774,7 +775,8 @@ New; it replaces no earlier text. What a row or an action added to
   it. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
-  refusal, and when its `effort store schema` row fails (below), and 0
+  refusal, when its `effort store schema` row fails, and when its
+  `effort sync` row fails (both below), and 0
   otherwise. For a plan `--plan` names, halt or not, it
   then prints the one risk-total line `loop start` prints before its
   notices (`src/start/risk-total.ts`), at `info`, a `log` event in json
@@ -867,7 +869,19 @@ New; it replaces no earlier text. What a row or an action added to
   migration in the preflight's words and, for the project's own store
   alone, on each migration whose `applied_by` names a development
   build. A project with no store yet prints no line. json mode gives
-  the row as `effortSchema`. Under the boolean
+  the row as `effortSchema`. Every run then prints the `effort sync`
+  row (`src/commands/doctor-effort-sync.ts`), `Effort sync: ok,
+  <strategy>`, ` (module)` added for a strategy a loaded module serves,
+  or `Effort sync: fail, <strategy>` with the problem indented under
+  it: `selectSync` resolves `effort.sync` (`local` when unset) through
+  core's registry for `local` and `file` and through the modules the
+  config loads for any other kind, touching nothing on disk. A kind no
+  adapter serves fails it, and `doctor` then exits 1 with
+  `rafa doctor: effort sync: effort.sync is "<kind>", ...`, which for
+  `git`, `service` and `p2p` names the `modules:` and `allowList:`
+  lines that load a module providing it, after a halt's text and the
+  schema row's refusal when those happen, and json mode gives no
+  `data`. json mode gives the row as `effortSync`. Under the boolean
   `--deep` it then reads and prints the Environment, Settings,
   Providers and Stack tools sections, and Plan needs for a plan
   `--plan` names (`src/commands/doctor-deep.ts`), a halt's included,
@@ -1850,7 +1864,9 @@ New; it replaces no earlier text. What a row or an action added to
   `--runtime` typed ahead of the subject; then for an unusable config, a plan
   file that does not exist, a default branch, a session record refusing
   the run, session records that cannot be read or written, and a
-  preflight that halts before any session: an `agent=` of a still-to-run
+  preflight that halts before any session: an `effort.sync` naming a
+  kind no adapter serves, checked first and worded as `rafa doctor`'s
+  `effort sync` row words it (`start/preflight-sync.ts`), an `agent=` of a still-to-run
   task that no scope `loop.settingSources` loads defines, checked ahead
   of every probe, a failed required prerequisite — the two automatic
   items a `gh` pull request provider contributes, `gh` on `PATH` and
@@ -2063,9 +2079,9 @@ say nothing of why.
   `npm source "<name>" is refused: phase 1 loads path sources alone, ...`.
 - **Every `path` source is validated**, enabled or not, with
   `validateManifest` (`src/modules/manifest.ts`). An enabled one with no
-  problem has each `tracker`, `store`, `planner` and `output` entry
-  imported, its default export the adapter's `create`, registered under
-  the manifest's `kind` and `requires.ports` version on
+  problem has each `tracker`, `store`, `planner`, `output` and `sync`
+  entry imported, its default export the adapter's `create`, registered
+  under the manifest's `kind` and `requires.ports` version on
   `CORE_ADAPTER_REGISTRY`, and its `commands` entry handed to
   `loadModuleCommands`. An entry outside the module directory, an import
   that throws, a default export that is no function and a registry refusal

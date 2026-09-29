@@ -16,8 +16,8 @@ back into every turn and the split would save nothing.
 - `context/verification.md` — the gate order and how to read their
   captures.
 - `context/effort-store.md` — the store port, its two backends, row
-  origins, store metadata, copy detection, and what a new kind or field
-  has to touch.
+  origins, store metadata, copy detection, sync (push, pull, registry,
+  file exchange, locked keys), and what a new kind or field has to touch.
 - `context/effort-merge.md` — merge rules, the `rafa effort merge` and
   `rafa effort move` commands, and the merge trail.
 - `context/source.md` — import paths under `src/` and the shapes the lint

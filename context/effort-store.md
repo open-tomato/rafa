@@ -199,6 +199,72 @@ at a failing required item, so no session is spawned.
 `doctor-effort-schema.test.ts` spawns `doctor` and `effort schema
 --check` over the same stores and holds their exit codes together.
 
+### Sync
+
+**The Sync port defines how stores exchange rows between devices.** It
+has two directions: push (send the rows this store wrote, identified by
+their origin pair) and pull (merge the rows another device wrote under
+its own origin). Every adapter's pull calls `mergeStore`
+(`src/effort/store/merge-store.ts`), which implements the merge rules;
+nothing here reimplements a merge rule.
+
+**`effort.sync` in `.rafa/config.yaml` selects the sync strategy, one of
+`local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
+which means no sync: a device keeps its own store. The user scope's
+`~/.rafa/config.yaml` already layers under the project's for every
+setting (`src/config.ts`), so the user default needs no reader of its
+own. The user and project scopes share every config key in `config.ts`,
+and a change in one scope's declaration of `effort.sync` takes effect
+when either is read. A deployment of the `service` strategy also names
+`effort.syncUrl` with the hub's address, and a module implementing
+`git`, `service` or `p2p` also names its own settings under `modules:`.
+
+**Core registers two adapters in `CORE_ADAPTER_REGISTRY`
+(`src/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
+(copy exchange).** The `git`, `service` and `p2p` adapters come from
+modules loaded under `src/modules/load.ts`; core ships no code for them.
+When `rafa doctor`, the loop preflight and `describe` read the config,
+a strategy with no adapter and no module to implement it is named with
+the `modules:` and `allowList:` lines that enable the module. A project
+that selects `git` without a module loading it, for instance, refuses
+every operation with `the sync strategy 'git' needs a module; enable it
+with an entry under modules: ... in the config`.
+
+**File exchange happens through `rafa effort copy` (export) and `rafa
+effort import` (import).** `rafa effort copy [--to=<dir>]` is already
+documented; it copies `<root>/.rafa/effort/` into a directory, using
+`VACUUM INTO` on the SQLite file to get a consistent snapshot. `rafa
+effort import <file>` takes that snapshot and merges its rows into the
+local store. The file exchanged is `<dir>/effort.sqlite`, and the
+directory structure it sits under is not part of the exchange; only the
+database file matters. Importing each other's files in a loop is safe
+and idempotent: a repeat of the same file merges nothing new.
+
+**Merge requires the SQLite backend.** A project configured with
+`store: ndjson` is refused by `rafa effort merge <file>`, which names
+`rafa effort move --to=sqlite` as the next safe step. `rafa effort
+import` uses the same refusal, since import is the user-facing surface
+of merge. `rafa effort move --to=sqlite` is already documented as
+migrating the store from NDJSON to SQLite.
+
+**The locked settings of the first release are `effort.sync` and
+`prerequisites.required`.** These keys cannot be changed by a plan
+pushing a settings change; only a released version can alter what a
+device must sync and what prerequisites a plan needs. `rafa-hub` serves
+these locked keys so every device on a team sees the same rules. The
+lock is declared as an immutable set in the device's settings store, not
+enforced by a migration, so a test can override it temporarily.
+
+**A module that is not loaded is named by the sync strategy it
+implements.** When a project needs `git` sync but its install has no git
+module loaded, every command that touches the store first checks the
+config, and refuses with a message naming the `modules:` and `allowList:`
+lines needed to enable it. The config holds the configuration; the
+registry holds what is installed. The check is done by `rafa doctor`,
+the loop's preflight, and every command that runs a sync. A module loaded
+but not allowed by `allowList:` is equally refused, since it is not
+trustworthy.
+
 ### Row origins
 
 **A store's origin is its store id, not the machine id.** A row's

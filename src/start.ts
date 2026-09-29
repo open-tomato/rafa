@@ -418,8 +418,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
     announcePlanIssues(planContent);
 
-    // Throws on an unresolvable agent or a halt, before the tracker and
-    // before any session.
+    // Throws on an unserved `effort.sync`, an unresolvable agent or a halt,
+    // before the tracker and before any session.
     const { knownMissing } = await runStartPreflight({
       repoRoot,
       planPath,
@@ -432,6 +432,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         tiersAgents: runConfig.config.tiersAgents,
         home: homedir(),
       },
+      sync: { resolved: runConfig, home: homedir() },
     });
 
     // What each session, task and wrap-up alike, is served against: the

@@ -14,8 +14,8 @@
  *
  * ## Keys
  *
- * A port type is one of the five `PortType` names: `tracker`, `store`,
- * `learning`, `output` and `planner`. A kind is any non-empty string,
+ * A port type is one of the six `PortType` names: `tracker`, `store`,
+ * `learning`, `output`, `planner` and `sync`. A kind is any non-empty string,
  * core's own (`sqlite`) or one an add-on brings. The registry refuses a
  * second adapter under a port type and kind it already holds, so an
  * add-on cannot take a core kind over by registering its name. A
@@ -66,7 +66,12 @@
  * `src/adapters/learning/`, `learning/local`, and the planner under
  * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
  * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
- * the phase 1 table names.
+ * the phase 1 table names. The `sync` port adds `sync/local`, the default
+ * strategy of `effort.sync`, from `src/effort/sync/select.ts`, whose
+ * `selectSync` resolves `effort.sync` through a registry, and `sync/file`,
+ * the store carried as a file, from `src/effort/sync/file.ts`. `git`,
+ * `service` and `p2p` are modules' strategies, registered by a loaded
+ * module.
  *
  * ## What an adapter answers
  *
@@ -86,10 +91,14 @@
  * `github` tracker added `gh`, the `claude` planner added
  * `settingSources`, `planPrompt`, `planDir` and `claude`, and the
  * `local` learning adapter added `home` and
- * `learningBlessMinConfidence`, each with a default. The planner's
- * first three are optional to the type and not to the adapter: none has a
- * default it could fall back on (`src/adapters/planner/claude.ts` says
- * why), so its `create` throws when any is left out. Each output `create` makes a new output,
+ * `learningBlessMinConfidence`, each with a default, and the `file` sync
+ * strategy added `store`. The planner's first three are optional to the
+ * type and not to the adapter: none has a default it could fall back on
+ * (`src/adapters/planner/claude.ts` says why), so its `create` throws
+ * when any is left out. `store` is the same to `sync/file`: a default of
+ * `sqlite` would carry an NDJSON project's store without its sessions
+ * (`src/effort/sync/file.ts` says why), so its `create` throws when it is
+ * left out or names no backend. Each output `create` makes a new output,
  * so a `json` output's one terminal result belongs to the command it was
  * made for. Each tracker `create` makes a new tracker, so the reason a
  * `local` tracker records is the one its own context named, and the
@@ -106,6 +115,7 @@ import type {
   Planner,
   PortType,
   PortVersions,
+  Sync,
   Tracker,
 } from '../ports/index.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -116,6 +126,8 @@ import { describeValue } from '../config-sections.js';
 import { CONFIG_DEFAULTS, STORE_BACKENDS } from '../config.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
+import { createFileSync } from '../effort/sync/file.js';
+import { createLocalSync } from '../effort/sync/select.js';
 
 import { createLocalLearning, localInstinctsDir } from './learning/local.js';
 import { createJsonOutput } from './output/json.js';
@@ -140,6 +152,7 @@ export const PORT_VERSIONS: Readonly<PortVersions> = Object.freeze({
   learning: 1,
   output: 1,
   planner: 1,
+  sync: 1,
 } satisfies PortVersions);
 
 /** The served versions by port type, for a lookup no prototype member answers. */
@@ -158,6 +171,7 @@ export interface PortImplementations {
   learning: Learning;
   output: Output;
   planner: Planner;
+  sync: Sync;
 }
 
 /** What every adapter is made with. */
@@ -213,6 +227,11 @@ export interface AdapterContext {
    * config default when left out.
    */
   readonly learningBlessMinConfidence?: number;
+  /**
+   * The project's resolved `store` backend. Read by the `file` sync
+   * strategy alone, which is refused without one.
+   */
+  readonly store?: StoreBackend;
 }
 
 /**
@@ -330,6 +349,7 @@ function indexByPort(adapters: readonly AnyAdapter[]): AdaptersByPort {
     learning: only('learning'),
     output: only('output'),
     planner: only('planner'),
+    sync: only('sync'),
   };
 }
 
@@ -390,7 +410,8 @@ const STORE_OPENERS: {
  * The adapters core registers, in the order `kinds` answers them: the
  * store backends, in the order the config names them, then the `text`
  * and `json` outputs, then the `local` and `github` trackers, then the
- * `local` learning adapter, then the `claude` planner.
+ * `local` learning adapter, then the `claude` planner, then the `local`
+ * and `file` sync strategies.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -466,6 +487,26 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
         );
       }
       return createClaudePlanner({ repoRoot, planDir, settingSources, buildPrompt: planPrompt, spawn: claude });
+    },
+  },
+  {
+    port: 'sync',
+    kind: 'local',
+    portVersion: PORT_VERSIONS.sync,
+    create: () => createLocalSync(),
+  },
+  {
+    port: 'sync',
+    kind: 'file',
+    portVersion: PORT_VERSIONS.sync,
+    create: ({ repoRoot, store }) => {
+      if (!(STORE_BACKENDS as readonly unknown[]).includes(store)) {
+        throw new TypeError(
+          `${REFUSAL}: sync/file has store ${describeValue(store)} in its context,`
+            + ` expected one of: ${STORE_BACKENDS.join(', ')}`,
+        );
+      }
+      return createFileSync({ repoRoot, backend: store as StoreBackend });
     },
   },
 ];
