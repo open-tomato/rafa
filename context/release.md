@@ -110,7 +110,11 @@ branch's fragment last and dated today in UTC
 (`src/release/branch-forecast.ts`, over `forecast.ts`). It sits in a block
 opened by `<!-- rafa:release v1 base=<version> waiting=<id>,<id> -->` and
 closed by `<!-- /rafa:release -->`, which a re-run replaces rather than
-repeats; a failure sentence is appended once instead. When the plan's
+repeats; a failure sentence is appended once instead. `rafa pr list` reads
+the block back (`src/release/body-forecast.ts`): the sentence off its
+forecast line, the basis off its marker alone, and marks the sentence
+`(base moved)` when `origin/<base>` as last fetched holds another version
+or other waiting fragment ids, in order, than that basis. When the plan's
 declared level is below the highest of its stored notes, the level report
 (`releaseLevelReport`, `src/release/level.ts`) joins that block, on a
 failure as on a push, and is printed at step 1: a report, never a refusal,

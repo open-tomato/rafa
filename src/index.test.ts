@@ -590,7 +590,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/pr/list.js', [
     ['../../config-sections.js', ['messageOf']],
+    ['../../pr/index.js', ['createGitRunner']],
+    ['../../release/enabled.js', ['resolveReleaseEnabled']],
     ['./current.js', ['SEPARATOR']],
+    ['./list-forecast.js', ['createBaseReader', 'forecastCell', 'forecastLine', 'listForecast']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'onProvider', 'openPrContext', 'PR_USAGE']],
   ]],
   ['./commands/pr/wait.js', [

@@ -1,7 +1,8 @@
 /**
  * `rafa pr list`: every open pull request, one row each, carrying its
  * number, its title, the branch it is from, how long ago it last moved,
- * the verdict over its checks and whether it merges.
+ * the verdict over its checks, whether it merges and, where the release
+ * is on, the release forecast its body carries.
  *
  * ## Three kinds of read, and what each one costs
  *
@@ -52,6 +53,14 @@
  * list, a blank title, a title past the cap, an unreadable cell, a
  * timestamp that does not parse — is driven by calling it.
  *
+ * ## The forecast column
+ *
+ * Where the project's release is on, a last column carries the release
+ * forecast each body holds, marked when the base moved since it was
+ * computed; `./list-forecast.ts` owns it. The body comes from the detail
+ * read the mergeable column already makes, so the column costs no `gh`
+ * command, and the bases are read from git as last fetched, once each.
+ *
  * ## Refusals
  *
  * `pr-context.ts`'s, and no others: exit 2 for a provider that is not
@@ -59,13 +68,17 @@
  * no single pull request, so nothing here reads a branch), a config that
  * cannot be used, and the `list` call itself rejecting.
  */
+import type { BaseReader, PrListForecast } from './list-forecast.js';
 import type { PrSeams } from './pr-context.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ChecksVerdict, Mergeability, PullRequests, PullRequestSummary } from '../../pr/index.js';
+import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../../pr/index.js';
 
 import { messageOf } from '../../config-sections.js';
+import { createGitRunner } from '../../pr/index.js';
+import { resolveReleaseEnabled } from '../../release/enabled.js';
 
 import { SEPARATOR } from './current.js';
+import { createBaseReader, forecastCell, forecastLine, listForecast } from './list-forecast.js';
 import {
   DEFAULT_PR_SEAMS,
   expectNoArguments,
@@ -73,6 +86,12 @@ import {
   openPrContext,
   PR_USAGE,
 } from './pr-context.js';
+
+/** The seams `pr list` reaches the provider and git through. */
+export interface PrListSeams extends PrSeams {
+  /** The git runner for a root, which reads the bases. `createGitRunner` when left out. */
+  readonly git?: (root: string) => GitRunner;
+}
 
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.list;
@@ -112,6 +131,8 @@ export interface PrListRow {
   readonly mergeable: Mergeability | null;
   /** What the detail read said when it failed, and null when it did not. */
   readonly mergeableProblem: string | null;
+  /** The release forecast its body carries, or null where the release is off; see `./list-forecast.ts`. */
+  readonly forecast: PrListForecast | null;
 }
 
 /** What json mode gives as the terminal result's `data`. */
@@ -181,6 +202,9 @@ function cellsOf(row: PrListRow, now: number): readonly string[] {
     ageCell(row.pull.updatedAt, now),
     `checks ${row.checks ?? UNREADABLE}`,
     row.mergeable ?? UNREADABLE,
+    ...(row.forecast === null
+      ? []
+      : [forecastCell(row.forecast, UNREADABLE)]),
   ];
 }
 
@@ -195,7 +219,7 @@ function padColumns(cells: readonly (readonly string[])[]): string[] {
     .trimEnd());
 }
 
-/** One line per probe that failed, naming the pull request and what the provider said. */
+/** One line per probe that failed, naming the pull request and what the provider said, and per forecast that moved. */
 function problemLines(rows: readonly PrListRow[]): string[] {
   return rows.flatMap((row) => [
     row.checksProblem === null
@@ -204,6 +228,9 @@ function problemLines(rows: readonly PrListRow[]): string[] {
     row.mergeableProblem === null
       ? null
       : `#${row.pull.number} mergeable could not be read${SEPARATOR}${row.mergeableProblem}`,
+    row.forecast === null
+      ? null
+      : forecastLine(row.pull.number, row.forecast),
   ].filter((line): line is string => line !== null));
 }
 
@@ -244,9 +271,10 @@ async function probe<T>(call: () => Promise<T>): Promise<Probe<T>> {
  * A number the repository has no pull request for answers `null` from
  * `get` rather than throwing (the port's rule), which here is a pull
  * request closed between the list and the probe: the cell is unreadable
- * and the line under the table says so.
+ * and the line under the table says so. `readBaseOf` is null where the
+ * release is off, and the row then carries no forecast.
  */
-async function rowOf(pulls: PullRequests, pull: PullRequestSummary): Promise<PrListRow> {
+async function rowOf(pulls: PullRequests, pull: PullRequestSummary, readBaseOf: BaseReader | null): Promise<PrListRow> {
   const [checks, detail] = await Promise.all([
     probe(() => pulls.checks(pull.number)),
     probe(() => pulls.get(pull.number)),
@@ -260,31 +288,41 @@ async function rowOf(pulls: PullRequests, pull: PullRequestSummary): Promise<PrL
     mergeableProblem: gone
       ? `the repository holds no pull request #${pull.number}`
       : detail.problem,
+    forecast: readBaseOf === null
+      ? null
+      : listForecast(detail.value?.body ?? null, pull.baseRefName, readBaseOf),
   };
 }
 
 /** Lists the open pull requests and probes each one; see the module note. */
-export async function readList(context: RafaContext, seams: PrSeams, now: number): Promise<PrListResult> {
+export async function readList(context: RafaContext, seams: PrListSeams, now: number): Promise<PrListResult> {
   expectNoArguments(context.args, USAGE);
   const pr = openPrContext(context, seams);
   const open = await onProvider('list the open pull requests', () => pr.pulls.list());
-  const rows = await mapWithLimit(open, PROBE_LIMIT, (pull) => rowOf(pr.pulls, pull));
+  const root = pr.project.root;
+  const readBaseOf = resolveReleaseEnabled(pr.versionGuard, root).enabled
+    ? createBaseReader((seams.git ?? createGitRunner)(root), pr.versionGuard)
+    : null;
+  const rows = await mapWithLimit(open, PROBE_LIMIT, (pull) => rowOf(pr.pulls, pull, readBaseOf));
   return { rows, text: renderList(rows, now) };
 }
 
 /** The command, reaching the provider through `seams`; see the module note. */
-export function createPrListCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaCommand {
+export function createPrListCommand(seams: PrListSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
     name: 'pr list',
     subject: 'pr',
     action: 'list',
-    summary: 'list the open pull requests with their checks and mergeability',
+    summary: 'list the open pull requests with their checks, mergeability and release forecast',
     description: 'Lists every open pull request of the repository at the project root, one row each carrying its'
       + ' number, its title, the branch it is from, how long ago it last moved, the verdict over its checks and'
       + ' whether it merges. The checks and the mergeability are read per pull request, so the command sends one'
       + ' GitHub CLI command for the list and two more for each row; a read that failed leaves its cell as `?` and'
       + ' says what the CLI reported on a line under the table rather than refusing the whole list. A pull request'
-      + ' GitHub ran nothing for reads `checks none`. With `--output=json` every row and the rendered table are the'
+      + ' GitHub ran nothing for reads `checks none`. Where the release is on, a last column shows the release forecast'
+      + ' the pull request body carries, marked `(base moved)` when the base branch, as last fetched, holds another'
+      + ' version or other waiting fragments than the forecast was computed against, with a line under the table'
+      + ' naming both; it fetches nothing and sends no further command. With `--output=json` every row and the rendered table are the'
       + ' data of the terminal result event. Refuses with exit code 2 where `pr.provider` is not `gh`.',
     args: [],
     flags: [],

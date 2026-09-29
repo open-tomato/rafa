@@ -13,7 +13,12 @@ Seven actions read and control pull requests:
 - `pr show [<n>]` — details: title, author, branch → base, mergeable, each
   check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
-- `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable
+- `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable,
+  and where the release is on the forecast its body carries, marked
+  `(base moved)` when `origin/<base>` as last fetched holds another version
+  or other waiting fragments than the body's `rafa:release` marker names
+  (`src/commands/pr/list-forecast.ts`, over `src/release/body-forecast.ts`;
+  no fetch, no fold, no extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
   merge the PR; `--skip-checks` is for a PR that reports no checks at all
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
