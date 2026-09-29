@@ -5,7 +5,7 @@ rafa on the left, a spacer for short status messages, and the task
 counter alone at the top right. The second line is where you type.
 
 ```
-rafa feat/rafa-367-releases-settle-base-branch +3130 -160 │ rafa:0.24.1 │ spec: #367 - Releases settle on the base bra…            🍅 #367 task 8/47
+rafa feat/rafa-367-releases-settle-base-branch +3130 -160 │ rafa:0.24.1 │ spec: #367 - Releases settle on the base bra…      │ 🍅 #367 13/47 · #370 8/33
 host >
 ```
 
@@ -39,8 +39,20 @@ plan's title and no count until the next board read.
 
 ## The top right
 
-The task counter only: the plan's state, as the rafa-prompt plugin shows
-it ([`../rafa-prompt/`](../rafa-prompt/)).
+After a dim divider, one 🍅 and every live loop of the project as
+`#<issue> <task>/<total>`, the current branch's first and the others by
+issue number, divided by `·`: `│ 🍅 #367 13/47 · #370 8/33`. A running
+loop is red and shows the task in progress; a paused one is yellow and
+shows the tasks done.
+
+A loop is live while its record under `.rafa/runs/` says `running` or
+`paused` and its process is still alive, so a record left behind by a
+loop that died is not counted. The records and the trackers are read
+from the main checkout, which every worktree of the project shares.
+
+When no loop runs on the current branch, its own state from the
+rafa-prompt plugin ([`../rafa-prompt/`](../rafa-prompt/)) comes first:
+`│ ⏳ #387 1/3 │ 🍅 #367 13/47`.
 
 ## The second line
 
@@ -50,18 +62,18 @@ command that succeeded and red after one that failed.
 ## The spacer and the title
 
 The spacer keeps `TOMATO_SPACER_MIN` columns (40, room for a short
-sentence) between the left side and the task counter. A spec title
+sentence) between the left side and the top right. A spec title
 longer than `TOMATO_TITLE_MAX` (32) takes every free column beyond
 those 40, so on a wide terminal it shows whole and the spacer still has
 its room. With less than 40 columns free the spacer is off, and the
 title takes the free columns, as many as it needs.
 
 When even that does not fit, these give way in order: the title down to
-12 characters, the middle of the branch name down to 16, the rafa
-version, and then the title, which gets back any spare columns once a
-readable part fits. The task counter goes last. One column is kept
-spare, because some terminals draw an emoji a cell narrower or wider
-than zsh counts it.
+12 characters, the middle of the branch name down to 16, the loops of
+other branches, the rafa version, and then the title, which gets back
+any spare columns once a readable part fits. The current branch's part
+of the top right goes last. One column is kept spare, because some
+terminals draw an emoji a cell narrower or wider than zsh counts it.
 
 | Width | What happens |
 | --- | --- |
@@ -129,13 +141,15 @@ this slot; none is built yet.
 
 ## Cost
 
-About 80 ms per prompt on a MacBook in the rafa checkout (zsh 5.9,
-2026-09-29): three `git` calls, one for the checkout and branch, one for
-the diff against the base and one for the untracked files, at about
-20 to 25 ms each. The board query runs again only when the board cache
-or the spec changes. Moving the git counts off the prompt's critical
-path, as oh-my-zsh does for its git segment, is the next step if it
-feels slow.
+About 80 to 100 ms per prompt on a MacBook in the rafa checkout (zsh
+5.9, 2026-09-29), and it grows with the branch's diff. Nearly all of it
+is three `git` calls: one for the checkout and branch, one for the diff
+against the base, and one for the untracked files. The diff call is the
+one that grows, about 70 ms on a branch of +6322 -2452. Reading every
+live loop costs about 7 ms. The board query runs again only when the
+board cache or the spec changes. Moving the git counts off the prompt's
+critical path, as oh-my-zsh does for its git segment, is the next step
+if it feels slow.
 
 ## Safety
 

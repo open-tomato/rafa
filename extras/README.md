@@ -41,6 +41,6 @@ Update it with `git -C ~/rafa-extras pull` for the clone, or
 
 | Entry | What it gives | Tested with |
 | --- | --- | --- |
-| [`zsh/tomato/`](zsh/tomato/) | A two-line oh-my-zsh theme: repository, branch and diff count, rafa version, spec or roadmap with epic progress on the left; a spacer for status messages; the task counter at the top right | zsh 5.9, oh-my-zsh |
+| [`zsh/tomato/`](zsh/tomato/) | A two-line oh-my-zsh theme: repository, branch and diff count, rafa version, spec or roadmap with epic progress on the left; a spacer for status messages; every live loop's task counter at the top right | zsh 5.9, oh-my-zsh |
 | [`zsh/rafa-prompt/`](zsh/rafa-prompt/) | A prompt segment naming the plan of the current branch and how far its run is: ready, in progress, blocked, running, done | zsh 5.9, oh-my-zsh |
 | [`warp/`](warp/) | Warp settings that matter to rafa, and a probe for Warp's use of zsh completions | Warp stable 0.2026.09.16 |

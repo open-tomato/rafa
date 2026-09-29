@@ -166,6 +166,39 @@ _tomato_rafa_part() {
   REPLY=${(pj:$sep:)groups}
 }
 
+# Sets `right` to the whole top right and REPLY to its current-branch
+# part alone. Running loops are red, paused ones yellow.
+_tomato_right() {
+  local entry color current='' own=''
+  local -a others
+  for entry in $rafa_live_runs; do
+    _rafa_prompt_live_entry "$entry"
+    color=red
+    [[ ${${(@ps:\t:)entry}[3]} == paused ]] && color=yellow
+    if [[ ${entry%%$'\t'*} == ${rafa_git[branch]} ]]; then
+      current="%F{$color}$REPLY%f"
+    else
+      others+=("%F{$color}$REPLY%f")
+    fi
+  done
+  if [[ -z $current ]]; then
+    _rafa_prompt_task_segment
+    own=$REPLY
+  fi
+  local sep=" %F{240}·%f "
+  local -a loops_all loops_min parts_all parts_min
+  loops_all=($current ${(on)others})
+  loops_min=($current)
+  [[ -n $own ]] && { parts_all+=("$own"); parts_min+=("$own"); }
+  (( ${#loops_all} )) && parts_all+=("%F{red}🍅%f ${(pj:$sep:)loops_all}")
+  (( ${#loops_min} )) && parts_min+=("%F{red}🍅%f ${(pj:$sep:)loops_min}")
+  local join=" $_tomato_divider "
+  right=''
+  (( ${#parts_all} )) && right="$_tomato_divider ${(pj:$join:)parts_all}"
+  REPLY=''
+  (( ${#parts_min} )) && REPLY="$_tomato_divider ${(pj:$join:)parts_min}"
+}
+
 # Sets REPLY to the width a prompt string takes on screen.
 _tomato_width() {
   local zero='%([BSUbfksu]|([FK]|){*})'
@@ -201,9 +234,14 @@ _tomato_precmd() {
   done
   local middle=${(j:  :)messages}
 
-  # The top right holds the task counter alone.
-  local right=''
-  (( _tomato_in_rafa )) && { _rafa_prompt_task_segment; right=$REPLY; }
+  # The top right: after a divider, the current branch's own state when
+  # no loop runs on it, then one tomato for every live loop of the
+  # project, the current branch's first. `right_min` keeps the current
+  # branch only, for a line too narrow for the rest.
+  local right='' right_min=''
+  REPLY=''
+  (( _tomato_in_rafa )) && _tomato_right
+  right_min=$REPLY
   local wr=0
   [[ -n $right ]] && { _tomato_width "$right"; wr=$REPLY; }
 
@@ -242,10 +280,16 @@ _tomato_precmd() {
     fi
   fi
 
-  # Still too wide: the branch, then the version, then the title give
-  # way, before the task counter or a wrapped line.
+  # Still too wide: the branch, the other loops, the version and then
+  # the title give way, before the top right or a wrapped line.
   if (( free < 0 && in_git )); then
     branch_max=$(( ${#rafa_git[branch]} + free < 16 ? 16 : ${#rafa_git[branch]} + free )); _tomato_fit
+  fi
+  if (( free < 0 )) && [[ $right != "$right_min" ]]; then
+    # The other loops give way before the version.
+    right=$right_min
+    wr=0; [[ -n $right ]] && { _tomato_width "$right"; wr=$REPLY; }
+    _tomato_fit
   fi
   (( free < 0 )) && { show_version=0; _tomato_fit; }
   if (( free < 0 )) && [[ -n ${rafa_plan[issue]} ]]; then
