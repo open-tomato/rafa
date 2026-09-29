@@ -67,6 +67,11 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import {
+  DANGEROUS_VERSION_COLLISION_LINE,
+  PR_VERSION_COLLISION_LINE,
+  RELEASE_FRAGMENT_LINES,
+} from '../commands/init-release.js';
 import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
 import { DEFAULT_ROUTES } from '../tiers/routing.js';
@@ -120,6 +125,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   mergeMethod: ${CONFIG_DEFAULTS.prMergeMethod}          # squash | merge | rebase`,
   '#   base:                        # the branch a PR opens into; unset is the remote default',
   `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
+  PR_VERSION_COLLISION_LINE,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
   '# roadmap:',
@@ -129,12 +135,14 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   versionFile: ${CONFIG_DEFAULTS.releaseVersionFile}`,
   `#   changelog: ${CONFIG_DEFAULTS.releaseChangelog}`,
   `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
+  ...RELEASE_FRAGMENT_LINES,
   '# cleanup:',
   `#   staleDays: ${String(CONFIG_DEFAULTS.cleanupStaleDays)}                # days before rafa cleanup lists a branch as Stale`,
   `#   worktreeIdleDays: ${String(CONFIG_DEFAULTS.cleanupWorktreeIdleDays)}          # days before rafa cleanup lists a worktree as idle`,
   '#   keep: []                     # glob patterns naming branches rafa cleanup never lists',
   '# dangerous:',
   `#   acceptStaleRefs: ${String(CONFIG_DEFAULTS.dangerousAcceptStaleRefs)}       # true plans past dangling and suspect spec references on every run`,
+  DANGEROUS_VERSION_COLLISION_LINE,
   '# status:',
   `#   notice: ${String(CONFIG_DEFAULTS.statusNotice)}                 # false drops the one-line notice of what is new since the last command`,
   '# tiers:',

@@ -222,6 +222,7 @@ describe('the config files', () => {
     expect(dangerous.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
       '# dangerous:',
       '#   acceptStaleRefs: false',
+      '#   acceptVersionCollision: false',
     ]);
     expect([resolved.config.dangerousAcceptStaleRefs, resolved.sources.dangerousAcceptStaleRefs]).toEqual([false, 'file']);
   });
