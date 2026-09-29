@@ -21,7 +21,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RAFA_VERSION } from '../../cli/version.js';
 import { bringForward } from '../../effort/store/bring-forward.js';
-import { LEGACY_GATE_CLOSED } from '../../effort/store/migrations.js';
+import { LEGACY_GATE_CLOSED, LEGACY_GATE_OPEN } from '../../effort/store/migrations.js';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS } from '../../effort/store/sqlite.js';
 import { beginSession } from '../../loop/sessions.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
@@ -88,7 +88,7 @@ function plantNotesStore(project: PlantedProject, notes: readonly (string | null
   return path;
 }
 
-/** Plants a store a release before the log wrote in `dir`, holding the first twelve legacy entries: one pending. */
+/** Plants a store a release before the log wrote in `dir`, holding the first twelve legacy entries: `plan-ci` and every entry after it pending. */
 function plantPreLogAt12(dir: string): string {
   const path = join(dir, 'effort.sqlite');
   mkdirSync(dir, { recursive: true });
@@ -100,6 +100,9 @@ function plantPreLogAt12(dir: string): string {
   }
   return path;
 }
+
+/** The ids a store {@link plantPreLogAt12} planted has pending, in apply order. */
+const PENDING_AT_12 = SQLITE_MIGRATIONS.slice(12).map(({ id }) => id);
 
 /** Every file in `dir` by name, with its bytes. */
 function snapshot(dir: string): ReadonlyMap<string, Buffer> {
@@ -321,8 +324,8 @@ describe('rafa effort migrate spawned as a development build', () => {
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'migrate'], childEnv());
 
     expect(outcome.exitCode).toBe(1);
-    expect(outcome.stderr).toContain(`effort store: ${path} needs migration schema_migrations, plan-ci and this rafa is a`
-      + ' development build (');
+    expect(outcome.stderr).toContain(`effort store: ${path} needs migration ${['schema_migrations', ...PENDING_AT_12].join(', ')}`
+      + ' and this rafa is a development build (');
     expect(outcome.stderr).toContain('a development build migrates only a store under the temp directory or RAFA_EFFORT_DIR.'
       + ' Copy it with \'rafa effort copy\' and run this command with RAFA_EFFORT_DIR=<the copy>.');
     expect(sameFiles(before, snapshot(dirname(path)))).toBe(true);
@@ -339,12 +342,12 @@ describe('rafa effort migrate spawned as a development build', () => {
 
     expect(outcome.stderr).toBe('');
     expect(outcome.exitCode).toBe(0);
-    expect(outcome.stdout).toContain(`Applies schema_migrations, plan-ci to ${copy}`);
+    expect(outcome.stdout).toContain(`Applies ${['schema_migrations', ...PENDING_AT_12].join(', ')} to ${copy}`);
     expect(readdirSync(copyDir).filter((name) => name !== 'effort.sqlite')).toEqual([
       expect.stringMatching(/^effort\.sqlite\.before-plan-ci-\d{8}T\d{6}Z\.bak$/) as unknown as string,
     ]);
     const { userVersion, log } = readLog(copy);
-    expect(userVersion).toBe(SQLITE_MIGRATIONS.length);
+    expect(userVersion).toBe(LEGACY_GATE_OPEN);
     expect(log.map(({ id }) => id)).toEqual(SQLITE_MIGRATIONS.map(({ id }) => id));
     expect(log.every(({ applied_by }) => applied_by.includes('+dev:'))).toBe(true);
     expect(sameFiles(liveBefore, snapshot(dirname(live)))).toBe(true);

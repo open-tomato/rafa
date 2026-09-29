@@ -5,7 +5,8 @@
  * spec describes in order —
  *
  *   1. a pre-log store adopts, its thirteen legacy entries logged with no
- *      run and `user_version` left at `LEGACY_GATE_OPEN`;
+ *      run, the entries past them run and logged, and `user_version` left
+ *      at `LEGACY_GATE_OPEN`;
  *   2. an installed identity applies a synthetic additive tail, logging
  *      it and raising the gate to match;
  *   3. a development build with nothing pending reads (and writes) the
@@ -122,7 +123,8 @@ describe('one store driven through adoption, an applied tail, a clean read and a
     plantPreLogStore();
     expect(readUserVersion()).toBe(LEGACY_GATE_OPEN);
 
-    // 1. Adoption: a pre-log store gets its log, the thirteen legacy ids logged unrun.
+    // 1. Adoption: a pre-log store gets its log, the thirteen legacy ids
+    // logged unrun and the entries past them run.
     const adoption = withDb((db) => bringForward(db, STORE_PATH, 'write', 'open', {
       identity: INSTALLED,
       env: {},
@@ -130,10 +132,10 @@ describe('one store driven through adoption, an applied tail, a clean read and a
     }));
 
     expect(adoption.adopted).toHaveLength(LEGACY_GATE_OPEN);
-    expect(adoption.applied).toEqual([]);
+    expect(adoption.applied).toEqual(SQLITE_MIGRATIONS.slice(LEGACY_GATE_OPEN).map(({ id }) => id));
     expect(adoption.userVersion).toBe(LEGACY_GATE_OPEN);
     const afterAdoption = readLog();
-    expect(afterAdoption.map((row) => row.id)).toEqual(SQLITE_MIGRATIONS.slice(0, LEGACY_GATE_OPEN).map(({ id }) => id));
+    expect(afterAdoption.map((row) => row.id)).toEqual(SQLITE_MIGRATIONS.map(({ id }) => id));
     expect(afterAdoption.every((row) => row.applied_by === '0.24.1')).toBe(true);
     expect(readUserVersion()).toBe(LEGACY_GATE_OPEN);
 
@@ -149,10 +151,7 @@ describe('one store driven through adoption, an applied tail, a clean read and a
     expect(applied.applied).toEqual([FIRST_TAIL.id]);
     expect(applied.userVersion).toBe(LEGACY_GATE_OPEN);
     const afterApplied = readLog();
-    expect(afterApplied.map((row) => row.id)).toEqual([
-      ...SQLITE_MIGRATIONS.slice(0, LEGACY_GATE_OPEN).map(({ id }) => id),
-      FIRST_TAIL.id,
-    ]);
+    expect(afterApplied.map((row) => row.id)).toEqual([...SQLITE_MIGRATIONS.map(({ id }) => id), FIRST_TAIL.id]);
     expect(afterApplied.at(-1)?.applied_by).toBe('0.25.0');
     expect(readUserVersion()).toBe(LEGACY_GATE_OPEN);
     const bytesAfterStep2 = readBytes();

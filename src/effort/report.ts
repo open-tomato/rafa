@@ -143,6 +143,13 @@
  * text mode the lines are `report-skills-format.ts`'s, and in json mode
  * the report is the result's data, as the session report is.
  *
+ * ## The trend report instead
+ *
+ * `--trend` prints the trend report (`report-trend.ts`) in place of all
+ * of the above: the task sessions of a recent window against a baseline,
+ * then one row per loop with the drift of its per-task figures, read and
+ * written by `report-trend-read.ts`.
+ *
  * ## Rounding
  *
  * Minutes come from {@link minutesBetween}, so this module and the
@@ -182,6 +189,7 @@ import {
 } from './report-format.js';
 import { formatSkillsReport } from './report-skills-format.js';
 import { buildSkillsReport, readHeldLessons } from './report-skills.js';
+import { writeTrendReport } from './report-trend-read.js';
 import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
 import { readPreflightHalts } from './store/preflight.js';
@@ -735,6 +743,10 @@ export default async function report(args: string[], repoRoot: string): Promise<
   if (parsed.errors.length > 0) refuse(parsed.errors);
   if (parsed.skills) {
     writeSkillsReport(parsed.plans, parsed.json, repoRoot);
+    return;
+  }
+  if (parsed.trend !== null) {
+    writeTrendReport(parsed.trend, parsed.json, repoRoot);
     return;
   }
 

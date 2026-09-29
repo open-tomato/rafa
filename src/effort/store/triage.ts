@@ -23,6 +23,7 @@
  * | `scope`, bugs only | read here off `what` and `artifact`: `machine` or `rafa` |
  * | `outcome` | the loop: `done`, `blocked` or `failed` |
  * | `collected_at` | the write's time, ISO 8601, one per write |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store.
  * An entry's `extras` are not stored.
@@ -158,6 +159,7 @@ import { randomUUID } from 'node:crypto';
 import { isMachineFault } from '../../triage/machine-fault.js';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's blockers and bugs, their dispatch, and the outcome. */
@@ -264,9 +266,10 @@ const BLOCKERS: TriageTable<ReportBlocker> = {
     INSERT INTO blockers (
       id, session_id, plan_stub, task_line,
       what, artifact,
-      outcome, collected_at
+      outcome, collected_at,
+      ${STAMPED_COLUMNS}
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('blockers')})
     ON CONFLICT (session_id, what, ifnull(artifact, '')) DO NOTHING
   `,
   values: ({ what, artifact }) => [what, artifact],
@@ -291,9 +294,10 @@ const OUT_OF_SCOPE_BUGS: TriageTable<ReportBug> = {
     INSERT INTO out_of_scope_bugs (
       id, session_id, plan_stub, task_line,
       what, artifact, security, scope,
-      outcome, collected_at
+      outcome, collected_at,
+      ${STAMPED_COLUMNS}
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('out_of_scope_bugs')})
     ON CONFLICT (session_id, what, ifnull(artifact, ''), ifnull(security, -1)) DO NOTHING
   `,
   values: (entry) => [

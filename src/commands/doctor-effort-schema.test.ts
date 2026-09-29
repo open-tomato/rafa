@@ -17,6 +17,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { bringForward } from '../effort/store/bring-forward.js';
+import { LEGACY_GATE_OPEN } from '../effort/store/migrations.js';
 import { unknownAdditiveWarning } from '../effort/store/schema-report.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from '../effort/store/sqlite.js';
 import { eventsOf, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
@@ -244,7 +245,9 @@ describe('rafa doctor, spawned', () => {
   }, SPAWN_TIMEOUT);
 
   it('leaves a store with a migration pending byte-identical, reporting it behind', () => {
-    const behind = scratchWith((dir) => plantPreLog(dir, SQLITE_MIGRATIONS.length - 1));
+    // A pre-log store is one a legacy release wrote, so the newest it can
+    // be is the legacy count; every named entry past it is pending.
+    const behind = scratchWith((dir) => plantPreLog(dir, LEGACY_GATE_OPEN));
     const before = readFileSync(behind.path);
     const doctor = runRafa(behind.scratch, behind.scratch.repo, ['doctor']);
     expect(doctor.exitCode).toBe(0);

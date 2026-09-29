@@ -43,6 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readProgressFindings, renderProgressText } from '../../utils/progress.js';
 
 import { writeFindings } from './findings.js';
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 import { readTrackerRef, writeTrackerRef } from './tracker-refs.js';
 
@@ -63,6 +64,8 @@ interface StoredFinding {
   outcome: string;
   tracker_ref: string | null;
   collected_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-tracker-refs-'));
@@ -213,6 +216,8 @@ describe('writeTrackerRef', () => {
       outcome: 'done',
       tracker_ref: localJson('1'),
       collected_at: '2026-09-15T10:00:00.000Z',
+      origin_store: null,
+      origin_seq: null,
     }]);
   });
 
@@ -399,7 +404,7 @@ describe('writeTrackerRef', () => {
     db.close();
 
     expect(writeTrackerRef(root, writeOf(), seams('from-v1')).action).toBe('inserted');
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(readTrackerRef(root, ARTIFACT)).toEqual(ref());
   });
 });

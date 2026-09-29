@@ -175,11 +175,12 @@ the next one, so you rarely have to remember it.
 ### Tracking effort and learning from skills
 
 Each run records what it cost in time, tokens and work, and which skills
-were offered, invoked and worked. Two commands read that record:
+were offered, invoked and worked. Key commands for the effort record:
 
 ```bash
 rafa effort collect        # gather and store session logs
 rafa effort report         # per-plan summary: sessions, tasks, costs
+rafa effort merge <file>   # join another device's store into this one
 ```
 
 `rafa effort report` shows the per-plan tables (sessions by status and
@@ -209,6 +210,60 @@ by ranking, or `none`):
 The report opens with a fixed line explaining that it shows co-occurrence,
 not causation: a skill can be invoked and its failure recur for reasons the
 skill does not cover.
+
+To see whether task sessions are getting more expensive over time, and
+whether that follows the plan or the calendar:
+
+```bash
+rafa effort report --trend                      # last 3 days against the 14 before, then the loops
+rafa effort report --trend --loops=10 --by=effort
+```
+
+The trend report has two parts. **Trend** compares the recent task
+sessions with a baseline: median and p90 of minutes, output tokens,
+cache-read tokens and turns per task, one row per day, and the sessions
+over the outlier line (baseline median plus three robust standard
+deviations). **Loops** lists one row per plan's loop, newest first: its
+wall-clock and summed task time, number of tasks, minutes per task (min,
+max, average, median), and average tokens and turns per task. Under the
+rows, a drift reading tests each per-task figure across the loops in the
+order they ran (the Mann-Kendall trend test). `no steady trend` means the
+cost moves with the plan; `rising` means it grows whatever the plan.
+
+To see everything at once, the loops running now included:
+
+```bash
+rafa effort collect && rafa effort dashboard
+rafa effort dashboard --output=json             # one key per widget, for a dashboard
+```
+
+The dashboard prints the running loops with their tasks done over total
+and three estimates of the time left: **by task** (the plan's average task
+session), **by progress** (the time since the plan first started, per task
+done), and **this session** (what `rafa loop status` prints). By progress
+counts the time between tasks too, so it is the one to compare against
+the clock. Then come the trend, the loops, each plan's skills M1 and M2,
+and the totals of every stored session.
+
+### Starting a second device
+
+To run rafa on a second device for the same project, bring the effort
+store over consistently:
+
+1. On the new device, check for an existing `.rafa/effort/` store and set
+   it aside (rename or back up).
+2. From the primary device, make a consistent copy:
+   ```bash
+   rafa effort copy --to=<path>
+   ```
+   Or use `sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, but never
+   a plain file copy during a write.
+3. Transfer the copied store and `.rafa/config.yaml` to the new device's
+   `.rafa/` directory.
+4. After both devices have recorded effort, bring them back together with:
+   ```bash
+   rafa effort merge <copied-store-file>
+   ```
 
 ### Which agents and skills are involved
 
