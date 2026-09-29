@@ -4,22 +4,23 @@
  *
  * The command is aliased `start`, so the phase 0 spelling
  * `rafa start --plan=<file>` still runs it, after one deprecation line on
- * stderr. `src/start.ts` and `src/start/run-config.ts` read its flags,
- * and the ones declared here are those they read. The CI defaults are
- * the loop's own constants, so the help cannot drift from them.
+ * stderr. `src/start.ts`, `src/start/run-config.ts` and
+ * `src/start/run-setup.ts` read its flags, and the ones declared here
+ * are those they read. The CI defaults are the loop's own constants, so
+ * the help cannot drift from them.
  *
  * `-d|--detached` is declared so the help does not change when detached
  * runs arrive in phase 6, and `start/run-config.ts` refuses it until
  * then, before anything else is read.
  *
- * `--create-branch` is read by `src/start.ts` ahead of its branch guard,
- * and only on `main` or `master`: it answers yes to the question the run
+ * `--create-branch` is read by `src/start/run-setup.ts` ahead of its
+ * branch guard, and only on `main` or `master`: it answers yes to the question the run
  * would otherwise ask a terminal (`start/branch.ts`). It is declared
  * beside `--any-branch` because the two are the pair an operator on the
  * base chooses between — leave the base, or stay on it deliberately —
  * and `--any-branch` outranks it.
  *
- * `--hint` is read by neither, and by nothing before the run: it is
+ * `--hint` is read by none of them, and by nothing before the run: it is
  * this tree's own ({@link HINT_FLAG_SPEC}), and `endingWith` reads it
  * once `start` has returned, to end a finished run by naming the one
  * step that follows — with the pull request pushed, the wait on its

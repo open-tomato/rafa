@@ -49,7 +49,8 @@
  * checked out. A fast-forward that ran before a later step failed did
  * move the base forward, which is the base's own business and not the
  * run's branch. Each refusal is thrown as a `CommandExit` with exit code
- * 1, the shape `src/start.ts`'s branch guard already refuses with.
+ * 1, the shape the branch guard in `src/start/run-setup.ts` already
+ * refuses with.
  *
  * ## What `git show-ref` answered
  *
