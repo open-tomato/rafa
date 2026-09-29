@@ -196,6 +196,13 @@
  *     `plan create`'s own argument for one run and not a layer over
  *     this key, for the reason the `pr` section gives.
  *
+ * `dangerous.selfUpdateDuringLoop` has `rafa self-update` replace the
+ * install while a loop of the project is live, where it otherwise
+ * refuses and names each loop. The three readings above hold for it
+ * as written: `false` by default, read through `flag`, and not a
+ * {@link CommandLineSetting}; `self-update --force` keeps its own
+ * meaning and is not a layer over this key.
+ *
  * ## The `status` section
  *
  * `rafa status` prints where a project stands, and the since-last-command
@@ -509,6 +516,12 @@ export interface RafaConfig {
    */
   dangerousAcceptStaleRefs: boolean;
   /**
+   * Whether `rafa self-update` replaces the install while a loop of the
+   * project is live, where it otherwise waits for that loop to finish.
+   * `dangerous.selfUpdateDuringLoop`.
+   */
+  dangerousSelfUpdateDuringLoop: boolean;
+  /**
    * Whether a command that runs inside a project prints the one-line
    * since-last-command notice on stderr. `status.notice`.
    */
@@ -587,6 +600,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
+  dangerousSelfUpdateDuringLoop: false,
   statusNotice: true,
   tiersRafa: 'on',
   tiersSkills: new Map<string, TierPin>(),
@@ -705,6 +719,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   },
   dangerousAcceptStaleRefs: {
     key: 'dangerous.acceptStaleRefs',
+    read: flag,
+    cli: false,
+  },
+  dangerousSelfUpdateDuringLoop: {
+    key: 'dangerous.selfUpdateDuringLoop',
     read: flag,
     cli: false,
   },

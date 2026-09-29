@@ -136,6 +136,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '#   keep: []                     # glob patterns naming branches rafa cleanup never lists',
   '# dangerous:',
   `#   acceptStaleRefs: ${String(CONFIG_DEFAULTS.dangerousAcceptStaleRefs)}       # true plans past dangling and suspect spec references on every run`,
+  `#   selfUpdateDuringLoop: ${String(CONFIG_DEFAULTS.dangerousSelfUpdateDuringLoop)}  # true lets rafa self-update replace the install while a loop runs`,
   '# status:',
   `#   notice: ${String(CONFIG_DEFAULTS.statusNotice)}                 # false drops the one-line notice of what is new since the last command`,
   '# tiers:',

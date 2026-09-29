@@ -245,8 +245,13 @@ describe('the config files', () => {
     expect(dangerous.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
       '# dangerous:',
       '#   acceptStaleRefs: false',
+      '#   selfUpdateDuringLoop: false',
     ]);
     expect([resolved.config.dangerousAcceptStaleRefs, resolved.sources.dangerousAcceptStaleRefs]).toEqual([false, 'file']);
+    expect([
+      resolved.config.dangerousSelfUpdateDuringLoop,
+      resolved.sources.dangerousSelfUpdateDuringLoop,
+    ]).toEqual([false, 'file']);
   });
 
   it('turns acceptStaleRefs on once its line is uncommented with true, so the reading above can fail', () => {
@@ -257,6 +262,22 @@ describe('the config files', () => {
 
     expect([flipped.config.dangerousAcceptStaleRefs, flipped.sources.dangerousAcceptStaleRefs]).toEqual([true, 'file']);
     expect([absent.config.dangerousAcceptStaleRefs, absent.sources.dangerousAcceptStaleRefs]).toEqual([false, 'default']);
+  });
+
+  it('turns selfUpdateDuringLoop on once its line is uncommented with true, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}selfUpdateDuringLoop:) false/, '$1 true'));
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   selfUpdateDuringLoop:'));
+    const flipped = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+    const absent = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dropped].join('\n')), 'c.yaml') });
+
+    expect([
+      flipped.config.dangerousSelfUpdateDuringLoop,
+      flipped.sources.dangerousSelfUpdateDuringLoop,
+    ]).toEqual([true, 'file']);
+    expect([
+      absent.config.dangerousSelfUpdateDuringLoop,
+      absent.sources.dangerousSelfUpdateDuringLoop,
+    ]).toEqual([false, 'default']);
   });
 
   it('carries the status section, the notice on by default, which resolves from the file once uncommented', () => {

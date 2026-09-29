@@ -353,6 +353,7 @@ function readLayer(
     cleanupWorktreeIdleDays: read('cleanupWorktreeIdleDays'),
     cleanupKeep: read('cleanupKeep'),
     dangerousAcceptStaleRefs: read('dangerousAcceptStaleRefs'),
+    dangerousSelfUpdateDuringLoop: read('dangerousSelfUpdateDuringLoop'),
     statusNotice: read('statusNotice'),
     tiersRafa: read('tiersRafa'),
     tiersSkills: read('tiersSkills'),
