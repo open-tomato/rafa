@@ -26,6 +26,7 @@
  * what reading the project root gives: the subdirectory holds no plans
  * directory, so a command reading the working directory lists nothing.
  */
+import type { PlanList, PlanListing } from './list.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -37,7 +38,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { parsePlan } from '../../plan/index.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
-import planListCommand, { listPlans, renderPlanList } from './list.js';
+import planListCommand, { listPlans, openPlans, renderPlanList } from './list.js';
 import { plansDirAt } from './plan-files.js';
 import planShowCommand, { renderShownPlan, showPlan } from './show.js';
 
@@ -119,6 +120,23 @@ function plantPlans(root: string, dir: string): string {
   }, [`${dir}/PLAN-folder.md`]);
 }
 
+/** A listing of `stub` with `tasks` and `issues`, the paths made up. */
+function madeUpListing(stub: string, tasks: PlanListing['tasks'], issues = 0): PlanListing {
+  return { stub, plan: `/plans/PLAN-${stub}.md`, tracker: null, tasks, issues };
+}
+
+/** One listing per case `--open` decides, in stub order. */
+const MIXED: PlanList = {
+  dir: '/plans',
+  plans: [
+    madeUpListing('blocked', { total: 2, done: 1, blocked: 1, open: 0 }),
+    madeUpListing('done', { total: 2, done: 2, blocked: 0, open: 0 }),
+    madeUpListing('empty', { total: 0, done: 0, blocked: 0, open: 0 }),
+    madeUpListing('misread', { total: 1, done: 1, blocked: 0, open: 0 }, 1),
+    madeUpListing('open', { total: 3, done: 1, blocked: 1, open: 1 }),
+  ],
+};
+
 /** A fresh directory of this file's own. */
 function freshRoot(): string {
   return mkdtempSync(join(tempBase, 'root-'));
@@ -179,6 +197,32 @@ describe('what rafa plan list lists', () => {
 
     expect(renderPlanList(listPlans(plansDirAt(root, DEFAULT_DIR)), DEFAULT_DIR)).toEqual(expectedRows(DEFAULT_DIR));
     expect(renderPlanList({ dir: '/nowhere', plans: [] }, CONFIGURED_DIR)).toEqual([`No plans in ${CONFIGURED_DIR}/.`]);
+  });
+});
+
+describe('what rafa plan list --open keeps', () => {
+  it('keeps the plans with an open task or an issue, in order, and hides the done, all-blocked and empty ones', () => {
+    expect(openPlans(MIXED)).toEqual({ dir: '/plans', plans: [MIXED.plans[3], MIXED.plans[4]] });
+    // The full list is left as it was: the filter builds a new one.
+    expect(MIXED.plans.map((plan) => plan.stub)).toEqual(['blocked', 'done', 'empty', 'misread', 'open']);
+  });
+
+  it('keeps both planted plans: alpha for its open task, b for its issues', () => {
+    const plans = plansDirAt(plantPlans(freshRoot(), DEFAULT_DIR), DEFAULT_DIR);
+
+    expect(openPlans(listPlans(plans)).plans.map((plan) => plan.stub)).toEqual(['alpha', 'b']);
+  });
+
+  it('renders the kept rows, and an empty filtered list as none open rather than none at all', () => {
+    expect(renderPlanList(openPlans(MIXED), CONFIGURED_DIR, true)).toEqual([
+      `Plans in ${CONFIGURED_DIR}/:`,
+      '  misread   1/1 done, 0 blocked, 0 open; no tracker; 1 issue',
+      '  open      1/3 done, 1 blocked, 1 open; no tracker',
+    ]);
+    const none = openPlans({ dir: '/plans', plans: MIXED.plans.slice(0, 3) });
+    expect(none.plans).toEqual([]);
+    expect(renderPlanList(none, CONFIGURED_DIR, true)).toEqual([`No plan in ${CONFIGURED_DIR}/ has open tasks.`]);
+    expect(renderPlanList(none, CONFIGURED_DIR)).toEqual([`No plans in ${CONFIGURED_DIR}/.`]);
   });
 });
 

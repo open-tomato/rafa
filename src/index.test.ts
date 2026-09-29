@@ -372,6 +372,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'isFile',
       'planFileName',
       'plural',
+      'readSwitch',
       'requireProject',
       'resolvePlansDir',
       'stubOfPlanFile',
