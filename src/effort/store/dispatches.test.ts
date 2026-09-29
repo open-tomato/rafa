@@ -26,10 +26,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../../utils/declaration.js';
 
 import { readSessionBudgets, writeDispatch } from './dispatches.js';
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import {
   migrateSchema,
   SQLITE_MIGRATIONS,
-  SQLITE_SCHEMA_VERSION,
   sqliteStorePath,
 } from './sqlite.js';
 
@@ -50,6 +50,8 @@ interface StoredDispatch {
   resolver: string | null;
   skills_offered: string | null;
   lessons_offered: string | null;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The table's columns, in order. */
@@ -69,6 +71,8 @@ const COLUMNS = [
   'resolver',
   'skills_offered',
   'lessons_offered',
+  'origin_store',
+  'origin_seq',
 ];
 
 /** Every table a store at the last version holds, by name. */
@@ -164,7 +168,7 @@ describe('the dispatches table', () => {
     const columns = rawQuery<{ name: string }>(root, 'SELECT name FROM pragma_table_info(?) ORDER BY cid', 'dispatches');
     expect(columns.map(({ name }) => name)).toEqual(COLUMNS);
     expect(tablesOf(root)).toEqual(TABLES);
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-6 store forward, keeping the rows it holds', () => {
@@ -185,7 +189,7 @@ describe('the dispatches table', () => {
 
     writeDispatch(root, writeOf('s-1', 'Do it'), CLOCK);
 
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT id FROM task_reports')).toEqual([{ id: 't-1' }]);
     expect(rowsOf(root).map(({ session_id }) => session_id)).toEqual(['s-1']);
   });
@@ -202,13 +206,14 @@ describe('the dispatches table', () => {
     db.close();
 
     // The control: the first nine entries make the table without the
-    // three columns, so they came from a later entry.
+    // three columns, so they came from a later entry, as the origin
+    // columns after them did.
     const before = rawQuery<{ name: string }>(root, 'SELECT name FROM pragma_table_info(?) ORDER BY cid', 'dispatches');
-    expect(before.map(({ name }) => name)).toEqual(COLUMNS.slice(0, -3));
+    expect(before.map(({ name }) => name)).toEqual(COLUMNS.slice(0, COLUMNS.indexOf('resolver')));
 
     writeDispatch(root, { ...writeOf('s-1', 'Do it'), resolver: 'tag', skillsOffered: ['bun-testing'], lessonsOffered: [] }, CLOCK);
 
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rowsOf(root).map(({ session_id, resolver, skills_offered, lessons_offered }) => [
       session_id,
       resolver,
@@ -268,6 +273,8 @@ describe('writeDispatch', () => {
       resolver: null,
       skills_offered: null,
       lessons_offered: null,
+      origin_store: null,
+      origin_seq: null,
     }]);
   });
 
@@ -311,6 +318,8 @@ describe('writeDispatch', () => {
       resolver: null,
       skills_offered: null,
       lessons_offered: null,
+      origin_store: null,
+      origin_seq: null,
     }]);
   });
 

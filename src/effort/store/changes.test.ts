@@ -60,6 +60,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CHANGE_LEVELS, parseReport } from '../../report/parse.js';
 
 import { readPlanChanges, writeChanges } from './changes.js';
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 
 /** A changes row as the table holds it. */
@@ -73,6 +74,8 @@ interface StoredChange {
   area: string | null;
   summary: string;
   collected_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The table's columns, in order. No outcome: the note is about the diff. */
@@ -86,6 +89,8 @@ const COLUMNS = [
   'area',
   'summary',
   'collected_at',
+  'origin_store',
+  'origin_seq',
 ];
 
 /** Every table a store at the last version holds, by name. */
@@ -265,7 +270,7 @@ describe('the changes migration', () => {
     expect(columns.map(({ name }) => name)).not.toContain('outcome');
     expect(tablesOf(root)).toEqual(TABLES);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-7 store forward, keeping the rows it holds', () => {
@@ -289,7 +294,7 @@ describe('the changes migration', () => {
 
     expect(counts(result)).toEqual(countsOf(1, 0));
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT id FROM task_reports')).toEqual([{ id: 't-1' }]);
     expect(columnOf(root, 'id')).toEqual(['from-v7-1']);
   });
@@ -365,6 +370,8 @@ describe('writeChanges rows', () => {
         area: 'effort store',
         summary: 'Task reports now store the changelog lines a task returns',
         collected_at: '2026-09-20T10:00:00.000Z',
+        origin_store: null,
+        origin_seq: null,
       },
       {
         seq: 2,
@@ -374,6 +381,8 @@ describe('writeChanges rows', () => {
         area: null,
         summary: 'Internal only',
         collected_at: '2026-09-20T10:00:00.000Z',
+        origin_store: null,
+        origin_seq: null,
       },
     ]);
   });

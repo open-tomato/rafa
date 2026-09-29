@@ -80,6 +80,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { openNdjsonStore } from './ndjson.js';
 import {
   migrateSchema,
@@ -309,7 +310,7 @@ describe('openSqliteStore layout', () => {
       .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     for (const [kind, keyColumn] of Object.entries(KEY_COLUMNS)) {
       expect(rawQuery<{ name: string }>(root, columns, kind))
-        .toEqual([{ name: 'seq' }, { name: keyColumn }, { name: 'row_json' }]);
+        .toEqual([{ name: 'seq' }, { name: keyColumn }, { name: 'row_json' }, { name: 'origin_store' }, { name: 'origin_seq' }]);
     }
     expect(rawQuery(root, 'SELECT session_id AS key FROM sessions'))
       .toEqual([{ key: 'aaaa-1111' }, { key: 'bbbb-2222' }]);
@@ -575,12 +576,12 @@ describe('append refusals', () => {
 });
 
 describe('schema versioning', () => {
-  it('creates a store at the last version the history holds', () => {
+  it('creates a store with the legacy gate open, whatever the history\'s length', () => {
     const root = freshRoot('fresh-version');
     openSqliteStore(root).append('sessions', [S_A]);
 
     expect(SQLITE_SCHEMA_VERSION).toBe(SQLITE_MIGRATIONS.length);
-    expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
+    expect(versionOf(root)).toBe(LEGACY_GATE_OPEN);
   });
 
   it('reads a zero-byte file as an empty store and gives it the schema', () => {
@@ -590,7 +591,7 @@ describe('schema versioning', () => {
     const store = openSqliteStore(root);
 
     expect(store.keys('sessions').size).toBe(0);
-    expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
+    expect(versionOf(root)).toBe(LEGACY_GATE_OPEN);
     expect(tablesOf(root))
       .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     expect(store.append('sessions', [S_A]).appended).toBe(1);
@@ -663,17 +664,18 @@ describe('the open path', () => {
 
   const ALL_IDS = SQLITE_MIGRATIONS.map(({ id }) => id);
 
-  it('adopts a store a pre-log release left on its first read, running nothing and keeping its rows', () => {
+  it('adopts a store a pre-log release left on its first read, running only the entries past the legacy ones and keeping its rows', () => {
     const root = freshRoot('pre-log');
-    rawExec(root, `${SQLITE_MIGRATIONS.map(({ sql }) => sql).join('\n')}
-      PRAGMA user_version = ${SQLITE_SCHEMA_VERSION};`);
+    const legacy = SQLITE_MIGRATIONS.slice(0, LEGACY_GATE_OPEN).map(({ sql }) => sql);
+    rawExec(root, `${legacy.join('\n')}
+      PRAGMA user_version = ${LEGACY_GATE_OPEN};`);
     rawInsert(root, 'sessions', 'aaaa-1111', JSON.stringify(S_A));
     expect(tablesOf(root)).not.toContain('schema_migrations');
 
     expect([...openSqliteStore(root).keys('sessions')]).toEqual(['aaaa-1111']);
 
     expect(loggedIds(root)).toEqual(ALL_IDS);
-    expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
+    expect(versionOf(root)).toBe(LEGACY_GATE_OPEN);
     expect(bodiesOf(root, 'sessions')).toEqual([JSON.stringify(S_A)]);
   });
 
@@ -770,7 +772,7 @@ describe('the open path', () => {
       expect(at).toBeGreaterThanOrEqual(releasedAt);
     }
     expect(loggedIds(root)).toEqual(ALL_IDS);
-    expect(versionOf(root)).toBe(SQLITE_SCHEMA_VERSION);
+    expect(versionOf(root)).toBe(LEGACY_GATE_OPEN);
   }, 20_000);
 });
 

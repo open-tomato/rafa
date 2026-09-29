@@ -222,7 +222,8 @@ describe('rafa effort schema over a store this rafa uses', () => {
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain('Migration log: none; a release before the log wrote this store, and the next open adopts it.');
     expect(run.stdout).toContain('Gate (user_version): 12 (a count of legacy migrations: no log yet); 13 (open:');
-    expect(run.stdout).toContain('Pending (1): plan-ci');
+    const pending = SQLITE_MIGRATIONS.slice(12).map(({ id }) => id);
+    expect(run.stdout).toContain(`Pending (${String(pending.length)}): ${pending.join(', ')}\n`);
     expect(run.stdout).toContain('✅ Behind:');
     expect(lastLine(run)).toBe('Next safe step: none');
     expect(Buffer.compare(readFileSync(path), before)).toBe(0);

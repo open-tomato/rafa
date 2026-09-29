@@ -22,6 +22,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import {
   planCiReading,
   planStubOfBranch,
@@ -32,7 +33,6 @@ import {
 import {
   migrateSchema,
   SQLITE_MIGRATIONS,
-  SQLITE_SCHEMA_VERSION,
   sqliteStorePath,
 } from './sqlite.js';
 
@@ -45,10 +45,12 @@ interface StoredPlanCi {
   verdict: string;
   failing: string;
   read_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The table's columns, in order. */
-const COLUMNS = ['seq', 'plan_stub', 'pr', 'head_sha', 'verdict', 'failing', 'read_at'];
+const COLUMNS = ['seq', 'plan_stub', 'pr', 'head_sha', 'verdict', 'failing', 'read_at', 'origin_store', 'origin_seq'];
 
 /** Every table a store at the last version holds, by name. */
 const TABLES = [
@@ -155,7 +157,7 @@ describe('the plan_ci table', () => {
     const columns = rawQuery<{ name: string }>(root, 'SELECT name FROM pragma_table_info(?) ORDER BY cid', 'plan_ci');
     expect(columns.map(({ name }) => name)).toEqual(COLUMNS);
     expect(tablesOf(root)).toEqual(TABLES);
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rowsOf(root)).toEqual([{
       seq: 1,
       plan_stub: 'rafa-24-know-which-skills-earn',
@@ -164,6 +166,8 @@ describe('the plan_ci table', () => {
       verdict: 'red',
       failing: '["lint","test"]',
       read_at: READ_AT,
+      origin_store: null,
+      origin_seq: null,
     }]);
   });
 
@@ -184,7 +188,7 @@ describe('the plan_ci table', () => {
 
     writePlanCi(root, RED);
 
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT session_id FROM dispatches')).toEqual([{ session_id: 's-0' }]);
     expect(rowsOf(root)).toHaveLength(1);
   });

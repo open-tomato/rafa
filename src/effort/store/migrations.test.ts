@@ -368,6 +368,12 @@ describe('the contract', () => {
   });
 });
 
+/**
+ * The tables `row-origins` gives an origin pair and its partial unique
+ * index: every table the thirteen legacy entries create.
+ */
+const ORIGIN_TABLE_COUNT = 12;
+
 /** The shape of each statement of each shipped entry, in order. */
 const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
   'kind-tables': ['create-table', 'create-table'],
@@ -388,6 +394,10 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
   'skill-invocations': ['create-table', 'create-unique-index-on-new-table'],
   'task-report-skills': ['add-column'],
   'plan-ci': ['create-table'],
+  'row-origins': Array.from(
+    { length: ORIGIN_TABLE_COUNT },
+    () => ['add-column', 'add-column', 'create-unique-index-on-new-column'],
+  ).flat(),
 };
 
 describe('classifyMigration over the catalogue', () => {

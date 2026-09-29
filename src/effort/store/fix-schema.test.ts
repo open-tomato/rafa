@@ -187,6 +187,16 @@ function countOf(path: string, sql: string): number {
   }
 }
 
+/** The thirteen entries every pre-log release holds, by position. */
+const LEGACY = SQLITE_MIGRATIONS.slice(0, LEGACY_GATE_OPEN);
+
+/**
+ * A store with no log, two entries past this rafa's whole catalogue. It
+ * is past the catalogue rather than past {@link LEGACY} because the
+ * rebuild refuses a store lacking a column this rafa writes, and a
+ * store holding only the legacy entries lacks the origin columns of
+ * `row-origins`.
+ */
 const NEWER = [...SQLITE_MIGRATIONS, ADDED_COLUMN, ADDED_TABLE];
 
 describe('fixStoreSchema on a pre-log store past this rafa', () => {
@@ -252,11 +262,11 @@ describe('fixStoreSchema on a pre-log store past this rafa', () => {
     expect(readdirSync(dir).sort()).toEqual(['effort.sqlite', `effort.sqlite.v${String(SQLITE_SCHEMA_VERSION + 2)}-${STAMP}.bak`]);
   });
 
-  it('rebuilds a pre-log store at 15 at the known ids, with a log naming this runtime', () => {
+  it('rebuilds a pre-log store two entries past this rafa at the known ids, with a log naming this runtime', () => {
     const dir = caseDir();
     const path = join(dir, 'effort.sqlite');
     plantStore(path, NEWER, fillNewer);
-    expect(versionOf(path)).toBe(15);
+    expect(versionOf(path)).toBe(SQLITE_SCHEMA_VERSION + 2);
     expect(countOf(path, `SELECT count(*) AS n FROM sqlite_master WHERE name = '${MIGRATION_LOG_TABLE}'`)).toBe(0);
 
     const result = fixStoreSchema(fixOptions(path, false));
@@ -482,13 +492,13 @@ describe('fixStoreSchema on a store this rafa can already use', () => {
   it('answers behind for a pre-log store at the legacy entries, which the next open adopts, leaving it byte-identical', () => {
     const dir = caseDir();
     const path = join(dir, 'effort.sqlite');
-    plantStore(path, SQLITE_MIGRATIONS);
+    plantStore(path, LEGACY);
     const before = readFileSync(path);
 
     const result = fixStoreSchema(fixOptions(path, false));
 
     expect(result.status).toBe('behind');
-    expect(result.pending).toEqual([MIGRATION_LOG_TABLE]);
+    expect(result.pending).toEqual([MIGRATION_LOG_TABLE, ...SQLITE_MIGRATIONS.slice(LEGACY_GATE_OPEN).map(({ id }) => id)]);
     expect(readFileSync(path).equals(before)).toBe(true);
   });
 

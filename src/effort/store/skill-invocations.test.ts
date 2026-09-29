@@ -20,11 +20,11 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { readSkillInvocations, UNKNOWN_SKILL_COUNT, writeSkillInvocations } from './skill-invocations.js';
 import {
   migrateSchema,
   SQLITE_MIGRATIONS,
-  SQLITE_SCHEMA_VERSION,
   sqliteStorePath,
 } from './sqlite.js';
 
@@ -35,10 +35,12 @@ interface StoredInvocation {
   name: string | null;
   sidechain: number | null;
   count: number | null;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The table's columns, in order. */
-const COLUMNS = ['seq', 'session_id', 'name', 'sidechain', 'count'];
+const COLUMNS = ['seq', 'session_id', 'name', 'sidechain', 'count', 'origin_store', 'origin_seq'];
 
 /** Every table a store at the last version holds, by name. */
 const TABLES = [
@@ -123,7 +125,7 @@ describe('the skill_invocations table', () => {
     const columns = rawQuery<{ name: string }>(root, 'SELECT name FROM pragma_table_info(?) ORDER BY cid', 'skill_invocations');
     expect(columns.map(({ name }) => name)).toEqual(COLUMNS);
     expect(tablesOf(root)).toEqual(TABLES);
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-10 store forward, keeping the rows it holds', () => {
@@ -143,7 +145,7 @@ describe('the skill_invocations table', () => {
 
     writeSkillInvocations(root, [COUNTED]);
 
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT session_id FROM dispatches')).toEqual([{ session_id: 's-0' }]);
     expect(rowsOf(root)).toHaveLength(3);
   });
@@ -185,10 +187,10 @@ describe('writeSkillInvocations', () => {
 
     expect(result).toMatchObject({ appended: 4, skipped: 0 });
     expect(rowsOf(root)).toEqual([
-      { seq: 1, session_id: 's-1', name: 'bun-testing', sidechain: 0, count: 2 },
-      { seq: 2, session_id: 's-1', name: 'bun-testing', sidechain: 1, count: 1 },
-      { seq: 3, session_id: 's-1', name: 'git-workflow', sidechain: 0, count: 3 },
-      { seq: 4, session_id: 's-2', name: null, sidechain: null, count: null },
+      { seq: 1, session_id: 's-1', name: 'bun-testing', sidechain: 0, count: 2, origin_store: null, origin_seq: null },
+      { seq: 2, session_id: 's-1', name: 'bun-testing', sidechain: 1, count: 1, origin_store: null, origin_seq: null },
+      { seq: 3, session_id: 's-1', name: 'git-workflow', sidechain: 0, count: 3, origin_store: null, origin_seq: null },
+      { seq: 4, session_id: 's-2', name: null, sidechain: null, count: null, origin_store: null, origin_seq: null },
     ]);
   });
 
@@ -210,7 +212,7 @@ describe('writeSkillInvocations', () => {
     expect(writeSkillInvocations(root, [{ sessionId: 's-1', uses: [] }]).appended).toBe(0);
 
     expect(tablesOf(root)).toEqual(TABLES);
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('skips a session already holding a row, whole, and writes the others', () => {

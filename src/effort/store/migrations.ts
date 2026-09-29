@@ -408,7 +408,92 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   );
   `,
   },
+  // The first entry past the legacy history: which store wrote each row
+  // of the twelve tables a merge unions, and the row's own `seq` there.
+  // Both columns are nullable with no DEFAULT, because a pre-log runtime
+  // keeps inserting through this entry without naming them, and a row
+  // it writes, like every row held before this entry ran, reads NULL in
+  // both. Each unique index covers only rows carrying an origin, so
+  // those NULL rows never collide. No trigger fills them, since a
+  // trigger breaks `writers`: a writer that stamps an origin names both
+  // columns in its own insert.
+  {
+    id: 'row-origins',
+    breaks: [],
+    sql: `
+  ALTER TABLE sessions ADD COLUMN origin_store TEXT;
+  ALTER TABLE sessions ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX sessions_by_origin
+    ON sessions (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
 
+  ALTER TABLE commits ADD COLUMN origin_store TEXT;
+  ALTER TABLE commits ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX commits_by_origin
+    ON commits (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE findings ADD COLUMN origin_store TEXT;
+  ALTER TABLE findings ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX findings_by_origin
+    ON findings (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE blockers ADD COLUMN origin_store TEXT;
+  ALTER TABLE blockers ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX blockers_by_origin
+    ON blockers (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE out_of_scope_bugs ADD COLUMN origin_store TEXT;
+  ALTER TABLE out_of_scope_bugs ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX out_of_scope_bugs_by_origin
+    ON out_of_scope_bugs (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE report_absences ADD COLUMN origin_store TEXT;
+  ALTER TABLE report_absences ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX report_absences_by_origin
+    ON report_absences (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE task_reports ADD COLUMN origin_store TEXT;
+  ALTER TABLE task_reports ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX task_reports_by_origin
+    ON task_reports (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE preflight ADD COLUMN origin_store TEXT;
+  ALTER TABLE preflight ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX preflight_by_origin
+    ON preflight (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE dispatches ADD COLUMN origin_store TEXT;
+  ALTER TABLE dispatches ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX dispatches_by_origin
+    ON dispatches (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE changes ADD COLUMN origin_store TEXT;
+  ALTER TABLE changes ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX changes_by_origin
+    ON changes (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE skill_invocations ADD COLUMN origin_store TEXT;
+  ALTER TABLE skill_invocations ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX skill_invocations_by_origin
+    ON skill_invocations (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+
+  ALTER TABLE plan_ci ADD COLUMN origin_store TEXT;
+  ALTER TABLE plan_ci ADD COLUMN origin_seq INTEGER;
+  CREATE UNIQUE INDEX plan_ci_by_origin
+    ON plan_ci (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+  `,
+  },
 ];
 
 /**

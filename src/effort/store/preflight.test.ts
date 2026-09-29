@@ -56,6 +56,7 @@ import { loadConfig } from '../../config-load.js';
 import { PREREQUISITE_KINDS } from '../../config.js';
 import { runPreflight } from '../../preflight/run.js';
 
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import {
   PREFLIGHT_OUTCOMES,
   PREFLIGHT_TIERS,
@@ -77,6 +78,8 @@ interface StoredCheck {
   duration_ms: number;
   failure: string | null;
   collected_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** A column value, as a raw insert binds it. */
@@ -95,6 +98,8 @@ const COLUMNS = [
   'duration_ms',
   'failure',
   'collected_at',
+  'origin_store',
+  'origin_seq',
 ];
 
 /** Every table a store at the last version holds, by name. */
@@ -306,7 +311,7 @@ describe('the preflight migration', () => {
     expect(result.path.startsWith(`${tempBase}/`)).toBe(true);
     expect(rawQuery<{ name: string }>(root, columns, 'preflight').map(({ name }) => name)).toEqual(COLUMNS);
     expect(tablesOf(root)).toEqual(TABLES);
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-5 store forward through a new entry, keeping the rows it holds', () => {
@@ -331,7 +336,7 @@ describe('the preflight migration', () => {
     const result = writePreflightChecks(root, { runId: 'run-v5', checks: [PASS_CHECK] }, CLOCK);
 
     expect(result.appended).toBe(1);
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT id FROM task_reports')).toEqual([{ id: 't-1' }]);
     expect(rowsOf(root).map(({ run_id }) => run_id)).toEqual(['run-v5']);
   });
@@ -431,11 +436,11 @@ describe('writePreflightChecks rows', () => {
     expect(result).toEqual({ path: storeFile(root), appended: 5 });
     const stamp = '2026-09-15T10:00:00.000Z';
     expect(rowsOf(root)).toEqual([
-      { seq: 1, run_id: 'run-rows', position: 0, tier: 'required', kind: 'tool', item: 'bun', probe: 'bun --version', outcome: 'pass', duration_ms: 7, failure: null, collected_at: stamp },
-      { seq: 2, run_id: 'run-rows', position: 1, tier: 'required', kind: 'env', item: 'UNSET_TOKEN', probe: null, outcome: 'fail', duration_ms: 7, failure: failures[1] ?? '', collected_at: stamp },
-      { seq: 3, run_id: 'run-rows', position: 2, tier: 'required', kind: 'service', item: 'https://api.github.com', probe: 'gh auth status', outcome: 'fail', duration_ms: 7, failure: failures[2] ?? '', collected_at: stamp },
-      { seq: 4, run_id: 'run-rows', position: 3, tier: 'optional', kind: 'tool', item: 'mgrep', probe: 'mgrep --version', outcome: 'timeout', duration_ms: 7, failure: failures[3] ?? '', collected_at: stamp },
-      { seq: 5, run_id: 'run-rows', position: 4, tier: 'optional', kind: 'lsp', item: 'typescript', probe: null, outcome: 'fail', duration_ms: 7, failure: failures[4] ?? '', collected_at: stamp },
+      { seq: 1, run_id: 'run-rows', position: 0, tier: 'required', kind: 'tool', item: 'bun', probe: 'bun --version', outcome: 'pass', duration_ms: 7, failure: null, collected_at: stamp, origin_store: null, origin_seq: null },
+      { seq: 2, run_id: 'run-rows', position: 1, tier: 'required', kind: 'env', item: 'UNSET_TOKEN', probe: null, outcome: 'fail', duration_ms: 7, failure: failures[1] ?? '', collected_at: stamp, origin_store: null, origin_seq: null },
+      { seq: 3, run_id: 'run-rows', position: 2, tier: 'required', kind: 'service', item: 'https://api.github.com', probe: 'gh auth status', outcome: 'fail', duration_ms: 7, failure: failures[2] ?? '', collected_at: stamp, origin_store: null, origin_seq: null },
+      { seq: 4, run_id: 'run-rows', position: 3, tier: 'optional', kind: 'tool', item: 'mgrep', probe: 'mgrep --version', outcome: 'timeout', duration_ms: 7, failure: failures[3] ?? '', collected_at: stamp, origin_store: null, origin_seq: null },
+      { seq: 5, run_id: 'run-rows', position: 4, tier: 'optional', kind: 'lsp', item: 'typescript', probe: null, outcome: 'fail', duration_ms: 7, failure: failures[4] ?? '', collected_at: stamp, origin_store: null, origin_seq: null },
     ]);
   });
 
@@ -473,7 +478,7 @@ describe('writePreflightChecks rows', () => {
 
     writePreflightChecks(root, { runId: 'run-empty', checks: [] }, CLOCK);
 
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(tablesOf(root)).toEqual(TABLES);
     expect(rowsOf(root)).toEqual([]);
   });

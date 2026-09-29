@@ -87,8 +87,14 @@ repeated and runs beside a live loop and from a development build; the
 swap refuses while a loop session is running or paused, and from a
 development build before anything is built. A newer schema that dropped
 a table or column this rafa writes is not additive, and the repair
-refuses it rather than copy around it. `fix-schema.test.ts` (store and
-command) rebuilds a pre-log store at 15 with a log, reports a logged
+refuses it rather than copy around it. It refuses a store that never
+held one as well: since `row-origins` added `origin_store` and
+`origin_seq`, a pre-log store past this rafa holds legacy tables
+without them, and the rebuild answers `the store holds no column
+blockers.origin_store, blockers.origin_seq, which this rafa writes;
+its newer schema is not additive`. So `fix-schema.test.ts` (store and
+command) plants its pre-log store two entries past the whole
+catalogue, rebuilds it with a log, reports a logged
 store with an unknown additive migration `current`, and spawns
 `bun src/rafa.ts` over a store outside the child's temp directory:
 the swap is refused, the dry run runs. The steps around the build, from
@@ -200,7 +206,12 @@ transaction as the migrations it records, so a run killed between the two
 rolls the field back with the tables; and the last version is the array's
 length rather than a constant beside it, so an appended entry cannot be
 forgotten. Measured, a throw inside the transaction rolls `user_version`
-back as well.
+back as well. That count is what `migrateSchema` writes and a pre-log
+release reads. `row-origins`, the first entry past the thirteen legacy
+ones, makes the array longer than 13, while an open through
+`bringForward` leaves `user_version` at the legacy gate; so a store's
+`user_version` no longer equals `SQLITE_SCHEMA_VERSION`, and its log,
+not `user_version`, says which entries it holds.
 
 **Each entry is a named `SqliteMigration`: an `id`, what it `breaks` and
 its `sql`.** The `id` is kebab-case and is never reused. `breaks` is `[]`

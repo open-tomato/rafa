@@ -60,6 +60,7 @@ import { loadConfig } from '../../config-load.js';
 import { parseReport, REPORT_STATUSES } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES } from './findings.js';
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { readReportedSkills, readTaskReportTallies, writeTaskReport } from './reports.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 
@@ -74,6 +75,8 @@ interface StoredReport {
   outcome: string;
   collected_at: string;
   skills_used: string | null;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The table's columns, in order. */
@@ -87,6 +90,8 @@ const COLUMNS = [
   'outcome',
   'collected_at',
   'skills_used',
+  'origin_store',
+  'origin_seq',
 ];
 
 /** A fence, kept out of the template literals. */
@@ -266,7 +271,7 @@ describe('the task reports migration', () => {
     expect(tablesOf(root))
       .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-4 store forward through a new entry, keeping the rows it holds', () => {
@@ -291,7 +296,7 @@ describe('the task reports migration', () => {
 
     expect([result.appended, result.skipped]).toEqual([1, 0]);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT id FROM report_absences')).toEqual([{ id: 'a-1' }]);
     expect(rowsOf(root).map(({ id }) => id)).toEqual(['from-v4-1']);
   });
@@ -355,6 +360,8 @@ describe('writeTaskReport rows', () => {
       outcome: 'failed',
       collected_at: '2026-09-14T10:00:00.000Z',
       skills_used: '[]',
+      origin_store: null,
+      origin_seq: null,
     }]);
   });
 
@@ -622,14 +629,16 @@ describe('the skills a task report says it used', () => {
     db.close();
 
     // The control: the first eleven entries make a task reports table with
-    // no skills column, so the column came from a later entry.
+    // no skills column, so the column came from a later entry. The origin
+    // columns came later still.
     const columns = 'SELECT name FROM pragma_table_info(?) ORDER BY cid';
+    const later = ['skills_used', 'origin_store', 'origin_seq'];
     expect(rawQuery<{ name: string }>(root, columns, 'task_reports').map(({ name }) => name))
-      .toEqual(COLUMNS.filter((name) => name !== 'skills_used'));
+      .toEqual(COLUMNS.filter((name) => !later.includes(name)));
 
     writeTaskReport(root, writeOf(), seams('skills-from-v11'));
 
-    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+    expect(rawQuery(root, 'PRAGMA user_version')).toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(readReportedSkills(root).map(({ sessionId, skillsUsed }) => [sessionId, skillsUsed]))
       .toEqual([['old-session', null], ['aaaa-1111', []]]);
   });

@@ -32,6 +32,7 @@ import { parseReport } from '../../report/parse.js';
 
 import { REPORT_ABSENCE_REASONS, writeReportAbsence } from './absences.js';
 import { FINDING_OUTCOMES } from './findings.js';
+import { LEGACY_GATE_OPEN } from './migrations.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 
 /** An absence row as the table holds it. */
@@ -46,6 +47,8 @@ interface StoredAbsence {
   block_body: string | null;
   outcome: string;
   collected_at: string;
+  origin_store: string | null;
+  origin_seq: number | null;
 }
 
 /** The table's columns, in order. */
@@ -60,6 +63,8 @@ const COLUMNS = [
   'block_body',
   'outcome',
   'collected_at',
+  'origin_store',
+  'origin_seq',
 ];
 
 /** A fence, kept out of the template literals. */
@@ -230,7 +235,7 @@ describe('the report absences migration', () => {
     expect(rawQuery<{ name: string }>(root, tables, 'table').map(({ name }) => name))
       .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });
 
   it('brings a version-3 store forward, keeping the rows it holds', () => {
@@ -249,7 +254,7 @@ describe('the report absences migration', () => {
 
     expect([result.appended, result.skipped]).toEqual([1, 0]);
     expect(rawQuery(root, 'PRAGMA user_version'))
-      .toEqual([{ user_version: SQLITE_SCHEMA_VERSION }]);
+      .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
     expect(rawQuery(root, 'SELECT id FROM blockers')).toEqual([{ id: 'b-1' }]);
     expect(rowsOf(root).map(({ id }) => id)).toEqual(['from-v3-1']);
   });
@@ -306,6 +311,8 @@ describe('writeReportAbsence rows', () => {
       block_body: write.absence.block?.body ?? null,
       outcome: 'done',
       collected_at: '2026-09-13T10:00:00.000Z',
+      origin_store: null,
+      origin_seq: null,
     }]);
   });
 
