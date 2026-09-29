@@ -5,9 +5,11 @@
  * ## Layout
  *
  * One file, `effort.sqlite`, in the directory the NDJSON backend's
- * files live in: `EFFORT_STORE_DIR`, `.rafa/effort/`, spelled once in
- * `effort/store.ts` and ignored by the project's `.gitignore` entry for
- * `.rafa/`. The two backends can therefore hold a store side by side, and
+ * files live in, which `effortStoreDir` (`location.ts`) spells once for
+ * both: `.rafa/effort/` (`EFFORT_STORE_DIR` in `effort/store.ts`),
+ * ignored by the project's `.gitignore` entry for `.rafa/`, or the
+ * directory `RAFA_EFFORT_DIR` names, which moves both backends together.
+ * The two backends can therefore hold a store side by side, and
  * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
@@ -37,33 +39,36 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds nine tables that are not kinds. Six are filled from
+ * The file holds eleven tables that are not kinds. Six are filled from
  * task reports: `findings`, `blockers`, `out_of_scope_bugs` and
  * `changes`, one per list a report carries, `report_absences`, one row
  * per task session whose output held no report to read, and
  * `task_reports`, one row per task session whose output carried one,
- * holding its status. The other three are filled from no report:
- * `preflight`, one row per item a run's preflight checked,
- * `dispatches`, one row per task session the loop spawned, and
- * `skill_invocations`, one row per skill a session invoked. The
- * port's row map names none of them, and nothing in this module reads or
- * writes them. `findings.ts` writes the first, `triage.ts` the next two,
- * `changes.ts` the fourth, `absences.ts` the fifth, `reports.ts` the
- * sixth, `preflight.ts` the seventh, `dispatches.ts` the eighth and
- * `skill-invocations.ts` the last. `tracker-refs.ts` writes the first as well, setting a filed
- * issue's reference on a row and inserting the row when there is none.
- * `findings.ts`, `triage.ts`, `changes.ts`, `preflight.ts` and
- * `skill-invocations.ts` write through {@link writeSqliteStore}, as an append does, so a write left
- * with nothing to insert still meets the schema check.
- * `absences.ts` always has its one row and opens {@link withSqliteStore}
- * directly, as `tracker-refs.ts` does with the one row it places.
- * `reports.ts` always has its one row too, and passes
- * {@link writeSqliteStore} a count of one, which opens the store as that
- * direct call does, and so does `dispatches.ts`. Each table is opened,
- * migrated and closed as every
- * kind's table is. Each writer
- * says why its tables have a column per field and their own
- * deduplication keys, where a kind has `row_json` and one key.
+ * holding its status. Four are filled from no report: `preflight`, one
+ * row per item a run's preflight checked, `dispatches`, one row per task
+ * session the loop spawned, `skill_invocations`, one row per skill a
+ * session invoked, and `plan_ci`, one row per reading of a plan's CI.
+ * The last is `schema_migrations`, the migration log, which only
+ * `bring-forward.ts` writes; the section on bringing a store forward
+ * says what it holds. The port's row map names none of them, and
+ * nothing in this module reads or writes them. `findings.ts` writes the
+ * first, `triage.ts` the next two, `changes.ts` the fourth,
+ * `absences.ts` the fifth, `reports.ts` the sixth, `preflight.ts` the
+ * seventh, `dispatches.ts` the eighth, `skill-invocations.ts` the ninth
+ * and `plan-ci.ts` the tenth. `tracker-refs.ts` writes the first as
+ * well, setting a filed issue's reference on a row and inserting the
+ * row when there is none. `findings.ts`, `triage.ts`, `changes.ts`,
+ * `preflight.ts` and `skill-invocations.ts` write through
+ * {@link writeSqliteStore}, as an append does, so a write left with
+ * nothing to insert still meets the schema check. `absences.ts` always
+ * has its one row and opens {@link withSqliteStore} directly, as
+ * `tracker-refs.ts` does with the one row it places. `reports.ts`
+ * always has its one row too, and passes {@link writeSqliteStore} a
+ * count of one, which opens the store as that direct call does, and so
+ * do `dispatches.ts` and `plan-ci.ts`. Each table is opened, brought
+ * forward and closed as every kind's table is. Each writer says why its
+ * tables have a column per field and their own deduplication keys,
+ * where a kind has `row_json` and one key.
  *
  * ## The port's rules, as they come out here
  *
@@ -91,11 +96,11 @@
  *   - Writing nothing writes NOTHING, and still checks the schema. An
  *     empty batch on a store that does not exist opens nothing. On a
  *     store that exists it opens the store, through
- *     {@link writeSqliteStore}, so an empty append is refused past this
- *     rafa's version and brought forward below it, as a batch with rows
- *     is, and inserts nothing. An empty append, or one whose every row
- *     is already held, leaves a current store's bytes identical,
- *     measured, where an append that adds a row changes them.
+ *     {@link writeSqliteStore}, so an empty append is brought forward,
+ *     or refused, as a batch with rows is, and inserts nothing. An
+ *     empty append, or one whose every row is already held, leaves a
+ *     current store's bytes identical, measured, where an append that
+ *     adds a row changes them.
  *   - Absence is the first-run case. `read`, `keys` and an empty append
  *     answer empty for a store with no file, without opening one, and
  *     only an append with a row to add opens the store with SQLite's
@@ -145,18 +150,58 @@
  * Every call opens the store, does its work and closes it before
  * returning, because the port has no `close`. Measured, thirty
  * open-append-close cycles left no descriptor on the file open, where
- * one open connection holds one. No busy timeout is set, so a call
- * that finds another process mid-write throws `SQLITE_BUSY` at once
- * (measured) rather than waiting its turn.
+ * one open connection holds one. Every open sets `PRAGMA busy_timeout`
+ * to `effort.busyTimeoutMs`, read off `activeStoreSettings`
+ * (`settings.ts`) at each open and five seconds by default, so a call
+ * that finds another process holding the write lock waits up to that
+ * long for its turn and throws `SQLITE_BUSY` past it. Measured without
+ * it, an open that found a migration pending while another process held
+ * the lock threw `SQLITE_BUSY` at once.
  *
- * ## Schema versioning
+ * ## Bringing a store forward
  *
- * The schema's history, `SQLITE_MIGRATIONS`, and its version,
- * `SQLITE_SCHEMA_VERSION`, live in `./migrations.ts`, whose module note
- * says how versions are counted and recorded. Both are re-exported
- * here. Every call brings an existing store forward before using it;
- * {@link migrateSchema} names the two stores it refuses instead.
+ * The schema's history, `SQLITE_MIGRATIONS`, lives in `./migrations.ts`,
+ * whose module note says what each named entry declares. It and its
+ * length, `SQLITE_SCHEMA_VERSION`, are re-exported here. Every call
+ * opens the store through {@link withSqliteStore}, which hands it to
+ * `bringForward` (`bring-forward.ts`) before any read or write. Each
+ * caller states its access: `keys`, `read` and every reader outside the
+ * port open for a `read`, and every writer, an empty write included,
+ * for a `write`. `planSchema` (`schema-plan.ts`) decides from the
+ * store's migration log, and `bringForward`'s module note says what is
+ * written and when. As it comes out here:
+ *
+ *   - A store with nothing to adopt or apply is used as it is. A read
+ *     of one writes nothing and takes no lock, so a read-only call
+ *     leaves a current store's bytes identical.
+ *   - A store a release before the log wrote, at a `user_version` from
+ *     1 to 13 with no `schema_migrations`, is adopted on its first open,
+ *     a read included, since adoption counts as a write. A fresh or
+ *     zero-byte file is given every migration.
+ *   - A development build (`bun src/rafa.ts`, a checkout's
+ *     `dist/cli.js`, `bun test`) adopts or applies only over a store
+ *     under the temporary directory or `RAFA_EFFORT_DIR`. Over any
+ *     other it throws `DevelopmentBuildRefusedError`
+ *     (`development-build.ts`) before any write, naming a live loop
+ *     recorded on the store, while a store with nothing pending is used
+ *     as it is.
+ *   - Whatever is pending is applied under `BEGIN IMMEDIATE`, after a
+ *     second plan under that lock. Measured in `sqlite.test.ts`: two
+ *     processes that open one fresh store at once both wait for the
+ *     lock, one applies every migration and the other finds nothing
+ *     pending and writes no row.
+ *   - A store `planSchema` refuses throws `SchemaRefusedError`, whose
+ *     message ends with the one command to run next, and no byte is
+ *     written. A store logging a migration this rafa does not know,
+ *     which breaks only older writers, is read and refused a write.
+ *
+ * {@link migrateSchema} counts the history by position and keeps no
+ * log. No open and no command goes through it; `fix-schema.ts` builds
+ * its rebuild through `bringForward`, and tests plant pre-log stores
+ * with it.
  */
+import type { SqliteMigration } from './migrations.js';
+import type { StoreAccess } from './schema-plan.js';
 import type {
   AppendResult,
   EffortRow,
@@ -169,23 +214,25 @@ import { dirname, join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
-import { EFFORT_STORE_DIR } from '../store.js';
-
+import { bringForward } from './bring-forward.js';
+import { effortStoreDir, guardTestProcess } from './location.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import { activeStoreSettings } from './settings.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
 export { SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './migrations.js';
 
-/** The store's file, inside `EFFORT_STORE_DIR`. */
-const STORE_FILE_NAME = 'effort.sqlite';
+/** The store's file name, inside the directory `effortStoreDir` answers. */
+export const SQLITE_STORE_FILE_NAME = 'effort.sqlite';
 
 /**
  * The file the SQLite store lives in under one repo root, whether or
- * not it exists yet. Every kind's table, and every table the report
- * writers fill, sit in it.
+ * not it exists yet: in `RAFA_EFFORT_DIR` when it is set, and under
+ * `<root>/.rafa/effort` otherwise (`location.ts`). Every kind's table,
+ * and every table the report writers fill, sit in it.
  */
 export function sqliteStorePath(repoRoot: string): string {
-  return join(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAME);
+  return join(effortStoreDir(repoRoot), SQLITE_STORE_FILE_NAME);
 }
 
 /** Where one kind's rows live in the schema. */
@@ -303,6 +350,10 @@ function checkedVersion(db: Database, path: string, latest: number): number {
 }
 
 /**
+ * The pre-log way of bringing a database forward, which no open and no
+ * command takes: it writes no migration log, which is what lets a test
+ * plant a store as a release before the log left it.
+ *
  * Brings a database's schema up to the last version a migrations array
  * holds: the store's own history unless another is passed, which is
  * what lets the version arithmetic be driven with a history of any
@@ -330,38 +381,51 @@ function checkedVersion(db: Database, path: string, latest: number): number {
 export function migrateSchema(
   db: Database,
   path: string,
-  migrations: readonly string[] = SQLITE_MIGRATIONS,
+  migrations: readonly SqliteMigration[] = SQLITE_MIGRATIONS,
 ): void {
   const latest = migrations.length;
   if (checkedVersion(db, path, latest) === latest) return;
 
   const applyPending = db.transaction(() => {
     const from = checkedVersion(db, path, latest);
-    for (const sql of migrations.slice(from)) db.run(sql);
+    for (const { sql } of migrations.slice(from)) db.run(sql);
     db.run(`PRAGMA user_version = ${latest}`);
   });
   applyPending.immediate();
 }
 
 /**
- * Opens the store at `path`, brings its schema forward, hands it to
- * `use`, and closes it whatever `use` did. Only a caller with a row to
+ * Refuses a test process opening a store outside the temporary
+ * directory before anything is made (`guardTestProcess`, `location.ts`),
+ * then opens the store at `path`, sets its busy timeout to the active
+ * `effort.busyTimeoutMs` (`settings.ts`), brings its schema
+ * forward through `bringForward` for an open with `access`, hands it to
+ * `use`, and closes it whatever `use` did. A refused store throws
+ * `SchemaRefusedError` before `use` runs. Only a caller with a row to
  * add passes `create`, and only then is the directory made.
  *
- * Exported so the tables outside the port are opened, migrated and
- * closed exactly as every kind's is. A write that can be left with
+ * `access` is `write` for every caller that may write, whether or not
+ * it ends up writing, and `read` for one that only reads. A read can
+ * still write the store, when it adopts one or applies what is pending;
+ * the module note says when.
+ *
+ * Exported so the tables outside the port are opened, brought forward
+ * and closed exactly as every kind's is. A write that can be left with
  * nothing to insert goes through {@link writeSqliteStore} instead.
  */
 export function withSqliteStore<T>(
   path: string,
+  access: StoreAccess,
   create: boolean,
   use: (db: Database) => T,
 ): T {
+  guardTestProcess(path);
   if (create) mkdirSync(dirname(path), { recursive: true });
 
   const db = new Database(path, { readwrite: true, create });
   try {
-    migrateSchema(db, path);
+    db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
+    bringForward(db, path, access, 'open');
     return use(db);
   } finally {
     db.close();
@@ -397,9 +461,9 @@ function insertBatch(
  *
  * With rows to insert, it opens the store, creating the file and its
  * directory when absent, and answers what `insert` answers. With none,
- * it still opens a store that exists, so {@link migrateSchema} brings
- * it forward or refuses it as it would for a write with rows, and it
- * answers `empty` without calling `insert`. Only an empty write on a
+ * it still opens a store that exists for a write, so `bringForward`
+ * brings it forward or refuses it as it would for a write with rows,
+ * and it answers `empty` without calling `insert`. Only an empty write on a
  * store that does not exist opens nothing, creating no file and no
  * directory: the branch `read` and `keys` take on an absent store.
  *
@@ -414,9 +478,9 @@ export function writeSqliteStore<T>(
   insert: (db: Database) => T,
 ): T {
   const exists = existsSync(path);
-  if (rowCount > 0) return withSqliteStore(path, !exists, insert);
+  if (rowCount > 0) return withSqliteStore(path, 'write', !exists, insert);
 
-  if (exists) withSqliteStore(path, false, () => undefined);
+  if (exists) withSqliteStore(path, 'write', false, () => undefined);
   return empty;
 }
 
@@ -442,7 +506,7 @@ function keysOfKind(path: string, kind: EffortRowKind): Set<string> {
   if (!existsSync(path)) return new Set();
 
   const { name, keyColumn } = KIND_TABLES[kind];
-  const keys = withSqliteStore(path, false, (db) => db
+  const keys = withSqliteStore(path, 'read', false, (db) => db
     .query<{ key: string }, []>(
       `SELECT ${keyColumn} AS key FROM ${name} ORDER BY seq`,
     )
@@ -489,7 +553,7 @@ function readKind<K extends EffortRowKind>(
   if (!existsSync(path)) return [];
 
   const { name } = KIND_TABLES[kind];
-  const stored = withSqliteStore(path, false, (db) => db
+  const stored = withSqliteStore(path, 'read', false, (db) => db
     .query<{ seq: number; body: string }, []>(
       `SELECT seq, row_json AS body FROM ${name} ORDER BY seq`,
     )

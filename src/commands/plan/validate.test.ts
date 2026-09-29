@@ -254,6 +254,7 @@ describe('rafa plan validate, dispatched', () => {
         stages: 1,
         tasks: { total: 3, done: 1, blocked: 1, open: 1 },
         issues: [],
+        storeProblems: [],
       },
     });
   });
@@ -516,6 +517,82 @@ describe('the agents rafa plan validate checks', () => {
       '✅ plan.md: no issues; 0 stages, tasks 0/1 done, 0 blocked, 1 open',
     ]);
     expect([inProject.exitCode, inProject.stdout.includes('"tdd-guide"')]).toEqual([1, true]);
+  });
+});
+
+/** A plan carrying migration `plan-ci`, with the collect command its second task spells. */
+function storePlan(collect: string): string {
+  return [
+    '# Stage: one',
+    '',
+    '- [ ] Add migration `plan-ci`, additive: a new `plan_ci` table',
+    `- [ ] Collect over a copy: \`${collect}\``,
+    '',
+  ].join('\n');
+}
+
+/** A PREREQUISITES file holding the schema probe under `[auto]`. */
+const PROBED_PREREQUISITES = '## Store [auto]\n'
+  + '- [ ] The installed rafa can read and write the live store: `rafa effort schema --check`\n';
+
+/** A fresh root holding `plans/PLAN-demo.md`, and `plans/PREREQUISITES-demo.md` when one is given. */
+function plantStorePlan(plan: string, prerequisites: string | null): string {
+  const root = mkdtempSync(join(tempBase, 'store-'));
+  mkdirSync(join(root, 'plans'));
+  writeFileSync(join(root, 'plans', 'PLAN-demo.md'), plan, 'utf8');
+  if (prerequisites !== null) writeFileSync(join(root, 'plans', 'PREREQUISITES-demo.md'), prerequisites, 'utf8');
+  return root;
+}
+
+/** Dispatches `plan validate plans/PLAN-demo.md` in `root`, with `words` added to the line. */
+async function validateStorePlan(root: string, words: readonly string[] = []): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  return dispatchCaptured(['plan', 'validate', 'plans/PLAN-demo.md', ...words], SUBJECTS, [createPlanValidateCommand(() => root)]);
+}
+
+describe('the effort-store rules rafa plan validate checks', () => {
+  it('refuses a migration plan with an unprefixed bun src/rafa.ts effort collect, where the prefixed one passes', async () => {
+    const bare = plantStorePlan(storePlan('bun src/rafa.ts effort collect'), PROBED_PREREQUISITES);
+    const prefixed = plantStorePlan(storePlan('RAFA_EFFORT_DIR=/tmp/copy bun src/rafa.ts effort collect'), PROBED_PREREQUISITES);
+
+    const refused = await validateStorePlan(bare);
+    const passed = await validateStorePlan(prefixed, ['--output=json']);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toBe('error: plans/PLAN-demo.md:4: unprefixed-command: runs `bun src/rafa.ts effort collect`'
+      + ' without a leading RAFA_EFFORT_DIR=, in a plan that carries a migration; copy the store first with'
+      + ' `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort` and write the command as'
+      + ' RAFA_EFFORT_DIR=<absolute path of that dir> bun src/rafa.ts effort collect\n');
+    expect(refused.stderr).toBe('❌ plans/PLAN-demo.md: 1 broken effort-store rule; no session would be dispatched\n');
+    // The control differs in the prefix alone.
+    expect(passed.exitCode).toBe(0);
+    expect(eventsOf(passed.stdout).at(-1)).toMatchObject({ type: 'result', ok: true, data: { storeProblems: [] } });
+  });
+
+  it('refuses a migration plan whose PREREQUISITES carries no schema probe, naming the file beside the plan', async () => {
+    const unprobed = plantStorePlan(storePlan('RAFA_EFFORT_DIR=/tmp/copy bun src/rafa.ts effort collect'), '## Tools [auto]\n');
+
+    const refused = await validateStorePlan(unprobed);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toBe('error: plans/PLAN-demo.md:3: missing-probe: carries a migration, and PREREQUISITES-demo.md'
+      + ' holds no [auto] item probing `rafa effort schema --check`; add - [ ] The installed rafa can read and write the'
+      + ' live store: `rafa effort schema --check` under an [auto] heading\n');
+  });
+
+  it('refuses a plan pinning a store change by number, where one quoting it in a code span passes', async () => {
+    const pinned = plantStorePlan('# Stage: one\n\n- [ ] Ship the column as migration 14\n', null);
+    const quoted = plantStorePlan('# Stage: one\n\n- [ ] Refuse a spec saying `migration 14`\n', null);
+
+    const refused = await validateStorePlan(pinned, ['--output=json']);
+    const passed = await validateStorePlan(quoted);
+
+    expect(refused.exitCode).toBe(1);
+    expect(eventsOf(refused.stdout).map(labelOf)).toEqual([
+      'start',
+      expect.stringContaining('error:plans/PLAN-demo.md:3: pinned-migration: pins a store change by number ("migration 14");'),
+      'result',
+    ]);
+    expect([passed.exitCode, passed.stderr]).toEqual([0, '']);
   });
 });
 

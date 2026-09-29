@@ -345,7 +345,7 @@ export function writeTrackerRef(
     write.outcome, wanted.json, collectedAt,
   ];
 
-  const [action, stored] = withSqliteStore(path, !existsSync(path), (db) => {
+  const [action, stored] = withSqliteStore(path, 'write', !existsSync(path), (db) => {
     const place = db.transaction(() => placeRef(db, path, write, wanted, insertValues));
     return place.immediate();
   });
@@ -366,7 +366,7 @@ export function readTrackerRef(repoRoot: string, artifact: string): IssueRef | n
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return null;
 
-  const oldest = withSqliteStore(path, false, (db) => db
+  const oldest = withSqliteStore(path, 'read', false, (db) => db
     .query<{ seq: number; tracker_ref: string }, [string]>(SELECT_OLDEST)
     .get(artifact));
   return oldest === null

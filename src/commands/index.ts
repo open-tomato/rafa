@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the sixty-seven registered so far wrap a
+ * of each is its command. Five of the seventy registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -120,8 +120,16 @@
  *     prompt, the reading left as one comment per pull request. Each
  *     refuses with exit code 2 where `pr.provider` is not `gh`.
  *   - `effort collect` and `effort report`, whose spelling is phase 0's,
- *     and `effort fix-schema [--dry-run]`, a store a newer rafa migrated
- *     rebuilt at the version this one knows, the original kept whole.
+ *     and `effort fix-schema [--dry-run]`, a store this rafa refuses for
+ *     a reason a rebuild repairs rebuilt at the migrations this one
+ *     knows, with a migration log, the original kept whole, and
+ *     `effort copy [--to=<dir>]`, the store copied into a scratch
+ *     directory for `RAFA_EFFORT_DIR` to point a command at, and
+ *     `effort schema [--check]`, whether this rafa can use the store,
+ *     read-only, ending with the next safe step, and `effort migrate
+ *     [--dry-run]`, the store's pending migrations, a breaking one
+ *     included, applied to a copy beside it and swapped in behind a
+ *     whole-file backup.
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
@@ -281,8 +289,11 @@ import cleanup from './cleanup.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
+import effortCopy from './effort/copy.js';
 import effortFixSchema from './effort/fix-schema.js';
+import effortMigrate from './effort/migrate.js';
 import effortReport from './effort/report.js';
+import effortSchema from './effort/schema.js';
 import epicCancel from './epic/cancel.js';
 import epicClose from './epic/close.js';
 import epicDefer from './epic/defer.js';
@@ -346,7 +357,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
-  { name: 'effort', summary: 'collect session and commit rows; report per plan; repair a store a newer rafa migrated' },
+  { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
@@ -388,6 +399,9 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortCollect,
   effortReport,
   effortFixSchema,
+  effortCopy,
+  effortSchema,
+  effortMigrate,
   moduleList,
   moduleExec,
   agentVendor,

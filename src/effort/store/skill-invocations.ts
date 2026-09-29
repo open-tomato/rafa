@@ -57,8 +57,9 @@
  *
  * {@link readSkillInvocations} answers every row in append order. It
  * opens and creates nothing when the store file does not exist, and
- * answers none. A store that exists is opened through `withSqliteStore`,
- * so its schema is brought forward, or refused, as it is for a write.
+ * answers none. A store that exists is opened through `withSqliteStore`
+ * for a read, so its schema is brought forward, or refused, as
+ * `sqlite.ts` says a read's is.
  *
  * ## What is refused
  *
@@ -253,6 +254,6 @@ export function readSkillInvocations(repoRoot: string): SkillInvocation[] {
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return [];
 
-  const rows = withSqliteStore(path, false, (db) => db.query<StoredInvocation, []>(SELECT_ALL).all());
+  const rows = withSqliteStore(path, 'read', false, (db) => db.query<StoredInvocation, []>(SELECT_ALL).all());
   return rows.map(invocationOf);
 }

@@ -668,7 +668,7 @@ describe('whole-write refusals', () => {
     const before = readRaw(root);
 
     expect(() => writeFindings(root, writeOf([finding({ artifact: 'new' })]), seams('newer-2')))
-      .toThrow(`past the ${SQLITE_SCHEMA_VERSION} this rafa knows`);
+      .toThrow(`has a migration log and schema version ${SQLITE_SCHEMA_VERSION + 1};`);
     expect(readRaw(root)).toEqual(before);
   });
 
@@ -686,8 +686,7 @@ describe('whole-write refusals', () => {
     db.run(`PRAGMA user_version = ${newer}`);
     db.close();
     const before = readRaw(root);
-    const refusal = `is at schema version ${newer}, past the`
-      + ` ${SQLITE_SCHEMA_VERSION} this rafa knows`;
+    const refusal = `has a migration log and schema version ${newer};`;
     const allRefused = [finding({ artifact: null, trigger: null })];
 
     expect(() => writeFindings(root, writeOf([]))).toThrow(refusal);

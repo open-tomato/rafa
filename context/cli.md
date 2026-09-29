@@ -61,7 +61,7 @@ module's note is the long form.
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`; then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts` |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
-| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
+| `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -86,6 +86,7 @@ module's note is the long form.
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the suspect, dangling and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified and stamped through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a suspect or dangling reference naming `rafa issue check <n>` |
+| `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues, the epic labels and the boards read over it in that order (`readDoctorBoard`, all four null with no runner), the board listing made once and handed to both the epic labels and the boards, and their lines joined in that order (`renderDoctorBoard`) |
 | `src/commands/doctor-epics.ts` | the epic labels row of `rafa doctor`: one board listing over `src/board/roadmap-board.ts`, the `several-epic-labels` and `orphan-label` problems of `readEpicProblems` (`src/board/epic-problems.ts`) kept and worded by `epicProblemMessage`, no orphan reported when the listing came back full, and the `Epic labels:` lines, none for a board carrying no `epic:` label |
@@ -205,7 +206,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue ready`, `issue unblock` and `issue check`;
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
-  `effort collect`, `effort report`, `module list`, `module exec`,
+  `effort collect`, `effort report`, `effort copy`, `effort schema`, `effort migrate`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
@@ -344,17 +345,25 @@ New; it replaces no earlier text. What a row or an action added to
   pin line. Then each other `skills=` name the resolution resolves to no
   winner, as `<file>: <the line `unresolvedSkillLine` words>`: held by no
   tier, switched off, or held only by a tier the session does not load,
-  each with what settles it. It throws exit code 1 when there is any of
-  the four, with a message counting each. That is the check `loop start`'s
-  preflight halts on, so a plan the loop would refuse is refused here
-  too. The roster is the project the dispatcher found and the config that
+  each with what settles it. Then each effort-store rule the plan breaks
+  (`src/plan/store-rules.ts`), as `<file>:<line>: <rule>: <text>`: a
+  store change pinned by number anywhere in the plan, and, in a plan one
+  of whose task lines names ``migration `<id>` ``, a still-to-run code
+  span running `src/rafa.ts`, `dist/cli.js` or `bun run rafa` without a
+  leading `RAFA_EFFORT_DIR=` (`effort copy` excepted), and a
+  `PREREQUISITES-<stub>.md` with no `[auto]` probe of
+  `rafa effort schema --check`. It throws exit code 1 when there is any
+  of the five, with a message counting each. That is the check `loop
+  start`'s preflight halts on, so a plan the loop would refuse is
+  refused here too. The roster is the project the dispatcher found and the config that
   resolves there, which is the only thing this command reads beyond the
   file; handed no project it says so and checks no agent and no skill.
   In json mode a list, a plan and a clean validation are the terminal
   result's `data`, the validation carrying an empty `issues`, an empty
-  `missingAgents`, an empty `skillCollisions` and an empty
-  `unresolvedSkills`, and each issue, missing agent, skill collision and
-  unresolved skill is an `error` `log` event; text
+  `missingAgents`, an empty `skillCollisions`, an empty
+  `unresolvedSkills` and an empty `storeProblems`, and each issue,
+  missing agent, skill collision, unresolved skill and broken store rule
+  is an `error` `log` event; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where
@@ -479,8 +488,9 @@ New; it replaces no earlier text. What a row or an action added to
   `--next` STOPS at a line that is not ready rather than skipping it.
   The completeness refusal names every template heading that is missing
   or empty, either of "Tasks the plan must carry" and "Definition of
-  done" holding no list item, and every placeholder left in the text,
-  in one sentence. It costs an issue
+  done" holding no list item, every placeholder left in the text, and
+  every effort-store change pinned by number (`migration 12`, `schema
+  version 9`, outside fences and code spans), in one sentence. It costs an issue
   opened before `src/board/templates/spec.md` a hand edit, since such a
   body carries none of the six headings and is refused whole; the module
   note in `src/board/plan-spec.ts` holds that trade. The WARNING that
@@ -641,7 +651,8 @@ New; it replaces no earlier text. What a row or an action added to
   it. It generates no run id and writes no
   `preflight` row, so `rafa effort report` lists the halts of `loop start`
   runs alone. It exits 1 when a required item fails, the halt being the
-  refusal, and 0 otherwise. For a plan `--plan` names, halt or not, it
+  refusal, and when its `effort store schema` row fails (below), and 0
+  otherwise. For a plan `--plan` names, halt or not, it
   then prints the one risk-total line `loop start` prints before its
   notices (`src/start/risk-total.ts`), at `info`, a `log` event in json
   mode, or a warning when the reading throws; the default plan gets
@@ -721,7 +732,19 @@ New; it replaces no earlier text. What a row or an action added to
   once per run, reads an issue the board cannot answer as `unknown`,
   and never changes the exit code. Every run then prints the
   `Skill tiers` rows (`src/commands/doctor-tiers.ts`), when there is
-  any, as json's `tiers`; they never change the exit code. Under the boolean
+  any, as json's `tiers`; they never change the exit code. Every run then
+  prints the `effort store schema` row (`src/commands/doctor-effort-schema.ts`),
+  `Effort store schema: <ok|warn|fail>, <status> (<path>)`, read
+  read-only as `rafa effort schema --check` reads the store, under
+  `RAFA_EFFORT_DIR` when it is set: it fails where that check fails,
+  and `doctor` then exits 1 with `rafa doctor: effort store schema:
+  this rafa refuses <path> (<status>): <why> Next safe step: <command>`,
+  after a halt's text when both happen, and json mode gives no `data`;
+  it warns, never changing the exit code, on each unknown additive
+  migration in the preflight's words and, for the project's own store
+  alone, on each migration whose `applied_by` names a development
+  build. A project with no store yet prints no line. json mode gives
+  the row as `effortSchema`. Under the boolean
   `--deep` it then reads and prints the Environment, Settings,
   Providers and Stack tools sections, and Plan needs for a plan
   `--plan` names (`src/commands/doctor-deep.ts`), a halt's included,
@@ -1680,6 +1703,10 @@ New; it replaces no earlier text. What a row or an action added to
   phase 0 command printed it and json mode carries it in the terminal
   result. `loop start` throws exit code 1 for a line asking for
   `-d|--detached`, before anything else is read (`start/run-config.ts`);
+  then, in the same module, while `RAFA_EFFORT_DIR` is set to anything but
+  the empty string: `❌ RAFA_EFFORT_DIR is set (<dir>); a loop records to
+  the project's own store. Unset it and run again.`, ahead of `--runtime`
+  so no runtime is handed a run bound for a copy;
   then, before anything else is read, for a `--runtime` with no value, a
   version with no `cli.js` under `~/.rafa/runtime/`, a path that is neither
   a file nor a directory holding `cli.js`, a runtime inside the `src/` of

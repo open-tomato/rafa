@@ -60,12 +60,27 @@
  * command's and not `validatePlan`'s, which reads one file and nothing
  * else.
  *
+ * ## The effort-store rules
+ *
+ * Beside both, the command checks the plan against the three rules of
+ * `src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
+ * store change pinned by number, anywhere in the plan; and, in a plan
+ * one of whose task lines names ``migration `<id>` ``, no still-to-run
+ * task spelling a code span that runs `src/rafa.ts`, `dist/cli.js` or
+ * `bun run rafa` without a leading `RAFA_EFFORT_DIR=`, and an `[auto]`
+ * item probing `rafa effort schema --check` in the plan's
+ * `PREREQUISITES-<stub>.md` beside it. They need no project, so they
+ * run whether or not one was found; like the roster, they are the
+ * command's and not `validatePlan`'s, which `src/board/gate.ts` weighs a
+ * planner's plan with and which reads one file only.
+ *
  * ## What it writes
  *
  * With nothing to report, json mode gives the terminal result `data`:
  * `file` (absolute), the number of `stages`, the task counts under
  * `tasks`, an empty `issues`, an empty `missingAgents`, an empty
- * `skillCollisions` and an empty `unresolvedSkills`. Text mode
+ * `skillCollisions`, an empty `unresolvedSkills` and an empty
+ * `storeProblems`. Text mode
  * writes one line naming the file as typed, its stages and its counts.
  *
  * With issues, each is written at `error`, in line order, as
@@ -78,8 +93,10 @@
  * follows those, at `error`, as `<file>: <the line `skillCollisionLine`
  * words>`, and each unresolved skill follows those, at `error`, as
  * `<file>: <the line `unresolvedSkillLine` words>`, which names the
- * skill, the task lines that asked for it, why and what settles it. The
- * command then
+ * skill, the task lines that asked for it, why and what settles it.
+ * Each broken store rule follows those, at `error`, as
+ * `<file>:<line>: <rule>: <text>` (`storeRuleLine`), the text ending
+ * with what to write instead. The command then
  * throws `CommandExit` with exit code 1 and a message counting what it
  * found, which text mode writes to stderr and json mode carries in the
  * terminal result.
@@ -92,10 +109,11 @@ import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { PlanIssue } from '../../plan/index.js';
+import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import {
   collidingPlanSkills,
@@ -110,6 +128,8 @@ import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { parsePlan } from '../../plan/index.js';
+import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
+import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 
 import { countTasks, expectOneArgument, formatCounts, isFile, issueLine, plural } from './plan-files.js';
 
@@ -142,7 +162,27 @@ export interface RosterFindings {
 }
 
 /** A plan file read, with the agents and skills of its still-to-run tasks checked. */
-export interface PlanValidationResult extends PlanValidation, RosterFindings {}
+export interface PlanValidationResult extends PlanValidation, RosterFindings {
+  /** Every effort-store rule the plan breaks, in line order; see the module note. */
+  readonly storeProblems: readonly StoreRuleProblem[];
+}
+
+/** The text at `path`, or null when no file sits there. */
+function readFileOrNull(path: string | null): string | null {
+  return path !== null && isFile(path)
+    ? readFileSync(path, 'utf8')
+    : null;
+}
+
+/** The effort-store rules the plan at `file`, whose text is `markdown`, breaks; see the module note. */
+function checkStoreRules(file: string, markdown: string): readonly StoreRuleProblem[] {
+  const prerequisitesPath = prerequisitesPathForPlan(file);
+  return findStoreRuleProblems({
+    plan: markdown,
+    prerequisites: readFileOrNull(prerequisitesPath),
+    prerequisitesName: basename(prerequisitesPath ?? 'PREREQUISITES-<stub>.md'),
+  });
+}
 
 /** The plan at the absolute path `file`, read, or a refusal with exit code 1 when it is no file. */
 export function validatePlan(file: string): PlanValidation {
@@ -196,10 +236,11 @@ interface RefusalCounts {
   readonly agents: number;
   readonly collisions: number;
   readonly unresolved: number;
+  readonly store: number;
 }
 
 /** The refusal a plan with issues, missing agents, colliding or unresolved skills, or any mix ends with. */
-function refusalFor(typed: string, { issues, agents, collisions, unresolved }: RefusalCounts): string {
+function refusalFor(typed: string, { issues, agents, collisions, unresolved, store }: RefusalCounts): string {
   const counts = [
     issues > 0
       ? plural(issues, 'issue')
@@ -212,6 +253,9 @@ function refusalFor(typed: string, { issues, agents, collisions, unresolved }: R
       : null,
     unresolved > 0
       ? plural(unresolved, 'unresolvable skill')
+      : null,
+    store > 0
+      ? plural(store, 'broken effort-store rule')
       : null,
   ].filter((count): count is string => count !== null);
   const tail = issues > 0
@@ -237,7 +281,10 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       + ' paths and the pin line or setting that settles it, then one line per `skills=` name two loaded'
       + ' tiers hold with different contents, naming both paths and the `tiers.skills` pin line that'
       + ' settles it, then one line per `skills=` name no loaded tier resolves (held by no tier, switched'
-      + ' off, or held only by a tier the session does not load), naming what settles it, then exits 1'
+      + ' off, or held only by a tier the session does not load), naming what settles it, then one line'
+      + ' per effort-store rule the plan breaks (a store change pinned by number; and, in a plan whose task'
+      + ' names migration `<id>`, a command running src/rafa.ts, dist/cli.js or bun run rafa without a leading'
+      + ' RAFA_EFFORT_DIR=, or no [auto] `rafa effort schema --check` probe in its PREREQUISITES), then exits 1'
       + ' — the same check'
       + ' `rafa loop start` halts on before it dispatches anything. The path is read relative to the'
       + ' working directory; the agents are read from the project found from it and the config that'
@@ -269,20 +316,24 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       const file = resolve(workingDirectory(), typed);
       const validation = validatePlan(file);
       const { issues, stages, tasks } = validation;
-      const findings = checkRoster(context, readFileSync(file, 'utf8'));
+      const markdown = readFileSync(file, 'utf8');
+      const findings = checkRoster(context, markdown);
       const { missingAgents, skillCollisions, unresolvedSkills } = findings;
-      const result: PlanValidationResult = { ...validation, ...findings };
+      const storeProblems = checkStoreRules(file, markdown);
+      const result: PlanValidationResult = { ...validation, ...findings, storeProblems };
       const counts = {
         issues: issues.length,
         agents: missingAgents.length,
         collisions: skillCollisions.length,
         unresolved: unresolvedSkills.length,
+        store: storeProblems.length,
       };
       if (Object.values(counts).some((count) => count > 0)) {
         for (const issue of issues) context.output.error(issueLine(typed, issue));
         for (const agent of missingAgents) context.output.error(`${typed}: ${missingAgentLine(agent)}`);
         for (const skill of skillCollisions) context.output.error(`${typed}: ${skillCollisionLine(skill)}`);
         for (const skill of unresolvedSkills) context.output.error(`${typed}: ${unresolvedSkillLine(skill)}`);
+        for (const problem of storeProblems) context.output.error(storeRuleLine(typed, problem));
         throw new CommandExit(1, refusalFor(typed, counts));
       }
       if (context.outputMode === 'json') {

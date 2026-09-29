@@ -47,8 +47,9 @@
  * required check that did not pass, in the order it was checked. Runs
  * come in the order they were written. It opens and creates nothing when
  * the store file does not exist, and answers none. A store that exists
- * is opened through `withSqliteStore`, as `readTaskReportTallies` opens
- * it, so its schema is brought forward, or refused, as it is for a write.
+ * is opened through `withSqliteStore` for a read, as
+ * `readTaskReportTallies` opens it, so its schema is brought forward, or
+ * refused, as `sqlite.ts` says a read's is.
  *
  * ## One write per run
  *
@@ -360,7 +361,7 @@ export function readPreflightHalts(repoRoot: string): PreflightHalt[] {
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return [];
 
-  const rows = withSqliteStore(path, false, (db) => db.query<HaltedRow, []>(SELECT_HALTED).all());
+  const rows = withSqliteStore(path, 'read', false, (db) => db.query<HaltedRow, []>(SELECT_HALTED).all());
   const halts = new Map<string, PreflightHalt & { failed: HaltedCheck[] }>();
   for (const row of rows) {
     const held = halts.get(row.run_id);

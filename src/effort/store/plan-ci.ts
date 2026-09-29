@@ -57,8 +57,9 @@
  *
  * {@link readPlanCi} answers every row, or one plan's, in append order.
  * It opens and creates nothing when the store file does not exist. A
- * store that exists is opened through `withSqliteStore`, so its schema is
- * brought forward, or refused, as it is for a write.
+ * store that exists is opened through `withSqliteStore` for a read, so
+ * its schema is brought forward, or refused, as `sqlite.ts` says a
+ * read's is.
  *
  * ## What is refused, and what is only warned about
  *
@@ -286,7 +287,7 @@ export function readPlanCi(repoRoot: string, planStub?: string): PlanCiRow[] {
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return [];
 
-  const rows = withSqliteStore(path, false, (db) => (planStub === undefined
+  const rows = withSqliteStore(path, 'read', false, (db) => (planStub === undefined
     ? db.query<StoredPlanCi, []>(`${SELECT_COLUMNS} ORDER BY seq`).all()
     : db.query<StoredPlanCi, [string]>(`${SELECT_COLUMNS} WHERE plan_stub = ? ORDER BY seq`).all(planStub)));
   return rows.map(rowOf);

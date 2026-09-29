@@ -130,6 +130,21 @@
  * the marker shape rafa writes itself, so a body carrying a
  * machine-written marker is not refused for it.
  *
+ * ## A store change pinned by number
+ *
+ * A spec that names an effort-store change by a version number —
+ * "migration 12", "schema version 9" — plans against an array position
+ * that another branch can take first, so the gap {@link PINNED_MIGRATION}
+ * finds is a template gap like a placeholder, named `pinned-migration`.
+ * The pattern is `.rafa/specs/rafa-234-effort-store-migrations-older.md`'s
+ * own, case-insensitive, and it is read under the same two exemptions:
+ * a fence and a code span quote the words rather than pin anything, so a
+ * spec ABOUT the rule can still say `migration 12` in backticks. A
+ * release number such as `rafa 0.18.0` is not a store change and does
+ * not match. {@link findPinnedMigrations} answers the same reading for a
+ * whole document, which is how `src/plan/store-rules.ts` refuses a plan
+ * that pins one.
+ *
  * A section already reported EMPTY does not also report the placeholders
  * inside it. A section holding nothing but the template's comment is one
  * fault, and naming it twice sends the author looking for a second one.
@@ -182,6 +197,7 @@ export type ReadinessGapKind =
   | 'empty-heading'
   | 'missing-heading'
   | 'no-list-item'
+  | 'pinned-migration'
   | 'placeholder';
 
 /** One thing keeping a spec from being planned from. */
@@ -237,6 +253,20 @@ const PLACEHOLDER_SHAPES: readonly PlaceholderShape[] = [
   { token: 'TODO', pattern: /\bTODO\b/u },
   { token: '???', pattern: /\?{3,}/u },
 ];
+
+/**
+ * A store change named by a version number rather than by what it adds;
+ * the spec's own pattern, read over prose with its code spans removed.
+ */
+export const PINNED_MIGRATION = /\b(?:migration|schema version)s?\s+#?\d+\b/iu;
+
+/** One store change pinned by number, where it sits and how it reads. */
+export interface PinnedMigration {
+  /** The 1-based line it sits on. */
+  readonly line: number;
+  /** The words {@link PINNED_MIGRATION} matched, as written. */
+  readonly text: string;
+}
 
 /** What the author must do about a refused spec. */
 const REMEDY = 'fill each gap in the spec and rerun';
@@ -471,9 +501,44 @@ function placeholdersInLine(heading: string, line: BodyLine): readonly Readiness
   return found;
 }
 
-/** Every placeholder under `heading`, in line order. */
+/** The store change `line` pins by number, or null; fenced lines and code spans pin nothing. */
+function pinnedInLine(line: BodyLine): PinnedMigration | null {
+  if (line.fenced) return null;
+  const match = PINNED_MIGRATION.exec(line.visible.replace(CODE_SPAN, ' '));
+  return match === null
+    ? null
+    : { line: line.number, text: match[0] };
+}
+
+/** The gap a store change pinned by number is, named under `heading`. */
+function pinnedGap(heading: string, pinned: PinnedMigration): ReadinessGap {
+  const what = `pins a store change by number ("${pinned.text}") on line ${String(pinned.line)}`;
+  return gapAt('pinned-migration', heading, what, pinned.line);
+}
+
+/** Every placeholder and pinned store change under `heading`, in line order. */
 function placeholderGaps(heading: string, lines: readonly BodyLine[]): readonly ReadinessGap[] {
-  return lines.flatMap((line) => placeholdersInLine(heading, line));
+  return lines.flatMap((line) => {
+    const pinned = pinnedInLine(line);
+    const pinnedGaps = pinned === null
+      ? []
+      : [pinnedGap(heading, pinned)];
+    return [...placeholdersInLine(heading, line), ...pinnedGaps];
+  });
+}
+
+/**
+ * Every store change `markdown` pins by number, one per line at most, in
+ * line order, read as the readiness gap reads a spec: fences, code spans
+ * and HTML comments skipped. See the module note.
+ */
+export function findPinnedMigrations(markdown: string): readonly PinnedMigration[] {
+  return readLines(markdown).flatMap((line) => {
+    const pinned = pinnedInLine(line);
+    return pinned === null
+      ? []
+      : [pinned];
+  });
 }
 
 /** What a span's gaps are named under: the template's spelling when it has one. */
@@ -524,8 +589,8 @@ function templateNames(spans: readonly BodySpan[]): ReadonlyMap<number, string> 
 
 /**
  * Every gap in `body`: the template headings it does not carry, the ones
- * it carries empty, the two list sections holding no item, and every
- * placeholder left in the text. A body that carries none answers an
+ * it carries empty, the two list sections holding no item, every
+ * placeholder left in the text, and every store change pinned by number. A body that carries none answers an
  * empty list, which is the only reading that lets a plan be written
  * from it.
  *
@@ -633,7 +698,8 @@ const LIST_REMEDY = 'the plan is written from those items, so fill them in and r
  */
 export function findListSectionGaps(body: string): readonly ReadinessGap[] {
   return findReadinessGaps(body)
-    .filter((gap) => gap.kind !== 'placeholder' && LIST_HEADINGS.includes(gap.heading));
+    .filter((gap) => (gap.kind === 'missing-heading' || gap.kind === 'empty-heading' || gap.kind === 'no-list-item')
+      && LIST_HEADINGS.includes(gap.heading));
 }
 
 /**

@@ -927,7 +927,7 @@ describe('rafa start, over a stand-in claude', () => {
   it.skipIf(IS_ROOT)('stops after a report its store refuses, that store still rendering', () => {
     const scratch = plantScratch([REPORTING_TASK, LATE_TASK]);
     const store = sqliteStorePath(scratch.repo);
-    withSqliteStore(store, true, () => null);
+    withSqliteStore(store, 'write', true, () => null);
     chmodSync(store, 0o444);
 
     const run = runStart(scratch);

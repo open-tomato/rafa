@@ -14,16 +14,26 @@ The runner reads the log with `collectSessionRow` and appends it under
 
 ### Where it lives
 
-**Both backends write under `.rafa/effort/` in the project root.**
-`EFFORT_STORE_DIR` in `src/effort/store.ts` spells the directory once, and
-`effortStorePath` and `sqliteStorePath` (`store/sqlite.ts`) join it under
-the root. It moved there from `.ralph/effort/` (Q20), and no backend and no
+**Both backends write under `.rafa/effort/` in the project root, unless
+`RAFA_EFFORT_DIR` names another directory.** `EFFORT_STORE_DIR` in
+`src/effort/store.ts` spells the directory, and `effortStoreDir`
+(`store/location.ts`) resolves it once for both backends:
+`sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's files join
+their names under it. `effortStorePath` in `store.ts` still joins under
+`.rafa/effort/` whatever the variable holds, and no backend calls it.
+`RAFA_EFFORT_DIR` moves the SQLite and NDJSON files together for one
+command line; it is a variable and not a config key so that it never
+moves the loop's own store. A relative value is refused (`is not an
+absolute path`), and so is one resolving to the project's own store,
+symlinks and `..` spellings included, so it cannot bypass the rule that
+branch code never migrates the live store. An empty value counts as
+unset. The store moved to `.rafa/effort/` from `.ralph/effort/` (Q20), and no backend and no
 command reads a store left under `.ralph/effort/`: `rafa doctor` only
 looks for the store's file names there, and warns while `.rafa/effort/`
 holds none of them (`store/legacy.ts`). A test that plants or
 opens a store file by path spells `.rafa/effort`; the `.ralph/effort` the
 parity suites name is the sibling's own store, read through
-`readStoreRows` and never written.
+`readStoreRows` and never written. `effort.busyTimeoutMs` in the config sets how long a store open waits for another process's lock, from 1 to 60000 milliseconds, defaulting to 5000.
 
 ### Imports
 
@@ -46,8 +56,8 @@ is copied there as well.
 ### A store past this rafa
 
 **A plan that adds a migration can lock its own loop out of the store.**
-`migrateSchema` refuses a store past the version `SQLITE_MIGRATIONS` holds,
-and every read and write goes through it. A task that runs the branch's
+A pre-log release refuses a store past the version its `SQLITE_MIGRATIONS`
+holds, and every read and write it makes goes through that check. A task that runs the branch's
 own code from its working tree against `.rafa/effort/effort.sqlite`
 migrates the project's store, while the loop driving the plan is the older
 installed runtime. From then on that runtime refuses the store, and the
@@ -56,15 +66,127 @@ versions 10 and 11 reached the store through `rafa effort collect` run from
 the branch, and the 0.18.0 loop stopped.
 
 **`rafa effort fix-schema` repairs such a store**
-(`src/effort/store/fix-schema.ts`). It builds `effort.sqlite.fix-<stamp>`
-at this rafa's version, copies every table and column this rafa knows,
-checks the row counts and `integrity_check`, and lists the tables and
-columns only the newer schema holds. The original is then renamed to
-`effort.sqlite.v<version>-<stamp>.bak`, whole, and the rebuild takes its
-place. `--dry-run` deletes the rebuild instead, so it can be repeated and
-runs beside a live loop; the swap refuses while a loop session is running
-or paused. A newer schema that dropped a table or column this rafa writes
-is not additive, and the repair refuses it rather than copy around it.
+(`src/effort/store/fix-schema.ts`). It decides through `planSchema`,
+asked for a write: a store this rafa uses is `current` or `behind` and
+left alone, unknown additive migrations included, and it rebuilds only
+on `pre-log-unreleased`, `gate-mismatch`, `edited` and both
+`unknown-breaks-*`; the two `breaking-*` refusals are passed on with
+their own next step. It builds `effort.sqlite.fix-<stamp>` through
+`bringForward` (with `builtAside`, so the open does not ask the
+development-build question of a file in the store's directory), which
+logs every id this rafa knows with `applied_by` from `appliedByName`
+(`development-build.ts`: the version, `+dev:<checkout>` for a
+development build). It copies every table and column this rafa knows
+except the log, checks the row counts, `integrity_check` and that
+`planSchema` finds the rebuild current, and lists the unknown
+migrations, tables and columns only the newer schema holds, which stay
+in the backup alone. The original is then renamed to
+`effort.sqlite.v<user_version>-<stamp>.bak`, whole, and the rebuild
+takes its place. `--dry-run` deletes the rebuild instead, so it can be
+repeated and runs beside a live loop and from a development build; the
+swap refuses while a loop session is running or paused, and from a
+development build before anything is built. A newer schema that dropped
+a table or column this rafa writes is not additive, and the repair
+refuses it rather than copy around it. `fix-schema.test.ts` (store and
+command) rebuilds a pre-log store at 15 with a log, reports a logged
+store with an unknown additive migration `current`, and spawns
+`bun src/rafa.ts` over a store outside the child's temp directory:
+the swap is refused, the dry run runs. The steps around the build, from
+the in-flight journal refusal through the row-count check,
+`integrity_check` and the swap to removal on failure, are `rebuildAside`
+(`src/effort/store/rebuild-aside.ts`), which takes the two file names
+and the build from its caller and opens no store itself;
+`SchemaFixRefusal` is its `RebuildRefusal`, and so is `effort migrate`'s
+`MigrateRefusal`.
+
+**`rafa effort copy [--to=<dir>]` is how branch code gets real data**
+(`src/commands/effort/copy.ts` over `copyEffortStore`,
+`src/effort/store/copy.ts`). It copies `<root>/.rafa/effort/` into
+`--to`, read from the project root when relative, or into
+`<root>/.rafa/scratch/effort-<stamp>/`, and prints the directory and the
+`RAFA_EFFORT_DIR=<dir>` line to put in front of each command on the same
+line. The SQLite file goes through `VACUUM INTO` on a read-only
+connection with the store's busy timeout, the NDJSON files by file copy.
+It never calls `bringForward`, so a development build may copy the live
+store: `copy.test.ts` copies a pre-log store and finds the live file's
+bytes unchanged and no `schema_migrations` in the copy, and a copy taken
+while another connection holds a read transaction keeps `user_version`,
+the log and every row. Exit 1, with nothing made, when `RAFA_EFFORT_DIR`
+is set, when the directory holds no store file, or when the target is a
+file or a non-empty directory; exit 2 on a read or write failure, with
+every file it wrote and every directory it made removed.
+
+**`rafa effort schema [--check]` says whether this rafa can use the
+store, and what to run next when it cannot** (`src/commands/effort/schema.ts`
+over `readSchemaReport`, `src/effort/store/schema-report.ts`). It opens
+the store `effortStoreDir` answers read-only, never through
+`bringForward`, and prints the applied, pending, unknown and edited
+migrations, the gate, and the verdict: `absent`, `current`, `behind`, one
+of `planSchema`'s seven reasons (asked for a write, so an unknown
+`writers` row is refused), or `development-build` when a development
+build would be refused the adoption or apply a `behind` store needs. It
+ends with `Next safe step: <command>` (json `nextStep`), the refusal's
+own, `rafa effort copy` for `development-build`, or `none`. `--check`
+exits 1 on any refusal; the report alone exits 0, and 2 when the file is
+no store. `schema.test.ts` leaves a pre-log store at 12 and a logged store
+with a synthetic entry pending byte-identical, and holds
+`REFUSAL_REASONS` to the seven `nextStep` values in order.
+
+**`rafa effort migrate [--dry-run]` applies a migration that breaks
+older runtimes** (`src/commands/effort/migrate.ts` over `migrateStore`,
+`src/effort/store/migrate.ts`), and any other pending one with it. It
+plans as the `migrate` caller, so `breaking-pending` never refuses it;
+any other refusal is passed on with its own next step, and a store with
+nothing to adopt or apply is `current` and left alone. It writes the
+store `effortStoreDir` answers to `effort.sqlite.migrate-<stamp>` with
+`vacuumInto` (`copy.ts`), brings that file forward through
+`bringForward` with `builtAside`, checks the row count of every table
+both files hold against the live store (`checkedCounts`: a table rebuild
+that lost a row is refused), `integrity_check` and that `planSchema`
+finds it current, then renames the original to
+`effort.sqlite.before-<id>-<stamp>.bak`, `<id>` being the first migration
+applied or `schema_migrations` for an adoption alone, and swaps the new
+file in through `rebuildAside`. `--dry-run` deletes it instead and is
+refused nothing. The swap is refused before anything is built from a
+development build over a store it does not own, with
+`refuseUnownedDevelopmentWrite`'s text, and while a loop record under
+the project reads `running` or `paused`: `REFUSED — migration <id>
+breaks older runtimes, and loop <sessionId> (pid <pid>, plan <stub>) is
+running on this store. Nothing was migrated. Finish or stop that loop,
+then run it again.`, or, with only additive migrations pending, the loop
+and the writes a swap under it would lose. `migrate.test.ts` leaves the
+directory byte-identical under a dry run that built the closed gate,
+refuses a synthetic rebuild that drops a null-note row while the same
+rebuild over non-null rows migrates, names the backup, refuses beside a
+planted live loop, and spawns `bun src/rafa.ts`: refused over a project's
+store, migrating a copy under `RAFA_EFFORT_DIR`.
+
+**A loop never records to a copy, and says what it does not know.**
+`loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
+empty string, right after the detached refusal and before `--runtime`
+hands the run on (`refuseEffortDirRun`, `src/start/run-config.ts`):
+`❌ RAFA_EFFORT_DIR is set (<dir>); a loop records to the project's own
+store. Unset it and run again.` Its preflight then reads the project's
+store through `readSchemaReport`, read-only, and warns once for each
+logged migration this rafa does not know whose `breaks` is empty, in
+the words of `unknownAdditiveWarning` (`schema-report.ts`): `⚠ effort
+store holds migration <id> this rafa does not know (applied by <by>);
+it is additive, so this run reads and writes the store as it is`. A
+refused store gets no warning there, since its first open refuses it;
+one that cannot be read is one warning naming why, and none halts.
+`rafa doctor` prints an `effort store schema` row
+(`src/commands/doctor-effort-schema.ts`) over the store `effort schema`
+reads: `fail`, and exit 1 with the next safe step, wherever
+`effort schema --check` fails, a refused `RAFA_EFFORT_DIR` and a file
+that is no store included; `warn` for each unknown additive migration
+and, in the project's own store alone, for each `applied_by` holding
+`DEVELOPMENT_MARK` (`+dev:`, `development-build.ts`), which a copy
+under `RAFA_EFFORT_DIR` is expected to hold. `loop-start-effort-store.test.ts`
+spawns the refusal beside an empty variable that goes on, and the
+warning beside a store holding no unknown migration; each run halts
+at a failing required item, so no session is spawned.
+`doctor-effort-schema.test.ts` spawns `doctor` and `effort schema
+--check` over the same stores and holds their exit codes together.
 
 ### The schema history
 
@@ -79,6 +201,141 @@ rolls the field back with the tables; and the last version is the array's
 length rather than a constant beside it, so an appended entry cannot be
 forgotten. Measured, a throw inside the transaction rolls `user_version`
 back as well.
+
+**Each entry is a named `SqliteMigration`: an `id`, what it `breaks` and
+its `sql`.** The `id` is kebab-case and is never reused. `breaks` is `[]`
+for an additive entry, and a breaking one also carries a `contract`. The
+thirteen entries 0.23.0 to 0.24.1 shipped are all `breaks: []`.
+`src/effort/store/migrations.lock.json` holds each entry's sha256 by id,
+and `migrations.test.ts` fails when an entry's SQL no longer matches its
+lock line, or when an entry has no lock line. So a new entry adds its
+lock line in the same commit. `LEGACY_GATE_OPEN` (13) and
+`LEGACY_GATE_CLOSED` (1000) are the `user_version` values that let a
+pre-log release in or keep it out, and `legacyGate` picks one from what
+a store holds. The open path reads the names and the gate through
+`bringForward`, and nothing outside `migrations.test.ts` reads the lock.
+`migrateSchema` still counts by position and writes no log; no open or
+command goes through it, and tests plant pre-log stores with it.
+
+**`classifyMigration` (`src/effort/store/migration-shapes.ts`) reads what
+an entry's SQL breaks, and `migrations.test.ts` holds every entry to it.**
+It strips comments, splits statements (a trigger body stays whole) and
+gives each one a row of the spec's additive table: a new table, nullable
+column, plain index or view breaks nothing; a unique index does too when
+its table is new in the same entry, or when it covers a column the same
+entry adds and its `WHERE` holds `c IS NOT NULL` as a top-level
+conjunct. Any other unique index, a dropped index or a trigger breaks
+`writers`; a dropped or renamed table or column, or a statement matching
+no row, breaks both sides. The test fails an entry that declares less
+than that, and an additive entry holding a column added `NOT NULL` or
+with a non-NULL `DEFAULT`, a PRAGMA, a data statement or an unknown
+shape. A breaking rebuild may carry its `INSERT … SELECT`. The test also
+checks unique kebab-case ids and `contract` exactly when `breaks` is
+not empty. It applies each entry to `:memory:` and requires every object
+its text names in a `CREATE` to be in `sqlite_master`. The names are read
+before comments are stripped, so a statement a comment swallowed fails
+here, and so does a `TEMP` table. SQLite also refuses an `ADD COLUMN`
+whose statement ends in a `--` comment before its `;` (`error in table
+<t> after add column: incomplete input`). Last, it reads
+`migrations.lock.json` at the newest `v*` tag by version order through
+`git show`, and fails a line changed or dropped since. The case is
+skipped, its title naming why, when git, the tag or the lock at the tag
+is absent. At v0.24.1 the lock is absent, since that release predates it.
+Each rule has a near-miss control, including a planted `DROP COLUMN`
+declared `[]`.
+
+**`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
+decision, and every open asks it through `bringForward`;** `fix-schema`,
+`effort schema` and `effort migrate` ask it directly. It takes what a store holds (its
+`schema_migrations` rows, or none, and `user_version`), this build's
+catalogue with checksums (`sqliteCatalogue`), `read` or `write`, and
+whether `rafa effort migrate` asks. It answers "use", with the legacy
+entries to adopt, the entries to apply and the gate value, or "refuse"
+with one of the seven `REFUSAL_REASONS` and a message ending in
+`Next safe step: <command>`. It imports nothing from `bun:sqlite` or
+`sqlite.ts`. An open with something to apply counts as a write, so a
+store holding an unknown migration that breaks writers refuses a read
+that would apply one.
+
+**`bringForward` (`src/effort/store/bring-forward.ts`) acts on that
+decision, and every open calls it.** It reads a store's
+`schema_migrations` and `user_version`, plans, and throws a refusal as
+`SchemaRefusedError` (`reason`, `nextStep`) with nothing written. With
+nothing to adopt or apply it returns without taking a lock. Otherwise it
+takes `BEGIN IMMEDIATE`, reads and plans again, and in that one
+transaction creates `schema_migrations`, logs the adopted legacy entries
+unrun with this build's checksums, runs and logs each pending entry, and
+sets `user_version` to the gate. A throw rolls all of it back. A test
+passes a synthetic tail as its `migrations` option; `applied_by` is this
+build's package version unless the caller names another.
+
+**A development build never adopts or migrates a store it does not
+own.** Between the first plan and the lock, an open with anything to
+adopt or apply asks `refuseUnownedDevelopmentWrite`
+(`src/effort/store/development-build.ts`). `readRuntimeIdentity`
+(`src/runtime/identity.ts`) walks up from `Bun.main`, through its real
+path, to the nearest `package.json` named `@open-tomato/rafa`; the build
+is a development build when that directory also holds `src/rafa.ts`, so
+`bun src/rafa.ts`, a checkout's `dist/cli.js` and every `bun test`
+process are, and a runtime copy (no `package.json`) or an npm install
+(no `src/`) is not. A development build owns a store under `tmpdir()`,
+and one under `RAFA_EFFORT_DIR` unless it sits in a project's own
+`<root>/.rafa/effort/`. Over any other it throws
+`DevelopmentBuildRefusedError` (`nextStep` `rafa effort copy`) with the
+spec's text, naming `schema_migrations` for an adoption ahead of the
+pending ids, and adds ` Loop <sessionId> (pid <pid>, plan <stub>) is
+running on this store.` for each record under `<root>/.rafa/runs/` that
+reads `running` or `paused` with its pid alive. Nothing is written, so
+the store keeps its bytes. With nothing pending a development build
+reads and writes the live store as any rafa does. So until the
+installed runtime has adopted this project's live store (0.24.1 left it
+at `user_version` 13 with no log), every `bun src/rafa.ts` command that
+opens it is refused; run it with `RAFA_EFFORT_DIR` over a copy.
+`development-build.test.ts` hands the refusal another `tempDir` to make
+a store under the real one unowned, as a spawned child's `TMPDIR` would.
+
+**`withSqliteStore(path, access, create, use)` is the open, and every
+caller states `access`.** `keys`, `read` and every reader outside the
+port pass `'read'`; every writer passes `'write'`, and so does
+`writeSqliteStore` for an empty write. The open sets `PRAGMA
+busy_timeout` to `effort.busyTimeoutMs`, then calls `bringForward(db,
+path, access, 'open')` before `use`. A read of a current store writes nothing;
+a read of a pre-log store adopts it, since adoption counts as a write,
+unless a development build is refused it as above; a
+store logging an unknown migration that breaks only writers is read and
+refused a write. Without the busy timeout, an open that found migrations
+pending while another process held the lock threw `SQLITE_BUSY` at
+once; with it, `sqlite.test.ts` has two processes open one fresh store
+while a third holds the lock, and one applies every migration while the
+other finds nothing pending. A test that expects an open to throw on a
+held lock waits out the timeout, five seconds by default, as the lock
+case of `tracker-refs.test.ts` does; one that sets a short timeout
+through `setActiveStoreSettings` puts `null` back after it.
+
+**`effort.busyTimeoutMs` reaches every open through
+`activeStoreSettings` (`src/effort/store/settings.ts`).** It is a whole
+number of milliseconds from 1 to 60000, 5000 by default, and the reader
+refuses `0`, negatives, `60001`, fractions, quoted numbers and `false`.
+`loadConfig` hands the store the value it resolved each time it runs, so
+a command that reads its config opens the store with it, and one that
+never does opens with the default. The setter refuses a value the
+reader would, with a `RangeError`. It is module state, so a test that
+sets it sets `null` after. `settings.test.ts` has an open wait on a lock
+a child process holds and get in once it is let go, and an open past a
+100 ms timeout throw `SQLITE_BUSY`. The two `fix-schema` opens set no
+busy timeout.
+
+### Migrations
+
+**A migration is an entry in `src/effort/store/migrations.ts` with an id, its SQL and what it breaks.** The id is kebab-case and never reused. The array's order is only the apply order for a fresh store: a store records applied migrations by id and sha256 in `schema_migrations`, and `migrations.lock.json` freezes each entry's sha256. Never edit a shipped entry; write a new one.
+
+**Additive is the default, and the guard checks it.** A new table, a nullable column, a non-unique index, or a partial unique index over columns the same migration adds breaks nothing. Anything else declares `breaks` and a `contract`, ships as the second of two specs, and runs only through `rafa effort migrate`. Migrations hold DDL only; a backfill is a command. No code reads by `SELECT *` or inserts without a column list. A reader treats NULL as "written by a runtime that did not know this column".
+
+**`user_version` is the legacy gate, not the schema version.** It holds 13 while every applied migration is additive, so pre-log runtimes keep working, and 1000 once a breaking migration runs, which shuts them out.
+
+**A development build never migrates the live store.** To run branch code over real data, copy the store first with `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort`, then put `RAFA_EFFORT_DIR=<absolute path of that dir>` in front of each command on the same line, because a session's shell may not keep an `export`. A test opens stores under `tmpdir()` only, and the store module throws otherwise.
+
+**A store a runtime refuses** is read with `rafa effort schema`, which names the next safe step: a newer rafa, `rafa effort migrate --dry-run`, or `rafa effort fix-schema --dry-run`.
 
 ### Tables outside the port
 
@@ -113,7 +370,9 @@ and the filter the version-5 case of `preflight.test.ts` takes the later
 tables out with, beside the version-6 filter of `dispatches.test.ts`, the
 two version-7 filters of `changes.test.ts`, the two version-10 filters of
 `skill-invocations.test.ts`, and the two version-12 filters of
-`plan-ci.test.ts`.
+`plan-ci.test.ts`. Those lists hold `schema_migrations`, which the first
+open through the module creates, and each filter over a store planted
+by raw SQL takes it out as well, since no open has made it there yet.
 
 ### The fact rows
 
@@ -446,6 +705,17 @@ sibling's roster and read no config. **Never run this branch's code
 against `.rafa/effort/` directly.** Tests over the store open a copy under
 a temporary root, or read the store through `readStoreRows` and pass no
 path; both patterns keep the real `.rafa/effort/` untouched.
+
+**A test opens stores under `tmpdir()` only, and the store throws
+otherwise.** `guardTestProcess` (`store/location.ts`) runs before any file
+or directory is made, at every open of either backend and at
+`fix-schema`'s. In a process whose `Bun.main` ends in `.test.ts`, or whose
+environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (or its
+real path) throws `effort store: a test opened <path>, outside the temp
+directory <tmp>; a test opens stores under tmpdir() only`. `runRafa` sets
+`RAFA_TEST=1` and the suite's `TMPDIR` on its child. A SQLite read of a
+file that does not exist opens nothing and so is not guarded; an NDJSON
+read or append is guarded whether or not its file exists.
 
 **Compare the two backends' rows by `JSON.stringify(row)`, paired by key
 rather than by position.** `toEqual` ignores field order, and
