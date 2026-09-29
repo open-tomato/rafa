@@ -14,7 +14,7 @@
  * ## What the config answers
  *
  * One `loadConfig` for the whole composition, which is what keeps the
- * five settings it reads on one reading of the file:
+ * settings it reads on one reading of the file:
  *
  * | Setting | Field | What it answers |
  * | --- | --- | --- |
@@ -23,6 +23,7 @@
  * | `pr.provider` | `prProvider` | whether this repository has a provider at all |
  * | `roadmap.issue` | `roadmapIssue` | the roadmap issue, when a layer named one |
  * | `release.changelog` | `releaseChangelog` | the changelog the end of an epic reads for an untagged version (`./epic-end.ts`) |
+ * | the keys `mergeGuardSettings` copies | `release*` and the two collision keys | the settle dry run read after a merge step (`./settle-step.ts`) |
  *
  * `pr.base` unset is {@link DEFAULT_BASE_BRANCH}: `main`, which is what
  * `release tag` resolves the same setting to and the first of the two
@@ -214,6 +215,7 @@ import type {
   TakenBlocker,
   WaitingLine,
 } from './readings.js';
+import type { SettleReader } from './settle-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { BoardView } from '../board/epic-board.js';
@@ -227,6 +229,7 @@ import type { SessionRecord } from '../loop/sessions.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { Place, Position } from '../project/position.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { MergeGuardSettings } from '../release/guard-merge.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
@@ -260,6 +263,7 @@ import { readEpicEndRelease } from './epic-end.js';
 import { decideHop, takenBy } from './hop-chain.js';
 import { readHopRecord, staleAgainst } from './hop-record.js';
 import { nextOwnerGate } from './owner-gate.js';
+import { settleReaderFor } from './settle-step.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */
 const PREFIX = 'rafa next';
@@ -313,7 +317,7 @@ export interface NextBoardOptions {
 }
 
 /** The settings the composition reads off the config. */
-type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue'>;
+type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
 
 /** `read`, called at most once per issue; the module note holds how long the memo lives. */
 function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
@@ -675,7 +679,7 @@ function nextProject(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The five settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
+/** The settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
 function nextConfig(project: ProjectFound, warn: (message: string) => void): NextConfig {
   try {
     return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
@@ -717,6 +721,8 @@ export interface OpenedNextSources extends NextSources {
    * an epic ran dry, and nothing else does (`./epic-end.ts`).
    */
   readonly release: () => EpicEndRelease;
+  /** The settle dry run over `origin/<base>`, read only after a merge step (`./settle-step.ts`). */
+  readonly settle: SettleReader;
 }
 
 /**
@@ -782,5 +788,6 @@ export function openNextSources(
     board: board(),
     answer: () => Object.freeze({ ...held, board: board() }),
     release: () => readEpicEndRelease(git, project.root, config.releaseChangelog),
+    settle: settleReaderFor({ root: project.root, home: project.home, base: held.base, config }, git),
   });
 }

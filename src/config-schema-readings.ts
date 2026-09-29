@@ -19,36 +19,12 @@
  *
  * ## The `pr` section
  *
- * `.rafa/specs/rafa-20-pr-commands.md` spells it `pr: { provider: gh | none,
- * mergeMethod: squash | merge | rebase, base: <default branch> }`, and
- * names `pr.resolveBudget` as what a `triage --resolve` session's
- * `--max-budget-usd` comes from. Four readings it leaves to this module:
- *
- *   - `pr.provider` and `pr.base` default to NULL, and null here means
- *     "nobody has said", not "off". The spec's default for the provider
- *     is `gh` when `origin` is a GitHub remote and `none` otherwise, and
- *     its default base is whatever the remote calls its default branch;
- *     neither is a value this module can spell, because both are read
- *     off the repository at use (`pr/provider.ts`). Writing either
- *     default as a literal would be the silent choice the config refuses
- *     everywhere else: `prBase: 'main'` would open a pull request into a
- *     branch that may not exist on a repository whose default is
- *     `master`. A file spelling `provider:` or `base:` with no value
- *     says nothing, as every null does, and resolves to the same null.
- *   - `pr.mergeMethod` defaults to `squash`, the first method the spec
- *     lists and the one the merge flow is written for: it deletes the
- *     local branch with `-D` because a squash leaves it unmerged in
- *     git's eyes.
- *   - `pr.resolveBudget` defaults to 2 US dollars, which the attempt
- *     guard's default of two attempts caps at 4 for one pull request.
- *     It is a number and not null: the spec has every resolve run carry
- *     `--max-budget-usd`, so a session with no budget is not a state
- *     this setting can be left in.
- *   - No `pr` setting is a `CommandLineSetting`. `pr merge` takes
- *     a `--method` flag, but that flag is the command's own argument for
- *     one merge, read by the command beside this setting, and not a
- *     layer over the config: a global `--merge-method` nobody typed
- *     would be a flag this module invented.
+ * Its readings sit in `config-schema-release.ts`'s note, beside its
+ * fields, defaults and specs. One is cited by the sections below: no
+ * `pr` setting is a `CommandLineSetting`, because a command's own flag
+ * for one run is not a layer over the config, and a global flag nobody
+ * typed would be one this module invented. That is "the reason the `pr`
+ * section gives".
  *
  * ## The `board` section
  *
@@ -90,32 +66,8 @@
  *
  * ## The `release` section
  *
- * `.rafa/specs/rafa-21-changelog-and-release.md` spells it `release: {
- * enabled: auto, versionFile: package.json, changelog: CHANGELOG.md,
- * heading: "## {version} — {date}, {title}" }`, and those four values
- * are the defaults here. Four readings it leaves to this module:
- *
- *   - `release.enabled` is not a flag. `auto`, its default, is a third
- *     value meaning "on when both files below exist" — a reading
- *     `release/enabled.ts` makes against a disk, which no value here
- *     could stand for. What the reader takes beside it, and why `on`
- *     and `off` are refused, is `config-sections.ts`'s to say.
- *   - `release.versionFile` and `release.changelog` are paths relative
- *     to the repository root, and neither is null. Null elsewhere here
- *     means "nobody has said", and the spec has said: `package.json`
- *     and `CHANGELOG.md`. The absence the spec cares about is the
- *     FILE's — "a project with no version file gets the changelog
- *     entry under a date heading and no bump" — which is a question
- *     about a disk, answered at use and not spellable as a default.
- *   - `release.heading` is free text. The spec makes it a template so
- *     "a consumer's changelog has another shape" is an edit rather
- *     than a fork, and which placeholders it may carry, and what an
- *     unknown one renders to, is `release/changelog.ts`'s to say. So
- *     nothing here refuses a heading for the placeholders it spells.
- *   - No `release` setting is a `CommandLineSetting`, for the
- *     reason the `pr` section gives: the `release` commands read these
- *     settings beside their own arguments, and a global flag nobody
- *     typed would be one this module invented.
+ * Its readings sit in `config-schema-release.ts`'s note, beside its
+ * fields, defaults and specs.
  *
  * ## The `cleanup` section
  *
@@ -160,6 +112,9 @@
  *     `plan create`'s own argument for one run and not a layer over
  *     this key, for the reason the `pr` section gives.
  *
+ * `dangerous.acceptVersionCollision` is read the same three ways, and
+ * its field, default and spec sit in `config-schema-release.ts` beside
+ * the `pr.versionCollision` it overrides, spread in right after this one.
  * `dangerous.selfUpdateDuringLoop` has `rafa self-update` replace the
  * install while a loop of the project is live, where it otherwise
  * refuses and names each loop. The three readings above hold for it

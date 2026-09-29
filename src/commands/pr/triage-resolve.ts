@@ -123,6 +123,16 @@
  * `./triage.ts` reports its own: the worktree, the branch and the
  * pushed commits are all real whatever GitHub said about a comment.
  *
+ * ## `conflict-version` is converted in code, ahead of the loop path
+ *
+ * A class in `CONVERSION_TRIAGE_CLASSES` (`src/pr/triage/classes.ts`)
+ * has no pinned plan, so it is dispatched before the pinned-plan check
+ * rather than read as "not simple", and after the trust check and the
+ * cross-repository refusal, since it pushes to the branch as a plan
+ * would. The run is `./triage-convert.ts`'s: no session and no attempt
+ * raised. It ends with exit 0, or {@link RESOLVE_STOP_EXIT} when the
+ * conversion or its push was refused.
+ *
  * ## The author is trusted before anything is done
  *
  * The first step of a run, ahead of the assessment it was handed being
@@ -160,6 +170,7 @@ import type { TriageAssessment } from '../../pr/triage/classify.js';
 import type { TriageBlock } from '../../pr/triage/comment.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { ExcerptReading } from '../../pr/triage/follow-up.js';
+import type { SettleSettings } from '../../release/settle.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
@@ -167,7 +178,7 @@ import { waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';
 import { hasPinnedPlan, loadPinnedPlan } from '../../pr/plans/load.js';
 import { readAttemptRepeat, readAttemptStart, spentAttempts } from '../../pr/triage/attempts.js';
-import { DEPENDENCY_BUMP_AUTHORS } from '../../pr/triage/classes.js';
+import { CONVERSION_TRIAGE_CLASSES, DEPENDENCY_BUMP_AUTHORS } from '../../pr/triage/classes.js';
 import { triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
 import { buildFollowUpPrompt, excerptLines } from '../../pr/triage/follow-up.js';
 import {
@@ -180,6 +191,7 @@ import {
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 
 import { runResolveLoop, writeResolvePlan } from './resolve-loop.js';
+import { runVersionConversion } from './triage-convert.js';
 import { evidenceOf, workflowCountOf } from './triage-report.js';
 import { readTrustedTriageComment, requireTrustedResolveAuthor } from './triage-trust.js';
 
@@ -210,6 +222,8 @@ export interface ResolveRun {
   readonly root: string;
   /** The home the worktree and the plans go under. */
   readonly home: string;
+  /** The release settings a `conflict-version` conversion reads; see the module note. */
+  readonly release: SettleSettings;
   /** The pull request number. */
   readonly number: number;
   /** The assessment this run acts on, as `./triage.ts` read it. */
@@ -494,6 +508,28 @@ function resolvable(assessment: TriageAssessment): boolean {
   return assessment.simple && hasPinnedPlan(assessment.triageClass);
 }
 
+/** Whether an assessment is converted in code rather than run through a plan; see the module note. */
+function converts(assessment: TriageAssessment): boolean {
+  return CONVERSION_TRIAGE_CLASSES.includes(assessment.triageClass);
+}
+
+/** The `conflict-version` run, as a result; see the module note. */
+function runConversion(run: ResolveRun, detail: PullRequestDetail): ResolveResult {
+  const outcome = runVersionConversion({
+    detail,
+    number: run.number,
+    release: run.release,
+    git: run.git,
+    now: run.now,
+    output: run.output,
+    worktree: { open: () => openWorktree(run, detail), close: (path) => closeWorktree(run, path) },
+  });
+  const exitCode = outcome.failed
+    ? RESOLVE_STOP_EXIT
+    : 0;
+  return { ...nothingToDo(run, outcome.headline), ran: outcome.converted, lines: outcome.lines, exitCode };
+}
+
 /** What is said about a loop that did not exit 0. */
 function loopProblem(loop: ResolveLoopOutcome): string {
   const said = loop.problem === null
@@ -531,7 +567,7 @@ export async function resolvePullRequest(run: ResolveRun): Promise<ResolveResult
   if (first === null) {
     return nothingToDo(run, `Nothing was assessed for #${run.number}, so --resolve ran nothing.`);
   }
-  if (!resolvable(first)) {
+  if (!resolvable(first) && !converts(first)) {
     return nothingToDo(
       run,
       `#${run.number} is \`${first.triageClass}\`, which is not simple, so --resolve ran nothing:`
@@ -540,6 +576,7 @@ export async function resolvePullRequest(run: ResolveRun): Promise<ResolveResult
   }
   const refusal = crossRepositoryRefusal(detail);
   if (refusal !== null) throw new CommandExit(RESOLVE_REFUSE_EXIT, `❌ ${refusal}`);
+  if (converts(first)) return runConversion(run, detail);
 
   return runAttempts(run, detail, first);
 }

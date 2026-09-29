@@ -11,8 +11,8 @@
  * seam included, across every section of the schema at once.
  *
  * Two full config texts, `PROJECT_TEXT` and `USER_TEXT`, name every
- * setting at a value that differs from the other's — `version` is the
- * one exception, since `1` is its only accepted value. Loading them
+ * setting at a value that differs from the other's — `version` and
+ * `release.strategy` are the exceptions, since each accepts one value. Loading them
  * together through `loadConfig` and reading `PROJECT_VALUES` back off
  * every setting, every source labelled `file`, is what shows the project
  * file outranks the user's key by key rather than by accident; the
@@ -179,6 +179,7 @@ const PROJECT_TEXT = [
   '  mergeMethod: rebase',
   '  base: trunk',
   '  resolveBudget: 0.5',
+  '  versionCollision: refuse',
   'board:',
   '  trustedAuthors: [octocat]',
   'roadmap:',
@@ -188,12 +189,17 @@ const PROJECT_TEXT = [
   '  versionFile: project.json',
   '  changelog: docs/PROJECT-CHANGES.md',
   '  heading: "### {version} on {date}"',
+  '  fragments: project-changes',
+  '  strategy: semver-by-level',
+  '  settle: pr',
+  '  tag: settle',
   'cleanup:',
   '  staleDays: 45',
   '  worktreeIdleDays: 10',
   '  keep: ["project/*"]',
   'dangerous:',
   '  acceptStaleRefs: true',
+  '  acceptVersionCollision: true',
   '  selfUpdateDuringLoop: true',
   'status:',
   '  notice: false',
@@ -256,16 +262,22 @@ const PROJECT_VALUES: RafaConfig = {
   prMergeMethod: 'rebase',
   prBase: 'trunk',
   prResolveBudget: 0.5,
+  prVersionCollision: 'refuse',
   boardTrustedAuthors: ['octocat'],
   roadmapIssue: 31,
   releaseEnabled: true,
   releaseVersionFile: 'project.json',
   releaseChangelog: 'docs/PROJECT-CHANGES.md',
   releaseHeading: '### {version} on {date}',
+  releaseFragments: 'project-changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'pr',
+  releaseTag: 'settle',
   cleanupStaleDays: 45,
   cleanupWorktreeIdleDays: 10,
   cleanupKeep: ['project/*'],
   dangerousAcceptStaleRefs: true,
+  dangerousAcceptVersionCollision: true,
   dangerousSelfUpdateDuringLoop: true,
   statusNotice: false,
   tiersRafa: 'off',
@@ -325,6 +337,7 @@ const USER_TEXT = [
   '  mergeMethod: merge',
   '  base: develop',
   '  resolveBudget: 3',
+  '  versionCollision: ask',
   'board:',
   '  trustedAuthors: ["dependabot[bot]", hubot]',
   'roadmap:',
@@ -334,12 +347,17 @@ const USER_TEXT = [
   '  versionFile: user.json',
   '  changelog: docs/USER-CHANGES.md',
   '  heading: "## {version}, {title}"',
+  '  fragments: user-changes',
+  '  strategy: semver-by-level',
+  '  settle: push',
+  '  tag: manual',
   'cleanup:',
   '  staleDays: 90',
   '  worktreeIdleDays: 2',
   '  keep: ["user/*", scratch]',
   'dangerous:',
   '  acceptStaleRefs: false',
+  '  acceptVersionCollision: false',
   '  selfUpdateDuringLoop: false',
   'status:',
   '  notice: true',
@@ -387,16 +405,22 @@ const USER_VALUES: RafaConfig = {
   prMergeMethod: 'merge',
   prBase: 'develop',
   prResolveBudget: 3,
+  prVersionCollision: 'ask',
   boardTrustedAuthors: ['dependabot[bot]', 'hubot'],
   roadmapIssue: 7,
   releaseEnabled: false,
   releaseVersionFile: 'user.json',
   releaseChangelog: 'docs/USER-CHANGES.md',
   releaseHeading: '## {version}, {title}',
+  releaseFragments: 'user-changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'push',
+  releaseTag: 'manual',
   cleanupStaleDays: 90,
   cleanupWorktreeIdleDays: 2,
   cleanupKeep: ['user/*', 'scratch'],
   dangerousAcceptStaleRefs: false,
+  dangerousAcceptVersionCollision: false,
   dangerousSelfUpdateDuringLoop: false,
   statusNotice: true,
   tiersRafa: 'on',
@@ -629,6 +653,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'pr:\n  resolveBudget: 4', 'prResolveBudget', 4,
   ],
   [
+    'pr.versionCollision', 'pr:\n  versionCollision: Report',
+    'pr.versionCollision is "Report", expected one of: allow, report, ask, refuse',
+    'pr:\n  versionCollision: allow', 'prVersionCollision', 'allow',
+  ],
+  [
     'board.trustedAuthors', 'board:\n  trustedAuthors: octocat',
     'board.trustedAuthors is "octocat", expected a list of GitHub logins',
     'board:\n  trustedAuthors: [hubot]', 'boardTrustedAuthors', ['hubot'],
@@ -659,6 +688,26 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'release:\n  heading: "## {version}"', 'releaseHeading', '## {version}',
   ],
   [
+    'release.fragments', 'release:\n  fragments: /tmp/changes',
+    'release.fragments is "/tmp/changes", expected a relative directory path not under .rafa/',
+    'release:\n  fragments: .changes/', 'releaseFragments', '.changes/',
+  ],
+  [
+    'release.strategy', 'release:\n  strategy: semver',
+    'release.strategy is "semver", expected one of: semver-by-level',
+    'release:\n  strategy: semver-by-level', 'releaseStrategy', 'semver-by-level',
+  ],
+  [
+    'release.settle', 'release:\n  settle: PR',
+    'release.settle is "PR", expected one of: push, pr',
+    'release:\n  settle: push', 'releaseSettle', 'push',
+  ],
+  [
+    'release.tag', 'release:\n  tag: auto',
+    'release.tag is "auto", expected one of: manual, settle',
+    'release:\n  tag: manual', 'releaseTag', 'manual',
+  ],
+  [
     'cleanup.staleDays', 'cleanup:\n  staleDays: 2.5',
     'cleanup.staleDays is 2.5, expected a number of days, a whole number above zero',
     'cleanup:\n  staleDays: 14', 'cleanupStaleDays', 14,
@@ -677,6 +726,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'dangerous.acceptStaleRefs', 'dangerous:\n  acceptStaleRefs: "true"',
     'dangerous.acceptStaleRefs is "true", expected true or false',
     'dangerous:\n  acceptStaleRefs: true', 'dangerousAcceptStaleRefs', true,
+  ],
+  [
+    'dangerous.acceptVersionCollision', 'dangerous:\n  acceptVersionCollision: 1',
+    'dangerous.acceptVersionCollision is 1, expected true or false',
+    'dangerous:\n  acceptVersionCollision: true', 'dangerousAcceptVersionCollision', true,
   ],
   [
     'dangerous.selfUpdateDuringLoop', 'dangerous:\n  selfUpdateDuringLoop: "true"',
@@ -812,5 +866,84 @@ describe('a user-level pin naming an unloaded tier', () => {
     loadConfig(roots, {}, warn);
 
     expect(lines).toEqual([]);
+  });
+});
+
+/**
+ * The release plan's six keys, driven through `loadConfig` rather than the
+ * pure resolver: `PROJECT_TEXT`/`PROJECT_VALUES` and `SECTION_CASES` above
+ * already carry all six through the whole-schema round trip, so what this
+ * block adds is narrow and explicit — the six read together from a real
+ * `.rafa/config.yaml`, the six fall back to their defaults together when no
+ * file names them, and a `release.fragments` planted under the gitignored
+ * `.rafa/` is refused with the real file's path, the case `SECTION_CASES`
+ * covers only with an absolute path.
+ */
+describe('the release plan\'s six keys, through loadConfig', () => {
+  it('reads all six from .rafa/config.yaml, sourced from the file', () => {
+    const roots = scopes(
+      [
+        'pr:',
+        '  versionCollision: ask',
+        'release:',
+        '  fragments: release-notes',
+        '  strategy: semver-by-level',
+        '  settle: pr',
+        '  tag: settle',
+        'dangerous:',
+        '  acceptVersionCollision: true',
+        '',
+      ].join('\n'),
+      null,
+    );
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      prVersionCollision: 'ask',
+      releaseFragments: 'release-notes',
+      releaseStrategy: 'semver-by-level',
+      releaseSettle: 'pr',
+      releaseTag: 'settle',
+      dangerousAcceptVersionCollision: true,
+    });
+    expect(resolved.sources).toMatchObject({
+      prVersionCollision: 'file',
+      releaseFragments: 'file',
+      releaseStrategy: 'file',
+      releaseSettle: 'file',
+      releaseTag: 'file',
+      dangerousAcceptVersionCollision: 'file',
+    });
+  });
+
+  it('falls back to defaults, together, when no config file names them', () => {
+    const roots = scopes(null, null);
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      prVersionCollision: CONFIG_DEFAULTS.prVersionCollision,
+      releaseFragments: CONFIG_DEFAULTS.releaseFragments,
+      releaseStrategy: CONFIG_DEFAULTS.releaseStrategy,
+      releaseSettle: CONFIG_DEFAULTS.releaseSettle,
+      releaseTag: CONFIG_DEFAULTS.releaseTag,
+      dangerousAcceptVersionCollision: CONFIG_DEFAULTS.dangerousAcceptVersionCollision,
+    });
+    expect(resolved.sources).toMatchObject({
+      prVersionCollision: 'default',
+      releaseFragments: 'default',
+      releaseStrategy: 'default',
+      releaseSettle: 'default',
+      releaseTag: 'default',
+      dangerousAcceptVersionCollision: 'default',
+    });
+  });
+
+  it('reports a release.fragments planted under .rafa/, naming the real file', () => {
+    const roots = scopes('release:\n  fragments: .rafa/changes\n', null);
+
+    expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+      `${literalPath(roots.root)}: release.fragments is ".rafa/changes", `
+        + 'expected a relative directory path not under .rafa/',
+    ]);
   });
 });

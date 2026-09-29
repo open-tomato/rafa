@@ -117,16 +117,22 @@ const SETTINGS: readonly ConfigSetting[] = [
   'prMergeMethod',
   'prBase',
   'prResolveBudget',
+  'prVersionCollision',
   'boardTrustedAuthors',
   'roadmapIssue',
   'releaseEnabled',
   'releaseVersionFile',
   'releaseChangelog',
   'releaseHeading',
+  'releaseFragments',
+  'releaseStrategy',
+  'releaseSettle',
+  'releaseTag',
   'cleanupStaleDays',
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
   'dangerousAcceptStaleRefs',
+  'dangerousAcceptVersionCollision',
   'dangerousSelfUpdateDuringLoop',
   'statusNotice',
   'tiersRafa',
@@ -166,16 +172,22 @@ const DEFAULTS: RafaConfig = {
   prMergeMethod: 'squash',
   prBase: null,
   prResolveBudget: 2,
+  prVersionCollision: 'report',
   boardTrustedAuthors: [],
   roadmapIssue: null,
   releaseEnabled: 'auto',
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseFragments: '.changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'push',
+  releaseTag: 'manual',
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
   dangerousAcceptStaleRefs: false,
+  dangerousAcceptVersionCollision: false,
   dangerousSelfUpdateDuringLoop: false,
   statusNotice: true,
   tiersRafa: 'on',
@@ -192,7 +204,10 @@ const DEFAULTS: RafaConfig = {
   taskLessons: 'on',
 };
 
-/** A file naming every setting, each at a value other than its default. */
+/**
+ * A file naming every setting, each at a value other than its default
+ * but for `version` and `release.strategy`, which accept one value each.
+ */
 const FULL = [
   'version: 1',
   'store: ndjson',
@@ -243,6 +258,7 @@ const FULL = [
   '  mergeMethod: rebase',
   '  base: trunk',
   '  resolveBudget: 0.5',
+  '  versionCollision: refuse',
   'board:',
   '  trustedAuthors: ["dependabot[bot]"]',
   'roadmap:',
@@ -252,12 +268,17 @@ const FULL = [
   '  versionFile: deno.json',
   '  changelog: docs/CHANGES.md',
   '  heading: "### {version} on {date}"',
+  '  fragments: docs/changes',
+  '  strategy: semver-by-level',
+  '  settle: pr',
+  '  tag: settle',
   'cleanup:',
   '  staleDays: 60',
   '  worktreeIdleDays: 14',
   '  keep: ["release/*", keep-me]',
   'dangerous:',
   '  acceptStaleRefs: true',
+  '  acceptVersionCollision: true',
   '  selfUpdateDuringLoop: true',
   'status:',
   '  notice: false',
@@ -272,7 +293,10 @@ const FULL = [
   '',
 ].join('\n');
 
-/** What {@link FULL} reads as. `version` is the one at its default. */
+/**
+ * What {@link FULL} reads as. `version` and `release.strategy`, each
+ * accepting one value, are the two at their default.
+ */
 const FULL_VALUES: RafaConfig = {
   version: 1,
   store: 'ndjson',
@@ -315,16 +339,22 @@ const FULL_VALUES: RafaConfig = {
   prMergeMethod: 'rebase',
   prBase: 'trunk',
   prResolveBudget: 0.5,
+  prVersionCollision: 'refuse',
   boardTrustedAuthors: ['dependabot[bot]'],
   roadmapIssue: 31,
   releaseEnabled: false,
   releaseVersionFile: 'deno.json',
   releaseChangelog: 'docs/CHANGES.md',
   releaseHeading: '### {version} on {date}',
+  releaseFragments: 'docs/changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'pr',
+  releaseTag: 'settle',
   cleanupStaleDays: 60,
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
   dangerousAcceptStaleRefs: true,
+  dangerousAcceptVersionCollision: true,
   dangerousSelfUpdateDuringLoop: true,
   statusNotice: false,
   tiersRafa: 'off',
@@ -411,12 +441,12 @@ describe('parseConfigText', () => {
     expect(file.path).toBe(PATH);
   });
 
-  it('names every setting but version at a value other than its default', () => {
+  it('names every setting but the two with one value at a value other than its default', () => {
     const atDefault = SETTINGS.filter(
       (setting) => Bun.deepEquals(FULL_VALUES[setting], CONFIG_DEFAULTS[setting]),
     );
 
-    expect(atDefault).toEqual(['version']);
+    expect(atDefault).toEqual(['version', 'releaseStrategy']);
   });
 
   it.each([
@@ -685,6 +715,11 @@ describe('parseConfigText', () => {
         'pr:\n  resolveBudget: 1.25', 'prResolveBudget', 1.25,
       ],
       [
+        'pr.versionCollision', 'pr:\n  versionCollision: warn',
+        'pr.versionCollision is "warn", expected one of: allow, report, ask, refuse',
+        'pr:\n  versionCollision: ask', 'prVersionCollision', 'ask',
+      ],
+      [
         'board.trustedAuthors', 'board:\n  trustedAuthors: [octo cat]',
         'board.trustedAuthors[0] is "octo cat", expected a GitHub login',
         'board:\n  trustedAuthors: [octocat]', 'boardTrustedAuthors', ['octocat'],
@@ -715,6 +750,26 @@ describe('parseConfigText', () => {
         'release:\n  heading: "### {version}"', 'releaseHeading', '### {version}',
       ],
       [
+        'release.fragments', 'release:\n  fragments: .rafa/changes',
+        'release.fragments is ".rafa/changes", expected a relative directory path not under .rafa/',
+        'release:\n  fragments: changes', 'releaseFragments', 'changes',
+      ],
+      [
+        'release.strategy', 'release:\n  strategy: calver',
+        'release.strategy is "calver", expected one of: semver-by-level',
+        'release:\n  strategy: semver-by-level', 'releaseStrategy', 'semver-by-level',
+      ],
+      [
+        'release.settle', 'release:\n  settle: merge',
+        'release.settle is "merge", expected one of: push, pr',
+        'release:\n  settle: pr', 'releaseSettle', 'pr',
+      ],
+      [
+        'release.tag', 'release:\n  tag: true',
+        'release.tag is true, expected one of: manual, settle',
+        'release:\n  tag: settle', 'releaseTag', 'settle',
+      ],
+      [
         'cleanup.staleDays', 'cleanup:\n  staleDays: 0',
         'cleanup.staleDays is 0, expected a number of days, a whole number above zero',
         'cleanup:\n  staleDays: 90', 'cleanupStaleDays', 90,
@@ -733,6 +788,11 @@ describe('parseConfigText', () => {
         'dangerous.acceptStaleRefs', 'dangerous:\n  acceptStaleRefs: yes',
         'dangerous.acceptStaleRefs is "yes", expected true or false',
         'dangerous:\n  acceptStaleRefs: true', 'dangerousAcceptStaleRefs', true,
+      ],
+      [
+        'dangerous.acceptVersionCollision', 'dangerous:\n  acceptVersionCollision: "true"',
+        'dangerous.acceptVersionCollision is "true", expected true or false',
+        'dangerous:\n  acceptVersionCollision: true', 'dangerousAcceptVersionCollision', true,
       ],
       [
         'dangerous.selfUpdateDuringLoop', 'dangerous:\n  selfUpdateDuringLoop: yes',

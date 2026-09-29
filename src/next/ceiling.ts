@@ -17,13 +17,13 @@
  * proposal and stopping the chain there is `src/commands/next.ts`, the
  * one module of the surface that writes a line.
  *
- * ## The ten ids
+ * ## The eleven ids
  *
  * {@link YES_ACTIONS}: `sync`, an action that runs no registered command
- * (`./sync.ts`), the seven of {@link NEXT_COMMAND_ACTIONS} that
+ * (`./sync.ts`), the eight of {@link NEXT_COMMAND_ACTIONS} that
  * {@link ALWAYS_ASKED} does not hold, and `hop` and `home`, the two
  * other actions that run none (`./hop-action.ts`), which only the hop
- * rows of `rafa next --roadmap` propose (`./hop-rows.ts`). The seven are
+ * rows of `rafa next --roadmap` propose (`./hop-rows.ts`). The eight are
  * taken off that table rather than spelled again, so an id the table
  * gains is accepted here the same day and the list `--yes` names cannot
  * drift from the list the chain can run. `none` is not among them: it
@@ -42,6 +42,12 @@
  * four, one at a time, `--yes=merge,start,hop`, which is the shape of a
  * ceiling: the cheap steps are the default, the costly ones are asked
  * for by name.
+ *
+ * `settle`, which `rafa next` proposes after its merge step while
+ * fragments wait on the base (`./settle-step.ts`), is left out for the
+ * same reason as `merge`: it commits a release and pushes it to the
+ * base branch, so it runs unasked only under a list that names it,
+ * `--yes=merge,settle`.
  *
  * {@link ROADMAP_ACTIONS} names the two ids no run proposes without
  * `--roadmap`: `src/next/lines.ts` leaves them out of the lists it
@@ -123,9 +129,9 @@ export const CEILING_REFUSAL_EXIT = 2;
 export const ROADMAP_ACTIONS: ReadonlySet<NextActionId> = new Set<NextActionId>(['hop', 'home']);
 
 /**
- * The ten ids a list may name: `sync`, which runs no command, the seven
+ * The eleven ids a list may name: `sync`, which runs no command, the eight
  * of the action table that {@link ALWAYS_ASKED} does not hold, and `hop`
- * and `home`. The seven are taken off that table, so the two cannot
+ * and `home`. The eight are taken off that table, so the two cannot
  * drift; see the module note.
  */
 export const YES_ACTIONS: readonly NextActionId[] = Object.freeze([

@@ -20,11 +20,14 @@
  *
  * ## Simple, and why it is not a property of the class alone
  *
- * SIMPLE means "a pinned resolve plan can fix this without judgement".
- * Two classes are simple whoever opened the pull request: a lockfile
+ * SIMPLE means "`--resolve` can fix this without judgement" — through a
+ * pinned resolve plan, or for {@link CONVERSION_TRIAGE_CLASSES} through
+ * a conversion in code that starts no session.
+ * Three classes are simple whoever opened the pull request: a lockfile
  * conflict is resolved by taking the base's lockfile and reinstalling,
  * and a manifest conflict by keeping both sides' entries and the higher
- * version where both bumped one. Neither needs to know what the pull
+ * version where both bumped one, and a stamped version by turning the
+ * stamped section into a fragment. None needs to know what the pull
  * request was FOR.
  *
  * The other two — {@link DEPENDENCY_BUMP_SIMPLE_CLASSES}, a failing
@@ -72,6 +75,9 @@ import type { PullRequestSummary } from '../types.js';
  * the way forward is `rafa pr merge --skip-checks`, not a resolve. `ci-other` and `conflict-other` are the deliberate
  * catch-alls: a failing step nothing recognises is still reported and
  * still commented, it is simply never resolved automatically.
+ * `conflict-version` is the release guard's reading, not git's: the
+ * branch stamped a version (`stale` or `collision` in
+ * `src/release/guard.ts`) where the base expects a fragment.
  */
 export type TriageClass
   = | 'green'
@@ -80,6 +86,7 @@ export type TriageClass
     | 'conflict-lockfile'
     | 'conflict-manifest'
     | 'conflict-other'
+    | 'conflict-version'
     | 'ci-install'
     | 'ci-lint'
     | 'ci-types'
@@ -99,6 +106,7 @@ export const TRIAGE_CLASSES: readonly TriageClass[] = Object.freeze([
   'conflict-lockfile',
   'conflict-manifest',
   'conflict-other',
+  'conflict-version',
   'ci-install',
   'ci-lint',
   'ci-types',
@@ -128,6 +136,21 @@ export function isTriageClass(value: unknown): value is TriageClass {
 export const SIMPLE_TRIAGE_CLASSES: readonly TriageClass[] = Object.freeze([
   'conflict-lockfile',
   'conflict-manifest',
+] as const);
+
+/**
+ * The classes `--resolve` converts in code, with no pinned plan and no
+ * session: simple on any pull request, like
+ * {@link SIMPLE_TRIAGE_CLASSES}, but kept apart from it because
+ * `src/pr/plans/load.ts` claims a pinned plan for every member of that
+ * list and none ships for these.
+ *
+ * `conflict-version` alone: its fix — the stamped section's lines
+ * become a fragment, the version file and the changelog return to the
+ * base's — needs nothing from the pull request's intent.
+ */
+export const CONVERSION_TRIAGE_CLASSES: readonly TriageClass[] = Object.freeze([
+  'conflict-version',
 ] as const);
 
 /**
@@ -190,7 +213,8 @@ export function isDependencyBump(pr: DependencyBumpReading): boolean {
  * Whether a class is eligible for `rafa pr triage --resolve` on a pull
  * request with this bump reading.
  *
- * The one rule: {@link SIMPLE_TRIAGE_CLASSES} always, and
+ * The one rule: {@link SIMPLE_TRIAGE_CLASSES} and
+ * {@link CONVERSION_TRIAGE_CLASSES} always, and
  * {@link DEPENDENCY_BUMP_SIMPLE_CLASSES} when `dependencyBump` is true.
  * Everything else — including `green`, `pending` and `no-checks`,
  * which are not failures to resolve at all — is assessed only.
@@ -205,6 +229,7 @@ export function isSimpleTriageClass(
   options: { readonly dependencyBump: boolean },
 ): boolean {
   if (SIMPLE_TRIAGE_CLASSES.includes(triageClass)) return true;
+  if (CONVERSION_TRIAGE_CLASSES.includes(triageClass)) return true;
   return options.dependencyBump
     && DEPENDENCY_BUMP_SIMPLE_CLASSES.includes(triageClass);
 }

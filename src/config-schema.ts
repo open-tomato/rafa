@@ -12,7 +12,9 @@
  * `mapOf`, whose ruling is on a KEY — the names a map setting's file
  * spells below its own key — and the named readers the settings below
  * are read through, `directory`, `trackerKind`, `releaseFile`,
- * `tierPins` and `routeTable`.
+ * `tierPins` and `routeTable`, and the readers of the release plan's
+ * keys. `config-schema-release.ts` holds the `pr` and `release`
+ * sections and `dangerous.acceptVersionCollision`, spread in here.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -21,7 +23,8 @@
  * those readers moved out to `config-readers.ts`, leaving it at 727.
  * At 780 its per-section readings — the `pr` section's through the
  * `learning` section's — moved out to `config-schema-readings.ts`, a
- * note that exports nothing, leaving it at 545.
+ * note that exports nothing, and the `pr` and `release` sections'
+ * fields, defaults and specs moved out to `config-schema-release.ts`.
  *
  * ## The schema
  *
@@ -65,7 +68,8 @@
  * entry naming no field does not either. {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and the known-key index are
  * all read off it, so adding a setting is one field, one default, one
- * spec, its reader in `config-sections.ts`, one line in `config.ts`'s
+ * spec — in `config-schema-release.ts` for a `pr` or `release` key —
+ * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
  * beyond the readings its spec leaves, which go in
@@ -87,18 +91,20 @@
  * that comparison argue for `full`, the change is that one line.
  */
 import type {
+  DangerousReleaseSettings,
+  PrSettings,
+  ReleaseSettings,
+} from './config-schema-release.js';
+import type {
   ClaudeSettingSource,
   ConfigVersion,
   InjectMode,
   LessonSwitch,
-  MergeMethod,
   ModuleSource,
   OptionalPrerequisiteItem,
   OutputMode,
   PrerequisiteItem,
-  PrProvider,
   Reader,
-  ReleaseEnabled,
   RouteTarget,
   SkillResolverName,
   StoreBackend,
@@ -111,11 +117,18 @@ import { join } from 'node:path';
 
 import {
   directory,
-  releaseFile,
   routeTable,
   tierPins,
   trackerKind,
 } from './config-readers.js';
+import {
+  DANGEROUS_RELEASE_DEFAULTS,
+  DANGEROUS_RELEASE_SETTINGS,
+  PR_DEFAULTS,
+  PR_SETTINGS,
+  RELEASE_DEFAULTS,
+  RELEASE_SETTINGS,
+} from './config-schema-release.js';
 import {
   busyTimeoutMs,
   CLAUDE_SETTING_SOURCES,
@@ -128,16 +141,12 @@ import {
   issueNumber,
   lessonSwitch,
   listOf,
-  mergeMethod,
   MODULE_SOURCE_KEYS,
   moduleSource,
   OPTIONAL_ITEM_KEYS,
   oneOf,
   optionalPrerequisite,
   OUTPUT_MODES,
-  PR_PROVIDERS,
-  RELEASE_AUTO,
-  releaseEnabled,
   recurrenceCount,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
@@ -147,7 +156,6 @@ import {
   SYNC_STRATEGIES,
   text,
   tierSwitch,
-  usdAmount,
 } from './config-sections.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
 
@@ -161,8 +169,13 @@ import { DEFAULT_ROUTING } from './tiers/routing.js';
  */
 export const CONFIG_FILE = join('.rafa', 'config.yaml');
 
-/** Every setting, resolved. The module note maps each to its file key. */
-export interface RafaConfig {
+/**
+ * Every setting, resolved. The module note maps each to its file key;
+ * the `pr` and `release` fields are {@link PrSettings}' and
+ * {@link ReleaseSettings}', and `dangerousAcceptVersionCollision` is
+ * {@link DangerousReleaseSettings}'.
+ */
+export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -216,23 +229,6 @@ export interface RafaConfig {
    */
   loopWorktreeDir: string;
   /**
-   * The provider every `pr` action goes through, or null to read it off
-   * the `origin` remote. `pr.provider`.
-   */
-  prProvider: PrProvider | null;
-  /** How `pr merge` merges, unless `--method` names another. `pr.mergeMethod`. */
-  prMergeMethod: MergeMethod;
-  /**
-   * The branch a pull request is opened into, or null for whatever the
-   * remote calls its default branch. `pr.base`.
-   */
-  prBase: string | null;
-  /**
-   * The budget in US dollars each `pr triage --resolve` session is
-   * spawned with. `pr.resolveBudget`.
-   */
-  prResolveBudget: number;
-  /**
    * The logins trusted with board text besides the repository's own
    * write-holders. `board.trustedAuthors`.
    */
@@ -242,23 +238,6 @@ export interface RafaConfig {
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
    */
   roadmapIssue: number | null;
-  /**
-   * Whether a run bumps the version and writes a changelog entry, or
-   * `auto` to decide it off the two files below. `release.enabled`.
-   */
-  releaseEnabled: ReleaseEnabled;
-  /**
-   * The manifest the version is read from and written back to, from
-   * the repository root. `release.versionFile`.
-   */
-  releaseVersionFile: string;
-  /**
-   * The changelog an entry is inserted into, from the repository root.
-   * `release.changelog`.
-   */
-  releaseChangelog: string;
-  /** The template one entry's heading is rendered from. `release.heading`. */
-  releaseHeading: string;
   /**
    * The age in days past which `rafa cleanup` lists a branch as Stale.
    * `cleanup.staleDays`.
@@ -349,20 +328,15 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
   loopWorktreeDir: join('.rafa', 'worktrees'),
-  prProvider: null,
-  prMergeMethod: 'squash',
-  prBase: null,
-  prResolveBudget: 2,
+  ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   roadmapIssue: null,
-  releaseEnabled: RELEASE_AUTO,
-  releaseVersionFile: 'package.json',
-  releaseChangelog: 'CHANGELOG.md',
-  releaseHeading: '## {version} — {date}, {title}',
+  ...RELEASE_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
+  ...DANGEROUS_RELEASE_DEFAULTS,
   dangerousSelfUpdateDuringLoop: false,
   statusNotice: true,
   tiersRafa: 'on',
@@ -448,28 +422,14 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: true,
   },
   loopWorktreeDir: { key: 'loop.worktreeDir', read: directory, cli: false },
-  prProvider: { key: 'pr.provider', read: oneOf(PR_PROVIDERS), cli: false },
-  prMergeMethod: { key: 'pr.mergeMethod', read: mergeMethod, cli: false },
-  prBase: { key: 'pr.base', read: text('a branch name'), cli: false },
-  prResolveBudget: { key: 'pr.resolveBudget', read: usdAmount, cli: false },
+  ...PR_SETTINGS,
   boardTrustedAuthors: {
     key: 'board.trustedAuthors',
     read: listOf(githubLogin, 'GitHub logins'),
     cli: false,
   },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
-  releaseEnabled: { key: 'release.enabled', read: releaseEnabled, cli: false },
-  releaseVersionFile: {
-    key: 'release.versionFile',
-    read: releaseFile,
-    cli: false,
-  },
-  releaseChangelog: { key: 'release.changelog', read: releaseFile, cli: false },
-  releaseHeading: {
-    key: 'release.heading',
-    read: text('a changelog heading template'),
-    cli: false,
-  },
+  ...RELEASE_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {
     key: 'cleanup.worktreeIdleDays',
@@ -486,6 +446,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: flag,
     cli: false,
   },
+  ...DANGEROUS_RELEASE_SETTINGS,
   dangerousSelfUpdateDuringLoop: {
     key: 'dangerous.selfUpdateDuringLoop',
     read: flag,

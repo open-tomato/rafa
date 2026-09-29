@@ -15,7 +15,8 @@
  * classifier itself as the reading.
  *
  * The second group covers the release bullets, the prompt's half of
- * the spec's step 2 (`.specs/rafa-21-changelog-and-release.md`). They
+ * the release's step 2 (`.rafa/specs/rafa-367-releases-settle-base-branch.md`):
+ * the session rewrites the notes inside the plan's fragment. They
  * are the only bullets whose text depends on an argument, so each case
  * builds a step-1 record and reads what the prompt made of it. The
  * prepared and the skipped record are each other's control: what one
@@ -42,7 +43,7 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { actionHash } from '../learning/index.js';
-import { renderChangelogEntry } from '../release/changelog.js';
+import { serializeFragment } from '../release/fragment.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { parsePromoted } from './promoted.js';
@@ -86,59 +87,54 @@ describe('the wrap-up prompt\'s pull-request naming', () => {
   });
 });
 
-/** The heading step 1 rendered, as every release case below reads it. */
-const HEADING = '## 0.5.0 — 2026-09-20, Changelog and release in the loop';
+/** The plan id every release case below writes its fragment for. */
+const PLAN_ID = 'rafa-367';
 
-/** The notes the entry's raw lines are rendered from. */
+/** The fragment path step 1 wrote, as every release case below reads it. */
+const FRAGMENT_PATH = '.changes/rafa-367.md';
+
+/** The raw note lines step 1 wrote below the front matter. */
 const NOTES = [
-  { level: 'minor', area: 'release', summary: 'the loop writes the changelog entry' },
-  { level: 'patch', area: 'loop', summary: 'the wrap-up leaves the release files alone' },
+  '- release: the wrap-up writes a change fragment',
+  '- loop: the wrap-up leaves the version file alone',
 ] as const;
 
 /**
- * A step-1 record shaped as `release/prepare.ts` answers one, over a
- * real rendering of {@link NOTES} so the bullets quote the heading the
- * changelog actually carries.
+ * A step-1 record shaped as `release/prepare.ts` answers one, its file
+ * text a real serialization of the fragment so the record is one that
+ * module could have written.
  *
- * `overrides` is how the no-version-file case drops both the version
- * and the file edit, which is the one shape that changes the wording.
+ * `level` is how the `none` case changes the fragment, which is the one
+ * reading that changes the wording.
  */
-function preparedRelease(overrides: Partial<ReleasePrepared> = {}): ReleasePrepared {
-  const changelogText = `# Changelog\n\n${HEADING}\n`;
+function preparedRelease(level: ReleasePrepared['level'] = 'minor'): ReleasePrepared {
+  const fragment = { plan: PLAN_ID, title: 'Releases settle on the base branch', level, notes: [...NOTES] };
   return {
     kind: 'prepared',
-    level: 'minor',
+    level,
     levelSource: 'plan',
     notesLevel: 'minor',
-    version: '0.5.0',
-    baseVersion: '0.4.0',
-    fetched: true,
-    entry: renderChangelogEntry({
-      template: '## {version} — {date}, {title}',
-      values: { version: '0.5.0', date: '2026-09-20', title: 'Changelog and release in the loop' },
-      notes: [...NOTES],
-    }),
-    insertPoint: 'file-end',
-    insertLine: 3,
-    changelog: { path: 'CHANGELOG.md', resolved: '/repo/CHANGELOG.md', before: '# Changelog\n', after: changelogText },
-    versionFile: {
-      path: 'package.json',
-      resolved: '/repo/package.json',
-      before: '{"version":"0.4.0"}',
-      after: '{"version":"0.5.0"}',
+    plan: PLAN_ID,
+    fragment,
+    file: {
+      path: FRAGMENT_PATH,
+      resolved: `/repo/${FRAGMENT_PATH}`,
+      before: null,
+      after: serializeFragment(fragment),
     },
+    base: { ref: 'origin/main', commit: 'a'.repeat(40), waiting: [] },
+    fetched: true,
     problems: [],
-    ...overrides,
   };
 }
 
-/** A step-1 record that wrote nothing, worded as `level-none` words it. */
+/** A step-1 record that wrote nothing, worded as `disabled` words it. */
 function skippedRelease(): ReleaseSkipped {
   return {
     kind: 'skipped',
-    reason: 'level-none',
-    sentence: 'the plan declares release: none, so this pull request ships no version bump and no changelog entry',
-    level: 'none',
+    reason: 'disabled',
+    sentence: 'no release fragment: release.enabled is false in this project',
+    level: 'minor',
     levelSource: 'plan',
     notesLevel: null,
     problems: [],
@@ -158,52 +154,72 @@ describe('the wrap-up prompt\'s release bullets', () => {
     }
   });
 
-  test('asks for the rewrite under the prepared heading and nowhere else', () => {
+  test('asks for the rewrite inside the fragment and nowhere else', () => {
     const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
 
-    expect(prompt).toContain(`headed \`${HEADING}\``);
-    expect(prompt).toContain('Rewrite the raw `- <area>: <summary>` lines under THAT heading into one line per area');
-    expect(prompt).toContain('not another release\'s section');
+    expect(prompt).toContain(`release fragment: \`${FRAGMENT_PATH}\`, for plan \`${PLAN_ID}\` at level \`minor\``);
+    expect(prompt).toContain('Rewrite the raw `- <area>: <summary>` lines below its front matter into one line per area');
+    expect(prompt).toContain('not the `plan:`, `title:` or `level:` lines');
     expect(prompt).toContain('not the file\'s trailing newline');
+    expect(prompt).toContain(`still names plan \`${PLAN_ID}\` and still carries level \`minor\``);
 
     // The control: with no preparation the prompt says none of it, so
     // the assertions above read the bullets and not the rest of the
     // list.
     const bare = buildWrapUpPrompt(BRANCH, PLAN, null);
-    expect(bare).not.toContain(HEADING);
+    expect(bare).not.toContain(FRAGMENT_PATH);
     expect(bare).not.toContain('Rewrite the raw');
   });
 
-  test('leaves both release files unstaged and uncommitted for the loop\'s own commit', () => {
+  test('no longer asks for a rewrite under a changelog heading', () => {
     const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
 
-    expect(prompt).toContain('Leave `CHANGELOG.md` and `package.json` UNSTAGED and UNCOMMITTED');
-    expect(prompt).toContain('do not sweep them up with `git add -A`');
-    expect(prompt).toContain('`chore: release 0.5.0` commit holding those files and nothing else');
+    expect(prompt).not.toContain('under THAT heading');
+    expect(prompt).not.toContain('now carries a new section headed');
+    expect(prompt).not.toContain('now declares');
+    expect(prompt).not.toContain('Carry the entry into the pull request body: the heading');
   });
 
-  test('carries the entry into the pull request body', () => {
+  test('leaves the fragment unstaged for the loop\'s own fragment commit', () => {
     const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
 
-    expect(prompt).toContain(`Carry the entry into the pull request body: the heading \`${HEADING}\``);
+    expect(prompt).toContain(`Leave \`${FRAGMENT_PATH}\` UNSTAGED and UNCOMMITTED`);
+    expect(prompt).toContain('do not sweep it up with `git add -A`');
+    expect(prompt).toContain(`\`chore: release fragment ${PLAN_ID}\` commit holding that file and nothing else`);
+  });
+
+  test('keeps the session off the version file, the changelog and the other fragments', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+
+    expect(prompt).toContain('Do not edit the version file, the changelog, or any other file under `.changes/` either');
+  });
+
+  test('carries the fragment into the pull request body with no version number', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+
+    expect(prompt).toContain('Carry the fragment into the pull request body: its level, `minor`');
     expect(prompt).toContain('as a section of the description');
+    expect(prompt).toContain('Name no version number');
   });
 
-  test('names the changelog alone when the project has no version file', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease({ version: null, versionFile: null }));
+  test('asks for the same rewrite over a none fragment, naming its level', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease('none'));
 
-    expect(prompt).toContain('this project has no version file to bump');
-    expect(prompt).toContain('Leave `CHANGELOG.md` UNSTAGED and UNCOMMITTED');
-    expect(prompt).toContain('its own `chore: release` commit');
-    expect(prompt).not.toContain('`package.json` now declares');
+    expect(prompt).toContain(`for plan \`${PLAN_ID}\` at level \`none\``);
+    expect(prompt).toContain('its level, `none`');
+    expect(prompt).not.toContain('ships NO release fragment');
+
+    // The control: the minor record's prompt names its own level, so
+    // the level above is read off the record and not a constant.
+    expect(buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease())).not.toContain('at level `none`');
   });
 
   test('writes the skip sentence verbatim instead of the three bullets', () => {
     const skipped = skippedRelease();
     const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, skipped);
 
-    expect(prompt).toContain(`This pull request ships NO release: ${skipped.sentence}.`);
-    expect(prompt).toContain('do not write an entry or bump a version by hand');
+    expect(prompt).toContain(`This pull request ships NO release fragment: ${skipped.sentence}.`);
+    expect(prompt).toContain('do not write a fragment, an entry or a version by hand');
 
     // The control: the prepared bullets are the ones NOT emitted here,
     // and a prompt built from the prepared record carries them.

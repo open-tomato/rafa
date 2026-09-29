@@ -92,6 +92,7 @@ import type { RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { MergeGuardSettings } from '../../release/guard-merge.js';
 
 import { execFileSync } from 'node:child_process';
 
@@ -100,6 +101,7 @@ import { loadConfig } from '../../config-load.js';
 import { messageOf } from '../../config-sections.js';
 import { ConfigError } from '../../config.js';
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
+import { mergeGuardSettings } from '../../release/guard-merge.js';
 
 /** One of the seven actions of the `pr` subject. */
 export type PrAction = 'current' | 'show' | 'view' | 'list' | 'merge' | 'triage' | 'wait';
@@ -213,6 +215,8 @@ export interface PrContext {
   readonly planDir: string;
   /** The branch checked out at the project root; throws when git cannot read it. */
   readonly readBranch: () => string;
+  /** The `release` settings the release guard reads, with `pr.versionCollision` and `dangerous.acceptVersionCollision`. */
+  readonly versionGuard: MergeGuardSettings;
 }
 
 /** Where a picked pull request number came from. */
@@ -232,7 +236,14 @@ export interface PullPick {
 /** The pull request settings an action reads off the config. */
 type PrConfig = Pick<
   RafaConfig,
-  'prProvider' | 'prMergeMethod' | 'prBase' | 'prResolveBudget' | 'boardTrustedAuthors' | 'roadmapIssue' | 'planDir'
+  | 'prProvider'
+  | 'prMergeMethod'
+  | 'prBase'
+  | 'prResolveBudget'
+  | 'boardTrustedAuthors'
+  | 'roadmapIssue'
+  | 'planDir'
+  | keyof MergeGuardSettings
 >;
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
@@ -293,6 +304,7 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     roadmapIssue: config.roadmapIssue,
     planDir: config.planDir,
     readBranch: () => readBranch(project.root),
+    versionGuard: mergeGuardSettings(config),
   };
 }
 

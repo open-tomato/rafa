@@ -259,7 +259,7 @@ const PROGRESS_PRESERVED = '\n✅ Progress preserved; PR opened or updated on th
  * sentence, not a temporary directory and whatever a spawn refused
  * with, so all three are read byte for byte.
  */
-const NO_RELEASE_SENTENCE = 'no version bump and no changelog entry: release.enabled is auto and package.json and CHANGELOG.md are not there';
+const NO_RELEASE_SENTENCE = 'no release fragment: release.enabled is auto and package.json and CHANGELOG.md are not there';
 
 /** Step 1 saying it prepared nothing, before the session is spawned. */
 const NO_RELEASE_PREPARED = `\n📦 No release prepared for this pull request: ${NO_RELEASE_SENTENCE}`;

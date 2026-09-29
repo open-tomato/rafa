@@ -175,6 +175,7 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
     changelog: { path: 'CHANGELOG.md', version: VERSION, problem: null },
     tags: { tags: [tag('v0.4.0')], latest: tag('v0.4.0'), problem: null },
     release: { commit: SET_COMMIT, ahead: 0, problem: null },
+    receipt: { kind: 'receipted', ids: ['rafa-21'] },
     ...over,
   };
 }

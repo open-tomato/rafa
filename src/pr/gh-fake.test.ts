@@ -76,7 +76,7 @@ describe('what the fake refuses', () => {
   it.each([
     [['pr', 'close', '7'], 'fake gh: unhandled command pr close 7\n'],
     [['pr', 'comment', '7', '--body', 'hi'], 'fake gh: unhandled command pr comment 7 --body hi\n'],
-    [['pr', 'create', '--title', 't'], 'fake gh: unhandled command pr create --title t\n'],
+    [['pr', 'ready', '7'], 'fake gh: unhandled command pr ready 7\n'],
     [['run', 'list'], 'fake gh: unhandled command run list\n'],
     [['auth', 'status'], 'fake gh: unhandled command auth status\n'],
   ])('refuses the command %p it does not model', async (args, stderr) => {
@@ -88,6 +88,7 @@ describe('what the fake refuses', () => {
     [['pr', 'merge', '7', '--squash', '--auto'], 'fake gh: pr merge does not model flag --auto\n'],
     [['pr', 'merge', '7', '--squash', '--admin'], 'fake gh: pr merge does not model flag --admin\n'],
     [['pr', 'list', '--json', 'number', '--author', 'octo'], 'fake gh: pr list does not model flag --author\n'],
+    [['pr', 'create', '--head', 'h', '--draft'], 'fake gh: pr create does not model flag --draft\n'],
   ])('refuses the flag %p it does not model', async (args, stderr) => {
     expect(await withOnePull().run(args)).toEqual(failure(stderr));
   });
@@ -298,16 +299,24 @@ describe('gh pr edit', () => {
     expect(fake.pull(7)?.body).toBe('');
   });
 
-  it('refuses an edit carrying no --body, before it looks for the pull request', async () => {
+  it('refuses an edit carrying neither --body nor --title, before it looks for the pull request', async () => {
     // The fake holds no pull request 7 here, so a refusal naming the
-    // body is also the reading that the body is checked first.
+    // two flags is also the reading that they are checked first.
     expect(await createFakePrGh().run(['pr', 'edit', '7']))
-      .toEqual(failure('fake gh: pr edit models --body <text> alone, and was handed no body\n'));
+      .toEqual(failure('fake gh: pr edit models --body <text> and --title <text>, and was handed neither\n'));
   });
 
-  it('refuses --title, which gh takes and this fake models nothing for', async () => {
-    expect(await withOnePull().run(['pr', 'edit', '7', '--title', 'a new title', '--body', 'x']))
-      .toEqual(failure('fake gh: pr edit does not model flag --title\n'));
+  it('replaces the title alone when handed --title alone, leaving the body', async () => {
+    const fake = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, body: 'Closes #20' }));
+
+    expect(await fake.run(['pr', 'edit', '7', '--title', 'chore: release 0.5.1'])).toEqual({ ok: true, stdout: '', stderr: '' });
+    expect(await json(fake, ['pr', 'view', '7', '--json', 'title,body'])).toEqual({ title: 'chore: release 0.5.1', body: 'Closes #20' });
+  });
+
+  it('refuses --add-label, which gh takes and this fake models nothing for', async () => {
+    expect(await withOnePull().run(['pr', 'edit', '7', '--add-label', 'release', '--body', 'x']))
+      .toEqual(failure('fake gh: pr edit does not model flag --add-label\n'));
   });
 
   it('answers the recorded GraphQL failure for a pull request it holds none of, changing no body', async () => {
@@ -317,6 +326,46 @@ describe('gh pr edit', () => {
       failure('GraphQL: Could not resolve to a PullRequest with the number of 9. (repository.pullRequest)\n'),
     );
     expect(fake.pull(7)?.body).toBe('');
+  });
+});
+
+describe('gh pr create', () => {
+  /** The four flags `create` always sends. */
+  const draft = (head: string): string[] => ['pr', 'create', '--head', head, '--base', 'main', '--title', 'chore: release 0.5.0', '--body', 'the body'];
+
+  it('opens the pull request under the next free number and writes its URL alone', async () => {
+    const fake = withOnePull();
+
+    expect(await fake.run(draft('rafa/release'))).toEqual({ ok: true, stdout: 'https://github.com/open-tomato/rafa/pull/8\n', stderr: '' });
+    expect(await json(fake, ['pr', 'view', '8', '--json', 'state,headRefName,baseRefName,title,body'])).toEqual({
+      state: 'OPEN',
+      headRefName: 'rafa/release',
+      baseRefName: 'main',
+      title: 'chore: release 0.5.0',
+      body: 'the body',
+    });
+  });
+
+  it('refuses a second open pull request from one head into one base, opening nothing', async () => {
+    const fake = createFakePrGh();
+    await fake.run(draft('rafa/release'));
+
+    expect(await fake.run(draft('rafa/release')))
+      .toEqual(failure('fake gh: a pull request for branch rafa/release into branch main already exists: https://github.com/open-tomato/rafa/pull/1\n'));
+    expect(fake.pull(2)).toBeUndefined();
+  });
+
+  it('opens one from a head whose earlier pull request is closed (the control)', async () => {
+    const fake = createFakePrGh();
+    await fake.run(draft('rafa/release'));
+    fake.update(1, (pull) => ({ ...pull, state: 'CLOSED' }));
+
+    expect((await fake.run(draft('rafa/release'))).stdout).toBe('https://github.com/open-tomato/rafa/pull/2\n');
+  });
+
+  it('refuses a create missing one of its four flags', async () => {
+    expect(await createFakePrGh().run(['pr', 'create', '--head', 'rafa/release', '--base', 'main', '--title', 't']))
+      .toEqual(failure('fake gh: pr create models --head, --base, --title and --body together, and was handed fewer\n'));
   });
 });
 

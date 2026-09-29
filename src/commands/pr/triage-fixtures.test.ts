@@ -5,7 +5,7 @@
  *
  * `triage.test.ts` proves the command's refusals, its ordering and its
  * writes; `classify.test.ts` proves the classifier holds the class set
- * closed over literal inputs. Neither reads the eleven fixture directories
+ * closed over literal inputs. Neither reads the twelve fixture directories
  * a earlier task captured, one per {@link TRIAGE_CLASSES} member, each
  * holding `pr.json` (the exact shape `gh pr view --json <DETAIL_FIELDS>`
  * answers, `gh.ts`'s `readDetail`), `checks.json` (the exact shape
@@ -19,7 +19,7 @@
  * Three jobs:
  *
  *   - Every class, produced from its own fixture, closed both ends the
- *     way `classify.test.ts` holds the set: the eleven classes produced are
+ *     way `classify.test.ts` holds the set: the twelve classes produced are
  *     exactly `TRIAGE_CLASSES`, and each fixture produces the class its
  *     directory is named for. `green` is read off `rerun.decision`
  *     rather than off `assessment.triageClass`, because a first-ever
@@ -44,12 +44,16 @@
  * `conflict.test.ts`'s territory — so it is supplied here by a stub
  * `GitRunner` keyed on the head commit each fixture carries, the same
  * technique `triage.test.ts` uses for its own single conflicting case.
+ * The release guard's verdict `conflict-version` needs is supplied the
+ * same way, by a `readGuard` seam keyed on the head commit.
  */
+import type { TriageGuardReader } from './triage-guard.js';
 import type { TriageSeams } from './triage.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { FakePrAuthor, FakePrCheck, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { TriageClass } from '../../pr/triage/classes.js';
+import type { GuardReading } from '../../release/guard.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
@@ -152,6 +156,48 @@ function conflictGit(filesByHead: ReadonlyMap<string, readonly string[]>): GitRu
   };
 }
 
+/**
+ * The files the `conflict-version` fixture conflicts on: the version
+ * file and the changelog both sides stamped, which alone would read as
+ * `conflict-other` — the guard's collision is what makes it the version
+ * class.
+ */
+const STAMPED_FILES: readonly string[] = ['CHANGELOG.md', 'package.json'];
+
+/**
+ * The guard's collision over the 0.25.0 incident, as `readGuard` would
+ * answer it for a branch that stamped the version the base released.
+ */
+const COLLISION_READING: GuardReading = {
+  ok: true,
+  verdict: {
+    answer: 'collision',
+    stamp: { version: '0.25.0', section: { heading: '## 0.25.0', notes: ['- the branch notes'] } },
+    base: {
+      version: '0.25.0',
+      section: { heading: '## 0.25.0', notes: ['- the base notes'] },
+      commit: 'b'.repeat(40),
+    },
+  },
+  branch: { ref: 'HEAD', name: 'feat/pr-412', pullRequest: 412, commit: 'c'.repeat(40) },
+  base: { ref: 'origin/main', commit: 'b'.repeat(40) },
+  forecast: null,
+  levelReport: null,
+  problems: [],
+};
+
+/**
+ * A guard reader answering {@link COLLISION_READING} for the heads in
+ * `stamped` and `null` — the release not running — for every other,
+ * the way `conflictGit` answers the conflicting files per head. The
+ * guard's own git reads are `src/release/guard.test.ts`'s territory.
+ */
+function stampGuard(stamped: ReadonlySet<string>): TriageGuardReader {
+  return (input) => stamped.has(input.pr.headRefOid)
+    ? COLLISION_READING
+    : null;
+}
+
 /** One class's captured fixture, read straight off disk. */
 interface CapturedFixture {
   /** The pull request, in the exact shape `gh pr view --json <DETAIL_FIELDS>` answers. */
@@ -208,6 +254,7 @@ const CONFLICT_FILES: ReadonlyMap<TriageClass, readonly string[]> = new Map([
   ['conflict-lockfile', ['bun.lock']],
   ['conflict-manifest', ['package.json']],
   ['conflict-other', ['src/config.ts']],
+  ['conflict-version', STAMPED_FILES],
 ]);
 
 /**
@@ -226,6 +273,7 @@ describe('every class, read off its own captured fixture', () => {
     const fake = createFakePrGh({ now: () => NOW });
     const numberOf = new Map<TriageClass, number>();
     const filesByHead = new Map<string, readonly string[]>();
+    const stamped = new Set<string>();
 
     for (const triageClass of TRIAGE_CLASSES) {
       const fixture = loadFixture(triageClass);
@@ -238,6 +286,7 @@ describe('every class, read off its own captured fixture', () => {
       if (runId !== null) fake.plantRun(runId, fixture.log);
       const files = CONFLICT_FILES.get(triageClass);
       if (files !== undefined) filesByHead.set(String(fixture.pr['headRefOid']), files);
+      if (triageClass === 'conflict-version') stamped.add(String(fixture.pr['headRefOid']));
     }
 
     const seams: TriageSeams = {
@@ -247,6 +296,7 @@ describe('every class, read off its own captured fixture', () => {
       git: () => conflictGit(filesByHead),
       now: () => NOW,
       permissions: () => createGhPermissions({ gh: fake.run }),
+      readGuard: stampGuard(stamped),
     };
     const project = freshProject();
 
@@ -258,6 +308,34 @@ describe('every class, read off its own captured fixture', () => {
 
     expect([...produced.values()].sort((a, b) => a.localeCompare(b))).toEqual([...TRIAGE_CLASSES].sort((a, b) => a.localeCompare(b)));
     for (const [triageClass, got] of produced) expect(got).toBe(triageClass);
+  });
+});
+
+describe('the release guard behind conflict-version', () => {
+  it('classes the stamped fixture on its git conflict alone where the guard reads nothing', async () => {
+    const fixture = loadFixture('conflict-version');
+    const seed = seedOf(fixture);
+    const head = String(fixture.pr['headRefOid']);
+    const filesByHead = new Map([[head, STAMPED_FILES]]);
+    const seamsWith = (stamped: ReadonlySet<string>): TriageSeams => {
+      const fake = createFakePrGh({ now: () => NOW });
+      fake.plant(seed);
+      return {
+        pullRequests: () => createGhPullRequests({ gh: fake.run }),
+        readBranch: () => 'main',
+        readRemote: () => GITHUB_ORIGIN,
+        git: () => conflictGit(filesByHead),
+        now: () => NOW,
+        permissions: () => createGhPermissions({ gh: fake.run }),
+        readGuard: stampGuard(stamped),
+      };
+    };
+
+    const unguarded = await readingsOf(seamsWith(new Set()), freshProject(), seed.number);
+    const guarded = await readingsOf(seamsWith(new Set([head])), freshProject(), seed.number);
+
+    expect(classOfReading(unguarded[0] as Record<string, unknown>)).toBe('conflict-other');
+    expect(classOfReading(guarded[0] as Record<string, unknown>)).toBe('conflict-version');
   });
 });
 

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the seventy-four registered so far wrap a
+ * of each is its command. Five of the seventy-five registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -57,6 +57,8 @@
  * `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s readers, nor
+ * `release settle`, which folds the waiting fragments in a scratch
+ * worktree of the base through `src/release/settle*.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
@@ -188,11 +190,16 @@
  *     declares, the latest release tag by semantic version precedence,
  *     the versions the changelog calls released that carry no tag, and
  *     the change notes pending for the current plan, writing nothing;
- *     and `release tag`, the one write of the subject, which puts
- *     `v<version>` on the release branch's HEAD and prints the push and
- *     publish lines rather than running them, refusing on another
- *     branch, on a tag already there, and where the two release files
- *     disagree.
+ *     `release settle [--dry-run]`, which folds the fragments waiting
+ *     on the base branch into one version and one changelog section in
+ *     a scratch worktree, commits `chore: release <version>` and
+ *     delivers it by `release.settle`, printing the fragments in fold
+ *     order, the strategy and the version and exiting 0 or 1 by the
+ *     settle's outcome, `--dry-run` writing nothing; and `release tag`,
+ *     which puts `v<version>` on the release branch's HEAD and prints
+ *     the push and publish lines rather than running them, refusing on
+ *     another branch, on a tag already there, and where the two release
+ *     files disagree.
  *   - `board list`, every open `type:roadmap` board, and the default
  *     board when it lacks the label, one line each: its number and
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
@@ -349,6 +356,7 @@ import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
 import prWait from './pr/wait.js';
+import releaseSettle from './release/settle.js';
 import releaseStatus from './release/status.js';
 import releaseTag from './release/tag.js';
 import roadmap from './roadmap.js';
@@ -374,7 +382,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
-  { name: 'release', summary: 'read the release state of the project; tag the commit that set the version' },
+  { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
 ]);
@@ -436,6 +444,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctFlag,
   instinctPromote,
   releaseStatus,
+  releaseSettle,
   releaseTag,
   boardList,
   epicShow,

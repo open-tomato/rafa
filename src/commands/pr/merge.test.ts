@@ -3,7 +3,7 @@
  * asks anything, the question and the two ways past it, the merge it
  * sends, each clean-up step it runs, what a failed step leaves, and the
  * follow-ups, the roadmap tick it writes after the merge, and the
- * unblock reading it ends with.
+ * unblock reading that runs after the clean-up.
  *
  * Every case dispatches the real command from a project of its own
  * beside a home of its own under this file's temporary directory
@@ -747,19 +747,19 @@ describe('the clean-up', () => {
 });
 
 describe('the follow-ups', () => {
-  it('names both where the version on the base is neither tagged nor installed', async () => {
+  it('names the update, and no tag, where the version on the base is untagged and not installed', async () => {
     const stub = stubPulls();
     const project = freshProject();
     plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
     const { run, lines } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes']);
 
     expect(run.exitCode).toBe(0);
-    expect(lines).toContain('Follow-ups:');
-    expect(lines.at(-2)).toContain('rafa release tag');
+    expect(lines.at(-2)).toBe('Follow-ups:');
     expect(lines.at(-1)).toContain('rafa self-update');
+    expect(lines.some((line) => line.includes('rafa release tag'))).toBe(false);
   });
 
-  it('names neither for a version that is tagged and already installed as the runtime', async () => {
+  it('names neither for a version already installed as the runtime, whatever its tag', async () => {
     const stub = stubPulls();
     const project = freshProject();
     plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
@@ -982,7 +982,7 @@ describe('the roadmap tick', () => {
   });
 });
 
-describe('the unblock reading it ends with', () => {
+describe('the unblock reading after the clean-up', () => {
   /** A board where #12 waits on the issue this merge closes, and that issue is closed. */
   const WAITING: BoardIssues = {
     blocked: { 12: 'Blocked by: #20\n' },
@@ -1029,10 +1029,10 @@ describe('the unblock reading it ends with', () => {
     expect(lines).toContain(`#12 is blocked by #26 (open), so ${SPEC_BLOCKED_LABEL} stays`);
   });
 
-  it('runs last, after the clean-up has reported and the follow-ups are named', async () => {
+  it('runs after the clean-up has reported, and before the follow-ups are named', async () => {
     const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
     const project = freshProject(ROADMAP_CONFIG);
-    plantPackage(project, `{"version": "${VERSION}"}`);
+    plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
     const seams = caseSeams(stub.pulls, project, { board: WAITING });
     const { lines } = await ran(seams.seams, project, ['41', '--yes']);
 
@@ -1043,8 +1043,8 @@ describe('the unblock reading it ends with', () => {
       return found;
     };
 
-    expect(at(`Removed ${SPEC_BLOCKED_LABEL} from #12`)).toBeGreaterThan(at('Follow-ups:'));
-    expect(at('Follow-ups:')).toBeGreaterThan(at('prune deleted remote branches: done'));
+    expect(at('Follow-ups:')).toBeGreaterThan(at(`Removed ${SPEC_BLOCKED_LABEL} from #12`));
+    expect(at(`Removed ${SPEC_BLOCKED_LABEL} from #12`)).toBeGreaterThan(at('prune deleted remote branches: done'));
   });
 
   it('is never reached by a clean-up step that failed, which leaves the label alone', async () => {
@@ -1103,7 +1103,8 @@ describe('json mode', () => {
       'delete-remote',
       'prune-remotes',
     ]);
-    expect((data['followUps'] as { id: string }[]).map((followUp) => followUp.id)).toEqual(['release-tag']);
+    // No changelog, so the release does not run and no settle is named; merge-settle.test.ts names one.
+    expect((data['followUps'] as { id: string }[]).map((followUp) => followUp.id)).toEqual([]);
     expect([data['roadmapTick'], data['roadmapTicks'], data['unblocked']]).toEqual([null, null, null]);
   });
 

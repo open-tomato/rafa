@@ -13,7 +13,12 @@ Seven actions read and control pull requests:
 - `pr show [<n>]` — details: title, author, branch → base, mergeable, each
   check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
-- `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable
+- `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable,
+  and where the release is on the forecast its body carries, marked
+  `(base moved)` when `origin/<base>` as last fetched holds another version
+  or other waiting fragments than the body's `rafa:release` marker names
+  (`src/commands/pr/list-forecast.ts`, over `src/release/body-forecast.ts`;
+  no fetch, no fold, no extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
   merge the PR; `--skip-checks` is for a PR that reports no checks at all
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
@@ -69,6 +74,20 @@ stage resolves is `gh`. The port is NOT in
 learning, output, planner and sync only), so adding a method to it bumps
 no version.
 
+`create` and `editTitle` are rafa-367's, for settle's `pr` delivery
+(`src/release/settle-pr.ts`), which opens or updates the one pending
+release pull request from `rafa/release`. `create` takes a
+`PullRequestDraft` — `head`, `base`, `title`, `body`, the head already
+pushed — and answers the pull request as `gh pr view` reads it back; it
+throws on every failure, a pull request already open from that head into
+that base included. On `gh` it sends `gh pr create` with all four flags,
+so nothing prompts, pushes or forks, and reads the number off the last
+stdout line that is a `/pull/<n>` URL. That output is from
+`gh pr create --help` on 2.100.0, not from a recorded create. `editTitle`
+is `gh pr edit <n> --title`, read by its exit code, as `editBody` is.
+The fake models both, and the unmodelled-flag case on `pr edit` now
+sends `--add-label`.
+
 `listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
 merged pull requests as `MergedPullRequest` rows — `number`,
 `headRefName`, `headRefOid`, `mergedAt` — through `gh pr list --state
@@ -120,9 +139,17 @@ sentence replaces nothing.
    `pr triage`, and verdict `none` — no checks at all — points at
    `--skip-checks` instead, since triage has nothing to fix there), and
    when the branch is checked out in another worktree (names it).
-2. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
+2. Where the release runs (`release.enabled`), read the release guard
+   (`src/commands/pr/merge-guard.ts`) over `origin/<head>` against
+   `origin/<base>`, both fetched first: `clean` prints its lines and the
+   forecast; `missing` and `stale` follow `pr.versionCollision` (`allow`,
+   `report`, `ask`, `refuse`); `collision` refuses unless
+   `dangerous.acceptVersionCollision` is true. Its question comes before the
+   merge question, `--yes` does not answer it, and without a TTY `ask`
+   refuses.
+3. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
-3. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
+4. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
    the base branch, `git pull --ff-only`, delete the local branch (`-D`: a
    squash leaves it unmerged in git's eyes), delete the remote branch when
    it still exists, `git fetch --prune`. A head branch this checkout has no
@@ -132,19 +159,23 @@ sentence replaces nothing.
    <name>; nothing to delete`; the remote delete and the prune still run,
    and the exit code stays 0. A branch checked out in another worktree is
    present, so step 1 still refuses it.
-4. Tick the roadmap, print what is ready and the two follow-ups when they
-   apply: `rafa release tag` and `rafa self-update`. While a loop of the
-   project is live, the update's line ends `run it after the loop on
-   <branch> finishes`, since `rafa self-update` refuses until then
-   (`src/commands/pr/merge-followups.ts`).
-5. Run the unblock reading over every open issue labelled
+5. Tick the roadmap and print what is ready.
+6. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
    about each one whose blockers have all closed and removing the label on a
    yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code.
-6. Last, name the one step that follows — with the base pulled and both
+7. Print the two follow-ups when they apply, under `Follow-ups:`:
+   `rafa self-update`, then `rafa release settle` while the fragments
+   waiting on `origin/<base>` fold into a version, so settle is the
+   merge's last line (`src/commands/pr/merge-followups.ts`). While a loop
+   of the project is live, the update's line ends `run it after the loop
+   on <branch> finishes`, since `rafa self-update` refuses until then.
+   Both are only printed: `pr merge` never runs settle, and `rafa release
+   tag` is no longer named here, since settle tags or names the tag itself.
+8. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
    (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
    DECLINED ends without it: nothing moved, so the hint would put the
@@ -198,18 +229,23 @@ Assessment is CODE, not a session:
   failing job, the repository's workflow count (`gh api
   repos/<repo>/actions/workflows`) when no check reported at all, and for a
   conflict the file list from `git merge-tree --write-tree` with a liveness
-  control (the `merge-tree-mergeability-readings` skill's rule).
+  control (the `merge-tree-mergeability-readings` skill's rule), and, where
+  the release runs, the release guard over the head against the base with
+  no fetch (`src/commands/pr/triage-guard.ts`).
 - Classify into one class: `green`, `pending`, `no-checks`,
   `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
-  added or bumped entries), `conflict-other`, `ci-install`, `ci-lint`,
-  `ci-types`, `ci-test`, `ci-other`. The failing STEP name decides the `ci-*`
-  class; `no-checks` means the PR reports no checks at all (verdict `none`),
+  added or bumped entries), `conflict-other`, `conflict-version`,
+  `ci-install`, `ci-lint`, `ci-types`, `ci-test`, `ci-other`. The failing STEP
+  name decides the `ci-*` class; `conflict-version` is the guard's `stale` or
+  `collision` answer (the branch stamped a version) and outranks every other
+  class, a git conflict included; `no-checks` means the PR reports no checks at all (verdict `none`),
   whatever the workflow count; the count, or that it could not be read,
   goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,
-  `conflict-manifest`, and `ci-install` or `ci-lint` on a dependency bump
-  PR (author `dependabot[bot]` or title `chore(deps`). Everything else is
-  assessed only.
+  `conflict-manifest`, `conflict-version` (`CONVERSION_TRIAGE_CLASSES`: a
+  conversion in code with no pinned plan and no session), and `ci-install`
+  or `ci-lint` on a dependency bump PR (author `dependabot[bot]` or title
+  `chore(deps`). Everything else is assessed only.
 - Output: the class, the evidence (files, step, log excerpt capped at 40
   lines), and a ready FOLLOW-UP PROMPT for another session that carries all
   of it, so that session does not assess again.
@@ -260,6 +296,28 @@ candidate refuses, exit 2, listing the commands.
 A pinned plan per simple class ships in the package
 (`src/pr/plans/resolve-<class>.md`), filled from the triage block and run by
 the ordinary loop, so commits, reports and effort rows are the usual ones.
+
+`conflict-version` has no pinned plan and is not run through the loop:
+`resolvePullRequest` dispatches it to `src/commands/pr/triage-convert.ts`
+ahead of the pinned-plan check, after the trust check and the
+cross-repository refusal. In the same worktree it runs
+`convertStampedVersion` (`src/pr/triage/version-convert.ts`), which makes
+ONE commit touching three paths. It writes a fragment of the stamped
+section's lines, named after the branch's last segment (a rafa branch gives
+its plan stub). The fragment's level is how far the stamp moved from the
+merge base's version. The commit also sets the version file's version back
+to the merge base's, keeping the branch's other bytes in it, and restores the
+changelog to the merge base's text. Then it pushes without force and removes
+the worktree. No session, no CI wait, no attempt raised, no comment written:
+the next `rafa pr triage` assesses the moved head. The MERGE base's values
+and not the base tip's, because the guard measures a stamp against the
+merge base: a branch holding the tip's version and sections still reads
+`stale`/`released` and would be classed `conflict-version` again. The merge
+then takes the base's side of both files. Exit 0 when converted and pushed
+or when the guard no longer reads a stamp; exit 3 when the conversion is
+refused (the worktree is not at the pull request's head, no level reads off
+the stamp, the merge base holds no version or changelog) or the push is
+rejected.
 
 - Workspace: `git worktree add ~/.rafa/worktrees/pr-<n> <branch>`, so the
   operator's uncommitted work is never touched; removed on success, on the

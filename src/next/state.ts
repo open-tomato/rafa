@@ -184,12 +184,16 @@ export type NextActionId =
   | 'plan'
   | 'unblock'
   | 'ready'
+  | 'settle'
   | 'hop'
   | 'home';
 
 /**
  * Which row of the table answered; the module note holds what each
- * matches. The last five are the hop rows, read under `roadmap` alone.
+ * matches. The five after `nothing-left` are the hop rows, read under
+ * `roadmap` alone, and the last, `fragments-waiting`, is no row at all:
+ * it is the settle step `./settle-step.ts` answers once a merge step
+ * has run.
  */
 export type NextStateId =
   | 'loop-running'
@@ -209,7 +213,8 @@ export type NextStateId =
   | 'away-ended'
   | 'hop-halt'
   | 'hop-blocked'
-  | 'hop-dry';
+  | 'hop-dry'
+  | 'fragments-waiting';
 
 /**
  * The two conditions reported ahead of the table, which stop it; the

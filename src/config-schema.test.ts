@@ -59,16 +59,22 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prMergeMethod', 'pr.mergeMethod'],
   ['prBase', 'pr.base'],
   ['prResolveBudget', 'pr.resolveBudget'],
+  ['prVersionCollision', 'pr.versionCollision'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
   ['roadmapIssue', 'roadmap.issue'],
   ['releaseEnabled', 'release.enabled'],
   ['releaseVersionFile', 'release.versionFile'],
   ['releaseChangelog', 'release.changelog'],
   ['releaseHeading', 'release.heading'],
+  ['releaseFragments', 'release.fragments'],
+  ['releaseStrategy', 'release.strategy'],
+  ['releaseSettle', 'release.settle'],
+  ['releaseTag', 'release.tag'],
   ['cleanupStaleDays', 'cleanup.staleDays'],
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
   ['dangerousAcceptStaleRefs', 'dangerous.acceptStaleRefs'],
+  ['dangerousAcceptVersionCollision', 'dangerous.acceptVersionCollision'],
   ['dangerousSelfUpdateDuringLoop', 'dangerous.selfUpdateDuringLoop'],
   ['statusNotice', 'status.notice'],
   ['tiersRafa', 'tiers.rafa'],
@@ -204,11 +210,20 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('plan.depth')).toEqual(['plan', ['inject', 'dir']]);
     expect(knownKeysAbove('pr.nonesuch')).toEqual([
       'pr',
-      ['provider', 'mergeMethod', 'base', 'resolveBudget'],
+      ['provider', 'mergeMethod', 'base', 'resolveBudget', 'versionCollision'],
     ]);
     expect(knownKeysAbove('release.bump')).toEqual([
       'release',
-      ['enabled', 'versionFile', 'changelog', 'heading'],
+      [
+        'enabled',
+        'versionFile',
+        'changelog',
+        'heading',
+        'fragments',
+        'strategy',
+        'settle',
+        'tag',
+      ],
     ]);
     expect(knownKeysAbove('cleanup.staleDayz')).toEqual([
       'cleanup',
@@ -216,7 +231,7 @@ describe('knownKeysAbove', () => {
     ]);
     expect(knownKeysAbove('dangerous.acceptStaleRef')).toEqual([
       'dangerous',
-      ['acceptStaleRefs', 'selfUpdateDuringLoop'],
+      ['acceptStaleRefs', 'acceptVersionCollision', 'selfUpdateDuringLoop'],
     ]);
     expect(knownKeysAbove('loop.worktreeDirs')).toEqual(['loop', ['settingSources', 'worktreeDir']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);

@@ -14,7 +14,7 @@
  *
  * The heading template is taken from `CONFIG_DEFAULTS.releaseHeading`
  * rather than spelled here, so a default changed in
- * `src/config-schema.ts` without this module hearing of it turns
+ * `src/config-schema-release.ts` without this module hearing of it turns
  * these cases red rather than leaving them green against a template
  * nothing uses.
  *

@@ -36,8 +36,8 @@ back into every turn and the split would save nothing.
   readiness gate for plans from the board.
 - `context/terminology.md` — formal and colloquial names: the ledger,
   lore and hindsight, and how prose introduces them.
-- `context/release.md` — change-note path from report to table, release level,
-  the three wrap-up steps with restore, the two release actions, and config keys.
+- `context/release.md` — fragments and the fold, settle and its deliveries,
+  the receipt rule with adoption boundary, the guards, readers, and six keys.
 - `context/notices.md` — the alpha and skip-permissions notices: where they
   are shown, how they are dismissed, and what a test's HOME must hold.
 

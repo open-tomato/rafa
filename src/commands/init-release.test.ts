@@ -49,13 +49,17 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, parseConfigText } from '../config.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
+import { withReleaseEnabled } from '../release/setting.js';
 
 import {
   askRelease,
+  DANGEROUS_VERSION_COLLISION_LINE,
   missingChangelogLine,
   missingVersionFileLine,
+  PR_VERSION_COLLISION_LINE,
+  RELEASE_FRAGMENT_LINES,
   releaseQuestion,
   RELEASE_FIX,
   renderReleaseStep,
@@ -394,5 +398,94 @@ describe('the line text mode prints', () => {
 
     expect(unset).toEqual([`release.enabled is left unset, which reads as auto; run ${RELEASE_FIX} to set it.`]);
     expect(refused).toEqual([]);
+  });
+});
+
+/** The six settings the release-settle plan adds, as the resolved config names them. */
+const SETTLE_SETTINGS = [
+  'releaseFragments',
+  'releaseStrategy',
+  'releaseSettle',
+  'releaseTag',
+  'prVersionCollision',
+  'dangerousAcceptVersionCollision',
+] as const;
+
+/** `lines` with the comment mark before a key dropped, the section lines included. */
+function uncommentedLines(lines: readonly string[]): string {
+  return lines.map((line) => line.replace(/^# (?= *[A-Za-z]+:)/, '')).join('\n');
+}
+
+/** The sections the six lines sit in, with their section lines, as one file's text. */
+function settleSections(fragments: readonly string[], collision: string, dangerous: string): string {
+  return uncommentedLines([
+    '# version: 1',
+    '# pr:',
+    collision,
+    '# release:',
+    ...fragments,
+    '# dangerous:',
+    dangerous,
+  ]);
+}
+
+/** Where each of the six resolved settings came from, and its value. */
+function readingsOf(text: string): readonly (readonly [unknown, string])[] {
+  const resolved = resolveConfig({ file: parseConfigText(text, 'c.yaml') });
+  return SETTLE_SETTINGS.map((setting) => [resolved.config[setting], resolved.sources[setting]] as const);
+}
+
+describe('the commented lines for the six release-settle settings', () => {
+  it('sit in the config rafa init writes, each under its own section and still commented', () => {
+    const lines = projectConfigText().split('\n');
+    const under = (line: string, section: string, next: string): boolean => {
+      const at = lines.indexOf(line);
+      return at > lines.indexOf(section) && at < lines.indexOf(next);
+    };
+
+    expect(RELEASE_FRAGMENT_LINES.every((line) => under(line, '# release:', '# cleanup:'))).toBe(true);
+    expect(under(PR_VERSION_COLLISION_LINE, '# pr:', '# board:')).toBe(true);
+    expect(under(DANGEROUS_VERSION_COLLISION_LINE, '# dangerous:', '# status:')).toBe(true);
+    expect(parseConfigText(projectConfigText(), 'c.yaml').values.releaseFragments).toBeUndefined();
+  });
+
+  it('resolve from the file to the schema defaults once uncommented', () => {
+    const text = settleSections(RELEASE_FRAGMENT_LINES, PR_VERSION_COLLISION_LINE, DANGEROUS_VERSION_COLLISION_LINE);
+
+    expect(readingsOf(text)).toEqual([
+      ['.changes', 'file'],
+      ['semver-by-level', 'file'],
+      ['push', 'file'],
+      ['manual', 'file'],
+      ['report', 'file'],
+      [false, 'file'],
+    ]);
+  });
+
+  it('read a changed value from each line, so the reading above can fail', () => {
+    const fragments = RELEASE_FRAGMENT_LINES
+      .map((line) => line.replace(/fragments: \.changes/, 'fragments: notes'))
+      .map((line) => line.replace(/settle: push/, 'settle: pr'))
+      .map((line) => line.replace(/tag: manual/, 'tag: settle'));
+    const collision = PR_VERSION_COLLISION_LINE.replace(/: report/, ': refuse');
+    const dangerous = DANGEROUS_VERSION_COLLISION_LINE.replace(/: false/, ': true');
+
+    expect(readingsOf(settleSections(fragments, collision, dangerous))).toEqual([
+      ['notes', 'file'],
+      ['semver-by-level', 'file'],
+      ['pr', 'file'],
+      ['settle', 'file'],
+      ['refuse', 'file'],
+      [true, 'file'],
+    ]);
+  });
+
+  it('stay commented when the release step writes release.enabled into the file', () => {
+    const written = withReleaseEnabled(projectConfigText(), true) ?? '';
+    const values = parseConfigText(written, 'c.yaml').values;
+
+    expect(values.releaseEnabled).toBe(true);
+    expect(RELEASE_FRAGMENT_LINES.every((line) => written.split('\n').includes(line))).toBe(true);
+    expect(SETTLE_SETTINGS.map((setting) => values[setting])).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
   });
 });

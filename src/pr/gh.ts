@@ -68,6 +68,17 @@
  *     ONE argument after `--body`, never interpolated into a command
  *     line: the runner spawns `gh` with an argument list, so a body
  *     holding newlines, quotes or backticks reaches GitHub as written.
+ *   - **Opening a pull request reads its URL, then the pull request.**
+ *     `gh pr create --help` on 2.100.0 says "Upon success, the URL of
+ *     the created pull request will be printed", and that `--head`
+ *     skips "any forking or pushing behavior"; nothing was opened on a
+ *     repository to record the output itself. So `create` always sends
+ *     `--head`, `--base`, `--title` and `--body`, so `gh` has nothing to
+ *     prompt for or push, reads the number off the last line of stdout
+ *     that is a `/pull/<n>` URL, refuses output holding none, and
+ *     answers what `gh pr view <n>` then reads, rather than a summary
+ *     built from what it sent. `editTitle` is `gh pr edit <n> --title`,
+ *     read by its exit code alone, as `editBody` is.
  *   - **The workflow count is `total_count`, never the length of
  *     `workflows`.** `gh api repos/<repo>/actions/workflows` without
  *     `--paginate` answers the first page of 30 beside the whole count
@@ -141,6 +152,7 @@ import type {
   PullRequestAuthor,
   PullRequestComment,
   PullRequestDetail,
+  PullRequestDraft,
   PullRequestReview,
   PullRequestState,
   PullRequestSummary,
@@ -197,6 +209,9 @@ const FIND_LIMIT = 1;
 
 /** Recorded in the stderr of a read of a pull request the repository has none of. */
 const MISSING_PULL = 'Could not resolve to a PullRequest';
+
+/** A pull request's URL as the last line `gh pr create` prints; the number is its one group. */
+const CREATED_URL = /\/pull\/([1-9]\d*)$/;
 
 /** Recorded in the stderr of `gh pr checks` on a pull request with no checks at all. */
 const NO_CHECKS = 'no checks reported on the';
@@ -461,6 +476,17 @@ function bodyText(value: string, member: string): string {
   return value;
 }
 
+/** The number of the pull request `gh pr create` printed the URL of; see the module note. */
+function createdNumber(stdout: string, command: string): string {
+  const lines = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const found = CREATED_URL.exec(lines.at(-1) ?? '');
+  if (found?.[1] === undefined) refuse(command, `no pull request URL on its last line: ${describeValue(stdout.trim())}`);
+  return found[1];
+}
+
 /** What a `gh` pull request provider is made with. */
 export interface GhPullRequestsOptions {
   /** Runs every `gh` command the provider sends. */
@@ -583,6 +609,26 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       const command = `gh pr merge ${target} --${method}`;
       const result = await gh(['pr', 'merge', target, `--${method}`]);
       return { merged: result.ok, detail: detailOf(result, command) };
+    },
+
+    create: async (draft: PullRequestDraft): Promise<PullRequestSummary> => {
+      const head = textArgument(draft.head, 'create', 'head', false);
+      const base = textArgument(draft.base, 'create', 'base', false);
+      const title = textArgument(draft.title, 'create', 'title', false);
+      const body = bodyText(draft.body, 'create');
+      const command = `gh pr create --head ${head} --base ${base}`;
+      const stdout = await succeed(['pr', 'create', '--head', head, '--base', base, '--title', title, '--body', body], command);
+      const target = createdNumber(stdout, command);
+      const viewed = `gh pr view ${target}`;
+      const view = await succeed(['pr', 'view', target, '--json', SUMMARY_FIELDS], viewed);
+      return readSummary(parseJson(view, viewed), viewed, 'the pull request');
+    },
+
+    editTitle: async (number: number, title: string): Promise<void> => {
+      const target = pullNumber(number, 'editTitle');
+      const text = textArgument(title, 'editTitle', 'title', false);
+      // Nothing reads what the edit wrote, as for `editBody`; see the module note.
+      await succeed(['pr', 'edit', target, '--title', text], `gh pr edit ${target} --title <title>`);
     },
 
     editBody: async (number: number, body: string): Promise<void> => {

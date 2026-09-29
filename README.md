@@ -153,9 +153,9 @@ the next one, so you rarely have to remember it.
    stored, one commit. A task that reports `blocked` is marked and the
    run stops with the reason; fix what it names and start again, and the
    blocked task goes first. After the last task a wrap-up session syncs
-   with the base, bumps the version and the changelog when the project
-   has them, pushes, opens the pull request and waits for CI, spending
-   repair sessions on a red one.
+   with the base, commits a release fragment when the project has them
+   (the plan's level and notes), pushes, opens the pull request and waits
+   for CI, spending repair sessions on a red one.
 
    From another terminal: `rafa loop status`, `rafa loop pause` (after the
    running task), `rafa loop stop` (now).
@@ -163,14 +163,63 @@ the next one, so you rarely have to remember it.
 5. **Land it and look at what it cost.**
 
    ```bash
-   rafa pr current        # number, title, checks, URL
-   rafa pr triage         # why is it red, and is the fix simple (🪙 only with --resolve)
-   rafa pr merge [--skip-checks] # asks y/N, merges, switches to the base, pulls, deletes both branches
-   rafa release tag       # tag the merged version
+   rafa pr current             # number, title, checks, URL
+   rafa pr triage              # why is it red, and is the fix simple (🪙 only with --resolve)
+   rafa pr merge [--skip-checks] # asks y/N, merges, switches to the base, pulls, deletes branches
+   rafa release settle         # folds fragments to a version and pushes
+   rafa release tag            # tag the released version (optional, depends on config)
    rafa effort collect && rafa effort report
    ```
 
-   Then step 2 again, or `rafa plan create --next`.
+   Then step 2 again, or `rafa plan create --next`. When `rafa next` is used,
+   it runs settle and optionally tag as part of the workflow.
+
+### Release fragments and settling
+
+A branch no longer owns a version number. Instead, the wrap-up commits a
+release fragment (a small markdown file naming the plan, level and notes),
+and `rafa release settle` assigns the version on the base branch after
+merges. This lets several branches merge in any order without a version
+collision: whichever machine settles first releases all waiting fragments
+under one version.
+
+The pull request shows a forecast of what version the branch would get if
+merged now. The fragment is stored under `release.fragments` (default
+`.changes/`), one file per plan. `rafa doctor` warns when fragments are
+waiting and suggests running settle. `rafa pr list` marks forecasts as
+`(base moved)` if the base branch changed since the forecast was written.
+
+Every project starts with fragments settling to the base branch and tagging
+by hand. You can configure settle to open a pending release pull request
+instead (for protected base branches), and have settle tag the commit
+automatically (for CI ownership of releases). Four keys, all optional:
+
+```yaml
+# Empty config: fragments in .changes/, semver-by-level, settle pushes, tags by hand
+# (This is the default for every new project.)
+
+release:
+  tag: settle          # settle tags the commit it pushed
+
+release:
+  settle: pr           # protected base branch: one pending release PR
+pr:
+  versionCollision: refuse
+
+release:
+  settle: pr
+  tag: settle
+pr:
+  versionCollision: refuse
+```
+
+The keys are: `release.fragments` (path, default `.changes/`), `release.strategy`
+(fold strategy, default `semver-by-level`), `release.settle` (`push` or `pr`,
+default `push`), `release.tag` (`manual` or `settle`, default `manual`).
+`pr.versionCollision` controls what happens when a merge would collide
+(default `report`). Read `context/release.md` for the full design,
+`docs/ci-release-settle.md` for automating settle in CI, and
+`rafa release settle --help` for the settle command.
 
 ### Tracking effort and learning from skills
 
@@ -640,7 +689,9 @@ and a line here is ticked by the change that finishes the feature.
 - ✅ Plan straight from the issue board, or from whatever is next on the roadmap
 - ✅ Review, merge and clean up pull requests from the command line
 - ✅ A failing pull request is diagnosed, and fixed when the fix is simple
-- ✅ A version bump and a changelog entry with every pull request
+- ✅ Release fragments on branches, settled to a version on the base
+  branch after merges, with forecasts in the PR and protection for
+  multiple concurrent branches
 - ✅ Start a plan from the main branch and rafa makes the branch for you
 - ✅ One command takes you to the next step: merge, clean up, plan,
   branch, start

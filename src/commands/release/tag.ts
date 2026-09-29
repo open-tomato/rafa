@@ -1,5 +1,6 @@
 /**
- * `rafa release tag`: the one WRITE of the `release` subject. It puts
+ * `rafa release tag`: the TAG write of the `release` subject, whose
+ * other write, the release commit, is `./settle.ts`'s. It puts
  * `v<version>` on the commit of the release branch that SET that
  * version, which is HEAD unless merges landed after it, when every
  * reading agrees that version is the one to tag, and then prints the
@@ -79,6 +80,18 @@
  * They are checked last, after the changelog, since each is about WHERE
  * the tag goes once every other reading agrees it should be written.
  *
+ * ## The receipt
+ *
+ * Once the two files agree, the version's changelog section has to
+ * carry the receipt settle writes (`<!-- rafa:fragments <id> -->`), or
+ * be at or below the adoption boundary, the newest version released
+ * before settle; with no receipted section anywhere every version is
+ * legacy. `../../release/receipt.ts` reads both and says why; a
+ * refusal carries the `receipt` reason. It runs after the changelog
+ * check, since a section is only worth auditing once it is the one
+ * both files name, and before the release commit, which is about where
+ * the tag goes.
+ *
  * ## The publish line is text
  *
  * "Publishing to a registry stays an operator step; `release tag`
@@ -129,6 +142,7 @@ import type { ReleaseSeams, TagReading } from './status.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { ReceiptVerdict } from '../../release/receipt.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -137,6 +151,7 @@ import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
+import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { readManifestVersion } from '../../release/version.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 import { versionTag } from '../pr/merge-followups.js';
@@ -215,7 +230,7 @@ export interface ReleaseFollowUp {
   readonly why: string;
 }
 
-/** Why a run refused; see the module note for why there are five. */
+/** Why a run refused; see the module note for the five, and the receipt. */
 export type TagRefusalReason =
   /** The release branch is not the one checked out, or none is. */
   | 'branch'
@@ -226,7 +241,9 @@ export type TagRefusalReason =
   /** The changelog's newest section names another version, or none. */
   | 'changelog'
   /** A git read the decision needs did not run. */
-  | 'git';
+  | 'git'
+  /** The version's changelog section carries no receipt above the adoption boundary. */
+  | 'receipt';
 
 /** A run that refused, before anything was written. */
 export interface TagRefused {
@@ -255,7 +272,7 @@ export interface TagReady {
 /** What one call to {@link decideTag} answered. */
 export type TagDecision = TagReady | TagRefused;
 
-/** The five readings a decision is made from. */
+/** The readings a decision is made from. */
 export interface TagInputs {
   /** The branch a release is tagged on. */
   readonly releaseBranch: string;
@@ -269,6 +286,8 @@ export interface TagInputs {
   readonly tags: TagReading;
   /** The commit that set the version, or null when there was no version to look for. */
   readonly release: ReleaseCommitReading | null;
+  /** The version's receipt, or null when there was no version or no changelog to read. */
+  readonly receipt: ReceiptVerdict | null;
 }
 
 /**
@@ -480,6 +499,12 @@ export function decideTag(inputs: TagInputs): TagDecision {
   const disagrees = changelogRefusal(inputs, version);
   if (disagrees !== null) return disagrees;
 
+  const path = inputs.changelog.path;
+  const unreceipted = inputs.receipt === null
+    ? `${path} was not read for the receipt of ${version}`
+    : receiptProblem(inputs.receipt, version, path);
+  if (unreceipted !== null) return refuse('receipt', unreceipted);
+
   const release = inputs.release;
   if (release === null) return refuse('version', `${inputs.version.path} was not looked up in the history`);
   if (release.problem !== null) return refuse(release.problem.reason, release.problem.message);
@@ -541,6 +566,9 @@ export function readTagInputs(root: string, git: GitRunner, config: TagSettings)
     release: walkable && version.version !== null
       ? readReleaseCommit(git, config.versionFile, version.version)
       : null,
+    receipt: version.version === null
+      ? null
+      : readReceiptVerdict(root, config.changelog, version.version),
   };
 }
 
@@ -610,7 +638,9 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
       + ' The tag goes on the commit that set that version: HEAD, or, where later commits landed on the branch,'
       + ' the earlier commit, with a warning naming how many commits HEAD is past it.'
       + ' It refuses, and writes nothing, when another branch is checked out, when a tag already names that'
-      + ' version, when the two files disagree, when no commit holds the version yet, and when the version'
+      + ' version, when the two files disagree, when the changelog section of that version carries no'
+      + ' `<!-- rafa:fragments -->` receipt and is above the newest version released before settle,'
+      + ' when no commit holds the version yet, and when the version'
       + ' file, the tag list or the history could not be read. After the tag it prints what to run next: the'
       + ' push that puts the tag on the remote, and the publish line for the registry the version file'
       + ' configures, spelled to publish from the tag when HEAD is past it, which it does not run. With'

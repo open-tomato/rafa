@@ -151,7 +151,7 @@
  *   - {@link MergeMethod} and the three methods behind
  *     {@link mergeMethod} are the pull request port's
  *     (`pr/types.ts`), which spells them to match what `gh pr merge`
- *     takes. The type is re-exported so `config-schema.ts` names a
+ *     takes. The type is re-exported so `config-schema-release.ts` names a
  *     field with it without reaching past this module, and nothing
  *     more: a caller acting on a merge reads the port.
  *   - The shape {@link usdAmount} accepts is `parseBudgetUsd`'s

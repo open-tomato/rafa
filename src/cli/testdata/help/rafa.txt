@@ -47,8 +47,8 @@ Subjects:
   skill      check a skills directory; list each tier; demote and backfill it 🪙
   instinct   check an instincts directory; list, show, flag and promote its
              records
-  release    read the release state of the project; tag the commit that set the
-             version
+  release    read the release state of the project; settle the waiting fragments
+             into a version; tag the commit that set it
   board      list the boards with their owner, epic count, and which is current
              and home
   epic       show one epic's issues as the Roadmap table; create an epic; defer

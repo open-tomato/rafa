@@ -32,6 +32,18 @@
  * on red checks, or on none, still records what it read. A store that
  * refuses the row is warned about and never changes the exit code.
  *
+ * ## The release guard
+ *
+ * Straight after `readMergeRefusal` and before the question, one call
+ * hands the pull request to `./merge-guard.ts`, which reads the release
+ * guard where the release runs and meets its answer as
+ * `pr.versionCollision` and `dangerous.acceptVersionCollision` say:
+ * printed, warned about, asked about, or refused with exit 1 — that
+ * module's note has the table. Its question is asked before
+ * `Merge? [y/N]`, `--yes` does not answer it, and a no to it declines
+ * the merge the way a no to the merge question does. What it read is
+ * {@link PrMergeResult.guard}, null where the release does not run.
+ *
  * ## The question
  *
  * `rafa init` reads an answer only when standard input is a TTY and
@@ -68,12 +80,20 @@
  *
  * A step that fails ends the command with exit code 1 carrying that
  * step, what git said, and the whole remaining tail as commands to
- * paste ({@link remainingFrom}, `commandLine`). It never reverts,
- * resets or re-pushes: the pull request IS merged by then, and the
- * clean-up is housekeeping the operator can finish by hand. The
- * follow-ups are printed for a clean-up that finished, since what they
- * turn on — the version now on the base — is only true once the base
- * has been pulled.
+ * paste. It never reverts, resets or re-pushes: the pull request IS
+ * merged by then, and the clean-up is housekeeping the operator can
+ * finish by hand. The follow-ups are printed for a clean-up that
+ * finished, since what they turn on — the version and the fragments now
+ * on the base — is only true once the base has been pulled. They are
+ * the last lines of the merge's own report, after the unblock reading
+ * below, so `rafa release settle`, printed last among them when
+ * fragments wait on the base (`./merge-followups.ts`), is the last line
+ * the merge prints; only the ending hint, which `--no-hint` turns off,
+ * comes after it.
+ * The clean-up, its two branch probes and the follow-up reading are
+ * `./merge-cleanup.ts`'s, whose module note says how each branch is
+ * probed and on which remote; this module calls them in that order and
+ * nothing else.
  *
  * ## The roadmap tick
  *
@@ -95,16 +115,16 @@
  * read, an edit that would not land and a pull request closing no issue
  * all leave the merge reported exactly as it happened.
  *
- * ## The unblock reading, and why it is last
+ * ## The unblock reading, and why it comes after the clean-up
  *
  * A merge that closes an issue can be the thing that clears another
- * issue's blocker, so the command ends by running the reading `rafa
- * issue unblock` runs, over every open issue whose `Blocked by:` line
+ * issue's blocker, so after the clean-up the command runs the reading
+ * `rafa issue unblock` runs, over every open issue whose `Blocked by:` line
  * names an issue this pull request closes (`./merge-unblock.ts`, per
  * the spec). Like the tick, nothing it comes to changes the exit code.
  *
- * Unlike the tick it runs LAST, after the clean-up and the follow-ups,
- * for two reasons. It ASKS, and a question in the middle of the
+ * Unlike the tick it runs after the clean-up, and only the follow-ups
+ * come after it, for two reasons. It ASKS, and a question in the middle of the
  * clean-up would interleave with the step lines an operator is reading
  * to see whether their branches are gone. And where a step FAILED the
  * command is already exiting 1 with the remaining commands to paste, so
@@ -120,51 +140,13 @@
  *
  * ## The ending, on a merge that went through
  *
- * Last of all, after the unblock reading, the command names the one
+ * Last of all, after the follow-ups, the command names the one
  * step that follows — with the base pulled and both branches gone, that
  * is the next plan or the loop on a plan already there
  * (`src/next/ending.ts`, `--no-hint` to turn it off). A DECLINED merge
  * ends without one: nothing moved, so the state still reads as a green
  * pull request waiting to be merged, and the hint would put the very
  * question that was just answered no.
- *
- * ## The remote branch, and which remote
- *
- * Whether the remote branch is still there is read AFTER the merge, by
- * `git ls-remote --heads`, because a repository with GitHub's
- * "automatically delete head branches" turned on has none left by then
- * and the delete step would fail on a merge that went perfectly.
- * Measured on git 2.50.1 (2026-09-18): `ls-remote` exits 0 and writes
- * nothing for a branch the remote does not have, so the probe is "exit
- * 0 with a line", not "exit 0". A probe that FAILED is warned about and
- * read as absent, which drops one step from a clean-up that is about to
- * fail at `git pull` anyway, since every reason the probe cannot reach
- * the remote stops the pull first.
- *
- * ## The local branch, and a checkout that never had it
- *
- * Whether this checkout holds the head branch is read the same way,
- * after the merge, by `git show-ref --verify --quiet refs/heads/<name>`.
- * A branch pushed from another clone, or from a worktree under a
- * different local name (`git push -u origin HEAD:<name>`), has none
- * here, and `git branch -D` would fail with `branch '<name>' not found`
- * and stop the remote delete and the prune behind it. So an absent
- * branch makes the local delete a SKIPPED step, reported in its place,
- * and the rest run. Measured on git 2.50.1 (2026-09-28): `show-ref
- * --quiet` exits 1 and writes nothing for a branch that is not there,
- * and exits 128 with `fatal: not a git repository` outside a
- * repository. So the probe reads "failed and said nothing" as absent,
- * and "failed and said something" as a probe that failed: that is
- * warned about and read as PRESENT, so the delete runs and reports its
- * own failure the way it did before the probe existed. The refusal for
- * a head branch checked out in another worktree is untouched: a branch
- * git holds elsewhere is present, and `readMergeRefusal` refuses it
- * before anything is merged.
- *
- * {@link REMOTE} is the one spelling of the remote here: the probe and
- * the delete step are handed the same word, where letting
- * `cleanUpSteps` fall back to its own default would leave the probe
- * naming a remote the delete might not.
  *
  * ## Refusals
  *
@@ -177,10 +159,12 @@
  * failed; each of the refusals `readMergeRefusal` answers, `--skip-checks`
  * on a pull request that reports checks among them; no terminal to ask
  * on and no `--yes`; `--yes` beside `--skip-checks` where workflows exist
- * or their count could not be read; a provider that would not merge; and
- * a clean-up step that failed.
+ * or their count could not be read; the release guard's refusals; a
+ * provider that would not merge; and a clean-up step that failed.
  */
+import type { MergeStepReport } from './merge-cleanup.js';
 import type { FollowUp } from './merge-followups.js';
+import type { MergeGuardReport } from './merge-guard.js';
 import type { UncheckedMerge } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -189,12 +173,9 @@ import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
-import type { ChecksReading, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { ChecksReading, GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
 import type { UncheckedCase } from '../../pr/unchecked.js';
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
-
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
@@ -204,8 +185,6 @@ import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { recordPlanCi } from '../../effort/store/plan-ci.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import {
-  cleanUpSteps,
-  commandLine,
   createGitRunner,
   gitSaid,
   isMergeMethod,
@@ -213,12 +192,10 @@ import {
   parseWorkingTree,
   parseWorktrees,
   readMergeRefusal,
-  remainingFrom,
 } from '../../pr/index.js';
-import { RUNTIME_SUBDIR } from '../../start/runtime.js';
-import { liveLoopsOf } from '../self-update.js';
 
-import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
+import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
+import { guardBeforeMerge } from './merge-guard.js';
 import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
 import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
@@ -232,14 +209,11 @@ import {
   readPullArgument,
 } from './pr-context.js';
 
+/** One clean-up step that ran; `./merge-cleanup.ts` reports it, and the result carries it. */
+export type { MergeStepReport } from './merge-cleanup.js';
+
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.merge;
-
-/** The remote the branch is probed on and deleted from; see the module note. */
-const REMOTE = 'origin';
-
-/** The indent a listed command or a quoted git line carries. */
-const INDENT = '   ';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];
@@ -256,25 +230,14 @@ export interface MergeSeams extends PrSeams {
   readonly openPrompter?: () => Prompter;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
   readonly ending?: NextEndingSeams;
+  /** The clock the release guard's forecast is dated by. The system's own when left out. */
+  readonly now?: () => Date;
   /** Whether a loop record's pid is alive, for the update follow-up. `isPidAlive` when left out. */
   readonly isAlive?: PidProbe;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
 export const DEFAULT_MERGE_SEAMS: MergeSeams = Object.freeze({});
-
-/** One clean-up step that ran, as the result carries it. */
-export interface MergeStepReport {
-  readonly id: MergeStepId;
-  /** What was reported as it ran. */
-  readonly label: string;
-  /** The whole command it ran, ready to paste. */
-  readonly command: string;
-  /** True when git exited 0, and for a skipped step, which spawned nothing. */
-  readonly ok: boolean;
-  /** True when the step was reported as skipped rather than run. */
-  readonly skipped: boolean;
-}
 
 /** What `--skip-checks` read and posted, as the result carries it; see the module note. */
 export interface UncheckedMergeReport {
@@ -306,7 +269,7 @@ export interface PrMergeResult {
   readonly detail: string;
   /** Each clean-up step that ran or was skipped, in order; empty for a declined merge. */
   readonly steps: readonly MergeStepReport[];
-  /** The follow-ups that apply, empty when neither does. */
+  /** The follow-ups that apply, settle last; empty when neither does. */
   readonly followUps: readonly FollowUp[];
   /** What the tick of the first board in `roadmapTicks` came to, the default board's when it was ticked; null when none was. */
   readonly roadmapTick: RoadmapTickResult | null;
@@ -316,6 +279,8 @@ export interface PrMergeResult {
   readonly unblocked: UnblockReport | null;
   /** What `--skip-checks` read and posted, or null when the flag was not given. */
   readonly unchecked: UncheckedMergeReport | null;
+  /** What the release guard answered and how the merge met it, or null where the release does not run. */
+  readonly guard: MergeGuardReport | null;
 }
 
 /** A refusal of this action with exit code 1. */
@@ -374,14 +339,18 @@ function refuseFromGit(git: GitRunner, detail: PullRequestDetail, checks: Checks
   if (found !== null) throw refusal([`❌ ${found.message}`]);
 }
 
+/** True when a question can be answered: the seam's reading, or standard input being a TTY. */
+function terminalOf(seams: MergeSeams): () => boolean {
+  return seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
+}
+
 /**
  * Refuses when there is no terminal to ask on. Read BEFORE the summary
  * line is written, so the refusal carries it once and the run that
  * cannot be answered writes nothing to stdout.
  */
 function requireTerminal(seams: MergeSeams, summary: string): void {
-  const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
-  if (isTerminal()) return;
+  if (terminalOf(seams)()) return;
   throw refusal([
     '❌ rafa pr merge asks before merging, and standard input is no terminal.',
     `${INDENT}${summary}`,
@@ -409,56 +378,6 @@ async function confirmed(seams: MergeSeams): Promise<boolean> {
   }
 }
 
-/** Whether the remote still holds the branch; a probe that failed is warned about. See the module note. */
-function remoteHoldsBranch(git: GitRunner, branch: string, warn: (message: string) => void): boolean {
-  const probe = git(['ls-remote', '--heads', REMOTE, branch]);
-  if (probe.ok) return probe.stdout.trim() !== '';
-  warn(`${REMOTE} could not be asked whether it still holds ${branch}, so it is left alone: ${gitSaid(probe)}`);
-  return false;
-}
-
-/** Whether this checkout holds the branch; a probe that failed is warned about and read as present. See the module note. */
-function localHoldsBranch(git: GitRunner, branch: string, warn: (message: string) => void): boolean {
-  const probe = git(['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]);
-  if (probe.ok) return true;
-  const said = gitSaid(probe);
-  if (said === '') return false;
-  warn(`could not read whether this checkout holds a local branch ${branch}, so its delete runs: ${said}`);
-  return true;
-}
-
-/** The text of a file, or the empty string when it cannot be read. */
-function textOf(path: string): string {
-  try {
-    return readFileSync(path, 'utf8');
-  } catch {
-    return '';
-  }
-}
-
-/** The live loops' branches under `root`, or null when a record cannot be read; see `merge-followups.ts`. */
-function liveLoopBranchesOf(root: string, isAlive?: PidProbe): readonly string[] | null {
-  try {
-    return liveLoopsOf(root, isAlive).map((loop) => loop.branch);
-  } catch {
-    return null;
-  }
-}
-
-/** The follow-ups that apply once the base has been pulled; see `merge-followups.ts`. */
-function followUpsFor(pr: PrContext, git: GitRunner, isAlive?: PidProbe): readonly FollowUp[] {
-  const facts = readPackageFacts(textOf(join(pr.project.root, 'package.json')));
-  if (facts.version === null) return [];
-  const tags = git(['tag', '--list', versionTag(facts.version)]);
-  return readFollowUps({
-    version: facts.version,
-    tagged: tags.ok && tags.stdout.trim() !== '',
-    rafaCheckout: facts.rafaCheckout,
-    runtimeInstalled: existsSync(join(pr.project.home, RUNTIME_SUBDIR, facts.version)),
-    liveLoopBranches: liveLoopBranchesOf(pr.project.root, isAlive),
-  });
-}
-
 /** The `gh` runner the board reads and writes after the merge go through, at the project root. */
 function openGh(pr: PrContext, seams: MergeSeams): GhRunner {
   return (seams.gh ?? ((root: string) => createGhRunner({ cwd: root })))(pr.project.root);
@@ -471,8 +390,7 @@ function openGh(pr: PrContext, seams: MergeSeams): GhRunner {
  * unblocks nothing opens none.
  */
 function unblockAsk(seams: MergeSeams): UnblockAsk | null {
-  const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
-  if (!isTerminal()) return null;
+  if (!terminalOf(seams)()) return null;
 
   const open = prompterOf(seams);
   return async (question: string): Promise<boolean> => {
@@ -541,69 +459,6 @@ async function reportTick(
     else context.output.info(tickSentence(board));
   }
   return tick;
-}
-
-/** Which of the two branches the clean-up found to delete. */
-interface BranchesPresent {
-  readonly local: boolean;
-  readonly remote: boolean;
-}
-
-/** The line saying what is ready, which each delete having run changes. */
-function readyLine(base: string, branch: string, present: BranchesPresent): string {
-  const pulled = `${base} is checked out and pulled`;
-  if (present.local) {
-    return present.remote
-      ? `${pulled}, and ${branch} is gone locally and on ${REMOTE}.`
-      : `${pulled}, and ${branch} is gone locally; ${REMOTE} had already deleted it.`;
-  }
-  return present.remote
-    ? `${pulled}, and ${branch} is gone on ${REMOTE}; there was no local branch to delete.`
-    : `${pulled}; ${branch} had no local branch, and ${REMOTE} had already deleted it.`;
-}
-
-/** What git said, each line indented, and nothing at all when it said nothing. */
-function quotedLines(said: string): readonly string[] {
-  return said === ''
-    ? []
-    : said.split('\n').map((line) => `${INDENT}${line}`);
-}
-
-/** Runs the clean-up, reporting each step, and refuses at the first that failed; see the module note. */
-function runCleanUp(
-  context: RafaContext,
-  git: GitRunner,
-  detail: PullRequestDetail,
-  present: BranchesPresent,
-): readonly MergeStepReport[] {
-  const steps = cleanUpSteps({
-    branch: detail.headRefName,
-    base: detail.baseRefName,
-    remote: REMOTE,
-    localBranchPresent: present.local,
-    remoteBranchPresent: present.remote,
-  });
-  const reports: MergeStepReport[] = [];
-  for (const step of steps) {
-    if (step.skip !== undefined) {
-      reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: true, skipped: true });
-      context.output.info(`${step.label}: skipped — ${step.skip}`);
-      continue;
-    }
-    const result = git(step.argv.slice(1));
-    reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: result.ok, skipped: false });
-    if (result.ok) {
-      context.output.info(`${step.label}: done`);
-      continue;
-    }
-    throw refusal([
-      `❌ ${step.label}: failed`,
-      ...quotedLines(gitSaid(result)),
-      `#${detail.number} is merged, and the merge is left alone. Run the rest yourself:`,
-      ...remainingFrom(steps, step.id).map((left) => `${INDENT}${commandLine(left)}`),
-    ]);
-  }
-  return reports;
 }
 
 /** What {@link askToMerge} decided: whether to merge, and what `--skip-checks` read when it was given. */
@@ -688,9 +543,25 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     },
   });
   refuseFromGit(git, detail, checks, skipChecks);
+  const guard = await guardBeforeMerge({
+    pr,
+    git,
+    detail,
+    now: (seams.now ?? ((): Date => new Date()))(),
+    info: (message) => {
+      context.output.info(message);
+    },
+    warn: (message) => {
+      context.output.warn(message);
+    },
+    isTerminal: terminalOf(seams),
+    openPrompter: prompterOf(seams),
+  });
 
   const summary = summaryLine(detail, method);
-  const answer = await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks });
+  const answer: MergeAnswer = guard.go
+    ? await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks })
+    : { go: false, unchecked: null };
   // What the run answers if it stops here, and the base of what it answers if it does not.
   const answered: PrMergeResult = {
     number: detail.number,
@@ -708,6 +579,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     roadmapTicks: null,
     unblocked: null,
     unchecked: uncheckedReport(answer.unchecked, null),
+    guard: guard.report,
   };
   if (!answer.go) {
     context.output.info('Nothing was merged.');
@@ -725,19 +597,22 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const present: BranchesPresent = {
-    remote: remoteHoldsBranch(git, detail.headRefName, warn),
-    local: localHoldsBranch(git, detail.headRefName, warn),
+  const info = (message: string): void => {
+    context.output.info(message);
   };
-  const steps = runCleanUp(context, git, detail, present);
-  context.output.info(readyLine(detail.baseRefName, detail.headRefName, present));
-
-  const followUps = followUpsFor(pr, git, seams.isAlive);
-  if (followUps.length > 0) {
-    context.output.info('Follow-ups:');
-    for (const followUp of followUps) context.output.info(`${INDENT}${followUp.command} — ${followUp.why}`);
-  }
+  const steps = cleanUpAfterMerge(git, detail, { info, warn });
   const unblocked = await reportUnblock(context, pr, seams, detail);
+  const followUps = reportFollowUps(
+    {
+      root: pr.project.root,
+      home: pr.project.home,
+      base: detail.baseRefName,
+      release: pr.versionGuard,
+      isAlive: seams.isAlive,
+    },
+    git,
+    info,
+  );
 
   return {
     ...answered,
@@ -770,7 +645,10 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' refused unless `--skip-checks` is given, which is refused on any pull request that does report checks;'
       + ' with it the command reads how many workflows the repository defines, prints a warning for that case, asks'
       + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow),'
-      + ' and after the merge posts one comment on the pull request saying so. A step that fails never undoes the merge: it'
+      + ' and after the merge posts one comment on the pull request saying so. Where the release runs, the release'
+      + ' guard reads the branch before the question: a `collision` is refused unless'
+      + ' `dangerous.acceptVersionCollision` is true, and `pr.versionCollision` sets whether a `missing` or'
+      + ' `stale` branch merges silently, with a warning, after its own question, or not at all. A step that fails never undoes the merge: it'
       + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
       + ' every issue the pull request closes on every open board whose checklist lists it, or on the roadmap issue while no issue carries `type:roadmap`, warning rather than failing when that write'
       + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'

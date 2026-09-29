@@ -22,7 +22,7 @@
  * ## The heading is a template, and the fields are three
  *
  * `release.heading` defaults to `## {version} — {date}, {title}`
- * (`src/config-schema.ts`), and {@link RELEASE_HEADING_FIELDS} is the
+ * (`src/config-schema-release.ts`), and {@link RELEASE_HEADING_FIELDS} is the
  * whole of what a placeholder can name. Two rules cover the rest:
  *
  *   - A placeholder naming anything else is left EXACTLY as written.

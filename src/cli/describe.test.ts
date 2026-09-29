@@ -242,6 +242,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('dashboard');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.find((action) => action.name === 'dashboard')?.spends).toBeNull();
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('migrate');
+    expect(document.subjects.find((subject) => subject.name === 'release')?.actions.map((action) => action.name)).toContain('settle');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('merge');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('import');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('move');
@@ -282,6 +283,7 @@ describe('the document over the core registry', () => {
     expect(spendsOf('effort', 'copy')).toBeNull();
     expect(spendsOf('effort', 'schema')).toBeNull();
     expect(spendsOf('effort', 'migrate')).toBeNull();
+    expect(spendsOf('release', 'settle')).toBeNull();
     expect(spendsOf('effort', 'merge')).toBeNull();
     expect(spendsOf('effort', 'import')).toBeNull();
     expect(spendsOf('effort', 'move')).toBeNull();

@@ -24,6 +24,7 @@
  * | `triage` | `pr triage` | `<pull request>` |
  * | `merge` | `pr merge` | `<pull request> --yes` |
  * | `merge-unchecked` | `pr merge` | `<pull request> --skip-checks` |
+ * | `settle` | `release settle` | none |
  * | `start` | `loop start` | `--plan=<plan file> --create-branch` |
  * | `plan` | `plan create` | `--next` |
  * | `unblock` | `issue unblock` | `<issue>` |
@@ -32,7 +33,9 @@
  * The words come off the state: the pull request of rows 5, 6, 7 and 8,
  * the issue of rows 11 and 12, and the absolute plan file of rows 3, 4
  * and 9, which `--plan` resolves against the project root and therefore
- * takes as it is (`src/start/plan-path.ts`). A state whose row left the
+ * takes as it is (`src/start/plan-path.ts`). `settle` takes none: the
+ * settle step read after a merge (`./settle-step.ts`) is about the
+ * fragments waiting on the base, which `release settle` reads itself. A state whose row left the
  * field it proposes an action over null is a defect of the table and
  * throws here, naming the state and the action, rather than running a
  * command over a guess.
@@ -63,6 +66,10 @@
  *    read on the base branch, where `loop start` would otherwise stop
  *    to offer the plan's branch; rows 3 and 4 are read on that branch
  *    already.
+ *  - `settle` passes no `--dry-run`: the question `rafa next` put, or
+ *    the `--yes` list naming `settle`, is the decision to fold the
+ *    waiting fragments into a version and push it to the base, and
+ *    `release settle` asks none of its own.
  *
  * ## Under `--roadmap`
  *
@@ -114,7 +121,7 @@
  *
  * One flag is set rather than read: {@link HINT_FLAG} is false in every
  * action's context, whatever the command declares it as. Six of the
- * eight commands here end by naming the step that follows
+ * nine commands here end by naming the step that follows
  * (`./ending.ts`), and the chain reads the state again itself after
  * every action — so leaving the flag at its default would read the
  * state twice for one step and, with a terminal, put two questions
@@ -209,13 +216,14 @@ function planFlagOf(state: NextState): string {
   return `--plan=${needed(state, state.planPath, 'plan file')}`;
 }
 
-/** The nine actions that run a command, each with its own; see the module note. */
+/** The ten actions that run a command, each with its own; see the module note. */
 const ACTION_COMMANDS: Readonly<Record<NextCommandActionId, ActionCommandSpec>> = Object.freeze({
   resume: { subject: 'loop', action: 'start', argv: (state) => [planFlagOf(state)] },
   wait: { subject: 'pr', action: 'wait', argv: (state) => [pullRequestOf(state)] },
   triage: { subject: 'pr', action: 'triage', argv: (state) => [pullRequestOf(state)] },
   merge: { subject: 'pr', action: 'merge', argv: (state) => [pullRequestOf(state), '--yes'] },
   'merge-unchecked': { subject: 'pr', action: 'merge', argv: (state) => [pullRequestOf(state), '--skip-checks'] },
+  settle: { subject: 'release', action: 'settle', argv: () => [] },
   start: { subject: 'loop', action: 'start', argv: (state) => [planFlagOf(state), '--create-branch'] },
   plan: { subject: 'plan', action: 'create', argv: () => ['--next'] },
   unblock: { subject: 'issue', action: 'unblock', argv: (state) => [issueOf(state)] },
@@ -223,7 +231,7 @@ const ACTION_COMMANDS: Readonly<Record<NextCommandActionId, ActionCommandSpec>> 
 });
 
 /**
- * The nine action ids that run a registered command, in the table's
+ * The ten action ids that run a registered command, in the table's
  * order. Taken off the table itself, so a caller reading the ids and
  * the mapping that answers for them cannot drift apart.
  */

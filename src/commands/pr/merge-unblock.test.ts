@@ -1,5 +1,5 @@
 /**
- * Tests for the unblock reading `rafa pr merge` ends with
+ * Tests for the unblock reading `rafa pr merge` runs after its clean-up
  * (`src/commands/pr/merge-unblock.ts`): whether there is anything to
  * read at all, which open blocked issues a merge considers, and that
  * nothing on the way out throws.

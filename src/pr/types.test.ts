@@ -118,6 +118,8 @@ const MEMBERS: readonly Member[] = [
       '  }),',
     ],
   },
+  { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => summary,'] },
+  { name: 'editTitle', lines: ['  editTitle: async (_n: number, _title: string) => {},'] },
   { name: 'editBody', lines: ['  editBody: async (_n: number, _body: string) => {},'] },
   { name: 'comments', lines: ['  comments: async (_n: number) => [comment],'] },
   { name: 'comment', lines: ['  comment: async (_n: number, _body: string) => comment,'] },
@@ -274,6 +276,31 @@ const REFUSALS: readonly Refusal[] = [
     // which is the reading: a provider cannot quietly answer a record
     // where the port promises nothing.
     names: 'Type \'Promise<PullRequestDetail>\' is not assignable to type \'Promise<void>\'',
+  },
+  {
+    title: 'an adapter with no create',
+    file: 'omits-create.ts',
+    source: probeSource(...adapterSource({ omit: 'create' })),
+    code: 2741,
+    names: '\'create\'',
+  },
+  {
+    title: 'an adapter whose create answers nothing',
+    file: 'create-answers-void.ts',
+    source: probeSource(...adapterSource({
+      rewrite: { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => {},'] },
+    })),
+    code: 2322,
+    // The caller reports the pull request it opened, so a provider
+    // cannot open one and answer nothing about it.
+    names: 'Type \'Promise<void>\' is not assignable to type \'Promise<PullRequestSummary>\'',
+  },
+  {
+    title: 'an adapter with no editTitle',
+    file: 'omits-edit-title.ts',
+    source: probeSource(...adapterSource({ omit: 'editTitle' })),
+    code: 2741,
+    names: '\'editTitle\'',
   },
   {
     title: 'an adapter with no workflowCount',

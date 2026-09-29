@@ -112,6 +112,7 @@ function row(over: Partial<PrListRow> = {}): PrListRow {
     checksProblem: null,
     mergeable: 'mergeable',
     mergeableProblem: null,
+    forecast: null,
     ...over,
   };
 }
