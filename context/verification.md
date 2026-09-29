@@ -228,6 +228,56 @@ while failing `existsSync`. Every gate that opens the file by path will
 fail, so stage the deletion and re-run — a gate's refusal to open a staged
 delete is not a fault.
 
+**On this machine, `isUnderTempDir` misses `tmpdir()`'s own symlink, and
+about twenty spawned tests fail from that one row.** `TMPDIR` here resolves
+under `/var/folders/...`, itself reached through `/tmp` on macOS, and
+`src/effort/store/location.test.ts`'s `answers true for a path under the
+real path of a symlinked temporary directory` is red for it: `isUnderTempDir`
+canonicalizes the temp dir it is handed but not the path it is asked about,
+so a path built through the link side (rather than the real side) reads
+as outside. `refuseUnownedDevelopmentWrite`
+(`src/effort/store/development-build.ts`) calls `isUnderTempDir` to decide
+whether a development build may migrate a scratch store, and every spawned
+test that runs a task session through this checkout's `bun src/rafa.ts`
+therefore hits the refusal once the session's report needs a migrated
+table — `effort store: <path> needs migration ...; a development build
+migrates only a store under the temp directory or RAFA_EFFORT_DIR`. The
+loop then halts the run rather than proceeding, so every assertion past
+that point fails too: a timed-out `loop start`/`loop pause` pair
+(`src/tests/loop-sessions.test.ts`, 90s each), six `rafa start` cases
+reading tables the halted report never wrote (`src/tests/task-report.test.ts`),
+and one each in `src/tests/loop-output.test.ts` (three cases),
+`src/tests/effort-skills-collect-integration.test.ts`,
+`src/tests/serve-spawned.test.ts`, `src/tests/command-output.test.ts`,
+`src/tests/preflight-halts.test.ts` (two cases) and
+`src/tests/lesson-push-e2e.test.ts`. Confirmed pre-existing at `origin/main`
+(`e5041c5`) with a worktree, `loop-output.test.ts` failing the same way
+there; the root cause predates every commit on this plan's branch —
+`isUnderTempDir` and `refuseUnownedDevelopmentWrite` were both last
+touched by rafa-234 (`dea6b76`), already on `main`. Do not re-file it as a
+finding; this paragraph is the record. It clears once `isUnderTempDir`
+canonicalizes the path argument the same way it canonicalizes the temp
+dir argument.
+
+**Two `migrations.test.ts` cases read the globally installed `rafa`, and
+one reads a release tag, both machine state.**
+`describe('the installed 0.24.1 runtime')`'s `holds the rule the
+transcription copies` compares a locally installed CLI's bytes against a
+transcribed rule, and `describe('the lock at the newest release tag')`'s
+`keeps every line of the lock at v0.28.0` reads a git tag; both fail here
+because the installed binary and the checked-out tag are older than this
+tree expects. Unrelated to the temp-dir cascade above and to this plan:
+`migrations.test.ts` was last touched by rafa-234 (`dea6b76`), already on
+`main`. This paragraph replaces nothing.
+
+**One `copy.test.ts` case reads a filesystem-specific SQLite error
+string.** `rafa effort copy over a live store`'s `copies while another
+connection holds a read transaction...` expects `database is locked` but
+this machine's SQLite reports `disk I/O error` for the same contention
+instead. Unrelated to the temp-dir cascade above; `src/commands/effort/copy.test.ts`
+was last touched by rafa-234 (`dea6b76`), already on `main`. This
+paragraph replaces nothing.
+
 ### Spawned CLI tests
 
 `src/tests/cli-capture.ts` (`plantScratchRepo`, `plantProjectConfig`,
