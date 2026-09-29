@@ -20,6 +20,7 @@
  * | `duration_ms` | the check: how long it took, in whole milliseconds |
  * | `failure` | the check: what failed, as the halt words it, or NULL for a pass |
  * | `collected_at` | the write's time, ISO 8601, one per write |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store.
  * There is no `id` column: `(run_id, position)` names a row, and nothing
@@ -110,6 +111,7 @@ import { existsSync } from 'node:fs';
 import { PREREQUISITE_KINDS } from '../../config.js';
 
 import { describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /**
@@ -166,9 +168,10 @@ const INSERT_CHECK = `
     run_id, position,
     tier, kind, item, probe,
     outcome, duration_ms, failure,
-    collected_at
+    collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('preflight')})
 `;
 
 /** A whole-write refusal, thrown before the store is opened. */

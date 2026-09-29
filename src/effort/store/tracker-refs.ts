@@ -106,6 +106,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore } from './sqlite.js';
 
 /** One write: a filed issue's reference, the artifact it is kept under, and its dispatch. */
@@ -159,14 +160,15 @@ const SELECT_HELD = `
   WHERE session_id = ? AND artifact = ?
 `;
 
-/** A row holding only the dispatch, the artifact and the reference. */
+/** A row holding only the dispatch, the artifact, the reference and its origin pair. */
 const INSERT_REF = `
   INSERT INTO findings (
     id, session_id, plan_stub, task_line,
     artifact,
-    outcome, tracker_ref, collected_at
+    outcome, tracker_ref, collected_at,
+    ${STAMPED_COLUMNS}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${stampedValues('findings')})
 `;
 
 /** The reference, set on a row that holds none. */

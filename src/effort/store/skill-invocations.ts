@@ -19,6 +19,7 @@
  * | `name` | the skill's bare name, or NULL on an `unknown` row |
  * | `sidechain` | 1 for the calls a sidechain made, 0 for the main thread's, or NULL on an `unknown` row |
  * | `count` | how many calls, above zero, or NULL on an `unknown` row |
+ * | `origin_store`, `origin_seq` | the store's origin and the row's own `seq`, NULL in both when unminted (`origins.ts`) |
  *
  * `seq` comes first, the append order, as in every table of the store. No
  * other column is kept, not even the write's time: the table holds the
@@ -81,6 +82,7 @@ import type { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
 
 import { describeValue, textProblem } from './findings.js';
+import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** The count a session reads when its log could not be read for skill calls. */
@@ -135,8 +137,8 @@ interface StoredInvocation {
 
 /** The insert. No conflict is absorbed: a duplicate is refused before the store opens. */
 const INSERT_INVOCATION = `
-  INSERT INTO skill_invocations (session_id, name, sidechain, count)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO skill_invocations (session_id, name, sidechain, count, ${STAMPED_COLUMNS})
+  VALUES (?, ?, ?, ?, ${stampedValues('skill_invocations')})
 `;
 
 /** Whether a session already holds a row. */

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the seventy-one registered so far wrap a
+ * of each is its command. Five of the seventy-three registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -129,7 +129,13 @@
  *     read-only, ending with the next safe step, and `effort migrate
  *     [--dry-run]`, the store's pending migrations, a breaking one
  *     included, applied to a copy beside it and swapped in behind a
- *     whole-file backup.
+ *     whole-file backup, and `effort merge <file> [--dry-run]`, another
+ *     device's store unioned into this one on a copy beside it and
+ *     swapped in behind a whole-file backup, exiting 2 on another
+ *     project's store and on a `store: ndjson` project, and `effort
+ *     move --to=sqlite`, a `store: ndjson` project's sessions and
+ *     commits appended to its SQLite store, the counts checked, and
+ *     `store: sqlite` set in its config.
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
@@ -292,7 +298,9 @@ import effortCollect from './effort/collect.js';
 import effortCopy from './effort/copy.js';
 import effortDashboard from './effort/dashboard.js';
 import effortFixSchema from './effort/fix-schema.js';
+import effortMerge from './effort/merge.js';
 import effortMigrate from './effort/migrate.js';
+import effortMove from './effort/move.js';
 import effortReport from './effort/report.js';
 import effortSchema from './effort/schema.js';
 import epicCancel from './epic/cancel.js';
@@ -358,7 +366,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
-  { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes' },
+  { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge another device\'s store; move an NDJSON store to SQLite' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
@@ -404,6 +412,8 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortCopy,
   effortSchema,
   effortMigrate,
+  effortMerge,
+  effortMove,
   moduleList,
   moduleExec,
   agentVendor,
