@@ -133,7 +133,7 @@ function unread(what: string, said: string): FragmentTreeReading {
  * `directory` as a path prefix from the root: `./.changes/` and
  * `.changes` both answer `.changes/`, and the root itself answers ''.
  */
-function directoryPrefix(directory: string): string {
+export function directoryPrefix(directory: string): string {
   const normal = posix.normalize(directory.replace(/\\/g, '/')).replace(/\/+$/, '');
   return normal === '.' || normal === ''
     ? ''
