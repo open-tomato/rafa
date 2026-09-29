@@ -457,7 +457,9 @@ copy, which carries the columns over as they were, the merge's
 union (`store/merge-union.ts`), which inserts another store's unmatched
 rows under a new local `seq` with their origin pair unchanged, and the
 merge's conflict trail (`store/merge-conflicts.ts`) into the local
-`merge_conflicts`, and its `merges` row (`store/merge-store.ts`).
+`merge_conflicts`, its `merges` row (`store/merge-store.ts`), and the
+merge fixtures' restore (`store/fixture-extract.ts`), which builds a
+store from an anonymised extract with every row as the extract holds it.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
