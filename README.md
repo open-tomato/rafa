@@ -438,10 +438,13 @@ of `~/.bun/bin`; both warn when it is not, and `rafa doctor` checks it.
 Both exit 1 before building anything while a plan tracker in `plan.dir`
 (`.rafa/plans` unless `.rafa/config.yaml` names another) still holds an
 open or blocked task, and name every such tracker. `rafa self-update`
-runs only inside a project, so `rafa init` the checkout first. They exit
+runs only inside a project, so `rafa init` the checkout first, and it
+also exits 1 while a loop of the project is live, naming each loop's
+branch and pid, unless `dangerous.selfUpdateDuringLoop` is true in the
+config; `--force` does not override that wait. They exit
 2 when they could not run: a `package.json` that is not rafa's or cannot
-be read, a config or tracker they could not read, or a build, copy or
-link that failed.
+be read, a config or tracker they could not read, a loop record
+`rafa self-update` could not read, or a build, copy or link that failed.
 
 A version is installed once. Both also exit 1, before building, when
 `~/.rafa/runtime/<version>/` is already there, naming that directory and

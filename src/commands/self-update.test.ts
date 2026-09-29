@@ -1,16 +1,21 @@
 /**
  * Tests for `rafa self-update` (`self-update.ts`): the install it runs in
  * the project root, the build lines it forwards, the `PATH` warning, json
- * mode, `--force` reaching the install, and its refusals with their exit
+ * mode, `--force` reaching the install, the wait for a live loop and
+ * `dangerous.selfUpdateDuringLoop`, and its refusals with their exit
  * codes. The install itself is held in `src/runtime/install.test.ts`.
  *
  * Each case dispatches a command made over a build seam of its own, in a
  * project planted under this file's temporary directory beside a home of
  * its own, with an environment of its own. No case runs the real build,
  * and every path a case reads a link or a runtime at is asserted under
- * that directory, so none reaches the real home.
+ * that directory, so none reaches the real home. A live loop is a
+ * session record planted under the project's `.rafa/runs/`, its pid
+ * judged by the case's own probe, except in the one case reading the
+ * default probe, whose record names this test process's own pid.
  */
 import type { SelfUpdateResult, SelfUpdateSeams } from './self-update.js';
+import type { SessionRecord, SessionState } from '../loop/sessions.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,10 +24,16 @@ import { delimiter, dirname, join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { projectConfigText } from '../project/scaffold.js';
 import { runBuild } from '../runtime/install.js';
-import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, plantProject, plantProjectConfig } from '../tests/cli-capture.js';
 
-import selfUpdateCommand, { createSelfUpdateCommand, DEFAULT_SELF_UPDATE_SEAMS } from './self-update.js';
+import selfUpdateCommand, {
+  createSelfUpdateCommand,
+  DEFAULT_SELF_UPDATE_SEAMS,
+  DURING_LOOP_KEY,
+  liveLoopsOf,
+} from './self-update.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-self-update-')));
@@ -223,6 +234,170 @@ describe('rafa self-update refuses', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('Usage: rafa self-update');
     expect(builds).toEqual([]);
+  });
+});
+
+/** The pids a case's probe reads as alive. */
+const LIVE_PID = 4242;
+const LIVE_PID_TOO = 4343;
+const GONE_PID = 4444;
+
+/** A probe reading {@link LIVE_PID} and {@link LIVE_PID_TOO} alive and every other pid gone. */
+const probe = (pid: number): boolean => pid === LIVE_PID || pid === LIVE_PID_TOO;
+
+/** Writes a session record under the project's `.rafa/runs/`, as `loop start` would. */
+function plantLoop(
+  project: PlantedProject,
+  sessionId: string,
+  branch: string,
+  pid: number,
+  state: SessionState = 'running',
+  startedAt = '2026-09-29T10:00:00.000Z',
+): void {
+  const record: SessionRecord = {
+    sessionId,
+    planStub: `stub-${sessionId}`,
+    plan: `.rafa/plans/PLAN-${sessionId}.md`,
+    branch,
+    pid,
+    startedAt,
+    state,
+    task: null,
+  };
+  writeFile(join(project.root, '.rafa', 'runs', `${sessionId}.json`), `${JSON.stringify(record, null, 2)}\n`);
+}
+
+/** A build seam as {@link recordingBuild}, judging pids by {@link probe}. */
+function probedBuild(builds: string[]): SelfUpdateSeams {
+  return { ...recordingBuild(builds), isAlive: probe };
+}
+
+/** The project's config with `dangerous.selfUpdateDuringLoop` set to `value`. */
+function setDuringLoop(project: PlantedProject, value: boolean): void {
+  plantProjectConfig(project.root, `${projectConfigText()}dangerous:\n  selfUpdateDuringLoop: ${String(value)}\n`);
+}
+
+describe('rafa self-update beside a live loop', () => {
+  it('exits 1 naming each live loop\'s branch and pid, oldest first, and builds nothing', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'later', 'feature/b', LIVE_PID_TOO, 'paused', '2026-09-29T11:00:00.000Z');
+    plantLoop(project, 'earlier', 'feature/a', LIVE_PID);
+    plantLoop(project, 'killed', 'feature/gone', GONE_PID);
+    plantLoop(project, 'finished', 'feature/done', LIVE_PID, 'done');
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, probedBuild(builds));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('REFUSED — 2 loop(s) of this project are live');
+    const named = run.stderr.split('\n').filter((line) => line.startsWith('  loop on '));
+    expect(named).toEqual([
+      `  loop on feature/a (pid ${LIVE_PID}, session earlier)`,
+      `  loop on feature/b (pid ${LIVE_PID_TOO}, session later)`,
+    ]);
+    expect(run.stderr).toContain(`set ${DURING_LOOP_KEY}: true to install under them`);
+    expect(builds).toEqual([]);
+    expect(existsSync(join(project.home, '.rafa'))).toBe(false);
+  });
+
+  it('refuses ahead of a tracker with a task left, so the loop is what it names', async () => {
+    const project = plantCheckout();
+    writeFile(join(project.root, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [ ] open\n');
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+
+    const run = await selfUpdate(project, probedBuild([]));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('loop on feature/a (pid 4242, session running)');
+    expect(run.stderr).not.toContain('plan tracker(s)');
+  });
+
+  it('keeps refusing under --force, which does not override the wait', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, probedBuild(builds), ['--force']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('loop on feature/a (pid 4242, session running)');
+    expect(builds).toEqual([]);
+  });
+
+  it('installs under a live loop when dangerous.selfUpdateDuringLoop is true', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const builds: string[] = [];
+
+    // The control: the key set to false refuses, as its absence does.
+    setDuringLoop(project, false);
+    const refused = await selfUpdate(project, probedBuild(builds));
+    expect(refused.exitCode).toBe(1);
+    expect(builds).toEqual([]);
+
+    setDuringLoop(project, true);
+    const run = await selfUpdate(project, probedBuild(builds));
+
+    expect(run.exitCode).toBe(0);
+    expect(builds).toEqual([project.root]);
+    expect(readlinkSync(join(rafaBinOf(project), 'rafa'))).toBe(join(project.home, '.rafa', 'runtime', VERSION, 'cli.js'));
+  });
+
+  it('installs once every recorded pid is gone, the records left as they are', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'killed', 'feature/a', GONE_PID);
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, probedBuild(builds));
+
+    expect(run.exitCode).toBe(0);
+    expect(builds).toEqual([project.root]);
+    expect(existsSync(join(project.root, '.rafa', 'runs', 'killed.json'))).toBe(true);
+  });
+
+  it('reads a pid with isPidAlive when the seams name no probe, this process reading as alive', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'this-process', 'feature/self', process.pid);
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, recordingBuild(builds));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`loop on feature/self (pid ${process.pid}, session this-process)`);
+    expect(builds).toEqual([]);
+  });
+
+  it('gives the refusal as a failed terminal result in json mode', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+
+    const run = await selfUpdate(project, probedBuild([]), ['--output=json']);
+
+    expect(run.exitCode).toBe(1);
+    const result = eventsOf(run.stdout).at(-1);
+    expect(result).toMatchObject({ type: 'result', ok: false });
+    expect(JSON.stringify(result)).toContain('loop on feature/a (pid 4242, session running)');
+  });
+
+  it('exits 2 for a loop record it cannot read, building nothing', async () => {
+    const project = plantCheckout();
+    writeFile(join(project.root, '.rafa', 'runs', 'broken.json'), 'not json\n');
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, probedBuild(builds));
+
+    expect(run.exitCode).toBe(2);
+    expect(run.stderr).toContain('FAIL — loops:');
+    expect(run.stderr).toContain('broken.json');
+    expect(builds).toEqual([]);
+  });
+});
+
+describe('liveLoopsOf', () => {
+  it('answers no loop for a project with no runs directory', () => {
+    const project = plantCheckout();
+
+    expect(liveLoopsOf(project.root, probe)).toEqual([]);
   });
 });
 

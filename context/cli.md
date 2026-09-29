@@ -896,7 +896,11 @@ New; it replaces no earlier text. What a row or an action added to
 - **`self-update` installs the checkout it runs in**
   (`src/commands/self-update.ts`), as `bun run snapshot` does: both call
   `installRuntime` (`src/runtime/install.ts`), the script from the
-  checkout and the command from the bundle. In the project root it reads
+  checkout and the command from the bundle. The command alone first reads
+  the session records under the project root's `.rafa/runs/` and refuses
+  with 1 while one reads `running` or `paused` with its pid alive, naming
+  each loop's branch, pid and session, unless `dangerous.selfUpdateDuringLoop`
+  is true; `--force` does not override that wait. In the project root it reads
   `package.json`, refusing one not named `@open-tomato/rafa`, then
   `plan.dir` as `loop start` resolves the config, then each
   `PLAN_TRACKER*.md` directly in `plan.dir`, refusing while one holds an
@@ -1870,10 +1874,12 @@ New; it replaces no earlier text. What a row or an action added to
   PREREQUISITES file that cannot be read, each message ending with the
   line `Nothing was checked.`, and for a failed required item, its message the runner's halt.
   `self-update` throws 1 for a positional word, for a `--force` value
-  other than `true` or `false`, for a tracker in `plan.dir` holding a
+  other than `true` or `false`, for a live loop of the project without
+  `dangerous.selfUpdateDuringLoop`, naming each loop's branch and pid, for a tracker in `plan.dir` holding a
   task, naming each, and for a `~/.rafa/runtime/<version>/` already there
   without `--force`, naming it and the version; and 2, the message naming the
-  step and what it leaves changed, for a `package.json` that cannot be
+  step and what it leaves changed, for a session record under `.rafa/runs/`
+  that cannot be read, for a `package.json` that cannot be
   read or names another package or no usable version, a config
   `loadConfig` refuses, a `plan.dir` that cannot be read, and a build,
   copy or link that failed.
