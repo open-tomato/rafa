@@ -32,8 +32,24 @@
  * counts, `no tracker` for a plan with none and the issues when there
  * are any; or the header naming the directory with no plans listed.
  *
- * The command declares no argument and no flag, and refuses a line
- * handing it an argument with exit code 1.
+ * ## `--open`
+ *
+ * With `--open` only the plans {@link openPlans} keeps are listed: a plan
+ * with a task still open, or with issues whatever its counts, since a
+ * plan the parser misread may hold work its counts miss. A plan whose
+ * remaining tasks are all `[BLOCKED]` and that has no issues is hidden,
+ * as is a plan with no tasks. `listPlans` itself still returns every
+ * plan, so `plan show` reads the full list. In json mode `data.plans`
+ * holds only the kept plans; in text mode a directory with plans but none
+ * kept writes `No plan in <dir>/ has open tasks.`, told apart from a
+ * directory with no plans at all by the caller rather than by the empty
+ * array.
+ *
+ * `--open` takes no value: a value typed onto it is refused with exit
+ * code 1 (`readSwitch`, `plan-files.ts`).
+ *
+ * The command declares no argument and the one flag `open`, and refuses
+ * a line handing it an argument with exit code 1.
  */
 import type { PlansDir, TaskCounts } from './plan-files.js';
 import type { RafaCommand } from '../../cli/command.js';
@@ -50,6 +66,7 @@ import {
   isFile,
   planFileName,
   plural,
+  readSwitch,
   requireProject,
   resolvePlansDir,
   stubOfPlanFile,
@@ -57,6 +74,9 @@ import {
 
 /** The usage line a refusal names, which is also how a refusal names the command. */
 const USAGE = 'rafa plan list';
+
+/** What a refusal of a value read into `--open` says to do instead. */
+const OPEN_HINT = 'Type it bare: rafa plan list --open';
 
 /** One plan the list holds. */
 export interface PlanListing {
@@ -106,6 +126,16 @@ export function listPlans(plans: PlansDir): PlanList {
   return { dir, plans: stubs.map((stub) => listing(dir, stub)) };
 }
 
+/** Whether `--open` keeps a plan: a task still open, or any issue; see the module note. */
+function isOpen(plan: PlanListing): boolean {
+  return plan.tasks.open > 0 || plan.issues > 0;
+}
+
+/** The plans of `list` with a task still open or with issues, in the same order; see the module note. */
+export function openPlans(list: PlanList): PlanList {
+  return { dir: list.dir, plans: list.plans.filter(isOpen) };
+}
+
 /** What a row carries after its stub. */
 function rowNotes(plan: PlanListing): string {
   const notes = [formatCounts(plan.tasks)];
@@ -116,11 +146,17 @@ function rowNotes(plan: PlanListing): string {
 
 /**
  * The lines text mode writes for a list, its paths opening with
- * `dirLabel`, `plan.dir` as the config spells it; see the module note.
+ * `dirLabel`, `plan.dir` as the config spells it. `openOnly` says the
+ * list is {@link openPlans} of another, so an empty one reads as none
+ * open rather than none at all; see the module note.
  */
-export function renderPlanList(list: PlanList, dirLabel: string): string[] {
+export function renderPlanList(list: PlanList, dirLabel: string, openOnly = false): string[] {
   const label = `${dirLabel}/`;
-  if (list.plans.length === 0) return [`No plans in ${label}.`];
+  if (list.plans.length === 0) {
+    return [openOnly
+      ? `No plan in ${label} has open tasks.`
+      : `No plans in ${label}.`];
+  }
   const width = Math.max(...list.plans.map((plan) => plan.stub.length));
   return [`Plans in ${label}:`, ...list.plans.map((plan) => `  ${plan.stub.padEnd(width)}   ${rowNotes(plan)}`)];
 }
@@ -136,14 +172,25 @@ const planListCommand: RafaCommand = {
     + ' there is one, and from the plan itself before then. A plan with no tracker is marked `no'
     + ' tracker`, and a plan the plan parser did not read as written shows how many issues `rafa plan'
     + ' validate` reports for it. The directory is read under the project root, and is `.rafa/plans`'
-    + ' unless a config names another. With `--output=json` the list is the data of the terminal result'
+    + ' unless a config names another. With `--open` only the plans with a task still open, or with'
+    + ' issues, are listed. With `--output=json` the list is the data of the terminal result'
     + ' event, each path absolute.',
   args: [],
-  flags: [],
+  flags: [
+    {
+      name: 'open',
+      description: 'Lists only the plans with a task still open, or with issues; takes no value.',
+      type: 'boolean',
+    },
+  ],
   examples: [
     {
       cmd: 'rafa plan list',
       note: 'Prints one row per plan: its stub, then its tasks done, blocked and open.',
+    },
+    {
+      cmd: 'rafa plan list --open',
+      note: 'Prints only the plans with open tasks or issues, hiding the done and all-blocked ones.',
     },
     {
       cmd: 'rafa plan list --output=json',
@@ -152,16 +199,20 @@ const planListCommand: RafaCommand = {
   ],
   outputs: ['text', 'json'],
   run: async (context) => {
+    const openOnly = readSwitch('open', context.flags['open'], OPEN_HINT);
     expectNoArgument(context.args, USAGE);
     const plans = resolvePlansDir(requireProject(context, USAGE), USAGE, (message) => {
       context.output.warn(message);
     });
-    const list = listPlans(plans);
+    const all = listPlans(plans);
+    const list = openOnly
+      ? openPlans(all)
+      : all;
     if (context.outputMode === 'json') {
       context.output.result(list);
       return;
     }
-    for (const line of renderPlanList(list, plans.label)) context.output.info(line);
+    for (const line of renderPlanList(list, plans.label, openOnly)) context.output.info(line);
   },
 };
 

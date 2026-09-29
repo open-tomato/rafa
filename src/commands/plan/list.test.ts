@@ -26,6 +26,7 @@
  * what reading the project root gives: the subdirectory holds no plans
  * directory, so a command reading the working directory lists nothing.
  */
+import type { PlanList, PlanListing } from './list.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -37,7 +38,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { parsePlan } from '../../plan/index.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
-import planListCommand, { listPlans, renderPlanList } from './list.js';
+import planListCommand, { listPlans, openPlans, renderPlanList } from './list.js';
 import { plansDirAt } from './plan-files.js';
 import planShowCommand, { renderShownPlan, showPlan } from './show.js';
 
@@ -119,6 +120,23 @@ function plantPlans(root: string, dir: string): string {
   }, [`${dir}/PLAN-folder.md`]);
 }
 
+/** A listing of `stub` with `tasks` and `issues`, the paths made up. */
+function madeUpListing(stub: string, tasks: PlanListing['tasks'], issues = 0): PlanListing {
+  return { stub, plan: `/plans/PLAN-${stub}.md`, tracker: null, tasks, issues };
+}
+
+/** One listing per case `--open` decides, in stub order. */
+const MIXED: PlanList = {
+  dir: '/plans',
+  plans: [
+    madeUpListing('blocked', { total: 2, done: 1, blocked: 1, open: 0 }),
+    madeUpListing('done', { total: 2, done: 2, blocked: 0, open: 0 }),
+    madeUpListing('empty', { total: 0, done: 0, blocked: 0, open: 0 }),
+    madeUpListing('misread', { total: 1, done: 1, blocked: 0, open: 0 }, 1),
+    madeUpListing('open', { total: 3, done: 1, blocked: 1, open: 1 }),
+  ],
+};
+
 /** A fresh directory of this file's own. */
 function freshRoot(): string {
   return mkdtempSync(join(tempBase, 'root-'));
@@ -182,6 +200,32 @@ describe('what rafa plan list lists', () => {
   });
 });
 
+describe('what rafa plan list --open keeps', () => {
+  it('keeps the plans with an open task or an issue, in order, and hides the done, all-blocked and empty ones', () => {
+    expect(openPlans(MIXED)).toEqual({ dir: '/plans', plans: [MIXED.plans[3], MIXED.plans[4]] });
+    // The full list is left as it was: the filter builds a new one.
+    expect(MIXED.plans.map((plan) => plan.stub)).toEqual(['blocked', 'done', 'empty', 'misread', 'open']);
+  });
+
+  it('keeps both planted plans: alpha for its open task, b for its issues', () => {
+    const plans = plansDirAt(plantPlans(freshRoot(), DEFAULT_DIR), DEFAULT_DIR);
+
+    expect(openPlans(listPlans(plans)).plans.map((plan) => plan.stub)).toEqual(['alpha', 'b']);
+  });
+
+  it('renders the kept rows, and an empty filtered list as none open rather than none at all', () => {
+    expect(renderPlanList(openPlans(MIXED), CONFIGURED_DIR, true)).toEqual([
+      `Plans in ${CONFIGURED_DIR}/:`,
+      '  misread   1/1 done, 0 blocked, 0 open; no tracker; 1 issue',
+      '  open      1/3 done, 1 blocked, 1 open; no tracker',
+    ]);
+    const none = openPlans({ dir: '/plans', plans: MIXED.plans.slice(0, 3) });
+    expect(none.plans).toEqual([]);
+    expect(renderPlanList(none, CONFIGURED_DIR, true)).toEqual([`No plan in ${CONFIGURED_DIR}/ has open tasks.`]);
+    expect(renderPlanList(none, CONFIGURED_DIR)).toEqual([`No plans in ${CONFIGURED_DIR}/.`]);
+  });
+});
+
 describe('rafa plan list, dispatched', () => {
   it('prints the rows of the default directory in text mode', async () => {
     const project = freshProject();
@@ -236,6 +280,58 @@ describe('rafa plan list, dispatched', () => {
     // The control: without the argument, that config is what refuses the line.
     const refused = await dispatchInProject(['plan', 'list'], SUBJECTS, [planListCommand], project);
     expect([refused.exitCode, refused.stderr.split('\n')[0]]).toEqual([1, '❌ rafa plan list: the config cannot be used:']);
+  });
+
+  it('refuses a value typed onto --open with exit code 1', async () => {
+    const project = freshProject();
+    plantPlans(project.root, DEFAULT_DIR);
+    const run = await dispatchInProject(['plan', 'list', '--open=maybe'], SUBJECTS, [planListCommand], project);
+
+    expect(run).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: '❌ --open takes no value, and read "maybe" as one. Type it bare: rafa plan list --open\n',
+    });
+  });
+
+  it('lists only alpha for its open task and b for its issues under --open, hiding neither', async () => {
+    const project = freshProject();
+    plantPlans(project.root, DEFAULT_DIR);
+    const run = await dispatchInProject(['plan', 'list', '--open'], SUBJECTS, [planListCommand], project);
+
+    expect(run).toEqual({
+      exitCode: 0,
+      stdout: `${[
+        `Plans in ${DEFAULT_DIR}/:`,
+        '  alpha   1/3 done, 1 blocked, 1 open',
+        '  b       1/1 done, 0 blocked, 0 open; no tracker; 2 issues',
+      ].join('\n')}\n`,
+      stderr: '',
+    });
+  });
+
+  it('prints the no-open-tasks line and exits 0 where every plan is done or all-blocked with no issues', async () => {
+    const project = freshProject();
+    const dir = DEFAULT_DIR;
+    plantFiles(project.root, {
+      [`${dir}/PLAN-alpha.md`]: ALPHA_PLAN,
+      [`${dir}/PLAN_TRACKER-alpha.md`]: ALPHA_TRACKER.replace('- [ ] third', '- [BLOCKED] third'),
+    });
+    const run = await dispatchInProject(['plan', 'list', '--open'], SUBJECTS, [planListCommand], project);
+
+    expect(run).toEqual({ exitCode: 0, stdout: `No plan in ${dir}/ has open tasks.\n`, stderr: '' });
+  });
+
+  it('holds only the kept plans in the result data of json mode', async () => {
+    const project = freshProject(CONFIGURED_CONFIG);
+    plantPlans(project.root, CONFIGURED_DIR);
+    const run = await dispatchInProject(['plan', 'list', '--open', '--output=json'], SUBJECTS, [planListCommand], project);
+    const events = eventsOf(run.stdout);
+    const kept = openPlans(listPlans(plansDirAt(project.root, CONFIGURED_DIR)));
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    expect(events[1]).toMatchObject({ type: 'result', ok: true, data: JSON.parse(JSON.stringify(kept)) as unknown });
   });
 });
 

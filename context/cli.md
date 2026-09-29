@@ -324,7 +324,10 @@ New; it replaces no earlier text. What a row or an action added to
   of either swept directory passes it in a tracked file; widening those
   tokens is a separate change.
   `plan list` names each `PLAN-<stub>.md`, its tasks counted from its
-  `PLAN_TRACKER-<stub>.md` when there is one. `plan show <stub>` gives one
+  `PLAN_TRACKER-<stub>.md` when there is one; with `--open` it keeps only
+  the plans `openPlans` keeps, those with a task still open or with
+  issues, and a directory with plans but none kept writes `No plan in
+  <dir>/ has open tasks.` `plan show <stub>` gives one
   plan as `parsePlan` reads it, or its tracker with `--tracker`.
   `plan validate <file>` resolves the file against the working directory,
   and like every command but `module exec`, the two checkers, `init` and
@@ -1682,7 +1685,8 @@ New; it replaces no earlier text. What a row or an action added to
   `plan show` declares the argument `stub` and the flag `tracker`,
   `plan validate` the argument `file`, `plan risk` the argument `plan`
   and the flag `strict`, `plan needs` the argument `plan` and the flags
-  `spec`, `issue`, `missing` and `source`, and `plan list` neither; each
+  `spec`, `issue`, `missing` and `source`, and `plan list` no argument
+  and the flag `open`; each
   declares `text` and `json`. `plan create` declares the flags `spec`,
   `issue`, `next`, `refresh`, `dry-run`, `skip-review`, `accept-refs`,
   `comment`, `stub`, `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
