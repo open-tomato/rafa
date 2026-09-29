@@ -18,11 +18,12 @@
  *     problem alone, because its other keys follow a schema this module
  *     cannot read.
  *   - `types`: a non-empty list of the feature types in the spec's table,
- *     each given once. `learning` is refused by name: the spec closes
- *     that port to third parties, so no module provides a learning
- *     source.
+ *     then `sync`, which issue #323 adds after the table, each given
+ *     once. `learning` is refused by name: the spec closes that port to
+ *     third parties, so no module provides a learning source.
  *   - `provides`: one entry per listed type, read by that type's shape.
- *     `tracker`, `store` and `planner` name a `kind` and an `entry`;
+ *     `tracker`, `store`, `planner` and `sync` name a `kind` and an
+ *     `entry`;
  *     `output` adds `channels`, a non-empty list of the spec's channels;
  *     `commands` names an `entry`; `skills` and `agents` are a directory
  *     path; `mcp` is a non-empty list of servers, each a `name` unique in
@@ -30,8 +31,8 @@
  *   - `requires`: `rafa`, a version range the running version must
  *     satisfy, and `ports`, the version of each port the module
  *     implements. Every listed type that is a port (`tracker`, `store`,
- *     `planner`, `output`) states its version, and a stated version core
- *     does not serve is refused naming both numbers.
+ *     `planner`, `output`, `sync`) states its version, and a stated
+ *     version core does not serve is refused naming both numbers.
  *   - `prerequisites` and `source`, both optional: the `required` and
  *     `optional` item lists `.rafa/config.yaml` reads, through the same
  *     readers, and a non-empty string.
@@ -106,8 +107,12 @@ import {
 /** The manifest version this module reads. */
 export const MANIFEST_VERSION = 1;
 
-/** The feature types of the spec's table, in its order. */
-export const FEATURE_TYPES = ['output', 'tracker', 'store', 'planner', 'learning', 'skills', 'agents', 'mcp', 'commands'] as const;
+/**
+ * The feature types of the spec's table, in its order, then `sync`: the
+ * port issue #323 adds, whose `git`, `service` and `p2p` strategies come
+ * from modules.
+ */
+export const FEATURE_TYPES = ['output', 'tracker', 'store', 'planner', 'learning', 'skills', 'agents', 'mcp', 'commands', 'sync'] as const;
 
 /** One feature type. */
 export type FeatureType = (typeof FEATURE_TYPES)[number];
@@ -121,7 +126,7 @@ export const OUTPUT_CHANNELS = ['stdout', 'file', 'socket', 'mqtt', 'kafka', 'tu
 /** One output channel. */
 export type OutputChannel = (typeof OUTPUT_CHANNELS)[number];
 
-/** A `tracker`, `store` or `planner` entry: the kind a config selects, and the file implementing it. */
+/** A `tracker`, `store`, `planner` or `sync` entry: the kind a config selects, and the file implementing it. */
 export interface AdapterProvision {
   readonly kind: string;
   readonly entry: string;
@@ -154,6 +159,7 @@ export interface ManifestProvides {
   readonly agents?: string;
   readonly mcp?: readonly McpServer[];
   readonly commands?: CommandsProvision;
+  readonly sync?: AdapterProvision;
 }
 
 /** A manifest that passed {@link validateManifest}. */
@@ -323,7 +329,7 @@ const readTypes: Check<readonly ModuleFeatureType[]> = (raw, label) => {
     : passed(Object.freeze(read.value.filter(isModuleType)));
 };
 
-/** Reads a `tracker`, `store` or `planner` entry. */
+/** Reads a `tracker`, `store`, `planner` or `sync` entry. */
 const readAdapter: Check<AdapterProvision> = (raw, label) => {
   const { fields, problems } = readFields(raw, label, ['kind', 'entry'], ['kind', 'entry']);
   const kind = field(fields, 'kind', label, nonEmpty);
@@ -413,6 +419,7 @@ const PROVISION_READERS: ReadonlyMap<string, Check<unknown>> = new Map<string, C
   ['agents', readDirectory],
   ['mcp', readMcp],
   ['commands', readCommands],
+  ['sync', readAdapter],
 ]);
 
 /** What `types` declares, when it read clean, and the label a cross check names it by. */

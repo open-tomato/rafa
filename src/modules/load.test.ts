@@ -142,6 +142,35 @@ describe('a path source allowList names', () => {
   });
 });
 
+describe('the sync-fixture module under testdata', () => {
+  const dir = join(import.meta.dir, 'testdata', 'sync-fixture');
+
+  it('registers its sync adapter under the sync port and its kind, answering the Sync its entry makes', async () => {
+    const loaded = await load([pathSource(dir)], ['sync-fixture']);
+
+    expect(loaded.warnings).toEqual([]);
+    expect(loaded.modules.map((module) => [module.name, module.state, module.types, module.adapters, module.commands]))
+      .toEqual([['sync-fixture', 'loaded', ['sync'], ['sync/git'], null]]);
+    const adapter = loaded.adapters.find('sync', 'git');
+    expect(adapter?.portVersion).toBe(1);
+    const sync = adapter?.create({ repoRoot: '/repo' });
+    expect(sync?.kind).toBe('git');
+    expect(await sync?.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(await sync?.pull({ from: null, dryRun: true })).toEqual({ status: 'nothing-to-sync' });
+    expect(loaded.adapters.kinds('sync')).toEqual([...CORE_ADAPTER_REGISTRY.kinds('sync'), 'git']);
+    expect(CORE_ADAPTER_REGISTRY.find('sync', 'git')).toBeUndefined();
+  });
+
+  it('registers nothing when allowList does not name it', async () => {
+    const loaded = await load([pathSource(dir)], []);
+
+    expect(loaded.modules.map((module) => [module.state, module.types, module.adapters, module.problems]))
+      .toEqual([['disabled', ['sync'], [], []]]);
+    expect(loaded.adapters).toBe(CORE_ADAPTER_REGISTRY);
+    expect(loaded.adapters.find('sync', 'git')).toBeUndefined();
+  });
+});
+
 describe('a module allowList does not name', () => {
   it('is read and validated, and loads nothing and warns about nothing', async () => {
     const dir = demoModule();
