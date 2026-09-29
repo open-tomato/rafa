@@ -356,7 +356,9 @@ call does; so does `writeDispatch` (`store/dispatches.ts`).
 `readTaskReportTallies` reads that table back for `rafa effort report`,
 under the repo root whatever `store` selects, and opens nothing when the
 file is absent; `readPreflightHalts` reads `preflight` back the same way,
-and `readSessionBudgets` the `dispatches` rows carrying a budget.
+`readSessionBudgets` the `dispatches` rows carrying a budget, and
+`readSessionAgents` those naming an agent, for the `--by=agent` split of
+`rafa effort report --trend`.
 `readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
 `task_reports` and `report_absences` back the same way, for the rough ETA
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every

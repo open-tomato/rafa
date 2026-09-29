@@ -25,7 +25,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../../utils/declaration.js';
 
-import { readSessionBudgets, writeDispatch } from './dispatches.js';
+import { readSessionAgents, readSessionBudgets, writeDispatch } from './dispatches.js';
 import {
   migrateSchema,
   SQLITE_MIGRATIONS,
@@ -406,6 +406,27 @@ describe('readSessionBudgets', () => {
     const root = freshRoot('absent');
 
     expect(readSessionBudgets(root)).toEqual([]);
+    expect(existsSync(root)).toBe(false);
+  });
+});
+
+describe('readSessionAgents', () => {
+  it('reads back the sessions dispatched with an agent, alone, in append order', () => {
+    const root = freshRoot('agents');
+    writeDispatch(root, writeOf('s-1', 'Do it  {agent=doc-updater}'), CLOCK);
+    writeDispatch(root, writeOf('s-2', 'Do it  {effort=low}'), CLOCK);
+    writeDispatch(root, writeOf('s-3', 'Do it too  {agent=tdd-guide}', null), CLOCK);
+
+    expect(readSessionAgents(root)).toEqual([
+      { sessionId: 's-1', agent: 'doc-updater' },
+      { sessionId: 's-3', agent: 'tdd-guide' },
+    ]);
+  });
+
+  it('reads none, and creates nothing, under a root with no store', () => {
+    const root = freshRoot('absent-agents');
+
+    expect(readSessionAgents(root)).toEqual([]);
     expect(existsSync(root)).toBe(false);
   });
 });
