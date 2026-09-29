@@ -9,6 +9,11 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.26.0 — 2026-09-29, `rafa plan list --open`
+
+- Plans: new `rafa plan list --open` lists only the plans with at least one open task, plus any plan the parser did not read as written; when none is left it prints `No plan in <plan.dir>/ has open tasks.` and exits 0, and in json mode the result's `plans` holds only the kept listings.
+- Tests: dispatched CLI tests hold `rafa plan list --open` refusing a value typed onto the flag with exit code 1, a mixed directory listing only its open plan and a plan with issues, the no-open-tasks line for an all-done directory, and json results holding only the kept plans.
+
 ## 0.25.0 — 2026-09-28, Named, additive effort-store migrations an older runtime survives
 
 - Effort store: every migration has a name, and the store keeps a `schema_migrations` log of the ones applied, adopting an existing store on its first open; `user_version` stays at 13 while every applied migration is additive, so an older installed rafa keeps reading and writing a store a newer one changed. A read of a current store never writes, every open waits for another process's write instead of failing at once, `RAFA_EFFORT_DIR` moves the store (SQLite and NDJSON together) for one command and refuses a relative path or the project's own store, and a development build refuses to adopt or migrate a store outside the temp directory or `RAFA_EFFORT_DIR`, naming any loop running on it.
