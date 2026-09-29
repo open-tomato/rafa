@@ -18,7 +18,9 @@
  * `selectEffortStore` gives (`src/effort/store/index.ts`): resolution
  * has one owner, the config. It resolves `effortSync` as a `sync` kind
  * through the registry it is handed, `CORE_ADAPTER_REGISTRY` when none
- * is, and makes the adapter with the repository root alone. A caller
+ * is, and makes the adapter with the repository root and, when the
+ * config carries one, its `store` backend, which the `file` strategy
+ * (`src/effort/sync/file.ts`) is refused without. A caller
  * that loaded modules hands the registry `loadModules` answers
  * (`src/modules/load.ts`), since only that one holds a module's `sync`
  * adapter.
@@ -133,7 +135,8 @@ function isModuleStrategy(kind: unknown): kind is SyncStrategy {
 
 /**
  * Makes the `Sync` that `config.effortSync` names, under `repoRoot`,
- * through the `sync` adapter `registry` holds under that name.
+ * through the `sync` adapter `registry` holds under that name, handing
+ * it `config.store` when that is set.
  *
  * Pass the `config` field of a resolved config, and the registry
  * `loadModules` answered when modules were loaded. Selecting touches
@@ -144,14 +147,18 @@ function isModuleStrategy(kind: unknown): kind is SyncStrategy {
  */
 export function selectSync(
   repoRoot: string,
-  config: Pick<RafaConfig, 'effortSync'>,
+  config: Pick<RafaConfig, 'effortSync'> & Partial<Pick<RafaConfig, 'store'>>,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Sync {
   const kind: unknown = config.effortSync;
   const adapter = typeof kind === 'string'
     ? registry.find('sync', kind)
     : undefined;
-  if (adapter !== undefined) return adapter.create({ repoRoot });
+  if (adapter !== undefined) {
+    return adapter.create(config.store === undefined
+      ? { repoRoot }
+      : { repoRoot, store: config.store });
+  }
 
   const registered = registry.kinds('sync');
   if (isModuleStrategy(kind)) throw new SyncModuleMissing(kind, registered);

@@ -8,7 +8,7 @@
  * per kind, each made with a context built just for that kind. Repeating
  * that grid here would add nothing the size of this file could earn
  * back. What this file adds instead is the single running example the
- * mutation grid never assembles: every one of the nine kinds core
+ * mutation grid never assembles: every one of the ten kinds core
  * registers, made from ONE shared context, so a kind whose `create`
  * reaches for a field none of the others need cannot pass silently by
  * only ever being exercised alongside a context tailored to it.
@@ -16,7 +16,7 @@
  * The four claims:
  *
  *   - Every core port kind resolves and makes something real, from a
- *     context wide enough to satisfy every one of the nine at once,
+ *     context wide enough to satisfy every one of the ten at once,
  *     across all six port types.
  *   - A fixture add-on adapter registers under a name of its own and is
  *     found beside the core kinds, without changing the registry it
@@ -120,6 +120,7 @@ describe('every core port kind', () => {
       planPrompt: (specContent, stub) => `${stub}: ${specContent}`,
       planDir: '.rafa/plans',
       claude,
+      store: 'sqlite',
     };
 
     expect({
@@ -135,7 +136,7 @@ describe('every core port kind', () => {
       learning: ['local'],
       output: ['text', 'json'],
       planner: ['claude'],
-      sync: ['local'],
+      sync: ['local', 'file'],
     });
 
     const sqlite = CORE_ADAPTER_REGISTRY.resolve('store', 'sqlite').create(context);
@@ -147,6 +148,7 @@ describe('every core port kind', () => {
     const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create(context);
     const planner = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude').create(context);
     const sync = CORE_ADAPTER_REGISTRY.resolve('sync', 'local').create(context);
+    const fileSync = CORE_ADAPTER_REGISTRY.resolve('sync', 'file').create(context);
 
     expect(sqlite.path('sessions')).toContain(root);
     expect(ndjson.path('sessions')).toContain(root);
@@ -157,6 +159,7 @@ describe('every core port kind', () => {
     expect(typeof planner.create).toBe('function');
     expect(sync.kind).toBe('local');
     expect(await sync.push({ to: null })).toEqual({ status: 'nothing-to-sync' });
+    expect(fileSync.kind).toBe('file');
 
     text.info('shared context smoke check');
     json.result('shared context smoke check');
@@ -168,7 +171,7 @@ describe('every core port kind', () => {
       data: 'shared context smoke check',
     });
 
-    // None of the nine touched disk making the adapter alone.
+    // None of the ten touched disk making the adapter alone.
     expect(existsSync(root)).toBe(false);
   });
 });

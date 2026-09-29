@@ -611,8 +611,8 @@ describe('the core adapter registry', () => {
     expect(attempt).toThrow(`adapter registry: planner/claude has ${named}`);
   });
 
-  it('registers the local sync strategy alone', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local']);
+  it('registers the local and file sync strategies, in that order', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local', 'file']);
   });
 
   it('makes the local sync strategy, whose push and pull answer that there is nothing to sync', async () => {
@@ -761,14 +761,14 @@ describe('registering an adapter', () => {
     expect(attempt).toThrow(`adapter registry: an adapter is ${quoted}, expected a mapping`);
   });
 
-  it('answers a new registry holding an add-on sync kind after core\'s local', () => {
+  it('answers a new registry holding an add-on sync kind after core\'s local and file', () => {
     const extended = CORE_ADAPTER_REGISTRY.register(
       addOn({ port: 'sync', kind: 'git', create: () => FIXTURE_SYNC }),
     );
 
-    expect(extended.kinds('sync')).toEqual(['local', 'git']);
+    expect(extended.kinds('sync')).toEqual(['local', 'file', 'git']);
     expect(extended.resolve('sync', 'git').create({ repoRoot: '/nonexistent' })).toBe(FIXTURE_SYNC);
-    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local']);
+    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local', 'file']);
   });
 
   it('refuses a sync add-on taking core\'s local kind over', () => {
@@ -845,7 +845,7 @@ describe('looking an adapter up', () => {
       'adapter registry: no planner adapter is registered as "webhook"; registered: claude',
     );
     expect(() => CORE_ADAPTER_REGISTRY.resolve('sync', 'git')).toThrow(
-      'adapter registry: no sync adapter is registered as "git"; registered: local',
+      'adapter registry: no sync adapter is registered as "git"; registered: local, file',
     );
   });
 

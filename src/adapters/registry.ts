@@ -68,8 +68,10 @@
  * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
  * the phase 1 table names. The `sync` port adds `sync/local`, the default
  * strategy of `effort.sync`, from `src/effort/sync/select.ts`, whose
- * `selectSync` resolves `effort.sync` through a registry. `git`, `service`
- * and `p2p` are modules' strategies, registered by a loaded module.
+ * `selectSync` resolves `effort.sync` through a registry, and `sync/file`,
+ * the store carried as a file, from `src/effort/sync/file.ts`. `git`,
+ * `service` and `p2p` are modules' strategies, registered by a loaded
+ * module.
  *
  * ## What an adapter answers
  *
@@ -89,10 +91,14 @@
  * `github` tracker added `gh`, the `claude` planner added
  * `settingSources`, `planPrompt`, `planDir` and `claude`, and the
  * `local` learning adapter added `home` and
- * `learningBlessMinConfidence`, each with a default. The planner's
- * first three are optional to the type and not to the adapter: none has a
- * default it could fall back on (`src/adapters/planner/claude.ts` says
- * why), so its `create` throws when any is left out. Each output `create` makes a new output,
+ * `learningBlessMinConfidence`, each with a default, and the `file` sync
+ * strategy added `store`. The planner's first three are optional to the
+ * type and not to the adapter: none has a default it could fall back on
+ * (`src/adapters/planner/claude.ts` says why), so its `create` throws
+ * when any is left out. `store` is the same to `sync/file`: a default of
+ * `sqlite` would carry an NDJSON project's store without its sessions
+ * (`src/effort/sync/file.ts` says why), so its `create` throws when it is
+ * left out or names no backend. Each output `create` makes a new output,
  * so a `json` output's one terminal result belongs to the command it was
  * made for. Each tracker `create` makes a new tracker, so the reason a
  * `local` tracker records is the one its own context named, and the
@@ -120,6 +126,7 @@ import { describeValue } from '../config-sections.js';
 import { CONFIG_DEFAULTS, STORE_BACKENDS } from '../config.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
+import { createFileSync } from '../effort/sync/file.js';
 import { createLocalSync } from '../effort/sync/select.js';
 
 import { createLocalLearning, localInstinctsDir } from './learning/local.js';
@@ -220,6 +227,11 @@ export interface AdapterContext {
    * config default when left out.
    */
   readonly learningBlessMinConfidence?: number;
+  /**
+   * The project's resolved `store` backend. Read by the `file` sync
+   * strategy alone, which is refused without one.
+   */
+  readonly store?: StoreBackend;
 }
 
 /**
@@ -399,7 +411,7 @@ const STORE_OPENERS: {
  * store backends, in the order the config names them, then the `text`
  * and `json` outputs, then the `local` and `github` trackers, then the
  * `local` learning adapter, then the `claude` planner, then the `local`
- * sync strategy.
+ * and `file` sync strategies.
  */
 const CORE_ADAPTERS: readonly AnyAdapter[] = [
   ...STORE_BACKENDS.map(
@@ -482,6 +494,20 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     kind: 'local',
     portVersion: PORT_VERSIONS.sync,
     create: () => createLocalSync(),
+  },
+  {
+    port: 'sync',
+    kind: 'file',
+    portVersion: PORT_VERSIONS.sync,
+    create: ({ repoRoot, store }) => {
+      if (!(STORE_BACKENDS as readonly unknown[]).includes(store)) {
+        throw new TypeError(
+          `${REFUSAL}: sync/file has store ${describeValue(store)} in its context,`
+            + ` expected one of: ${STORE_BACKENDS.join(', ')}`,
+        );
+      }
+      return createFileSync({ repoRoot, backend: store as StoreBackend });
+    },
   },
 ];
 

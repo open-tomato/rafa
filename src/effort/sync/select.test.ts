@@ -89,7 +89,7 @@ function naming(effortSync: unknown): Pick<RafaConfig, 'effortSync'> {
 function missing(kind: string): string {
   return [
     `effort sync: effort.sync is "${kind}", and no module registers a sync adapter of that kind`
-      + ` (registered: local). Core ships no ${kind} strategy; load a module that provides`
+      + ` (registered: local, file). Core ships no ${kind} strategy; load a module that provides`
       + ' one with these lines in .rafa/config.yaml:',
     'modules:',
     '  - path: <module directory>',
@@ -181,7 +181,7 @@ describe('selectSync', () => {
     expect(thrownBy(() => selectSync(ROOT, naming('p2p'), registry))).toMatchObject({
       name: 'SyncModuleMissing',
       kind: 'p2p',
-      message: missing('p2p').replace('(registered: local)', '(registered: local, git)'),
+      message: missing('p2p').replace('(registered: local, file)', '(registered: local, file, git)'),
     });
   });
 
@@ -277,7 +277,7 @@ describe('the import cycle with the adapter registry', () => {
   ])('resolves sync/local when %s is imported first', (_label, first, second) => {
     expect(importing(first, second)).toEqual({
       exitCode: 0,
-      stdout: '[["local"],"local","nothing-to-sync"]\n',
+      stdout: '[["local","file"],"local","nothing-to-sync"]\n',
     });
   });
 });
