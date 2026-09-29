@@ -1838,7 +1838,9 @@ New; it replaces no earlier text. What a row or an action added to
   `--runtime` typed ahead of the subject; then for an unusable config, a plan
   file that does not exist, a default branch, a session record refusing
   the run, session records that cannot be read or written, and a
-  preflight that halts before any session: an `agent=` of a still-to-run
+  preflight that halts before any session: an `effort.sync` naming a
+  kind no adapter serves, checked first and worded as `rafa doctor`'s
+  `effort sync` row words it (`start/preflight-sync.ts`), an `agent=` of a still-to-run
   task that no scope `loop.settingSources` loads defines, checked ahead
   of every probe, a failed required prerequisite — the two automatic
   items a `gh` pull request provider contributes, `gh` on `PATH` and

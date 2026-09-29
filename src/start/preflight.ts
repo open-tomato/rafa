@@ -16,7 +16,14 @@
  *      left out, before anything is checked. The id keys the store's
  *      rows. `start()` hands in its session's id (`start/session.ts`),
  *      so the run id a halt names is the session's.
- *   2. **Checks the agent roster**, before any item is read and any
+ *   2. **Checks the sync strategy**, before anything of the plan is
+ *      read, through `start/preflight-sync.ts`: the project's
+ *      `effort.sync` read as `rafa doctor`'s `effort sync` row reads it.
+ *      A kind no adapter serves refuses the run, since a strategy that
+ *      moves no rows would leave the devices of one project apart; for
+ *      `git`, `service` and `p2p` with no module loaded the refusal names
+ *      the `modules:` and `allowList:` lines that load one.
+ *   3. **Checks the agent roster**, before any item is read and any
  *      probe is run, through `agents/roster.ts`: every `agent=` the
  *      still-to-run tasks of this run's checklist ask for, against the
  *      names the three tiers serve a session under the run's
@@ -42,7 +49,7 @@
  *      tracker is created after this preflight; a document that cannot
  *      be read is passed over, as the plan's own absence is refused by
  *      `start()` before this runs.
- *   3. **Checks the effort-store rules** `rafa plan validate` checks,
+ *   4. **Checks the effort-store rules** `rafa plan validate` checks,
  *      through `plan/store-rules.ts`, over the same checklist and the
  *      plan's `PREREQUISITES-<stub>.md`: no store change pinned by
  *      number, and in a plan whose task names ``migration `<id>` ``, no
@@ -52,20 +59,20 @@
  *      refuses the run before any item is read, since a plan that pins a
  *      number or runs branch store code over the live store is wrong
  *      before any probe could say so.
- *   4. **Reads the items** through `loadPlanPrerequisites`: the config's
+ *   5. **Reads the items** through `loadPlanPrerequisites`: the config's
  *      two tiers, with the plan's `PREREQUISITES-<stub>.md` merged in for
  *      this plan alone (`preflight/prerequisites-md.ts`). A file there
  *      that cannot be read refuses the run before any probe runs, and
  *      so does one holding a MALFORMED item: an `auto` or `start` item
  *      no command ends after a final `: `, which asked for a check and
  *      names none to run.
- *   5. **Adds the pull request provider's automatic items**, through
+ *   6. **Adds the pull request provider's automatic items**, through
  *      `pr/preflight-items.ts`: `gh` on `PATH` and `gh auth status` for
  *      `origin`'s host, both REQUIRED, when the provider resolves to
  *      `gh`. They go AHEAD of the configured required tier, because a
  *      run whose pull request could never be opened should halt at its
  *      cheapest check rather than after the tiers a repository added.
- *   6. **Prints the reminders** that file carries, through `info`: each
+ *   7. **Prints the reminders** that file carries, through `info`: each
  *      `human` item, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing. It then **warns
@@ -80,20 +87,20 @@
  *      this rafa refuses prints nothing here either (its first open
  *      refuses it with its own next step), and one that cannot be read
  *      is one warning naming why. None of it halts.
- *   7. **Decides the start-only tier**, through `isFirstDispatch`
+ *   8. **Decides the start-only tier**, through `isFirstDispatch`
  *      (`preflight/first-dispatch.ts`): the plan's `[start]` items are
  *      probed ahead of the configured required tier on a first
  *      dispatch, and on a resume each is skipped with one line naming
  *      it and why. See below.
- *   8. **Checks every item** through `runPreflight`
+ *   9. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
  *      optional item is warned about as it is found.
- *   9. **Stores a row per check** through `writePreflightChecks`
+ *  10. **Stores a row per check** through `writePreflightChecks`
  *      (`effort/store/preflight.ts`), under the repo root in the SQLite
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
- *  10. **Halts, or answers.** A failed required item, or rows that could
+ *  11. **Halts, or answers.** A failed required item, or rows that could
  *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
  *      code 1. Otherwise the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
@@ -121,7 +128,11 @@
  * halt as well, the halt comes first and the store's refusal replaces the
  * sentence about where the rows went.
  *
- * An unresolvable agent refuses before any of that, naming the document
+ * A sync strategy no adapter serves refuses before any of that, and
+ * before every other refusal below, with the problem `selectSync` worded
+ * indented under one opening line; `start/preflight-sync.ts` shows it.
+ *
+ * An unresolvable agent refuses next, also before any probe, naming the document
  * it read, the settings it resolved under, and every missing name with
  * the line that asked for it, why, and the pin line or setting that
  * settles it (`missingAgentLine`):
@@ -258,6 +269,7 @@
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
 import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
+import type { StartPreflightSync } from './preflight-sync.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
@@ -301,6 +313,8 @@ import {
 } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
 import { trackerPathFor } from '../utils/tracker.js';
+
+import { refuseUnservedSync } from './preflight-sync.js';
 
 /**
  * The sentence a task prompt carries after its `known-missing:` lines,
@@ -353,6 +367,8 @@ export interface StartPreflightOptions {
   readonly agents?: StartPreflightAgents;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
+  /** What the sync-strategy check reads; see the module note. */
+  readonly sync: StartPreflightSync;
 }
 
 /** What a preflight that let the run through answers. */
@@ -613,11 +629,13 @@ function refusalOf(runId: string, halt: string | null, storeProblem: string | nu
 /**
  * Runs the preflight of one `loop start` run and answers what the run's
  * sessions are handed, or throws `CommandExit` with exit code 1 for a
- * failed required item, rows the store refused, or a PREREQUISITES file
- * that cannot be read. See the module note.
+ * failed required item, rows the store refused, a PREREQUISITES file
+ * that cannot be read, or an `effort.sync` no adapter serves. See the
+ * module note.
  */
 export async function runStartPreflight(options: StartPreflightOptions): Promise<StartPreflight> {
   const runId = (options.newRunId ?? randomUUID)();
+  await refuseUnservedSync(options.repoRoot, options.sync);
   refuseUnresolvableAgents(options);
   refuseStoreRuleBreaks(options.planPath);
   const items = await loadItems(options);
