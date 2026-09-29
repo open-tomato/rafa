@@ -12,13 +12,16 @@
  * `mapOf`, whose ruling is on a KEY — the names a map setting's file
  * spells below its own key — and the named readers the settings below
  * are read through, `directory`, `trackerKind`, `releaseFile`,
- * `tierPins` and `routeTable`.
+ * `tierPins` and `routeTable`. `config-schema-release.ts` holds the
+ * `pr` and `release` sections, spread in here.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
  * section: `config-schema.ts` is 396 lines, `config.ts` 506 and
  * `config-sections.ts` 478. This module had reached 800 exactly when
  * those readers moved out to `config-readers.ts`, leaving it at 727.
+ * It stood at 780 when the `pr` and `release` sections moved out to
+ * `config-schema-release.ts`.
  *
  * ## The schema
  *
@@ -50,38 +53,18 @@
  *     resolves to a list in the order written, because the list is what
  *     a caller asks (does it include `user`?) and rebuilds the flag from.
  *
- * ## The `pr` section
+ * ## The `pr` and `release` sections
  *
- * `.rafa/specs/rafa-20-pr-commands.md` spells it `pr: { provider: gh | none,
- * mergeMethod: squash | merge | rebase, base: <default branch> }`, and
- * names `pr.resolveBudget` as what a `triage --resolve` session's
- * `--max-budget-usd` comes from. Four readings it leaves to this module:
- *
- *   - `pr.provider` and `pr.base` default to NULL, and null here means
- *     "nobody has said", not "off". The spec's default for the provider
- *     is `gh` when `origin` is a GitHub remote and `none` otherwise, and
- *     its default base is whatever the remote calls its default branch;
- *     neither is a value this module can spell, because both are read
- *     off the repository at use (`pr/provider.ts`). Writing either
- *     default as a literal would be the silent choice the config refuses
- *     everywhere else: `prBase: 'main'` would open a pull request into a
- *     branch that may not exist on a repository whose default is
- *     `master`. A file spelling `provider:` or `base:` with no value
- *     says nothing, as every null does, and resolves to the same null.
- *   - `pr.mergeMethod` defaults to `squash`, the first method the spec
- *     lists and the one the merge flow is written for: it deletes the
- *     local branch with `-D` because a squash leaves it unmerged in
- *     git's eyes.
- *   - `pr.resolveBudget` defaults to 2 US dollars, which the attempt
- *     guard's default of two attempts caps at 4 for one pull request.
- *     It is a number and not null: the spec has every resolve run carry
- *     `--max-budget-usd`, so a session with no budget is not a state
- *     this setting can be left in.
- *   - No `pr` setting is a {@link CommandLineSetting}. `pr merge` takes
- *     a `--method` flag, but that flag is the command's own argument for
- *     one merge, read by the command beside this setting, and not a
- *     layer over the config: a global `--merge-method` nobody typed
- *     would be a flag this module invented.
+ * Both sections' fields, defaults and specs sit in
+ * `config-schema-release.ts`, whose note argues the readings their
+ * specs leave open. {@link RafaConfig} extends its two interfaces, and
+ * {@link CONFIG_DEFAULTS} and {@link SETTINGS} spread its defaults and
+ * specs where the sections have always sat, so the order settings are
+ * reported in and a warning lists keys in is unchanged. One of its
+ * readings is cited by the sections below: no `pr` setting is a
+ * {@link CommandLineSetting}, because a command's own flag for one run
+ * is not a layer over the config, and a global flag nobody typed would
+ * be one this module invented. That is "the reason the `pr` section gives".
  *
  * ## The `board` section
  *
@@ -120,35 +103,6 @@
  *     number, `src/board/naming.ts` refuses anything that is not a
  *     positive whole one, and `issueNumber` refuses it here instead,
  *     where a person can still fix the file.
- *
- * ## The `release` section
- *
- * `.rafa/specs/rafa-21-changelog-and-release.md` spells it `release: {
- * enabled: auto, versionFile: package.json, changelog: CHANGELOG.md,
- * heading: "## {version} — {date}, {title}" }`, and those four values
- * are the defaults here. Four readings it leaves to this module:
- *
- *   - `release.enabled` is not a flag. `auto`, its default, is a third
- *     value meaning "on when both files below exist" — a reading
- *     `release/enabled.ts` makes against a disk, which no value here
- *     could stand for. What the reader takes beside it, and why `on`
- *     and `off` are refused, is `config-sections.ts`'s to say.
- *   - `release.versionFile` and `release.changelog` are paths relative
- *     to the repository root, and neither is null. Null elsewhere here
- *     means "nobody has said", and the spec has said: `package.json`
- *     and `CHANGELOG.md`. The absence the spec cares about is the
- *     FILE's — "a project with no version file gets the changelog
- *     entry under a date heading and no bump" — which is a question
- *     about a disk, answered at use and not spellable as a default.
- *   - `release.heading` is free text. The spec makes it a template so
- *     "a consumer's changelog has another shape" is an edit rather
- *     than a fork, and which placeholders it may carry, and what an
- *     unknown one renders to, is `release/changelog.ts`'s to say. So
- *     nothing here refuses a heading for the placeholders it spells.
- *   - No `release` setting is a {@link CommandLineSetting}, for the
- *     reason the `pr` section gives: the `release` commands read these
- *     settings beside their own arguments, and a global flag nobody
- *     typed would be one this module invented.
  *
  * ## The `cleanup` section
  *
@@ -299,7 +253,8 @@
  * entry naming no field does not either. {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and the known-key index are
  * all read off it, so adding a setting is one field, one default, one
- * spec, its reader in `config-sections.ts`, one line in `config.ts`'s
+ * spec — in `config-schema-release.ts` for a `pr` or `release` key —
+ * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else.
  *
@@ -318,19 +273,17 @@
  * cutover runs one plan under `full` and again under `stage`; should
  * that comparison argue for `full`, the change is that one line.
  */
+import type { PrSettings, ReleaseSettings } from './config-schema-release.js';
 import type {
   ClaudeSettingSource,
   ConfigVersion,
   InjectMode,
   LessonSwitch,
-  MergeMethod,
   ModuleSource,
   OptionalPrerequisiteItem,
   OutputMode,
   PrerequisiteItem,
-  PrProvider,
   Reader,
-  ReleaseEnabled,
   RouteTarget,
   SkillResolverName,
   StoreBackend,
@@ -342,11 +295,16 @@ import { join } from 'node:path';
 
 import {
   directory,
-  releaseFile,
   routeTable,
   tierPins,
   trackerKind,
 } from './config-readers.js';
+import {
+  PR_DEFAULTS,
+  PR_SETTINGS,
+  RELEASE_DEFAULTS,
+  RELEASE_SETTINGS,
+} from './config-schema-release.js';
 import {
   busyTimeoutMs,
   CLAUDE_SETTING_SOURCES,
@@ -359,16 +317,12 @@ import {
   issueNumber,
   lessonSwitch,
   listOf,
-  mergeMethod,
   MODULE_SOURCE_KEYS,
   moduleSource,
   OPTIONAL_ITEM_KEYS,
   oneOf,
   optionalPrerequisite,
   OUTPUT_MODES,
-  PR_PROVIDERS,
-  RELEASE_AUTO,
-  releaseEnabled,
   recurrenceCount,
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
@@ -377,7 +331,6 @@ import {
   subsetOf,
   text,
   tierSwitch,
-  usdAmount,
 } from './config-sections.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
 
@@ -391,8 +344,12 @@ import { DEFAULT_ROUTING } from './tiers/routing.js';
  */
 export const CONFIG_FILE = join('.rafa', 'config.yaml');
 
-/** Every setting, resolved. The module note maps each to its file key. */
-export interface RafaConfig {
+/**
+ * Every setting, resolved. The module note maps each to its file key;
+ * the `pr` and `release` fields are {@link PrSettings}' and
+ * {@link ReleaseSettings}'.
+ */
+export interface RafaConfig extends PrSettings, ReleaseSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -439,23 +396,6 @@ export interface RafaConfig {
   /** What each spawned session loads settings from. `loop.settingSources`. */
   settingSources: readonly ClaudeSettingSource[];
   /**
-   * The provider every `pr` action goes through, or null to read it off
-   * the `origin` remote. `pr.provider`.
-   */
-  prProvider: PrProvider | null;
-  /** How `pr merge` merges, unless `--method` names another. `pr.mergeMethod`. */
-  prMergeMethod: MergeMethod;
-  /**
-   * The branch a pull request is opened into, or null for whatever the
-   * remote calls its default branch. `pr.base`.
-   */
-  prBase: string | null;
-  /**
-   * The budget in US dollars each `pr triage --resolve` session is
-   * spawned with. `pr.resolveBudget`.
-   */
-  prResolveBudget: number;
-  /**
    * The logins trusted with board text besides the repository's own
    * write-holders. `board.trustedAuthors`.
    */
@@ -465,23 +405,6 @@ export interface RafaConfig {
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
    */
   roadmapIssue: number | null;
-  /**
-   * Whether a run bumps the version and writes a changelog entry, or
-   * `auto` to decide it off the two files below. `release.enabled`.
-   */
-  releaseEnabled: ReleaseEnabled;
-  /**
-   * The manifest the version is read from and written back to, from
-   * the repository root. `release.versionFile`.
-   */
-  releaseVersionFile: string;
-  /**
-   * The changelog an entry is inserted into, from the repository root.
-   * `release.changelog`.
-   */
-  releaseChangelog: string;
-  /** The template one entry's heading is rendered from. `release.heading`. */
-  releaseHeading: string;
   /**
    * The age in days past which `rafa cleanup` lists a branch as Stale.
    * `cleanup.staleDays`.
@@ -564,16 +487,10 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   modules: Object.freeze([]),
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
-  prProvider: null,
-  prMergeMethod: 'squash',
-  prBase: null,
-  prResolveBudget: 2,
+  ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   roadmapIssue: null,
-  releaseEnabled: RELEASE_AUTO,
-  releaseVersionFile: 'package.json',
-  releaseChangelog: 'CHANGELOG.md',
-  releaseHeading: '## {version} — {date}, {title}',
+  ...RELEASE_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
@@ -660,28 +577,14 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: subsetOf(CLAUDE_SETTING_SOURCES),
     cli: true,
   },
-  prProvider: { key: 'pr.provider', read: oneOf(PR_PROVIDERS), cli: false },
-  prMergeMethod: { key: 'pr.mergeMethod', read: mergeMethod, cli: false },
-  prBase: { key: 'pr.base', read: text('a branch name'), cli: false },
-  prResolveBudget: { key: 'pr.resolveBudget', read: usdAmount, cli: false },
+  ...PR_SETTINGS,
   boardTrustedAuthors: {
     key: 'board.trustedAuthors',
     read: listOf(githubLogin, 'GitHub logins'),
     cli: false,
   },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
-  releaseEnabled: { key: 'release.enabled', read: releaseEnabled, cli: false },
-  releaseVersionFile: {
-    key: 'release.versionFile',
-    read: releaseFile,
-    cli: false,
-  },
-  releaseChangelog: { key: 'release.changelog', read: releaseFile, cli: false },
-  releaseHeading: {
-    key: 'release.heading',
-    read: text('a changelog heading template'),
-    cli: false,
-  },
+  ...RELEASE_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {
     key: 'cleanup.worktreeIdleDays',

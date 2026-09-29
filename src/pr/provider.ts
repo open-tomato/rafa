@@ -3,7 +3,7 @@
  * every `pr` action shares when that provider is not the GitHub CLI.
  *
  * `pr.provider` resolves to null in the config layer, and null there
- * means "nobody has said", not "off" (`src/config-schema.ts`). This
+ * means "nobody has said", not "off" (`src/config-schema-release.ts`). This
  * module is where that null becomes an answer: the spec's default is
  * `gh` when `origin` is a GitHub remote and `none` otherwise, which is
  * a reading off the repository and so cannot be a literal in the

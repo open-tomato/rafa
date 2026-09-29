@@ -26,8 +26,8 @@
  * into a sibling; however, 75
  * modules currently import `config-sections.js` directly. The one
  * exception is `MergeMethod`, which `config-sections.ts` re-exports
- * from `pr/types.ts` so `config-schema.ts` can type a field with it. The
- * pull request port owns that name, a caller reading
+ * from `pr/types.ts` so `config-schema-release.ts` can type a field with
+ * it. The pull request port owns that name, a caller reading
  * {@link RafaConfig.prMergeMethod} imports it from `./pr/index.js`, and
  * re-exporting it here would make the config a second place to learn it
  * from.
@@ -41,6 +41,8 @@
  *     them. The four readings the spec leaves to the reader — open
  *     tracker kinds, empty prerequisite tiers, `version: 1` alone, and
  *     `loop.settingSources` as an ordered list — are argued there.
+ *     Its `pr` and `release` sections sit in `config-schema-release.ts`,
+ *     which it spreads in.
  *   - `config-readers.ts` holds `mapOf` and the named readers
  *     `config-schema.ts` reads its settings through. No caller reads a
  *     setting through them but the schema, so nothing here re-exports
@@ -52,7 +54,8 @@
  * `context/source.md`, which no gate reads. Measured with `wc -l` at the
  * commit that added the `pr` section: `config.ts` is 506 lines,
  * `config-schema.ts` 396 and `config-sections.ts` 478. A new setting is
- * one field, one default and one spec in `config-schema.ts`, its reader
+ * one field, one default and one spec in `config-schema.ts` (in
+ * `config-schema-release.ts` for a `pr` or `release` key), its reader
  * in `config-sections.ts`, and one line in {@link readLayer}'s layer
  * literal here; the literal is exhaustive on purpose, so a setting
  * added there and forgotten here does not compile.
