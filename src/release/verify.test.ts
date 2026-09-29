@@ -1,81 +1,82 @@
 /**
  * Tests for step 3 of the release (`src/release/verify.ts`): the three
- * readings over the files a wrap-up session left, and the restore of
- * step 1's text on every refusal.
+ * readings over the fragment a wrap-up session left — it parses, it
+ * carries the plan's level, it is the only file the release step
+ * changed — and the restore of step 1's fragment text on every refusal.
  *
- * Each case builds a scratch repository of its own under `mkdtemp` and
- * runs the REAL step 1 over it — never the checkout the suite runs in,
- * whose own `package.json` and `CHANGELOG.md` are exactly the two
- * files these modules rewrite. So the record every case verifies
- * against is the one `prepareRelease` actually answers, and a change to
- * the insertion that step 3 could not follow reddens here rather than
- * in production. The fake {@link GitRunner} answers a base manifest
- * whose version differs from the worktree one, as in
- * `./prepare.test.ts`; no case reaches a network.
+ * Each case builds scratch repositories of its own under `mkdtemp` — a
+ * bare `origin` and the working clone — never the checkout the suite
+ * runs in, and runs the REAL step 1 over it, so the record every case
+ * verifies against is the one `prepareRelease` actually answers. The
+ * runner handed to both modules is the real one: which files changed is
+ * git's own answer, not a planted reply. No case reaches a network:
+ * `origin` is a path.
  *
- * What a session did to the files is planted by writing over them
- * between step 1 and step 3, which is exactly the seam the real
- * session sits in.
+ * What a session did is planted by writing over files between step 1
+ * and step 3, which is exactly the seam the real session sits in.
  *
  * Several things here would pass while wrong, so each has an assertion
  * of its own:
  *
  *  - A module that restored on EVERY call would satisfy every refusal
- *    case. So one verified case reads both files back and asserts the
- *    text the session left is still on disk, step 1's text having been
- *    written over.
- *  - A module that answered `verified` without reading the version
- *    file would pass every changelog case. So the three version
- *    refusals leave the changelog exactly as a passing session left
- *    it, and can only be caught by opening the manifest.
- *  - A module that compared the changelog against step 1's `after`
- *    whole, rather than outside the span, would refuse every
- *    legitimate rewrite. So the rewrite case replaces every raw line
- *    under the heading with different prose, and still verifies.
+ *    case. So the rewrite case reads the fragment back and asserts the
+ *    session's text is still on disk.
+ *  - A module that refused every change anywhere would pass every
+ *    planted-edit case. So one case leaves session work outside the
+ *    release files — a tracked source edit and an untracked file — and
+ *    still verifies.
+ *  - A stray fragment beside the plan's own, in a directory step 1
+ *    just made, is one the plan's-own-path filter could fold in. So
+ *    one case plants a second fragment there, untracked with the
+ *    directory as a whole.
+ *  - A module that compared the working tree only, not the index,
+ *    passes an edit the session staged and then reverted on disk. So
+ *    one case stages a changelog edit and puts the file back.
  *  - A restore that wrote `before` instead of `after` would still put
- *    a file back. So every refusal case compares both files byte for
- *    byte against step 1's `after`, which is not the text step 1 found.
+ *    a file back. Step 1's `before` is null here — the file is new — so
+ *    every refusal case compares the fragment byte for byte against
+ *    step 1's `after`.
  *
- * Six mutations of `verify.ts` were driven on 2026-09-20, one at a
+ * Seven mutations of `verify.ts` were driven on 2026-09-29, one at a
  * time over `env -u CLAUDECODE bun test src/release/verify.test.ts`,
  * the module restored from a scratch copy and verified with `shasum -c`
- * after each. 23 cases, all green on the unmutated module; each fail
+ * after each. 17 cases, all green on the unmutated module; each fail
  * count is that run's own:
  *
- *  - `changedOutside` answering null always: 3 fail, the edits planted
- *    in the preamble, in the older release and past the end of the
- *    file. The two shortened files still refuse, on the length reading
- *    before it, which is why they are separate cases.
- *  - the suffix half of `changedOutside` dropped: 2 fail, the edits
- *    BELOW the section; the preamble edit above it still refuses. That
- *    is why there is a planted edit on each side of the entry.
- *  - the restore dropped from `refuse`: 13 fail, every refusal case
- *    that reads a file back — all of them but the one that asserts
- *    only the singular in a sentence.
- *  - the restore writing `before` instead of `after`: the same 13,
- *    since step 1's text is not the text step 1 found.
- *  - `checkVersion` answering null always: 5 fail, the four manifests
- *    the session broke and the restore-failure case built on one of
- *    them. None of the five touches the changelog, so only a module
- *    that opens the manifest catches them.
- *  - the `section[0] !== heading` reading dropped: 1 fails, the stray
- *    line planted above the heading, which is the only case whose
- *    heading is present but not first.
+ *  - `--untracked-files=all` dropped: 14 fail. Git then names the new
+ *    `.changes/` directory, not the fragment in it, so every case
+ *    refuses — the verified ones included — as `other-file-changed`.
+ *  - the files beside the fragment ignored: 4 fail, the changelog
+ *    edit, the bumped version, the stray fragment and the staged edit.
+ *  - `git diff HEAD --name-only` in place of `git status`: 4 fail,
+ *    among them the staged-then-put-back edit, the one case only an
+ *    index-aware reading catches (the other three fail because a
+ *    `--name-only` line has no status letters to slice off).
+ *  - the restore dropped: 7 fail, the refusal cases that read the
+ *    fragment back or ask what the restore did.
+ *  - the restore writing `before` instead of `after`: 6 fail, the same
+ *    cases but the restore-failure one, whose write fails either way.
+ *  - the level check dropped: 2 fail, the changed level and the
+ *    restore-failure case built on one.
+ *  - the plan check dropped: 1 fails, the fragment naming another plan.
  */
 import type { ChangelogNote } from './changelog.js';
-import type { ReleasePrepared, ReleasePreparationInput, ReleaseSettings } from './prepare.js';
+import type { ReleasePrepared, ReleaseSettings } from './prepare.js';
+import type { ReleaseVerificationContext } from './verify.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RELEASE_AUTO } from '../config-sections.js';
+import { createGitRunner } from '../pr/index.js';
 
 import { prepareRelease } from './prepare.js';
-import { changelogInsertionSpan, verifyRelease } from './verify.js';
+import { verifyRelease } from './verify.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-verify-')));
@@ -84,20 +85,12 @@ afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
 
-/** The manifest the scratch worktree holds; its version is not the base's. */
-const WORKTREE_MANIFEST = '{\n  "name": "scratch",\n  "version": "9.9.9",\n  "private": true\n}';
+/** The manifest the base branch holds; the release step must not change it. */
+const MANIFEST = '{\n  "name": "scratch",\n  "version": "0.4.0",\n  "private": true\n}\n';
 
-/** The manifest step 1 leaves behind, once the base is bumped into it. */
-const BUMPED_MANIFEST = '{\n  "name": "scratch",\n  "version": "0.5.0",\n  "private": true\n}';
-
-/** What the fake git answers for `show origin/main:package.json`. */
-const BASE_MANIFEST = '{\n  "name": "scratch",\n  "version": "0.4.0",\n  "private": true\n}';
-
-/** A changelog shaped as this repository's is: a heading, a preamble, then versions. */
+/** A changelog shaped as this repository's is; the release step must not change it. */
 const CHANGELOG = [
   '# Changelog',
-  '',
-  'Every notable change to this project, newest first.',
   '',
   '## 0.4.0 — 2026-09-19, the one before',
   '',
@@ -105,46 +98,98 @@ const CHANGELOG = [
   '',
 ].join('\n');
 
-/** The heading step 1 renders for every case below. */
-const HEADING = '## 0.5.0 — 2026-09-20, changelog and release in the loop';
+/** The plan id every case writes under. */
+const PLAN = 'rafa-367';
 
 /** The settings every case starts from. */
 const SETTINGS: ReleaseSettings = {
   releaseEnabled: RELEASE_AUTO,
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
-  releaseHeading: '## {version} — {date}, {title}',
+  releaseFragments: '.changes',
 };
 
-/** The date every heading is rendered with, built local so no zone moves it. */
-const NOW = new Date(2026, 8, 20, 12, 0, 0);
-
-/** Three notes in two areas, as a plan's sessions would have stored them. */
+/** Two raw notes in one area, which a session would fold into one line. */
 const NOTES: readonly ChangelogNote[] = [
-  { level: 'minor', area: 'loop', summary: 'the loop writes the changelog entry itself' },
-  { level: 'patch', area: 'cli', summary: 'rafa release status prints the pending notes' },
-  { level: 'minor', area: 'loop', summary: 'a task reports what its diff is worth' },
+  { level: 'minor', area: 'loop', summary: 'the loop writes a fragment itself' },
+  { level: 'patch', area: 'loop', summary: 'a task reports what its diff is worth' },
 ];
 
-/** A runner that fetches cleanly and shows the base manifest. */
-const git: GitRunner = (args) => ({
-  ok: true,
-  stdout: args[0] === 'show'
-    ? BASE_MANIFEST
-    : '',
-  stderr: '',
-});
+/** How many worlds this file has made, so each gets its own directories. */
+let worldCount = 0;
 
-/** A scratch repository step 1 has already run over. */
+/** A working clone with step 1 already run in it. */
 interface World {
-  /** The repository root. */
+  /** The working clone's root. */
   readonly root: string;
-  /** The manifest's absolute path, planted or not. */
-  readonly manifest: string;
-  /** The changelog's absolute path. */
-  readonly changelog: string;
-  /** What step 1 answered over it. */
+  /** Runs git in the working clone with this world's isolated config. */
+  readonly git: (args: readonly string[]) => string;
+  /** The real runner the modules are handed. */
+  readonly runner: GitRunner;
+  /** What step 1 answered. */
   readonly prepared: ReleasePrepared;
+  /** The context step 3 is handed. */
+  readonly context: ReleaseVerificationContext;
+}
+
+/**
+ * Plants a bare origin whose `main` holds the manifest, the changelog
+ * and a source file, clones it, and runs step 1 in the clone at
+ * `declared`.
+ */
+function world(declared: 'minor' | 'none' = 'minor'): World {
+  worldCount += 1;
+  const at = join(tempBase, `world-${String(worldCount)}`);
+  const home = join(at, 'home');
+  const origin = join(at, 'origin.git');
+  const root = join(at, 'work');
+  mkdirSync(home, { recursive: true });
+  const env = {
+    PATH: process.env['PATH'] ?? '',
+    HOME: home,
+    GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'rafa test',
+    GIT_AUTHOR_EMAIL: 'test@example.invalid',
+    GIT_COMMITTER_NAME: 'rafa test',
+    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    LC_ALL: 'C',
+  };
+  const run = (cwd: string, args: readonly string[]): string => execFileSync(
+    'git',
+    [...args],
+    { cwd, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] },
+  ).trim();
+
+  run(at, ['init', '-q', '--bare', '--initial-branch=main', origin]);
+  run(at, ['clone', '-q', origin, root]);
+  run(root, ['checkout', '-q', '-B', 'main']);
+  mkdirSync(join(root, 'src'));
+  writeFileSync(join(root, 'package.json'), MANIFEST);
+  writeFileSync(join(root, 'CHANGELOG.md'), CHANGELOG);
+  writeFileSync(join(root, 'src', 'loop.ts'), 'export const loop = 1;\n');
+  run(root, ['add', '-A']);
+  run(root, ['commit', '-q', '-m', 'seed main']);
+  run(root, ['push', '-q', 'origin', 'main']);
+
+  const runner = createGitRunner(root);
+  const prepared = prepareRelease({
+    repoRoot: root,
+    settings: SETTINGS,
+    git: runner,
+    plan: PLAN,
+    declared,
+    notes: NOTES,
+    title: 'releases settle on the base branch',
+  });
+  if (prepared.kind !== 'prepared') throw new Error(`step 1 wrote nothing: ${prepared.sentence}`);
+  return {
+    root,
+    git: (args) => run(root, args),
+    runner,
+    prepared,
+    context: { git: runner, settings: SETTINGS },
+  };
 }
 
 /** `path`'s text, or null when it is not there. */
@@ -156,396 +201,235 @@ function textAt(path: string): string | null {
   }
 }
 
-/**
- * Plants a scratch repository and runs step 1 over it, answering both.
- * `manifest: null` leaves the version file absent, which is the
- * dated-entry-no-bump shape — and turns `release.enabled` on by hand,
- * since `auto` reads a missing version file as a project with no
- * release to make (`./enabled.ts`).
- */
-function world(name: string, files: { manifest?: string | null } = {}): World {
-  const root = mkdtempSync(join(tempBase, `${name}-`));
-  const manifest = join(root, 'package.json');
-  const changelog = join(root, 'CHANGELOG.md');
-  const manifestText = files.manifest === undefined
-    ? WORKTREE_MANIFEST
-    : files.manifest;
-  if (manifestText !== null) writeFileSync(manifest, manifestText);
-  writeFileSync(changelog, CHANGELOG);
-
-  const input: ReleasePreparationInput = {
-    repoRoot: root,
-    settings: manifestText === null
-      ? { ...SETTINGS, releaseEnabled: true }
-      : SETTINGS,
-    git,
-    declared: 'minor',
-    notes: NOTES,
-    title: 'changelog and release in the loop',
-    now: NOW,
-  };
-  const prepared = prepareRelease(input);
-  if (prepared.kind !== 'prepared') {
-    throw new Error(`step 1 skipped the scratch repository: ${prepared.sentence}`);
-  }
-  return { root, manifest, changelog, prepared };
+/** The fragment a session that did as it was told leaves: one line per area. */
+function rewritten(prepared: ReleasePrepared): string {
+  return prepared.file.after.replace(
+    /\n- loop: [^\n]*\n- loop: [^\n]*\n$/,
+    '\n- loop: the loop writes a fragment itself and reports what a diff is worth\n',
+  );
 }
-
-/** The changelog as it stands, by line. */
-function linesAt(at: World): string[] {
-  return (textAt(at.changelog) ?? '').split('\n');
-}
-
-/** Writes `lines` back as the changelog, as a wrap-up session would. */
-function writeLines(at: World, lines: readonly string[]): void {
-  writeFileSync(at.changelog, lines.join('\n'));
-}
-
-/** The session rewriting the three raw lines into one line per area. */
-const REWRITTEN = [
-  '- loop: the loop now writes the changelog entry and picks the version itself',
-  '- cli: rafa release status prints the version, the latest tag and the pending notes',
-];
-
-/** Step 1's raw lines rewritten in place, touching nothing else. */
-function rewriteSection(at: World): void {
-  const lines = linesAt(at);
-  const first = lines.indexOf(HEADING);
-  writeLines(at, [
-    ...lines.slice(0, first + 2),
-    ...REWRITTEN,
-    ...lines.slice(first + 5),
-  ]);
-}
-
-describe('changelogInsertionSpan over the two texts step 1 recorded', () => {
-  it('splits a middle insertion into its prefix, its lines and its suffix', () => {
-    const before = 'a\nb\nc';
-    const after = 'a\nX\nY\nb\nc';
-
-    const span = changelogInsertionSpan(before, after);
-
-    expect(span.prefix).toBe(1);
-    expect(span.suffix).toBe(2);
-    expect(span.inserted).toEqual(['X', 'Y']);
-  });
-
-  it('keeps the two counts from overlapping when the inserted lines repeat the file', () => {
-    const before = 'a\nb';
-    const after = 'a\nb\na\nb';
-
-    const span = changelogInsertionSpan(before, after);
-
-    expect(span.prefix + span.suffix).toBe(2);
-    expect(span.inserted.length).toBe(2);
-  });
-
-  it('reads an insertion at the top of the file as an empty prefix', () => {
-    const span = changelogInsertionSpan('a\nb', 'X\n\na\nb');
-
-    expect(span.prefix).toBe(0);
-    expect(span.suffix).toBe(2);
-    expect(span.inserted).toEqual(['X', '']);
-  });
-
-  it('reads an insertion at the end of the file as an empty suffix', () => {
-    const span = changelogInsertionSpan('a\nb', 'a\nb\n\nX');
-
-    expect(span.prefix).toBe(2);
-    expect(span.suffix).toBe(0);
-    expect(span.inserted).toEqual(['', 'X']);
-  });
-
-  it('answers the span of a real preparation, one entry wide', () => {
-    const at = world('span');
-
-    const span = changelogInsertionSpan(at.prepared.changelog.before, at.prepared.changelog.after);
-
-    expect(span.prefix).toBe(4);
-    expect(span.suffix).toBe(4);
-    expect(span.inserted[0]).toBe(HEADING);
-  });
-});
 
 describe('verifyRelease over a session that did as it was told', () => {
-  it('verifies a section rewritten in place and answers its lines', () => {
-    const at = world('rewritten');
-    rewriteSection(at);
+  it('verifies the notes rewritten into one line, and leaves the session\'s text on disk', () => {
+    const at = world();
+    const text = rewritten(at.prepared);
+    expect(text).not.toBe(at.prepared.file.after);
+    writeFileSync(at.prepared.file.resolved, text);
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
-    expect(read.kind).toBe('verified');
-    if (read.kind !== 'verified') return;
-    expect(read.version).toBe('0.5.0');
-    expect(read.heading).toBe(HEADING);
-    expect(read.section).toEqual([HEADING, '', ...REWRITTEN]);
-    expect(read.lines).toEqual(REWRITTEN);
+    expect(read).toEqual({
+      kind: 'verified',
+      path: '.changes/rafa-367.md',
+      fragment: {
+        plan: PLAN,
+        title: 'releases settle on the base branch',
+        level: 'minor',
+        notes: ['- loop: the loop writes a fragment itself and reports what a diff is worth'],
+      },
+      text,
+    });
+    expect(textAt(at.prepared.file.resolved)).toBe(text);
   });
 
-  it('leaves both files exactly as the session left them', () => {
-    const at = world('no-restore');
-    rewriteSection(at);
-    const session = textAt(at.changelog);
+  it('verifies a fragment the session did not touch', () => {
+    const at = world();
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('verified');
-    expect(textAt(at.changelog)).toBe(session);
-    expect(session).not.toBe(at.prepared.changelog.after);
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
+    expect(read.kind === 'verified' && read.text).toBe(at.prepared.file.after);
   });
 
-  it('verifies a session that rewrote nothing at all', () => {
-    const at = world('untouched');
+  it('verifies a none fragment, which carries no notes', () => {
+    const at = world('none');
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('verified');
-    if (read.kind !== 'verified') return;
-    expect(read.lines).toEqual([
-      '- loop: the loop writes the changelog entry itself',
-      '- loop: a task reports what its diff is worth',
-      '- cli: rafa release status prints the pending notes',
-    ]);
-    expect(read.changelog).toBe(at.prepared.changelog.after);
+    expect(read.kind === 'verified' && read.fragment.level).toBe('none');
   });
 
-  it('verifies a release with no version file, checking only the changelog', () => {
-    const at = world('no-version-file', { manifest: null });
-    expect(at.prepared.versionFile).toBeNull();
+  it('lets the session reword the title, which is its to reword', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, at.prepared.file.after.replace('title: releases', 'title: Releases'));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
+
+    expect(read.kind === 'verified' && read.fragment.title).toBe('Releases settle on the base branch');
+  });
+
+  it('does not read the session\'s work outside the release files', () => {
+    const at = world();
+    writeFileSync(join(at.root, 'src', 'loop.ts'), 'export const loop = 2;\n');
+    writeFileSync(join(at.root, 'notes.txt'), 'a leftover\n');
+
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('verified');
-    if (read.kind !== 'verified') return;
-    expect(read.version).toBeNull();
-    expect(read.heading).toBe('## 2026-09-20, changelog and release in the loop');
-    expect(textAt(at.manifest)).toBeNull();
+  });
+
+  it('does not refuse a changelog change the session committed, such as a merge from the base', () => {
+    const at = world();
+    writeFileSync(join(at.root, 'CHANGELOG.md'), `${CHANGELOG}\n- a line from the base\n`);
+    at.git(['commit', '-q', '-m', 'merge main', '--', 'CHANGELOG.md']);
+
+    const read = verifyRelease(at.prepared, at.context);
+
+    expect(read.kind).toBe('verified');
   });
 });
 
-describe('verifyRelease over a session that changed another section', () => {
-  it('refuses an edit to an older release and restores step 1s text', () => {
-    const at = world('old-section');
-    const lines = linesAt(at);
-    writeLines(at, lines.map((line) => (
-      line === '- loop: the loop learned to stop'
-        ? '- loop: the loop learned to stop, rewritten'
-        : line
-    )));
+describe('verifyRelease over a planted edit outside the fragment', () => {
+  it('refuses an edit to the changelog, restores the fragment, and leaves the changelog as the session left it', () => {
+    const at = world();
+    const planted = CHANGELOG.replace('learned to stop', 'learned to stop and start');
+    writeFileSync(join(at.root, 'CHANGELOG.md'), planted);
+    writeFileSync(at.prepared.file.resolved, rewritten(at.prepared));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('changelog-changed');
+    expect(read.reason).toBe('other-file-changed');
     expect(read.sentence).toBe(
-      'no release commit: CHANGELOG.md line 13 reads "- loop: the loop learned to stop, rewritten" '
-      + `where the loop left "- loop: the loop learned to stop", outside the ${HEADING} section, `
-      + 'and CHANGELOG.md and package.json were restored to the text the loop wrote',
+      'no release commit: the release step may change .changes/rafa-367.md alone, yet CHANGELOG.md was changed too'
+      + ' and was left as the wrap-up session left it, out of any release commit,'
+      + ' and .changes/rafa-367.md was restored to the text the loop wrote',
     );
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
+    expect(read.restore).toEqual({ path: '.changes/rafa-367.md', restored: true, problem: null });
+    expect(textAt(at.prepared.file.resolved)).toBe(at.prepared.file.after);
+    expect(textAt(join(at.root, 'CHANGELOG.md'))).toBe(planted);
   });
 
-  it('refuses an edit to the preamble above the entry', () => {
-    const at = world('preamble');
-    const lines = linesAt(at);
-    writeLines(at, lines.map((line) => (
-      line.startsWith('Every notable')
-        ? 'Everything notable, newest first.'
-        : line
-    )));
+  it('refuses a version the session bumped, naming every file beside the fragment', () => {
+    const at = world();
+    writeFileSync(join(at.root, 'package.json'), MANIFEST.replace('0.4.0', '0.5.0'));
+    rmSync(join(at.root, 'CHANGELOG.md'));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('changelog-changed');
-    expect(read.sentence).toContain('CHANGELOG.md line 3 reads "Everything notable, newest first."');
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
+    expect(read.reason).toBe('other-file-changed');
+    expect(read.sentence).toContain('yet CHANGELOG.md and package.json were changed too and were left as the wrap-up session left them');
   });
 
-  it('refuses a line appended past the end of the file', () => {
-    const at = world('appended');
-    writeFileSync(at.changelog, `${at.prepared.changelog.after}<!-- generated -->`);
+  it('refuses a second fragment inside the directory step 1 just made', () => {
+    const at = world();
+    const stray = join(at.root, '.changes', 'rafa-999.md');
+    writeFileSync(stray, at.prepared.file.after.replace(`plan: ${PLAN}`, 'plan: rafa-999'));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('changelog-changed');
-    expect(read.sentence).toContain('reads "<!-- generated -->" where the loop left ""');
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
+    expect(read.reason).toBe('other-file-changed');
+    expect(read.sentence).toContain('yet .changes/rafa-999.md was changed too');
+    expect(textAt(stray)).not.toBeNull();
   });
 
-  it('refuses a file that lost more lines than the entry had', () => {
-    const at = world('shrunk');
-    writeFileSync(at.changelog, '# Changelog\n');
+  it('refuses a changelog edit the session staged and then put back on disk', () => {
+    const at = world();
+    writeFileSync(join(at.root, 'CHANGELOG.md'), `${CHANGELOG}- staged\n`);
+    at.git(['add', 'CHANGELOG.md']);
+    writeFileSync(join(at.root, 'CHANGELOG.md'), CHANGELOG);
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
+
+    expect(read.kind === 'refused' && read.reason).toBe('other-file-changed');
+  });
+
+  it('refuses when git cannot say what changed, and still restores the fragment', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, rewritten(at.prepared));
+    const failing: GitRunner = () => ({ ok: false, stdout: '', stderr: 'fatal: not a git repository' });
+
+    const read = verifyRelease(at.prepared, { ...at.context, git: failing });
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('changelog-changed');
-    expect(read.sentence).toContain(`CHANGELOG.md is 6 lines shorter than the text the loop left around the ${HEADING} section`);
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
-  });
-
-  it('names one line when exactly one is missing', () => {
-    const at = world('one-short');
-    const lines = linesAt(at);
-    writeLines(at, lines.slice(0, 7));
-
-    const read = verifyRelease(at.prepared);
-
-    expect(read.kind).toBe('refused');
-    if (read.kind !== 'refused') return;
-    expect(read.sentence).toContain('CHANGELOG.md is 1 line shorter than');
+    expect(read.reason).toBe('status-unreadable');
+    expect(read.sentence).toContain('git status could not say which of package.json, CHANGELOG.md and .changes changed: fatal: not a git repository');
+    expect(textAt(at.prepared.file.resolved)).toBe(at.prepared.file.after);
   });
 });
 
-describe('verifyRelease over a session that lost the heading', () => {
-  it('refuses a heading the session rewrote', () => {
-    const at = world('heading-rewritten');
-    const lines = linesAt(at);
-    writeLines(at, lines.map((line) => (
-      line === HEADING
-        ? '## Unreleased'
-        : line
-    )));
+describe('verifyRelease over a fragment the session broke', () => {
+  it('refuses a fragment that no longer parses, and writes step 1\'s text back', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, at.prepared.file.after.replace(/^---\n/, ''));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('heading-missing');
-    expect(read.sentence).toBe(
-      `no release commit: the heading ${HEADING} is no longer in CHANGELOG.md, `
-      + 'and CHANGELOG.md and package.json were restored to the text the loop wrote',
-    );
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
+    expect(read.reason).toBe('fragment-unparsable');
+    expect(read.sentence).toContain('.changes/rafa-367.md no longer parses as a fragment: The fragment does not open with a --- line.');
+    expect(textAt(at.prepared.file.resolved)).toBe(at.prepared.file.after);
   });
 
-  it('refuses a line the session put above the heading', () => {
-    const at = world('heading-not-first');
-    const lines = linesAt(at);
-    const first = lines.indexOf(HEADING);
-    writeLines(at, [...lines.slice(0, first), '<!-- newest -->', ...lines.slice(first)]);
+  it('refuses a shipping fragment whose notes the session removed', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, at.prepared.file.after.replace(/\n\n- [\s\S]*$/, '\n'));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
-    expect(read.kind).toBe('refused');
-    if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('heading-missing');
-    expect(read.sentence).toContain(`the heading ${HEADING} no longer opens the section the loop inserted into CHANGELOG.md`);
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
-  });
-});
-
-describe('verifyRelease over a version file the session touched', () => {
-  it('refuses a manifest holding a version other than the prepared one', () => {
-    const at = world('version-changed');
-    rewriteSection(at);
-    writeFileSync(at.manifest, BUMPED_MANIFEST.replace('0.5.0', '0.6.0'));
-
-    const read = verifyRelease(at.prepared);
-
-    expect(read.kind).toBe('refused');
-    if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('version-changed');
-    expect(read.sentence).toBe(
-      'no release commit: package.json declares 0.6.0, not the 0.5.0 this release was prepared for, '
-      + 'and CHANGELOG.md and package.json were restored to the text the loop wrote',
-    );
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
+    expect(read.kind === 'refused' && read.reason).toBe('fragment-unparsable');
+    expect(textAt(at.prepared.file.resolved)).toBe(at.prepared.file.after);
   });
 
-  it('refuses a manifest whose version is no version at all', () => {
-    const at = world('version-unparsable');
-    writeFileSync(at.manifest, BUMPED_MANIFEST.replace('0.5.0', 'nightly'));
+  it('refuses a fragment whose level is not the plan\'s', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, at.prepared.file.after.replace('level: minor', 'level: major'));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('version-unparsable');
-    expect(read.sentence).toContain('package.json declares nightly, which is no version');
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
+    expect(read.reason).toBe('level-changed');
+    expect(read.sentence).toContain('.changes/rafa-367.md carries the level major, not the plan\'s minor');
+    expect(textAt(at.prepared.file.resolved)).toBe(at.prepared.file.after);
   });
 
-  it('refuses a manifest that no longer parses as JSON', () => {
-    const at = world('version-unjson');
-    writeFileSync(at.manifest, `${BUMPED_MANIFEST}<<<<<<< HEAD`);
+  it('refuses a fragment that names another plan', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, at.prepared.file.after.replace(`plan: ${PLAN}`, 'plan: rafa-1'));
 
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('version-unreadable');
-    expect(read.sentence).toContain('package.json no longer parses as a manifest declaring a version');
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
+    expect(read.reason).toBe('plan-changed');
+    expect(read.sentence).toContain('names the plan rafa-1, not the rafa-367 the loop wrote');
   });
 
-  it('refuses a manifest the session deleted, and writes it back', () => {
-    const at = world('version-deleted');
-    rmSync(at.manifest);
+  it('refuses a fragment the session deleted, and writes it back', () => {
+    const at = world();
+    rmSync(at.prepared.file.resolved);
 
-    const read = verifyRelease(at.prepared);
-
-    expect(read.kind).toBe('refused');
-    if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('version-unreadable');
-    expect(read.sentence).toContain('package.json could not be read back after the wrap-up session');
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
-  });
-});
-
-describe('verifyRelease over files it cannot open', () => {
-  it('refuses a changelog the session deleted, and writes it back', () => {
-    const at = world('changelog-deleted');
-    rmSync(at.changelog);
-
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('changelog-unreadable');
-    expect(read.sentence).toContain('CHANGELOG.md could not be read back after the wrap-up session');
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
+    expect(read.reason).toBe('fragment-unreadable');
+    expect(read.sentence).toContain('.changes/rafa-367.md could not be read back after the wrap-up session');
+    expect(textAt(at.prepared.file.resolved)).toBe(at.prepared.file.after);
   });
 
-  it('says which file could not be restored when the restore itself fails', () => {
-    const at = world('restore-unwritable');
-    writeFileSync(at.manifest, BUMPED_MANIFEST.replace('0.5.0', '0.6.0'));
-    chmodSync(at.changelog, 0o444);
+  it('says the fragment could not be restored when the restore itself fails', () => {
+    const at = world();
+    writeFileSync(at.prepared.file.resolved, at.prepared.file.after.replace('level: minor', 'level: patch'));
+    chmodSync(at.prepared.file.resolved, 0o444);
 
-    const read = verifyRelease(at.prepared);
-    chmodSync(at.changelog, 0o644);
-
-    expect(read.kind).toBe('refused');
-    if (read.kind !== 'refused') return;
-    expect(read.reason).toBe('version-changed');
-    expect(read.sentence).toContain('CHANGELOG.md could not be restored to the text the loop wrote:');
-    expect(read.restores.map((restore) => [restore.path, restore.restored])).toEqual([
-      ['CHANGELOG.md', false],
-      ['package.json', true],
-    ]);
-    expect(textAt(at.manifest)).toBe(BUMPED_MANIFEST);
-  });
-
-  it('restores the changelog alone when there is no version file', () => {
-    const at = world('restore-one', { manifest: null });
-    writeFileSync(at.changelog, '# Changelog\n');
-
-    const read = verifyRelease(at.prepared);
+    const read = verifyRelease(at.prepared, at.context);
+    chmodSync(at.prepared.file.resolved, 0o644);
 
     expect(read.kind).toBe('refused');
     if (read.kind !== 'refused') return;
-    expect(read.sentence).toContain('CHANGELOG.md was restored to the text the loop wrote');
-    expect(read.restores.length).toBe(1);
-    expect(textAt(at.changelog)).toBe(at.prepared.changelog.after);
+    expect(read.reason).toBe('level-changed');
+    expect(read.restore.restored).toBe(false);
+    expect(read.sentence).toContain('and .changes/rafa-367.md could not be restored to the text the loop wrote:');
+    expect(textAt(at.prepared.file.resolved)).toContain('level: patch');
   });
 });

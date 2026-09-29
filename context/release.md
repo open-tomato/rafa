@@ -84,9 +84,16 @@ receives the raw notes as bullets below the first line so the classifier key
 does not move. The bullets are built in `src/start/wrap-up.ts`,
 `buildWrapUpPrompt`, never in a prompt file.
 
-**Step 3** (Loop, code): Verify the heading and version are still there and
-match, that no other section changed, and that the version file still parses.
-On failure, restore step 1's text and report the failure in the PR body.
+**Step 3** (Loop, code): Verify the fragment still parses (`parseFragment`,
+the reader settle folds with), still names the plan id and carries the
+plan's level, and is the only file the release step changed: `git status`
+over `release.versionFile`, `release.changelog` and `release.fragments`,
+index and working tree against `HEAD`, untracked files listed one by one,
+may name no path but the fragment's. The session's other work is not read,
+and a change it committed (a merge from the base) is not a working-tree
+change. On failure, restore step 1's fragment text — never the other files,
+which step 1 did not write and which are named in the sentence instead —
+and report the failure in the PR body.
 Commit `chore: release <version>` over the two release files alone — never
 `git add -A`, which would sweep the session's other leftovers under that
 subject. The PR body gains the entry. The verification is
@@ -109,8 +116,9 @@ branch's fragments cannot be read or the fragment cannot be written, and
 reports that in the PR body — or on the terminal alone, by the line above,
 when the provider resolves to `none`.
 
-A planted edit outside the new section is caught by step 3's check and
-refused, restored, and reported.
+A planted edit outside the fragment — to the version file, the changelog
+or another fragment — is caught by step 3's check and refused, the
+fragment restored, and reported.
 
 ### Two release actions
 
