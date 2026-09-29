@@ -104,6 +104,17 @@
  * `rafa loop resume` writes `running`, and the run goes on; a SIGINT ends
  * the hold, and the run.
  *
+ * Every run, worktree or not, holds its checkout to its branch at the
+ * HEAD it started from, moved on by each commit a task's attempt makes
+ * (`start/checkout-watch.ts`). Before each task is dispatched, and
+ * before `progress.txt` is written into the checkout, the loop guard
+ * reads the checkout (`start/checkout-guard.ts`). A checkout on another
+ * branch, at another commit, or gone marks the task `[BLOCKED]` with
+ * `checkout moved` as its blocker text and stops the run: no session is
+ * spawned, nothing is committed, the checkout is not switched back, and
+ * the output names the branch expected, what was found and the one
+ * command that restores it.
+ *
  * Before the tracker is created and before any session is spawned, the
  * wrap-up's included, the run's preflight checks the configured
  * prerequisites and those of the plan's `PREREQUISITES-<stub>.md`, and
@@ -196,7 +207,7 @@
  * nothing, and the wrap-up runs without a release rather than not at
  * all.
  *
- * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
+ * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
  * through the active output
@@ -216,7 +227,8 @@
  * an unusable config, `--as-worktree` while a `tracking` setting is
  * on (`start/run-setup.ts`), a plan file that does not exist, a checkout git
  * could not read (`start/checkout.ts`), a branch offer
- * that could not be taken (`start/branch.ts`), a worktree git would not
+ * that could not be taken (`start/branch.ts`), a checkout the loop guard
+ * cannot hold (`start/checkout-watch.ts`), a worktree git would not
  * add (`start/worktree.ts`), a default branch the run
  * stayed on,
  * a session record refusing the run or session records that cannot be
@@ -226,8 +238,8 @@
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
- * A failed task, a blocked one and a report left unstored still stop the
- * run by returning, which the dispatcher ends as a success, with exit
+ * A failed task, a blocked one, a checkout that moved and a report left
+ * unstored still stop the run by returning, which the dispatcher ends as a success, with exit
  * code 0. A triage failure stops nothing.
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
@@ -254,6 +266,7 @@ import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
+import { advanceExpectation, haltIfCheckoutMoved, openCheckoutExpectation } from './start/checkout-watch.js';
 import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit } from './start/commit.js';
 import {
@@ -360,6 +373,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     args,
   });
   guardRunBranch(planStub, branch, args);
+  // What the loop guard holds the checkout to: its branch at the HEAD it
+  // starts from, moved on by each task commit (`start/checkout-watch.ts`).
+  let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });
 
   // The plan's risk total, on every run and ahead of the notices below, so
   // the count is read before consent is asked (`start/risk-total.ts`).
@@ -466,6 +482,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
       const trackerContent = fs.readFileSync(trackerPath, 'utf8');
       const taskInfo = findNextTask(trackerContent);
+
+      // The loop guard, before anything is written into the checkout: a
+      // moved or missing one marks the task `[BLOCKED]` and stops the run.
+      if (taskInfo && haltIfCheckoutMoved({ expected, trackerPath, taskInfo })) return;
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
@@ -584,6 +604,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         repoRoot: checkout,
         output: dispatch.output,
       });
+      expected = advanceExpectation(expected, finished.attempt);
       const stored = await storeReport(finished.outcome);
       if (finished.outcome !== 'done') return;
       if (!stored) {
