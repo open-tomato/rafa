@@ -154,8 +154,7 @@ sentence replaces nothing.
    <name>; nothing to delete`; the remote delete and the prune still run,
    and the exit code stays 0. A branch checked out in another worktree is
    present, so step 1 still refuses it.
-5. Tick the roadmap, print what is ready and the two follow-ups when they
-   apply: `rafa release tag` and `rafa self-update`.
+5. Tick the roadmap and print what is ready.
 6. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
@@ -163,7 +162,13 @@ sentence replaces nothing.
    yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code.
-7. Last, name the one step that follows — with the base pulled and both
+7. Print the two follow-ups when they apply, under `Follow-ups:`:
+   `rafa self-update`, then `rafa release settle` while the fragments
+   waiting on `origin/<base>` fold into a version, so settle is the
+   merge's last line (`src/commands/pr/merge-followups.ts`). It is only
+   printed: `pr merge` never runs settle, and `rafa release tag` is no
+   longer named here, since settle tags or names the tag itself.
+8. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
    (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
    DECLINED ends without it: nothing moved, so the hint would put the

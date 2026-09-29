@@ -2,18 +2,29 @@
  * `./merge-cleanup.ts` driven through a fake {@link GitRunner} that
  * answers each argv from a table and records what it was asked, and
  * through a planted `package.json` under `tmpdir` for the follow-ups.
- * Nothing here spawns git; `merge.test.ts` and `merge-driven.test.ts`
- * run the same functions through `rafa pr merge` itself.
+ * The clean-up cases spawn no git; the settle follow-up's cases plant a
+ * one-commit repository with its fragments and an `origin/main` ref,
+ * since the dry run it gathers from reads git objects, and each case
+ * that names settle sits beside one over the same base that names
+ * nothing (a `none` fragment, the release off, another base).
+ * `merge.test.ts` and `merge-driven.test.ts` run the same functions
+ * through `rafa pr merge` itself.
  */
+import type { FollowUpPlace } from './merge-cleanup.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
+import type { Fragment } from '../../release/fragment.js';
+import type { MergeGuardSettings } from '../../release/guard-merge.js';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
+import { createGitRunner } from '../../pr/index.js';
+import { serializeFragment } from '../../release/fragment.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import {
@@ -38,6 +49,35 @@ function fakeGit(answers: Readonly<Record<string, GitResult>> = {}): { git: GitR
     return answers[key] ?? OK;
   };
   return { git, calls };
+}
+
+/** The release settings the follow-ups read: on under `auto`, over the default files. */
+const RELEASE: MergeGuardSettings = {
+  releaseEnabled: 'auto',
+  releaseVersionFile: 'package.json',
+  releaseChangelog: 'CHANGELOG.md',
+  releaseFragments: '.changes',
+  releaseStrategy: 'semver-by-level',
+  releaseHeading: '## {version} — {date}, {title}',
+  prVersionCollision: 'report',
+  dangerousAcceptVersionCollision: false,
+};
+
+/** Runs git in `cwd` under a fixed identity and no system config, answering what it wrote. */
+function runGit(cwd: string, ...args: readonly string[]): string {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'rafa test',
+      GIT_AUTHOR_EMAIL: 'test@example.invalid',
+      GIT_COMMITTER_NAME: 'rafa test',
+      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      GIT_CONFIG_NOSYSTEM: '1',
+      LC_ALL: 'C',
+    },
+  });
 }
 
 /** Collects every line a report function is handed. */
@@ -185,44 +225,100 @@ describe('followUpsFor and reportFollowUps', () => {
   });
 
   /** A project root and a home under tmpdir, the root holding `packageJson` when it is given. */
-  function place(packageJson?: object): { root: string; home: string } {
-    const root = mkdtempSync(join(tmpdir(), 'merge-cleanup-root-'));
-    const home = mkdtempSync(join(tmpdir(), 'merge-cleanup-home-'));
+  function place(packageJson?: object, over: Partial<MergeGuardSettings> = {}): FollowUpPlace {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'merge-cleanup-root-')));
+    const home = realpathSync(mkdtempSync(join(tmpdir(), 'merge-cleanup-home-')));
     planted.push(root, home);
     if (packageJson !== undefined) writeFileSync(join(root, 'package.json'), JSON.stringify(packageJson));
-    return { root, home };
+    return { root, home, base: 'main', release: { ...RELEASE, ...over } };
   }
 
-  it('names nothing and asks git nothing where the root holds no package.json', () => {
+  /**
+   * `at`'s root made a repository whose one commit holds its
+   * `package.json`, a changelog and one fragment per level in `levels`,
+   * with `origin/main` pointing at that commit as a pull leaves it.
+   */
+  function plantBase(at: FollowUpPlace, levels: readonly string[]): GitRunner {
+    writeFileSync(join(at.root, 'CHANGELOG.md'), '# Changelog\n');
+    mkdirSync(join(at.root, '.changes'), { recursive: true });
+    levels.forEach((level, index) => {
+      const plan = `rafa-${String(index + 1)}`;
+      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], notes: ['- loop: a change'] };
+      writeFileSync(join(at.root, '.changes', `${plan}.md`), serializeFragment(fragment));
+    });
+    runGit(at.root, 'init', '--quiet', '--initial-branch=main');
+    runGit(at.root, 'add', '-A');
+    runGit(at.root, '-c', 'commit.gpgsign=false', 'commit', '--quiet', '--no-verify', '-m', 'base');
+    runGit(at.root, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    return createGitRunner(at.root);
+  }
+
+  it('names nothing and asks git nothing where the root holds no package.json and the release is off', () => {
     const { git, calls } = fakeGit();
     expect(followUpsFor(place(), git)).toEqual([]);
     expect(calls).toEqual([]);
   });
 
-  it('names the tag for an untagged version and prints it under Follow-ups', () => {
+  it('names no tag for a version nothing has tagged, and asks git nothing where the release does not run', () => {
     const { git, calls } = fakeGit();
     const info = collector();
-    const followUps = reportFollowUps(place({ name: 'other', version: '1.2.3' }), git, info.report);
-    expect(calls).toEqual(['tag --list v1.2.3']);
-    expect(followUps.map((followUp) => followUp.id)).toEqual(['release-tag']);
-    expect(info.lines).toEqual([
-      'Follow-ups:',
-      '   rafa release tag — 1.2.3 is on the base branch and no v1.2.3 tag names it',
-    ]);
-  });
-
-  it('prints nothing where the version is tagged and the project is no rafa checkout', () => {
-    const { git } = fakeGit({ 'tag --list v1.2.3': { ok: true, stdout: 'v1.2.3\n', stderr: '' } });
-    const info = collector();
     expect(reportFollowUps(place({ name: 'other', version: '1.2.3' }), git, info.report)).toEqual([]);
+    expect(calls).toEqual([]);
     expect(info.lines).toEqual([]);
   });
 
   it('reads the runtime directory under the home for a rafa checkout', () => {
-    const tagged = fakeGit({ 'tag --list v1.2.3': { ok: true, stdout: 'v1.2.3\n', stderr: '' } }).git;
+    const { git } = fakeGit();
     const at = place({ name: '@open-tomato/rafa', version: '1.2.3' });
-    expect(followUpsFor(at, tagged).map((followUp) => followUp.id)).toEqual(['self-update']);
+    expect(followUpsFor(at, git).map((followUp) => followUp.id)).toEqual(['self-update']);
     mkdirSync(join(at.home, RUNTIME_SUBDIR, '1.2.3'), { recursive: true });
-    expect(followUpsFor(at, tagged)).toEqual([]);
+    expect(followUpsFor(at, git)).toEqual([]);
+  });
+
+  it('prints rafa release settle as the last line where a shipping fragment waits on origin/main', () => {
+    const at = place({ name: 'other', version: '1.2.3' });
+    const git = plantBase(at, ['patch']);
+    const info = collector();
+
+    const followUps = reportFollowUps(at, git, info.report);
+
+    expect(followUps.map((followUp) => followUp.id)).toEqual(['release-settle']);
+    expect(info.lines).toEqual([
+      'Follow-ups:',
+      '   rafa release settle — 1 fragment waits on main and folds into 1.2.4',
+    ]);
+  });
+
+  it('prints settle after self-update in a rafa checkout, so it stays the last line', () => {
+    const at = place({ name: '@open-tomato/rafa', version: '1.2.3' });
+    const git = plantBase(at, ['patch', 'minor']);
+    const info = collector();
+
+    reportFollowUps(at, git, info.report);
+
+    expect(info.lines).toEqual([
+      'Follow-ups:',
+      '   rafa self-update — 1.2.3 is not installed as this machine\'s rafa runtime',
+      '   rafa release settle — 2 fragments wait on main and fold into 1.3.0',
+    ]);
+  });
+
+  it('names no settle where only level none fragments wait, since settle would commit nothing', () => {
+    const at = place({ name: 'other', version: '1.2.3' });
+    const git = plantBase(at, ['none']);
+    expect(followUpsFor(at, git)).toEqual([]);
+  });
+
+  it('names no settle where release.enabled is false, over the same base that names it when on', () => {
+    const at = place({ name: 'other', version: '1.2.3' }, { releaseEnabled: false });
+    const git = plantBase(at, ['patch']);
+    expect(followUpsFor(at, git)).toEqual([]);
+    expect(followUpsFor({ ...at, release: RELEASE }, git).map((followUp) => followUp.id)).toEqual(['release-settle']);
+  });
+
+  it('names no settle where origin/<base> names no commit', () => {
+    const at = place({ name: 'other', version: '1.2.3' });
+    const git = plantBase(at, ['patch']);
+    expect(followUpsFor({ ...at, base: 'trunk' }, git)).toEqual([]);
   });
 });

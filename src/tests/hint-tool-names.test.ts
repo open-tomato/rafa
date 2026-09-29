@@ -16,10 +16,10 @@
  * drives none of that and reads only the two lines each state prints.
  *
  * The follow-up cases are every combination `readFollowUps` decides
- * between for a version it has read: tagged or not, a rafa checkout or
- * not, the runtime installed or not — the same three booleans
- * `merge-followups.test.ts` drives, read here for their printed
- * `command` and `why` rather than for which ids came back.
+ * between for a version it has read: fragments waiting on the base or
+ * not, a rafa checkout or not, the runtime installed or not — the same
+ * three facts `merge-followups.test.ts` drives, read here for their
+ * printed `command` and `why` rather than for which ids came back.
  *
  * ## The control
  *
@@ -132,11 +132,13 @@ const STATES: readonly NextState[] = Object.freeze([
 
 /** Every combination `readFollowUps` decides between, for a version it has read. */
 const FOLLOW_UP_READINGS: readonly FollowUpReading[] = Object.freeze(
-  [true, false].flatMap((tagged) => [true, false].flatMap((rafaCheckout) => [true, false].map((runtimeInstalled) => ({
+  [true, false].flatMap((waiting) => [true, false].flatMap((rafaCheckout) => [true, false].map((runtimeInstalled) => ({
     version: '0.4.0',
-    tagged,
     rafaCheckout,
     runtimeInstalled,
+    settle: waiting
+      ? { base: 'main', fragments: 2, version: '0.5.0' }
+      : null,
   })))),
 );
 
@@ -161,7 +163,7 @@ function hintLines(): readonly CapturedLine[] {
 /** The `command` and `why` of every follow-up {@link FOLLOW_UP_READINGS} names, each labelled by its combination and id. */
 function followUpLines(): readonly CapturedLine[] {
   return FOLLOW_UP_READINGS.flatMap((reading) => {
-    const label = `followup:tagged=${String(reading.tagged)},checkout=${String(reading.rafaCheckout)},installed=${String(reading.runtimeInstalled)}`;
+    const label = `followup:waiting=${String(reading.settle !== null)},checkout=${String(reading.rafaCheckout)},installed=${String(reading.runtimeInstalled)}`;
     return readFollowUps(reading).flatMap((followUp) => [
       { source: `${label}.${followUp.id}.command`, line: followUp.command },
       { source: `${label}.${followUp.id}.why`, line: followUp.why },

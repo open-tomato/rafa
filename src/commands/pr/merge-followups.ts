@@ -3,17 +3,8 @@
  * clean-up are done, and the reading that decides whether either
  * applies.
  *
- * Both follow-ups turn on the same fact: the VERSION that is now on the
- * base branch.
- *
- *   - `rafa release tag` applies while that version carries no tag. The
- *     tag spelling is {@link versionTag}, `v<version>`, which is the
- *     spelling this repository's own tags use. A merge that changed no
- *     version lands on a version that was tagged when it was released,
- *     so nothing is named; a merge that carried a version bump lands on
- *     one nothing has tagged yet, and the line is the reminder.
  *   - `rafa self-update` applies while the project's `package.json`
- *     names rafa's own package AND the version is not installed as a
+ *     names rafa's own package AND its version is not installed as a
  *     runtime under the home. Both halves keep the line out of a place
  *     where the command it names would refuse: `self-update` installs
  *     the checkout it runs in, and `installRuntime` refuses a
@@ -23,37 +14,59 @@
  *     already there (`src/runtime/install.ts`). Naming it in another
  *     project, or for an installed version, would send the operator at
  *     a guaranteed refusal.
+ *   - `rafa release settle` applies while fragments wait on the base
+ *     branch AND folding them ships a version: the settle dry run over
+ *     `origin/<base>` answered `folded`. It is always printed LAST, so
+ *     it is `pr merge`'s last line: no branch owns a version number, and
+ *     settling what the merges left on the base is the step that comes
+ *     after them. A base holding only `level: none` fragments, none at
+ *     all, or one the dry run could not fold names nothing, since
+ *     settle would commit nothing there or refuse; `rafa release settle
+ *     --dry-run` is the command that says why.
  *
- * Both are therefore silent on the ordinary merge of a change that
- * touched no version, which is what makes them worth printing at all.
+ * Both are therefore silent on the ordinary merge that left nothing to
+ * install or settle, which is what makes them worth printing at all.
+ *
+ * ## Settle replaces the tag line
+ *
+ * `pr merge` used to name `rafa release tag` for a version on the base
+ * no `v<version>` tag named: the branch that stamped the version was the
+ * release. No branch stamps a version any more; settle writes it on the
+ * base and tags it as `release.tag` says (`src/release/settle-tag.ts`),
+ * naming `rafa release tag` itself where it leaves the tag to the
+ * operator. So the tag line is settle's to print, not the merge's.
+ *
+ * {@link versionTag} stays spelled here: `src/commands/release/tag.ts`
+ * and `src/release/settle-tag.ts` both build the tag they write from it.
  *
  * ## Both name a rafa command, and this still only prints them
  *
- * rafa-21 registered `release tag`, and {@link versionTag} is the one
- * string both this module's predicted tag and
- * `src/commands/release/tag.ts`'s written tag are built from, so the
- * printed line and the command that honours it cannot drift. The same
- * holds of the second line: {@link RAFA_PACKAGE_NAME} is imported from
- * `src/runtime/install.ts`, the module `self-update` installs through,
- * so the name this reading tests and the name that install refuses over
- * are one string. Nothing here runs either command even so: the
- * follow-ups are text an operator reads, and both tagging and updating
- * are the operator's call.
+ * A command never runs another command's step. Nothing here runs
+ * either command: the follow-ups are text an operator reads, and both
+ * settling and updating are the operator's call — or, for settle,
+ * `rafa next`'s workflow action. {@link RAFA_PACKAGE_NAME} is imported
+ * from `src/runtime/install.ts`, the module `self-update` installs
+ * through, so the name this reading tests and the name that install
+ * refuses over are one string.
  *
  * ## Why the reading is separate from what reads it
  *
- * The four facts — the version, whether it is tagged, whether the
- * project is a rafa checkout, whether the runtime is installed — come
- * from three different places: a `package.json` under the project root,
- * `git tag --list`, and a directory under the home. Keeping the RULE
- * pure and total means every combination of them is measurable from a
- * literal, where planting a repository for each would measure the
- * planting. `merge-followups.test.ts` drives all of them.
+ * The facts — the version, whether the project is a rafa checkout,
+ * whether the runtime is installed, what the settle dry run folded —
+ * come from a `package.json` under the project root, a directory under
+ * the home, and the base branch's git tree. Keeping the RULE pure and
+ * total means every combination of them is measurable from a literal,
+ * where planting a repository for each would measure the planting.
+ * `merge-followups.test.ts` drives all of them; `merge-cleanup.ts`
+ * gathers them.
  */
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 
 /** Which follow-up a line names. */
-export type FollowUpId = 'release-tag' | 'self-update';
+export type FollowUpId = 'self-update' | 'release-settle';
+
+/** The command the settle follow-up names, as the operator types it. */
+export const RELEASE_SETTLE_COMMAND = 'rafa release settle';
 
 /** One follow-up: the command to run, and why it applies. */
 export interface FollowUp {
@@ -64,19 +77,32 @@ export interface FollowUp {
   readonly why: string;
 }
 
+/**
+ * What the settle dry run folded on the base branch: the fragments
+ * waiting there and the version they fold into.
+ */
+export interface SettleWaiting {
+  /** The base branch the fragments wait on, e.g. `main`. */
+  readonly base: string;
+  /** How many fragments the fold took, `level: none` ones included. */
+  readonly fragments: number;
+  /** The version settle would write. */
+  readonly version: string;
+}
+
 /** What {@link readFollowUps} decides from; see the module note. */
 export interface FollowUpReading {
   /**
-   * The version on the base branch after the pull, or null when the
-   * project holds no readable `package.json` version.
+   * The version in the project's `package.json` after the pull, or null
+   * when it holds no readable one.
    */
   readonly version: string | null;
-  /** True when a tag already names that version. */
-  readonly tagged: boolean;
   /** True when the project's `package.json` names rafa's own package. */
   readonly rafaCheckout: boolean;
   /** True when that version is already installed as a runtime under the home. */
   readonly runtimeInstalled: boolean;
+  /** What the settle dry run folded on the base, or null where it folded nothing. */
+  readonly settle: SettleWaiting | null;
 }
 
 /** What a project's `package.json` says that the follow-ups turn on. */
@@ -126,30 +152,31 @@ export function readPackageFacts(text: string): PackageFacts {
   };
 }
 
+/** Why settle applies: how many fragments wait on which base, and what they fold into. */
+function settleWhy(waiting: SettleWaiting): string {
+  const [count, wait, fold] = waiting.fragments === 1
+    ? ['1 fragment', 'waits', 'folds']
+    : [`${String(waiting.fragments)} fragments`, 'wait', 'fold'];
+  return `${count} ${wait} on ${waiting.base} and ${fold} into ${waiting.version}`;
+}
+
 /**
- * The follow-ups that apply, in the order they are printed: the tag
- * first, since it names the release, then the update that installs it.
- * Empty when the merge changed nothing either one turns on; see the
- * module note.
+ * The follow-ups that apply, in the order they are printed: the update
+ * first, then settle, which is always last; see the module note. Empty
+ * when the merge left nothing either one turns on.
  */
 export function readFollowUps(reading: FollowUpReading): readonly FollowUp[] {
-  const { rafaCheckout, runtimeInstalled, tagged, version } = reading;
-  if (version === null) return Object.freeze([]);
-
+  const { rafaCheckout, runtimeInstalled, settle, version } = reading;
   const followUps: FollowUp[] = [];
-  if (!tagged) {
-    followUps.push({
-      id: 'release-tag',
-      command: 'rafa release tag',
-      why: `${version} is on the base branch and no ${versionTag(version)} tag names it`,
-    });
-  }
-  if (rafaCheckout && !runtimeInstalled) {
+  if (version !== null && rafaCheckout && !runtimeInstalled) {
     followUps.push({
       id: 'self-update',
       command: 'rafa self-update',
       why: `${version} is not installed as this machine's rafa runtime`,
     });
+  }
+  if (settle !== null) {
+    followUps.push({ id: 'release-settle', command: RELEASE_SETTLE_COMMAND, why: settleWhy(settle) });
   }
   return Object.freeze(followUps.map((followUp) => Object.freeze(followUp)));
 }

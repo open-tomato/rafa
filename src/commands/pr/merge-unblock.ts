@@ -1,8 +1,8 @@
 /**
- * The unblock reading `rafa pr merge` ends with: every open issue
- * whose `Blocked by:` line names an issue the merged pull request
- * closes, read, asked about and unlabelled where every blocker has
- * closed.
+ * The unblock reading `rafa pr merge` runs after its clean-up: every
+ * open issue whose `Blocked by:` line names an issue the merged pull
+ * request closes, read, asked about and unlabelled where every blocker
+ * has closed.
  *
  * `src/commands/issue/unblock.ts` is the whole of what touches the
  * board — the listing, the state of each blocker, the one question and

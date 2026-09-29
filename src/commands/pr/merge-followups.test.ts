@@ -1,34 +1,40 @@
 /**
  * Tests for the merge follow-ups (`merge-followups.ts`): which of the
- * two applies for each reading, and what a `package.json` text is read
- * as.
+ * two applies for each reading, in which order, and what a
+ * `package.json` text is read as.
  *
  * Both functions are pure and total, so every case is a literal: no
  * repository is planted, no home is read, and nothing is spawned. The
- * command that gathers the four facts is `merge.ts`, and its own cases
- * measure the gathering.
+ * gathering is `merge-cleanup.ts`'s, and `merge-cleanup.test.ts`
+ * measures it over a scratch repository.
  *
  * The rafa-checkout cases read the package name from
  * {@link RAFA_PACKAGE_NAME} rather than spelling `@open-tomato/rafa`
  * again, since that constant is what `self-update`'s own install
  * refuses over; the control beside them is a literal foreign name,
- * which holds the check to something it could fail.
+ * which holds the check to something it could fail. The settle command
+ * is checked against the name `rafa release settle` registers under,
+ * so the line cannot name a command `rafa` would not route.
  */
-import type { FollowUpReading } from './merge-followups.js';
+import type { FollowUpReading, SettleWaiting } from './merge-followups.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
+import { createReleaseSettleCommand } from '../release/settle.js';
 
-import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
+import { readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND, versionTag } from './merge-followups.js';
 
-/** A reading of a rafa checkout on a version nothing has tagged and nothing has installed, filled from `over`. */
+/** Two fragments waiting on main that fold into 0.5.0. */
+const WAITING: SettleWaiting = { base: 'main', fragments: 2, version: '0.5.0' };
+
+/** A reading of a rafa checkout on a version nothing has installed, with fragments waiting, filled from `over`. */
 function reading(over: Partial<FollowUpReading> = {}): FollowUpReading {
   return {
     version: '0.4.0',
-    tagged: false,
     rafaCheckout: true,
     runtimeInstalled: false,
+    settle: WAITING,
     ...over,
   };
 }
@@ -45,33 +51,54 @@ describe('the tag spelling', () => {
 });
 
 describe('which follow-ups apply', () => {
-  it('names both for a version that is neither tagged nor installed, the tag first', () => {
+  it('names both for an uninstalled version with fragments waiting, settle last', () => {
     const followUps = readFollowUps(reading());
 
-    expect(followUps.map((followUp) => followUp.command)).toEqual(['rafa release tag', 'rafa self-update']);
-    expect(followUps[0]?.why).toBe('0.4.0 is on the base branch and no v0.4.0 tag names it');
-    expect(followUps[1]?.why).toContain('0.4.0 is not installed');
+    expect(followUps.map((followUp) => followUp.command)).toEqual(['rafa self-update', 'rafa release settle']);
+    expect(followUps[0]?.why).toBe('0.4.0 is not installed as this machine\'s rafa runtime');
+    expect(followUps[1]?.why).toBe('2 fragments wait on main and fold into 0.5.0');
   });
 
-  it('names neither when the version is tagged and installed, which is the merge that changed no version', () => {
-    expect(idsOf(reading({ tagged: true, runtimeInstalled: true }))).toEqual([]);
+  it('keeps settle last in every combination that names it', () => {
+    for (const rafaCheckout of [true, false]) {
+      for (const runtimeInstalled of [true, false]) {
+        const ids = idsOf(reading({ rafaCheckout, runtimeInstalled }));
+        expect(ids.at(-1)).toBe('release-settle');
+      }
+    }
   });
 
-  it('names the tag alone in a project that is no rafa checkout, where self-update would refuse', () => {
-    expect(idsOf(reading({ rafaCheckout: false }))).toEqual(['release-tag']);
+  it('counts one fragment in the singular', () => {
+    const followUps = readFollowUps(reading({ settle: { base: 'trunk', fragments: 1, version: '1.0.1' } }));
+
+    expect(followUps.at(-1)?.why).toBe('1 fragment waits on trunk and folds into 1.0.1');
   });
 
-  it('names the update alone for a tagged version this machine has not installed', () => {
-    expect(idsOf(reading({ tagged: true }))).toEqual(['self-update']);
+  it('names neither when nothing waits and the version is installed, which is the ordinary merge', () => {
+    expect(idsOf(reading({ settle: null, runtimeInstalled: true }))).toEqual([]);
+  });
+
+  it('names settle alone in a project that is no rafa checkout, where self-update would refuse', () => {
+    expect(idsOf(reading({ rafaCheckout: false }))).toEqual(['release-settle']);
+  });
+
+  it('names the update alone where no fragment waits', () => {
+    expect(idsOf(reading({ settle: null }))).toEqual(['self-update']);
   });
 
   it('leaves the update out for a version already installed, which rafa self-update would refuse', () => {
-    expect(idsOf(reading({ runtimeInstalled: true }))).toEqual(['release-tag']);
+    expect(idsOf(reading({ runtimeInstalled: true }))).toEqual(['release-settle']);
   });
 
-  it('names nothing at all for a project with no readable version, whatever else is true', () => {
-    expect(idsOf(reading({ version: null }))).toEqual([]);
-    expect(idsOf(reading({ version: null, tagged: false, rafaCheckout: true }))).toEqual([]);
+  it('names settle for a project with no readable package.json version, since the fold reads the version file', () => {
+    expect(idsOf(reading({ version: null }))).toEqual(['release-settle']);
+    expect(idsOf(reading({ version: null, settle: null }))).toEqual([]);
+  });
+
+  it('never names the tag, which settle now owns', () => {
+    const commands = readFollowUps(reading()).map((followUp) => followUp.command);
+
+    expect(commands).not.toContain('rafa release tag');
   });
 
   it('answers a frozen list of frozen follow-ups, so a caller cannot change what a later one says', () => {
@@ -85,6 +112,12 @@ describe('which follow-ups apply', () => {
     const commands = readFollowUps(reading()).map((followUp) => followUp.command);
 
     expect(commands.every((command) => command.startsWith('rafa '))).toBe(true);
+  });
+});
+
+describe('the settle command', () => {
+  it('is the name the settle command registers under', () => {
+    expect(RELEASE_SETTLE_COMMAND).toBe(`rafa ${createReleaseSettleCommand().name}`);
   });
 });
 

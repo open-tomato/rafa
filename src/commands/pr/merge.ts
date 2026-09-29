@@ -83,11 +83,17 @@
  * paste. It never reverts, resets or re-pushes: the pull request IS
  * merged by then, and the clean-up is housekeeping the operator can
  * finish by hand. The follow-ups are printed for a clean-up that
- * finished, since what they turn on — the version now on the base — is
- * only true once the base has been pulled. The clean-up, its two branch
- * probes and the follow-up reading are `./merge-cleanup.ts`'s, whose
- * module note says how each branch is probed and on which remote; this
- * module calls them in that order and nothing else.
+ * finished, since what they turn on — the version and the fragments now
+ * on the base — is only true once the base has been pulled. They are
+ * the last lines of the merge's own report, after the unblock reading
+ * below, so `rafa release settle`, printed last among them when
+ * fragments wait on the base (`./merge-followups.ts`), is the last line
+ * the merge prints; only the ending hint, which `--no-hint` turns off,
+ * comes after it.
+ * The clean-up, its two branch probes and the follow-up reading are
+ * `./merge-cleanup.ts`'s, whose module note says how each branch is
+ * probed and on which remote; this module calls them in that order and
+ * nothing else.
  *
  * ## The roadmap tick
  *
@@ -109,16 +115,16 @@
  * read, an edit that would not land and a pull request closing no issue
  * all leave the merge reported exactly as it happened.
  *
- * ## The unblock reading, and why it is last
+ * ## The unblock reading, and why it comes after the clean-up
  *
  * A merge that closes an issue can be the thing that clears another
- * issue's blocker, so the command ends by running the reading `rafa
- * issue unblock` runs, over every open issue whose `Blocked by:` line
+ * issue's blocker, so after the clean-up the command runs the reading
+ * `rafa issue unblock` runs, over every open issue whose `Blocked by:` line
  * names an issue this pull request closes (`./merge-unblock.ts`, per
  * the spec). Like the tick, nothing it comes to changes the exit code.
  *
- * Unlike the tick it runs LAST, after the clean-up and the follow-ups,
- * for two reasons. It ASKS, and a question in the middle of the
+ * Unlike the tick it runs after the clean-up, and only the follow-ups
+ * come after it, for two reasons. It ASKS, and a question in the middle of the
  * clean-up would interleave with the step lines an operator is reading
  * to see whether their branches are gone. And where a step FAILED the
  * command is already exiting 1 with the remaining commands to paste, so
@@ -134,7 +140,7 @@
  *
  * ## The ending, on a merge that went through
  *
- * Last of all, after the unblock reading, the command names the one
+ * Last of all, after the follow-ups, the command names the one
  * step that follows — with the base pulled and both branches gone, that
  * is the next plan or the loop on a plan already there
  * (`src/next/ending.ts`, `--no-hint` to turn it off). A DECLINED merge
@@ -260,7 +266,7 @@ export interface PrMergeResult {
   readonly detail: string;
   /** Each clean-up step that ran or was skipped, in order; empty for a declined merge. */
   readonly steps: readonly MergeStepReport[];
-  /** The follow-ups that apply, empty when neither does. */
+  /** The follow-ups that apply, settle last; empty when neither does. */
   readonly followUps: readonly FollowUp[];
   /** What the tick of the first board in `roadmapTicks` came to, the default board's when it was ticked; null when none was. */
   readonly roadmapTick: RoadmapTickResult | null;
@@ -592,8 +598,12 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     context.output.info(message);
   };
   const steps = cleanUpAfterMerge(git, detail, { info, warn });
-  const followUps = reportFollowUps({ root: pr.project.root, home: pr.project.home }, git, info);
   const unblocked = await reportUnblock(context, pr, seams, detail);
+  const followUps = reportFollowUps(
+    { root: pr.project.root, home: pr.project.home, base: detail.baseRefName, release: pr.versionGuard },
+    git,
+    info,
+  );
 
   return {
     ...answered,

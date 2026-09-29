@@ -55,10 +55,10 @@ module's note is the long form.
 | `src/commands/pr/resolve-loop.ts` | one `--resolve` attempt's loop: the filled plan written under `~/.rafa/resolve/pr-<n>/attempt-<k>`, outside the worktree so the loop's own commit cannot push it, and `rafa loop start --plan=<file> --no-ci-wait` spawned in the worktree with its stdout forwarded a line at a time |
 | `src/commands/pr/triage-report.ts` | the one pure renderer of a triage: the head line, the re-run sentence, the class with its evidence or the stored triage, what was written, and the follow-up prompt whole |
 | `src/commands/pr/merge-tick.ts` | what `pr merge` decides about the roadmap tick: the issues the merged pull request closes, each one's line on the checklist of the open epic its `epic:` label names (through `src/board/epic-checklist.ts`, one sentence per epic), every open `type:roadmap` board whose checklist lists one (with a `roadmap.issue` the listing does not hold), or while none is labelled the roadmap issue `roadmap.issue` names or the search finds, and every failure on the way turned into a warning |
-| `src/commands/pr/merge-unblock.ts` | the unblock reading `pr merge` ends with: the open `spec:blocked` issues whose `Blocked by:` line names an issue the merged pull request closes, run through `runUnblock`, with every failure turned into a warning naming the reading |
-| `src/commands/pr/merge-cleanup.ts` | what `pr merge` runs after the provider merged: the `ls-remote` and `show-ref` probes of both branches, the clean-up steps walked and each reported, the exit-1 refusal naming the rest to paste at the first that failed, the line saying what is ready, and the follow-ups read off `package.json`, `git tag --list` and the runtime directory and printed under `Follow-ups:` |
+| `src/commands/pr/merge-unblock.ts` | the unblock reading `pr merge` runs after its clean-up, ahead of the follow-ups: the open `spec:blocked` issues whose `Blocked by:` line names an issue the merged pull request closes, run through `runUnblock`, with every failure turned into a warning naming the reading |
+| `src/commands/pr/merge-cleanup.ts` | what `pr merge` runs after the provider merged: the `ls-remote` and `show-ref` probes of both branches, the clean-up steps walked and each reported, the exit-1 refusal naming the rest to paste at the first that failed, the line saying what is ready, and the follow-ups read off `package.json`, the runtime directory and the settle dry run (`readSettle`) over `origin/<base>` where `release.enabled` reads on, printed under `Follow-ups:` |
 | `src/commands/pr/merge-guard.ts` | the release guard's step in `pr merge`, called from `runMerge` after `readMergeRefusal` and before the question, only where `release.enabled` reads on: `readMergeGuard` (`src/release/guard-merge.ts`) fetches the base and the head from `origin` and reads the guard over `origin/<head>`, and `guardReaction` picks what to do. `clean` prints its lines, the forecast among them; `missing` and `stale` follow `pr.versionCollision` (`allow` silent, `report` warns, `ask` asks `Merge #<n> with its release guard reading <answer>? [y/N]` before `Merge? [y/N]`, `refuse` refuses with exit 1); a `collision` refuses with exit 1 unless `dangerous.acceptVersionCollision` is true, when it warns and merges; a guard that could not read warns and never refuses. `--yes` does not answer the guard's question, and without a terminal `ask` refuses with exit 1. A refusal names the answer and the setting first, so a `stale` or `collision` one still ends with `rafa pr triage <n> --resolve`. `PrMergeResult.guard` carries the answer, the reaction and the lines, null where the release does not run |
-| `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa release tag` while the version on the base carries no `v<version>` tag, and `rafa self-update` while the project's `package.json` names rafa's own package and the version is not installed under the home |
+| `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa self-update` while the project's `package.json` names rafa's own package and the version is not installed under the home, and `rafa release settle` — always last, so it is the merge's last line ahead of the ending hint — while the settle dry run folds the fragments waiting on the base into a version (`<n> fragments wait on <base> and fold into <version>`); a base holding only `level: none` fragments names nothing. It no longer names `rafa release tag`, which settle's own tag step names where it leaves the tag to the operator; `versionTag` stays spelled here |
 | `src/commands/pr/pr-context.ts` | what the seven `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
 | `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
@@ -573,14 +573,16 @@ New; it replaces no earlier text. What a row or an action added to
   every board's as `roadmapTicks`, null when the pull request closes
   nothing, and the first of them as `roadmapTick`, null when no board was
   ticked.
-- **`pr merge` ends with the unblock reading**
+- **`pr merge` runs the unblock reading after its clean-up**
   (`src/commands/pr/merge-unblock.ts`), over every open issue labelled
   `spec:blocked` whose `Blocked by:` line names an issue the merged pull
   request closes. It is `rafa issue unblock`'s own `runUnblock`, so the
   question, the state of each blocker and the one `removeLabel` are
-  spelled once. It runs LAST, after the clean-up and the follow-ups,
-  because it asks and a question among the step lines would interleave
-  with them; a clean-up step that failed therefore never reaches it.
+  spelled once. It runs after the clean-up, and only the follow-ups
+  come after it, so `rafa release settle` is the merge's last line; it
+  waits for the clean-up because it asks and a question among the step
+  lines would interleave with them, and a clean-up step that failed
+  therefore never reaches it.
   `--yes` does not answer that question — it is declared as merging
   without asking — and without a terminal nothing is asked and nothing
   is written. Every failure is a warning naming the reading and none of

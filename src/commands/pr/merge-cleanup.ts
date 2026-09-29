@@ -60,24 +60,31 @@
  * ## The follow-ups, and why they wait for the clean-up
  *
  * They are printed for a clean-up that finished, since what they turn
- * on — the version now on the base — is only true once the base has
- * been pulled. {@link followUpsFor} gathers the four facts
+ * on — the version and the fragments now on the base — is only true
+ * once the base has been pulled. {@link followUpsFor} gathers what
  * `readFollowUps` decides from: the version in the project's
- * `package.json` (none, and nothing is named), whether `git tag --list`
- * finds its tag, whether that `package.json` names rafa, and whether
- * the version is installed as a runtime under the home.
+ * `package.json`, whether that `package.json` names rafa, whether the
+ * version is installed as a runtime under the home, and the settle dry
+ * run (`readSettle`, `src/release/settle.ts`) over `origin/<base>`,
+ * which the pull has just updated. The dry run reads git objects only
+ * and runs where the release does (`release.enabled`, read as the
+ * wrap-up and the guard read it); only its `folded` answer names
+ * settle.
  */
-import type { FollowUp } from './merge-followups.js';
+import type { FollowUp, SettleWaiting } from './merge-followups.js';
 import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { MergeGuardSettings } from '../../release/guard-merge.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
+import { resolveReleaseEnabled } from '../../release/enabled.js';
+import { readSettle } from '../../release/settle.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
-import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
+import { readFollowUps, readPackageFacts } from './merge-followups.js';
 
 /** The remote the branch is probed on and deleted from; see the module note. */
 export const REMOTE = 'origin';
@@ -110,12 +117,16 @@ export interface BranchesPresent {
 /** What the clean-up reads off the merged pull request. */
 export type MergedPull = Pick<PullRequestDetail, 'number' | 'headRefName' | 'baseRefName'>;
 
-/** Where the follow-ups are read: the project root and the home. */
+/** Where the follow-ups are read: the project root, the home, and the base the fragments wait on. */
 export interface FollowUpPlace {
   /** The project root, whose `package.json` names the version. */
   readonly root: string;
   /** The home, whose runtime directory says whether the version is installed. */
   readonly home: string;
+  /** The merged pull request's base branch, read as `origin/<base>`. */
+  readonly base: string;
+  /** The release settings the settle dry run reads, `release.enabled` among them. */
+  readonly release: MergeGuardSettings;
 }
 
 /** Whether the remote still holds the branch; a probe that failed is warned about. See the module note. */
@@ -222,16 +233,22 @@ function textOf(path: string): string {
   }
 }
 
+/** What the settle dry run folded on `origin/<base>`, or null where the release is off or nothing folds. */
+export function settleWaitingOn(place: FollowUpPlace, git: GitRunner): SettleWaiting | null {
+  if (!resolveReleaseEnabled(place.release, place.root).enabled) return null;
+  const reading = readSettle(git, `${REMOTE}/${place.base}`, place.release);
+  if (reading.outcome !== 'folded') return null;
+  return { base: place.base, fragments: reading.fragments.length, version: reading.version };
+}
+
 /** The follow-ups that apply once the base has been pulled; see the module note and `merge-followups.ts`. */
 export function followUpsFor(place: FollowUpPlace, git: GitRunner): readonly FollowUp[] {
   const facts = readPackageFacts(textOf(join(place.root, 'package.json')));
-  if (facts.version === null) return [];
-  const tags = git(['tag', '--list', versionTag(facts.version)]);
   return readFollowUps({
     version: facts.version,
-    tagged: tags.ok && tags.stdout.trim() !== '',
     rafaCheckout: facts.rafaCheckout,
-    runtimeInstalled: existsSync(join(place.home, RUNTIME_SUBDIR, facts.version)),
+    runtimeInstalled: facts.version !== null && existsSync(join(place.home, RUNTIME_SUBDIR, facts.version)),
+    settle: settleWaitingOn(place, git),
   });
 }
 
