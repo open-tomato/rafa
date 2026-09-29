@@ -226,6 +226,23 @@ export interface PullRequestReview {
 }
 
 /**
+ * A pull request to open, as {@link PullRequests.create} takes it.
+ *
+ * The head is a branch already pushed to the repository the provider
+ * resolves: opening one never pushes, forks or asks where to push, so
+ * the branch and its commit are the caller's to have put there first.
+ */
+export interface PullRequestDraft {
+  /** The branch the PR is FROM, already on the remote. */
+  readonly head: string;
+  /** The branch the PR is INTO. */
+  readonly base: string;
+  readonly title: string;
+  /** The PR body. An empty one is a body, and opens a PR with none. */
+  readonly body: string;
+}
+
+/**
  * What a merge did.
  *
  * `merged` false is a merge the provider REFUSED — not green, not
@@ -288,6 +305,21 @@ export interface PullRequests {
   browse: (number: number) => Promise<void>;
   /** Merges the PR, or answers why the provider would not. */
   merge: (number: number, method: MergeMethod) => Promise<MergeOutcome>;
+  /**
+   * Opens a PR from `draft.head` into `draft.base`, answering it as
+   * opened.
+   *
+   * A WRITE, so every failure throws — a head with a PR already open
+   * into that base among them, since answering the one already there
+   * would hide that the caller did not look first. The head must
+   * already be pushed; see {@link PullRequestDraft}.
+   */
+  create: (draft: PullRequestDraft) => Promise<PullRequestSummary>;
+  /**
+   * Replaces the PR's title and answers nothing. An absent PR throws,
+   * for the reason {@link PullRequests.editBody} gives.
+   */
+  editTitle: (number: number, title: string) => Promise<void>;
   /**
    * Replaces the PR's own body — the description above the
    * conversation, not a comment under it — and answers nothing.

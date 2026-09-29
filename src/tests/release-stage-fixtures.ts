@@ -297,6 +297,8 @@ function stubPulls(script: Script, calls: string[], bodies: string[]): PullReque
     checks: () => unreached('checks'),
     browse: () => unreached('browse'),
     merge: () => unreached('merge'),
+    create: () => unreached('create'),
+    editTitle: () => unreached('editTitle'),
     comments: () => unreached('comments'),
     comment: () => unreached('comment'),
     editComment: () => unreached('editComment'),

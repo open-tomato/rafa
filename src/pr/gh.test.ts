@@ -66,6 +66,11 @@
  *   - `editBody` sending `--title` where `--body` goes: its three cases
  *     that reach the fake, which refuses a flag the `pr edit` route
  *     models nothing for.
+ *
+ * Driven again on 2026-09-29, once the fake modelled `--title` for
+ * `editTitle` (84 pass before, module restored by sha256), that last
+ * mutation reddens two cases: the two that read the body back.
+ * `editTitle` and `create` are held in `./gh-create.test.ts`.
  */
 import type { FakePrGh } from './gh-fake.js';
 import type { PullRequests } from './types.js';

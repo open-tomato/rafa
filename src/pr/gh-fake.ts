@@ -29,7 +29,8 @@
  * | `pr view <n> --web [--repo]` | `browse` |
  * | `pr checks <n> --json <fields> [--repo]` | `checks` |
  * | `pr merge <n> --squash or --merge or --rebase [--repo]` | `merge` |
- * | `pr edit <n> --body <text> [--repo]` | `editBody` |
+ * | `pr edit <n> --body <text> or --title <text> [--repo]` | `editBody`, `editTitle` |
+ * | `pr create --head --base --title --body [--repo]` | `create` |
  * | `run view <id> --log-failed [--repo]` | `failedLog` |
  * | `api repos/<repo>/issues/<n>/comments [-X POST -f body=]` | `comments`, `comment` |
  * | `api repos/<repo>/issues/comments/<id> -X PATCH -f body=` | `editComment` |
@@ -67,7 +68,14 @@
  * edit is that kind of write too: it replaces the stored body, which
  * every later `pr view --json body` then answers, and writes nothing to
  * either stream, because what `gh pr edit` writes was not recorded
- * either.
+ * either. A title edit is the same write to the title.
+ *
+ * `gh pr create` is modelled from its help text alone, which says the
+ * new pull request's URL is printed: the fake opens the pull request
+ * under the next free number, by `rafa-fake`, and writes that URL and
+ * nothing else. A second open pull request from one head into one base
+ * is refused, in words the fake invents, since what `gh` writes then
+ * was not recorded.
  *
  * The repository holds no workflow until {@link FakePrGh.plantWorkflows}
  * gives it some, as `open-tomato/rafa` has none, and the workflows path
@@ -98,6 +106,7 @@ import {
   notFound,
   ok,
   PULL_FIELDS,
+  pullUrl,
   renderCheckRow,
   renderPermission,
   renderPull,
@@ -201,7 +210,8 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['pr view', { values: ['--json', '--repo'], switches: ['--web'], positionals: 1 }],
   ['pr checks', { values: ['--json', '--repo'], switches: [], positionals: 1 }],
   ['pr merge', { values: ['--repo'], switches: MERGE_SWITCHES, positionals: 1 }],
-  ['pr edit', { values: ['--body', '--repo'], switches: [], positionals: 1 }],
+  ['pr edit', { values: ['--body', '--title', '--repo'], switches: [], positionals: 1 }],
+  ['pr create', { values: ['--head', '--base', '--title', '--body', '--repo'], switches: [], positionals: 0 }],
   ['run view', { values: ['--repo'], switches: ['--log-failed'], positionals: 1 }],
   ['api', { values: ['-X', '-f'], switches: [], positionals: 1 }],
 ]);
@@ -389,12 +399,32 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     const refused = repoProblem(parsed);
     if (refused !== null) return refused;
     const body = flagValue(parsed, '--body');
-    if (body === undefined) return failed('fake gh: pr edit models --body <text> alone, and was handed no body\n');
+    const title = flagValue(parsed, '--title');
+    if (body === undefined && title === undefined) {
+      return failed('fake gh: pr edit models --body <text> and --title <text>, and was handed neither\n');
+    }
     const pull = namedPull(parsed.positionals[0] ?? '');
     if (isResult(pull)) return pull;
-    // The body is replaced whole, and nothing is written: see the module note.
-    store({ ...pull, body });
+    // The body and the title are replaced whole, and nothing is written: see the module note.
+    store({ ...pull, body: body ?? pull.body, title: title ?? pull.title });
     return ok();
+  };
+
+  const handlePrCreate = (parsed: ParsedCommand): GhResult => {
+    const refused = repoProblem(parsed);
+    if (refused !== null) return refused;
+    const [head, base, title, body] = ['--head', '--base', '--title', '--body'].map((name) => flagValue(parsed, name));
+    if (head === undefined || base === undefined || title === undefined || body === undefined) {
+      return failed('fake gh: pr create models --head, --base, --title and --body together, and was handed fewer\n');
+    }
+    const open = [...pulls.values()].find((pull) => pull.state === 'OPEN' && pull.headRefName === head && pull.baseRefName === base);
+    if (open !== undefined) {
+      return failed(`fake gh: a pull request for branch ${head} into branch ${base} already exists: ${pullUrl(named, open.number)}\n`);
+    }
+    const number = Math.max(0, ...pulls.keys()) + 1;
+    store(fillSeed({ number, title, body, headRefName: head, baseRefName: base, author: COMMENT_AUTHOR, updatedAt: now() }));
+    // The URL alone, as the help text says; see the module note.
+    return ok(`${pullUrl(named, number)}\n`);
   };
 
   const handleRunView = (parsed: ParsedCommand): GhResult => {
@@ -501,6 +531,7 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     ['pr checks', handlePrChecks],
     ['pr merge', handlePrMerge],
     ['pr edit', handlePrEdit],
+    ['pr create', handlePrCreate],
     ['run view', handleRunView],
     ['api', handleApi],
   ]);

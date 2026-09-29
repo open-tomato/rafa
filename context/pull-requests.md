@@ -69,6 +69,20 @@ stage resolves is `gh`. The port is NOT in
 learning, output and planner only), so adding a method to it bumps no
 version.
 
+`create` and `editTitle` are rafa-367's, for settle's `pr` delivery
+(`src/release/settle-pr.ts`), which opens or updates the one pending
+release pull request from `rafa/release`. `create` takes a
+`PullRequestDraft` — `head`, `base`, `title`, `body`, the head already
+pushed — and answers the pull request as `gh pr view` reads it back; it
+throws on every failure, a pull request already open from that head into
+that base included. On `gh` it sends `gh pr create` with all four flags,
+so nothing prompts, pushes or forks, and reads the number off the last
+stdout line that is a `/pull/<n>` URL. That output is from
+`gh pr create --help` on 2.100.0, not from a recorded create. `editTitle`
+is `gh pr edit <n> --title`, read by its exit code, as `editBody` is.
+The fake models both, and the unmodelled-flag case on `pr edit` now
+sends `--add-label`.
+
 `listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
 merged pull requests as `MergedPullRequest` rows — `number`,
 `headRefName`, `headRefOid`, `mergedAt` — through `gh pr list --state

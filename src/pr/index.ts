@@ -49,6 +49,7 @@ export type {
   PullRequestAuthor,
   PullRequestComment,
   PullRequestDetail,
+  PullRequestDraft,
   PullRequests,
   PullRequestState,
   PullRequestSummary,
