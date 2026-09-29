@@ -451,8 +451,10 @@ column list, with no trigger and no `UPDATE`. A store with no row
 stamps NULL in both. A copy's new origin counts on from the `seq` it
 copied, and no reader names either column, so a row an older runtime
 inserted is read as any other. `origins.test.ts` reads every
-`INSERT INTO` under `store/` from source and fails on an unstamped one
-other than the `schema_migrations` log, `store_meta`, `fix-schema`'s
+`INSERT INTO` in the modules directly under `store/` from source, not
+the scenario builders in `store/testdata/merge-scenarios.ts`, which
+plant a `plan-ci` store's rows with no origin columns, and fails on an
+unstamped one other than the `schema_migrations` log, `store_meta`, `fix-schema`'s
 copy, which carries the columns over as they were, the merge's
 union (`store/merge-union.ts`), which inserts another store's unmatched
 rows under a new local `seq` with their origin pair unchanged, and the
