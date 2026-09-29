@@ -842,3 +842,82 @@ describe('a user-level pin naming an unloaded tier', () => {
     expect(lines).toEqual([]);
   });
 });
+
+/**
+ * The release plan's six keys, driven through `loadConfig` rather than the
+ * pure resolver: `PROJECT_TEXT`/`PROJECT_VALUES` and `SECTION_CASES` above
+ * already carry all six through the whole-schema round trip, so what this
+ * block adds is narrow and explicit — the six read together from a real
+ * `.rafa/config.yaml`, the six fall back to their defaults together when no
+ * file names them, and a `release.fragments` planted under the gitignored
+ * `.rafa/` is refused with the real file's path, the case `SECTION_CASES`
+ * covers only with an absolute path.
+ */
+describe('the release plan\'s six keys, through loadConfig', () => {
+  it('reads all six from .rafa/config.yaml, sourced from the file', () => {
+    const roots = scopes(
+      [
+        'pr:',
+        '  versionCollision: ask',
+        'release:',
+        '  fragments: release-notes',
+        '  strategy: semver-by-level',
+        '  settle: pr',
+        '  tag: settle',
+        'dangerous:',
+        '  acceptVersionCollision: true',
+        '',
+      ].join('\n'),
+      null,
+    );
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      prVersionCollision: 'ask',
+      releaseFragments: 'release-notes',
+      releaseStrategy: 'semver-by-level',
+      releaseSettle: 'pr',
+      releaseTag: 'settle',
+      dangerousAcceptVersionCollision: true,
+    });
+    expect(resolved.sources).toMatchObject({
+      prVersionCollision: 'file',
+      releaseFragments: 'file',
+      releaseStrategy: 'file',
+      releaseSettle: 'file',
+      releaseTag: 'file',
+      dangerousAcceptVersionCollision: 'file',
+    });
+  });
+
+  it('falls back to defaults, together, when no config file names them', () => {
+    const roots = scopes(null, null);
+    const resolved = loadConfig(roots, {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      prVersionCollision: CONFIG_DEFAULTS.prVersionCollision,
+      releaseFragments: CONFIG_DEFAULTS.releaseFragments,
+      releaseStrategy: CONFIG_DEFAULTS.releaseStrategy,
+      releaseSettle: CONFIG_DEFAULTS.releaseSettle,
+      releaseTag: CONFIG_DEFAULTS.releaseTag,
+      dangerousAcceptVersionCollision: CONFIG_DEFAULTS.dangerousAcceptVersionCollision,
+    });
+    expect(resolved.sources).toMatchObject({
+      prVersionCollision: 'default',
+      releaseFragments: 'default',
+      releaseStrategy: 'default',
+      releaseSettle: 'default',
+      releaseTag: 'default',
+      dangerousAcceptVersionCollision: 'default',
+    });
+  });
+
+  it('reports a release.fragments planted under .rafa/, naming the real file', () => {
+    const roots = scopes('release:\n  fragments: .rafa/changes\n', null);
+
+    expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+      `${literalPath(roots.root)}: release.fragments is ".rafa/changes", `
+        + 'expected a relative directory path not under .rafa/',
+    ]);
+  });
+});
