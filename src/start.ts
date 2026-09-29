@@ -157,16 +157,16 @@
  *
  * The release is wrapped around that session, in three parts
  * (`start/release-stage.ts`). Before it is spawned, the loop writes the
- * changelog entry and the version bump this pull request ships, or says
- * why it ships neither, and hands that record to the session, whose
- * prompt asks it to rewrite the entry's raw lines and to leave both
- * files unstaged. Once the session returns, and BEFORE the CI gate, the
- * loop verifies that rewrite, restores its own text on a refusal, and
- * commits and pushes those two files alone under `chore: release
- * <version>`. Every outcome short of a pushed release puts one sentence
- * in the pull request body. A stage that could not run at all prepares
- * nothing, and the wrap-up runs without a release rather than not at
- * all.
+ * plan's change fragment, or says why it wrote none, and hands that
+ * record to the session, whose prompt asks it to rewrite the fragment's
+ * raw notes and to leave it unstaged. Once the session returns, and
+ * BEFORE the CI gate, the loop verifies that rewrite, restores its own
+ * text on a refusal, commits and pushes the fragment alone under
+ * `chore: release fragment <plan id>`, and writes a forecast of what it
+ * ships into the pull request body. Every outcome short of a pushed
+ * fragment puts one sentence in the pull request body instead. A stage
+ * that could not run at all prepares nothing, and the wrap-up runs
+ * without a release rather than not at all.
  *
  * Every line this module, `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
@@ -604,17 +604,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning);
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
-        // refusal, the `chore: release` commit and its push. A release
-        // pushed after the wait started would be a commit those checks
-        // never read, and the wait would then report on a head the
-        // release moved.
-        // The reading that decides whether the failure sentence reaches a
-        // pull request body at all is made here too, and for the same
+        // refusal, the `chore: release fragment` commit, its push and the
+        // forecast. A fragment pushed after the wait started would be a
+        // commit those checks never read, and the wait would then report
+        // on a head the release moved.
+        // The reading that decides whether the sentence or the forecast
+        // reaches a pull request body at all is made here too, and for the same
         // reason: the run's `pr.provider` lives in this config, and a
         // repository resolving to `none` has no pull request to carry it
         // (`start/release-stage.ts`).
         await finishRelease(
-          { repoRoot, preparation: release },
+          { repoRoot, settings: runConfig.config, preparation: release },
           {
             readProvider: () => resolvePrProvider({
               configured: runConfig.config.prProvider ?? null,

@@ -64,7 +64,8 @@ skipped, so a missing fragment and "no release" stay two readings. A
 shipping level whose notes all came out empty carries the plan title as its
 one note, reported as a problem, since the format refuses a bare `patch`,
 `minor` or `major`. The file name is `<plan id>.md`, or `-2`, `-3` when a
-fragment of that name still waits on `origin/main`, read after a
+fragment of that name still waits on `origin/<pr.base>` (`main` when the
+project names no `pr.base`), read after a
 `git fetch` of it (`src/release/fragment-tree.ts`), so a second wrap-up of
 one branch rewrites its own fragment. A failed fetch is reported and the
 step goes on; a base tree that cannot be read at all writes nothing.
@@ -100,11 +101,22 @@ and a change it committed (a merge from the base) is not a working-tree
 change. On failure, restore step 1's fragment text — never the other files,
 which step 1 did not write and which are named in the sentence instead —
 and report the failure in the PR body.
-Commit `chore: release <version>` over the two release files alone — never
-`git add -A`, which would sweep the session's other leftovers under that
-subject. The PR body gains the entry. The verification is
-`src/release/verify.ts`, `verifyRelease`; the commit, the push and the
-`editBody` that writes a failure sentence into the pull request body are
+Commit `chore: release fragment <plan id>` over the fragment path alone —
+never `git add -A`, which would sweep the session's other leftovers under
+that subject — and push. The PR body then gains the forecast: the fold
+settle would run if the branch merged now, over the base version and
+waiting fragments step 1 read (the version read at that same commit), the
+branch's fragment last and dated today in UTC
+(`src/release/branch-forecast.ts`, over `forecast.ts`). It sits in a block
+opened by `<!-- rafa:release v1 base=<version> waiting=<id>,<id> -->` and
+closed by `<!-- /rafa:release -->`, which a re-run replaces rather than
+repeats; a failure sentence is appended once instead. When the plan's
+declared level is below the highest of its stored notes, the level report
+(`releaseLevelReport`, `src/release/level.ts`) joins that block, on a
+failure as on a push, and is printed at step 1: a report, never a refusal,
+since the declaration wins. The verification is `src/release/verify.ts`,
+`verifyRelease`; the commit, the push and the `editBody` that writes the
+block or the failure sentence into the pull request body are
 `src/start/release-stage.ts`, which `src/start.ts` calls from its wrap-up
 branch.
 
@@ -113,8 +125,8 @@ assumption: `resolvePrProvider` (`src/pr/provider.ts`) is asked before any
 provider is built, and `src/start.ts` passes it the run's own
 `pr.provider`. A repository that resolves to `none` has no pull request to
 write to, so the stage builds no provider, spawns no `gh`, and prints one
-line naming the sentence that went unwritten and the reading that kept it
-off the board.
+line naming the sentence or forecast that went unwritten and the reading
+that kept it off the board.
 
 Level `none` no longer skips: step 1 writes a `none` fragment. Step 1
 skips when the release is off, the plan id cannot name a file, the base

@@ -9,9 +9,10 @@
  * scratch git repository with a bare `origin` beside it, real change
  * notes written through `effort/store/changes.ts`'s `writeChanges` under
  * a plan stub, and every seam left at its default — `release/prepare.ts`
- * reads the real base version off `origin/main`, `release/verify.ts`
- * reads the real files back, and the commit and the push run over the
- * real git history. Only `currentBranch` is fixed to the branch this
+ * reads the real fragments waiting on `origin/main`, `release/verify.ts`
+ * reads the real fragment and the real `git status` back, the commit and
+ * the push run over the real git history, and the forecast folds over
+ * the real base version. Only `currentBranch` is fixed to the branch this
  * file checks out, because the real `getCurrentBranch`
  * (`src/utils/git.ts`) reads `process.cwd()` rather than the scratch
  * repository this suite plants. The two body cases name two seams more,
@@ -20,16 +21,17 @@
  *
  * One scenario: a plan that declares `release: minor` and whose sessions
  * stored two change notes under two different areas. It answers that the
- * version shipped is the base's bumped by the DECLARED level (not by the
- * notes' own, higher claim), that exactly one `chore: release <version>`
- * commit lands over the two release files and nothing else, that it
- * reaches the bare `origin`, and that the new changelog section carries
- * both planted notes' areas above the section that was already there.
+ * fragment carries the DECLARED level (not the notes' own, higher claim)
+ * and both planted notes' areas, that exactly one `chore: release
+ * fragment <plan id>` commit lands over the fragment and nothing else,
+ * that the version file and the changelog are untouched, that it reaches
+ * the bare `origin`, and that the pull request body gets a forecast of
+ * the base bumped by that level, with the level report beside it.
  */
 import type { GitRunner, PrProviderReading } from '../pr/index.js';
-import type { ReleasePreparation, ReleaseSettings } from '../release/prepare.js';
+import type { ReleasePreparation } from '../release/prepare.js';
 import type { ReportChange } from '../report/parse.js';
-import type { ReleaseFinish } from '../start/release-stage.js';
+import type { ReleaseFinish, ReleaseStageSettings } from '../start/release-stage.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,14 +76,23 @@ const BASE_VERSION = '0.4.0';
 const VERSION = '0.5.0';
 
 /** The `release` settings this scenario runs under: this repository's own. */
-const SETTINGS: ReleaseSettings = {
+const SETTINGS: ReleaseStageSettings = {
   releaseEnabled: RELEASE_AUTO,
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
+  releaseFragments: '.changes',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseStrategy: 'semver-by-level',
+  prBase: null,
 };
 
-/** The plan title the entry's heading is rendered from, `Plan:` label off. */
+/** The same settings with the release turned off: step 1 skips. */
+const RELEASE_OFF: ReleaseStageSettings = { ...SETTINGS, releaseEnabled: false };
+
+/** The fragment the plan's wrap-up writes, relative to the repository root. */
+const FRAGMENT_PATH = `.changes/${PLAN_STUB}.md`;
+
+/** The plan title the fragment's `title` is written from, `Plan:` label off. */
 const TITLE = 'rafa-99 — a scratch release run end to end';
 
 /** A plan the way the loop writes one, declaring the level outright. */
@@ -213,7 +224,7 @@ function linesAt(path: string): readonly string[] {
   }
 }
 
-/** A plan declaring `release: none`, the simplest way to reach the provider gate. */
+/** A plan declaring `release: none`, which writes a `none` fragment. */
 const DECLARES_NONE_PLAN = [
   `# Plan: ${TITLE}`,
   '',
@@ -241,8 +252,8 @@ const OUTPUT_SINKS_MODULE = fileURLToPath(new URL('./output-sinks.ts', import.me
 /**
  * A standalone script that calls the real `finishRelease` and prints the
  * `ReleaseFinish` it answered as its only line of stdout, reading
- * `repoRoot`, the preparation, the branch and the provider reading off
- * its own argv. Written once under {@link tempBase}, since its content
+ * `repoRoot`, the settings, the preparation, the branch and the provider
+ * reading off its own argv. Written once under {@link tempBase}, since its content
  * never varies between the two cases that spawn it.
  */
 const RUNNER_SCRIPT = join(tempBase, 'gh-stub-runner.ts');
@@ -251,13 +262,14 @@ writeFileSync(RUNNER_SCRIPT, [
   `import { setActiveOutput } from ${JSON.stringify(OUTPUT_ACTIVE_MODULE)};`,
   `import { sinkOutput } from ${JSON.stringify(OUTPUT_SINKS_MODULE)};`,
   '',
-  'const [repoRoot, preparationJson, branch, providerJson] = process.argv.slice(2);',
+  'const [repoRoot, settingsJson, preparationJson, branch, providerJson] = process.argv.slice(2);',
   'setActiveOutput(sinkOutput({}));',
+  'const settings = JSON.parse(settingsJson);',
   'const preparation = JSON.parse(preparationJson);',
   'const provider = JSON.parse(providerJson);',
   '',
   'const finish = await finishRelease(',
-  '  { repoRoot, preparation },',
+  '  { repoRoot, settings, preparation },',
   '  { currentBranch: () => branch, readProvider: () => provider },',
   ');',
   '',
@@ -287,7 +299,15 @@ function runFinishInSubprocess(
   path: string,
 ): ReleaseFinish {
   const run = Bun.spawnSync(
-    [process.execPath, RUNNER_SCRIPT, repoRoot, JSON.stringify(preparation), branch, JSON.stringify(provider)],
+    [
+      process.execPath,
+      RUNNER_SCRIPT,
+      repoRoot,
+      JSON.stringify(RELEASE_OFF),
+      JSON.stringify(preparation),
+      branch,
+      JSON.stringify(provider),
+    ],
     { env: { PATH: path, HOME: tempBase } },
   );
   if (!run.success) {
@@ -296,22 +316,27 @@ function runFinishInSubprocess(
   return JSON.parse(run.stdout.toString()) as ReleaseFinish;
 }
 
+/** The planted pull request's body before the release stage writes to it. */
+const BODY_BEFORE = 'What this pull request does.';
+
+/** The pull request number the fake `gh` plants for {@link BRANCH}. */
+const PR_NUMBER = 42;
+
 describe('the release stage over a scratch repository', () => {
   it(
-    'ships the version the base plus the declared level, one release commit, and both planted areas in the new section',
+    'commits one fragment at the declared level with both planted areas, leaves the version file and changelog alone, and forecasts the bump in the body',
     async () => {
       const scratch = plantScratchRelease('happy-path');
       setActiveOutput(sinkOutput({}));
+      const fakeGh = createFakePrGh();
+      fakeGh.plant({ number: PR_NUMBER, headRefName: BRANCH, body: BODY_BEFORE });
 
-      const preparation = prepareReleaseStage(
-        {
-          repoRoot: scratch.repo,
-          settings: SETTINGS,
-          planStub: PLAN_STUB,
-          planContent: PLAN,
-        },
-        { now: () => new Date('2026-09-20T09:00:00Z') },
-      );
+      const preparation = prepareReleaseStage({
+        repoRoot: scratch.repo,
+        settings: SETTINGS,
+        planStub: PLAN_STUB,
+        planContent: PLAN,
+      });
 
       if (preparation === null || preparation.kind !== 'prepared') {
         throw new Error(`expected a prepared release, got ${JSON.stringify(preparation)}`);
@@ -319,77 +344,67 @@ describe('the release stage over a scratch repository', () => {
       expect(preparation.levelSource).toBe('plan');
       expect(preparation.level).toBe('minor');
       expect(preparation.notesLevel).toBe('major');
-      expect(preparation.baseVersion).toBe(BASE_VERSION);
-      expect(preparation.version).toBe(VERSION);
+      expect(preparation.file.path).toBe(FRAGMENT_PATH);
 
       const finish = await finishRelease(
-        { repoRoot: scratch.repo, preparation },
-        { currentBranch: () => BRANCH },
+        { repoRoot: scratch.repo, settings: SETTINGS, preparation },
+        {
+          currentBranch: () => BRANCH,
+          pulls: () => createGhPullRequests({ gh: fakeGh.run }),
+          readProvider: () => GH_READING,
+          now: () => new Date('2026-09-20T09:00:00Z'),
+        },
       );
 
       expect(finish.outcome).toBe('released');
-      expect(finish.version).toBe(VERSION);
-      expect(finish.subject).toBe(`chore: release ${VERSION}`);
+      expect(finish.fragment).toBe(FRAGMENT_PATH);
+      expect(finish.subject).toBe(`chore: release fragment ${PLAN_STUB}`);
       expect(finish.sha).not.toBeNull();
       expect(finish.sentence).toBeNull();
-      expect(finish.body).toBeNull();
 
-      // Exactly one release commit landed, over the two release files alone.
+      // Exactly one release commit landed, over the fragment alone.
       const subjects = scratch.git(['log', '--format=%s']).stdout.trim().split('\n');
-      expect(subjects).toEqual([`chore: release ${VERSION}`, 'first']);
-      const changedFiles = scratch.git(['diff', '--name-only', 'HEAD~1', 'HEAD']).stdout.trim().split('\n')
-        .sort();
-      expect(changedFiles).toEqual(['CHANGELOG.md', 'package.json']);
+      expect(subjects).toEqual([`chore: release fragment ${PLAN_STUB}`, 'first']);
+      const changedFiles = scratch.git(['diff', '--name-only', 'HEAD~1', 'HEAD']).stdout.trim().split('\n');
+      expect(changedFiles).toEqual([FRAGMENT_PATH]);
 
-      // The version bumped by exactly the declared level, on disk.
-      const manifest = JSON.parse(readFileSync(join(scratch.repo, 'package.json'), 'utf8')) as { version: string };
-      expect(manifest.version).toBe(VERSION);
+      // No branch owns a version: both release files are as they were.
+      expect(readFileSync(join(scratch.repo, 'package.json'), 'utf8')).toBe(PACKAGE_JSON_BEFORE);
+      expect(readFileSync(join(scratch.repo, 'CHANGELOG.md'), 'utf8')).toBe(CHANGELOG_BEFORE);
 
-      // The new section carries both planted notes' areas, above the
-      // section that was already there, which is untouched.
-      const changelog = readFileSync(join(scratch.repo, 'CHANGELOG.md'), 'utf8');
-      const heading = `## ${VERSION} — 2026-09-20, ${TITLE}`;
-      expect(changelog).toContain(heading);
-      expect(changelog).toContain('- loop: the wrap-up commits the scratch release end to end');
-      expect(changelog).toContain('- cli: rafa release ships a real commit in a scratch repository');
-      expect(changelog).toContain(`## ${BASE_VERSION} — 2026-09-19, the one before`);
-      expect(changelog.indexOf(heading)).toBeLessThan(changelog.indexOf(`## ${BASE_VERSION}`));
+      // The fragment carries the declared level and both planted areas.
+      const fragment = readFileSync(join(scratch.repo, FRAGMENT_PATH), 'utf8');
+      expect(fragment).toContain(`plan: ${PLAN_STUB}`);
+      expect(fragment).toContain('level: minor');
+      expect(fragment).toContain('- loop: the wrap-up commits the scratch release end to end');
+      expect(fragment).toContain('- cli: rafa release ships a real commit in a scratch repository');
 
       // Pushed to the bare origin, not merely committed locally.
       const remoteTip = createGitRunner(scratch.origin)(['rev-parse', BRANCH]).stdout.trim();
       expect(remoteTip).toBe(finish.sha);
+
+      // The body gained the forecast, folded over the real base version,
+      // and the level report, since the notes reach major.
+      expect(finish.forecast?.ok && finish.forecast.baseVersion).toBe(BASE_VERSION);
+      const body = fakeGh.pull(PR_NUMBER)?.body ?? '';
+      expect(body.startsWith(`${BODY_BEFORE}\n\n<!-- rafa:release v1 base=${BASE_VERSION} waiting= -->`)).toBe(true);
+      expect(body).toContain(`Release forecast: this branch ships as the next minor, ${VERSION} if merged now`);
+      expect(body).toContain('Level report: the plan declares release: minor, below the major its change notes reach');
     },
   );
 
   /**
    * The two ways a level comes out `none`: `release/level.ts`'s "the
    * declaration wins outright, `none` included" and its "a plan with no
-   * notes at all reads as `none` from `default`". Neither writes either
-   * release file, and each carries its own sentence — the record's own,
-   * per `release/prepare.ts` — into the pull request body, over a real
-   * `gh` fake rather than a hand-stubbed provider, so this suite checks
-   * the same read-modify-write `carryIntoBody` performs against a real
-   * one. Two seams are named for these: the provider the write goes
-   * through and the reading that says there is one ({@link GH_READING}).
+   * notes at all reads as `none` from `default`". Each now WRITES a
+   * `none` fragment and commits it, so a missing fragment and "no
+   * release" stay two readings, and neither touches either release
+   * file. The body is written over a real `gh` fake rather than a
+   * hand-stubbed provider, so this suite checks the same
+   * read-modify-write the stage performs against a real one.
    */
   it.each([
-    [
-      'a plan declaring release: none',
-      'declares-none',
-      [
-        `# Plan: ${TITLE}`,
-        '',
-        '```rafa:plan',
-        `stub: ${PLAN_STUB}`,
-        'issue: "99"',
-        'release: none',
-        '```',
-        '',
-        '- [x] Ship a scratch release end to end',
-      ].join('\n'),
-      [] as readonly ReportChange[],
-      'the plan declares release: none, so this pull request ships no version bump and no changelog entry',
-    ],
+    ['a plan declaring release: none', 'declares-none', DECLARES_NONE_PLAN, 'plan'],
     [
       'a plan whose run stored no change note',
       'no-change-note',
@@ -403,26 +418,53 @@ describe('the release stage over a scratch repository', () => {
         '',
         '- [x] Ship a scratch release end to end',
       ].join('\n'),
-      [] as readonly ReportChange[],
-      'this plan stored no change note and declares no release level, so this pull request ships no version bump and no changelog entry',
+      'default',
     ],
-  ])('writes neither release file for %s, and carries the sentence into the pull request body', async (
+  ])('commits a none fragment for %s, leaves both release files alone, and forecasts no release', async (
     _label,
     scratchName,
     plan,
-    notes,
-    sentence,
+    source,
   ) => {
-    const scratch = plantScratchRelease(scratchName, notes);
+    const scratch = plantScratchRelease(scratchName, []);
     setActiveOutput(sinkOutput({}));
-
     const fakeGh = createFakePrGh();
-    fakeGh.plant({ number: 42, headRefName: BRANCH, body: 'What this pull request does.' });
+    fakeGh.plant({ number: PR_NUMBER, headRefName: BRANCH, body: BODY_BEFORE });
 
-    const preparation = prepareReleaseStage(
-      { repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: plan },
-      { now: () => new Date('2026-09-20T09:00:00Z') },
+    const preparation = prepareReleaseStage({ repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: plan });
+
+    if (preparation === null || preparation.kind !== 'prepared') {
+      throw new Error(`expected a prepared release, got ${JSON.stringify(preparation)}`);
+    }
+    expect(preparation.level).toBe('none');
+    expect(preparation.levelSource).toBe(source);
+
+    const finish = await finishRelease(
+      { repoRoot: scratch.repo, settings: SETTINGS, preparation },
+      {
+        currentBranch: () => BRANCH,
+        pulls: () => createGhPullRequests({ gh: fakeGh.run }),
+        readProvider: () => GH_READING,
+      },
     );
+
+    expect(finish.outcome).toBe('released');
+    expect(readFileSync(join(scratch.repo, FRAGMENT_PATH), 'utf8')).toContain('level: none');
+    expect(readFileSync(join(scratch.repo, 'CHANGELOG.md'), 'utf8')).toBe(CHANGELOG_BEFORE);
+    expect(readFileSync(join(scratch.repo, 'package.json'), 'utf8')).toBe(PACKAGE_JSON_BEFORE);
+    const subjects = scratch.git(['log', '--format=%s']).stdout.trim().split('\n');
+    expect(subjects).toEqual([`chore: release fragment ${PLAN_STUB}`, 'first']);
+    expect(fakeGh.pull(PR_NUMBER)?.body).toContain('Release forecast: this branch ships no release (level none)');
+  });
+
+  it('writes no fragment when the release is off, and carries the sentence into the pull request body', async () => {
+    const scratch = plantScratchRelease('release-off');
+    setActiveOutput(sinkOutput({}));
+    const fakeGh = createFakePrGh();
+    fakeGh.plant({ number: PR_NUMBER, headRefName: BRANCH, body: BODY_BEFORE });
+    const sentence = 'no release fragment: release.enabled is false in this project';
+
+    const preparation = prepareReleaseStage({ repoRoot: scratch.repo, settings: RELEASE_OFF, planStub: PLAN_STUB, planContent: PLAN });
 
     if (preparation === null || preparation.kind !== 'skipped') {
       throw new Error(`expected a skipped release, got ${JSON.stringify(preparation)}`);
@@ -430,7 +472,7 @@ describe('the release stage over a scratch repository', () => {
     expect(preparation.sentence).toBe(sentence);
 
     const finish = await finishRelease(
-      { repoRoot: scratch.repo, preparation },
+      { repoRoot: scratch.repo, settings: RELEASE_OFF, preparation },
       {
         currentBranch: () => BRANCH,
         pulls: () => createGhPullRequests({ gh: fakeGh.run }),
@@ -439,19 +481,14 @@ describe('the release stage over a scratch repository', () => {
     );
 
     expect(finish.outcome).toBe('skipped');
-    expect(finish.sentence).toBe(sentence);
-
-    // Neither release file was touched.
-    expect(readFileSync(join(scratch.repo, 'CHANGELOG.md'), 'utf8')).toBe(CHANGELOG_BEFORE);
-    expect(readFileSync(join(scratch.repo, 'package.json'), 'utf8')).toBe(PACKAGE_JSON_BEFORE);
-
-    // No commit landed beyond the one the scratch repository started with.
     const subjects = scratch.git(['log', '--format=%s']).stdout.trim().split('\n');
     expect(subjects).toEqual(['first']);
-
-    // The sentence reached the real pull request body, under what was there.
-    const pull = fakeGh.pull(42);
-    expect(pull?.body).toBe(`What this pull request does.\n\n${sentence}`);
+    // The level report rides along: the plan declares minor, its notes reach major.
+    expect(fakeGh.pull(PR_NUMBER)?.body).toBe(
+      `${BODY_BEFORE}\n\n${sentence}\n\n<!-- rafa:release v1 -->\n`
+        + 'Level report: the plan declares release: minor, below the major its change notes reach;'
+        + ' the declaration stands, so this pull request ships as minor\n<!-- /rafa:release -->',
+    );
   });
 });
 
@@ -467,10 +504,12 @@ describe('the release stage over a scratch repository', () => {
  * is what lets this file measure that against the one thing `gh` could
  * actually do: get invoked.
  *
- * Both cases run the same skipped preparation — a plan declaring
- * `release: none`, prepared once here in this process — through the
- * subprocess script's `finishRelease`, over the real `ghPullRequestsIn`
- * default and the stub's bin directory first on that child's `PATH`.
+ * Both cases run the same skipped preparation — a release turned off
+ * by `release.enabled: false`, prepared once here in this process, since
+ * a `release: none` plan now writes a fragment rather than skipping —
+ * through the subprocess script's `finishRelease`, over the real
+ * `ghPullRequestsIn` default and the stub's bin directory first on that
+ * child's `PATH`.
  */
 describe('the release stage provider gate against a real gh stub first on PATH', () => {
   it('spawns no gh at all when the resolved provider is none', () => {
@@ -480,8 +519,7 @@ describe('the release stage provider gate against a real gh stub first on PATH',
     const reading: PrProviderReading = { provider: 'none', source: 'config', remote: null, host: null };
 
     const preparation = prepareReleaseStage(
-      { repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: DECLARES_NONE_PLAN },
-      { now: () => new Date('2026-09-20T09:00:00Z') },
+      { repoRoot: scratch.repo, settings: RELEASE_OFF, planStub: PLAN_STUB, planContent: DECLARES_NONE_PLAN },
     );
     if (preparation === null || preparation.kind !== 'skipped') {
       throw new Error(`expected a skipped release, got ${JSON.stringify(preparation)}`);
@@ -504,8 +542,7 @@ describe('the release stage provider gate against a real gh stub first on PATH',
     const reading: PrProviderReading = { provider: 'gh', source: 'config', remote: null, host: null };
 
     const preparation = prepareReleaseStage(
-      { repoRoot: scratch.repo, settings: SETTINGS, planStub: PLAN_STUB, planContent: DECLARES_NONE_PLAN },
-      { now: () => new Date('2026-09-20T09:00:00Z') },
+      { repoRoot: scratch.repo, settings: RELEASE_OFF, planStub: PLAN_STUB, planContent: DECLARES_NONE_PLAN },
     );
     if (preparation === null || preparation.kind !== 'skipped') {
       throw new Error(`expected a skipped release, got ${JSON.stringify(preparation)}`);

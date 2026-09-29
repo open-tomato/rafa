@@ -132,3 +132,22 @@ export function resolveReleaseLevel(
   if (notesLevel !== null) return { level: notesLevel, source: 'notes', notesLevel };
   return { level: 'none', source: 'default', notesLevel };
 }
+
+/**
+ * The level report: one sentence when the plan declared a level BELOW
+ * the highest of its stored notes, and null otherwise.
+ *
+ * It is a report and never a refusal. The declaration wins, as the
+ * module note says, because the notes are per-task guesses; the report
+ * only puts the disagreement where a reviewer reads it, the pull request
+ * body. A declaration at or above the notes, a level read off the notes
+ * themselves, and a plan with no notes all answer null: there is nothing
+ * the declaration overruled.
+ */
+export function releaseLevelReport(reading: ReleaseLevelReading): string | null {
+  const { level, source, notesLevel } = reading;
+  if (source !== 'plan' || notesLevel === null) return null;
+  if (RELEASE_LEVEL_RANK[level] >= RELEASE_LEVEL_RANK[notesLevel]) return null;
+  return `the plan declares release: ${level}, below the ${notesLevel} its change notes reach;`
+    + ` the declaration stands, so this pull request ships as ${level}`;
+}

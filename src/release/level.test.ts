@@ -41,7 +41,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { PLAN_RELEASE_LEVELS } from '../plan/parse.js';
 
-import { RELEASE_LEVEL_RANK, highestChangeLevel, resolveReleaseLevel } from './level.js';
+import { RELEASE_LEVEL_RANK, highestChangeLevel, releaseLevelReport, resolveReleaseLevel } from './level.js';
 
 /** A note list from bare levels, the only field the ranking reads. */
 function notes(...levels: ReleaseLevelNote['level'][]): ReleaseLevelNote[] {
@@ -161,5 +161,35 @@ describe('resolveReleaseLevel', () => {
       source: 'default',
       notesLevel: null,
     });
+  });
+});
+
+describe('releaseLevelReport', () => {
+  it('reports a declaration below the highest note', () => {
+    expect(releaseLevelReport(resolveReleaseLevel('patch', notes('minor', 'none')))).toBe(
+      'the plan declares release: patch, below the minor its change notes reach;'
+        + ' the declaration stands, so this pull request ships as patch',
+    );
+  });
+
+  it('reports a none declaration below a patch note', () => {
+    expect(releaseLevelReport(resolveReleaseLevel('none', notes('patch')))).toContain('release: none, below the patch');
+  });
+
+  it('stays silent for a declaration equal to the highest note, the control beside the first case', () => {
+    expect(releaseLevelReport(resolveReleaseLevel('minor', notes('minor', 'patch')))).toBeNull();
+  });
+
+  it('stays silent for a declaration above the highest note', () => {
+    expect(releaseLevelReport(resolveReleaseLevel('major', notes('minor')))).toBeNull();
+  });
+
+  it('stays silent when the level came from the notes or the default', () => {
+    expect(releaseLevelReport(resolveReleaseLevel(null, notes('major')))).toBeNull();
+    expect(releaseLevelReport(resolveReleaseLevel(null, []))).toBeNull();
+  });
+
+  it('stays silent when the plan declares a level and stored no note', () => {
+    expect(releaseLevelReport(resolveReleaseLevel('patch', []))).toBeNull();
   });
 });
