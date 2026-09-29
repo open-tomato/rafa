@@ -54,6 +54,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['modules', 'modules'],
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
+  ['loopWorktreeDir', 'loop.worktreeDir'],
   ['prProvider', 'pr.provider'],
   ['prMergeMethod', 'pr.mergeMethod'],
   ['prBase', 'pr.base'],
@@ -68,6 +69,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
   ['dangerousAcceptStaleRefs', 'dangerous.acceptStaleRefs'],
+  ['dangerousSelfUpdateDuringLoop', 'dangerous.selfUpdateDuringLoop'],
   ['statusNotice', 'status.notice'],
   ['tiersRafa', 'tiers.rafa'],
   ['tiersSkills', 'tiers.skills'],
@@ -214,8 +216,9 @@ describe('knownKeysAbove', () => {
     ]);
     expect(knownKeysAbove('dangerous.acceptStaleRef')).toEqual([
       'dangerous',
-      ['acceptStaleRefs'],
+      ['acceptStaleRefs', 'selfUpdateDuringLoop'],
     ]);
+    expect(knownKeysAbove('loop.worktreeDirs')).toEqual(['loop', ['settingSources', 'worktreeDir']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
     expect(knownKeysAbove('learning.promote.afters')).toEqual([
       'learning.promote',

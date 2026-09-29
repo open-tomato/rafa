@@ -53,6 +53,9 @@
  *   - `loop.settingSources` is the key finding 3 of the spec names. It
  *     resolves to a list in the order written, because the list is what
  *     a caller asks (does it include `user`?) and rebuilds the flag from.
+ *   - `loop.worktreeDir` defaults to `.rafa/worktrees` and is never null:
+ *     a relative value is read from the project root, not the checkout
+ *     (`start/worktree-dir.ts`). It is no {@link CommandLineSetting}.
  *
  * ## The closed set
  *
@@ -208,6 +211,11 @@ export interface RafaConfig {
   /** What each spawned session loads settings from. `loop.settingSources`. */
   settingSources: readonly ClaudeSettingSource[];
   /**
+   * The directory a loop adds its worktrees under, read from the
+   * project root. `loop.worktreeDir`.
+   */
+  loopWorktreeDir: string;
+  /**
    * The provider every `pr` action goes through, or null to read it off
    * the `origin` remote. `pr.provider`.
    */
@@ -269,6 +277,12 @@ export interface RafaConfig {
    * on one. `dangerous.acceptStaleRefs`.
    */
   dangerousAcceptStaleRefs: boolean;
+  /**
+   * Whether `rafa self-update` replaces the install while a loop of the
+   * project is live, where it otherwise waits for that loop to finish.
+   * `dangerous.selfUpdateDuringLoop`.
+   */
+  dangerousSelfUpdateDuringLoop: boolean;
   /**
    * Whether a command that runs inside a project prints the one-line
    * since-last-command notice on stderr. `status.notice`.
@@ -334,6 +348,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   modules: Object.freeze([]),
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
+  loopWorktreeDir: join('.rafa', 'worktrees'),
   prProvider: null,
   prMergeMethod: 'squash',
   prBase: null,
@@ -348,6 +363,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
+  dangerousSelfUpdateDuringLoop: false,
   statusNotice: true,
   tiersRafa: 'on',
   tiersSkills: new Map<string, TierPin>(),
@@ -431,6 +447,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: subsetOf(CLAUDE_SETTING_SOURCES),
     cli: true,
   },
+  loopWorktreeDir: { key: 'loop.worktreeDir', read: directory, cli: false },
   prProvider: { key: 'pr.provider', read: oneOf(PR_PROVIDERS), cli: false },
   prMergeMethod: { key: 'pr.mergeMethod', read: mergeMethod, cli: false },
   prBase: { key: 'pr.base', read: text('a branch name'), cli: false },
@@ -466,6 +483,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   },
   dangerousAcceptStaleRefs: {
     key: 'dangerous.acceptStaleRefs',
+    read: flag,
+    cli: false,
+  },
+  dangerousSelfUpdateDuringLoop: {
+    key: 'dangerous.selfUpdateDuringLoop',
     read: flag,
     cli: false,
   },

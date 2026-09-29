@@ -9,6 +9,18 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.30.0 — 2026-09-29, Run a loop in its own worktree
+
+- Loop: new `rafa loop start --as-worktree` creates `feat/<stub>` from the latest `origin/<base>` and adds it as a worktree under `loop.worktreeDir`, never switching the main checkout; git commands, task sessions, commits and pushes run in the worktree while config, plans, runs, the effort store and served skills stay in the main checkout's `.rafa/`; it is refused beside `--create-branch`, on a branch checked out in another worktree (naming its path) and while `tracking.specs`, `tracking.plans` or `tracking.all` is on (naming the setting); a worktree loop records its path on its session record and `rafa loop list` shows it as a column.
+- Loop guard: every loop now checks its checkout's branch and HEAD before each task, before each task commit and around the wrap-up, against the branch it holds and the commit it last made; a switched, moved or removed checkout halts the run with `checkout moved`, commits nothing, keeps the work, marks the task blocked and prints the expected branch, the found branch and the command that restores it; `rafa loop start` refuses a detached HEAD or a branch with no commit, since the guard cannot hold them.
+- Project scope: rafa commands run from a linked git worktree, beside the repository or under `.rafa/worktrees`, now find the main checkout's `.rafa/` instead of asking for `rafa init`.
+- Plan: `rafa plan create` runs its planning session in the project root, so a plan made from a nested worktree no longer lands in a second `.rafa/` (#171).
+- Self-update: `rafa self-update` exits 1 while a loop of the project is live, naming each loop's branch and pid, unless `dangerous.selfUpdateDuringLoop` is set; `--force` keeps its old meaning.
+- PR: while a loop runs, `rafa pr merge` suggests `rafa self-update` only after the loop on that branch finishes.
+- Config: new `loop.worktreeDir` (default `.rafa/worktrees`, resolved against the project root) and `dangerous.selfUpdateDuringLoop` (default `false`), each with its commented line in the config `rafa init` writes.
+- Tests: new integration tests cover project resolution and planning from worktrees, each `--as-worktree` refusal, a worktree loop leaving the main checkout untouched, the guard halting on an outside commit, on the 2026-09-29 incident replayed and on a removed worktree while ignoring branch switches in the main checkout, `rafa self-update` beside a live loop, and two worktree loops writing one shared effort store.
+- Docs: `context/workflow.md`, `context/cli.md` and the README's loop section cover `--as-worktree`, the project root versus checkout split, the loop guard, the `loop list` worktree column, `self-update` waiting for live loops, and the config examples.
+
 ## 0.29.0 — 2026-09-29, Choose how a project's effort store travels between devices
 
 - Config: new `effort.sync` (default `local`; one of `local`, `file`, `git`, `service` or `p2p`) names how a project's effort store travels between devices, and a value set in `~/.rafa/config.yaml` applies to every project that leaves it out; `rafa init` writes it commented out, and `effort.sync` and `prerequisites.required` are declared the settings every device of a team must share.

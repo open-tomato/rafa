@@ -1341,6 +1341,7 @@ async function promptFor(knownMissing: readonly string[] | undefined): Promise<s
       planContent: PLAN,
       inject: 'full',
       repoRoot: tempRoot,
+      checkout: tempRoot,
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
       serving: null,

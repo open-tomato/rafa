@@ -35,6 +35,7 @@ import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { SessionRecord } from '../../loop/sessions.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   ChecksReading,
@@ -781,6 +782,80 @@ describe('the follow-ups', () => {
     expect(run.exitCode).toBe(0);
     expect(lines).not.toContain('Follow-ups:');
     expect(seams.git.ran().filter((line) => line.startsWith('tag '))).toEqual([]);
+  });
+});
+
+/** The pid a case's probe reads as a live loop's; every other pid reads as gone. */
+const LIVE_PID = 4242;
+
+/** The pid of a loop that has ended. */
+const GONE_PID = 4444;
+
+/** Writes a session record under the project's `.rafa/runs/`, as `loop start` would. */
+function plantLoop(project: PlantedProject, sessionId: string, branch: string, pid: number): void {
+  const record: SessionRecord = {
+    sessionId,
+    planStub: `stub-${sessionId}`,
+    plan: `.rafa/plans/PLAN-${sessionId}.md`,
+    branch,
+    pid,
+    startedAt: '2026-09-29T10:00:00.000Z',
+    state: 'running',
+    task: null,
+  };
+  mkdirSync(join(project.root, '.rafa', 'runs'), { recursive: true });
+  writeFileSync(join(project.root, '.rafa', 'runs', `${sessionId}.json`), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+}
+
+/** A rafa checkout on a version nothing has installed, its seams reading only {@link LIVE_PID} as alive. */
+function updateCase(): { readonly project: PlantedProject; readonly seams: MergeSeams } {
+  const project = freshProject();
+  plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
+  const seams = caseSeams(stubPulls().pulls, project, {
+    git: { [`tag --list v${VERSION}`]: ok(`v${VERSION}\n`) },
+  }).seams;
+  return { project, seams: { ...seams, isAlive: (pid) => pid === LIVE_PID } };
+}
+
+describe('the self-update follow-up beside a live loop', () => {
+  it('reads "after the loop on <branch> finishes" while a loop of the project runs', async () => {
+    const { project, seams } = updateCase();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const { run, lines } = await ran(seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(`${'   '}rafa self-update — ${VERSION} is not installed as this machine's rafa runtime;`
+      + ' run it after the loop on feature/a finishes');
+  });
+
+  it('names the update bare once that loop\'s pid is gone, the control the wait is read against', async () => {
+    const { project, seams } = updateCase();
+    plantLoop(project, 'ended', 'feature/a', GONE_PID);
+    const { run, lines } = await ran(seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(`${'   '}rafa self-update — ${VERSION} is not installed as this machine's rafa runtime`);
+  });
+
+  it('carries the wait into the result event\'s follow-up', async () => {
+    const { project, seams } = updateCase();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const { run, events } = await ran(seams, project, ['41', '--yes', '--output=json']);
+    const data = events.at(-1)?.data as { followUps: { id: string; why: string }[] };
+
+    expect(run.exitCode).toBe(0);
+    expect(data.followUps.map((followUp) => followUp.id)).toEqual(['self-update']);
+    expect(data.followUps[0]?.why).toEndWith('run it after the loop on feature/a finishes');
+  });
+
+  it('says a loop record cannot be read, and still exits 0, where one under .rafa/runs holds no JSON', async () => {
+    const { project, seams } = updateCase();
+    mkdirSync(join(project.root, '.rafa', 'runs'), { recursive: true });
+    writeFileSync(join(project.root, '.rafa', 'runs', 'torn.json'), '{ not json', 'utf8');
+    const { run, lines } = await ran(seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toEndWith('a loop record under .rafa/runs cannot be read, and rafa self-update refuses until it can');
   });
 });
 

@@ -188,6 +188,7 @@ async function runCase(dir: string, sessionId: string, output: string) {
     planContent: PLAN,
     inject: 'full',
     repoRoot: dir,
+    checkout: dir,
     home: join(dir, 'home'),
     settingSources: ['project', 'local'],
     serving: null,

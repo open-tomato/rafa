@@ -403,6 +403,7 @@ describe('a blocker comment on its way downstream', () => {
       planContent: TRACKER,
       inject: 'full',
       repoRoot: join(tempRoot, 'no-definitions', 'repo'),
+      checkout: join(tempRoot, 'no-definitions', 'repo'),
       home: join(tempRoot, 'no-definitions', 'home'),
       settingSources: ['project', 'local'],
       serving: null,

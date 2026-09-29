@@ -368,6 +368,7 @@ describe('a blocker over the local adapter', () => {
       planContent: TRACKER_TEXT,
       inject: 'full',
       repoRoot: f.root,
+      checkout: f.root,
       home: join(f.root, 'home'),
       settingSources: ['project', 'local'],
       serving: null,

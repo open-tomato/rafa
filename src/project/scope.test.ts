@@ -21,7 +21,9 @@
  * planted at the link's own parent; a directory at the config path
  * found beside a bare `.rafa/` walked past; the user file named in the
  * hint beside a walk that never passed the home; each refusal beside
- * the same seams resolving. Paths are planted at the LITERAL
+ * the same seams resolving. Every in-memory case answers "no
+ * repository" for the main checkout, whose fallback
+ * `scope-fallback.test.ts` reads. Paths are planted at the LITERAL
  * `.rafa/config.yaml`, never through the module's constants.
  *
  * Eighteen module mutations were driven against this file one at a
@@ -134,6 +136,15 @@ function memoryFs({ dirs = [], files = [], links = {} }: MemoryTree): MemoryFile
       return target;
     },
   };
+}
+
+/**
+ * A `mainCheckout` seam answering that no repository holds the start,
+ * for in-memory cases, whose directories are not on disk for git to run
+ * in. The fallback to a main checkout is read in `scope-fallback.test.ts`.
+ */
+function noRepository(): null {
+  return null;
 }
 
 describe('scopeAt and SCOPE_DIR', () => {
@@ -311,7 +322,7 @@ describe('resolveScope without a project', () => {
   it('answers the init hint after probing every directory up to the filesystem root', () => {
     const fs = memoryFs(tree);
 
-    const resolution = resolveScope('/srv/app/src', { home: '/home/op', fs });
+    const resolution = resolveScope('/srv/app/src', { home: '/home/op', fs, mainCheckout: noRepository });
 
     expect(resolution).toEqual({
       found: false,
@@ -331,17 +342,18 @@ describe('resolveScope without a project', () => {
   it('finds a config at the filesystem root, the last directory the walk probes', () => {
     const fs = memoryFs({ ...tree, files: ['/.rafa/config.yaml'] });
 
-    expect(rootOf(resolveScope('/srv/app/src', { home: '/home/op', fs }))).toBe('/');
+    expect(rootOf(resolveScope('/srv/app/src', { home: '/home/op', fs, mainCheckout: noRepository }))).toBe('/');
   });
 
   it('names the start directory, the config file and rafa init in the hint', () => {
-    const hint = hintOf(resolveScope('/srv/app/src', { home: '/home/op', fs: memoryFs(tree) }));
+    const hint = hintOf(resolveScope('/srv/app/src', { home: '/home/op', fs: memoryFs(tree), mainCheckout: noRepository }));
 
     expect(INIT_COMMAND).toBe('rafa init');
     expect(hint).toContain('/srv/app/src');
     expect(hint).toContain('.rafa/config.yaml');
     expect(hint).toContain('`rafa init`');
     expect(hint).not.toContain('user scope');
+    expect(hint).not.toContain('main checkout');
   });
 
   it('names the user config as marking no project when the walk passed over the home', () => {
@@ -350,9 +362,9 @@ describe('resolveScope without a project', () => {
       files: ['/home/op/.rafa/config.yaml'],
     });
 
-    const fromWork = resolveScope('/home/op/work', { home: '/home/op', fs });
-    const fromHome = resolveScope('/home/op', { home: '/home/op', fs });
-    const homeElsewhere = resolveScope('/home/op/work', { home: '/home/other', fs });
+    const fromWork = resolveScope('/home/op/work', { home: '/home/op', fs, mainCheckout: noRepository });
+    const fromHome = resolveScope('/home/op', { home: '/home/op', fs, mainCheckout: noRepository });
+    const homeElsewhere = resolveScope('/home/op/work', { home: '/home/other', fs, mainCheckout: noRepository });
 
     expect(hintOf(fromWork)).toBe(initHint('/home/op/work', '/home/op/.rafa/config.yaml'));
     expect(hintOf(fromWork)).toContain('/home/op/.rafa/config.yaml is the user scope');
@@ -366,7 +378,7 @@ describe('resolveScope without a project', () => {
       files: ['/home/op/.rafa/config.yaml'],
     });
 
-    const hint = hintOf(resolveScope('/srv/app', { home: '/home/op', fs }));
+    const hint = hintOf(resolveScope('/srv/app', { home: '/home/op', fs, mainCheckout: noRepository }));
 
     expect(hint).toBe(initHint('/srv/app'));
     expect(hint).not.toContain('user scope');
@@ -379,7 +391,7 @@ describe('resolveScope without a project', () => {
       links: { '/Users/op': '/home/op' },
     });
 
-    const hint = hintOf(resolveScope('/home/op/work', { home: '/Users/op', fs }));
+    const hint = hintOf(resolveScope('/home/op/work', { home: '/Users/op', fs, mainCheckout: noRepository }));
 
     expect(hint).toBe(initHint('/home/op/work', '/Users/op/.rafa/config.yaml'));
   });
@@ -387,7 +399,7 @@ describe('resolveScope without a project', () => {
   it('reads a home that does not resolve as holding nothing', () => {
     const fs = memoryFs({ dirs: ['/', '/srv', '/srv/app'], files: ['/srv/app/.rafa/config.yaml'] });
 
-    const resolution = resolveScope('/srv/app', { home: '/nowhere', fs });
+    const resolution = resolveScope('/srv/app', { home: '/nowhere', fs, mainCheckout: noRepository });
 
     expect(rootOf(resolution)).toBe('/srv/app');
     expect(resolution.user.configFile).toBe('/nowhere/.rafa/config.yaml');
@@ -400,25 +412,25 @@ describe('resolveScope refusals', () => {
   it('refuses a relative start directory before probing, and resolves the absolute one', () => {
     const fs = memoryFs(tree);
 
-    expect(() => resolveScope('work', { home: '/home/op', fs })).toThrow(
+    expect(() => resolveScope('work', { home: '/home/op', fs, mainCheckout: noRepository })).toThrow(
       'rafa scope: start directory is "work", expected an absolute path',
     );
     expect(fs.probes).toEqual([]);
-    expect(hintOf(resolveScope('/work', { home: '/home/op', fs }))).toBe(initHint('/work'));
+    expect(hintOf(resolveScope('/work', { home: '/home/op', fs, mainCheckout: noRepository }))).toBe(initHint('/work'));
   });
 
   it('refuses a relative home before probing, and resolves with the absolute one', () => {
     const fs = memoryFs(tree);
 
-    expect(() => resolveScope('/work', { home: 'home/op', fs })).toThrow(
+    expect(() => resolveScope('/work', { home: 'home/op', fs, mainCheckout: noRepository })).toThrow(
       'rafa scope: home directory is "home/op", expected an absolute path',
     );
     expect(fs.probes).toEqual([]);
-    expect(hintOf(resolveScope('/work', { home: '/home/op', fs }))).toBe(initHint('/work'));
+    expect(hintOf(resolveScope('/work', { home: '/home/op', fs, mainCheckout: noRepository }))).toBe(initHint('/work'));
   });
 
   it('fails loudly when the home is left out', () => {
-    const seams = { fs: memoryFs(tree) } as unknown as { home: string };
+    const seams = { fs: memoryFs(tree), mainCheckout: noRepository } as unknown as { home: string };
 
     expect(() => resolveScope('/work', seams)).toThrow(TypeError);
   });

@@ -40,9 +40,25 @@
  * `start` with the run's other words and waited for, and its exit code is
  * this run's.
  *
+ * Two directories, never confused (`start/checkout.ts`). The PROJECT
+ * ROOT is the dispatcher's root, the one holding `.rafa/`: the config,
+ * the plan and its tracker, `PROMPT.md`, the session record, the
+ * preflight, the store, the learning adapter and triage are all read
+ * and written there. The CHECKOUT is the working tree the run was
+ * started in, when it is one of the project's own: every git command
+ * runs there — the branch read, offered and guarded, each task's
+ * commit, the release's files, commit and push, and the CI gate — and
+ * every session, task, wrap-up and CI repair alike, is spawned there,
+ * with `progress.txt` written there for it to read. From a linked
+ * worktree that is the worktree, and under `--as-worktree` it is the
+ * worktree the run adds for the plan's branch; the run says so once
+ * either way. Everywhere else it is the project root. Both are settled
+ * in `start/run-checkout.ts`.
+ *
  * Ahead of the branch guard, a run started on `main` or `master` is
- * offered the plan's own branch ({@link resolveRunBranch},
- * `start/branch.ts`): with a terminal it is asked whether to create
+ * offered the plan's own branch (`resolveRunBranch` in
+ * `start/run-setup.ts`, the offer itself in `start/branch.ts`): with a
+ * terminal it is asked whether to create
  * `feat/<plan-stub>` from the latest `origin/<base>` and run there, or
  * whether to switch to that branch when it already exists, and
  * `--create-branch` answers yes without asking. A run that moved carries
@@ -53,6 +69,13 @@
  * always did. Every refusal along the way — a modified tracked file, a
  * fetch that failed, a base that has diverged — is thrown from there as
  * exit code 1, and leaves the run on its base.
+ *
+ * `--as-worktree` takes the place of that offer: no question is asked,
+ * and `feat/<plan-stub>` is cut from the latest `origin/<base>`, or taken
+ * as it stands when it exists, and added as a linked worktree at
+ * `loop.worktreeDir/<stub>` (`start/worktree.ts`), which becomes the
+ * run's checkout. The main checkout is never switched, and every session
+ * is still served from its `.rafa/` (`start/serving.ts`).
  *
  * Once the branch guard lets the run through, the run prints the plan's
  * risk total, the one line `rafa plan risk` ends its report with
@@ -80,6 +103,21 @@
  * and marks nothing. While it holds, the record names no task.
  * `rafa loop resume` writes `running`, and the run goes on; a SIGINT ends
  * the hold, and the run.
+ *
+ * Every run, worktree or not, holds its checkout to its branch at the
+ * HEAD it started from, moved on by each commit a task's attempt makes
+ * (`start/checkout-watch.ts`). Before each task is dispatched, and
+ * before `progress.txt` is written into the checkout, the loop guard
+ * reads the checkout (`start/checkout-guard.ts`), and again before each
+ * task commit. A checkout on another branch, at another commit, or gone
+ * marks the task `[BLOCKED]` with `checkout moved` as its blocker text
+ * and stops the run: no further session is spawned, nothing is
+ * committed, the checkout is not switched back, and the output names the
+ * branch expected, what was found and the one command that restores it.
+ * A halt before the commit stores the session's report as `blocked`. The guard
+ * also runs before the wrap-up session, marking nothing since the
+ * wrap-up has no tracker line, and before the loop's release commit,
+ * where it holds only the branch: the wrap-up session commits itself.
  *
  * Before the tracker is created and before any session is spawned, the
  * wrap-up's included, the run's preflight checks the configured
@@ -137,9 +175,14 @@
  * --create-branch on `main` or `master`, create `feat/<plan-stub>` from the
  *               latest `origin/<base>` and run there without asking, or
  *               switch to that branch when it is already there
- *               (`start/branch.ts`). Read nowhere else.
+ *               (`start/branch.ts`). Read by `start/run-setup.ts` alone.
+ * --as-worktree run in a linked worktree of `feat/<plan-stub>` at
+ *               `loop.worktreeDir/<stub>`, created from the latest
+ *               `origin/<base>` when the branch is not there yet, and leave
+ *               the main checkout as it is (`start/run-checkout.ts`).
  * --any-branch  run where the loop stands, whatever branch that is: no
- *               offer is made and the guard below checks nothing.
+ *               offer is made and the guard (`start/run-setup.ts`)
+ *               checks nothing.
  * --roadmap     stamp the hop record, when a hop is away, on the run's
  *               session record as its `hop` (`start/session.ts`). What
  *               `rafa next --roadmap` passes to the loop it starts.
@@ -168,7 +211,7 @@
  * nothing, and the wrap-up runs without a release rather than not at
  * all.
  *
- * Every line this module, `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
+ * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
  * through the active output
@@ -180,11 +223,17 @@
  * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
  * never by `process.exit`, so the dispatcher writes the terminal event.
  * A line asking for `-d|--detached`, refused before anything else is
- * read (`start/run-config.ts`), a `RAFA_EFFORT_DIR` set in the
- * environment, refused right after it (the same module), a `--runtime`
+ * read (`start/run-config.ts`), `--as-worktree` beside
+ * `--create-branch`, refused right after it (`start/run-setup.ts`), a
+ * `RAFA_EFFORT_DIR` set in the environment, refused next
+ * (`start/run-config.ts`), a `--runtime`
  * refused (`start/runtime.ts`),
- * an unusable config, a plan file that does not exist, a branch offer
- * that could not be taken (`start/branch.ts`), a default branch the run
+ * an unusable config, `--as-worktree` while a `tracking` setting is
+ * on (`start/run-setup.ts`), a plan file that does not exist, a checkout git
+ * could not read (`start/checkout.ts`), a branch offer
+ * that could not be taken (`start/branch.ts`), a checkout the loop guard
+ * cannot hold (`start/checkout-watch.ts`), a worktree git would not
+ * add (`start/worktree.ts`), a default branch the run
  * stayed on,
  * a session record refusing the run or session records that cannot be
  * read or written, and a preflight that halts (a failed required
@@ -193,8 +242,8 @@
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
- * A failed task, a blocked one and a report left unstored still stop the
- * run by returning, which the dispatcher ends as a success, with exit
+ * A failed task, a blocked one, a checkout that moved and a report left
+ * unstored still stop the run by returning, which the dispatcher ends as a success, with exit
  * code 0. A triage failure stops nothing.
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
@@ -205,7 +254,6 @@
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
-import type { BranchSeams } from './start/branch.js';
 import type { TaskLearning } from './start/dispatch.js';
 import type { TaskHandout } from './start/handout.js';
 import type { SessionServing } from './start/serving.js';
@@ -221,9 +269,15 @@ import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
-import { branchNameFor, REMOTE } from './start/branch-decision.js';
-import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './start/branch.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
+import {
+  advanceExpectation,
+  expectWrapUpCommits,
+  haltIfCheckoutMoved,
+  haltIfWrapUpMoved,
+  openCheckoutExpectation,
+} from './start/checkout-watch.js';
+import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit } from './start/commit.js';
 import {
   dispatchTask,
@@ -232,29 +286,30 @@ import {
 } from './start/dispatch.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
-import {
-  DEFAULT_CI_ATTEMPTS,
-  DEFAULT_CI_TIMEOUT_MIN,
-  verifyPullRequest,
-} from './start/pr-lifecycle.js';
+import { prLifecycleSeamsIn, verifyPullRequest } from './start/pr-lifecycle.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import { announceRiskTotal } from './start/risk-total.js';
+import { settleRunCheckout } from './start/run-checkout.js';
 import {
   announcePlanIssues,
-  argValue,
   injectSourceLabel,
   loadRunConfig,
   refuseDetachedRun,
   refuseEffortDirRun,
 } from './start/run-config.js';
+import {
+  guardRunBranch,
+  readRunArgs,
+  refuseWorktreeBesideCreateBranch,
+  refuseWorktreeWhileTracking,
+} from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createStartTriage } from './start/triage.js';
 import { preserveProgress } from './start/wrap-up.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
-import { getCurrentBranch } from './utils/git.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
@@ -263,169 +318,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let interrupted = false;
 
-/** Branches a plan run is refused on, and the ones the branch offer is made on. */
-const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
-
-/** The flag that runs the loop where it stands, offering nothing and checking nothing. */
-const ANY_BRANCH_FLAG = '--any-branch';
-
-/** The flag that answers the branch question yes before it is asked. */
-const CREATE_BRANCH_FLAG = '--create-branch';
-
-/** The flag `rafa next --roadmap` passes on, stamping the away hop on the session record (`start/session.ts`). */
-const ROADMAP_FLAG = '--roadmap';
-
-/** What the refusal calls a plan whose file names no stub. */
-const UNNAMED_PLAN = 'this-plan';
-
-/** What the run knows about its branch when the offer is made. */
-export interface RunBranchRequest {
-  /** The project root git is run in. */
-  readonly repoRoot: string;
-  /** The plan's stub, or null when the plan path gave none. */
-  readonly planStub: string | null;
-  /** The branch the run was started on. */
-  readonly base: string;
-  /** The words of the run's line, which the two branch flags are read from. */
-  readonly args: readonly string[];
-}
-
-/**
- * The branch the rest of the run reads: the one it was started on, or
- * the plan's own branch once the offer to leave the base has been made
- * and taken.
- *
- * The offer is only made on a branch {@link DEFAULT_BRANCHES} names,
- * which is exactly the set {@link guardRunBranch} refuses. Everywhere
- * else the run is already on a branch of its own and there is nothing to
- * offer, so no git runs and no question is asked — a run on
- * `feat/<stub>` costs this function one array lookup.
- *
- * On the base, `start/branch.ts` has the whole of it: which question is
- * asked, what `--create-branch` stands in for, and which refusal a
- * modified tracked file, a failed fetch or a diverged base throws. Only
- * a `moved` outcome answers a new branch; `stood-aside` and `declined`
- * both answer the base, and the guard then refuses or lets it through
- * exactly as it did before this offer existed.
- *
- * The answer is the branch handed to BOTH {@link guardRunBranch} and
- * `openRunSession`, so a run that moved is guarded on, and records, the
- * branch it is actually on.
- */
-export async function resolveRunBranch(
-  request: RunBranchRequest,
-  seams: BranchSeams = DEFAULT_BRANCH_SEAMS,
-): Promise<string> {
-  const { args, base } = request;
-  if (!DEFAULT_BRANCHES.includes(base)) return base;
-
-  const outcome = await offerRunBranch({
-    repoRoot: request.repoRoot,
-    planStub: request.planStub,
-    base,
-    anyBranch: args.includes(ANY_BRANCH_FLAG),
-    createBranch: args.includes(CREATE_BRANCH_FLAG),
-  }, seams);
-
-  return outcome.kind === 'moved'
-    ? outcome.branch
-    : base;
-}
-
-/**
- * The middle of the refusal: how to get onto the plan's branch. Named
- * after the plan's stub when there is one, and the `git` line when there
- * is not; see {@link guardRunBranch}.
- */
-function branchOffer(planStub: string | null, base: string): readonly string[] {
-  if (planStub === null) {
-    return [
-      `\n   git checkout -b ${branchNameFor(UNNAMED_PLAN)}`,
-      `   ${CREATE_BRANCH_FLAG} names the branch after the plan's stub, as`,
-      '   `PLAN-<stub>.md` spells it, and this plan file spells none.',
-    ];
-  }
-  return [
-    `\n   Pass ${CREATE_BRANCH_FLAG} to create ${branchNameFor(planStub)} from the latest`,
-    `   ${REMOTE}/${base} and run there.`,
-    '   On a terminal the run asks that as a question instead of refusing.',
-  ];
-}
-
-/**
- * Refuses to run a plan on the default branch, and warns on a branch
- * that names no plan.
- *
- * Measured: one run executed on `main`. It produced 21 commits and 74
- * sessions and cost three things — no PR, so the wrap-up's CI stage
- * found nothing to verify and skipped itself; no review; and, before
- * prompts carried a plan stamp, no per-plan attribution, its sessions
- * landing in the `main` group beside every other main-branch session
- * ever recorded.
- *
- * A refusal rather than a warning, because the only signal the mistake
- * produced at the time was silence, and a warning in a loop nobody
- * watches is the same silence one line longer. `--any-branch` is the
- * whole of the escape hatch, so an operator who means it says so once.
- *
- * What the refusal offers depends on whether the plan's file named a
- * stub, because that is what `--create-branch` builds the branch name
- * out of ({@link resolveRunBranch}). With a stub the refusal names the
- * flag and the branch it would create, since passing it is all the
- * operator has to do. With none — a plain `PLAN.md` — the flag would
- * stand aside on the next run too, so the refusal says so and prints the
- * `git` line instead of naming a flag that could not help. A refusal
- * naming a flag that does nothing is the failure this branch exists to
- * avoid.
- *
- * The branch-names-the-plan check is only a WARNING, and deliberately.
- * A branch stub is not a plan stub — measured across eleven
- * plan-driven branches, five named their plan differently
- * (`feat/q17-dynamic-forms` against `q17-dynamic-form-provider-v1`) —
- * so a refusal keyed on it would reject the project's own convention.
- * Attribution no longer depends on it either, the stamp having taken
- * that job over.
- *
- * The refusal is thrown as a `CommandExit` with exit code 1 whose
- * message is the whole refusal, the lines the guard printed before it
- * threw, joined. Both warnings go through the active output.
- */
-export function guardRunBranch(
-  planStub: string | null,
-  branch: string,
-  args: readonly string[],
-): void {
-  if (args.includes(ANY_BRANCH_FLAG)) {
-    activeOutput().warn(`\n⚠️  ${ANY_BRANCH_FLAG}: running on \`${branch}\` without the branch check.`);
-    return;
-  }
-
-  if (DEFAULT_BRANCHES.includes(branch)) {
-    throw new CommandExit(1, [
-      `\n❌ Refusing to run a plan on \`${branch}\`.`,
-      '   A plan run needs its own branch: that is what gives it a PR to',
-      '   review, and what lets the wrap-up\'s CI stage have something to',
-      '   wait on. Run on main and both are silently skipped.',
-      ...branchOffer(planStub, branch),
-      `\n   Pass ${ANY_BRANCH_FLAG} to run here anyway.`,
-    ].join('\n'));
-  }
-
-  if (planStub !== null && !branch.includes('/')) {
-    activeOutput().warn(`\n⚠️  Branch \`${branch}\` carries no \`<type>/\` prefix.`);
-    activeOutput().warn('   The run proceeds; the convention is `feat/<plan-stub>`.');
-  }
-}
-
 /**
  * Runs the loop over the words of its line, on the project at `repoRoot`:
  * the root the dispatcher resolved from the nearest `.rafa/config.yaml`
- * at or above the working directory, handed over by
- * `src/commands/wrap.ts`.
+ * at or above the working directory, or the main checkout's from a
+ * linked worktree with none, handed over by `src/commands/wrap.ts`. The
+ * checkout git and the sessions run in is resolved here, once the plan
+ * is known to exist; see the module note.
  */
 export default async function start(args: string[], repoRoot: string): Promise<void> {
   // Before anything is read: `-d|--detached` is declared, and refused until phase 6.
   refuseDetachedRun(args);
+  // Then two flags that each make the plan's branch, one of them in a worktree.
+  refuseWorktreeBesideCreateBranch(args);
   // Then a store override: a loop records to the project's own store, never to a copy.
   refuseEffortDirRun(process.env);
   // Then `--runtime`: an installed rafa other than this one runs the whole run instead.
@@ -441,17 +346,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     const problems = error.problems.map((problem) => `   ${problem}`);
     throw new CommandExit(1, ['❌ Refusing to start on this configuration:', ...problems].join('\n'));
   }
+  // A worktree beside tracked `.rafa/` content would carry a second copy of it.
+  refuseWorktreeWhileTracking(args, runConfig.config);
   const { inject: injectMode, settingSources } = runConfig.config;
 
-  const startAt = argValue(args, '--start-at');
+  // Every flag `start()` reads itself, read once (`start/run-setup.ts`).
+  const { startAt, plan, ciWait, ciTimeoutMin, ciAttempts, roadmap } = readRunArgs(args);
   if (startAt) await deferUntil(startAt);
 
-  const ciWait = !args.includes('--no-ci-wait');
-  const ciTimeoutMin = Number(argValue(args, '--ci-timeout') ?? DEFAULT_CI_TIMEOUT_MIN);
-  const ciAttempts = Number(argValue(args, '--ci-attempts') ?? DEFAULT_CI_ATTEMPTS);
-
   // Default plan: PLAN.md in plan.dir, else at the root (`start/plan-path.ts`).
-  const planPath = resolvePlanPath(repoRoot, runConfig.config.planDir, argValue(args, '--plan'));
+  const planPath = resolvePlanPath(repoRoot, runConfig.config.planDir, plan);
 
   const rootPromptPath = path.join(repoRoot, 'PROMPT.md');
   const promptPath = fs.existsSync(rootPromptPath)
@@ -465,18 +369,23 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   }
 
   const planStub = planStubFromPath(planPath);
-  // Ahead of the guard: on `main` or `master` the run offers to create or
-  // switch to `feat/<stub>` and take it (`start/branch.ts`). What it
-  // answers is the branch the guard reads and the branch the session
-  // record below names, so a run that moved is never guarded on, and never
-  // records, the base it started from.
-  const branch = await resolveRunBranch({
-    repoRoot,
+  // Where git runs and every session is spawned, and the branch there
+  // (`start/run-checkout.ts`): the working tree the run was started in,
+  // on `main` or `master` offered `feat/<stub>` first, or under
+  // `--as-worktree` the worktree added for that branch. The branch is the
+  // one the guard reads and the session record below names, so a run
+  // that moved is never guarded on, and never records, the base it
+  // started from.
+  const { checkout, branch } = await settleRunCheckout({
+    projectRoot: repoRoot,
+    worktreeDir: runConfig.config.loopWorktreeDir,
     planStub,
-    base: getCurrentBranch(),
     args,
   });
   guardRunBranch(planStub, branch, args);
+  // What the loop guard holds the checkout to: its branch at the HEAD it
+  // starts from, moved on by each task commit (`start/checkout-watch.ts`).
+  let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });
 
   // The plan's risk total, on every run and ahead of the notices below, so
   // the count is read before consent is asked (`start/risk-total.ts`).
@@ -497,13 +406,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
   // Refuses a second run of the plan before anything else is printed or
   // checked; every way out of the `try` writes the run's end. Under
-  // `--roadmap` the record carries the away hop, when there is one.
-  const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap: args.includes(ROADMAP_FLAG) });
+  // `--roadmap` the record carries the away hop, when there is one, and
+  // a run in a worktree carries the worktree's path.
+  const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
   try {
     const planContent = fs.readFileSync(planPath, 'utf8');
     const promptContent = fs.readFileSync(promptPath, 'utf8');
 
     const injectSource = injectSourceLabel(runConfig);
+    announceRunDirs({ projectRoot: repoRoot, checkout });
     activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
     announcePlanIssues(planContent);
 
@@ -583,8 +494,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const trackerContent = fs.readFileSync(trackerPath, 'utf8');
       const taskInfo = findNextTask(trackerContent);
 
+      // The loop guard, before anything is written into the checkout: a
+      // moved or missing one marks the task `[BLOCKED]`, or before the
+      // wrap-up marks nothing, and stops the run.
+      const moved = taskInfo
+        ? haltIfCheckoutMoved({ expected, trackerPath, taskInfo })
+        : haltIfWrapUpMoved({ expected, before: 'dispatch' });
+      if (moved) return;
+
       // Before the session it is for, whichever it is: a task or the wrap-up.
-      if (!renderProgressForDispatch(repoRoot, planStub)) return;
+      if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
 
       if (!taskInfo) {
         session.wrapUpStarted();
@@ -598,11 +517,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // at all, and the wrap-up carries on without a release.
         const release = prepareReleaseStage({
           repoRoot,
+          checkout,
           settings: runConfig.config,
           planStub,
           planContent,
         });
-        await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning);
+        await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
+        // The loop guard before the loop's own release commit, against the
+        // HEAD the wrap-up session's commits left on the run's branch: a
+        // moved branch or a gone checkout skips the commit, push and wait.
+        if (haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })) return;
         // Step 3, over that same record, after the session has returned
         // and BEFORE the CI gate: the verification, the restore on a
         // refusal, the `chore: release` commit and its push. A release
@@ -615,11 +539,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // repository resolving to `none` has no pull request to carry it
         // (`start/release-stage.ts`).
         await finishRelease(
-          { repoRoot, preparation: release },
+          { repoRoot: checkout, preparation: release },
           {
             readProvider: () => resolvePrProvider({
               configured: runConfig.config.prProvider ?? null,
-              dir: repoRoot,
+              dir: checkout,
             }),
           },
         );
@@ -633,9 +557,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
             // (`start/pr-lifecycle.ts`). The reading is made here
             // because the run's `pr.provider` lives in this config.
             {
+              ...prLifecycleSeamsIn(checkout),
               readProvider: () => resolvePrProvider({
                 configured: runConfig.config.prProvider ?? null,
-                dir: repoRoot,
+                dir: checkout,
               }),
             },
           );
@@ -651,6 +576,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         planContent,
         inject: injectMode,
         repoRoot,
+        checkout,
         home: homedir(),
         settingSources,
         knownMissing,
@@ -691,12 +617,20 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         return;
       }
 
+      // The loop guard before the task commit: a moved or missing checkout
+      // commits nothing and stores the task blocked on `checkout moved`.
+      if (haltIfCheckoutMoved({ expected, trackerPath, taskInfo, before: 'commit' })) {
+        await storeReport('blocked');
+        return;
+      }
+
       const finished = finishCleanExit({
         trackerPath,
         taskInfo,
-        repoRoot,
+        repoRoot: checkout,
         output: dispatch.output,
       });
+      expected = advanceExpectation(expected, finished.attempt);
       const stored = await storeReport(finished.outcome);
       if (finished.outcome !== 'done') return;
       if (!stored) {

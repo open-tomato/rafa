@@ -18,8 +18,9 @@
  * The follow-up cases are every combination `readFollowUps` decides
  * between for a version it has read: tagged or not, a rafa checkout or
  * not, the runtime installed or not — the same three booleans
- * `merge-followups.test.ts` drives, read here for their printed
- * `command` and `why` rather than for which ids came back.
+ * `merge-followups.test.ts` drives — each with no live loop, with two,
+ * and with loop records that could not be read, read here for their
+ * printed `command` and `why` rather than for which ids came back.
  *
  * ## The control
  *
@@ -130,14 +131,23 @@ const STATES: readonly NextState[] = Object.freeze([
   }),
 ]);
 
-/** Every combination `readFollowUps` decides between, for a version it has read. */
-const FOLLOW_UP_READINGS: readonly FollowUpReading[] = Object.freeze(
-  [true, false].flatMap((tagged) => [true, false].flatMap((rafaCheckout) => [true, false].map((runtimeInstalled) => ({
+/** What the live loops read as: none, two, and records that could not be read. */
+const LIVE_LOOP_READINGS: readonly (readonly string[] | null)[] = [[], ['feature/a', 'feature/b'], null];
+
+/** The readings of one combination of the three booleans, one per {@link LIVE_LOOP_READINGS}. */
+function withEachLoopReading(tagged: boolean, rafaCheckout: boolean, runtimeInstalled: boolean): FollowUpReading[] {
+  return LIVE_LOOP_READINGS.map((liveLoopBranches) => ({
     version: '0.4.0',
     tagged,
     rafaCheckout,
     runtimeInstalled,
-  })))),
+    liveLoopBranches,
+  }));
+}
+
+/** Every combination `readFollowUps` decides between, for a version it has read. */
+const FOLLOW_UP_READINGS: readonly FollowUpReading[] = Object.freeze(
+  [true, false].flatMap((tagged) => [true, false].flatMap((rafaCheckout) => [true, false].flatMap((runtimeInstalled) => withEachLoopReading(tagged, rafaCheckout, runtimeInstalled)))),
 );
 
 /** One line the sweep reads, and where it came from, for a hit that names its source. */
@@ -161,7 +171,10 @@ function hintLines(): readonly CapturedLine[] {
 /** The `command` and `why` of every follow-up {@link FOLLOW_UP_READINGS} names, each labelled by its combination and id. */
 function followUpLines(): readonly CapturedLine[] {
   return FOLLOW_UP_READINGS.flatMap((reading) => {
-    const label = `followup:tagged=${String(reading.tagged)},checkout=${String(reading.rafaCheckout)},installed=${String(reading.runtimeInstalled)}`;
+    const loops = reading.liveLoopBranches === null
+      ? 'unread'
+      : String(reading.liveLoopBranches.length);
+    const label = `followup:tagged=${String(reading.tagged)},checkout=${String(reading.rafaCheckout)},installed=${String(reading.runtimeInstalled)},loops=${loops}`;
     return readFollowUps(reading).flatMap((followUp) => [
       { source: `${label}.${followUp.id}.command`, line: followUp.command },
       { source: `${label}.${followUp.id}.why`, line: followUp.why },

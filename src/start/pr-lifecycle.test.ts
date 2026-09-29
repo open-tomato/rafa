@@ -78,9 +78,12 @@ import type {
   PushOutcome,
 } from '../pr/index.js';
 
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { classifyPromptContent } from '../effort/classify.js';
@@ -96,6 +99,7 @@ import {
   DEFAULT_CI_ATTEMPTS,
   DEFAULT_CI_TIMEOUT_MIN,
   PR_LIFECYCLE_SEAMS,
+  prLifecycleSeamsIn,
   verifyPullRequest,
 } from './pr-lifecycle.js';
 import { setActivePlanStub } from './stamp.js';
@@ -664,6 +668,51 @@ describe('PR_LIFECYCLE_SEAMS', () => {
   });
 });
 
+describe('prLifecycleSeamsIn', () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-lifecycle-seams-')));
+  const git = (args: readonly string[]): void => {
+    const run = spawnSync('git', [...args], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: { ...process.env, HOME: dir, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+    });
+    if (run.status !== 0) throw new Error(`git ${args.join(' ')}: ${run.stderr}`);
+  };
+  git(['init', '-q', '-b', 'feat/seams-in-a-directory']);
+  git(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init']);
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads the branch checked out in the directory it was made for', () => {
+    // This checkout is on another branch, so a reading of the process's
+    // own directory would answer that one.
+    expect(prLifecycleSeamsIn(dir).currentBranch()).toBe('feat/seams-in-a-directory');
+    expect(getCurrentBranch()).not.toBe('feat/seams-in-a-directory');
+  });
+
+  it('spawns each repair session in that directory, under the sources it is handed', async () => {
+    const spawned: { readonly args: readonly string[]; readonly cwd: string | undefined }[] = [];
+    const seams = prLifecycleSeamsIn(dir, (args, _prompt, options) => {
+      spawned.push({ args, cwd: options?.cwd });
+      return Promise.resolve(0);
+    });
+
+    expect(await seams.runClaude('repair the PR', SOURCES)).toBe(0);
+
+    expect(spawned).toEqual([{ args: ['-p', '--dangerously-skip-permissions', '--setting-sources', 'local,user'], cwd: dir }]);
+  });
+
+  it('holds the `gh` provider and leaves the clock to waitForChecks', () => {
+    const seams = prLifecycleSeamsIn(dir);
+
+    expect(seams.pulls.kind).toBe('gh');
+    expect(seams.now).toBeUndefined();
+    expect(seams.sleep).toBeUndefined();
+  });
+});
+
 describe('the gate as start() calls it', () => {
   it('hands it the setting sources the run resolved', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
@@ -676,6 +725,16 @@ describe('the gate as start() calls it', () => {
     expect(start.split(opening).length - 1).toBe(1);
     expect(call).toContain('settingSources,');
     expect(start).toContain('const { inject: injectMode, settingSources } = runConfig.config;');
+  });
+
+  it('hands it the seams of the run\'s checkout, and reads the provider there', () => {
+    const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
+    const opening = 'await verifyPullRequest(';
+    const call = start.slice(start.indexOf(opening), start.indexOf(');', start.indexOf(opening)));
+
+    expect(call).toContain('...prLifecycleSeamsIn(checkout),');
+    expect(call).toContain('dir: checkout,');
+    expect(call).not.toContain('dir: repoRoot');
   });
 });
 

@@ -625,6 +625,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'remainingFrom',
     ]],
     ['../../start/runtime.js', ['RUNTIME_SUBDIR']],
+    ['../self-update.js', ['liveLoopsOf']],
     ['./merge-followups.js', ['readFollowUps', 'readPackageFacts', 'versionTag']],
     ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
@@ -1119,6 +1120,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/self-update.js', [
     ['../cli/command.js', ['CommandExit']],
+    ['../config-load.js', ['loadConfig']],
+    ['../config-schema.js', ['SETTINGS']],
+    ['../config-sections.js', ['messageOf']],
+    ['../loop/sessions.js', ['isPidAlive', 'readSessions']],
     ['../project/bin-path.js', ['readBinPath']],
     ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
     ['./plan/plan-files.js', ['expectNoArgument']],

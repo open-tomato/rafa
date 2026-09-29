@@ -338,6 +338,22 @@ New; it replaces no earlier text. What a row or an action added to
   Without the flag neither file is read and the record carries no `hop`
   key; `parseSessionRecord` (`loop/sessions.ts`) refuses a `hop` key
   holding anything but a hop record, and every later write keeps it.
+- **`loop start --as-worktree` creates a new git worktree for the loop to run
+  in, alongside the main checkout** (`start/run-config.ts`, `start/session.ts`):
+  the worktree is created under `.rafa/worktrees/` by default, or in the
+  directory `loop.worktreeDir` names when configured. The project root and
+  checkout stay separate: the root owns `.rafa/`, the config and the store,
+  while the checkout (the worktree) is where the loop creates the branch and
+  runs; you stay on `main` in the original checkout and can work there while
+  the loop runs beside you. The worktree carries its own checked-out branch
+  (the feature branch the loop creates), and `loop list` names it in the
+  `worktree` column, one per run. Worktrees on merged branches are left idle
+  for `rafa cleanup` to find and remove. The loop guard compares the checkout's
+  branch and HEAD against what the run was given when it started, and halts
+  with the work kept if either changes externally; the guard fires on every
+  loop, with or without `--as-worktree`, and never interferes with the loop's
+  own commits. Without `--as-worktree` the checkout is the project root itself,
+  and you run the loop where you already are.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
@@ -913,7 +929,14 @@ New; it replaces no earlier text. What a row or an action added to
 - **`self-update` installs the checkout it runs in**
   (`src/commands/self-update.ts`), as `bun run snapshot` does: both call
   `installRuntime` (`src/runtime/install.ts`), the script from the
-  checkout and the command from the bundle. In the project root it reads
+  checkout and the command from the bundle. The command alone first reads
+  the session records under the project root's `.rafa/runs/` and refuses
+  with exit code 1 when a live loop is found reading `running` or `paused`
+  with its pid alive, naming each loop's branch, pid and session id so you
+  know what is running. The wait can be bypassed with `dangerous.selfUpdateDuringLoop:
+  true` in the config, allowing the binary to be swapped even during a loop run,
+  or deferred until the loops complete; `--force` does not override the guard.
+  In the project root it reads
   `package.json`, refusing one not named `@open-tomato/rafa`, then
   `plan.dir` as `loop start` resolves the config, then each
   `PLAN_TRACKER*.md` directly in `plan.dir`, refusing while one holds an
@@ -1779,7 +1802,10 @@ New; it replaces no earlier text. What a row or an action added to
   from its tracker and gives a live session a rough ETA from the store's
   `done` finishes since the session started
   (`effort/store/task-finishes.ts`). `list` lists every live record and
-  reads no branch. In json mode each gives its reading as the result's
+  reads no branch; a row names each session's branch and end with the
+  `worktree` column (`src/commands/loop/loop-sessions.ts`): the path to the
+  worktree if the run was started with `--as-worktree` (`start/session.ts`),
+  or `in the main checkout` if the checkout is the project root. In json mode each gives its reading as the result's
   `data`; text mode writes lines.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
@@ -1887,10 +1913,12 @@ New; it replaces no earlier text. What a row or an action added to
   PREREQUISITES file that cannot be read, each message ending with the
   line `Nothing was checked.`, and for a failed required item, its message the runner's halt.
   `self-update` throws 1 for a positional word, for a `--force` value
-  other than `true` or `false`, for a tracker in `plan.dir` holding a
+  other than `true` or `false`, for a live loop of the project without
+  `dangerous.selfUpdateDuringLoop`, naming each loop's branch and pid, for a tracker in `plan.dir` holding a
   task, naming each, and for a `~/.rafa/runtime/<version>/` already there
   without `--force`, naming it and the version; and 2, the message naming the
-  step and what it leaves changed, for a `package.json` that cannot be
+  step and what it leaves changed, for a session record under `.rafa/runs/`
+  that cannot be read, for a `package.json` that cannot be
   read or names another package or no usable version, a config
   `loadConfig` refuses, a `plan.dir` that cannot be read, and a build,
   copy or link that failed.
@@ -2092,12 +2120,17 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   command needing a project is read, `resolveScope` walks up from the
   working directory, `process.cwd()` unless the `cwd` option names
   another, to the nearest `.rafa/config.yaml`, passing over the home,
-  `homedir()` unless `home` names another. The project found is the
-  context's `project`. With none, the invocation ends as `no_project`
+  `homedir()` unless `home` names another. When the walk finds none, the
+  main checkout of the repository holding the working directory is the
+  project if it holds `.rafa/config.yaml`, so a linked worktree beside
+  it, which has no `.rafa/` of its own, runs in the main checkout's
+  project. The project found is the context's `project`. With none, the
+  invocation ends as `no_project`
   with exit code 1: `rafa: ` and the `rafa init` hint on stderr in text
   mode, the hint as the result's message in json mode. The command never
   runs, so it prints no deprecation line. A relative working directory or
-  home ends the same way with the walk's message. A help request, a
+  home, and a git that cannot name the main checkout, end the same way
+  with the walk's message. A help request, a
   routing refusal, `invalid_spec` and a command declaring
   `needsProject: false` read neither the working directory nor the home.
 

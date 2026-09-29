@@ -160,6 +160,13 @@
  *     `plan create`'s own argument for one run and not a layer over
  *     this key, for the reason the `pr` section gives.
  *
+ * `dangerous.selfUpdateDuringLoop` has `rafa self-update` replace the
+ * install while a loop of the project is live, where it otherwise
+ * refuses and names each loop. The three readings above hold for it
+ * as written: `false` by default, read through `flag`, and not a
+ * `CommandLineSetting`; `self-update --force` keeps its own
+ * meaning and is not a layer over this key.
+ *
  * ## The `status` section
  *
  * `rafa status` prints where a project stands, and the since-last-command

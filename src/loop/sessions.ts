@@ -30,6 +30,11 @@
  *     other run carries no `hop` key at all, never one set to null, so
  *     such a record is written byte for byte as it was before the field.
  *     Once written, every later write of the record keeps it as it is.
+ *   - `worktree`: only on a run whose checkout is a linked worktree rather
+ *     than the project root, as a `loop start --as-worktree` run's is, the
+ *     absolute path of that worktree (`start/session.ts`). A run in the
+ *     main checkout carries no `worktree` key at all, as it carries no
+ *     `hop`, and every later write keeps the path as it is.
  *
  * ## One session is one `loop start`
  *
@@ -103,7 +108,8 @@
  *
  * {@link SessionRecordError}, naming the file: text that is no JSON
  * object, a field of the wrong type or outside its set, a `hop` key whose
- * value is not a hop record (null included), a pid that is no
+ * value is not a hop record (null included), a `worktree` key whose value
+ * is no absolute path (null included), a pid that is no
  * positive whole number (signal 0 to pid 0 or below would reach a process
  * group), an unparsable `startedAt`, and a `sessionId` that is no plain
  * file name or differs from the file's name. {@link readSessions} reads
@@ -122,7 +128,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
 import { asHopRecord } from '../next/hop-record.js';
@@ -164,6 +170,8 @@ export interface SessionRecord {
   readonly task: SessionTask | null;
   /** The away hop the run was started under; left out of every other run's record. See the module note. */
   readonly hop?: HopRecord;
+  /** The linked worktree the run's checkout is; left out of a run in the main checkout. See the module note. */
+  readonly worktree?: string;
 }
 
 /** What a new record is made from; it opens `running`, with no task. */
@@ -308,6 +316,15 @@ function hopProblem(fields: object): string | null {
     : null;
 }
 
+/** The problem with a record's `worktree`, or null, a record without the key included. */
+function worktreeProblem(fields: object): string | null {
+  if (!Object.hasOwn(fields, 'worktree')) return null;
+  const worktree = field(fields, 'worktree');
+  return isText(worktree) && isAbsolute(worktree)
+    ? null
+    : `worktree is ${describeValue(worktree)}, expected an absolute path`;
+}
+
 /** The problem with a record's `sessionId`, read from `file`, or null. */
 function sessionIdProblem(sessionId: unknown, file: string): string | null {
   if (typeof sessionId !== 'string' || !isSessionId(sessionId)) {
@@ -352,6 +369,7 @@ function recordProblems(fields: object, file: string): string[] {
       : `state is ${describeValue(state)}, expected one of ${SESSION_STATES.join(', ')}`,
     taskProblem(field(fields, 'task')),
     hopProblem(fields),
+    worktreeProblem(fields),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }
@@ -362,10 +380,14 @@ function freezeHop(value: unknown): HopRecord {
   return Object.freeze({ ...hop, home: Object.freeze(hop.home), from: Object.freeze(hop.from) });
 }
 
-/** A frozen record of fields already checked, in the order it is written; `hop` last, and only when there. */
+/**
+ * A frozen record of fields already checked, in the order it is written;
+ * `hop` then `worktree` last, each only when there.
+ */
 function freezeRecord(fields: object): SessionRecord {
   const task = field(fields, 'task');
   const hop = field(fields, 'hop');
+  const worktree = field(fields, 'worktree');
   return Object.freeze({
     sessionId: field(fields, 'sessionId') as string,
     planStub: field(fields, 'planStub') as string | null,
@@ -380,6 +402,9 @@ function freezeRecord(fields: object): SessionRecord {
     ...hop === undefined
       ? {}
       : { hop: freezeHop(hop) },
+    ...worktree === undefined
+      ? {}
+      : { worktree: worktree as string },
   });
 }
 

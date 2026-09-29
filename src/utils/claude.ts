@@ -11,12 +11,14 @@
  * add.
  *
  * {@link runClaudeCaptured} is the door for a session whose output the
- * LOOP reads as well. It has four callers: the per-task dispatch,
+ * LOOP reads as well. It has three callers: the per-task dispatch,
  * through `runTaskSession` in `start/dispatch.ts`, the wrap-up session
- * in `start/wrap-up.ts`, the backfill proposal pass in
- * `backfill/propose.ts`, and plan generation in the `claude` planner,
- * `adapters/planner/claude.ts`, which `plan.ts` makes. Each of the four
- * parses what its session wrote: a task session ends its final message
+ * in `start/wrap-up.ts` and the backfill proposal pass in
+ * `backfill/propose.ts`. Plan generation in the `claude` planner,
+ * `adapters/planner/claude.ts`, which `plan.ts` makes, captures its
+ * session through the same spawner without that door, for the reason
+ * the search runner does below. Each of the four parses what its
+ * session wrote: a task session ends its final message
  * with a `rafa:report` block, the wrap-up with a `rafa:promoted` one
  * when it was listed lessons to promote (`start/promoted-check.ts`), a
  * plan session ends its final message with a `rafa:spec-review` one,
@@ -28,7 +30,7 @@
  * the ones its routing declaration resolved to, with the
  * `--session-id` the loop picked for that session ahead of them and
  * its served flags (`start/serving.ts`) ahead of both, and the planner
- * hands over none. The captured entry builds its argument
+ * hands over none: its argument list is `claudeArgs(settingSources)`. The captured entry builds its argument
  * list through the same {@link claudeArgs} and hands the prompt over the
  * same way; only the spawner differs, {@link spawnClaudeCaptured} piping
  * stdout, echoing it on to the operator as it arrives and keeping the
@@ -40,11 +42,18 @@
  * The search runner (`inventory/search/index.ts`) captures its one
  * session through the same spawner without going through
  * `runClaudeCaptured`: it builds its argument list with
- * {@link claudeArgs} and hands the spawner the one option the loop's
- * callers never pass, {@link CapturedSpawnOptions.cwd}, since that
- * session runs inside the scratch copy of its candidates. The epic
- * verification runner (`epic/verify-run.ts`) does the same for each
- * check session, which runs inside a worktree made for the run.
+ * {@link claudeArgs} and hands the spawner its one option,
+ * {@link CapturedSpawnOptions.cwd}, since that session runs inside the
+ * scratch copy of its candidates. The epic verification runner
+ * (`epic/verify-run.ts`) does the same for each check session, which
+ * runs inside a worktree made for the run, and the `claude` planner for
+ * its plan session, which runs in the project root `rafa plan` resolved
+ * rather than in the caller's directory (#171). The loop's sessions
+ * name the same option through `runClaude` and `runClaudeCaptured`,
+ * which take it last: each task, wrap-up and CI repair session runs in
+ * the run's checkout (`start/checkout.ts`), a linked worktree's own
+ * directory when the loop runs in one, and never in the directory the
+ * process happens to stand in.
  *
  * The flags land AFTER {@link CLAUDE_BASE_ARGS} and the setting sources
  * rather than before, and the ordering is load-bearing rather than
@@ -298,6 +307,7 @@ export function claudeArgs(
 export type ClaudeSpawner = (
   args: readonly string[],
   prompt: string,
+  options?: CapturedSpawnOptions,
 ) => Promise<number>;
 
 /** A spawned session, as {@link interruptClaudeSessions} reaches it. */
@@ -370,7 +380,8 @@ function guardSpend(): void {
 
 /**
  * The real spawner: `Bun.spawn`, streams inherited so the session's
- * output reaches the operator as it happens.
+ * output reaches the operator as it happens, in the working directory
+ * `options.cwd` names, or the loop's own when it names none.
  *
  * In json mode it spawns through {@link spawnClaudeCaptured} instead and
  * answers that session's exit code, so the session's stdout reaches the
@@ -387,10 +398,11 @@ function guardSpend(): void {
 export async function spawnClaude(
   args: readonly string[],
   prompt: string,
+  options: CapturedSpawnOptions = {},
 ): Promise<number> {
   guardSpend();
   if (activeOutputMode() === 'json') {
-    const { exitCode } = await spawnCaptured(args, prompt);
+    const { exitCode } = await spawnCaptured(args, prompt, options);
     return exitCode;
   }
   const proc = Bun.spawn([CLAUDE_BIN, ...args], {
@@ -398,6 +410,7 @@ export async function spawnClaude(
     stdout: 'inherit',
     stderr: 'inherit',
     env: sessionSpawnEnv(process.env),
+    ...cwdOption(options),
   });
   liveSessions.add(proc);
   try {
@@ -418,8 +431,10 @@ export async function spawnClaude(
  *
  * `served` is the flags handing a served directory over, which
  * {@link claudeArgs} places between the setting sources and `flags`. It
- * defaults to empty, and the CI repair hands none. It comes last so
- * that no call written before it existed has to change.
+ * defaults to empty, and the CI repair hands none. `options` is where
+ * the session runs, handed to the spawner as it is; the CI repair names
+ * the run's checkout there (`start/pr-lifecycle.ts`). Both come last so
+ * that no call written before they existed has to change.
  */
 export function runClaude(
   prompt: string,
@@ -427,8 +442,9 @@ export function runClaude(
   flags: readonly string[] = [],
   spawn: ClaudeSpawner = spawnClaude,
   served: readonly string[] = [],
+  options: CapturedSpawnOptions = {},
 ): Promise<number> {
-  return spawn(claudeArgs(settingSources, flags, served), prompt);
+  return spawn(claudeArgs(settingSources, flags, served), prompt, options);
 }
 
 /**
@@ -446,13 +462,23 @@ export interface CapturedSession {
  */
 export interface CapturedSpawnOptions {
   /**
-   * The session's working directory, or the loop's own when absent. Two
-   * callers name one: the search session (`src/inventory/search/index.ts`),
-   * which runs inside the scratch copy of its candidates, and each check
-   * session of the epic verification run (`src/epic/verify-run.ts`), which
-   * runs inside a detached worktree of main.
+   * The session's working directory, or the loop's own when absent. The
+   * search session (`src/inventory/search/index.ts`) names the scratch
+   * copy of its candidates, each check session of the epic verification
+   * run (`src/epic/verify-run.ts`) a detached worktree of main, the plan
+   * session of the `claude` planner (`src/adapters/planner/claude.ts`)
+   * the project root it writes the plan under, and the loop's task,
+   * wrap-up and CI repair sessions the run's checkout
+   * (`src/start/checkout.ts`).
    */
   readonly cwd?: string;
+}
+
+/** The `Bun.spawn` option naming `options.cwd`, or none when it names no directory. */
+function cwdOption(options: CapturedSpawnOptions): { readonly cwd?: string } {
+  return options.cwd === undefined
+    ? {}
+    : { cwd: options.cwd };
 }
 
 /**
@@ -526,8 +552,8 @@ async function teeToOperator(
  *
  * Everything else matches {@link spawnClaude}: the executable, the
  * prompt on stdin, the environment. The working directory is the
- * loop's own unless `options.cwd` names another; {@link spawnClaude}
- * never names one. Stderr stays inherited, so the
+ * loop's own unless `options.cwd` names another, as it is for
+ * {@link spawnClaude}. Stderr stays inherited, so the
  * operator sees it and the capture never holds it, and a report parsed
  * out of `stdout` cannot have been a warning line.
  *
@@ -580,9 +606,7 @@ async function spawnCaptured(
     stdout: 'pipe',
     stderr: 'inherit',
     env: sessionSpawnEnv(process.env),
-    ...(options.cwd === undefined
-      ? {}
-      : { cwd: options.cwd }),
+    ...cwdOption(options),
   });
   liveSessions.add(proc);
   let stdout: string;
@@ -605,9 +629,10 @@ async function spawnCaptured(
  * what is run. The operator still sees that output as it is written,
  * through the tee in {@link spawnClaudeCaptured}.
  *
- * `served` is taken as {@link runClaude} takes it. The task session
- * (`runTaskSession` in `start/dispatch.ts`) and the wrap-up
- * (`start/wrap-up.ts`) are the two callers that hand any.
+ * `served` and `options` are taken as {@link runClaude} takes them. The
+ * task session (`runTaskSession` in `start/dispatch.ts`) and the wrap-up
+ * (`start/wrap-up.ts`) are the two callers that hand any, and both name
+ * the run's checkout as the session's working directory.
  */
 export function runClaudeCaptured(
   prompt: string,
@@ -615,6 +640,7 @@ export function runClaudeCaptured(
   flags: readonly string[] = [],
   spawn: CapturingSpawner = spawnClaudeCaptured,
   served: readonly string[] = [],
+  options: CapturedSpawnOptions = {},
 ): Promise<CapturedSession> {
-  return spawn(claudeArgs(settingSources, flags, served), prompt);
+  return spawn(claudeArgs(settingSources, flags, served), prompt, options);
 }

@@ -13,8 +13,10 @@
  *
  * ## What the adapter is made with
  *
- *   - `repoRoot`: the repository plans are written under. A spec path is
- *     resolved against it, as `rafa plan` resolves `--spec=`.
+ *   - `repoRoot`: the repository plans are written under, and the
+ *     session's working directory. A spec path is resolved against it,
+ *     as `rafa plan` resolves `--spec=`. See "The session's working
+ *     directory" below.
  *   - `planDir`: the directory plans are written into, the run's resolved
  *     `plan.dir`, relative to `repoRoot` or absolute. There is no default:
  *     a planner falling back on one would write the plan somewhere the
@@ -33,8 +35,8 @@
  *     And `plan.ts` imports the registry, which imports this module, so
  *     this module importing `buildPlanPrompt` from `plan.ts` would close
  *     an import cycle, where `src/` held none.
- *   - `spawn`: the seam the session goes through, handed to
- *     `runClaudeCaptured` with the argument list that builds.
+ *   - `spawn`: the seam the session goes through, handed the argument
+ *     list {@link claudeArgs} builds, the prompt, and the root as `cwd`.
  *     {@link spawnClaudeCaptured} when left out. The tests hand over a
  *     spawner that records what it is handed, so no case spawns
  *     `claude`.
@@ -49,8 +51,8 @@
  *   2. Reads the spec, rejecting with the read's own error when it cannot.
  *   3. Makes `planDir` when it is missing, since the session writes into
  *      it.
- *   4. Runs one session with the built prompt on stdin, CAPTURING its
- *      stdout.
+ *   4. Runs one session in the root with the built prompt on stdin,
+ *      CAPTURING its stdout.
  *   5. Reads the session's `rafa:spec-review` block out of that stdout,
  *      once, whatever the session went on to do.
  *   6. Rejects when the session exits nonzero, whatever it wrote.
@@ -60,9 +62,24 @@
  *      of step 5.
  *
  * The rejections of steps 1, 6 and 7 are {@link ClaudePlannerError}s. The
- * messages of steps 6 and 7 are the lines `rafa plan` printed for those
- * failures before this adapter existed, so the command prints them as
- * they were.
+ * message of step 6 is the line `rafa plan` printed for that failure
+ * before this adapter existed. The message of step 7 is that line with
+ * the absolute root it looked under added, so a plan written somewhere
+ * else is read as a path question and not only as a session fault.
+ *
+ * ## The session's working directory
+ *
+ * The session is spawned with the root, resolved absolute, as its
+ * working directory, and never inherits the caller's. The prompt names
+ * the plan by a path relative to that root (`<planDir>/PLAN-<stub>.md`),
+ * so a session whose working directory differed from the root would
+ * write the plan under its own directory while step 7 looked under the
+ * root. That is #171: `rafa plan create` run from a git worktree nested
+ * under the project root resolved the root by walking up, wrote the spec
+ * copy there, and the session, left in the worktree, wrote the plan into
+ * a second `.rafa/` under it and was blamed for writing none. With the
+ * root as the working directory, the working directory and the root
+ * name the same file for every relative path.
  *
  * ## The review the session rides back on
  *
@@ -117,7 +134,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { posix, resolve } from 'node:path';
 
 import { parseSpecReview } from '../../board/spec-review.js';
-import { runClaudeCaptured, spawnClaudeCaptured } from '../../utils/claude.js';
+import { claudeArgs, spawnClaudeCaptured } from '../../utils/claude.js';
 
 /** The exit code of a rejection no session exit code stands behind. */
 const FAILURE_EXIT_CODE = 1;
@@ -177,24 +194,20 @@ export class ClaudePlannerError extends Error {
  */
 export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
   const { repoRoot, planDir, settingSources, buildPrompt, spawn = spawnClaudeCaptured } = options;
+  const root = resolve(repoRoot);
 
   const create = async ({ specPath, stub }: PlanRequest): Promise<GeneratedPlan> => {
     const planPath = planFilePath(planDir, `PLAN-${stub}.md`);
     const prerequisitesPath = planFilePath(planDir, `PREREQUISITES-${stub}.md`);
-    const isWritten = (path: string): boolean => existsSync(resolve(repoRoot, path));
+    const isWritten = (path: string): boolean => existsSync(resolve(root, path));
 
     if (isWritten(planPath)) {
       throw new ClaudePlannerError(`${planPath} already exists`, FAILURE_EXIT_CODE);
     }
-    const specContent = await readFile(resolve(repoRoot, specPath), 'utf8');
-    await mkdir(resolve(repoRoot, planDir), { recursive: true });
+    const specContent = await readFile(resolve(root, specPath), 'utf8');
+    await mkdir(resolve(root, planDir), { recursive: true });
 
-    const session = await runClaudeCaptured(
-      buildPrompt(specContent, stub),
-      settingSources,
-      [],
-      spawn,
-    );
+    const session = await spawn(claudeArgs(settingSources), buildPrompt(specContent, stub), { cwd: root });
     const review = parseSpecReview(session.stdout);
     const { exitCode } = session;
     if (exitCode !== 0) {
@@ -202,7 +215,7 @@ export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
     }
     if (!isWritten(planPath)) {
       throw new ClaudePlannerError(
-        `The session finished but ${planPath} was not created — inspect the output above.`,
+        `The session finished but ${planPath} was not created under ${root} — inspect the output above.`,
         FAILURE_EXIT_CODE,
         review,
       );

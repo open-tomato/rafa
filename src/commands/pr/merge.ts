@@ -187,6 +187,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { ChecksReading, GitRunner, MergeMethod, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { UncheckedCase } from '../../pr/unchecked.js';
@@ -215,6 +216,7 @@ import {
   remainingFrom,
 } from '../../pr/index.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
+import { liveLoopsOf } from '../self-update.js';
 
 import { readFollowUps, readPackageFacts, versionTag } from './merge-followups.js';
 import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
@@ -254,6 +256,8 @@ export interface MergeSeams extends PrSeams {
   readonly openPrompter?: () => Prompter;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
   readonly ending?: NextEndingSeams;
+  /** Whether a loop record's pid is alive, for the update follow-up. `isPidAlive` when left out. */
+  readonly isAlive?: PidProbe;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -432,8 +436,17 @@ function textOf(path: string): string {
   }
 }
 
+/** The live loops' branches under `root`, or null when a record cannot be read; see `merge-followups.ts`. */
+function liveLoopBranchesOf(root: string, isAlive?: PidProbe): readonly string[] | null {
+  try {
+    return liveLoopsOf(root, isAlive).map((loop) => loop.branch);
+  } catch {
+    return null;
+  }
+}
+
 /** The follow-ups that apply once the base has been pulled; see `merge-followups.ts`. */
-function followUpsFor(pr: PrContext, git: GitRunner): readonly FollowUp[] {
+function followUpsFor(pr: PrContext, git: GitRunner, isAlive?: PidProbe): readonly FollowUp[] {
   const facts = readPackageFacts(textOf(join(pr.project.root, 'package.json')));
   if (facts.version === null) return [];
   const tags = git(['tag', '--list', versionTag(facts.version)]);
@@ -442,6 +455,7 @@ function followUpsFor(pr: PrContext, git: GitRunner): readonly FollowUp[] {
     tagged: tags.ok && tags.stdout.trim() !== '',
     rafaCheckout: facts.rafaCheckout,
     runtimeInstalled: existsSync(join(pr.project.home, RUNTIME_SUBDIR, facts.version)),
+    liveLoopBranches: liveLoopBranchesOf(pr.project.root, isAlive),
   });
 }
 
@@ -718,7 +732,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   const steps = runCleanUp(context, git, detail, present);
   context.output.info(readyLine(detail.baseRefName, detail.headRefName, present));
 
-  const followUps = followUpsFor(pr, git);
+  const followUps = followUpsFor(pr, git, seams.isAlive);
   if (followUps.length > 0) {
     context.output.info('Follow-ups:');
     for (const followUp of followUps) context.output.info(`${INDENT}${followUp.command} — ${followUp.why}`);

@@ -107,7 +107,7 @@
  * reads its one `gh auth status` call.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { CapturingSpawner } from '../utils/claude.js';
+import type { CapturedSpawnOptions, CapturingSpawner } from '../utils/claude.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { execFileSync } from 'node:child_process';
@@ -171,11 +171,30 @@ describe('the task session runner', () => {
       calls.push([...args]);
       return Promise.resolve({ exitCode: 3, stdout: 'the final message' });
     };
-    const session = await runTaskSession('do the task', flags, 'aaaa-1111', ['local', 'user'], [], spawn);
+    const session = await runTaskSession('do the task', flags, 'aaaa-1111', ['local', 'user'], [], undefined, spawn);
 
     expect(session).toEqual({ exitCode: 3, stdout: 'the final message' });
     return calls;
   }
+
+  /** The spawn options one session through a recording spawner was handed, with `cwd` as its directory. */
+  async function spawnedOptions(cwd: string | undefined): Promise<readonly (CapturedSpawnOptions | undefined)[]> {
+    const handed: (CapturedSpawnOptions | undefined)[] = [];
+    const spawn: CapturingSpawner = (_args, _prompt, options) => {
+      handed.push(options);
+      return Promise.resolve({ exitCode: 0, stdout: '' });
+    };
+    await runTaskSession('do the task', [], 'aaaa-1111', ['local', 'user'], [], cwd, spawn);
+    return handed;
+  }
+
+  it('spawns the session in the checkout it is handed', async () => {
+    expect(await spawnedOptions('/work/checkout')).toEqual([{ cwd: '/work/checkout' }]);
+  });
+
+  it('names no working directory when handed none, so the session runs in the loop\'s own', async () => {
+    expect(await spawnedOptions(undefined)).toEqual([{}]);
+  });
 
   it('puts the setting sources, then the session id, between the base arguments and the flags', async () => {
     const calls = await spawnedArgs(['--model', 'haiku', '--tools', 'Read,Write']);
@@ -226,6 +245,7 @@ describe('a dispatched task session', () => {
       planContent: plan,
       inject: 'full',
       repoRoot: tempRoot,
+      checkout: tempRoot,
       home: join(tempRoot, 'home'),
       settingSources: ['project', 'local'],
       serving: null,
