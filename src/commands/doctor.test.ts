@@ -352,6 +352,9 @@ function pathsUnder(root: string): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/** The `effort sync` row of a project that names no `effort.sync`, printed ahead of the install warnings. */
+const LOCAL_SYNC_LINE = 'Effort sync: ok, local';
+
 /** The line text mode ends with when the `PATH` order holds. */
 function aheadLine(world: World): string {
   return `${world.rafaBin} is on PATH, and ${world.bunBin} is not ahead of it.`;
@@ -517,6 +520,7 @@ describe('the preflight it prints', () => {
       `  fail    optional tool "mgrep", probe \`${LOGIN_PROBE}\`, 0 ms`,
       'Preflight passed: rafa loop start would go on, naming 1 optional item known-missing in every task prompt:',
       '  known-missing: mgrep (faster search; grep is the fallback)',
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
   });
@@ -539,6 +543,7 @@ describe('the preflight it prints', () => {
       VERSION_LINE,
       noPlanHead('1 item from the config checked'),
       `  fail    required tool "needed", probe \`${MISSING_TOOL_PROBE}\`, 0 ms`,
+      LOCAL_SYNC_LINE,
       aheadLine(failing),
     ]);
     expect(passed.exitCode).toBe(0);
@@ -548,6 +553,7 @@ describe('the preflight it prints', () => {
       noPlanHead('1 item from the config checked'),
       '  pass    required tool "needed", probe `exit 0`, 0 ms',
       'Preflight passed: rafa loop start would go on to its first session.',
+      LOCAL_SYNC_LINE,
       aheadLine(passing),
     ]);
   });
@@ -633,12 +639,14 @@ describe('the preflight it prints', () => {
       '  line 4: Publish with `npm publish`',
       'Preflight passed: rafa loop start would go on to its first session.',
       riskLine('.plans/PLAN-probe.md'),
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
     expect(lines(unnamed.stdout)).toEqual([
       VERSION_LINE,
       noPlanHead('nothing to check'),
       'Preflight passed: rafa loop start would go on to its first session.',
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
   });
@@ -781,6 +789,7 @@ describe('the plan\'s start-only [start] items', () => {
       CLEAN_LINE,
       'Preflight passed: rafa loop start would go on to its first session.',
       riskLine('.plans/PLAN-start.md'),
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
 
@@ -794,6 +803,7 @@ describe('the plan\'s start-only [start] items', () => {
       SKIPPED_LINE,
       'Preflight passed: rafa loop start would go on to its first session.',
       riskLine('.plans/PLAN-start.md'),
+      LOCAL_SYNC_LINE,
       aheadLine(resume),
     ]);
 
@@ -980,6 +990,7 @@ describe('the warnings beside the report', () => {
       VERSION_LINE,
       noPlanHead('nothing to check'),
       'Preflight passed: rafa loop start would go on to its first session.',
+      LOCAL_SYNC_LINE,
       `warn: ${warning}`,
       aheadLine(left),
     ]);
@@ -1125,6 +1136,7 @@ describe('the automatic items of the pull request provider', () => {
       '  pass    required tool "needed", probe `exit 0`, 0 ms',
       'Preflight passed: rafa loop start would go on to its first session.',
       ...bareBoardLines(),
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
     expect(control.exitCode).toBe(0);
@@ -1133,6 +1145,7 @@ describe('the automatic items of the pull request provider', () => {
       noPlanHead('1 item from the config checked'),
       '  pass    required tool "needed", probe `exit 0`, 0 ms',
       'Preflight passed: rafa loop start would go on to its first session.',
+      LOCAL_SYNC_LINE,
       aheadLine(controlWorld),
     ]);
   });
@@ -1191,6 +1204,7 @@ describe('the automatic items of the pull request provider', () => {
       VERSION_LINE,
       noPlanHead('nothing to check'),
       'Preflight passed: rafa loop start would go on to its first session.',
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
     expect(control.exitCode).toBe(0);
@@ -1319,14 +1333,15 @@ describe('the board rows', () => {
     const control = await doctor(ready, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => setUp.run) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-(BOARD_ROW_COUNT + 3))).toEqual([...bareBoardLines(), aheadLine(bare)]);
+    expect(lines(run.stdout).slice(-(BOARD_ROW_COUNT + 4))).toEqual([...bareBoardLines(), LOCAL_SYNC_LINE, aheadLine(bare)]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-(BOARD_ROW_COUNT + 2))).toEqual([
+    expect(lines(control.stdout).slice(-(BOARD_ROW_COUNT + 3))).toEqual([
       BOARD_HEADING,
       ...BOARD_LABELS.map((label) => `  present  label ${label.name}`),
       `  present  ${SPEC_TEMPLATE_PATH}`,
       `  present  ${ROADMAP_ROW_NAME}`,
       `  present  ${ROADMAP_SETTING}`,
+      LOCAL_SYNC_LINE,
       aheadLine(ready),
     ]);
     expect(setUp.calls()).toEqual(['label list', 'issue list --label', LISTING_CALL]);
@@ -1398,7 +1413,7 @@ describe('the board rows', () => {
     const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, { [MISSING_TOOL_PROBE]: failed }) });
 
     expect(run.exitCode).toBe(1);
-    expect(lines(run.stdout).slice(-(BOARD_ROW_COUNT + 3))).toEqual([...bareBoardLines(), aheadLine(world)]);
+    expect(lines(run.stdout).slice(-(BOARD_ROW_COUNT + 4))).toEqual([...bareBoardLines(), LOCAL_SYNC_LINE, aheadLine(world)]);
     expect(run.stderr).toContain('rafa loop start would halt here, before any session.');
   });
 });
@@ -1417,16 +1432,18 @@ describe('the blocked issues', () => {
     const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, reading) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-3)).toEqual([
+    expect(lines(run.stdout).slice(-4)).toEqual([
       BLOCKED_HEADING,
       `  #12 is labelled ${SPEC_BLOCKED_LABEL} and its body carries no "Blocked by:" line;`
         + ` name them as "Blocked by: #24 #26", or take the ${SPEC_BLOCKED_LABEL} label off`,
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-3)).toEqual([
+    expect(lines(control.stdout).slice(-4)).toEqual([
       BLOCKED_HEADING,
       `  1 issue labelled ${SPEC_BLOCKED_LABEL}, naming 1 blocker this run could read`,
+      LOCAL_SYNC_LINE,
       aheadLine(controlWorld),
     ]);
   });
@@ -1490,16 +1507,18 @@ describe('the epic labels', () => {
     const control = await doctor(controlWorld, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, () => fixed.run) });
 
     expect(run.exitCode).toBe(0);
-    expect(lines(run.stdout).slice(-4)).toEqual([
+    expect(lines(run.stdout).slice(-5)).toEqual([
       EPICS_HEADING,
       '  #5 carries 2 epic labels (epic:auth, epic:billing); an issue belongs to one epic, so remove all but one',
       '  #6 carries epic:atuh, which no type:epic issue carries; fix the slug or open the epic',
+      LOCAL_SYNC_LINE,
       aheadLine(world),
     ]);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-3)).toEqual([
+    expect(lines(control.stdout).slice(-4)).toEqual([
       EPICS_HEADING,
       '  4 issues with an epic: label, none with two, every slug one a type:epic issue carries',
+      LOCAL_SYNC_LINE,
       aheadLine(controlWorld),
     ]);
     expect(faulted.calls().filter((call) => call === LISTING_CALL)).toEqual([LISTING_CALL]);
@@ -1518,10 +1537,11 @@ describe('the epic labels', () => {
     expect(run.exitCode).toBe(0);
     expect(lines(run.stdout)).not.toContain(EPICS_HEADING);
     expect(control.exitCode).toBe(0);
-    expect(lines(control.stdout).slice(-3)).toEqual([
+    expect(lines(control.stdout).slice(-4)).toEqual([
       EPICS_HEADING,
       '  the epic: labels could not be read: board listing:'
         + ` gh issue list --state all --limit 1000 --json ${BOARD_LIST_FIELDS} failed: HTTP 502`,
+      LOCAL_SYNC_LINE,
       aheadLine(controlWorld),
     ]);
   });
@@ -1577,7 +1597,7 @@ describe('the boards', () => {
     expect(runLines.filter((line) => line === unresolved)).toHaveLength(1);
     expect(runLines.filter((line) => line === unlabelled)).toHaveLength(1);
     expect(runLines.filter((line) => line === lostPosition)).toHaveLength(1);
-    expect(runLines.slice(runLines.indexOf(BOARDS_HEADING) + 1)).toEqual([unresolved, unlabelled, lostPosition, aheadLine(world)]);
+    expect(runLines.slice(runLines.indexOf(BOARDS_HEADING) + 1)).toEqual([unresolved, unlabelled, lostPosition, LOCAL_SYNC_LINE, aheadLine(world)]);
 
     expect(control.exitCode).toBe(0);
     expect(lines(control.stdout)).not.toContain(BOARDS_HEADING);
@@ -1828,5 +1848,44 @@ describe('the skill tier rows', () => {
     expect(run.exitCode).toBe(0);
     expect(lines(run.stdout)).toContain(`${TIERS_SECTION_TITLE}:`);
     expect(run.stdout).toContain('0.0.1');
+  });
+});
+
+describe('the effort sync row', () => {
+  it('exits 1 for effort.sync: git with no module, naming the module lines, where local exits 0', async () => {
+    const world = plantWorld(['effort:', '  sync: git']);
+    const control = plantWorld();
+
+    const run = await doctor(world);
+    const passed = await doctor(control);
+
+    expect(run.exitCode).toBe(1);
+    expect(lines(run.stdout)).toContain('Effort sync: fail, git');
+    expect(run.stderr).toContain('rafa doctor: effort sync: effort.sync is "git"');
+    expect(run.stderr).toContain('\nmodules:\n');
+    expect(run.stderr).toContain('\nallowList:\n');
+    expect(run.stderr).not.toContain('rafa loop start would halt here');
+    expect(passed.exitCode).toBe(0);
+    expect(passed.stderr).toBe('');
+    expect(lines(passed.stdout)).toContain(LOCAL_SYNC_LINE);
+  });
+
+  it('gives the row as json data, and no data for a failing row', async () => {
+    const world = plantWorld(['effort:', '  sync: file']);
+    const failing = plantWorld(['effort:', '  sync: p2p']);
+
+    const run = await doctor(world, ['--output=json']);
+    const failed = await doctor(failing, ['--output=json']);
+
+    expect(run.exitCode).toBe(0);
+    expect(resultData(run.stdout)?.effortSync).toEqual({
+      outcome: 'ok',
+      strategy: 'file',
+      source: 'core',
+      missingModule: false,
+      problem: null,
+    });
+    expect(failed.exitCode).toBe(1);
+    expect(resultData(failed.stdout)).toBeUndefined();
   });
 });

@@ -102,18 +102,22 @@ function tableLine(entry: TableMerge): string {
   return `  ${entry.table}: ${counts.join(', ')}`;
 }
 
-/** The line closing one outcome: the backup's name, or what a dry run did. */
-function closingLine(result: MergeResult): string {
+/** The line closing one outcome: the backup's name, or what a dry run did, naming `command` to run it again. */
+function closingLine(result: MergeResult, command: string): string {
   if (result.status === 'would-merge') {
     return '🔍 Dry run: the merged store was built beside it, checked (row counts, integrity_check, this rafa\'s'
-      + ` schema plan) and deleted. Run \`${COMMAND_NAME} ${result.otherPath}\` to swap it in; the original would be`
+      + ` schema plan) and deleted. Run \`${command} ${result.otherPath}\` to swap it in; the original would be`
       + ` kept whole at ${result.path}.before-merge-<stamp>.bak.`;
   }
   return `✅ Merged. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`;
 }
 
-/** Every line one outcome prints. */
-export function renderMerge(result: MergeResult): string[] {
+/**
+ * Every line one outcome prints. `command` is the spelling a dry run's
+ * closing line names to swap the merge in: this command's by default,
+ * and `rafa effort import`'s when that command renders its pull.
+ */
+export function renderMerge(result: MergeResult, command: string = COMMAND_NAME): string[] {
   const other = result.otherStore === null
     ? 'a store that names no origin'
     : `store ${result.otherStore}`;
@@ -126,32 +130,42 @@ export function renderMerge(result: MergeResult): string[] {
     ...result.tables.map(tableLine),
     `Total: ${String(result.rowsAdded)} added, ${String(result.rowsSkipped)} skipped,`
       + ` ${String(result.rowsInConflict)} in conflict; ${String(result.gapsRewritten)} commit gaps recomputed.`,
-    closingLine(result),
+    closingLine(result, command),
   ];
 }
 
-/** The store file every other command would open under `root`, or a refusal of `RAFA_EFFORT_DIR`. */
-function storePath(context: RafaContext, root: string): string {
+/**
+ * The store file every other command would open under `root`, or a
+ * refusal of `RAFA_EFFORT_DIR` with exit code 1 naming `command`. Shared
+ * with `rafa effort import`, which merges into the same store.
+ */
+export function mergeTargetPath(context: RafaContext, root: string, command: string = COMMAND_NAME): string {
   try {
     return join(effortStoreDir(root, context.env), SQLITE_STORE_FILE_NAME);
   } catch (error) {
-    throw new CommandExit(REFUSED_EXIT, `❌ ${COMMAND_NAME}: ${messageOf(error)}`);
+    throw new CommandExit(REFUSED_EXIT, `❌ ${command}: ${messageOf(error)}`);
   }
 }
 
-/** The exit a merge's error is answered with, or null for one this command does not know. */
-function refusalExit(error: unknown): CommandExit | null {
+/**
+ * The exit a merge's error is answered with, naming `command`, or null
+ * for one the merge does not throw as a refusal: exit code 2 for another
+ * project's store and an NDJSON project, 1 for every other refusal.
+ * Shared with `rafa effort import`, whose pull rejects with the merge's
+ * own refusals, so the two commands cannot answer one refusal apart.
+ */
+export function mergeRefusalExit(error: unknown, command: string = COMMAND_NAME): CommandExit | null {
   if (error instanceof MergeRefusal) {
     const code = UNMERGEABLE_REASONS.has(error.reason)
       ? UNMERGEABLE_EXIT
       : REFUSED_EXIT;
-    return new CommandExit(code, `❌ ${COMMAND_NAME}: ${error.message}`);
+    return new CommandExit(code, `❌ ${command}: ${error.message}`);
   }
   const known = error instanceof RebuildRefusal
     || error instanceof DevelopmentBuildRefusedError
     || error instanceof UnionSchemaMismatch;
   return known
-    ? new CommandExit(REFUSED_EXIT, `❌ ${COMMAND_NAME}: ${error.message}`)
+    ? new CommandExit(REFUSED_EXIT, `❌ ${command}: ${error.message}`)
     : null;
 }
 
@@ -181,7 +195,7 @@ export function runMerge(context: RafaContext, seams: MergeCommandSeams): void {
   const file = expectOneArgument(context.args, MERGE_USAGE);
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${MERGE_USAGE}`);
   const project = requireProject(context, COMMAND_NAME);
-  const path = storePath(context, project.root);
+  const path = mergeTargetPath(context, project.root);
   const backend = resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message)).store;
   const now = seams.now ?? ((): Date => new Date());
   const otherPath = resolve((seams.cwd ?? ((): string => process.cwd()))(), file);
@@ -190,7 +204,7 @@ export function runMerge(context: RafaContext, seams: MergeCommandSeams): void {
   try {
     result = mergeStore({ path, otherPath, backend, dryRun, stamp: fileStamp(now()), now, env: context.env, ...probeSeams(seams) });
   } catch (error) {
-    throw refusalExit(error) ?? error;
+    throw mergeRefusalExit(error) ?? error;
   }
 
   if (context.outputMode === 'json') {

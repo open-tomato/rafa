@@ -59,6 +59,14 @@
  * moved ahead of the provider's automatic items 1, the skip lines not
  * printed 3, and the tracker dropped from the skip line 3.
  *
+ * The sync-strategy check is driven over configs parsed from text, and
+ * every other case runs under the config default, `effort.sync: local`.
+ * Its refusal sits beside a control differing only in the strategy, which
+ * goes on to the roster's refusal, so the check is read as running first.
+ * Two mutations of `start/preflight.ts` were driven against it on
+ * 2026-09-29, the file run alone and restored sha256-identical: the check
+ * dropped reddened 1 case, and the check moved after the roster 1.
+ *
  * `start()` handing the preflight its settings and its plan, and handing
  * the lines on to each dispatch, is reached by no case here, since
  * `start()` spawns the CLI with no seam. It was read on the same day by
@@ -83,13 +91,15 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { PORT_VERSIONS } from '../adapters/registry.js';
 import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
@@ -253,6 +263,8 @@ async function drive(
       // No case here reads this machine's `origin`: a case that wants one
       // plants it, and every other run resolves `pr.provider: none`.
       readRemote: () => null,
+      // The config default, `effort.sync: local`, unless a case plants another.
+      sync: { resolved: resolveConfig(), home: join(tempRoot, 'sync-home') },
       ...options,
     });
     return { result, refusal: null, probes, info, warn };
@@ -939,6 +951,61 @@ describe('a PREREQUISITES file that cannot be read', () => {
 
     expect(control.refusal).toBeNull();
     expect(control.probes).toEqual([`bun --version in ${controlRoot}`]);
+  });
+});
+
+/** The config a project's `.rafa/config.yaml` naming `kind` as `effort.sync`, and `extra` after it, resolves to. */
+function syncConfig(root: string, kind: string, extra: readonly string[] = []): StartPreflightOptions['sync'] {
+  const text = ['version: 1', 'effort:', `  sync: ${kind}`, ...extra, ''].join('\n');
+  const file = parseConfigText(text, join(root, '.rafa', 'config.yaml'));
+  return { resolved: resolveConfig({ cli: {}, file, user: null }), home: freshHome() };
+}
+
+/** The module whose `git` sync adapter the passing control loads. */
+const SYNC_FIXTURE_MODULE = fileURLToPath(new URL('../modules/testdata/sync-fixture', import.meta.url));
+
+describe('the sync-strategy check', () => {
+  it('refuses git with no module ahead of the roster and every probe, storing nothing', async () => {
+    const root = freshRoot();
+    const controlRoot = freshRoot();
+    const home = freshHome();
+    for (const planted of [root, controlRoot]) writeFileSync(planPathIn(planted), TASKS_NAMING_AGENTS, 'utf8');
+    const agents = { settingSources: ['project', 'local'] as ClaudeSettingSource[], home };
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents,
+      sync: syncConfig(root, 'git'),
+    });
+    // The control differs only in the strategy, so it goes on to the roster's refusal.
+    const control = await drive(controlRoot, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      agents,
+      sync: syncConfig(controlRoot, 'local'),
+    });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message).toStartWith('❌ Refusing to start: effort.sync names a strategy no adapter serves.\n');
+    expect(run.refusal?.message).toContain('   effort.sync is "git", and no module registers a sync adapter');
+    expect(run.refusal?.message).toContain('\n   modules:\n     - path: <module directory>\n');
+    expect(run.refusal?.message).toContain('\n   allowList:\n     - <module name>\n');
+    expect(run.refusal?.message).toEndWith('\n   Nothing was checked and nothing was dispatched.');
+    expect([run.probes, run.info, run.warn]).toEqual([[], [], []]);
+    expect(existsSync(sqliteStorePath(root))).toBe(false);
+
+    expect(control.refusal?.message).toStartWith(`❌ Refusing to start: PLAN-${STUB}.md names 2 agent(s)`);
+  });
+
+  it('lets git through to the probes once a module providing it is on modules: and allowList:', async () => {
+    const root = freshRoot();
+    const lines = ['modules:', `  - path: ${SYNC_FIXTURE_MODULE}`, 'allowList:', '  - sync-fixture'];
+    const sync = {
+      ...syncConfig(root, 'git', lines),
+      seams: { syncModules: { manifest: { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS } } },
+    };
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, { sync });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([`bun --version in ${root}`]);
   });
 });
 
