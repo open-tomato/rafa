@@ -182,6 +182,23 @@ build was checked and deleted. Another project's store and a
 development build over a store it does not own among them, is exit
 code 1, and each leaves both files byte-identical (`merge.test.ts`).
 
+**`rafa effort move --to=sqlite` is that step** (`src/commands/effort/move.ts`
+over `moveToSqlite`, `src/effort/store/move.ts`). It reads the NDJSON
+sessions and commits with the NDJSON backend's `readRows` and appends
+them with the SQLite backend's `append`, both under `effortStoreDir`, so
+each row is deduplicated by its port key and the open's development-build
+refusal applies. It then checks, per kind, that the SQLite keys hold
+every key read and number the keys before plus the rows appended, and
+only then sets `store: sqlite` in `.rafa/config.yaml` by a line edit
+that keeps every comment. The config text is built and parsed back
+before any row moves, so a file spelling `store` in a shape the edit
+does not cover refuses with nothing moved; a failed count check leaves
+the config as it was. The NDJSON files stay, a keyless row and an
+unparsed line are counted and not moved, and a move run again adds
+nothing and changes no config byte, which is how rows a loop started
+before the move appended later are brought in. `--to` takes `sqlite`
+alone; any other value, or none, is exit code 1 with nothing read.
+
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
 empty string, right after the detached refusal and before `--runtime`

@@ -206,7 +206,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue ready`, `issue unblock` and `issue check`;
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
-  `effort collect`, `effort report`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `module list`, `module exec`,
+  `effort collect`, `effort report`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release tag`, `board list`, `epic show`, aliased
