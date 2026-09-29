@@ -33,28 +33,73 @@ _rafa_prompt_plan_dir() {
   [[ $dir == /* ]] && REPLY=$dir || REPLY=$root/$dir
 }
 
-# Sets REPLY to the state of the live run of this branch, `running` or
-# `paused`: a record under `.rafa/runs/` naming the branch in one of those
-# states, whose process is still alive. Returns 1 when there is none.
-_rafa_prompt_live_run() {
-  local branch=$1 record content pid
-  shift
-  REPLY=''
-  for record in ${^@}/.rafa/runs/*.json(N); do
-    content=$(<$record)
-    [[ $content == *\"branch\":\ \"$branch\"* ]] || continue
-    [[ $content =~ '"state": "(running|paused)"' ]] || continue
-    local state=${match[1]}
-    [[ $content =~ '"pid": ([0-9]+)' ]] || continue
-    pid=${match[1]}
-    kill -0 $pid 2>/dev/null || continue
-    REPLY=$state
-    return 0
+# Sets the global array `rafa_live_runs` to one entry per live loop:
+# "branch<TAB>stub<TAB>state<TAB>plan". A loop is live while a record
+# under `.rafa/runs/` in one of the given roots is `running` or `paused`
+# and its process is alive; records whose process is gone are left out,
+# and a branch counts once however many records name it.
+_rafa_prompt_live_runs() {
+  typeset -ga rafa_live_runs
+  rafa_live_runs=()
+  local -A seen
+  local root record content state pid branch stub plan
+  for root in ${(u)@}; do
+    for record in $root/.rafa/runs/*.json(N); do
+      content=$(<$record)
+      [[ $content =~ '"state": "(running|paused)"' ]] || continue
+      state=${match[1]}
+      [[ $content =~ '"pid": ([0-9]+)' ]] || continue
+      pid=${match[1]}
+      kill -0 $pid 2>/dev/null || continue
+      [[ $content =~ '"branch": "([^"]*)"' ]] || continue
+      branch=${match[1]}
+      (( ${+seen[$branch]} )) && continue
+      seen[$branch]=1
+      stub=${branch#*/}
+      [[ $content =~ '"planStub": "([^"]+)"' ]] && stub=${match[1]}
+      plan=''
+      [[ $content =~ '"plan": "([^"]+)"' ]] && plan=${match[1]}
+      [[ -n $plan && $plan != /* ]] && plan=$root/$plan
+      rafa_live_runs+=("$branch"$'\t'"$stub"$'\t'"$state"$'\t'"$plan")
+    done
   done
-  return 1
 }
 
-# Reads the current checkout into the global association `rafa_plan`.
+# Sets `reply` to (done open blocked), the task lines of a tracker or plan.
+_rafa_prompt_count() {
+  setopt localoptions extendedglob
+  reply=(0 0 0)
+  [[ -r $1 ]] || return 1
+  local -a lines
+  lines=("${(@f)$(<$1)}")
+  reply=(${#${(M)lines:#[[:space:]]#- \[x\]*}} ${#${(M)lines:#[[:space:]]#- \[ \]*}}
+    ${#${(M)lines:#[[:space:]]#- \[BLOCKED\]*}})
+}
+
+# Sets REPLY to the label for a stub: `#<n>` for a `rafa-<n>-…` stub,
+# else the stub with `%` escaped, since it goes into a prompt.
+_rafa_prompt_label() {
+  if [[ $1 =~ '^[a-z0-9]+-([0-9]+)(-|$)' ]]; then
+    REPLY="#${match[1]}"
+  else
+    REPLY=${1//\%/%%}
+  fi
+}
+
+# Sets REPLY to "#<n> <task>/<total>" for one entry of `rafa_live_runs`:
+# the task in progress for a running loop, the tasks done for a paused one.
+_rafa_prompt_live_entry() {
+  local -a f
+  f=("${(@ps:\t:)1}")
+  local stub=${f[2]} state=${f[3]} plan=${f[4]} file=${f[4]}
+  [[ -f ${plan:h}/PLAN_TRACKER-$stub.md ]] && file=${plan:h}/PLAN_TRACKER-$stub.md
+  _rafa_prompt_count $file
+  local total=$(( reply[1] + reply[2] + reply[3] )) at=${reply[1]}
+  [[ $state == running ]] && at=$(( reply[1] + 1 ))
+  _rafa_prompt_label $stub
+  REPLY="$REPLY $at/$total"
+}
+
 # Reads the checkout into the global association `rafa_git` with one git
 # call: `top` (this checkout's root), `common` (the shared git directory),
 # `main` (the main checkout's root) and `branch`. Returns 1 outside git.
@@ -74,7 +119,8 @@ _rafa_prompt_git() {
 # `main` and `branch`; on a branch other than the base it also sets
 # `stub`, `issue` (the number in a `rafa-<n>-…` stub, else empty) and
 # `label`, and, when the branch has a plan, `plan`, `title`, `done`,
-# `open`, `blocked`, `total` and `run`. With a first argument it reuses
+# `open`, `blocked`, `total` and `run`. It also fills `rafa_live_runs`
+# with every live loop of the project. With a first argument it reuses
 # the `rafa_git` a caller has just read instead of calling git again.
 _rafa_prompt_read() {
   setopt localoptions extendedglob
@@ -85,13 +131,13 @@ _rafa_prompt_read() {
   local top=${rafa_git[top]} main=${rafa_git[main]} branch=${rafa_git[branch]}
   [[ -d $top/.rafa || -d $main/.rafa ]] || return 1
   rafa_plan=(top $top main $main branch $branch)
+  _rafa_prompt_live_runs $main $top
   [[ $branch == (main|master|HEAD) ]] && return 0
 
   local stub=${branch#*/} issue=''
   [[ $stub =~ '^[a-z0-9]+-([0-9]+)(-|$)' ]] && issue=${match[1]}
-  # A `%` in a branch name would otherwise read as a prompt escape.
-  local label=${${issue:+#$issue}:-${stub//\%/%%}}
-  rafa_plan+=(stub $stub issue "$issue" label $label)
+  _rafa_prompt_label $stub
+  rafa_plan+=(stub $stub issue "$issue" label $REPLY)
 
   # Plans are gitignored, so a worktree reads them from the main checkout.
   local root dir plan='' tracker=''
@@ -110,14 +156,17 @@ _rafa_prompt_read() {
   IFS= read -r title < $plan
   title=${${title#\# Plan: }//\`/}
 
-  local -a lines
-  lines=("${(@f)$(<${tracker:-$plan})}")
-  local done=${#${(M)lines:#[[:space:]]#- \[x\]*}}
-  local open=${#${(M)lines:#[[:space:]]#- \[ \]*}}
-  local blocked=${#${(M)lines:#[[:space:]]#- \[BLOCKED\]*}}
-  _rafa_prompt_live_run $branch $top $main
+  _rafa_prompt_count ${tracker:-$plan}
+  local done=${reply[1]} open=${reply[2]} blocked=${reply[3]}
+  local entry run=''
+  for entry in $rafa_live_runs; do
+    if [[ ${entry%%$'\t'*} == $branch ]]; then
+      run=${${(@ps:\t:)entry}[3]}
+      break
+    fi
+  done
   rafa_plan+=(plan $plan title "$title" done $done open $open
-    blocked $blocked total $(( done + open + blocked )) run "$REPLY")
+    blocked $blocked total $(( done + open + blocked )) run "$run")
 }
 
 # Sets REPLY to the task segment for what `_rafa_prompt_read` read, or to
@@ -131,7 +180,7 @@ _rafa_prompt_task_segment() {
     # plan is not rafa's, so it gets no segment.
     [[ ${rafa_plan[branch]} == feat/* ]] && REPLY="%F{244}📝 $label no plan%f"
   elif [[ ${rafa_plan[run]} == running ]]; then
-    REPLY="%F{red}🍅 $label task $(( done + 1 ))/$total%f"
+    REPLY="%F{red}🍅 $label $(( done + 1 ))/$total%f"
   elif [[ ${rafa_plan[run]} == paused ]]; then
     REPLY="%F{yellow}⏸ $label paused $done/$total%f"
   elif (( ${rafa_plan[blocked]} > 0 )); then
