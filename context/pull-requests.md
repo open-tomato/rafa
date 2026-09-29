@@ -290,6 +290,28 @@ A pinned plan per simple class ships in the package
 (`src/pr/plans/resolve-<class>.md`), filled from the triage block and run by
 the ordinary loop, so commits, reports and effort rows are the usual ones.
 
+`conflict-version` has no pinned plan and is not run through the loop:
+`resolvePullRequest` dispatches it to `src/commands/pr/triage-convert.ts`
+ahead of the pinned-plan check, after the trust check and the
+cross-repository refusal. In the same worktree it runs
+`convertStampedVersion` (`src/pr/triage/version-convert.ts`), which makes
+ONE commit touching three paths. It writes a fragment of the stamped
+section's lines, named after the branch's last segment (a rafa branch gives
+its plan stub). The fragment's level is how far the stamp moved from the
+merge base's version. The commit also sets the version file's version back
+to the merge base's, keeping the branch's other bytes in it, and restores the
+changelog to the merge base's text. Then it pushes without force and removes
+the worktree. No session, no CI wait, no attempt raised, no comment written:
+the next `rafa pr triage` assesses the moved head. The MERGE base's values
+and not the base tip's, because the guard measures a stamp against the
+merge base: a branch holding the tip's version and sections still reads
+`stale`/`released` and would be classed `conflict-version` again. The merge
+then takes the base's side of both files. Exit 0 when converted and pushed
+or when the guard no longer reads a stamp; exit 3 when the conversion is
+refused (the worktree is not at the pull request's head, no level reads off
+the stamp, the merge base holds no version or changelog) or the push is
+rejected.
+
 - Workspace: `git worktree add ~/.rafa/worktrees/pr-<n> <branch>`, so the
   operator's uncommitted work is never touched; removed on success, on the
   guard's stop and on an unresolvable class. It is NOT removed when an

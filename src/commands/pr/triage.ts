@@ -566,6 +566,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
       pulls: pr.pulls,
       root: pr.project.root,
       home: seams.home ?? pr.project.home,
+      release: pr.versionGuard,
       number,
       reading,
       maxAttempts,
@@ -622,7 +623,11 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       + ' ordinary loop over the pinned plan for that class, in a worktree under `~/.rafa/worktrees/pr-<n>` removed'
       + ' on success, each session capped at `pr.resolveBudget`; it waits on the checks after every attempt and, at'
       + ' `--max-attempts` or on an attempt ending as the one before it, updates the comment, removes the worktree,'
-      + ' prints the follow-up prompt and exits 3. It reads the triage comment only from an author holding write'
+      + ' prints the follow-up prompt and exits 3. A `conflict-version` pull request is not handed to the loop:'
+      + ' `--resolve` converts it in code, with no session and no attempt spent, turning the stamped changelog section'
+      + ' into a release fragment and setting the version file and the changelog back to the merge base\'s in one'
+      + ' commit it pushes to the branch, and exits 3 when the conversion or the push is refused.'
+      + ' It reads the triage comment only from an author holding write'
       + ' access to the repository or listed in `board.trustedAuthors`, and ignores and reports one written by'
       + ' anybody else. A cross-repository pull request, more than one candidate, and under `--resolve` a pull'
       + ' request whose author is neither trusted nor a known dependency-bump bot, are refused with exit code 2. With `--output=json` the selection, every'
@@ -645,7 +650,8 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       {
         name: 'resolve',
         description: 'Run the pinned plan for a simple class in a worktree of its own, waiting on CI after each'
-          + ' attempt. Exits 3 when the attempt guard gives up.',
+          + ' attempt, or convert a `conflict-version` stamp into a release fragment with no session. Exits 3 when'
+          + ' the attempt guard gives up or the conversion is refused.',
         type: 'boolean',
       },
       {
