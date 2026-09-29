@@ -23,6 +23,10 @@ import {
   FORECAST_NO_FRAGMENT_SENTENCE,
   FORECAST_NONE_SENTENCE,
   forecastRelease,
+  forecastSettle,
+  SETTLE_EMPTY_SENTENCE,
+  SETTLE_NONE_SENTENCE,
+  settlesSentence,
   shipsSentence,
   versionBump,
 } from './forecast.js';
@@ -181,5 +185,61 @@ describe('shipsSentence', () => {
   test('names the bump when there is one, the version alone otherwise', () => {
     expect(shipsSentence('0.26.0', 'minor')).toBe('ships as the next minor, 0.26.0 if merged now');
     expect(shipsSentence('2026.9', null)).toBe('ships as 2026.9 if merged now');
+  });
+});
+
+describe('forecastSettle', () => {
+  test('folds every waiting fragment, in order, into the version settle would write', () => {
+    const forecast = forecastSettle({
+      strategy: SEMVER,
+      baseVersion: '0.25.0',
+      waiting: [fragmentOf('rafa-354', 'patch', '2026-09-27'), fragmentOf('rafa-356', 'minor', '2026-09-28')],
+    });
+    expect(forecast).toMatchObject({
+      kind: 'settles',
+      strategy: 'semver-by-level',
+      baseVersion: '0.25.0',
+      waiting: ['rafa-354', 'rafa-356'],
+      version: '0.26.0',
+      bump: 'minor',
+    });
+    expect(forecast.sentence).toBe('settles as the next minor, 0.26.0');
+    if (forecast.kind !== 'settles') throw new Error(`expected settles, got ${forecast.kind}`);
+    expect(forecast.section.split('\n')[1]).toBe('<!-- rafa:fragments rafa-354 rafa-356 -->');
+  });
+
+  test('answers the section settle folds over the same batch', () => {
+    const waiting = [fragmentOf('rafa-1', 'patch'), fragmentOf('rafa-2', 'none')];
+    const forecast = forecastSettle({ strategy: SEMVER, baseVersion: '0.1.0', waiting });
+    const folded = SEMVER.fold('0.1.0', waiting);
+    expect(forecast).toMatchObject({ kind: 'settles', version: folded?.version, section: folded?.section });
+  });
+
+  test('nothing waiting is not folded: a throwing strategy is never reached', () => {
+    const forecast = forecastSettle({ strategy: throwing('reached'), baseVersion: '0.1.0', waiting: [] });
+    expect(forecast).toEqual({ kind: 'empty', sentence: SETTLE_EMPTY_SENTENCE });
+  });
+
+  test('only none fragments waiting settle no release, naming the strategy', () => {
+    const forecast = forecastSettle({ strategy: SEMVER, baseVersion: '0.1.0', waiting: [fragmentOf('rafa-1', 'none')] });
+    expect(forecast).toEqual({ kind: 'none', strategy: 'semver-by-level', sentence: SETTLE_NONE_SENTENCE });
+  });
+
+  test('a throwing strategy answers the port line naming it', () => {
+    const forecast = forecastSettle({
+      strategy: throwing('boom'),
+      baseVersion: '0.1.0',
+      waiting: [fragmentOf('rafa-1', 'patch')],
+    });
+    expect(forecast.kind).toBe('failed');
+    expect(forecast.sentence).toStartWith('release strategy semver-by-level failed: ');
+    expect(forecast.sentence).toContain('boom');
+  });
+});
+
+describe('settlesSentence', () => {
+  test('names the bump when there is one, the version alone otherwise', () => {
+    expect(settlesSentence('0.26.0', 'minor')).toBe('settles as the next minor, 0.26.0');
+    expect(settlesSentence('2026.9', null)).toBe('settles as 2026.9');
   });
 });

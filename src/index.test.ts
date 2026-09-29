@@ -832,6 +832,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/changelog.js', ['groupChangeNotes', 'renderNoteLines']],
     ['../../release/level.js', ['highestChangeLevel']],
     ['../../release/version.js', ['parseSemanticVersion', 'readManifestVersion']],
+    ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
   ]],
   ['./commands/release/settle.js', [
     ['../../cli/command.js', ['CommandExit']],

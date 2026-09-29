@@ -181,8 +181,12 @@ export function releaseCommitSubject(version: string): string {
   return `chore: release ${version}`;
 }
 
-/** The version `versionFile` declares at `commit`, or the sentence saying why not. */
-function versionAt(
+/**
+ * The version `versionFile` declares at `commit`, or the sentence saying
+ * why not. Reads one blob; `rafa release status` reads the base version
+ * its forecast folds from through it too.
+ */
+export function versionAt(
   git: GitRunner,
   commit: string,
   versionFile: string,

@@ -42,6 +42,15 @@
  * Every answer that folded names the strategy, and a `ships` answer
  * carries the base version and the waiting ids it was computed against,
  * so a reader can tell when the base has moved since.
+ *
+ * ## The fold of the base alone
+ *
+ * {@link forecastSettle} is the same fold with no branch: the fragments
+ * already waiting on the base, as `rafa release settle` would fold them
+ * now. It answers `settles` for a version, `none` when the fold answered
+ * null (every waiting fragment is `level: none`), `empty` when nothing
+ * waits, which is not folded, and `failed` as above. `rafa release
+ * status` prints it; like {@link forecastRelease} it reads nothing.
  */
 import type { ReleaseStrategy } from '../config-readers.js';
 import type { FoldFragment, ReleaseStrategyAdapter } from './strategy.js';
@@ -143,5 +152,61 @@ export function forecastRelease(input: ForecastInput): Forecast {
     bump,
     section,
     sentence: shipsSentence(version, bump),
+  };
+}
+
+/** What {@link forecastSettle} answers; see the module note. */
+export type SettleForecast =
+  | (ForecastBasis & {
+    readonly kind: 'settles';
+    readonly strategy: ReleaseStrategy;
+    /** The version the base moves to if settled now. */
+    readonly version: string;
+    /** The part of the base version that moves; null when none can be named. */
+    readonly bump: ForecastBump | null;
+    /** The section settle would write. */
+    readonly section: string;
+    readonly sentence: string;
+  })
+  | { readonly kind: 'none'; readonly strategy: ReleaseStrategy; readonly sentence: string }
+  | { readonly kind: 'empty'; readonly sentence: string }
+  | { readonly kind: 'failed'; readonly strategy: ReleaseStrategy; readonly sentence: string };
+
+/** What {@link forecastSettle} reads: {@link ForecastInput} with no branch. */
+export type SettleForecastInput = Omit<ForecastInput, 'branch'>;
+
+/** The sentence of a base whose waiting fragments all say `level: none`. */
+export const SETTLE_NONE_SENTENCE = 'settles no release (every waiting fragment is level none)';
+
+/** The sentence of a base with no fragment waiting. */
+export const SETTLE_EMPTY_SENTENCE = 'nothing waits to settle';
+
+/** The sentence of a settle that moves the base to `version`, moving `bump`. */
+export function settlesSentence(version: string, bump: ForecastBump | null): string {
+  return bump === null
+    ? `settles as ${version}`
+    : `settles as the next ${bump}, ${version}`;
+}
+
+/** What settling the base's waiting fragments now would release; see the module note. */
+export function forecastSettle(input: SettleForecastInput): SettleForecast {
+  const { strategy, baseVersion, waiting } = input;
+  if (waiting.length === 0) return { kind: 'empty', sentence: SETTLE_EMPTY_SENTENCE };
+
+  const outcome = foldWithStrategy(strategy, baseVersion, waiting);
+  if (!outcome.ok) return { kind: 'failed', strategy: outcome.strategy, sentence: outcome.line };
+  if (outcome.result === null) return { kind: 'none', strategy: outcome.strategy, sentence: SETTLE_NONE_SENTENCE };
+
+  const { version, section } = outcome.result;
+  const bump = versionBump(baseVersion, version);
+  return {
+    kind: 'settles',
+    strategy: outcome.strategy,
+    baseVersion,
+    waiting: waiting.map((each) => each.id),
+    version,
+    bump,
+    section,
+    sentence: settlesSentence(version, bump),
   };
 }

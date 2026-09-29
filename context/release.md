@@ -140,13 +140,19 @@ fragment restored, and reported.
 
 ### Three release actions
 
-**`rafa release status`** — Read-only. Prints four lines:
+**`rafa release status`** — Read-only. Prints five lines:
 - The version `release.versionFile` declares now
 - The latest release tag by semantic version precedence
 - Untagged versions `release.changelog` marks as released (ones that carry a
   changelog section but no `v<version>` tag)
 - Change notes pending for the current plan (the raw entries `readPlanChanges`
   would render into the next changelog)
+- The fragments waiting on `origin/<pr.base>` as last fetched (it fetches
+  nothing), one line each under it in fold order with level, add date and
+  title, and the release `rafa release settle` would fold them into, from
+  `forecastSettle` (`src/release/forecast.ts`); a fragment that does not
+  parse gives no forecast, since settle would refuse the batch
+  (`src/commands/release/status-fragments.ts`)
 
 Exits 0. Never writes.
 

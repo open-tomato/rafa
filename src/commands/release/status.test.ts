@@ -143,6 +143,7 @@ function reading(over: Partial<ReleaseStatusReading> = {}): ReleaseStatusReading
     tags: { tags: [tag('v0.4.0')], latest: tag('v0.4.0'), problem: null },
     untagged: { path: 'CHANGELOG.md', released: ['0.5.0', '0.4.0'], versions: ['0.5.0'], problem: null },
     plan: { stub: STUB, source: 'roster', branch: BRANCH, notes: [note()], level: 'minor', problem: null },
+    waiting: { ref: 'origin/main', read: true, baseVersion: '0.5.0', fragments: [], malformed: 0, forecast: null, problems: [] },
     ...over,
   };
 }
@@ -536,7 +537,7 @@ describe('the block', () => {
     expect(cellOf(text, 'latest tag')).toBe('v0.4.0, of 1 release tags');
     expect(cellOf(text, 'untagged')).toBe('0.5.0');
     expect(cellOf(text, 'pending')).toBe(`1 note for ${STUB}, worth a minor release`);
-    expect(linesOf(text).at(-1)).toBe('                - release: a line a user would understand');
+    expect(linesOf(text)[4]).toBe('                - release: a line a user would understand');
   });
 
   it('pads the labels to one column, so every cell starts at the same character', () => {
@@ -593,7 +594,7 @@ describe('the block', () => {
     }));
 
     expect(cellOf(text, 'pending')).toBe(`${NOTHING}: no current plan`);
-    expect(linesOf(text)).toHaveLength(4);
+    expect(linesOf(text)).toHaveLength(5);
   });
 
   it('says a plan with no stored note has none pending', () => {
@@ -636,7 +637,7 @@ describe('the block', () => {
       },
     }));
 
-    const notes = linesOf(text).slice(4);
+    const notes = linesOf(text).slice(4, -1);
 
     expect(notes.map((line) => line.trim()))
       .toEqual(['- release: one', '- release: three', '- two']);
