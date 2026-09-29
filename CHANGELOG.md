@@ -9,6 +9,17 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.29.0 — 2026-09-29, Choose how a project's effort store travels between devices
+
+- Config: new `effort.sync` (default `local`; one of `local`, `file`, `git`, `service` or `p2p`) names how a project's effort store travels between devices, and a value set in `~/.rafa/config.yaml` applies to every project that leaves it out; `rafa init` writes it commented out, and `effort.sync` and `prerequisites.required` are declared the settings every device of a team must share.
+- Ports: a new `Sync` port (version 1) pushes the rows this store wrote and pulls the rows another device wrote, always merging through `rafa effort merge`'s rules; core serves `local`, which has nothing to sync, and `file`, whose push is a `rafa effort copy` snapshot and whose pull is a merge.
+- Modules: a module can provide a sync strategy, listing `sync` in its manifest and registering its adapter as `sync/<kind>`; a module claiming `local` or `file`, or serving a port version core does not, is refused, naming both numbers.
+- Effort: new `rafa effort import <file> [--dry-run]` merges the `effort.sqlite` another device carried over, with `rafa effort merge`'s output and exit codes, including exit 2 for another project's store and for a `store: ndjson` project; importing the same file again adds nothing.
+- Doctor: `rafa doctor` gains an `effort sync` row naming the strategy in use (`local` when unset), and exits 1 when no adapter serves it, naming the `modules:` and `allowList:` lines that load a module providing `git`, `service` or `p2p`.
+- Loop: `rafa loop start` refuses a run whose `effort.sync` names a strategy no adapter serves, before any session, naming the same `modules:` and `allowList:` lines.
+- Tests: new tests hold the user and project precedence of `effort.sync` through `loadConfig`, the refused module adapters, a two-way `file` exchange converging on identical merged-table rows with a repeated pull adding nothing, and spawned `rafa effort import`, `rafa doctor` and `rafa loop start` runs over a missing module and over a project with no `effort.sync`, whose merge, copy and preflight outcomes are unchanged.
+- Docs: `context/effort-store.md` gains a Sync section (its pointer in `AGENTS.md` widened), and the README gains the `rafa effort import` line, the strategies from one laptop to a company with their config examples, and a warning that the carried file holds private text.
+
 ## 0.28.0 — 2026-09-29, Merge two devices' effort stores with nothing lost
 
 - Effort store: every row now records its origin, the id of the store that wrote it and its own position there, in two nullable columns added by the additive `row-origins` migration, so an older installed rafa keeps reading and writing the store; the `store-meta` migration adds `store_meta`, `merges` and `merge_conflicts`, and a writing open records the store's id in `store_meta`, minting a new one when the host, the file's path or its inode shows the store is a copy, while a read never writes it; every table declares its merge rule in `MERGE_RULES`, and release notes and skill facts read in one order on every merged store: by time, then origin, then local order.
