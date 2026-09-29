@@ -1,16 +1,19 @@
 /**
- * The `pr` and `release` sections of the config schema: each setting's
- * field, its default and its spec. `config-schema.ts`'s `RafaConfig`
- * extends {@link PrSettings} and {@link ReleaseSettings}, and its
- * `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below at the
- * places the two sections always sat, so the order settings are
- * reported in, and the order a warning lists keys in, is unchanged.
+ * The `pr` and `release` sections of the config schema, and the one
+ * `dangerous` key the release plan adds: each setting's field, its
+ * default and its spec. `config-schema.ts`'s `RafaConfig` extends
+ * {@link PrSettings}, {@link ReleaseSettings} and
+ * {@link DangerousReleaseSettings}, and its `CONFIG_DEFAULTS` and
+ * `SETTINGS` spread the objects below at the places the two sections
+ * always sat, and the `dangerous` key right after
+ * `dangerous.acceptStaleRefs`, so the order settings are reported in,
+ * and the order a warning lists keys in, holds each key's section.
  *
  * They moved out of `config-schema.ts` when that module stood at 780
  * lines, measured with `wc -l`, before the release plan's six keys
  * joined these two sections and `dangerous`: new keys in a module near
  * the 800-line cap of `context/source.md` would be paid for by
- * rewrapping prose. Every rule the schema module states about a KEY
+ * rewrapping prose. The six keys then joined here. Every rule the schema module states about a KEY
  * still holds here, and `config-sections.ts` still holds every rule
  * about a VALUE. Only `config-schema.ts` imports this file; a caller
  * reads these settings off the resolved `RafaConfig`.
@@ -47,6 +50,15 @@
  *     one merge, read by the command beside this setting, and not a
  *     layer over the config: a global `--merge-method` nobody typed
  *     would be a flag this module invented.
+ *   - `pr.versionCollision` defaults to `report`. It sets how `rafa pr
+ *     merge` reacts to a branch the release guard reads as `missing`
+ *     (source changes and no fragment) or `stale` (a stamped version
+ *     the base branch has passed): `report` names it and merges,
+ *     `allow` is silent, `ask` asks and `refuse` stops. A `collision` is
+ *     not this setting's: it always refuses, unless
+ *     `dangerous.acceptVersionCollision` says otherwise. A default of
+ *     `refuse` would stop every project whose branches still stamp their
+ *     own versions the day it upgrades.
  *
  * ## The `release` section
  *
@@ -76,7 +88,44 @@
  *     reason the `pr` section gives: the `release` commands read these
  *     settings beside their own arguments, and a global flag nobody
  *     typed would be one this module invented.
+ *
+ * Four more `release` settings belong to the plan in which no branch
+ * owns a version number — a branch commits one change fragment, and
+ * `rafa release settle` folds the fragments into a version on the base
+ * branch after the merges:
+ *
+ *   - `release.fragments` defaults to `.changes`, the directory a
+ *     fragment is written into. It is a path relative to the repository
+ *     root and never under `.rafa/`, which is gitignored; the reader,
+ *     `config-readers.ts`'s `fragmentsDirectory`, says why.
+ *   - `release.strategy` defaults to `semver-by-level`, and that is the
+ *     only value it accepts today: a closed list of one, so a file
+ *     naming a strategy that does not exist is refused rather than
+ *     folded by a strategy it did not name.
+ *   - `release.settle` defaults to `push`: settle pushes the settled
+ *     commit to the base branch, and `pr` opens a pull request with it
+ *     instead, for a base branch that takes no direct push.
+ *   - `release.tag` defaults to `manual`: `rafa release tag` stays the
+ *     one write of the tag, and `settle` has settle put it on the
+ *     commit it pushes.
+ *
+ * ## The `dangerous` key
+ *
+ * `dangerous.acceptVersionCollision` has `rafa pr merge` accept, on
+ * every run, a branch the release guard reads as a `collision` — its
+ * version already on the base branch with different notes — which it
+ * refuses whatever `pr.versionCollision` says. It is read as `dangerous.acceptStaleRefs`
+ * is, for the reasons `config-schema.ts`'s "The `dangerous` section"
+ * gives: it defaults to `false` and not null, it goes through `flag` so
+ * `"true"`, `yes` and `1` are refused, and it is not a
+ * `CommandLineSetting`.
  */
+import type {
+  ReleaseSettleMode,
+  ReleaseStrategy,
+  ReleaseTagMode,
+  VersionCollisionMode,
+} from './config-readers.js';
 import type { SettingSpec } from './config-schema.js';
 import type {
   MergeMethod,
@@ -84,8 +133,16 @@ import type {
   ReleaseEnabled,
 } from './config-sections.js';
 
-import { releaseFile } from './config-readers.js';
 import {
+  fragmentsDirectory,
+  releaseFile,
+  releaseSettleMode,
+  releaseStrategy,
+  releaseTagMode,
+  versionCollisionMode,
+} from './config-readers.js';
+import {
+  flag,
   mergeMethod,
   oneOf,
   PR_PROVIDERS,
@@ -114,6 +171,11 @@ export interface PrSettings {
    * spawned with. `pr.resolveBudget`.
    */
   prResolveBudget: number;
+  /**
+   * How `pr merge` reacts to a branch the release guard reads as
+   * `missing` or `stale`. `pr.versionCollision`.
+   */
+  prVersionCollision: VersionCollisionMode;
 }
 
 /** The `release` section's settings, resolved. */
@@ -135,6 +197,26 @@ export interface ReleaseSettings {
   releaseChangelog: string;
   /** The template one entry's heading is rendered from. `release.heading`. */
   releaseHeading: string;
+  /**
+   * The directory change fragments are written into, from the
+   * repository root. `release.fragments`.
+   */
+  releaseFragments: string;
+  /** The strategy the fragments are folded into a version by. `release.strategy`. */
+  releaseStrategy: ReleaseStrategy;
+  /** How settle lands the settled version on the base branch. `release.settle`. */
+  releaseSettle: ReleaseSettleMode;
+  /** Who tags a settled version. `release.tag`. */
+  releaseTag: ReleaseTagMode;
+}
+
+/** The `dangerous` setting the release plan adds, resolved. */
+export interface DangerousReleaseSettings {
+  /**
+   * Whether `pr merge` accepts, on every run, a branch the release
+   * guard reads as a `collision`. `dangerous.acceptVersionCollision`.
+   */
+  dangerousAcceptVersionCollision: boolean;
 }
 
 /** What every `pr` setting resolves to when no layer names it. */
@@ -143,6 +225,7 @@ export const PR_DEFAULTS: Readonly<PrSettings> = Object.freeze({
   prMergeMethod: 'squash',
   prBase: null,
   prResolveBudget: 2,
+  prVersionCollision: 'report',
 });
 
 /** What every `release` setting resolves to when no layer names it. */
@@ -151,6 +234,15 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseFragments: '.changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'push',
+  releaseTag: 'manual',
+});
+
+/** What the release plan's `dangerous` setting resolves to when no layer names it. */
+export const DANGEROUS_RELEASE_DEFAULTS: Readonly<DangerousReleaseSettings> = Object.freeze({
+  dangerousAcceptVersionCollision: false,
 });
 
 /** The `pr` section's setting specs, in the order problems are reported. */
@@ -161,6 +253,11 @@ export const PR_SETTINGS: {
   prMergeMethod: { key: 'pr.mergeMethod', read: mergeMethod, cli: false },
   prBase: { key: 'pr.base', read: text('a branch name'), cli: false },
   prResolveBudget: { key: 'pr.resolveBudget', read: usdAmount, cli: false },
+  prVersionCollision: {
+    key: 'pr.versionCollision',
+    read: versionCollisionMode,
+    cli: false,
+  },
 };
 
 /** The `release` section's setting specs, in the order problems are reported. */
@@ -177,6 +274,25 @@ export const RELEASE_SETTINGS: {
   releaseHeading: {
     key: 'release.heading',
     read: text('a changelog heading template'),
+    cli: false,
+  },
+  releaseFragments: {
+    key: 'release.fragments',
+    read: fragmentsDirectory,
+    cli: false,
+  },
+  releaseStrategy: { key: 'release.strategy', read: releaseStrategy, cli: false },
+  releaseSettle: { key: 'release.settle', read: releaseSettleMode, cli: false },
+  releaseTag: { key: 'release.tag', read: releaseTagMode, cli: false },
+};
+
+/** The release plan's `dangerous` setting spec. */
+export const DANGEROUS_RELEASE_SETTINGS: {
+  readonly [K in keyof DangerousReleaseSettings]: SettingSpec<K>;
+} = {
+  dangerousAcceptVersionCollision: {
+    key: 'dangerous.acceptVersionCollision',
+    read: flag,
     cli: false,
   },
 };

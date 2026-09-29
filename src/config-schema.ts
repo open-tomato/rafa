@@ -12,8 +12,9 @@
  * `mapOf`, whose ruling is on a KEY — the names a map setting's file
  * spells below its own key — and the named readers the settings below
  * are read through, `directory`, `trackerKind`, `releaseFile`,
- * `tierPins` and `routeTable`. `config-schema-release.ts` holds the
- * `pr` and `release` sections, spread in here.
+ * `tierPins` and `routeTable`, and the readers of the release plan's
+ * keys. `config-schema-release.ts` holds the `pr` and `release`
+ * sections and `dangerous.acceptVersionCollision`, spread in here.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -57,10 +58,11 @@
  *
  * Both sections' fields, defaults and specs sit in
  * `config-schema-release.ts`, whose note argues the readings their
- * specs leave open. {@link RafaConfig} extends its two interfaces, and
+ * specs leave open. {@link RafaConfig} extends its three interfaces, and
  * {@link CONFIG_DEFAULTS} and {@link SETTINGS} spread its defaults and
- * specs where the sections have always sat, so the order settings are
- * reported in and a warning lists keys in is unchanged. One of its
+ * specs where the sections have always sat, and its `dangerous` key
+ * after `dangerous.acceptStaleRefs`, so each key is reported, and a
+ * warning lists it, among its own section's. One of its
  * readings is cited by the sections below: no `pr` setting is a
  * {@link CommandLineSetting}, because a command's own flag for one run
  * is not a layer over the config, and a global flag nobody typed would
@@ -146,6 +148,10 @@
  *   - It is not a {@link CommandLineSetting}. `--accept-refs` is
  *     `plan create`'s own argument for one run and not a layer over
  *     this key, for the reason the `pr` section gives.
+ *
+ * `dangerous.acceptVersionCollision` is read the same three ways, and
+ * its field, default and spec sit in `config-schema-release.ts` beside
+ * the `pr.versionCollision` it overrides, spread in right after this one.
  *
  * ## The `status` section
  *
@@ -273,7 +279,11 @@
  * cutover runs one plan under `full` and again under `stage`; should
  * that comparison argue for `full`, the change is that one line.
  */
-import type { PrSettings, ReleaseSettings } from './config-schema-release.js';
+import type {
+  DangerousReleaseSettings,
+  PrSettings,
+  ReleaseSettings,
+} from './config-schema-release.js';
 import type {
   ClaudeSettingSource,
   ConfigVersion,
@@ -300,6 +310,8 @@ import {
   trackerKind,
 } from './config-readers.js';
 import {
+  DANGEROUS_RELEASE_DEFAULTS,
+  DANGEROUS_RELEASE_SETTINGS,
   PR_DEFAULTS,
   PR_SETTINGS,
   RELEASE_DEFAULTS,
@@ -347,9 +359,10 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
 /**
  * Every setting, resolved. The module note maps each to its file key;
  * the `pr` and `release` fields are {@link PrSettings}' and
- * {@link ReleaseSettings}'.
+ * {@link ReleaseSettings}', and `dangerousAcceptVersionCollision` is
+ * {@link DangerousReleaseSettings}'.
  */
-export interface RafaConfig extends PrSettings, ReleaseSettings {
+export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -495,6 +508,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
   dangerousAcceptStaleRefs: false,
+  ...DANGEROUS_RELEASE_DEFAULTS,
   statusNotice: true,
   tiersRafa: 'on',
   tiersSkills: new Map<string, TierPin>(),
@@ -601,6 +615,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: flag,
     cli: false,
   },
+  ...DANGEROUS_RELEASE_SETTINGS,
   statusNotice: { key: 'status.notice', read: flag, cli: false },
   tiersRafa: { key: 'tiers.rafa', read: tierSwitch, cli: false },
   tiersSkills: { key: 'tiers.skills', read: tierPins, cli: false },
