@@ -195,8 +195,10 @@
  * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
  * never by `process.exit`, so the dispatcher writes the terminal event.
  * A line asking for `-d|--detached`, refused before anything else is
- * read (`start/run-config.ts`), a `RAFA_EFFORT_DIR` set in the
- * environment, refused right after it (the same module), a `--runtime`
+ * read (`start/run-config.ts`), `--as-worktree` beside
+ * `--create-branch`, refused right after it (`start/run-setup.ts`), a
+ * `RAFA_EFFORT_DIR` set in the environment, refused next
+ * (`start/run-config.ts`), a `--runtime`
  * refused (`start/runtime.ts`),
  * an unusable config, a plan file that does not exist, a checkout git
  * could not read (`start/checkout.ts`), a branch offer
@@ -257,7 +259,12 @@ import {
   refuseDetachedRun,
   refuseEffortDirRun,
 } from './start/run-config.js';
-import { guardRunBranch, readRunArgs, resolveRunBranch } from './start/run-setup.js';
+import {
+  guardRunBranch,
+  readRunArgs,
+  refuseWorktreeBesideCreateBranch,
+  resolveRunBranch,
+} from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
@@ -284,6 +291,8 @@ let interrupted = false;
 export default async function start(args: string[], repoRoot: string): Promise<void> {
   // Before anything is read: `-d|--detached` is declared, and refused until phase 6.
   refuseDetachedRun(args);
+  // Then two flags that each make the plan's branch, one of them in a worktree.
+  refuseWorktreeBesideCreateBranch(args);
   // Then a store override: a loop records to the project's own store, never to a copy.
   refuseEffortDirRun(process.env);
   // Then `--runtime`: an installed rafa other than this one runs the whole run instead.

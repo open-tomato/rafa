@@ -17,6 +17,11 @@
  * throws when it is opened: a case that reached the terminal reddens
  * instead of hanging.
  *
+ * `refuseWorktreeBesideCreateBranch` reads the words alone, so its
+ * cases hand it lines and read what it throws; each refusing case is
+ * paired with the same line less one flag, which returns, so the
+ * refusal is shown to be keyed on the pair and not on either flag.
+ *
  * The guard and wiring cases moved here from `tests/plan-stamp.test.ts`
  * with the two functions, unchanged.
  */
@@ -31,7 +36,13 @@ import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
-import { guardRunBranch, readRunArgs, resolveRunBranch } from './run-setup.js';
+import {
+  guardRunBranch,
+  readRunArgs,
+  refuseWorktreeBesideCreateBranch,
+  resolveRunBranch,
+} from './run-setup.js';
+import { NOTHING_DISPATCHED } from './session.js';
 
 const STUB = 'q16a-compose-n8n';
 
@@ -95,6 +106,48 @@ function refusalOf(planStub: string | null, branch: string, args: readonly strin
     throw error;
   }
 }
+
+/** Runs the refusal over `args` and answers what it threw, or undefined. */
+function worktreeRefusalOf(args: readonly string[]): unknown {
+  try {
+    refuseWorktreeBesideCreateBranch(args);
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
+describe('refuseWorktreeBesideCreateBranch', () => {
+  it('throws exit code 1 naming both flags when the line carries both', () => {
+    const thrown = worktreeRefusalOf(['--plan=.rafa/plans/PLAN-x.md', '--as-worktree', '--create-branch']);
+
+    expect(thrown).toBeInstanceOf(CommandExit);
+    const exit = thrown as CommandExit;
+    expect(exit.exitCode).toBe(1);
+    expect(exit.message.startsWith('❌ Refusing --as-worktree beside --create-branch:')).toBe(true);
+    expect(exit.message).toContain('--as-worktree alone');
+    expect(exit.message).toContain('--create-branch alone');
+    expect(exit.message.endsWith(NOTHING_DISPATCHED)).toBe(true);
+  });
+
+  it('refuses the pair in either order', () => {
+    expect(worktreeRefusalOf(['--create-branch', '--as-worktree'])).toBeInstanceOf(CommandExit);
+  });
+
+  it.each([
+    [['--plan=.rafa/plans/PLAN-x.md', '--as-worktree']],
+    [['--plan=.rafa/plans/PLAN-x.md', '--create-branch']],
+    [['--plan=.rafa/plans/PLAN-x.md']],
+  ])('returns for %j, which carries at most one of the two', (args) => {
+    expect(worktreeRefusalOf(args)).toBeUndefined();
+  });
+
+  it('reads the flags as bare words, as the branch offer reads --create-branch', () => {
+    // `resolveRunBranch` acts on the bare `--create-branch` only, so a
+    // valued spelling makes no branch and there is no pair to refuse.
+    expect(worktreeRefusalOf(['--as-worktree', '--create-branch=false'])).toBeUndefined();
+  });
+});
 
 describe('guardRunBranch', () => {
   /** Lines the guard wrote through the active output at warn level. */

@@ -20,6 +20,12 @@
  * The guard's two warnings go through the active output
  * (`adapters/output/active.ts`), and its refusal is thrown as a
  * `CommandExit` with exit code 1.
+ *
+ * {@link refuseWorktreeBesideCreateBranch} runs ahead of all of it, on
+ * the words alone: `--as-worktree` and `--create-branch` both make the
+ * plan's `feat/<stub>`, one in a worktree of its own and the other by
+ * switching the main checkout, so a line naming both asks for two
+ * contradictory things and is refused before anything is read.
  */
 import type { BranchSeams } from './branch.js';
 
@@ -30,6 +36,7 @@ import { branchNameFor, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
 import { argValue } from './run-config.js';
+import { NOTHING_DISPATCHED } from './session.js';
 
 /** Branches a plan run is refused on, and the ones the branch offer is made on. */
 const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
@@ -40,11 +47,38 @@ const ANY_BRANCH_FLAG = '--any-branch';
 /** The flag that answers the branch question yes before it is asked. */
 const CREATE_BRANCH_FLAG = '--create-branch';
 
+/**
+ * The flag that runs the plan in a linked worktree of its own
+ * (`start/worktree.ts`), leaving the main checkout where it is.
+ */
+export const AS_WORKTREE_FLAG = '--as-worktree';
+
 /** The flag `rafa next --roadmap` passes on, stamping the away hop on the session record (`start/session.ts`). */
 const ROADMAP_FLAG = '--roadmap';
 
 /** What the refusal calls a plan whose file names no stub. */
 const UNNAMED_PLAN = 'this-plan';
+
+/**
+ * Throws `CommandExit` with exit code 1 when the words carry both
+ * `--as-worktree` and `--create-branch`, and returns otherwise.
+ *
+ * Both flags are read as bare words, the way {@link resolveRunBranch}
+ * reads `--create-branch`, so the refusal fires on exactly the lines
+ * where each flag would act. It names both routes rather than choosing
+ * one: which checkout the operator meant to leave on the base is not
+ * something the words say.
+ */
+export function refuseWorktreeBesideCreateBranch(args: readonly string[]): void {
+  if (!args.includes(AS_WORKTREE_FLAG) || !args.includes(CREATE_BRANCH_FLAG)) return;
+  throw new CommandExit(1, [
+    `❌ Refusing ${AS_WORKTREE_FLAG} beside ${CREATE_BRANCH_FLAG}: each makes the plan's branch, one in a worktree`,
+    '   of its own and the other by switching the main checkout to it.',
+    `   Pass ${AS_WORKTREE_FLAG} alone to run under \`loop.worktreeDir\` and leave the main checkout as it is,`,
+    `   or ${CREATE_BRANCH_FLAG} alone to switch the main checkout to the branch and run there.`,
+    NOTHING_DISPATCHED,
+  ].join('\n'));
+}
 
 /** What the run knows about its branch when the offer is made. */
 export interface RunBranchRequest {
