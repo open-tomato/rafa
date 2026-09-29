@@ -107,11 +107,19 @@
  * another kind reddened the four planner cases. Each refusal dropped
  * reddened its own case alone. The context's spawner ignored, and the
  * context's sources ignored, each reddened the planner case alone.
+ *
+ * Two more were driven on 2026-09-29, once the `sync` port was served
+ * with no core kind, over this file, `src/ports/index.test.ts`,
+ * `src/tests/adapter-registry.test.ts` and `src/modules/`, with
+ * `registry.ts` restored and verified with `sha256sum -c`.
+ * `PORT_VERSIONS.sync` set to 2 failed `check-types` and reddened the
+ * literal case and both sync add-on cases. The sync adapters left out
+ * of the index reddened the add-on sync kind case alone.
  */
 import type { DescribedInstinctRecord } from './learning/local.js';
 import type { AdapterContext, AnyAdapter } from './registry.js';
 import type { SessionEffortRow } from '../effort/store/types.js';
-import type { InstinctRecord, Tracker } from '../ports/index.js';
+import type { InstinctRecord, Sync, Tracker } from '../ports/index.js';
 import type { CapturingSpawner } from '../utils/claude.js';
 
 import {
@@ -152,7 +160,7 @@ const REGISTRY_ENTRY = fileURLToPath(new URL('./registry.ts', import.meta.url));
 const PORTS_ENTRY = fileURLToPath(new URL('../ports/index.ts', import.meta.url));
 
 /** The port types, in the order a refusal lists them. */
-const PORT_TYPES = 'tracker, store, learning, output, planner';
+const PORT_TYPES = 'tracker, store, learning, output, planner, sync';
 
 /** What the planner case's session writes to stdout: a review judging the spec ready. */
 const PLANNER_SESSION_STDOUT = [
@@ -173,12 +181,13 @@ const DRIFTED_PROBE = [
   '  learning: 1;',
   '  output: 1;',
   '  planner: number;',
+  '  sync: 1;',
   '}',
   '',
 ].join('\n');
 
 /** What the reader must report for the drifted probe. */
-const DRIFTED_READING = { tracker: 2, store: 1, learning: 1, output: 1, planner: 'number' };
+const DRIFTED_READING = { tracker: 2, store: 1, learning: 1, output: 1, planner: 'number', sync: 1 };
 
 /** Each store backend and the files it leaves once a session row is written. */
 const STORE_LAYOUTS: readonly (readonly [string, readonly string[]])[] = [
@@ -246,6 +255,13 @@ const FIXTURE_TRACKER: Tracker = {
   },
   comment: async () => {},
   transition: async () => ({}),
+};
+
+/** A sync every fixture sync adapter answers. Never called. */
+const FIXTURE_SYNC: Sync = {
+  kind: 'git',
+  push: async () => ({ status: 'nothing-to-sync' }),
+  pull: async () => ({ status: 'nothing-to-sync' }),
 };
 
 /**
@@ -724,6 +740,25 @@ describe('registering an adapter', () => {
     expect(attempt).toThrow(`adapter registry: an adapter is ${quoted}, expected a mapping`);
   });
 
+  it('answers a new registry holding an add-on sync kind, where core holds none', () => {
+    const extended = CORE_ADAPTER_REGISTRY.register(
+      addOn({ port: 'sync', kind: 'git', create: () => FIXTURE_SYNC }),
+    );
+
+    expect(extended.kinds('sync')).toEqual(['git']);
+    expect(extended.resolve('sync', 'git').create({ repoRoot: '/nonexistent' })).toBe(FIXTURE_SYNC);
+    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual([]);
+  });
+
+  it('refuses a sync add-on at a port version core does not serve, naming both numbers', () => {
+    const sync = addOn({ port: 'sync', kind: 'git', portVersion: 2, create: () => FIXTURE_SYNC });
+
+    expect(() => CORE_ADAPTER_REGISTRY.register(sync)).toThrow(
+      'adapter registry: sync/git implements sync port version 2,'
+        + ' and core serves sync port version 1',
+    );
+  });
+
   it('refuses through createAdapterRegistry as register does, on the first refused adapter', () => {
     const attempt = (): unknown => createAdapterRegistry([
       addOn(),
@@ -781,6 +816,9 @@ describe('looking an adapter up', () => {
     );
     expect(() => CORE_ADAPTER_REGISTRY.resolve('planner', 'webhook')).toThrow(
       'adapter registry: no planner adapter is registered as "webhook"; registered: claude',
+    );
+    expect(() => CORE_ADAPTER_REGISTRY.resolve('sync', 'git')).toThrow(
+      'adapter registry: no sync adapter is registered as "git"; registered: none',
     );
   });
 

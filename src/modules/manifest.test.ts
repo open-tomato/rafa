@@ -65,7 +65,7 @@ const SEAMS: ManifestSeams = { rafaVersion: '0.2.0', portVersions: PORT_VERSIONS
 const TYPES = 'output, tracker, store, planner, learning, skills, agents, mcp, commands';
 
 /** The port types, as a refusal lists them. */
-const PORTS = 'tracker, store, learning, output, planner';
+const PORTS = 'tracker, store, learning, output, planner, sync';
 
 /** The sentence every refusal of `learning` ends with. */
 const CLOSED = 'which core closes to third parties: a module never provides a learning source';

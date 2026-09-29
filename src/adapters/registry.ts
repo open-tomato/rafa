@@ -14,8 +14,8 @@
  *
  * ## Keys
  *
- * A port type is one of the five `PortType` names: `tracker`, `store`,
- * `learning`, `output` and `planner`. A kind is any non-empty string,
+ * A port type is one of the six `PortType` names: `tracker`, `store`,
+ * `learning`, `output`, `planner` and `sync`. A kind is any non-empty string,
  * core's own (`sqlite`) or one an add-on brings. The registry refuses a
  * second adapter under a port type and kind it already holds, so an
  * add-on cannot take a core kind over by registering its name. A
@@ -66,7 +66,9 @@
  * `src/adapters/learning/`, `learning/local`, and the planner under
  * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
  * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
- * the phase 1 table names.
+ * the phase 1 table names. Core registers no `sync` adapter yet: the port
+ * is served at version 1, so a module's `sync` adapter registers, and
+ * `kinds('sync')` answers an empty list.
  *
  * ## What an adapter answers
  *
@@ -106,6 +108,7 @@ import type {
   Planner,
   PortType,
   PortVersions,
+  Sync,
   Tracker,
 } from '../ports/index.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -140,6 +143,7 @@ export const PORT_VERSIONS: Readonly<PortVersions> = Object.freeze({
   learning: 1,
   output: 1,
   planner: 1,
+  sync: 1,
 } satisfies PortVersions);
 
 /** The served versions by port type, for a lookup no prototype member answers. */
@@ -158,6 +162,7 @@ export interface PortImplementations {
   learning: Learning;
   output: Output;
   planner: Planner;
+  sync: Sync;
 }
 
 /** What every adapter is made with. */
@@ -330,6 +335,7 @@ function indexByPort(adapters: readonly AnyAdapter[]): AdaptersByPort {
     learning: only('learning'),
     output: only('output'),
     planner: only('planner'),
+    sync: only('sync'),
   };
 }
 

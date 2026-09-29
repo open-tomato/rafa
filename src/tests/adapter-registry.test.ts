@@ -17,7 +17,8 @@
  *
  *   - Every core port kind resolves and makes something real, from a
  *     context wide enough to satisfy every one of the eight at once,
- *     across all five port types.
+ *     across the five port types core registers a kind for. The sixth,
+ *     `sync`, is read too, and core registers no kind for it yet.
  *   - A fixture add-on adapter registers under a name of its own and is
  *     found beside the core kinds, without changing the registry it
  *     extended.
@@ -128,12 +129,14 @@ describe('every core port kind', () => {
       learning: CORE_ADAPTER_REGISTRY.kinds('learning'),
       output: CORE_ADAPTER_REGISTRY.kinds('output'),
       planner: CORE_ADAPTER_REGISTRY.kinds('planner'),
+      sync: CORE_ADAPTER_REGISTRY.kinds('sync'),
     }).toEqual({
       tracker: ['local', 'github'],
       store: ['sqlite', 'ndjson'],
       learning: ['local'],
       output: ['text', 'json'],
       planner: ['claude'],
+      sync: [],
     });
 
     const sqlite = CORE_ADAPTER_REGISTRY.resolve('store', 'sqlite').create(context);
