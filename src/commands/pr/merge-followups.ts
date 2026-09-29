@@ -27,6 +27,23 @@
  * Both are therefore silent on the ordinary merge of a change that
  * touched no version, which is what makes them worth printing at all.
  *
+ * ## The update waits for a live loop
+ *
+ * `rafa self-update` also refuses while a loop of the project is live,
+ * since each loop runs from the runtime it would replace
+ * (`src/commands/self-update.ts`). The update still applies then — the
+ * version is still not installed — so the line is kept and its reason
+ * says when: {@link FollowUpReading.liveLoopBranches} names the branch of
+ * each live loop, and a non-empty list ends the reason with
+ * `run it after the loop on <branch> finishes` ({@link afterLoopsPhrase}),
+ * several branches joined into one `after the loops on … finish`. The
+ * line reads so whatever `dangerous.selfUpdateDuringLoop` says: that key
+ * lets the command through, and waiting is still what a loop needs. A
+ * list that could not be read, because a record under `.rafa/runs/`
+ * cannot be, is null, and the reason says so instead, since
+ * `self-update` exits 2 over that same record: the line never names the
+ * command bare while it cannot rule a loop out.
+ *
  * ## Both name a rafa command, and this still only prints them
  *
  * rafa-21 registered `release tag`, and {@link versionTag} is the one
@@ -77,6 +94,11 @@ export interface FollowUpReading {
   readonly rafaCheckout: boolean;
   /** True when that version is already installed as a runtime under the home. */
   readonly runtimeInstalled: boolean;
+  /**
+   * The branch of each live loop of the project, oldest first, empty
+   * while none runs, or null when a loop record could not be read.
+   */
+  readonly liveLoopBranches: readonly string[] | null;
 }
 
 /** What a project's `package.json` says that the follow-ups turn on. */
@@ -102,6 +124,29 @@ function trimmedOrNull(value: unknown): string | null {
 /** The tag naming `version`, in this repository's spelling: `v0.4.0`. */
 export function versionTag(version: string): string {
   return `v${version}`;
+}
+
+/**
+ * When the update can run beside `branches`, the live loops' branches:
+ * `after the loop on <branch> finishes`, or for several, each named once,
+ * `after the loops on <a>, <b> and <c> finish`.
+ */
+export function afterLoopsPhrase(branches: readonly string[]): string {
+  const named = [...new Set(branches)];
+  if (named.length === 1) return `after the loop on ${named[0] ?? ''} finishes`;
+  const last = named.at(-1) ?? '';
+  return `after the loops on ${named.slice(0, -1).join(', ')} and ${last} finish`;
+}
+
+/** Why the update applies, and when a live loop lets it run; see the module note. */
+function selfUpdateWhy(version: string, liveLoopBranches: readonly string[] | null): string {
+  const why = `${version} is not installed as this machine's rafa runtime`;
+  if (liveLoopBranches === null) {
+    return `${why}; a loop record under .rafa/runs cannot be read, and rafa self-update refuses until it can`;
+  }
+  return liveLoopBranches.length === 0
+    ? why
+    : `${why}; run it ${afterLoopsPhrase(liveLoopBranches)}`;
 }
 
 /**
@@ -133,7 +178,7 @@ export function readPackageFacts(text: string): PackageFacts {
  * module note.
  */
 export function readFollowUps(reading: FollowUpReading): readonly FollowUp[] {
-  const { rafaCheckout, runtimeInstalled, tagged, version } = reading;
+  const { liveLoopBranches, rafaCheckout, runtimeInstalled, tagged, version } = reading;
   if (version === null) return Object.freeze([]);
 
   const followUps: FollowUp[] = [];
@@ -148,7 +193,7 @@ export function readFollowUps(reading: FollowUpReading): readonly FollowUp[] {
     followUps.push({
       id: 'self-update',
       command: 'rafa self-update',
-      why: `${version} is not installed as this machine's rafa runtime`,
+      why: selfUpdateWhy(version, liveLoopBranches),
     });
   }
   return Object.freeze(followUps.map((followUp) => Object.freeze(followUp)));

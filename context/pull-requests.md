@@ -133,7 +133,10 @@ sentence replaces nothing.
    and the exit code stays 0. A branch checked out in another worktree is
    present, so step 1 still refuses it.
 4. Tick the roadmap, print what is ready and the two follow-ups when they
-   apply: `rafa release tag` and `rafa self-update`.
+   apply: `rafa release tag` and `rafa self-update`. While a loop of the
+   project is live, the update's line ends `run it after the loop on
+   <branch> finishes`, since `rafa self-update` refuses until then
+   (`src/commands/pr/merge-followups.ts`).
 5. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
