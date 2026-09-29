@@ -167,37 +167,10 @@ rebuild over non-null rows migrates, names the backup, refuses beside a
 planted live loop, and spawns `bun src/rafa.ts`: refused over a project's
 store, migrating a copy under `RAFA_EFFORT_DIR`.
 
-**`rafa effort merge <file> [--dry-run]` joins another device's store**
-(`src/commands/effort/merge.ts` over `mergeStore`,
-`src/effort/store/merge-store.ts`, whose note holds the rules and the
-refusals). This store is the one `effortStoreDir` answers; `<file>` is
-read against the directory the command runs from and is only read. It
-prints, per merged table, the rows added, skipped and in conflict (and
-the set-once fields filled and the rows another UNIQUE key refused,
-when any), the totals with the commit gaps recomputed, and
-`effort.sqlite.before-merge-<stamp>.bak`, or under `--dry-run` that the
-build was checked and deleted. Another project's store and a
-`store: ndjson` project, the latter naming `rafa effort move
---to=sqlite`, are exit code 2; every other refusal, a live loop and a
-development build over a store it does not own among them, is exit
-code 1, and each leaves both files byte-identical (`merge.test.ts`).
-
-**`rafa effort move --to=sqlite` is that step** (`src/commands/effort/move.ts`
-over `moveToSqlite`, `src/effort/store/move.ts`). It reads the NDJSON
-sessions and commits with the NDJSON backend's `readRows` and appends
-them with the SQLite backend's `append`, both under `effortStoreDir`, so
-each row is deduplicated by its port key and the open's development-build
-refusal applies. It then checks, per kind, that the SQLite keys hold
-every key read and number the keys before plus the rows appended, and
-only then sets `store: sqlite` in `.rafa/config.yaml` by a line edit
-that keeps every comment. The config text is built and parsed back
-before any row moves, so a file spelling `store` in a shape the edit
-does not cover refuses with nothing moved; a failed count check leaves
-the config as it was. The NDJSON files stay, a keyless row and an
-unparsed line are counted and not moved, and a move run again adds
-nothing and changes no config byte, which is how rows a loop started
-before the move appended later are brought in. `--to` takes `sqlite`
-alone; any other value, or none, is exit code 1 with nothing read.
+**`rafa effort merge <file> [--dry-run]` joins another device's store,
+and `rafa effort move --to=sqlite` migrates from NDJSON to SQLite.**
+See `context/effort-merge.md` for the merge rules, the command details,
+and the merge trail (`merges` and `merge_conflicts` tables).
 
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
@@ -225,6 +198,121 @@ warning beside a store holding no unknown migration; each run halts
 at a failing required item, so no session is spawned.
 `doctor-effort-schema.test.ts` spawns `doctor` and `effort schema
 --check` over the same stores and holds their exit codes together.
+
+### Row origins
+
+**A store's origin is its store id, not the machine id.** A row's
+**origin pair** is `(origin_store, origin_seq)`, where `origin_store`
+is a UUID minted when the store first writes after a migration, and
+`origin_seq` is the row's own local `seq` at the moment of insert. The
+origin pair stays with a row through copies and merges, so rows from
+the first device keep their A identity even after being copied to device
+B. If device B then keeps its own store id and the copied rows under A's
+origin, both devices can write new rows with their own store ids
+without collision: B's new rows are `finding:B:1`, while the copied
+rows keep `finding:A:1`, etc. This is why the origin is the store and
+not the machine — a single machine might hold multiple copies of a
+store.
+
+**Minting a new origin is always safe; missing a copy is not.** The
+principle guides every copy-detection rule. A new origin should be
+minted when a copy is detected, even if the detection is uncertain —
+false positives create duplicates that merge removes, while false
+negatives create collisions that merge cannot undo. A store mints a new
+origin on a write open after the first migration (when the origin pair
+columns were added) and on a write open that detects a copy, never on a
+read open.
+
+**The nine scenarios describe every way two stores can meet.** Numbered
+by who comes second (the store being brought in): 1) no store anywhere
+(the first device creates it); 2) one device has a store (the other
+takes a copy before opening); 3) two clean starts (every row new,
+only commits overlap); 4) copied then diverged (the shared part
+collapses, diverged parts are added); 5) a restored older `.bak`
+(nothing new, just the old store restored); 6) different rafa versions
+(both brought to the union of named migrations); 7) wrong project
+(refused); 8) a loop is writing the store (refused); 9) three devices or
+the same merge twice (same result in any order, any number of times). In
+scenario 4, the recommended pattern for starting a second device: first
+set aside any existing store on the new device. On 2026-09-28, an `scp`
+of the seed store overwrote the second device's own small store before
+rename; then take a consistent copy with `rafa effort copy` (or
+`sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, never a plain
+file copy during a write), move it and `.rafa/config.yaml` into the new
+device's `.rafa/`, and merge back later with `rafa effort merge`.
+
+**Why UUIDs alone are not trusted.** A v4 UUID almost never collides by
+chance; collisions come from copies (a restored backup, a cloned VM
+starting with the same random state). A project that minimized UUID
+collisions still saw a handful a year. The composite id guards against
+exactly that: two columns, one fixed per store, one per row within that
+store, cost just as much as the UUID column they replace and catch every
+copy by detecting when the machine's filesystem reports a fact that did
+not come from that store. The storage choice is "expand first" from
+expand-and-contract (parallel change); #234 already uses "contract" for
+a breaking migration, and expand-first lets migration name everything,
+today and in the future.
+
+### Store metadata
+
+**`store_meta` is a single-row table (`id = 1`) that identifies the
+store.** The row holds the origin the store stamps (`origin_store`, a
+UUID), the project git reads in the store's directory (or the one the
+row already names when git finds no root commit there), and the host,
+path and file identity the store was minted under. It is written on a
+write open, at most once per store, behind the first migration named
+`store-meta`; a write open that keeps the existing origin asks git
+nothing. The row is unminted if it has no value in `origin_store` (the
+column is `NOT NULL` for every runtime, but minting is skipped when git
+finds no project or repository). A read open never reads or writes the
+`store_meta` row, which is why `rafa effort schema` leaves an unminted
+store's bytes unchanged.
+
+**The host id is an HMAC-SHA256 of `/etc/machine-id`, the macOS
+platform UUID, or the hostname, never the raw value, since `machine-id(5)`
+asks for a keyed hash and a store travels between machines.** The path is
+the real path, so a symlinked spelling does not trigger a copy-detection
+mint. The device and inode are bigints: when a `.bak` file is renamed
+over the store, it has a new inode and triggers a copy-detection mint,
+but one restored with `cp` over the existing file keeps the old inode
+and does not (measured on tmpfs). The merge's collision check is what
+catches a missed `.bak` restore. SQLite's INTEGER is signed and bun binds
+a bigint past 2^63 by wrapping without warning, so the device and inode
+are written as their two's complement and read back through `CAST(… AS TEXT)`
+as unsigned.
+
+**A test passes its fifth argument to `withSqliteStore` to inject the
+host and project, so test stores can be minted independently.** The store
+module reads these values from `settleStoreIdentity`
+(`src/effort/store/store-identity.ts`) on a write, and `store-meta.ts`
+reads and writes the row. `withSqliteStore` calls `settleStoreIdentity`
+after `bringForward`, so a write open mints when the row is absent or a
+fact moved (the filesystem identity changed), under `BEGIN IMMEDIATE`
+with a second decision.
+
+### Copy detection
+
+**The collision check in the merge (`store/merge-store.ts`) catches
+every copy by examining the origin pair of each incoming row.** When a
+store is copied — backed up and restored, cloned to a new VM, or moved
+to another device — the merged store will hold two rows with the same
+origin pair: one from the local store (inserted before the copy) and one
+from the incoming store (the same insert, copied). The first detection
+marks the incoming store's origin as a copy: its `store_meta` row's
+filesystem identity (device, inode, path) is found in the local store's
+`merges` table (a log of every completed merge) or it collides on
+`origin_store`. When a copy is detected and merged, the merge refusal
+entry names the copy's origin and what copied it.
+
+**A development build mints on the first write after copy detection.**
+Between the first plan and the lock in `bringForward`, an open with
+anything to adopt or apply asks `refuseUnownedDevelopmentWrite` for a
+store it does not own. After the lock is taken (in the same transaction),
+if the merge detects a copy, `settleStoreIdentity` is called a second
+time with the detection flag, and it mints a new origin for this store.
+This is why a development build can write copies: it owns stores under
+`tmpdir()` and under `RAFA_EFFORT_DIR` unless one sits in the project's
+own `<root>/.rafa/effort/`.
 
 ### The schema history
 
