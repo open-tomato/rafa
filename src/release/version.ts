@@ -51,7 +51,7 @@
  * ## The path is git's, not the filesystem's
  *
  * `release.versionFile` is relative to the repository root
- * (`src/config-schema.ts`), which is what `<ref>:<path>` wants. A
+ * (`src/config-schema-readings.ts`), which is what `<ref>:<path>` wants. A
  * leading `./` is stripped ({@link gitPathOf}) because git reads
  * `<ref>:./<path>` relative to the CURRENT DIRECTORY instead: measured
  * 2026-09-20, `git show origin/main:./package.json` from a
