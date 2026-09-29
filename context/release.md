@@ -19,9 +19,11 @@ changes:
 The loop writes each entry to the SQLite `changes` table with columns:
 `id`, `session_id`, `plan_stub`, `task_line`, `level`, `area`, `summary`,
 `collected_at` (ISO 8601 timestamp). `readPlanChanges` retrieves every note
-under one plan stub, oldest first (by append order `seq`, not by timestamp),
-and a release step renders the changelog entry from them. It matches
-`plan_stub` with `IS`, so the null stub is a queryable group of its own —
+under one plan stub, oldest first by `collected_at`, then the origin pair,
+then `seq` (`ACROSS_STORES_ORDER` in `store/origins.ts`), so a store merged
+from two devices reads one order whichever side ran the merge, and one
+report's notes keep the order the report listed them; a release step
+renders the changelog entry from them. It matches `plan_stub` with `IS`, so the null stub is a queryable group of its own —
 the notes of sessions that resolved NO plan. A caller meaning "there is no
 current plan" therefore skips the read rather than passing null.
 

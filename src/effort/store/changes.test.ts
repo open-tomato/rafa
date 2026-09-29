@@ -34,23 +34,34 @@
  * other. Every case asking for one stub writes notes under another stub
  * and under none beside them.
  *
- * Eight mutations of the reader were driven against this file, with the
- * unmutated source green before and after and restored byte-identical.
- * All eight redden: the stub filter dropped (3 cases), `ORDER BY seq`
- * made `ORDER BY summary` (3), `collected_at` answered blank (2), and
- * one each for `IS` made `=`, the missing-store guard dropped, the area
- * answered null, the session id taken from the task line, and
- * `ORDER BY seq` made `ORDER BY collected_at`. The last one SURVIVED
- * until the backwards-clock case was written: with the stamps agreeing
- * with the append order, both orderings answer the same rows in the same
- * order, and measured on SQLite 3.51.0 a tie inside one write comes back
- * in rowid order either way.
+ * Eight mutations of the reader were driven against this file while it
+ * still read by `seq` alone, with the unmutated source green before and
+ * after and restored byte-identical. All eight reddened: the stub filter
+ * dropped (3 cases), `ORDER BY seq` made `ORDER BY summary` (3),
+ * `collected_at` answered blank (2), and one each for `IS` made `=`, the
+ * missing-store guard dropped, the area answered null, the session id
+ * taken from the task line, and `ORDER BY seq` made
+ * `ORDER BY collected_at`.
+ *
+ * The reader now orders by `ACROSS_STORES_ORDER` (`origins.ts`), and two
+ * cases read a store merged from two devices' through `mergeStore`, once
+ * from each side (`src/tests/merged-stores.ts`). Three mutations of that
+ * order were driven against this file, restored byte-identical after:
+ * `seq` alone reddens two cases (the backwards clock and the merged
+ * order), and `collected_at, seq` reddens the merged order. Dropping
+ * `origin_seq` alone SURVIVES, and no case here can redden it: within
+ * one origin, every store appends that origin's rows in `origin_seq`
+ * order, since a merge reads the other store's rows by `seq`, so the
+ * local `seq` breaks the tie the same way. The append-order case over a
+ * merged store passes under all three mutations for the same reason;
+ * what it pins is that the merge kept the order, not which term read it.
  */
 import type { ChangesWrite, ChangesWriteResult } from './changes.js';
 import type { FindingsWriterSeams } from './findings.js';
 import type { ReportChange } from '../../report/parse.js';
+import type { Device, MergedBothWays } from '../../tests/merged-stores.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -58,6 +69,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CHANGE_LEVELS, parseReport } from '../../report/parse.js';
+import { copyDevice, freshDevice, mergeBothWays } from '../../tests/merged-stores.js';
 
 import { readPlanChanges, writeChanges } from './changes.js';
 import { LEGACY_GATE_OPEN } from './migrations.js';
@@ -824,7 +836,7 @@ describe('readPlanChanges', () => {
       ]);
   });
 
-  it('orders by the append order, not the stamp, when a clock goes backwards', () => {
+  it('orders by the stamp, not the append order, when a clock goes backwards', () => {
     const root = freshRoot('backwards-clock');
     const stub = 'rafa-21-changelog-and-release';
     writeChanges(root, {
@@ -837,11 +849,12 @@ describe('readPlanChanges', () => {
     }, { now: () => new Date('2026-09-20T09:00:00.000Z'), newId: () => 'backwards-2' });
 
     // The control: the stamps disagree with the append order here, so the
-    // order below is `seq` and cannot be `collected_at`.
+    // order below is `collected_at` and cannot be `seq`.
+    expect(columnOf(root, 'summary')).toEqual(['written first', 'written second']);
     expect(columnOf(root, 'collected_at'))
       .toEqual(['2026-09-20T11:00:00.000Z', '2026-09-20T09:00:00.000Z']);
     expect(readPlanChanges(root, stub).map(({ summary }) => summary))
-      .toEqual(['written first', 'written second']);
+      .toEqual(['written second', 'written first']);
   });
 
   it('answers none for a store that does not exist, creating nothing', () => {
@@ -922,5 +935,88 @@ describe('readPlanChanges', () => {
     // the table refuses it even from a writer outside this module.
     expect(() => rawInsert(root, { plan_stub: stub, level: 'breaking' }))
       .toThrow(/CHECK constraint failed/);
+  });
+});
+
+describe('readPlanChanges over a merged store', () => {
+  const stub = 'rafa-322-effort-stores-two-devices';
+
+  /** Writes `summaries` as one report of `sessionId` on `device`, stamped `at`. */
+  function report(device: Device, sessionId: string, at: string, summaries: readonly string[]): void {
+    writeChanges(device.root, {
+      dispatch: { sessionId, planStub: stub, taskLine: `Task of ${sessionId}` },
+      changes: summaries.map((summary) => change({ summary })),
+    }, { now: () => new Date(at), newId: () => `${sessionId}-${Math.random()}` });
+  }
+
+  /**
+   * Scenario 1 of #322: device b starts as a copy of device a, and each
+   * then writes on its own, b's second report stamped the same minute as
+   * a's so only the origin pair can order the two.
+   */
+  function twoDevices(): { a: Device; b: Device; merged: MergedBothWays } {
+    const scope = realpathSync(mkdtempSync(join(tempBase, 'merged-')));
+    const a = freshDevice(scope, 'store-a');
+    report(a, 's-1', '2026-09-29T09:00:00.000Z', ['shared before the copy']);
+    const b = copyDevice(scope, a, 'store-b');
+    report(a, 's-2', '2026-09-29T10:00:00.000Z', ['zebra from a', 'alpha from a', 'middle from a']);
+    report(b, 's-3', '2026-09-29T09:30:00.000Z', ['half past nine on b']);
+    report(b, 's-4', '2026-09-29T10:00:00.000Z', ['yak from b', 'beta from b']);
+    return { a, b, merged: mergeBothWays(scope, a, b) };
+  }
+
+  /** The summaries of the plan's rows at `root` in `seq` order, module uninvolved. */
+  function bySeq(root: string): unknown[] {
+    const sql = 'SELECT summary FROM changes WHERE plan_stub IS ? ORDER BY seq';
+    return rawQuery<{ summary: string }>(root, sql, stub).map(({ summary }) => summary);
+  }
+
+  it('answers one order whichever side ran the merge', () => {
+    const { merged } = twoDevices();
+
+    // The control: the two merged stores hold the same seven notes under
+    // different local `seq` values, so a reader by `seq` alone would
+    // answer two orders and this case could fail.
+    const seqOrders = [bySeq(merged.firstRanIt), bySeq(merged.secondRanIt)];
+    expect(seqOrders[0]).toHaveLength(7);
+    expect(new Set(seqOrders[0])).toEqual(new Set(seqOrders[1]));
+    expect(seqOrders[0]).not.toEqual(seqOrders[1]);
+
+    const expected = [
+      'shared before the copy',
+      'half past nine on b',
+      'zebra from a',
+      'alpha from a',
+      'middle from a',
+      'yak from b',
+      'beta from b',
+    ];
+    expect(readPlanChanges(merged.firstRanIt, stub).map(({ summary }) => summary)).toEqual(expected);
+    expect(readPlanChanges(merged.secondRanIt, stub)).toEqual(readPlanChanges(merged.firstRanIt, stub));
+  });
+
+  it('keeps one device\'s notes of one report in their append order on either side', () => {
+    const { a, b, merged } = twoDevices();
+
+    // The control: every note of one report shares its write's time, and
+    // each device stamped its own origin, so the order below comes from
+    // the origin pair and cannot come from the clock.
+    const stamped = rawQuery<{ origin_store: string | null; collected_at: string }>(
+      a.root,
+      'SELECT origin_store, collected_at FROM changes WHERE session_id = ?',
+      's-2',
+    );
+    expect(stamped.map(({ origin_store: origin }) => origin)).toEqual(['store-a', 'store-a', 'store-a']);
+    expect(new Set(stamped.map(({ collected_at: at }) => at)).size).toBe(1);
+    expect(rawQuery<{ origin_store: string }>(b.root, 'SELECT DISTINCT origin_store FROM changes WHERE session_id = ?', 's-4'))
+      .toEqual([{ origin_store: 'store-b' }]);
+
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      const notes = readPlanChanges(root, stub);
+      expect(notes.filter(({ sessionId }) => sessionId === 's-2').map(({ summary }) => summary))
+        .toEqual(['zebra from a', 'alpha from a', 'middle from a']);
+      expect(notes.filter(({ sessionId }) => sessionId === 's-4').map(({ summary }) => summary))
+        .toEqual(['yak from b', 'beta from b']);
+    }
   });
 });

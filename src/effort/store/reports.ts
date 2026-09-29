@@ -72,7 +72,9 @@
  * ## Reading it back
  *
  * {@link readReportedSkills} answers every row's session, plan, task line,
- * outcome and `skills_used`, in append order, the list parsed and NULL
+ * outcome and `skills_used`, in `ACROSS_STORES_ORDER` (`origins.ts`),
+ * so a merged store reads them in one order whichever side ran the
+ * merge, the list parsed and NULL
  * answered as null, so a caller cannot read an unrecorded list as an
  * empty one. It opens the store as the tallies below do.
  *
@@ -118,7 +120,7 @@ import { existsSync } from 'node:fs';
 import { REPORT_STATUSES } from '../../report/parse.js';
 
 import { checkDispatch, describeValue } from './findings.js';
-import { STAMPED_COLUMNS, stampedValues } from './origins.js';
+import { ACROSS_STORES_ORDER, STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's status, the dispatch it came from, and the outcome. */
@@ -304,11 +306,11 @@ interface ReportedSkillsRow {
   readonly skills_used: string | null;
 }
 
-/** Every row, in append order. */
+/** Every row, in the order every store holding them reads. */
 const SELECT_REPORTED_SKILLS = `
   SELECT session_id, plan_stub, task_line, outcome, skills_used
   FROM task_reports
-  ORDER BY seq
+  ORDER BY ${ACROSS_STORES_ORDER}
 `;
 
 /** The list a stored `skills_used` holds. Throws for one no write stores. */

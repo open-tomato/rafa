@@ -114,12 +114,21 @@
  * the notes of the sessions that resolved no plan rather than none at
  * all, as `readTaskFinishes` matches its own.
  *
- * Oldest first is `seq`, the append order, and not `collected_at`: one
- * write stamps every row it inserts with the same time, so the clock
- * cannot order the notes of a single report, while `seq` orders them as
- * the report listed them. The two agree across writes whenever the clock
- * runs forward, and where they disagree the append order is what is
- * answered.
+ * Oldest first is `ACROSS_STORES_ORDER` (`origins.ts`): `collected_at`,
+ * then the origin pair, then `seq`, never `seq` alone. A plan's notes may
+ * come from two devices whose stores were merged, and a merge gives the
+ * other store's rows new local `seq` values after its own, so `seq`
+ * would answer one order on the store that ran the merge and another on
+ * the store it came from. The write's time is the same on both.
+ *
+ * One write stamps every row it inserts with the same time, so the clock
+ * cannot order the notes of a single report. The origin pair does:
+ * `origin_seq` is the `seq` each note got on the device that wrote it,
+ * so one device's notes of one report read as the report listed them, on
+ * any store. A note with no origin, written by an unminted store or a
+ * runtime before `row-origins`, falls back to the store's own `seq`. Where
+ * a clock went backwards between two writes, the later write's notes are
+ * answered first, since the stamp now wins over the append order.
  *
  * Each row is answered whole but for `seq` and `id`, which are the
  * store's own bookkeeping, and `plan_stub`, which the caller asked by.
@@ -156,7 +165,7 @@ import { existsSync } from 'node:fs';
 import { CHANGE_LEVELS } from '../../report/parse.js';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
-import { STAMPED_COLUMNS, stampedValues } from './origins.js';
+import { ACROSS_STORES_ORDER, STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** One write: a report's change notes and the dispatch they came from. */
@@ -364,12 +373,12 @@ interface PlanChangeRow {
   readonly collected_at: string;
 }
 
-/** Every note under one plan stub, in append order. */
+/** Every note under one plan stub, oldest first, in the order every store holding them reads. */
 const SELECT_PLAN_CHANGES = `
   SELECT session_id, task_line, level, area, summary, collected_at
   FROM changes
   WHERE plan_stub IS ?
-  ORDER BY seq
+  ORDER BY ${ACROSS_STORES_ORDER}
 `;
 
 /**

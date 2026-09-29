@@ -47,10 +47,16 @@
  *
  * ## Readers
  *
- * No reader names either column or filters on them, so a row an older
- * runtime inserts, NULL in both, is read as every stamped row is. The
- * partial unique index `<table>_by_origin` covers only rows whose
+ * No reader filters on either column, so a row an older runtime
+ * inserts, NULL in both, is read as every stamped row is. The partial
+ * unique index `<table>_by_origin` covers only rows whose
  * `origin_store` is not NULL, so any number of such rows coexist.
+ *
+ * A reader that answers rows in order and may run over a merged store
+ * sorts by {@link ACROSS_STORES_ORDER}, which names both columns. `seq`
+ * alone cannot be that order: a merge inserts the other store's rows
+ * under new local `seq` values after its own, so the two sides of one
+ * merge would read the same rows in two orders.
  */
 
 /**
@@ -77,6 +83,28 @@ export const ORIGIN_TABLES = [
 
 /** One of the {@link ORIGIN_TABLES}. */
 export type OriginTable = typeof ORIGIN_TABLES[number];
+
+/**
+ * The `ORDER BY` terms of a reader that answers the rows of a table
+ * with `collected_at` in the same order on every store holding them:
+ * the write's time first, then the origin pair, then the local `seq`.
+ *
+ *   - `collected_at` orders rows written at different times, whichever
+ *     store wrote them and whichever side ran a merge.
+ *   - The origin pair breaks a tie. One write stamps every row it
+ *     inserts with one time, and `origin_seq` is the `seq` each row got
+ *     in the store that wrote it, so one device's rows of one write keep
+ *     the order that device appended them in, on any store, and two
+ *     devices' rows at one time are ordered by their `origin_store`.
+ *   - `seq` breaks what remains: rows with a NULL origin, which SQLite
+ *     sorts before every origin. Among those at one time the order is
+ *     the store's own append order, which is not the same on both sides
+ *     of a merge.
+ *
+ * A clock that goes backwards reorders rows here; the append order no
+ * longer wins over the stamp.
+ */
+export const ACROSS_STORES_ORDER = 'collected_at, origin_store, origin_seq, seq';
 
 /**
  * The columns a stamped insert names after its own, in the order

@@ -476,8 +476,11 @@ and `readSessionBudgets` the `dispatches` rows carrying a budget.
 `readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
 `task_reports` and `report_absences` back the same way, for the rough ETA
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
-`changes` row under one plan stub, in append order, for a release step to
-render.
+`changes` row under one plan stub, in `ACROSS_STORES_ORDER`
+(`store/origins.ts`: `collected_at`, the origin pair, then `seq`), for a
+release step to render. A reader that answers rows in order over a table
+with `collected_at` sorts by that constant rather than `seq`, since a
+merge gives the other store's rows new local `seq` values after its own.
 
 **A new table has a checklist, and each item lands in the table's own
 commit:**
@@ -521,7 +524,8 @@ expectations do not move. Each `SkillFact` holds what `task_reports` says
 (plan, task line, outcome, claimed skills), what `dispatches` holds about
 its resolver and offers, what `skill_invocations` shows it invoked (or
 `'unknown'` when its log could not be read), its `findings`, `blockers`
-and `out_of_scope_bugs` rows in append order, and every `plan_ci` reading
+and `out_of_scope_bugs` rows in `ACROSS_STORES_ORDER`, the facts of one
+plan in that order over `task_reports`, and every `plan_ci` reading
 of its plan (empty for no plan or a plan with no reading). Names are
 mapped through `bareSkillName`, so a served skill reads as its bare name
 and a plugin's `plugin:name` is kept. A session with no report (a
@@ -768,8 +772,8 @@ NULL or an array and nothing else. `writeTaskReport` stores it from the
 `recordTaskReport`. NULL is "not recorded" and never an empty list: a
 row a version-11 store held reads NULL, and so does a write that leaves
 the list out, while a report that listed no skill stores `[]`.
-`readReportedSkills` (`store/reports.ts`) answers the list per row in
-append order, NULL as null. A `SkillFact` reads it as `skillsUsed` after
+`readReportedSkills` (`store/reports.ts`) answers the list per row, the
+rows in `ACROSS_STORES_ORDER`, NULL as null. A `SkillFact` reads it as `skillsUsed` after
 mapping each name through `bareSkillName`, keeping each once in first-
 seen order. It is the session's claim; comparing it with `skill_invocations`
 (what the log shows) is the reader's job, not the writer's. Never called

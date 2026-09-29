@@ -8,11 +8,23 @@
  * column carrying something other than names, is planted through
  * `bun:sqlite` directly. No case reads or writes the project's own
  * `.rafa/effort/`.
+ *
+ * The merged-store cases write two devices' stores through the same
+ * writers, each store's origin planted by `src/tests/merged-stores.ts`,
+ * and read the store `mergeStore` builds from each side. Mutations of
+ * the order, restored byte-identical after: `task_reports` read by `seq`
+ * alone or by `collected_at, seq` reddens the merged order, and the
+ * findings, blockers and dispatches read by `seq` alone redden it and
+ * the two-device session. Those three reads by `collected_at, seq`
+ * SURVIVE: they are grouped by session, and no case holds two devices'
+ * rows of one session stamped the same time, which is what the origin
+ * pair would order.
  */
 import type { SkillResolverName } from '../config-sections.js';
 import type { FindingsDispatch } from './store/findings.js';
 import type { PlanCiRow } from './store/plan-ci.js';
 import type { ReportBlocker, ReportBug, ReportFinding } from '../report/parse.js';
+import type { Device, MergedBothWays } from '../tests/merged-stores.js';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,6 +32,8 @@ import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { copyDevice, freshDevice, mergeBothWays } from '../tests/merged-stores.js';
 
 import { readSkillFacts } from './skill-facts.js';
 import { writeDispatch } from './store/dispatches.js';
@@ -361,6 +375,110 @@ describe('readSkillFacts ordering and plans', () => {
     report(root, 's1');
 
     expect(readSkillFacts(root)[0]?.planCi).toEqual([]);
+  });
+});
+
+describe('readSkillFacts over a merged store', () => {
+  /** Every write of one report on `device`: the report, its findings and its blockers, stamped `at`. */
+  function reportOn(device: Device, sessionId: string, at: string, whats: readonly string[]): void {
+    const seams = { now: () => new Date(at) };
+    const dispatch = dispatchOf(sessionId);
+    writeFindings(device.root, { dispatch, outcome: 'done', findings: whats.map((what) => finding({ what, artifact: `artifact of ${what}` })) }, seams);
+    writeTriage(device.root, { dispatch, outcome: 'done', blockers: whats.map((what) => blocker(`blocked on ${what}`, null)), outOfScopeBugs: [] }, seams);
+    writeTaskReport(device.root, { dispatch, outcome: 'done', report: { status: 'done', skillsUsed: [] } }, seams);
+  }
+
+  /** Files an issue for `sessionId` on `device` under `key`, stamped `at`, which inserts a finding row. */
+  function fileIssue(device: Device, sessionId: string, at: string, key: string): void {
+    writeTrackerRef(device.root, {
+      dispatch: dispatchOf(sessionId),
+      outcome: 'done',
+      artifact: key,
+      ref: { opt: 0, kind: 'local', externalId: key, url: null },
+    }, { now: () => new Date(at) });
+  }
+
+  /**
+   * Scenario 1 of #322: device b starts as a copy of device a, and each
+   * then reports on its own, b's second report stamped the same minute
+   * as a's so only the origin pair can order the two. Both then file an
+   * issue for the shared session, b's stamped earlier, so that session's
+   * findings come from two devices.
+   */
+  function twoDevices(): { a: Device; merged: MergedBothWays } {
+    const scope = freshRoot();
+    const a = freshDevice(scope, 'store-a');
+    reportOn(a, 's-1', '2026-09-29T09:00:00.000Z', ['shared before the copy']);
+    const b = copyDevice(scope, a, 'store-b');
+    reportOn(a, 's-2', '2026-09-29T10:00:00.000Z', ['zebra from a', 'alpha from a', 'middle from a']);
+    reportOn(b, 's-3', '2026-09-29T09:30:00.000Z', ['half past nine on b']);
+    reportOn(b, 's-4', '2026-09-29T10:00:00.000Z', ['yak from b', 'beta from b']);
+    fileIssue(a, 's-1', '2026-09-29T11:00:00.000Z', 'key filed on a');
+    fileIssue(b, 's-1', '2026-09-29T10:30:00.000Z', 'key filed on b');
+    return { a, merged: mergeBothWays(scope, a, b) };
+  }
+
+  /** One column of the `table` rows at `root` that `where` keeps, in `seq` order, module uninvolved. */
+  function bySeq(root: string, table: string, column: string, where = '1'): unknown[] {
+    const db = new Database(sqliteStorePath(root), { readonly: true });
+    try {
+      return db.query<{ value: unknown }, []>(`SELECT ${column} AS value FROM ${table} WHERE ${where} ORDER BY seq`).all()
+        .map(({ value }) => value);
+    } finally {
+      db.close();
+    }
+  }
+
+  it('answers one order whichever side ran the merge', () => {
+    const { merged } = twoDevices();
+
+    // The control: the two merged stores hold the same reports and
+    // findings under different local `seq` values, so a reader by `seq`
+    // alone would answer two orders and this case could fail.
+    for (const [table, column] of [['task_reports', 'session_id'], ['findings', 'what'], ['blockers', 'what']] as const) {
+      const [first, second] = [bySeq(merged.firstRanIt, table, column), bySeq(merged.secondRanIt, table, column)];
+      expect(new Set(first)).toEqual(new Set(second));
+      expect(first).not.toEqual(second);
+    }
+
+    const facts = readSkillFacts(merged.firstRanIt);
+    expect(facts.map(({ sessionId }) => sessionId)).toEqual(['s-1', 's-3', 's-2', 's-4']);
+    expect(readSkillFacts(merged.secondRanIt)).toEqual(facts);
+  });
+
+  it('orders one session\'s rows from two devices by time on either side', () => {
+    const { merged } = twoDevices();
+
+    // The control: the two issues filed for s-1 sit in opposite `seq`
+    // order on the two merged stores, so a read by `seq` alone would
+    // answer two orders and this case could fail.
+    const filed = 'session_id = \'s-1\' AND kind IS NULL';
+    expect(bySeq(merged.firstRanIt, 'findings', 'artifact', filed)).toEqual(['key filed on a', 'key filed on b']);
+    expect(bySeq(merged.secondRanIt, 'findings', 'artifact', filed)).toEqual(['key filed on b', 'key filed on a']);
+
+    const expected = ['artifact of shared before the copy', 'key filed on b', 'key filed on a'];
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      const shared = readSkillFacts(root).find(({ sessionId }) => sessionId === 's-1');
+      expect(shared?.findings.map(({ artifact }) => artifact)).toEqual(expected);
+    }
+  });
+
+  it('keeps one device\'s rows of one report in their append order on either side', () => {
+    const { a, merged } = twoDevices();
+
+    // The control: s-2's three findings share one write's time and
+    // device a's origin, so the order below comes from the origin pair,
+    // never the clock.
+    expect(new Set(bySeq(a.root, 'findings', 'collected_at', 'session_id = \'s-2\'')).size).toBe(1);
+    expect(bySeq(a.root, 'findings', 'origin_store', 'session_id = \'s-2\'')).toEqual(['store-a', 'store-a', 'store-a']);
+
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      const facts = new Map(readSkillFacts(root).map((fact) => [fact.sessionId, fact]));
+      expect(facts.get('s-2')?.findings.map(({ what }) => what)).toEqual(['zebra from a', 'alpha from a', 'middle from a']);
+      expect(facts.get('s-2')?.blockers.map(({ what }) => what))
+        .toEqual(['blocked on zebra from a', 'blocked on alpha from a', 'blocked on middle from a']);
+      expect(facts.get('s-4')?.findings.map(({ what }) => what)).toEqual(['yak from b', 'beta from b']);
+    }
   });
 });
 

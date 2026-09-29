@@ -55,7 +55,7 @@
  *
  * ## Findings, blockers and out-of-scope bugs
  *
- * Every row the session holds is kept, in append order, whatever its
+ * Every row the session holds is kept, in the order below, whatever its
  * `kind`: a row `store/tracker-refs.ts` inserted for a filed issue holds
  * only the key it was filed under, in `artifact`, with `kind`, `what` and
  * `signal` NULL, and filtering on `kind` would drop exactly the findings
@@ -63,8 +63,16 @@
  *
  * ## Order and plans
  *
- * Rows are grouped by plan, and ordered by `task_reports.seq` within one.
- * With no `plans` named, every row is read, the plans in the order of
+ * Rows are grouped by plan, and ordered within one by
+ * `ACROSS_STORES_ORDER` (`store/origins.ts`) over `task_reports`:
+ * `collected_at`, then the origin pair, then `seq`. The findings,
+ * blockers, bugs and dispatches of a session are read in that order too.
+ * `seq` alone would not do, since a merge gives the other store's rows
+ * new local `seq` values after its own, and a merged store has to read
+ * one order whichever side ran the merge; one device's rows of one
+ * report still keep their append order, which `origin_seq` carries.
+ * `skill_invocations` and `plan_ci` hold no `collected_at` and are read
+ * in their store's own `seq` order. With no `plans` named, every row is read, the plans in the order of
  * their first report, and a report dispatched under no plan reads a null
  * `planStub` in a group of its own, placed the same way. With `plans`
  * named, only reports under those stubs are read, in the order the stubs
@@ -90,6 +98,7 @@ import { existsSync } from 'node:fs';
 
 import { bareSkillName } from '../tiers/skill-names.js';
 
+import { ACROSS_STORES_ORDER } from './store/origins.js';
 import { readPlanCi } from './store/plan-ci.js';
 import { readReportedSkills } from './store/reports.js';
 import { readSkillInvocations, UNKNOWN_SKILL_COUNT } from './store/skill-invocations.js';
@@ -189,18 +198,18 @@ interface SessionRows {
 }
 
 /** Every dispatch's offers. */
-const SELECT_OFFERS = 'SELECT session_id, resolver, skills_offered, lessons_offered FROM dispatches ORDER BY seq';
+const SELECT_OFFERS = `SELECT session_id, resolver, skills_offered, lessons_offered FROM dispatches ORDER BY ${ACROSS_STORES_ORDER}`;
 
-/** Every finding, every column a recurrence can match, in append order. */
+/** Every finding, every column a recurrence can match, in the order every store holding them reads. */
 const SELECT_FINDINGS = `
   SELECT session_id, kind, trigger, what, cause, resolution, artifact, signal
   FROM findings
-  ORDER BY seq
+  ORDER BY ${ACROSS_STORES_ORDER}
 `;
 
-/** Every row of `table`, a blocker or a bug, in append order. */
+/** Every row of `table`, a blocker or a bug, in the order every store holding them reads. */
 function selectEntries(table: 'blockers' | 'out_of_scope_bugs'): string {
-  return `SELECT session_id, what, artifact FROM ${table} ORDER BY seq`;
+  return `SELECT session_id, what, artifact FROM ${table} ORDER BY ${ACROSS_STORES_ORDER}`;
 }
 
 /** The list a stored JSON column holds. Throws for one no writer stores. */
@@ -302,7 +311,7 @@ function orderedReports(
 
 /**
  * One fact row per task session the store holds a report for, grouped
- * by plan and ordered by `task_reports.seq` within one; only `plans`'
+ * by plan and ordered within one as the module note says; only `plans`'
  * reports when it is named.
  *
  * Answers none, opening and creating nothing, when the store file does
