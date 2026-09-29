@@ -175,7 +175,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
 const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
-  'plan list': [[], []],
+  'plan list': [[], ['open']],
   'plan show': [['stub'], ['tracker']],
   'plan validate': [['file'], []],
   'plan risk': [['plan'], ['strict']],

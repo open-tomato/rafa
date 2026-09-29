@@ -9,7 +9,7 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
-## 0.26.0 — 2026-09-29, `rafa next --roadmap` — one hop to a blocker's epic, and back home
+## 0.27.0 — 2026-09-29, `rafa next --roadmap` — one hop to a blocker's epic, and back home
 
 - Walk: new `rafa next --roadmap` follows one blocker into another epic or board and comes home: on an issue H blocked by C in another epic it records the hop in `.rafa/hop.json`, switches to C's epic with `--no-rehome`, plans C rather than the epic's first line, runs its loop and, once C's pull request is open, switches home and closes the record as waiting, merged or halted; an epic that has run dry hops to the next `now` epic on the board the same way; a C blocked in turn (H ← C ← B, H itself included) or with no ready spec halts, prints the chain and goes home; while C's pull request waits, the walk passes over H to the home epic's next line; a `rafa switch` typed during a hop drops the record and the loop follows the new position. Each hop is logged on stdout (`hop from epic #<e>: #<H> blocked by #<C>, in epic #<f>`, `back home: epic #<e> on board #<b>`) and listed as `hops` in the json result. Without `--roadmap`, `rafa next` prints and sends exactly what it did before.
 - CLI: `--yes` accepts the `hop` and `home` steps and a bare `--yes` allows `home`; the stop lines under `--roadmap` name both in the `--yes` list they suggest; `plan create --next --roadmap` plans the blocker an away hop went for, on its own board, and `--roadmap` without `--next` is refused with exit 2; `loop start --roadmap` stamps the away hop as a `hop` field on the run's session record.
@@ -18,6 +18,11 @@ version is tagged `v<version>` (`v0.1.0` was never tagged;
 - Position: with `tracking.all` on, the hop record `.rafa/hop.json` stays out of git like `.rafa/position.json`, and an older managed `.gitignore` block gets the line on its next write.
 - Tests: integration and spawned CLI tests hold the hop record's git exclusion, racing writers and staleness, the cross-board blocker locator, every hop, halt, wait and dry-epic outcome, the full hop, plan, loop and home chain with its session record, the owner gate over an unresolved owner, a failed read and a team member's approval, the status waiting line, and byte-identical `rafa next` and `rafa status` output without the flag.
 - Docs: `context/cli.md`, the README's roadmap section, `docs/specs-and-roadmap.md` and `context/terminology.md` cover `rafa next --roadmap` from the solo project up: the hop rows and actions, the hop record, the owner gate, the two-hands picture and the worked example.
+
+## 0.26.0 — 2026-09-29, `rafa plan list --open`
+
+- Plans: new `rafa plan list --open` lists only the plans with at least one open task, plus any plan the parser did not read as written; when none is left it prints `No plan in <plan.dir>/ has open tasks.` and exits 0, and in json mode the result's `plans` holds only the kept listings.
+- Tests: dispatched CLI tests hold `rafa plan list --open` refusing a value typed onto the flag with exit code 1, a mixed directory listing only its open plan and a plan with issues, the no-open-tasks line for an all-done directory, and json results holding only the kept plans.
 
 ## 0.25.0 — 2026-09-28, Named, additive effort-store migrations an older runtime survives
 
