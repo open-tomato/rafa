@@ -17,10 +17,12 @@ Description:
   --skip-checks`, which asks its own question after the warning it prints, so
   rafa next asks none before it. `--dry-run` prints the two lines and stops, and
   so does a run with no terminal to answer on and no `--yes`, since there is
-  nobody to put the question to. With `--roadmap` it follows one blocker into
-  another epic or board, works it up to its pull request and comes home, halting
-  where that blocker is blocked in turn. With `--output=json` the steps and why
-  the chain stopped are the data of the terminal result event, and under
+  nobody to put the question to. After a merge, while fragments wait on the base
+  and fold into a version, it proposes `rafa release settle`, which runs unasked
+  only under a --yes list naming settle. With `--roadmap` it follows one blocker
+  into another epic or board, works it up to its pull request and comes home,
+  halting where that blocker is blocked in turn. With `--output=json` the steps
+  and why the chain stopped are the data of the terminal result event, and under
   `--roadmap` the hops that ran as well.
 
 Spends:
@@ -41,9 +43,10 @@ Flags:
   --yes       string
       Run the actions named without asking, as a comma list of action ids, and
       stop at the first action the list leaves out. Bare it names sync, wait,
-      unblock, plan, home. The ids are sync, resume, wait, triage, merge, start,
-      plan, unblock, hop, home; a list naming ready or merge-unchecked, which
-      are always asked, or a word that is no id at all is refused.
+      unblock, plan, home. The ids are sync, resume, wait, triage, merge,
+      settle, start, plan, unblock, hop, home; a list naming ready or
+      merge-unchecked, which are always asked, or a word that is no id at all is
+      refused.
 
 Examples:
   rafa next

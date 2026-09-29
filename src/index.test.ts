@@ -1006,6 +1006,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'stateLine',
       'stopLine',
     ]],
+    ['../next/settle-step.js', ['followsMerge', 'readSettleAfterMerge']],
     ['../next/sources.js', ['openNextSources']],
     ['../next/state.js', ['readHomeAfterLoop', 'readNextState']],
     ['../next/sync.js', ['fastForwardBase']],

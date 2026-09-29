@@ -13,8 +13,9 @@
  * `hint.ts` words the question and the command line, which the six
  * commands that end by naming what follows say the same way, and
  * `lines.ts` words the two lines and the stop line and reads
- * `--dry-run`. This module owns the loop, the action and the exit code,
- * and of the nine only `hint.ts` also prints — the one line it leaves a run that has
+ * `--dry-run`, and `settle-step.ts` answers the settle step read after a
+ * merge. This module owns the loop, the action and the exit code,
+ * and of the ten only `hint.ts` also prints — the one line it leaves a run that has
  * no terminal to be asked on.
  *
  * ## One turn of the chain
@@ -204,6 +205,25 @@
  *    and `home` action that ran wrote, and the stop lines name `hop` and
  *    `home` in the lists they print (`src/next/lines.ts`).
  *
+ * ## After a merge: the settle step
+ *
+ * Once a `merge` or `merge-unchecked` action has run,
+ * {@link NextChainOptions.afterMerge} reads the fragments waiting on the
+ * base (`src/next/settle-step.ts`, over the settle dry run `pr merge`'s
+ * own follow-up is decided by) and, while they fold into a version,
+ * puts the `settle` step as one more turn — two lines, then the question
+ * or the ceiling, then `rafa release settle`. It is asked like `merge`:
+ * bare `--yes` leaves it out, since it commits a release and pushes it
+ * to the base, so it runs unasked only under a list naming `settle`. A
+ * no stops the chain `declined` and a list that leaves it out `unasked`,
+ * with the fragments still waiting for `rafa release settle` by hand;
+ * a settle that fails ends the chain with its own exit code. Otherwise
+ * the chain reads again, and `previous` stays the merge's state, so a
+ * merge that moved nothing still stops `unchanged` on the next turn
+ * rather than being proposed again after the settle. The step is read
+ * after a merge alone: fragments a merge through the button left
+ * waiting are the doctor warning's to report.
+ *
  * ## The exit code
  *
  * 0 for every ending above, a pre-condition included: `rafa next` is a
@@ -243,6 +263,7 @@ import {
   stateLine,
   stopLine,
 } from '../next/lines.js';
+import { followsMerge, readSettleAfterMerge } from '../next/settle-step.js';
 import { openNextSources } from '../next/sources.js';
 import { readHomeAfterLoop, readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
@@ -324,6 +345,12 @@ export interface NextChainOptions {
   readonly info: (line: string) => void;
   /** Where a reading that failed goes. */
   readonly warn: (line: string) => void;
+  /**
+   * The settle step to put after a `merge` or `merge-unchecked` action
+   * has run, or null where no fragment waits to fold; see the module
+   * note's "After a merge". Left out, no step is read.
+   */
+  readonly afterMerge?: () => NextState | null;
   /**
    * Set by `rafa next --roadmap`: the actions' words carry `--roadmap`,
    * the stop lines name `hop` and `home`, the home step runs after a loop
@@ -439,6 +466,13 @@ export async function runNextChain(options: NextChainOptions): Promise<NextChain
         ? stopOn('loop-started', state)
         : stopOn(homeStop, home ?? state);
     }
+    const settle = followsMerge(state.action)
+      ? options.afterMerge?.() ?? null
+      : null;
+    const settleStop = settle === null
+      ? null
+      : await turn(settle, null);
+    if (settleStop !== null) return stopOn(settleStop, settle ?? state);
     if (steps.length >= MAX_ACTIONS) return stopOn('capped', state);
     previous = state;
   }
@@ -533,6 +567,9 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
       warn: (line: string) => {
         context.output.warn(line);
       },
+      afterMerge: () => readSettleAfterMerge(sources.settle, (line: string) => {
+        context.output.warn(line);
+      }),
       ...roadmap
         ? { roadmap: { afterLoop: () => homeAfterLoop(context, sources) } }
         : {},
@@ -591,6 +628,8 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       + ' `rafa pr merge <n> --skip-checks`, which asks its own question after the warning it prints, so'
       + ' rafa next asks none before it. `--dry-run` prints the two lines and stops, and so does a run'
       + ' with no terminal to answer on and no `--yes`, since there is nobody to put the question to.'
+      + ' After a merge, while fragments wait on the base and fold into a version, it proposes'
+      + ' `rafa release settle`, which runs unasked only under a --yes list naming settle.'
       + ' With `--roadmap` it follows one blocker into another epic or board, works it up to its pull'
       + ' request and comes home, halting where that blocker is blocked in turn.'
       + ' With `--output=json`'

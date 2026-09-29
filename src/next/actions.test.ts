@@ -14,7 +14,7 @@
  *
  * One case reads a flag the caller never typed: `hint`, which the
  * action context sets to false for every action, since `rafa next`
- * reads the state again itself after each one and six of these eight
+ * reads the state again itself after each one and six of these nine
  * commands would otherwise end with a hint of their own
  * (`./ending.ts`). It is paired with a reading of the WORDS, which
  * carry no `--no-hint`: the line the chain prints stays the line a
@@ -72,6 +72,7 @@ import planCreate from '../commands/plan/create.js';
 import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
+import releaseSettle from '../commands/release/settle.js';
 import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -140,6 +141,7 @@ const STATES: Readonly<Record<string, NextState>> = Object.freeze({
   plan: stateOf({ id: 'issue-ready', action: 'plan', issue: ISSUE }),
   unblock: stateOf({ id: 'issue-blocked', action: 'unblock', issue: ISSUE }),
   ready: stateOf({ id: 'issue-not-ready', action: 'ready', issue: ISSUE }),
+  settle: stateOf({ id: 'fragments-waiting', action: 'settle' }),
 });
 
 /** One call a recording command took. */
@@ -169,12 +171,13 @@ function recording(seen: Seen[], subject: string, action: string, overrides: Par
   };
 }
 
-/** The four subjects the table reaches. */
+/** The five subjects the table reaches. */
 const SUBJECTS = [
   { name: 'pr', summary: 'pull requests' },
   { name: 'loop', summary: 'the loop' },
   { name: 'plan', summary: 'plans' },
   { name: 'issue', summary: 'the board' },
+  { name: 'release', summary: 'releases' },
 ];
 
 /** What a case drives: the registry, the caller's context, and what ran. */
@@ -211,6 +214,10 @@ function harnessFor(without: readonly string[] = []): Harness {
     }),
     recording(seen, 'issue', 'unblock'),
     recording(seen, 'issue', 'ready'),
+    recording(seen, 'release', 'settle', {
+      args: [],
+      flags: [{ name: 'dry-run', description: 'Fold only.', type: 'boolean' }],
+    }),
   ].filter((command) => !without.includes(`${command.subject} ${command.action}`));
   const registry = createCommandRegistry({ subjects: SUBJECTS, commands });
   const caller: RafaContext = Object.freeze({
@@ -229,7 +236,7 @@ function harnessFor(without: readonly string[] = []): Harness {
 }
 
 describe('the command each action runs', () => {
-  it('maps the nine action ids of the table onto their commands and words', () => {
+  it('maps the ten action ids of the table onto their commands and words', () => {
     const invocations = NEXT_COMMAND_ACTIONS.map((action) => {
       const invocation = actionInvocation(STATES[action]);
       return [action, invocation?.command, invocation?.argv];
@@ -241,6 +248,7 @@ describe('the command each action runs', () => {
       ['triage', 'pr triage', ['41']],
       ['merge', 'pr merge', ['41', '--yes']],
       ['merge-unchecked', 'pr merge', ['41', '--skip-checks']],
+      ['settle', 'release settle', []],
       ['start', 'loop start', [`--plan=${PLAN}`, '--create-branch']],
       ['plan', 'plan create', ['--next']],
       ['unblock', 'issue unblock', ['64']],
@@ -453,7 +461,7 @@ describe('what travels back out of an action', () => {
 
 describe('the declarations the table names', () => {
   /** The command each action runs, as the module that declares it exports it. */
-  const DECLARED: readonly RafaCommand[] = [prWait, prTriage, prMerge, loopStart, planCreate, issueUnblock, issueReady];
+  const DECLARED: readonly RafaCommand[] = [prWait, prTriage, prMerge, loopStart, planCreate, issueUnblock, issueReady, releaseSettle];
 
   /** The command of a spelling among the declarations, or undefined. */
   function declaredAs(spelling: string): RafaCommand | undefined {
