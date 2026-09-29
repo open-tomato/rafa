@@ -111,6 +111,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'modules',
   'allowList',
   'settingSources',
+  'loopWorktreeDir',
   'prProvider',
   'prMergeMethod',
   'prBase',
@@ -157,6 +158,7 @@ const DEFAULTS: RafaConfig = {
   modules: [],
   allowList: [],
   settingSources: ['project', 'local'],
+  loopWorktreeDir: join('.rafa', 'worktrees'),
   prProvider: null,
   prMergeMethod: 'squash',
   prBase: null,
@@ -230,6 +232,7 @@ const FULL = [
   'allowList: [my-output]',
   'loop:',
   '  settingSources: user, project',
+  '  worktreeDir: ../worktrees',
   'pr:',
   '  provider: none',
   '  mergeMethod: rebase',
@@ -300,6 +303,7 @@ const FULL_VALUES: RafaConfig = {
   ],
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
+  loopWorktreeDir: '../worktrees',
   prProvider: 'none',
   prMergeMethod: 'rebase',
   prBase: 'trunk',
@@ -642,6 +646,10 @@ describe('parseConfigText', () => {
         'loop.settingSources is "project,project", '
           + 'expected a comma-separated subset of: user, project, local',
         'loop:\n  settingSources: user', 'settingSources', ['user'],
+      ],
+      [
+        'loop.worktreeDir', 'loop:\n  worktreeDir: 7', 'loop.worktreeDir is 7, expected a directory path',
+        'loop:\n  worktreeDir: /tmp/trees', 'loopWorktreeDir', '/tmp/trees',
       ],
       [
         'pr.provider', 'pr:\n  provider: github',

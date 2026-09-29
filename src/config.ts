@@ -338,6 +338,7 @@ function readLayer(
     modules: read('modules'),
     allowList: read('allowList'),
     settingSources: read('settingSources'),
+    loopWorktreeDir: read('loopWorktreeDir'),
     prProvider: read('prProvider'),
     prMergeMethod: read('prMergeMethod'),
     prBase: read('prBase'),

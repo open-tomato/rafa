@@ -172,6 +172,7 @@ const PROJECT_TEXT = [
   'allowList: [my-output]',
   'loop:',
   '  settingSources: user, project',
+  '  worktreeDir: user-trees',
   'pr:',
   '  provider: none',
   '  mergeMethod: rebase',
@@ -247,6 +248,7 @@ const PROJECT_VALUES: RafaConfig = {
   ],
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
+  loopWorktreeDir: 'user-trees',
   prProvider: 'none',
   prMergeMethod: 'rebase',
   prBase: 'trunk',
@@ -312,6 +314,7 @@ const USER_TEXT = [
   'allowList: [rafa-linear, my-output]',
   'loop:',
   '  settingSources: project, local',
+  '  worktreeDir: ../project-trees',
   'pr:',
   '  provider: gh',
   '  mergeMethod: merge',
@@ -372,6 +375,7 @@ const USER_VALUES: RafaConfig = {
   modules: [{ kind: 'npm', location: 'rafa-linear', ref: null }],
   allowList: ['rafa-linear', 'my-output'],
   settingSources: ['project', 'local'],
+  loopWorktreeDir: '../project-trees',
   prProvider: 'gh',
   prMergeMethod: 'merge',
   prBase: 'develop',
@@ -586,6 +590,10 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'loop.settingSources is "project,project", '
       + 'expected a comma-separated subset of: user, project, local',
     'loop:\n  settingSources: user', 'settingSources', ['user'],
+  ],
+  [
+    'loop.worktreeDir', 'loop:\n  worktreeDir: []', 'loop.worktreeDir is a list, expected a directory path',
+    'loop:\n  worktreeDir: trees', 'loopWorktreeDir', 'trees',
   ],
   [
     'pr.provider', 'pr:\n  provider: gitlab',

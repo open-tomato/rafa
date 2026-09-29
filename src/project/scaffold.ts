@@ -115,6 +115,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# allowList: []',
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,
+  `#   worktreeDir: ${CONFIG_DEFAULTS.loopWorktreeDir}   # where a loop adds its worktrees, read from the project root`,
   '# pr:',
   '#   provider:                    # gh | none; unset reads it off the origin remote',
   `#   mergeMethod: ${CONFIG_DEFAULTS.prMergeMethod}          # squash | merge | rebase`,

@@ -212,6 +212,29 @@ describe('the config files', () => {
     ]);
   });
 
+  it('carries the loop section, worktreeDir at .rafa/worktrees, which resolves from the file once uncommented', () => {
+    const loop = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# loop:'),
+      CONFIG_SETTINGS_LINES.indexOf('# pr:'),
+    );
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...loop].join('\n')), 'c.yaml') });
+
+    expect(loop.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# loop:',
+      '#   settingSources: project,local',
+      `#   worktreeDir: ${join('.rafa', 'worktrees')}`,
+    ]);
+    expect([resolved.config.loopWorktreeDir, resolved.sources.loopWorktreeDir]).toEqual([join('.rafa', 'worktrees'), 'file']);
+  });
+
+  it('answers worktreeDir from the default once its line is dropped, so the reading above can fail', () => {
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   worktreeDir:'));
+    const absent = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dropped].join('\n')), 'c.yaml') });
+
+    expect(dropped).toHaveLength(CONFIG_SETTINGS_LINES.length - 1);
+    expect([absent.config.loopWorktreeDir, absent.sources.loopWorktreeDir]).toEqual([join('.rafa', 'worktrees'), 'default']);
+  });
+
   it('carries the dangerous section, off by default, which resolves from the file once uncommented', () => {
     const dangerous = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# dangerous:'),
