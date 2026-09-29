@@ -190,6 +190,19 @@
  *     section gives. `loadConfig` hands the resolved value to the store
  *     (`effort/store/settings.ts`); nothing else reads it.
  *
+ * `effort.sync` is how the store travels between a project's devices,
+ * one of `SYNC_STRATEGIES`. Three readings are this module's:
+ *
+ *   - It defaults to `local` and is never null: a store that travels
+ *     nowhere is still a strategy, and the one nobody has chosen.
+ *   - The list is closed and names `git`, `service` and `p2p` though
+ *     core ships no adapter for them, so a misspelt strategy is refused
+ *     when the file is read, not when a sync is first attempted.
+ *   - It is not a `CommandLineSetting`, for the reason the `pr`
+ *     section gives. The user scope's file layers under the project's
+ *     as it does for every setting, so a user default needs no reader
+ *     of its own.
+ *
  * ## The `tiers` section
  *
  * `.rafa/specs/rafa-26-skill-tiers.md` names three keys that decide which

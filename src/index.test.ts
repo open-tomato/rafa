@@ -130,6 +130,7 @@ import {
   RELEASE_AUTO,
   resolveConfig,
   STORE_BACKENDS,
+  SYNC_STRATEGIES,
 } from './config.js';
 import * as configModule from './config.js';
 import effortCollect from './effort/collect.js';
@@ -219,6 +220,7 @@ const RUNTIME_EXPORTS = [
   'RUNNING_MANIFEST_SEAMS',
   'SCOPE_DIR',
   'STORE_BACKENDS',
+  'SYNC_STRATEGIES',
   'ScopeError',
   'configFilePath',
   'createAdapterRegistry',
@@ -284,6 +286,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['RUNNING_MANIFEST_SEAMS', entry.RUNNING_MANIFEST_SEAMS, RUNNING_MANIFEST_SEAMS],
   ['SCOPE_DIR', entry.SCOPE_DIR, SCOPE_DIR],
   ['STORE_BACKENDS', entry.STORE_BACKENDS, STORE_BACKENDS],
+  ['SYNC_STRATEGIES', entry.SYNC_STRATEGIES, SYNC_STRATEGIES],
   ['ScopeError', entry.ScopeError, ScopeError],
   ['configFilePath', entry.configFilePath, configFilePath],
   ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],

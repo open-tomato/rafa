@@ -190,6 +190,7 @@ export type {
   RouteTarget,
   SkillResolverName,
   StoreBackend,
+  SyncStrategy,
   TierPin,
   TierSwitch,
 } from './config-sections.js';
@@ -203,6 +204,7 @@ export {
   PREREQUISITE_KINDS,
   RELEASE_AUTO,
   STORE_BACKENDS,
+  SYNC_STRATEGIES,
 } from './config-sections.js';
 
 /**
@@ -323,6 +325,7 @@ function readLayer(
     version: read('version'),
     store: read('store'),
     effortBusyTimeoutMs: read('effortBusyTimeoutMs'),
+    effortSync: read('effortSync'),
     inject: read('inject'),
     planDir: read('planDir'),
     specsDir: read('specsDir'),

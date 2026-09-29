@@ -337,11 +337,13 @@ with its section line, to change it.
 ### `effort`
 
 One setting says how long a command waits for another rafa process that
-is writing the effort store before it gives up with `SQLITE_BUSY`.
+is writing the effort store before it gives up with `SQLITE_BUSY`, and
+another names how the store travels between a project's devices.
 
 | Key | Default | What it sets |
 |---|---|---|
 | `effort.busyTimeoutMs` | `5000` | the wait in milliseconds, a whole number from 1 to 60000 |
+| `effort.sync` | `local` | how the store travels: `local`, `file`, `git`, `service` or `p2p` |
 
 There is no unlimited wait, since a lock wait with no end can hang a
 loop; `0`, a fraction and a quoted `"5000"` are refused.

@@ -99,6 +99,7 @@ import type {
   RouteTarget,
   SkillResolverName,
   StoreBackend,
+  SyncStrategy,
   TierPin,
   TierSwitch,
 } from './config-sections.js';
@@ -140,6 +141,7 @@ import {
   skillResolverName,
   STORE_BACKENDS,
   subsetOf,
+  SYNC_STRATEGIES,
   text,
   tierSwitch,
   usdAmount,
@@ -167,6 +169,8 @@ export interface RafaConfig {
    * lock, in milliseconds. `effort.busyTimeoutMs`.
    */
   effortBusyTimeoutMs: number;
+  /** How the effort store travels between devices. `effort.sync`. */
+  effortSync: SyncStrategy;
   /** How much of the plan a task prompt receives. `plan.inject`. */
   inject: InjectMode;
   /** Where plans are written and read. `plan.dir`. */
@@ -311,6 +315,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   version: 1,
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
+  effortSync: 'local',
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -376,6 +381,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   version: { key: 'version', read: oneOf(CONFIG_VERSIONS), cli: false },
   store: { key: 'store', read: oneOf(STORE_BACKENDS), cli: true },
   effortBusyTimeoutMs: { key: 'effort.busyTimeoutMs', read: busyTimeoutMs, cli: false },
+  effortSync: { key: 'effort.sync', read: oneOf(SYNC_STRATEGIES), cli: false },
   inject: { key: 'plan.inject', read: oneOf(INJECT_MODES), cli: true },
   planDir: { key: 'plan.dir', read: directory, cli: true },
   specsDir: { key: 'specs.dir', read: directory, cli: true },
