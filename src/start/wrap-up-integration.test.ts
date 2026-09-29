@@ -1,15 +1,26 @@
 /**
- * Integration test of the wrap-up's lesson list and answer check, over a
- * scratch git repository and the real `local` learning adapter.
+ * Integration test of the wrap-up's lesson list and answer check, and of
+ * its release fragment stage, over scratch git repositories.
  *
- * A lesson held by three sources at 0.7 is listed in the prompt; a
- * stand-in session answers a `rafa:promoted` block that omits it, and the
- * check appends the unpromoted line to the pull request body. Only gh is
- * the recorded fake; git and the adapter are real.
+ * The lesson case: a lesson held by three sources at 0.7 is listed in
+ * the prompt; a stand-in session answers a `rafa:promoted` block that
+ * omits it, and the check appends the unpromoted line to the pull
+ * request body. Only gh is the recorded fake; git and the adapter are
+ * real.
+ *
+ * The release fragment cases: `prepareReleaseStage` and `finishRelease`
+ * (`./release-stage.js`) run over a real scratch repository with a bare
+ * `origin`, exactly as `src/tests/release-stage-integration.test.ts`
+ * drives them, but the pull request is a `PullRequests` double
+ * (`../pr/pull-requests-double.js`) rather than the `gh` fake, since the
+ * subject there is what the stage SENDS a provider — the forecast in
+ * the body — and not a provider's own read-modify-write.
  */
+import type { ReleaseStageSettings } from './release-stage.js';
+import type { ReportChange } from '../report/parse.js';
 import type { Instinct } from '../schema/instinct.js';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,13 +28,17 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 
 import { localInstinctsDir } from '../adapters/learning/local.js';
 import { setActiveOutput } from '../adapters/output/active.js';
+import { RELEASE_AUTO } from '../config-sections.js';
+import { writeChanges } from '../effort/store/changes.js';
 import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
+import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { writeInstinct } from '../schema/instinct.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';
+import { finishRelease, prepareReleaseStage } from './release-stage.js';
 import { buildWrapUpPrompt, lessonsToPromote } from './wrap-up.js';
 
 const BRANCH = 'feat/rafa-25-rafa-learns-own-runs';
@@ -129,5 +144,206 @@ describe('wrap-up over a scratch repository', () => {
       'Lessons listed for promotion that this pull request does not carry: `held-three` (no answer in the `rafa:promoted` block).',
     );
     expect(body.startsWith('What this pull request does.\n\n')).toBe(true);
+  });
+});
+
+describe('wrap-up release fragment over a scratch repository', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'rafa-wrap-up-release-it-'));
+  const origin = join(scratch, 'origin.git');
+  const root = join(scratch, 'repo');
+  const BODY_BEFORE = 'What this pull request does.';
+  const PR_NUMBER = 42;
+
+  /** The `release` settings this scenario runs under: this repository's own. */
+  const SETTINGS: ReleaseStageSettings = {
+    releaseEnabled: RELEASE_AUTO,
+    releaseVersionFile: 'package.json',
+    releaseChangelog: 'CHANGELOG.md',
+    releaseFragments: '.changes',
+    releaseHeading: '## {version} — {date}, {title}',
+    releaseStrategy: 'semver-by-level',
+    prBase: null,
+  };
+
+  const CHANGELOG_BEFORE = [
+    '# Changelog',
+    '',
+    'Every notable change to this project, newest first.',
+    '',
+  ].join('\n');
+  const PACKAGE_JSON_BEFORE = '{"name":"wrap-up-release-repo","version":"0.4.0"}\n';
+
+  beforeAll(() => {
+    mkdirSync(root, { recursive: true });
+    const outside = createGitRunner(scratch);
+    outside(['init', '--quiet', '--bare', '--initial-branch=main', origin]);
+    outside(['init', '--quiet', '--initial-branch=main', root]);
+    const git = createGitRunner(root);
+    for (const args of [
+      ['config', 'user.email', 'test@example.com'],
+      ['config', 'user.name', 'Test'],
+      ['config', 'commit.gpgsign', 'false'],
+    ]) git(args);
+    writeFileSync(join(root, 'CHANGELOG.md'), CHANGELOG_BEFORE);
+    writeFileSync(join(root, 'package.json'), PACKAGE_JSON_BEFORE);
+    git(['add', '--all']);
+    git(['commit', '-q', '-m', 'first']);
+    git(['remote', 'add', 'origin', origin]);
+    git(['push', '-q', '-u', 'origin', 'main']);
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  afterAll(() => {
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  /** A `PullRequests` double that answers one open PR and records the body it is given. */
+  function bodyDouble(branch: string): { readonly pulls: ReturnType<typeof createPullRequestsDouble>; edited: () => string | null } {
+    let body: string | null = null;
+    const double = createPullRequestsDouble({
+      findOpen: () => Promise.resolve({
+        number: PR_NUMBER,
+        title: 'a wrap-up release',
+        url: `https://github.com/open-tomato/rafa/pull/${PR_NUMBER}`,
+        state: 'open',
+        headRefName: branch,
+        baseRefName: 'main',
+        author: { login: 'markosth', isBot: false },
+        isCrossRepository: false,
+        updatedAt: '2026-09-20T12:00:00Z',
+      }),
+      get: () => Promise.resolve({
+        number: PR_NUMBER,
+        title: 'a wrap-up release',
+        url: `https://github.com/open-tomato/rafa/pull/${PR_NUMBER}`,
+        state: 'open',
+        headRefName: branch,
+        baseRefName: 'main',
+        author: { login: 'markosth', isBot: false },
+        isCrossRepository: false,
+        updatedAt: '2026-09-20T12:00:00Z',
+        body: BODY_BEFORE,
+        headRefOid: 'deadbeef',
+        mergeable: 'mergeable',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+      }),
+      editBody: (_number, next) => {
+        body = next;
+        return Promise.resolve();
+      },
+    });
+    return { pulls: double, edited: () => body };
+  }
+
+  test('leaves one fragment commit, an untouched version file and changelog, and a forecast in the body a PullRequests double received', async () => {
+    setActiveOutput(sinkOutput({}));
+    const branch = 'feat/rafa-367-wrap-up-release';
+    const planStub = 'rafa-367-wrap-up-release';
+    const git = createGitRunner(root);
+    git(['checkout', '-q', '-b', branch]);
+    const changes: readonly ReportChange[] = [
+      { level: 'patch', area: 'loop', summary: 'the wrap-up commits a fragment', extras: [] },
+    ];
+    writeChanges(root, {
+      dispatch: { sessionId: 'wrap-up-release-session', planStub, taskLine: '- [x] Ship a wrap-up release' },
+      changes,
+    });
+    const plan = [
+      '# Plan: rafa-367 — wrap-up release',
+      '',
+      '```rafa:plan',
+      `stub: ${planStub}`,
+      'issue: "367"',
+      'release: minor',
+      '```',
+      '',
+      '- [x] Ship a wrap-up release',
+    ].join('\n');
+
+    const preparation = prepareReleaseStage({ repoRoot: root, settings: SETTINGS, planStub, planContent: plan });
+    if (preparation === null || preparation.kind !== 'prepared') {
+      throw new Error(`expected a prepared release, got ${JSON.stringify(preparation)}`);
+    }
+
+    const double = bodyDouble(branch);
+    const finish = await finishRelease(
+      { repoRoot: root, settings: SETTINGS, preparation },
+      {
+        currentBranch: () => branch,
+        pulls: () => double.pulls.pulls,
+        readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
+        now: () => new Date('2026-09-20T09:00:00Z'),
+      },
+    );
+
+    expect(finish.outcome).toBe('released');
+    const fragmentPath = `.changes/${planStub}.md`;
+    expect(finish.fragment).toBe(fragmentPath);
+    expect(finish.subject).toBe(`chore: release fragment ${planStub}`);
+
+    // Exactly one release commit landed, over the fragment alone.
+    const subjects = git(['log', '--format=%s']).stdout.trim().split('\n');
+    expect(subjects).toEqual([`chore: release fragment ${planStub}`, 'first']);
+    const changedFiles = git(['diff', '--name-only', 'HEAD~1', 'HEAD']).stdout.trim().split('\n');
+    expect(changedFiles).toEqual([fragmentPath]);
+
+    // No branch owns a version: both release files are as they were.
+    expect(readFileSync(join(root, 'package.json'), 'utf8')).toBe(PACKAGE_JSON_BEFORE);
+    expect(readFileSync(join(root, 'CHANGELOG.md'), 'utf8')).toBe(CHANGELOG_BEFORE);
+
+    // The forecast reached the PullRequests double's edited body.
+    expect(double.pulls.calls().map((call) => call.member)).toEqual(['findOpen', 'get', 'editBody']);
+    expect(double.edited()).toContain('Release forecast: this branch ships as the next minor, 0.5.0 if merged now');
+  });
+
+  test('a plan declaring release: none writes a none fragment, and forecasts no release', async () => {
+    setActiveOutput(sinkOutput({}));
+    const branch = 'feat/rafa-367-wrap-up-release-none';
+    const planStub = 'rafa-367-wrap-up-release-none';
+    const git = createGitRunner(root);
+    git(['checkout', '-q', 'main']);
+    git(['checkout', '-q', '-b', branch]);
+    const plan = [
+      '# Plan: rafa-367 — wrap-up release none',
+      '',
+      '```rafa:plan',
+      `stub: ${planStub}`,
+      'issue: "368"',
+      'release: none',
+      '```',
+      '',
+      '- [x] Ship nothing worth a release',
+    ].join('\n');
+
+    const preparation = prepareReleaseStage({ repoRoot: root, settings: SETTINGS, planStub, planContent: plan });
+    if (preparation === null || preparation.kind !== 'prepared') {
+      throw new Error(`expected a prepared release, got ${JSON.stringify(preparation)}`);
+    }
+    expect(preparation.level).toBe('none');
+    expect(preparation.levelSource).toBe('plan');
+
+    const double = bodyDouble(branch);
+    const finish = await finishRelease(
+      { repoRoot: root, settings: SETTINGS, preparation },
+      {
+        currentBranch: () => branch,
+        pulls: () => double.pulls.pulls,
+        readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
+        now: () => new Date('2026-09-20T09:00:00Z'),
+      },
+    );
+
+    expect(finish.outcome).toBe('released');
+    const fragmentPath = `.changes/${planStub}.md`;
+    expect(readFileSync(join(root, fragmentPath), 'utf8')).toContain('level: none');
+    expect(readFileSync(join(root, 'package.json'), 'utf8')).toBe(PACKAGE_JSON_BEFORE);
+    expect(readFileSync(join(root, 'CHANGELOG.md'), 'utf8')).toBe(CHANGELOG_BEFORE);
+    const subjects = git(['log', '--format=%s']).stdout.trim().split('\n');
+    expect(subjects[0]).toBe(`chore: release fragment ${planStub}`);
+    expect(double.edited()).toContain('Release forecast: this branch ships no release (level none)');
   });
 });
