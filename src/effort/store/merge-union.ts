@@ -120,7 +120,7 @@ function mergedTables(): MergedTable[] {
 }
 
 /** The columns of `table` other than `seq`, in table order. */
-function carriedColumns(db: Database, table: string): string[] {
+export function carriedColumns(db: Database, table: string): string[] {
   return db
     .query<{ name: string }, []>(`PRAGMA table_info(${quoted(table)})`)
     .all()

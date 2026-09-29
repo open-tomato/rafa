@@ -364,7 +364,15 @@ own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and
 `merge_conflicts` each incoming row one could not settle. No writer
-fills `merges` or `merge_conflicts` yet.
+fills `merges` yet. `settleMatches` (`store/merge-conflicts.ts`) fills
+`merge_conflicts`: it compares each pair the union matched on every
+column but `seq` and the origin pair, skips an equal pair, fills a
+set-once field NULL here from the other store and keeps a filled one
+against NULL there, and records the incoming row as JSON, both rows
+kept, when two filled values differ (`field` names the column) or the
+rows differ outside every edited field (`field` NULL). Each set-once
+field has its literal `UPDATE` in `SET_ONCE_FILLS`, so
+`merge-rules.test.ts` can read it.
 `src/effort/store/store-identity.ts` decides, on a write, whether to
 mint, and `store-meta.ts` reads and writes the row: `withSqliteStore`
 calls `settleStoreIdentity` after `bringForward`, so a `write` open
@@ -400,9 +408,11 @@ copied, and no reader names either column, so a row an older runtime
 inserted is read as any other. `origins.test.ts` reads every
 `INSERT INTO` under `store/` from source and fails on an unstamped one
 other than the `schema_migrations` log, `store_meta`, `fix-schema`'s
-copy, which carries the columns over as they were, and the merge's
+copy, which carries the columns over as they were, the merge's
 union (`store/merge-union.ts`), which inserts another store's unmatched
-rows under a new local `seq` with their origin pair unchanged.
+rows under a new local `seq` with their origin pair unchanged, and the
+merge's conflict trail (`store/merge-conflicts.ts`) into the local
+`merge_conflicts`.
 Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
